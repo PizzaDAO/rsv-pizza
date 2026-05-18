@@ -32,6 +32,7 @@ import venueReportRoutes from './routes/venue-report.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import payoutRoutes from './routes/payout.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
@@ -46,6 +47,7 @@ import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import adminPayoutRoutes from './routes/admin-payout.routes.js';
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
@@ -117,6 +119,7 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
+app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
@@ -141,6 +144,7 @@ app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake form routes
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)

@@ -33,6 +33,7 @@ export const VALID_TAB_IDS = [
   'gpp',
   'promo',
   'flyer',
+  'payouts',
   'print',
   'apps',
 ] as const;

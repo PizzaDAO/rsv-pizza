@@ -311,6 +311,74 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
 }
 
 /**
+ * Upload a host payout photo (pizza shot OR receipt) to Supabase Storage.
+ * Path: `payouts/{partyId}/{payoutTempId}/{kind}/{timestamp}-{rand}.{ext}`.
+ *
+ * Used by the payouts host flow (arugula-38633). The backend `/ocr-preview`
+ * and `POST /payouts` endpoints validate that uploaded image URLs match this
+ * exact path shape under the `event-images` bucket — so don't change the path
+ * structure without updating `assertSupabasePayoutUrl` in
+ * `backend/src/routes/payout.routes.ts`.
+ *
+ * @param file       The image file (JPEG / PNG / WebP / HEIC)
+ * @param partyId    The party we're submitting a payout against
+ * @param payoutTempId  A client-generated id to group files for one in-progress submission
+ * @param kind       'pizza' or 'receipt' — drives OCR behavior server-side
+ */
+export async function uploadPayoutPhoto(
+  file: File,
+  partyId: string,
+  payoutTempId: string,
+  kind: 'pizza' | 'receipt'
+): Promise<{
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+} | null> {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  if (!allowedTypes.includes(file.type)) {
+    console.error('Invalid file type for payout photo:', file.type);
+    return null;
+  }
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    console.error('Payout photo too large:', file.size);
+    return null;
+  }
+
+  try {
+    const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const timestamp = Date.now();
+    const rand = Math.random().toString(36).substring(7);
+    const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('event-images')
+      .upload(path, file, { cacheControl: '3600', upsert: false });
+
+    if (error) {
+      console.error('Error uploading payout photo:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(path);
+
+    return {
+      url: urlData.publicUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+    };
+  } catch (err) {
+    console.error('Error uploading payout photo:', err);
+    return null;
+  }
+}
+
+/**
  * Upload an event photo to Supabase Storage
  * @param file The image file to upload
  * @param partyId The party ID for organizing uploads

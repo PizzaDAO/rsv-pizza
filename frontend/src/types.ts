@@ -1125,7 +1125,7 @@ export interface FakeDetectionResponse {
 export interface AdminUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'admin';
+  role: 'super_admin' | 'admin' | 'payment_admin';
   name: string | null;
   createdBy: string | null;
   createdAt: string;
@@ -1380,4 +1380,139 @@ export interface UnifiedPartner {
   avatarUrl: string | null;
   website: string | null;
   sortOrder: number;
+}
+
+// ============================================
+// Host Payouts (arugula-38633)
+// ============================================
+export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed';
+export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
+
+export interface PayoutDocument {
+  id: string;
+  kind: 'pizza' | 'receipt';
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  ocrError: string | null;
+  sortOrder: number;
+}
+
+export interface BankDetails {
+  accountHolderName: string;
+  bankName: string;
+  bankAddress?: string;
+  // US bank
+  routingNumber?: string;
+  accountNumber?: string;
+  // International
+  iban?: string;
+  swift?: string;
+  // Free-form notes (e.g. intermediary bank)
+  notes?: string;
+}
+
+export interface PayoutAuditEntry {
+  id: string;
+  action: 'create' | 'approve' | 'reject' | 'edit_amount' | 'mark_paid' | 'mark_failed' | 'retry' | 'cancel';
+  oldStatus: string | null;
+  newStatus: string | null;
+  oldAmount: number | null;
+  newAmount: number | null;
+  actorEmail: string;
+  actorKind: 'admin' | 'super_admin' | 'payment_admin' | 'host' | 'system';
+  note: string | null;
+  createdAt: string;
+}
+
+
+export interface Payout {
+  id: string;
+  partyId: string;
+  hostUserId: string;
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  extractedAmountUsd: number;
+  finalAmountUsd: number;
+  status: PayoutStatus;
+  payoutMethod: PayoutMethod;
+  payoutWalletAddress: string | null;
+  payoutBankDetails: BankDetails | null;
+  mercuryCardId: string | null;
+  mercuryCardLast4: string | null;
+  hostNotes: string | null;
+  adminNotes: string | null;
+  rejectionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  paidAt: string | null;
+  transactionHash: string | null;
+  wireReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documents: PayoutDocument[];
+}
+
+// Admin-list payout: includes embedded party + host info
+export interface AdminPayout extends Payout {
+  party: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    customUrl: string | null;
+  };
+  host: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  };
+}
+
+export interface AdminPayoutDetail extends AdminPayout {
+  audits: PayoutAuditEntry[];
+}
+
+export interface AdminPayoutFilters {
+  status?: PayoutStatus | 'all';
+  payoutMethod?: PayoutMethod | 'all';
+  partyId?: string;
+  hostEmail?: string;
+  currency?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface AdminPayoutTotals {
+  byStatus: Record<string, number>;
+  byMethod: Record<string, number>;
+  totalUsdPending: number;
+  totalUsdPaid: number;
+  totalUsdThisMonth: number;
+  avgUsd: number;
+  awaitingReview: number;
+}
+
+export interface AdminPayoutsResponse {
+  payouts: AdminPayout[];
+  nextCursor: string | null;
+  totals: AdminPayoutTotals;
+}
+
+export interface OcrPreviewResult {
+  amount: number;             // USD-converted total
+  currency: 'USD';
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  confidence: number;
+  items?: string[];
+  fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
+  conversionNote?: string;
 }

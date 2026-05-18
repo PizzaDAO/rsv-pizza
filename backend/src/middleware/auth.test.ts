@@ -17,7 +17,7 @@ vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 // Set JWT_SECRET before importing auth module
 process.env.JWT_SECRET = JWT_SECRET;
 
-import { requireAuth, optionalAuth, isSuperAdmin, AuthRequest } from './auth.js';
+import { requireAuth, optionalAuth, isAdmin, isSuperAdmin, isPaymentAdmin, isFullAdmin, AuthRequest } from './auth.js';
 import { errorHandler } from './error.js';
 
 function createTestApp(middleware: any) {
@@ -196,5 +196,126 @@ describe('isSuperAdmin', () => {
     expect(mockPrisma.admin.findUnique).toHaveBeenCalledWith({
       where: { email: 'admin@example.com' },
     });
+  });
+});
+
+describe('isAdmin (tightened — excludes payment_admin)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true for role=admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'admin@example.com',
+      role: 'admin',
+    });
+    expect(await isAdmin('admin@example.com')).toBe(true);
+  });
+
+  it('returns true for role=super_admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'super@example.com',
+      role: 'super_admin',
+    });
+    expect(await isAdmin('super@example.com')).toBe(true);
+  });
+
+  // Behavioral change (arugula-38633 PR 2): payment_admin must NOT pass isAdmin.
+  it('returns false for role=payment_admin (behavioral change)', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'finance@example.com',
+      role: 'payment_admin',
+    });
+    expect(await isAdmin('finance@example.com')).toBe(false);
+  });
+
+  it('returns false when there is no admin row', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue(null);
+    expect(await isAdmin('nobody@example.com')).toBe(false);
+  });
+
+  it('returns false for undefined email', async () => {
+    expect(await isAdmin(undefined)).toBe(false);
+    expect(mockPrisma.admin.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('isPaymentAdmin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true for role=payment_admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'finance@example.com',
+      role: 'payment_admin',
+    });
+    expect(await isPaymentAdmin('finance@example.com')).toBe(true);
+  });
+
+  it('returns true for role=admin (full admins also get in)', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'admin@example.com',
+      role: 'admin',
+    });
+    expect(await isPaymentAdmin('admin@example.com')).toBe(true);
+  });
+
+  it('returns true for role=super_admin (full admins also get in)', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'super@example.com',
+      role: 'super_admin',
+    });
+    expect(await isPaymentAdmin('super@example.com')).toBe(true);
+  });
+
+  it('returns false for non-admin email (no admin row)', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue(null);
+    expect(await isPaymentAdmin('user@example.com')).toBe(false);
+  });
+
+  it('returns false for undefined email', async () => {
+    expect(await isPaymentAdmin(undefined)).toBe(false);
+    expect(mockPrisma.admin.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('isFullAdmin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true for role=admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'admin@example.com',
+      role: 'admin',
+    });
+    expect(await isFullAdmin('admin@example.com')).toBe(true);
+  });
+
+  it('returns true for role=super_admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'super@example.com',
+      role: 'super_admin',
+    });
+    expect(await isFullAdmin('super@example.com')).toBe(true);
+  });
+
+  it('returns false for role=payment_admin', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue({
+      email: 'finance@example.com',
+      role: 'payment_admin',
+    });
+    expect(await isFullAdmin('finance@example.com')).toBe(false);
+  });
+
+  it('returns false when there is no admin row', async () => {
+    mockPrisma.admin.findUnique.mockResolvedValue(null);
+    expect(await isFullAdmin('user@example.com')).toBe(false);
+  });
+
+  it('returns false for undefined email', async () => {
+    expect(await isFullAdmin(undefined)).toBe(false);
+    expect(mockPrisma.admin.findUnique).not.toHaveBeenCalled();
   });
 });
