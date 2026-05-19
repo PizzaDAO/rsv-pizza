@@ -83,7 +83,7 @@ export async function uploadProfilePicture(file: File, userId: string): Promise<
  * @param bucket The storage bucket name (default: 'event-images')
  * @returns The public URL of the uploaded image, or null if upload failed
  */
-export async function uploadEventImage(file: File, bucket: string = 'event-images'): Promise<string | null> {
+export async function uploadEventImage(file: File, bucket: string = 'event-images'): Promise<string> {
   try {
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
@@ -100,7 +100,7 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
 
     if (error) {
       console.error('Error uploading image:', error);
-      return null;
+      throw new Error(error.message);
     }
 
     // Get public URL
@@ -111,7 +111,7 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading image:', error);
-    return null;
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }
 
@@ -120,7 +120,7 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
  * @param file The image file to upload
  * @returns The public URL of the uploaded logo, or null if upload failed
  */
-export async function uploadSponsorLogo(file: File): Promise<string | null> {
+export async function uploadSponsorLogo(file: File): Promise<string> {
   try {
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
@@ -136,7 +136,7 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
 
     if (error) {
       console.error('Error uploading sponsor logo:', error);
-      return null;
+      throw new Error(error.message);
     }
 
     // Get public URL
@@ -147,7 +147,7 @@ export async function uploadSponsorLogo(file: File): Promise<string | null> {
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading sponsor logo:', error);
-    return null;
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }
 

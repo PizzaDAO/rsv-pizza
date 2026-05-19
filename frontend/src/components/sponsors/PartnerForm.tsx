@@ -357,11 +357,10 @@ export function PartnerForm({
       // Upload logo if a new file was selected (CRM, intake, and partner modes)
       if ((isCrm || isIntake || isPartner) && logoFile) {
         setUploadingLogo(true);
-        const uploadedUrl = await uploadSponsorLogo(logoFile);
-        if (uploadedUrl) {
-          logoUrl = uploadedUrl;
-        } else {
-          setError('Failed to upload logo. Please try again.');
+        try {
+          logoUrl = await uploadSponsorLogo(logoFile);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to upload logo. Please try again.');
           setUploadingLogo(false);
           return;
         }
@@ -372,11 +371,10 @@ export function PartnerForm({
       let avatarUrl = formData.coHostAvatarUrl.trim() || undefined;
       if (avatarFile) {
         setUploadingAvatar(true);
-        const uploadedAvatar = await uploadSponsorLogo(avatarFile);
-        if (uploadedAvatar) {
-          avatarUrl = uploadedAvatar;
-        } else {
-          setError('Failed to upload avatar. Please try again.');
+        try {
+          avatarUrl = await uploadSponsorLogo(avatarFile);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to upload avatar. Please try again.');
           setUploadingAvatar(false);
           return;
         }

@@ -82,21 +82,16 @@ export function useImageUpload(options: UseImageUploadOptions = {}): UseImageUpl
 
     try {
       const uploadedUrl = await uploadEventImage(file, bucket);
-      if (uploadedUrl) {
-        // Clean up object URL after successful upload
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          setObjectUrl(null);
-        }
-        setPreviewUrl(uploadedUrl);
-        setFile(null);
-        return uploadedUrl;
-      } else {
-        setError('Failed to upload image. Please try again.');
-        return null;
+      // Clean up object URL after successful upload
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        setObjectUrl(null);
       }
+      setPreviewUrl(uploadedUrl);
+      setFile(null);
+      return uploadedUrl;
     } catch (err) {
-      setError('Failed to upload image. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to upload image. Please try again.');
       return null;
     } finally {
       setUploading(false);

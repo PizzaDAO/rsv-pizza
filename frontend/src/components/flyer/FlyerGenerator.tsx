@@ -37,6 +37,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [setImageState, setSetImageState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [setImageError, setSetImageError] = useState<string | null>(null);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [containerWidth, setContainerWidth] = useState(500);
   const [hoveredElement, setHoveredElement] = useState<keyof FlyerPositions | null>(null);
@@ -703,6 +704,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
   const handleUseAsEventImage = async () => {
     if (!party) return;
     setSetImageState('uploading');
+    setSetImageError(null);
     try {
       const canvas = await renderFlyerToCanvas();
       const blob: Blob | null = await new Promise(resolve =>
@@ -717,7 +719,6 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       );
 
       const uploadedUrl = await uploadEventImage(file);
-      if (!uploadedUrl) throw new Error('Upload failed');
 
       // Build flyerConfig from current customization state (only save non-default values)
       const hasCustomizations =
@@ -767,8 +768,12 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       setTimeout(() => setSetImageState('idle'), 2000);
     } catch (err) {
       console.error('Failed to set flyer as event image:', err);
+      setSetImageError(err instanceof Error ? err.message : 'Upload failed');
       setSetImageState('error');
-      setTimeout(() => setSetImageState('idle'), 2500);
+      setTimeout(() => {
+        setSetImageState('idle');
+        setSetImageError(null);
+      }, 2500);
     }
   };
 
@@ -1700,6 +1705,12 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
           </button>
         )}
       </div>
+
+      {setImageError && (
+        <div className="text-xs text-red-400 text-center mt-2 px-4 break-words">
+          {setImageError}
+        </div>
+      )}
 
       {showAddSponsor && (
         <PartnerForm
