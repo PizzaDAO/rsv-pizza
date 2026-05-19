@@ -381,10 +381,11 @@ export function AppsHub({
   const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
   const isGppEvent = party?.eventType === 'gpp';
 
-  // Soft-launch gate for the Payouts app (arugula-38633 v1): hide the tile
-  // entirely unless caller is underboss/admin/super_admin. Remove when opening
-  // to all hosts.
-  const [canSeePayouts, setCanSeePayouts] = useState<boolean | null>(null);
+  // Soft-launch gate for the Payouts app (arugula-38633 v1): the tile stays
+  // visible for everyone, but downgrades from 'live' to 'coming-soon' (badge +
+  // unclickable) unless caller is underboss/admin/super_admin. Remove when
+  // opening to all hosts.
+  const [canUsePayouts, setCanUsePayouts] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -394,17 +395,19 @@ export function AppsHub({
           fetchAdminMe().catch(() => null),
         ]);
         if (cancelled) return;
-        setCanSeePayouts(Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin));
+        setCanUsePayouts(Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin));
       } catch {
-        if (!cancelled) setCanSeePayouts(false);
+        if (!cancelled) setCanUsePayouts(false);
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const visibleApps = apps.filter((a) => {
-    if (a.id === 'payouts' && !canSeePayouts) return false;
-    return true;
+  const visibleApps = apps.map((a) => {
+    if (a.id === 'payouts' && canUsePayouts === false) {
+      return { ...a, status: 'coming-soon' as const };
+    }
+    return a;
   });
 
   const handleTogglePin = async (appId: string, pin: boolean) => {
