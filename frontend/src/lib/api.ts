@@ -3918,6 +3918,11 @@ export interface CreatePayoutData {
   mercuryCardLast4?: string;
   finalAmountUsd?: number;
   saveAsDefault?: boolean;
+  /**
+   * One-shot setup: backend writes this to `parties.expectedGuests` only when
+   * the party's current value is null. Sent only on the host's first payout.
+   */
+  estimatedAttendance?: number;
 }
 
 export async function createPayout(

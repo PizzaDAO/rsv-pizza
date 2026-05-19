@@ -292,11 +292,27 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       mercuryCardLast4,
       finalAmountUsd,
       saveAsDefault,
+      estimatedAttendance,
     } = req.body || {};
 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Validate optional one-shot attendance setup. Only persisted to the party
+    // below if the party's current expectedGuests is null (see updateMany call).
+    let validatedAttendance: number | null = null;
+    if (estimatedAttendance !== undefined && estimatedAttendance !== null) {
+      const n = Number(estimatedAttendance);
+      if (!Number.isInteger(n) || n < 1) {
+        throw new AppError(
+          'estimatedAttendance must be a positive integer',
+          400,
+          'INVALID_ATTENDANCE'
+        );
+      }
+      validatedAttendance = n;
     }
 
     if (!Array.isArray(receiptPhotos) || receiptPhotos.length === 0) {
@@ -473,6 +489,21 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       },
       include: { documents: { orderBy: { sortOrder: 'asc' } } },
     });
+
+    // One-shot: persist the host's attendance estimate to the party, but only
+    // if it hasn't already been set. updateMany no-ops gracefully when the row
+    // already has a non-null expectedGuests value, so we never overwrite.
+    if (validatedAttendance != null) {
+      try {
+        await prisma.party.updateMany({
+          where: { id: partyId, expectedGuests: null },
+          data: { expectedGuests: validatedAttendance },
+        });
+      } catch (err) {
+        // Non-fatal — the payout itself succeeded.
+        console.warn('[payouts] failed to persist expectedGuests:', err);
+      }
+    }
 
     // Optional: save host defaults
     if (saveAsDefault === true) {

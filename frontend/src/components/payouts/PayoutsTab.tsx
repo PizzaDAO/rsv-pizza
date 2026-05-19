@@ -11,6 +11,8 @@ interface PayoutsTabProps {
   reimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
+  /** Threaded to NewPayoutForm — gates the "ask once" attendance prompt. */
+  expectedGuests?: number | null;
 }
 
 type View = 'list' | 'new';
@@ -29,6 +31,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   reimbursementCapUsd,
   reimbursementCapAppealNote,
   reimbursementCapAppealedAt,
+  expectedGuests,
 }) => {
   const [view, setView] = useState<View>('list');
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -188,6 +191,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             reimbursementCapAppealNote={reimbursementCapAppealNote}
             reimbursementCapAppealedAt={reimbursementCapAppealedAt}
             totalPaidUsd={totalPaidUsd}
+            expectedGuests={expectedGuests}
           />
         </>
       )}

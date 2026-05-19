@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote, BadgeDollarSign } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { Checkbox } from '../Checkbox';
 import { useAuth } from '../../contexts/AuthContext';
 import { Payout, PayoutMethod, BankDetails } from '../../types';
 import { createPayout } from '../../lib/api';
@@ -27,6 +26,12 @@ interface NewPayoutFormProps {
    * arugula-38633 v2 follow-up.
    */
   totalPaidUsd?: number;
+  /**
+   * Current value of `parties.expectedGuests`. When null, the form prompts the
+   * host for an attendance estimate (asked once per event); when set, the
+   * estimated-attendance section is hidden entirely.
+   */
+  expectedGuests?: number | null;
 }
 
 const EMPTY_BANK: BankDetails = {
@@ -38,13 +43,13 @@ const EMPTY_BANK: BankDetails = {
  * Single-page submission form (no multi-step wizard — matches pizza-faucet-v2).
  *
  * Sections:
+ *   0. Estimated attendance (only if `expectedGuests` is currently null)
  *   1. Receipts (multi-upload + per-receipt OCR preview)
  *   2. Pizza / event photos (multi-upload, no OCR)
  *   3. Notes
  *   4. Amount summary (auto-summed + manual override)
  *   5. Payout method picker
- *   6. Save-as-default
- *   7. Submit
+ *   6. Submit
  */
 export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   partyId,
@@ -54,6 +59,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   reimbursementCapAppealNote,
   reimbursementCapAppealedAt,
   totalPaidUsd = 0,
+  expectedGuests,
 }) => {
   const { user } = useAuth();
   // Stable id for this in-flight form, used as the storage-path grouping key.
@@ -74,7 +80,13 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const [walletAddress, setWalletAddress] = useState('');
   const [bankDetails, setBankDetails] = useState<BankDetails>(EMPTY_BANK);
   const [mercuryCardLast4, setMercuryCardLast4] = useState('');
-  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  // Estimated attendance: asked once per event. Pre-fills from the party's
+  // existing `expectedGuests` if set; otherwise the host is prompted.
+  const askForAttendance = expectedGuests == null;
+  const [estimatedAttendance, setEstimatedAttendance] = useState<number | null>(
+    expectedGuests ?? null
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -105,9 +117,14 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
     return true;
   }, [method, walletAddress, bankDetails]);
 
+  // When the attendance section is shown, require a positive integer before submit.
+  const attendanceValid = !askForAttendance
+    || (estimatedAttendance != null && estimatedAttendance > 0);
+
   const canSubmit = hasUploadedReceipt
     && finalAmount > 0
     && methodValid
+    && attendanceValid
     && !isProcessing
     && !submitting;
 
@@ -142,7 +159,8 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           ? { mercuryCardLast4 }
           : {}),
         ...(overrideAmount != null ? { finalAmountUsd: overrideAmount } : {}),
-        saveAsDefault,
+        ...(estimatedAttendance != null ? { estimatedAttendance } : {}),
+        saveAsDefault: true,
       });
       onCreated(created);
     } catch (err: any) {
@@ -200,12 +218,36 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       )}
 
+      {/* 0. Estimated attendance — asked once per event */}
+      {askForAttendance && (
+        <div className="card p-6">
+          <div className="mb-3">
+            <h3 className="text-base font-semibold text-theme-text">Estimated attendance</h3>
+            <p className="text-xs text-theme-text-muted mt-0.5">
+              How many people are you expecting at your event? (You'll only be asked this once.)
+            </p>
+          </div>
+          <IconInput
+            icon={Users}
+            type="number"
+            placeholder="e.g. 50"
+            value={estimatedAttendance ?? ''}
+            onChange={e =>
+              setEstimatedAttendance(
+                e.target.value ? Math.max(0, parseInt(e.target.value, 10)) : null
+              )
+            }
+            min={1}
+          />
+        </div>
+      )}
+
       {/* 1. Receipts */}
       <div className="card p-6">
         <div className="mb-3">
           <h3 className="text-base font-semibold text-theme-text">Receipts</h3>
           <p className="text-xs text-theme-text-muted mt-0.5">
-            Upload one receipt per transaction. We'll read each total automatically.
+            Upload each of your receipts. We'll add up the total.
           </p>
         </div>
         <ReceiptUpload
@@ -276,15 +318,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           userEmail={user?.email}
           amountUsd={finalAmount}
         />
-
-        {/* 6. Save as default */}
-        <div className="mt-4">
-          <Checkbox
-            checked={saveAsDefault}
-            onChange={() => setSaveAsDefault(v => !v)}
-            label="Use this method for my future payouts too"
-          />
-        </div>
 
         {/* Hidden last4 field is intentionally omitted — Mercury card numbers come from admin, not host. */}
         {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}

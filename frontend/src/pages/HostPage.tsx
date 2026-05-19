@@ -493,6 +493,7 @@ function HostPageContent() {
                   reimbursementCapUsd={party.reimbursementCapUsd}
                   reimbursementCapAppealNote={party.reimbursementCapAppealNote}
                   reimbursementCapAppealedAt={party.reimbursementCapAppealedAt}
+                  expectedGuests={party.expectedGuests}
                 />
               )}
 
