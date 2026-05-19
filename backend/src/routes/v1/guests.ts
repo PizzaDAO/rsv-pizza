@@ -155,7 +155,10 @@ router.get('/', requireApiKey(SCOPES.GUESTS_READ), async (req: ApiKeyRequest, re
     } else {
       // mushroom-31723: by default, exclude rejected guests (approved=false)
       // so they don't leak into integrations that aren't aware of soft-reject.
-      whereClause.approved = { not: false };
+      // anchovy-59118: `{ not: false }` translates to SQL `<>`, which excludes
+      // approved=NULL via three-valued logic. Use an explicit OR so new RSVPs
+      // (approved=null by default) aren't silently filtered out.
+      whereClause.OR = [{ approved: true }, { approved: null }];
     }
 
     const [guests, total] = await Promise.all([

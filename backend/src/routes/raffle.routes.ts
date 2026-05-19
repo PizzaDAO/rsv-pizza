@@ -365,7 +365,7 @@ router.post('/:partyId/raffles/:raffleId/enter', async (req: AuthRequest, res: R
     // Verify guest belongs to this party. mushroom-31723: rejected guests
     // (approved=false) cannot enter raffles.
     const guest = await prisma.guest.findFirst({
-      where: { id: guestId, partyId, approved: { not: false } },
+      where: { id: guestId, partyId, OR: [{ approved: true }, { approved: null }] },
     });
 
     if (!guest) {

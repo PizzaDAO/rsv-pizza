@@ -59,7 +59,7 @@ async function findGuestForUser(partyId: string, userEmail?: string) {
     where: {
       partyId,
       email: userEmail.toLowerCase(),
-      approved: { not: false },
+      OR: [{ approved: true }, { approved: null }],
     },
     select: { id: true, checkedInAt: true },
   });
