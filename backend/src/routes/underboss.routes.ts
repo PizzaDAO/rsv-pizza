@@ -482,6 +482,252 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
   }
 });
 
+// ============================================
+// Outreach (marinara-67583)
+// Admin/underboss tool for tracking outreach to candidate blockchain
+// communities in uncovered cities. Per-route middleware ONLY — no
+// `router.use('/outreach', ...)` (see memory: arugula-38633).
+// NOTE: Must be registered BEFORE /:region catch-all.
+// ============================================
+
+const OUTREACH_CHANNELS = ['twitter_dm', 'email', 'telegram'] as const;
+const OUTREACH_TEMPLATE_IDS = ['v1_twitter', 'v1_email', 'v1_telegram'] as const;
+const OUTREACH_STATUSES = ['sent', 'replied', 'declined', 'converted', 'bounced'] as const;
+
+function formatOutreachCommunity(community: any) {
+  const attempts: any[] = Array.isArray(community.attempts) ? community.attempts : [];
+  const last = attempts.length > 0 ? attempts[0] : null;
+  return {
+    id: community.id,
+    city: community.city,
+    country: community.country ?? null,
+    name: community.communityName,
+    source: community.source,
+    contactHandle: community.contactHandle ?? null,
+    contactUrl: community.contactUrl,
+    contactEmail: community.contactEmail ?? null,
+    twitterHandle:
+      community.source && community.source.toLowerCase().includes('twitter')
+        ? community.contactHandle ?? null
+        : null,
+    telegramHandle:
+      community.source && community.source.toLowerCase().includes('telegram')
+        ? community.contactHandle ?? null
+        : null,
+    email: community.contactEmail ?? null,
+    followerCount: community.followerCount ?? null,
+    priority: community.priority ?? null,
+    notes: community.notes ?? null,
+    lastAttempt: last
+      ? {
+          id: last.id,
+          channel: last.channel,
+          templateId: last.templateId,
+          sentAt: last.sentAt instanceof Date ? last.sentAt.toISOString() : last.sentAt,
+          sentBy: last.sentBy,
+          status: last.status,
+          convertedPartyId: last.convertedPartyId ?? null,
+          notes: last.notes ?? null,
+        }
+      : null,
+    attemptCount: community._count?.attempts ?? attempts.length,
+    createdAt: community.createdAt instanceof Date ? community.createdAt.toISOString() : community.createdAt,
+    updatedAt: community.updatedAt instanceof Date ? community.updatedAt.toISOString() : community.updatedAt,
+  };
+}
+
+// GET /api/underboss/outreach/communities - List outreach candidates with latest attempt
+router.get('/outreach/communities', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const cityFilter = typeof req.query.city === 'string' ? req.query.city.trim() : '';
+    const priorityFilter = typeof req.query.priority === 'string' ? req.query.priority.trim() : '';
+    const sourceFilter = typeof req.query.source === 'string' ? req.query.source.trim() : '';
+    const statusFilter = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+
+    const where: any = {};
+    if (cityFilter) where.city = { contains: cityFilter, mode: 'insensitive' };
+    if (priorityFilter) where.priority = priorityFilter;
+    if (sourceFilter) where.source = sourceFilter;
+    if (statusFilter === 'none') where.attempts = { none: {} };
+
+    const rows = await prisma.outreachCommunity.findMany({
+      where,
+      include: {
+        attempts: {
+          orderBy: { sentAt: 'desc' },
+          take: 1,
+        },
+        _count: { select: { attempts: true } },
+      },
+      orderBy: [
+        { priority: 'asc' },
+        { followerCount: 'desc' },
+        { city: 'asc' },
+      ],
+    });
+
+    let formatted = rows.map(formatOutreachCommunity);
+
+    // For status filters other than 'none' / '', post-filter on latest attempt status.
+    if (statusFilter && statusFilter !== 'none') {
+      if (!(OUTREACH_STATUSES as readonly string[]).includes(statusFilter)) {
+        throw new AppError(
+          `status must be one of: ${OUTREACH_STATUSES.join(', ')}, none`,
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+      formatted = formatted.filter((c) => c.lastAttempt?.status === statusFilter);
+    }
+
+    res.json({ communities: formatted });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/underboss/outreach/attempts - Log a new outreach attempt
+router.post('/outreach/attempts', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { communityId, channel, templateId, notes } = req.body ?? {};
+
+    if (!communityId || typeof communityId !== 'string') {
+      throw new AppError('communityId is required', 400, 'VALIDATION_ERROR');
+    }
+    if (!channel || !(OUTREACH_CHANNELS as readonly string[]).includes(channel)) {
+      throw new AppError(`channel must be one of: ${OUTREACH_CHANNELS.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+    if (!templateId || !(OUTREACH_TEMPLATE_IDS as readonly string[]).includes(templateId)) {
+      throw new AppError(`templateId must be one of: ${OUTREACH_TEMPLATE_IDS.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+    if (notes !== undefined && notes !== null && typeof notes !== 'string') {
+      throw new AppError('notes must be a string', 400, 'VALIDATION_ERROR');
+    }
+
+    const community = await prisma.outreachCommunity.findUnique({
+      where: { id: communityId },
+      select: { id: true },
+    });
+    if (!community) {
+      throw new AppError('community not found', 404, 'NOT_FOUND');
+    }
+
+    const sentBy = req.underboss?.email || req.userEmail || '';
+    if (!sentBy) {
+      throw new AppError('authenticated email missing', 401, 'UNAUTHORIZED');
+    }
+
+    const attempt = await prisma.outreachAttempt.create({
+      data: {
+        communityId,
+        channel,
+        templateId,
+        sentBy,
+        notes: notes ?? null,
+        // status defaults to 'sent' per schema
+      },
+    });
+
+    res.status(201).json({ attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/outreach/attempts/:id - Update status / link converted party / notes
+router.patch('/outreach/attempts/:id', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status, convertedPartyId, notes } = req.body ?? {};
+
+    if (status === undefined && convertedPartyId === undefined && notes === undefined) {
+      throw new AppError('nothing to update', 400, 'VALIDATION_ERROR');
+    }
+
+    const updateData: any = {};
+
+    if (status !== undefined) {
+      if (!(OUTREACH_STATUSES as readonly string[]).includes(status)) {
+        throw new AppError(
+          `status must be one of: ${OUTREACH_STATUSES.join(', ')}`,
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+      updateData.status = status;
+    }
+
+    if (convertedPartyId !== undefined) {
+      if (convertedPartyId === null) {
+        updateData.convertedPartyId = null;
+      } else if (typeof convertedPartyId === 'string') {
+        const party = await prisma.party.findUnique({
+          where: { id: convertedPartyId },
+          select: { id: true },
+        });
+        if (!party) {
+          throw new AppError('party not found', 404, 'NOT_FOUND');
+        }
+        updateData.convertedPartyId = convertedPartyId;
+      } else {
+        throw new AppError('convertedPartyId must be a string or null', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    if (notes !== undefined) {
+      if (notes !== null && typeof notes !== 'string') {
+        throw new AppError('notes must be a string or null', 400, 'VALIDATION_ERROR');
+      }
+      updateData.notes = notes;
+    }
+
+    const existing = await prisma.outreachAttempt.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) {
+      throw new AppError('attempt not found', 404, 'NOT_FOUND');
+    }
+
+    const attempt = await prisma.outreachAttempt.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({ attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/underboss/outreach/parties-search?q=<query> - Search parties for "Link to converted party"
+router.get('/outreach/parties-search', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!q || q.length < 2) {
+      return res.json({ parties: [] });
+    }
+
+    const parties = await prisma.party.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { customUrl: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        customUrl: true,
+        city: true,
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ parties });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/underboss/:region - Main dashboard data
 router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {

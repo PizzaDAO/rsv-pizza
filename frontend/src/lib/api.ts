@@ -3963,3 +3963,103 @@ export async function previewReceiptOCR(
   );
 }
 
+// ============================================================
+// Outreach (marinara-67583) — admin-only outreach tracker
+// ============================================================
+
+export type OutreachChannel = 'twitter_dm' | 'email' | 'telegram';
+export type OutreachStatus = 'sent' | 'replied' | 'declined' | 'converted' | 'bounced';
+
+export interface OutreachAttemptRow {
+  id: string;
+  channel: OutreachChannel;
+  templateId: string;
+  sentAt: string;
+  sentBy: string;
+  status: OutreachStatus;
+  convertedPartyId: string | null;
+  notes: string | null;
+}
+
+export interface OutreachCommunityRow {
+  id: string;
+  city: string;
+  country: string | null;
+  name: string;
+  source: string;
+  contactHandle: string | null;
+  contactUrl: string;
+  contactEmail: string | null;
+  twitterHandle: string | null;
+  telegramHandle: string | null;
+  email: string | null;
+  followerCount: number | null;
+  priority: string | null;
+  notes: string | null;
+  lastAttempt: OutreachAttemptRow | null;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OutreachFilters {
+  city?: string;
+  priority?: string;
+  source?: string;
+  status?: string; // 'none' | OutreachStatus | ''
+}
+
+export async function fetchOutreachCommunities(
+  filters: OutreachFilters = {}
+): Promise<OutreachCommunityRow[]> {
+  const params = new URLSearchParams();
+  if (filters.city) params.set('city', filters.city);
+  if (filters.priority) params.set('priority', filters.priority);
+  if (filters.source) params.set('source', filters.source);
+  if (filters.status) params.set('status', filters.status);
+  const qs = params.toString();
+  const res = await apiRequest<{ communities: OutreachCommunityRow[] }>(
+    `/api/underboss/outreach/communities${qs ? `?${qs}` : ''}`
+  );
+  return res.communities;
+}
+
+export async function logOutreachAttempt(body: {
+  communityId: string;
+  channel: OutreachChannel;
+  templateId: string;
+  notes?: string;
+}): Promise<OutreachAttemptRow> {
+  const res = await apiRequest<{ attempt: any }>(
+    '/api/underboss/outreach/attempts',
+    { method: 'POST', body }
+  );
+  return res.attempt;
+}
+
+export async function updateOutreachAttempt(
+  id: string,
+  body: { status?: OutreachStatus; convertedPartyId?: string | null; notes?: string | null }
+): Promise<OutreachAttemptRow> {
+  const res = await apiRequest<{ attempt: any }>(
+    `/api/underboss/outreach/attempts/${id}`,
+    { method: 'PATCH', body }
+  );
+  return res.attempt;
+}
+
+export interface OutreachPartySearchResult {
+  id: string;
+  name: string;
+  customUrl: string | null;
+  city: string | null;
+}
+
+export async function searchPartiesForOutreach(q: string): Promise<OutreachPartySearchResult[]> {
+  const params = new URLSearchParams({ q });
+  const res = await apiRequest<{ parties: OutreachPartySearchResult[] }>(
+    `/api/underboss/outreach/parties-search?${params.toString()}`
+  );
+  return res.parties;
+}
+

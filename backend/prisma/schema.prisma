@@ -223,6 +223,7 @@ model Party {
   slugAliases           SlugAlias[]
   scorecardItems        GuestScorecardItem[]
   payouts               Payout[]
+  outreachAttempts      OutreachAttempt[]
 
   @@map("parties")
 }
@@ -1521,7 +1522,7 @@ model PayoutAudit {
 }
 
 // ============================================
-// Outreach Communities (stagioni-29104)
+// Outreach Communities (stagioni-29104) + Outreach Attempts (marinara-67583)
 // ============================================
 // Admin-only staging table populated by scripts/outreach/scrapers/*.
 // Joined against supreme-43217 gap analysis to produce prioritized
@@ -1543,9 +1544,31 @@ model OutreachCommunity {
 
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  attempts       OutreachAttempt[]
 
   @@unique([source, contactUrl])
   @@index([city])
   @@index([priority])
   @@map("outreach_communities")
+}
+
+model OutreachAttempt {
+  id                String   @id @default(cuid())
+  communityId       String   @map("community_id")
+  community         OutreachCommunity @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  channel           String   // 'twitter_dm' | 'email' | 'telegram'
+  templateId        String   @map("template_id") // 'v1_twitter' | 'v1_email' | 'v1_telegram'
+  sentAt            DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  sentBy            String   @map("sent_by") // admin email from req.userEmail
+  status            String   @default("sent") // 'sent' | 'replied' | 'declined' | 'converted' | 'bounced'
+  convertedPartyId  String?  @map("converted_party_id") @db.Uuid
+  convertedParty    Party?   @relation(fields: [convertedPartyId], references: [id], onDelete: SetNull)
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([communityId])
+  @@index([status])
+  @@index([sentAt(sort: Desc)])
+  @@map("outreach_attempts")
 }
