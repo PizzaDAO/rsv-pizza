@@ -349,17 +349,20 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     }
 
     // Enrich coHosts with user profile data (avatar, socials)
+    // mushroom-48468: User.email is canonical lowercase. Co-host emails come from
+    // user-typed JSONB and may be mixed-case — lowercase before query + lookup.
     const rawCoHosts = (party.coHosts as any[] || []);
     const coHostEmails = rawCoHosts.map((h: any) => h.email).filter(Boolean);
+    const coHostEmailsLc = coHostEmails.map((e: string) => e.toLowerCase());
     let enrichedCoHosts = rawCoHosts;
-    if (coHostEmails.length > 0) {
+    if (coHostEmailsLc.length > 0) {
       const users = await prisma.user.findMany({
-        where: { email: { in: coHostEmails } },
+        where: { email: { in: coHostEmailsLc } },
         select: { email: true, profilePictureUrl: true, twitter: true, website: true, instagram: true },
       });
       const profilesByEmail = Object.fromEntries(users.map(u => [u.email, u]));
       enrichedCoHosts = rawCoHosts.map((h: any) => {
-        const profile = h.email ? profilesByEmail[h.email] : null;
+        const profile = h.email ? profilesByEmail[h.email.toLowerCase()] : null;
         if (profile) {
           return {
             ...h,
