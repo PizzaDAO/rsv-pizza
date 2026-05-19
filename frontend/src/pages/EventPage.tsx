@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn } from 'lucide-react';
+import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
@@ -35,6 +35,34 @@ import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
 import { GuestScorecard } from '../components/scorecard';
+
+function normalizeTelegramUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const u = new URL(trimmed);
+      if (!/(^|\.)t\.me$/i.test(u.hostname) && !/(^|\.)telegram\.me$/i.test(u.hostname)) return null;
+      return u.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  const noScheme = trimmed.match(/^(?:t\.me|telegram\.me)\/(.+)$/i);
+  if (noScheme) {
+    return `https://t.me/${noScheme[1].replace(/^\/+/, '')}`;
+  }
+
+  const bare = trimmed.replace(/^@/, '');
+  if (/^[A-Za-z0-9_+\-]{3,}$/.test(bare)) {
+    return `https://t.me/${bare}`;
+  }
+
+  return null;
+}
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -515,6 +543,8 @@ export function EventPage() {
         ? `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`
         : null;
 
+  const telegramLink = normalizeTelegramUrl(event.telegramGroup);
+
   const metaTitle = event.name;
 
   // Construct description: Host * Date @ Time * Location. Description
@@ -906,6 +936,27 @@ export function EventPage() {
                       </a>
                     )}
 
+                    {/* Telegram group */}
+                    {telegramLink && (
+                      <a
+                        href={telegramLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => slug && trackLinkClick(slug, telegramLink, 'telegram')}
+                        className="flex items-start gap-3 group"
+                        data-testid="event-telegram"
+                      >
+                        <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                          <Send className="w-5 h-5 text-theme-text" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">
+                            {t('telegramGroup')}
+                          </p>
+                        </div>
+                      </a>
+                    )}
+
                     {/* RSVP Button (+ Check In) - Desktop */}
                     <div className="pt-1">
                       {showCheckIn ? (
@@ -1013,6 +1064,26 @@ export function EventPage() {
                         <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
                       )}
                       <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                    </div>
+                  </a>
+                )}
+
+                {/* Mobile: Telegram group */}
+                {telegramLink && (
+                  <a
+                    href={telegramLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => slug && trackLinkClick(slug, telegramLink, 'telegram')}
+                    className="md:hidden flex items-start gap-3 group"
+                  >
+                    <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
+                      <Send className="w-5 h-5 text-theme-text" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">
+                        {t('telegramGroup')}
+                      </p>
                     </div>
                   </a>
                 )}
