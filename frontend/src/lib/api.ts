@@ -3460,7 +3460,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     coHostTelegrams: e.coHostTelegrams ?? [],
   }));
   if (curated) {
-    events = events.filter((e) => e.underbossStatus === 'approved' || e.underbossStatus === 'listed');
+    events = events.filter((e) => e.underbossStatus === 'approved');
   }
   return events;
 }
