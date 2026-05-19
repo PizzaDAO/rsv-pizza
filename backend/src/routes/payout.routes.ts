@@ -25,12 +25,12 @@ import { convertToUSD } from '../services/fx.service.js';
 
 const router = Router();
 
-// All routes here require auth.
-router.use(requireAuth);
-
-// Soft-launch gate (arugula-38633 v1): the host payouts feature is restricted
-// to underbosses + admins. Remove this middleware when opening to all hosts.
-router.use(async (req, res, next) => {
+// Path-scope auth + soft-launch gate to /:partyId/payouts ONLY. The router is
+// mounted at /api/parties (alongside many sibling routers including partyRoutes
+// after it), so an unconditioned `router.use(...)` here would gate every
+// /api/parties/* request — which broke host guest approvals system-wide.
+router.use('/:partyId/payouts', requireAuth);
+router.use('/:partyId/payouts', async (req, res, next) => {
   try {
     await assertCanUsePayouts(req as AuthRequest);
     next();
