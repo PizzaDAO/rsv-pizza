@@ -36,7 +36,7 @@ import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
 import { GuestScorecard } from '../components/scorecard';
 
-function normalizeTelegramUrl(raw: string | null | undefined): { href: string; display: string } | null {
+function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -45,8 +45,7 @@ function normalizeTelegramUrl(raw: string | null | undefined): { href: string; d
     try {
       const u = new URL(trimmed);
       if (!/(^|\.)t\.me$/i.test(u.hostname) && !/(^|\.)telegram\.me$/i.test(u.hostname)) return null;
-      const path = u.pathname.replace(/^\/+/, '');
-      return { href: u.toString(), display: path ? `t.me/${path}` : 't.me' };
+      return u.toString();
     } catch {
       return null;
     }
@@ -54,13 +53,12 @@ function normalizeTelegramUrl(raw: string | null | undefined): { href: string; d
 
   const noScheme = trimmed.match(/^(?:t\.me|telegram\.me)\/(.+)$/i);
   if (noScheme) {
-    const path = noScheme[1].replace(/^\/+/, '');
-    return { href: `https://t.me/${path}`, display: `t.me/${path}` };
+    return `https://t.me/${noScheme[1].replace(/^\/+/, '')}`;
   }
 
   const bare = trimmed.replace(/^@/, '');
   if (/^[A-Za-z0-9_+\-]{3,}$/.test(bare)) {
-    return { href: `https://t.me/${bare}`, display: `t.me/${bare}` };
+    return `https://t.me/${bare}`;
   }
 
   return null;
@@ -941,10 +939,10 @@ export function EventPage() {
                     {/* Telegram group */}
                     {telegramLink && (
                       <a
-                        href={telegramLink.href}
+                        href={telegramLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={() => slug && trackLinkClick(slug, telegramLink.href, 'telegram')}
+                        onClick={() => slug && trackLinkClick(slug, telegramLink, 'telegram')}
                         className="flex items-start gap-3 group"
                         data-testid="event-telegram"
                       >
@@ -955,7 +953,6 @@ export function EventPage() {
                           <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">
                             {t('telegramGroup')}
                           </p>
-                          <p className="text-base text-theme-text-secondary">{telegramLink.display}</p>
                         </div>
                       </a>
                     )}
@@ -1074,10 +1071,10 @@ export function EventPage() {
                 {/* Mobile: Telegram group */}
                 {telegramLink && (
                   <a
-                    href={telegramLink.href}
+                    href={telegramLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => slug && trackLinkClick(slug, telegramLink.href, 'telegram')}
+                    onClick={() => slug && trackLinkClick(slug, telegramLink, 'telegram')}
                     className="md:hidden flex items-start gap-3 group"
                   >
                     <div className="flex-shrink-0 w-11 h-12 rounded-lg border border-theme-stroke bg-theme-surface flex items-center justify-center mt-0.5 group-hover:border-[#ff393a] transition-colors">
@@ -1087,7 +1084,6 @@ export function EventPage() {
                       <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">
                         {t('telegramGroup')}
                       </p>
-                      <p className="text-base text-theme-text-secondary">{telegramLink.display}</p>
                     </div>
                   </a>
                 )}
