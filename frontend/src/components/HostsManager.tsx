@@ -1,20 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Upload, Loader2, Send, Mail } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
-import { IconInput } from './IconInput';
+import HostFormModal from './HostFormModal';
 import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar } from '../lib/supabase';
 import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
-
-// X (Twitter) icon component
-const XIcon: React.FC<{ size?: number; className?: string }> = ({ size = 20, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-  </svg>
-);
 
 interface HostsManagerProps {
   partyId: string;
@@ -543,331 +535,128 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       </button>
 
       {/* Host Edit Modal */}
-      {editingHostId && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={cancelEditingHost}>
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">Edit Host</h2>
-
-            <div className="space-y-3">
-              {/* Avatar upload */}
-              <div>
-                <input
-                  ref={editAvatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleEditAvatarFileChange}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-3">
-                  {(editAvatarFilePreview || editHostAvatarUrl) ? (
-                    <img
-                      src={editAvatarFilePreview || editHostAvatarUrl}
-                      alt=""
-                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-theme-surface border border-theme-stroke shrink-0" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => editAvatarInputRef.current?.click()}
-                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
-                  >
-                    <Upload size={16} />
-                    Upload avatar
-                  </button>
-                  {(editAvatarFilePreview || editHostAvatarUrl) && (
-                    <button
-                      type="button"
-                      onClick={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); setEditHostAvatarFromX(null); }}
-                      className="text-xs text-red-400 hover:text-red-300"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <IconInput
-                icon={User}
-                type="text"
-                value={editHostName}
-                onChange={(e) => setEditHostName(e.target.value)}
-                placeholder="Name"
-                required
-              />
-
-              <IconInput
-                icon={Mail}
-                type="email"
-                value={editHostEmail}
-                onChange={(e) => setEditHostEmail(e.target.value)}
-                placeholder="Email (required to edit event)"
-              />
-
-              <IconInput
-                icon={Globe}
-                type="url"
-                value={editHostWebsite}
-                onChange={(e) => setEditHostWebsite(e.target.value)}
-                onBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
-                placeholder="Website"
-              />
-
-              <div className="relative">
-                <IconInput
-                  customIcon={<XIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none" />}
-                  type="text"
-                  value={editHostTwitter}
-                  onChange={(e) => setEditHostTwitter(e.target.value)}
-                  onBlur={async () => {
-                    const handle = stripToHandle(editHostTwitter);
-                    setEditHostTwitter(handle);
-                    if (!handle) return;
-                    // Skip partial-handle lookups that resolve to wrong users
-                    if (handle.length < 4) return;
-                    if (editHostAvatarFile) return;
-                    // Already current for this handle — no-op
-                    if (editHostAvatarFromX === handle) return;
-                    // First-time fetch: only auto-fill empty slot or legacy unavatar URL
-                    if (editHostAvatarFromX == null) {
-                      if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
-                    }
-                    setEditXAvatarFetching(true);
-                    try {
-                      const fetched = await fetchXAvatarToSupabase(handle);
-                      if (fetched) {
-                        setEditHostAvatarUrl(fetched);
-                        setEditHostAvatarFromX(handle);
-                      }
-                    } finally {
-                      setEditXAvatarFetching(false);
-                    }
-                  }}
-                  disabled={editXAvatarFetching}
-                  placeholder="Twitter (no @)"
-                />
-                {editXAvatarFetching && (
-                  <Loader2
-                    size={14}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
-                  />
-                )}
-              </div>
-
-              <IconInput
-                icon={Instagram}
-                type="text"
-                value={editHostInstagram}
-                onChange={(e) => setEditHostInstagram(e.target.value)}
-                onBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
-                placeholder="Instagram (no @)"
-              />
-
-              <IconInput
-                icon={Send}
-                type="text"
-                value={editHostTelegram}
-                onChange={(e) => setEditHostTelegram(e.target.value)}
-                onBlur={() => setEditHostTelegram(stripToHandle(editHostTelegram))}
-                placeholder="Telegram (no @)"
-              />
-            </div>
-
-            <div className="flex gap-3 mt-4">
-              <button
-                type="button"
-                onClick={cancelEditingHost}
-                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveHostEdit}
-                disabled={!editHostName.trim() || savingHost}
-                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-              >
-                {savingHost ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <HostFormModal
+        open={editingHostId !== null}
+        mode="edit"
+        name={editHostName}
+        email={editHostEmail}
+        website={editHostWebsite}
+        twitter={editHostTwitter}
+        instagram={editHostInstagram}
+        telegram={editHostTelegram}
+        avatarUrl={editHostAvatarUrl}
+        avatarFilePreview={editAvatarFilePreview}
+        showOnEvent={
+          editingHostId
+            ? (coHosts.find(h => h.id === editingHostId)?.showOnEvent !== false)
+            : true
+        }
+        canEdit={
+          editingHostId
+            ? (coHosts.find(h => h.id === editingHostId)?.canEdit === true)
+            : false
+        }
+        xAvatarFetching={editXAvatarFetching}
+        onNameChange={setEditHostName}
+        onEmailChange={setEditHostEmail}
+        onWebsiteChange={setEditHostWebsite}
+        onWebsiteBlur={() => setEditHostWebsite(normalizeUrl(editHostWebsite))}
+        onTwitterChange={setEditHostTwitter}
+        onTwitterBlur={async () => {
+          const handle = stripToHandle(editHostTwitter);
+          setEditHostTwitter(handle);
+          if (!handle) return;
+          // Skip partial-handle lookups that resolve to wrong users
+          if (handle.length < 4) return;
+          if (editHostAvatarFile) return;
+          // Already current for this handle — no-op
+          if (editHostAvatarFromX === handle) return;
+          // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+          if (editHostAvatarFromX == null) {
+            if (editHostAvatarUrl.trim() && !isAutoFilledXAvatar(editHostAvatarUrl)) return;
+          }
+          setEditXAvatarFetching(true);
+          try {
+            const fetched = await fetchXAvatarToSupabase(handle);
+            if (fetched) {
+              setEditHostAvatarUrl(fetched);
+              setEditHostAvatarFromX(handle);
+            }
+          } finally {
+            setEditXAvatarFetching(false);
+          }
+        }}
+        onInstagramChange={setEditHostInstagram}
+        onInstagramBlur={() => setEditHostInstagram(stripToHandle(editHostInstagram))}
+        onTelegramChange={setEditHostTelegram}
+        onTelegramBlur={() => setEditHostTelegram(stripToHandle(editHostTelegram))}
+        onShowOnEventChange={() => { if (editingHostId) toggleCoHostShowOnEvent(editingHostId); }}
+        onCanEditChange={() => { if (editingHostId) toggleCoHostCanEdit(editingHostId); }}
+        fileInputRef={editAvatarInputRef}
+        onAvatarFileChange={handleEditAvatarFileChange}
+        onAvatarClear={() => { setEditHostAvatarFile(null); setEditHostAvatarUrl(''); setEditHostAvatarFromX(null); }}
+        onCancel={cancelEditingHost}
+        onSubmit={saveHostEdit}
+        submitting={savingHost}
+      />
 
       {/* Add Host Modal */}
-      {showAddHostModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={() => setShowAddHostModal(false)}>
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-theme-text mb-4">Add Host</h2>
-
-            <div className="space-y-3">
-              {/* Avatar upload */}
-              <div>
-                <input
-                  ref={newAvatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleNewAvatarFileChange}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-3">
-                  {(newAvatarFilePreview || newCoHostAvatarUrl) ? (
-                    <img
-                      src={newAvatarFilePreview || newCoHostAvatarUrl}
-                      alt=""
-                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-theme-surface border border-theme-stroke shrink-0" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => newAvatarInputRef.current?.click()}
-                    className="flex items-center gap-2 px-3 py-2 bg-theme-surface border border-theme-stroke rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors text-sm"
-                  >
-                    <Upload size={16} />
-                    Upload avatar
-                  </button>
-                  {(newAvatarFilePreview || newCoHostAvatarUrl) && (
-                    <button
-                      type="button"
-                      onClick={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); setNewCoHostAvatarFromX(null); }}
-                      className="text-xs text-red-400 hover:text-red-300"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <input
-                type="text"
-                value={newCoHostName}
-                onChange={(e) => setNewCoHostName(e.target.value)}
-                placeholder="Name *"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-
-              <input
-                type="email"
-                value={newCoHostEmail}
-                onChange={(e) => setNewCoHostEmail(e.target.value)}
-                placeholder="Email (required to edit event)"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-
-              <input
-                type="url"
-                value={newCoHostWebsite}
-                onChange={(e) => setNewCoHostWebsite(e.target.value)}
-                onBlur={() => setNewCoHostWebsite(normalizeUrl(newCoHostWebsite))}
-                placeholder="Website"
-                className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-              />
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={newCoHostTwitter}
-                    onChange={(e) => setNewCoHostTwitter(e.target.value)}
-                    onBlur={async () => {
-                      const handle = stripToHandle(newCoHostTwitter);
-                      setNewCoHostTwitter(handle);
-                      if (!handle) return;
-                      // Skip partial-handle lookups that resolve to wrong users
-                      if (handle.length < 4) return;
-                      if (newCoHostAvatarFile) return;
-                      // Already current for this handle — no-op
-                      if (newCoHostAvatarFromX === handle) return;
-                      // First-time fetch: only auto-fill empty slot or legacy unavatar URL
-                      if (newCoHostAvatarFromX == null) {
-                        if (newCoHostAvatarUrl.trim() && !isAutoFilledXAvatar(newCoHostAvatarUrl)) return;
-                      }
-                      setNewXAvatarFetching(true);
-                      try {
-                        const fetched = await fetchXAvatarToSupabase(handle);
-                        if (fetched) {
-                          setNewCoHostAvatarUrl(fetched);
-                          setNewCoHostAvatarFromX(handle);
-                        }
-                      } finally {
-                        setNewXAvatarFetching(false);
-                      }
-                    }}
-                    disabled={newXAvatarFetching}
-                    placeholder="Twitter (no @)"
-                    className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a] disabled:opacity-60"
-                  />
-                  {newXAvatarFetching && (
-                    <Loader2
-                      size={14}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-text-muted animate-spin pointer-events-none"
-                    />
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={newCoHostInstagram}
-                  onChange={(e) => setNewCoHostInstagram(e.target.value)}
-                  onBlur={() => setNewCoHostInstagram(stripToHandle(newCoHostInstagram))}
-                  placeholder="Instagram (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-                <input
-                  type="text"
-                  value={newCoHostTelegram}
-                  onChange={(e) => setNewCoHostTelegram(e.target.value)}
-                  onBlur={() => setNewCoHostTelegram(stripToHandle(newCoHostTelegram))}
-                  placeholder="Telegram (no @)"
-                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 mt-3">
-              <Checkbox
-                checked={newCoHostShowOnEvent}
-                onChange={() => setNewCoHostShowOnEvent(!newCoHostShowOnEvent)}
-                label="Show on event"
-                size={16}
-                labelClassName="text-xs font-medium text-white/60"
-              />
-              <Checkbox
-                checked={newCoHostCanEdit}
-                onChange={() => setNewCoHostCanEdit(!newCoHostCanEdit)}
-                label="Editor"
-                size={16}
-                labelClassName="text-xs font-medium text-white/60"
-              />
-            </div>
-
-            <div className="flex gap-3 mt-4">
-              <button
-                type="button"
-                onClick={() => setShowAddHostModal(false)}
-                className="flex-1 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={addCoHost}
-                disabled={!newCoHostName.trim() || savingHost}
-                className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-              >
-                <UserPlus size={16} />
-                {savingHost ? 'Adding...' : 'Add Host'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <HostFormModal
+        open={showAddHostModal}
+        mode="add"
+        name={newCoHostName}
+        email={newCoHostEmail}
+        website={newCoHostWebsite}
+        twitter={newCoHostTwitter}
+        instagram={newCoHostInstagram}
+        telegram={newCoHostTelegram}
+        avatarUrl={newCoHostAvatarUrl}
+        avatarFilePreview={newAvatarFilePreview}
+        showOnEvent={newCoHostShowOnEvent}
+        canEdit={newCoHostCanEdit}
+        xAvatarFetching={newXAvatarFetching}
+        onNameChange={setNewCoHostName}
+        onEmailChange={setNewCoHostEmail}
+        onWebsiteChange={setNewCoHostWebsite}
+        onWebsiteBlur={() => setNewCoHostWebsite(normalizeUrl(newCoHostWebsite))}
+        onTwitterChange={setNewCoHostTwitter}
+        onTwitterBlur={async () => {
+          const handle = stripToHandle(newCoHostTwitter);
+          setNewCoHostTwitter(handle);
+          if (!handle) return;
+          // Skip partial-handle lookups that resolve to wrong users
+          if (handle.length < 4) return;
+          if (newCoHostAvatarFile) return;
+          // Already current for this handle — no-op
+          if (newCoHostAvatarFromX === handle) return;
+          // First-time fetch: only auto-fill empty slot or legacy unavatar URL
+          if (newCoHostAvatarFromX == null) {
+            if (newCoHostAvatarUrl.trim() && !isAutoFilledXAvatar(newCoHostAvatarUrl)) return;
+          }
+          setNewXAvatarFetching(true);
+          try {
+            const fetched = await fetchXAvatarToSupabase(handle);
+            if (fetched) {
+              setNewCoHostAvatarUrl(fetched);
+              setNewCoHostAvatarFromX(handle);
+            }
+          } finally {
+            setNewXAvatarFetching(false);
+          }
+        }}
+        onInstagramChange={setNewCoHostInstagram}
+        onInstagramBlur={() => setNewCoHostInstagram(stripToHandle(newCoHostInstagram))}
+        onTelegramChange={setNewCoHostTelegram}
+        onTelegramBlur={() => setNewCoHostTelegram(stripToHandle(newCoHostTelegram))}
+        onShowOnEventChange={() => setNewCoHostShowOnEvent(!newCoHostShowOnEvent)}
+        onCanEditChange={() => setNewCoHostCanEdit(!newCoHostCanEdit)}
+        fileInputRef={newAvatarInputRef}
+        onAvatarFileChange={handleNewAvatarFileChange}
+        onAvatarClear={() => { setNewCoHostAvatarFile(null); setNewCoHostAvatarUrl(''); setNewCoHostAvatarFromX(null); }}
+        onCancel={() => setShowAddHostModal(false)}
+        onSubmit={addCoHost}
+        submitting={savingHost}
+      />
     </div>
   );
 };
