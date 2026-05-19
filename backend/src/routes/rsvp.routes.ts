@@ -418,11 +418,16 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
 
     // Count confirmed guests to check capacity. Rejected guests
     // (approved === false, see mushroom-31723) do not count toward capacity.
+    // anchovy-59118: use `OR: [{approved:true},{approved:null}]` instead of
+    // `{ not: false }` — Prisma compiles `{ not: false }` to SQL `<>`, and
+    // under Postgres three-valued logic `NULL <> false` is NULL (falsy in
+    // WHERE), so unreviewed RSVPs (approved=null by default) were silently
+    // excluded from the capacity gate.
     const confirmedGuestCount = await prisma.guest.count({
       where: {
         partyId: party.id,
         status: { in: ['CONFIRMED', 'PENDING'] },
-        approved: { not: false },
+        OR: [{ approved: true }, { approved: null }],
       },
     });
 
@@ -461,7 +466,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           if (isAtCapacity) {
             newStatus = 'WAITLISTED';
             const maxPos = await prisma.guest.aggregate({
-              where: { partyId: party.id, status: 'WAITLISTED', approved: { not: false } },
+              where: { partyId: party.id, status: 'WAITLISTED', OR: [{ approved: true }, { approved: null }] },
               _max: { waitlistPosition: true },
             });
             newWaitlistPosition = (maxPos._max.waitlistPosition || 0) + 1;
@@ -525,7 +530,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         where: {
           partyId: party.id,
           status: 'WAITLISTED',
-          approved: { not: false },
+          OR: [{ approved: true }, { approved: null }],
         },
         _max: { waitlistPosition: true },
       });

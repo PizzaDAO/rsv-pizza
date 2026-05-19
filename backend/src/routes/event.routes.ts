@@ -81,7 +81,8 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         },
         _count: {
           // mushroom-31723: exclude rejected guests (approved=false) from the public count.
-          select: { guests: { where: { approved: { not: false } } } },
+          // anchovy-59118: see rsvp.routes.ts capacity-gate comment for why we use OR/null.
+          select: { guests: { where: { OR: [{ approved: true }, { approved: null }] } } },
         },
       },
     });
