@@ -1519,3 +1519,33 @@ model PayoutAudit {
   @@index([createdAt(sort: Desc)])
   @@map("payout_audit")
 }
+
+// ============================================
+// Outreach Communities (stagioni-29104)
+// ============================================
+// Admin-only staging table populated by scripts/outreach/scrapers/*.
+// Joined against supreme-43217 gap analysis to produce prioritized
+// contact list consumed by /underboss/outreach (marinara-67583).
+
+model OutreachCommunity {
+  id             String    @id @default(cuid())
+  city           String
+  country        String?
+  communityName  String    @map("community_name")
+  source         String    // 'luma' | 'meetup' | 'curated' | 'twitter'
+  contactHandle  String?   @map("contact_handle")
+  contactUrl     String    @map("contact_url")
+  contactEmail   String?   @map("contact_email")
+  followerCount  Int?      @map("follower_count")
+  activityScore  Decimal?  @map("activity_score") @db.Decimal(10, 4)
+  priority       String?   // 'high' | 'medium' | 'low'
+  notes          String?
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([source, contactUrl])
+  @@index([city])
+  @@index([priority])
+  @@map("outreach_communities")
+}
