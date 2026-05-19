@@ -33,7 +33,7 @@ const router = Router();
 const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
-type AdminActorKind = 'admin' | 'superadmin' | 'payment_admin';
+type AdminActorKind = 'admin' | 'super_admin' | 'payment_admin';
 
 /**
  * Loads the admin row + the currently-authenticated user's id (used for
@@ -62,7 +62,7 @@ async function loadActor(req: AuthRequest): Promise<{
   }
 
   const actorKind: AdminActorKind =
-    admin.role === 'super_admin' ? 'superadmin' :
+    admin.role === 'super_admin' ? 'super_admin' :
     admin.role === 'payment_admin' ? 'payment_admin' :
     'admin';
 
@@ -447,9 +447,9 @@ router.post(
           },
         });
 
-        // DB CHECK on payout_audit.actor_kind expects 'super_admin' (with
-        // underscore), but loadActor() returns 'superadmin'. Normalize here.
-        const auditActorKind = actor.actorKind === 'superadmin' ? 'super_admin' : actor.actorKind;
+        // loadActor() now returns 'super_admin' (matches DB CHECK on
+        // payout_audit.actor_kind) — no normalization needed.
+        const auditActorKind = actor.actorKind;
 
         await tx.payoutAudit.create({
           data: {
