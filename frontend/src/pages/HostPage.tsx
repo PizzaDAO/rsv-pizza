@@ -67,9 +67,18 @@ function HostPageContent() {
 
   useEffect(() => {
     if (!authLoading && !partyLoading && party && !canEdit) {
-      navigate(`/rsvp/${inviteCode}`, { replace: true });
+      // mushroom-48468: logged-out users hit /login with redirect back to /host/...
+      // so they can sign in and reach their dashboard (root cause was iOS auto-cap
+      // creating duplicate User rows; this prevents an orphaned-dashboard UX while
+      // the dedup migration is being applied). Authenticated-but-unauthorized
+      // visitors fall through to /rsvp as before.
+      if (!user) {
+        navigate(`/login?redirect=${encodeURIComponent(`/host/${inviteCode}`)}`, { replace: true });
+      } else {
+        navigate(`/rsvp/${inviteCode}`, { replace: true });
+      }
     }
-  }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode]);
+  }, [authLoading, partyLoading, party, canEdit, navigate, inviteCode, user]);
 
   // Determine if this user is the owner or super admin (full access)
   const isOwnerOrAdmin = useMemo(() => {

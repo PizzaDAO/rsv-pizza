@@ -596,11 +596,13 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
     });
 
     // Batch-fetch all co-host profile data upfront (avoid await inside .map)
+    // mushroom-48468: User.email is canonical lowercase. Co-host emails come from
+    // user-typed JSONB and may be mixed-case — lowercase before query + lookup.
     const allCoHostEmails = new Set<string>();
     for (const event of events) {
       const rawCoHosts = Array.isArray(event.coHosts) ? (event.coHosts as any[]) : [];
       for (const h of rawCoHosts) {
-        if (h.email) allCoHostEmails.add(h.email);
+        if (h.email) allCoHostEmails.add(h.email.toLowerCase());
       }
     }
     let allProfilesByEmail: Record<string, any> = {};
@@ -746,7 +748,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       // Co-hosts — enrich with user profile data (avatar, socials)
       const rawCoHosts = Array.isArray(event.coHosts) ? (event.coHosts as any[]) : [];
       const coHosts = rawCoHosts.map(({ email, ...rest }: any) => {
-        const profile = email ? allProfilesByEmail[email] : null;
+        const profile = email ? allProfilesByEmail[email.toLowerCase()] : null;
         if (profile) {
           return {
             ...rest,

@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { normalizeEmail } from '../helpers/email.js';
 
 const router = Router();
 
@@ -74,8 +75,15 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
       throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
     }
 
+    // mushroom-48468: canonicalize email so iOS auto-capitalization can't create
+    // duplicate User rows. Use `normalized` for every DB read/write below.
+    const normalized = normalizeEmail(email);
+    if (!normalized) {
+      throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+    }
+
     // Find or create user
-    let user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email: normalized } });
 
     // Generate secure token
     const token = randomBytes(32).toString('hex');
@@ -96,7 +104,7 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
       data: {
         token,
         code,
-        email,
+        email: normalized,
         expiresAt,
         userId: user?.id,
       },
@@ -118,7 +126,8 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     const resendApiKey = process.env.RESEND_API_KEY;
     if (resendApiKey) {
       try {
-        await sendMagicLinkEmail(email, magicLinkUrl, code, resendApiKey);
+        // mushroom-48468: use normalized lowercase for `to:` field
+        await sendMagicLinkEmail(normalized, magicLinkUrl, code, resendApiKey);
       } catch (emailError) {
         console.error('Failed to send magic link email:', emailError);
         // Don't fail the request if email fails
@@ -215,8 +224,10 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
     // Create user if doesn't exist
     let user = magicLink.user;
     if (!user) {
+      // mushroom-48468: normalize even though /magic-link now writes lowercase,
+      // because pre-existing MagicLink rows may still hold mixed-case email.
       user = await prisma.user.create({
-        data: { email: magicLink.email },
+        data: { email: normalizeEmail(magicLink.email)! },
       });
     }
 
@@ -294,9 +305,11 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
     // Create user if doesn't exist, or update name if provided
     let user = magicLink.user;
     if (!user) {
+      // mushroom-48468: normalize even though /magic-link now writes lowercase,
+      // because pre-existing MagicLink rows may still hold mixed-case email.
       user = await prisma.user.create({
         data: {
-          email: magicLink.email,
+          email: normalizeEmail(magicLink.email)!,
           name: name?.trim() || null,
         },
       });
