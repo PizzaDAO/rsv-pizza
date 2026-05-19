@@ -32,6 +32,10 @@ export interface FakeDetectionGuest {
   // romana-30802: cookie-based per-browser session ID; null for legacy rows
   // (pre-2026-05) and for browsers that block cookies.
   visitorSessionId?: string | null;
+  // bounce-rate-heuristic: Resend delivery status — 'delivered' | 'bounced'
+  // | 'complained' | 'delivery_delayed' | 'failed' | 'suppressed'. Nullable
+  // for legacy/non-email RSVPs; only populated rows are scored.
+  emailStatus?: string | null;
 }
 
 export interface FakeDetectionCoHost {
@@ -119,6 +123,7 @@ export const WEIGHTS = {
   email_digit_benford: 5,
   co_host_twitter_handles_missing: 12,
   repeat_session_rsvp_count: 20,
+  high_bounce_rate: 25,
 } as const;
 
 // ============================================
@@ -973,6 +978,40 @@ export function checkRepeatSessionRsvpCount(guests: FakeDetectionGuest[]): FlagR
   );
 }
 
+/**
+ * bounce-rate-heuristic: `high_bounce_rate` — Resend's delivery telemetry
+ * flags too many bad addresses on this event. Bounce / suppression-list /
+ * complaint are all "this email never reached a real human" signals; on
+ * legit African / international events we see <2% combined, on the Ebonyi
+ * / Uyo / Calabar padding events we saw 36%–77%. 15% is the threshold
+ * Snax confirmed as the right cliff between noisy-real and clearly-fake.
+ *
+ * Inputs come from `guests.email_status` populated by the Resend webhook
+ * handler (and the historical backfill script). Only guests with a
+ * scorable status count toward the denominator; `null` and `'unknown'`
+ * are excluded so the heuristic doesn't fire on legacy events.
+ */
+export function checkHighBounceRate(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'high_bounce_rate';
+  const scored = guests.filter(g => g.emailStatus && g.emailStatus !== 'unknown');
+  if (scored.length < 10) {
+    return flag(id, false, `n=${scored.length} below 10`);
+  }
+  const bad = scored.filter(g =>
+    g.emailStatus === 'bounced' ||
+    g.emailStatus === 'suppressed' ||
+    g.emailStatus === 'complained'
+  ).length;
+  const rate = bad / scored.length;
+  const fired = rate >= 0.15;
+  return flag(
+    id,
+    fired,
+    `badRate=${(rate * 100).toFixed(1)}% (${bad}/${scored.length})`,
+    { bad, total: scored.length, rate },
+  );
+}
+
 // ============================================
 // Aggregator
 // ============================================
@@ -1017,6 +1056,7 @@ export function scoreEvent(
     checkEmailDigitBenford(guests),
     checkCoHostTwitterHandlesMissing(party),
     checkRepeatSessionRsvpCount(guests),
+    checkHighBounceRate(guests),
   ];
 
   const score = Math.min(

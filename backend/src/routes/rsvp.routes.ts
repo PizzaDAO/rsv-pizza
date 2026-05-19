@@ -6,6 +6,35 @@ import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 
 const router = Router();
 
+/**
+ * bounce-rate-heuristic: parse Resend's email-send response and persist the
+ * `id` onto `guests.email_resend_id` so the webhook handler can match
+ * delivery/bounce/complaint events back to the originating guest by ID
+ * (not by address — same address can be re-sent N times).
+ *
+ * Safe to call without a guestId (no-ops) since some sends happen before
+ * the guest row is created. Never throws — email sending must not fail
+ * because of a downstream DB write.
+ *
+ * Param `response` is a global-fetch Response; we don't type it as such
+ * because Express's Response is already imported above under the same name.
+ */
+async function recordResendId(response: { json: () => Promise<unknown> }, guestId?: string | null): Promise<unknown> {
+  const data = await response.json().catch(() => null) as { id?: string } | null;
+  if (guestId && data && typeof data.id === 'string' && data.id.length > 0) {
+    try {
+      await prisma.guest.update({
+        where: { id: guestId },
+        data: { emailResendId: data.id },
+      });
+    } catch (err) {
+      // Non-fatal — bounce-tracking is observability, not correctness.
+      console.error('Failed to record Resend message ID on guest', guestId, err);
+    }
+  }
+  return data;
+}
+
 // GET /api/rsvp/:inviteCode - Get party info for RSVP page (public)
 router.get('/:inviteCode', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -579,6 +608,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           await sendWaitlistConfirmationEmail({
             guestEmail: email.trim(),
             guestName: name.trim(),
+            guestId: guest.id,
             partyName: party.name,
             partyDate: party.date,
             partyTimezone: party.timezone,
@@ -854,7 +884,7 @@ async function sendRSVPConfirmationEmail(params: {
     throw new Error(`Resend API error: ${error}`);
   }
 
-  return response.json();
+  return recordResendId(response, params.guestId);
 }
 
 // Helper function to send approval notification email with QR code
@@ -973,13 +1003,14 @@ export async function sendApprovalEmail(params: {
     throw new Error(`Resend API error: ${error}`);
   }
 
-  return response.json();
+  return recordResendId(response, params.guestId);
 }
 
 // Helper function to send waitlist confirmation email
 async function sendWaitlistConfirmationEmail(params: {
   guestEmail: string;
   guestName: string;
+  guestId?: string;
   partyName: string;
   partyDate: Date | null;
   partyTimezone: string | null;
@@ -1075,7 +1106,7 @@ async function sendWaitlistConfirmationEmail(params: {
     throw new Error(`Resend API error: ${error}`);
   }
 
-  return response.json();
+  return recordResendId(response, params.guestId);
 }
 
 // Helper function to send promotion email (guest moved from waitlist to confirmed)
@@ -1196,7 +1227,7 @@ export async function sendPromotionEmail(params: {
     throw new Error(`Resend API error: ${error}`);
   }
 
-  return response.json();
+  return recordResendId(response, params.guestId);
 }
 
 export default router;

@@ -30,6 +30,7 @@ import {
   checkEmailDigitBenford,
   checkCoHostTwitterHandlesMissing,
   checkRepeatSessionRsvpCount,
+  checkHighBounceRate,
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
@@ -64,6 +65,9 @@ function makeGuest(overrides: Partial<FakeDetectionGuest> = {}): FakeDetectionGu
     suggestedPizzerias: [{ name: 'da Michele' }],
     mailingListOptIn: false,
     visitorSessionId: null,
+    // bounce-rate-heuristic: null by default so existing fixtures (which
+    // pre-date the email_status column) skip checkHighBounceRate cleanly.
+    emailStatus: null,
     ...overrides,
   };
 }
@@ -969,6 +973,79 @@ describe('checkRepeatSessionRsvpCount', () => {
     const result = checkRepeatSessionRsvpCount([...withSession, ...withoutSession]);
     expect(result.fired).toBe(false);
     expect(result.detail).toMatch(/10\/30/);
+  });
+});
+
+describe('checkHighBounceRate', () => {
+  // bounce-rate-heuristic: fires when ≥15% of scorable emails are
+  // bounced/suppressed/complained. Min-n=10 scorable.
+
+  it('does not fire below min-n (only 9 scorable emails)', () => {
+    const guests = Array.from({ length: 9 }, () =>
+      makeGuest({ emailStatus: 'bounced' }),
+    );
+    const result = checkHighBounceRate(guests);
+    expect(result.fired).toBe(false);
+    expect(result.detail).toMatch(/n=9 below 10/);
+  });
+
+  it('ignores null and "unknown" statuses in the denominator', () => {
+    // 9 nulls + 1 unknown + 5 delivered = n=5 scorable → below min-n
+    const guests = [
+      ...Array.from({ length: 9 }, () => makeGuest({ emailStatus: null })),
+      makeGuest({ emailStatus: 'unknown' }),
+      ...Array.from({ length: 5 }, () => makeGuest({ emailStatus: 'delivered' })),
+    ];
+    const result = checkHighBounceRate(guests);
+    expect(result.fired).toBe(false);
+    expect(result.detail).toMatch(/n=5 below 10/);
+  });
+
+  it('does not fire at 14% bad rate (below threshold)', () => {
+    // 14 bounced / 100 scorable = 14%
+    const bad = Array.from({ length: 14 }, () => makeGuest({ emailStatus: 'bounced' }));
+    const good = Array.from({ length: 86 }, () => makeGuest({ emailStatus: 'delivered' }));
+    const result = checkHighBounceRate([...bad, ...good]);
+    expect(result.fired).toBe(false);
+    expect(result.evidence?.rate).toBeCloseTo(0.14);
+  });
+
+  it('fires at exactly 15% bad rate (boundary)', () => {
+    const bad = Array.from({ length: 15 }, () => makeGuest({ emailStatus: 'bounced' }));
+    const good = Array.from({ length: 85 }, () => makeGuest({ emailStatus: 'delivered' }));
+    const result = checkHighBounceRate([...bad, ...good]);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.rate).toBeCloseTo(0.15);
+  });
+
+  it('fires at 100% bounce rate', () => {
+    const guests = Array.from({ length: 30 }, () => makeGuest({ emailStatus: 'bounced' }));
+    const result = checkHighBounceRate(guests);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.rate).toBe(1);
+    expect(result.evidence?.bad).toBe(30);
+    expect(result.evidence?.total).toBe(30);
+  });
+
+  it('counts bounced + suppressed + complained as bad (all three flavors)', () => {
+    // 6 bounced + 5 suppressed + 4 complained = 15 bad of 100 → fires
+    const bounced = Array.from({ length: 6 }, () => makeGuest({ emailStatus: 'bounced' }));
+    const suppressed = Array.from({ length: 5 }, () => makeGuest({ emailStatus: 'suppressed' }));
+    const complained = Array.from({ length: 4 }, () => makeGuest({ emailStatus: 'complained' }));
+    const good = Array.from({ length: 85 }, () => makeGuest({ emailStatus: 'delivered' }));
+    const result = checkHighBounceRate([...bounced, ...suppressed, ...complained, ...good]);
+    expect(result.fired).toBe(true);
+    expect(result.evidence?.bad).toBe(15);
+  });
+
+  it('delivered + delivery_delayed + failed are NOT counted as bad', () => {
+    // 30 delivered + 5 delivery_delayed + 5 failed = 0 bad of 40 → no fire
+    const delivered = Array.from({ length: 30 }, () => makeGuest({ emailStatus: 'delivered' }));
+    const delayed = Array.from({ length: 5 }, () => makeGuest({ emailStatus: 'delivery_delayed' }));
+    const failed = Array.from({ length: 5 }, () => makeGuest({ emailStatus: 'failed' }));
+    const result = checkHighBounceRate([...delivered, ...delayed, ...failed]);
+    expect(result.fired).toBe(false);
+    expect(result.evidence?.bad).toBe(0);
   });
 });
 

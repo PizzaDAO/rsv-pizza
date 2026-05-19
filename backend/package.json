@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "nft:backfill": "tsx scripts/backfill-nft-mints.ts",
+    "email:backfill": "tsx scripts/backfill-email-status.ts",
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {

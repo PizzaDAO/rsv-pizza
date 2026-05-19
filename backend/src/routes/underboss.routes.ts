@@ -405,6 +405,7 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
             suggestedPizzerias: true,
             mailingListOptIn: true,
             visitorSessionId: true,
+            emailStatus: true,
           },
         },
         linkClicks: {
@@ -452,6 +453,7 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
           suggestedPizzerias: g.suggestedPizzerias,
           mailingListOptIn: g.mailingListOptIn,
           visitorSessionId: g.visitorSessionId,
+          emailStatus: g.emailStatus,
         })),
         p.linkClicks.map(c => ({ clickedAt: c.clickedAt })),
         sybilWallets,

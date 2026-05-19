@@ -290,6 +290,14 @@ model Guest {
   // romana-30802: cookie-based visitor session ID for duplicate-RSVP detection
   visitorSessionId String? @map("visitor_session_id")
 
+  // bounce-rate-heuristic: Resend message-id + delivery status (delivered,
+  // bounced, complained, delivery_delayed, failed, suppressed). Updated by the
+  // /api/webhooks/resend handler. Used by the high_bounce_rate fake-detection
+  // heuristic to flag events with too many bad addresses.
+  emailStatus          String?   @map("email_status")
+  emailStatusUpdatedAt DateTime? @map("email_status_updated_at") @db.Timestamptz
+  emailResendId        String?   @map("email_resend_id")
+
   // Check-in fields
   checkedInAt       DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy       String?   @map("checked_in_by")
