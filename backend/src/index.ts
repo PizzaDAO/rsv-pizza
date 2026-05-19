@@ -57,6 +57,7 @@ import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
+import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -95,6 +96,11 @@ app.use(cors({
   },
   credentials: true,
 }));
+// Resend webhook MUST be mounted BEFORE express.json() so its per-route
+// express.raw() handler sees the unparsed body bytes that Svix signed.
+// bounce-rate-heuristic.
+app.use('/api/webhooks/resend', resendWebhookRouter);
+
 app.use(express.json());
 
 // Rate limiting
