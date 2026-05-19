@@ -1473,6 +1473,7 @@ model Payout {
 
   transactionHash     String?   @map("transaction_hash")
   wireReference       String?   @map("wire_reference")
+  externalProofUrl    String?   @map("external_proof_url")
 
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz

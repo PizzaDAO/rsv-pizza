@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock } from 'lucide-react';
 import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
@@ -103,6 +103,16 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     setPayouts(prev => prev.filter(p => p.id !== payoutId));
   };
 
+  // arugula-38633 v2 follow-up: sum already-paid payouts so the host can see
+  // their running reimbursement total (and how it compares to the cap, if any).
+  // Computed client-side from the existing list — no backend change needed.
+  const totalPaidUsd = useMemo(
+    () => payouts
+      .filter(p => p.status === 'paid')
+      .reduce((s, p) => s + Number(p.finalAmountUsd || 0), 0),
+    [payouts]
+  );
+
   if (loading) {
     return (
       <div className="card p-8 flex items-center justify-center">
@@ -155,6 +165,8 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             onCancelled={handleCancelled}
             onStartNew={() => setView('new')}
             partyId={partyId}
+            totalPaidUsd={totalPaidUsd}
+            reimbursementCapUsd={reimbursementCapUsd ?? null}
           />
         </>
       )}
@@ -175,6 +187,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             reimbursementCapUsd={reimbursementCapUsd}
             reimbursementCapAppealNote={reimbursementCapAppealNote}
             reimbursementCapAppealedAt={reimbursementCapAppealedAt}
+            totalPaidUsd={totalPaidUsd}
           />
         </>
       )}

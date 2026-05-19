@@ -21,6 +21,12 @@ interface NewPayoutFormProps {
   reimbursementCapAppealNote?: string | null;
   /** Previous appeal timestamp — non-null means host has already appealed. */
   reimbursementCapAppealedAt?: string | null;
+  /**
+   * Sum of finalAmountUsd for already-paid payouts on this party.
+   * Shown inside the cap banner (and standalone if there's no cap).
+   * arugula-38633 v2 follow-up.
+   */
+  totalPaidUsd?: number;
 }
 
 const EMPTY_BANK: BankDetails = {
@@ -47,6 +53,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   reimbursementCapUsd,
   reimbursementCapAppealNote,
   reimbursementCapAppealedAt,
+  totalPaidUsd = 0,
 }) => {
   const { user } = useAuth();
   // Stable id for this in-flight form, used as the storage-path grouping key.
@@ -146,6 +153,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   };
 
   const showCapBanner = typeof reimbursementCapUsd === 'number' && reimbursementCapUsd > 0;
+  const showPaidOnlyBanner = !showCapBanner && totalPaidUsd > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -156,7 +164,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             <BadgeDollarSign size={22} className="text-[#ff393a] mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-theme-text">
-                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}.
+                We'll reimburse you up to ${reimbursementCapUsd!.toFixed(2)}.
+                {totalPaidUsd > 0 && (
+                  <> ${totalPaidUsd.toFixed(2)} paid so far.</>
+                )}
               </p>
               <p className="text-xs text-theme-text-muted mt-0.5">
                 {localAppealedAt
@@ -172,6 +183,20 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           >
             {localAppealedAt ? 'Update appeal' : 'Appeal cap →'}
           </button>
+        </div>
+      )}
+
+      {/* Paid-so-far standalone banner (no cap) — only when there's at least one
+          paid payout. Same visual treatment as the cap banner so the layout is
+          consistent. */}
+      {showPaidOnlyBanner && (
+        <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
+          <BadgeDollarSign size={22} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-theme-text">
+              ${totalPaidUsd.toFixed(2)} paid so far.
+            </p>
+          </div>
         </div>
       )}
 

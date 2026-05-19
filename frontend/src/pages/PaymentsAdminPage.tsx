@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ShieldX, Loader2, DollarSign, Download } from 'lucide-react';
+import { ShieldX, Loader2, DollarSign, Download, Plus } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import {
   fetchAdminMe,
@@ -27,6 +27,7 @@ import {
   PayoutReviewModal,
   PaymentsStatsCards,
   BulkActionsBar,
+  ExternalPaymentModal,
 } from '../components/payments-admin';
 
 type RoleState =
@@ -62,6 +63,9 @@ export function PaymentsAdminPage() {
 
   // CSV export
   const [exporting, setExporting] = useState(false);
+
+  // External payment modal (arugula-38633 v2 follow-up)
+  const [showExternalModal, setShowExternalModal] = useState(false);
 
   // Role gate
   useEffect(() => {
@@ -303,6 +307,14 @@ export function PaymentsAdminPage() {
           )}
           <button
             type="button"
+            onClick={() => setShowExternalModal(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
+          >
+            <Plus size={14} />
+            Record External Payment
+          </button>
+          <button
+            type="button"
             onClick={handleExportCsv}
             disabled={exporting}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-sm text-theme-text disabled:opacity-50"
@@ -468,6 +480,13 @@ export function PaymentsAdminPage() {
             }}
           />
         )}
+        {showExternalModal && (
+          <ExternalPaymentModal
+            onClose={() => setShowExternalModal(false)}
+            onCreated={() => refresh()}
+          />
+        )}
+
         {/* meUserId placeholder to silence unused-warning while client-side comparison stays optional */}
         <input type="hidden" value={meUserId} />
       </main>
