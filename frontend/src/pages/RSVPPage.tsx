@@ -13,6 +13,7 @@ import { useConfetti } from '../hooks/useConfetti';
 import { useTranslation } from 'react-i18next';
 import { RSVPFlowContent } from '../components/RSVPFlowContent';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
+import posthog from 'posthog-js';
 
 /** Map DbParty (snake_case) to a partial PublicEvent for RSVPFlowContent */
 function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
@@ -96,6 +97,10 @@ export function RSVPPage() {
         const foundParty = await getPartyByInviteCodeOrCustomUrl(inviteCode);
         if (foundParty) {
           setParty(foundParty);
+          posthog.capture('rsvp_page_viewed', {
+            eventName: foundParty.name,
+            inviteCode: foundParty.invite_code,
+          });
 
           // Check if donations are enabled
           const stats = await getDonationStats(foundParty.id);
@@ -182,6 +187,22 @@ export function RSVPPage() {
       if (isGPP) fireFromCenter();
     },
   });
+
+  useEffect(() => {
+    if (form.step === 2 && party) {
+      posthog.capture('rsvp_step2_reached', { eventName: party.name });
+    }
+  }, [form.step, party]);
+
+  useEffect(() => {
+    if (form.submitted && party) {
+      posthog.capture('rsvp_submitted', {
+        eventName: party.name,
+        alreadyRegistered: form.alreadyRegistered,
+        pendingApproval: form.pendingApproval,
+      });
+    }
+  }, [form.submitted, party, form.alreadyRegistered, form.pendingApproval]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
