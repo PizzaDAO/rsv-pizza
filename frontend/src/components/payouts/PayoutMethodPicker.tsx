@@ -83,6 +83,12 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     <div className="space-y-4">
       <div className="grid sm:grid-cols-3 gap-3">
         <Option
+          value="usdc_base"
+          icon={<Coins size={18} />}
+          title="USDC on Base"
+          description="On-chain payout to your wallet."
+        />
+        <Option
           value="mercury_card"
           icon={<CreditCard size={18} />}
           title="Mercury virtual card"
@@ -93,12 +99,6 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           icon={<Banknote size={18} />}
           title="Bank wire"
           description="We send a wire to your bank account."
-        />
-        <Option
-          value="usdc_base"
-          icon={<Coins size={18} />}
-          title="USDC on Base"
-          description="On-chain payout to your wallet."
         />
       </div>
 
