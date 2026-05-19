@@ -36,3 +36,7 @@ backend/prisma/migrations/*.sql
 tmpclaude-*
 **/tmpclaude-*
 nul
+
+# Outreach scrapers (stagioni-29104)
+.cache/
+scripts/outreach/output/
