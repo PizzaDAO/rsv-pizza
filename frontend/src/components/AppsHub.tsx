@@ -176,7 +176,7 @@ const apps: AppItem[] = [
     name: 'Payouts',
     description: 'Submit receipts for host reimbursement',
     icon: Receipt,
-    status: 'preview',
+    status: 'live',
     category: 'after-party',
     tab: 'payouts',
   },
