@@ -86,6 +86,7 @@ export function FakeDetectionTable() {
   });
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [hideRejected, setHideRejected] = useState(true);  // default ON — rejected events clutter the queue
 
   // Per-row action state (keyed by party id)
   const [actionPending, setActionPending] = useState<Record<string, boolean>>({});
@@ -231,6 +232,10 @@ export function FakeDetectionTable() {
       rows = rows.filter((r) => r.flags.some((f) => f.fired));
     }
 
+    if (hideRejected) {
+      rows = rows.filter((r) => effectiveStatus(r) !== 'rejected');
+    }
+
     rows = [...rows].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -251,7 +256,7 @@ export function FakeDetectionTable() {
     });
 
     return rows;
-  }, [data, search, sortField, sortDir, tierFilters, countryFilter, onlyFlagged]);
+  }, [data, search, sortField, sortDir, tierFilters, countryFilter, onlyFlagged, hideRejected, statusOverride]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -360,6 +365,13 @@ export function FakeDetectionTable() {
           checked={onlyFlagged}
           onChange={() => setOnlyFlagged((v) => !v)}
           label={t('fakeDetection.onlyFlagged', 'Only flagged')}
+          size={14}
+          labelClassName="text-xs text-theme-text"
+        />
+        <Checkbox
+          checked={hideRejected}
+          onChange={() => setHideRejected((v) => !v)}
+          label={t('fakeDetection.hideRejected', 'Hide rejected')}
           size={14}
           labelClassName="text-xs text-theme-text"
         />

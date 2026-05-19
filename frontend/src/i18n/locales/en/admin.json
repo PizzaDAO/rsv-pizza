@@ -155,6 +155,7 @@
     "country": "Country",
     "allCountries": "All",
     "onlyFlagged": "Only flagged",
+    "hideRejected": "Hide rejected",
     "noResults": "No events match the current filters.",
     "openEvent": "Open event page",
     "columns": {
