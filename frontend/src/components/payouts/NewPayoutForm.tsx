@@ -148,7 +148,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({ partyId, onCreated
         <div className="mb-3">
           <h3 className="text-base font-semibold text-theme-text">Pizza or event photos</h3>
           <p className="text-xs text-theme-text-muted mt-0.5">
-            Optional — proof-of-event photos help your reviewer.
+            Proof-of-event photos help your reviewer.
           </p>
         </div>
         <PizzaPhotoUpload

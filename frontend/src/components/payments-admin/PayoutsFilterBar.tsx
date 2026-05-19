@@ -22,9 +22,9 @@ const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
 
 const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [
   { value: 'all', label: 'All methods' },
+  { value: 'usdc_base', label: PAYOUT_METHOD_LABELS.usdc_base },
   { value: 'mercury_card', label: PAYOUT_METHOD_LABELS.mercury_card },
   { value: 'wire', label: PAYOUT_METHOD_LABELS.wire },
-  { value: 'usdc_base', label: PAYOUT_METHOD_LABELS.usdc_base },
 ];
 
 /**
