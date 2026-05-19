@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Store,
@@ -23,6 +23,7 @@ import {
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
+import { fetchUnderbossMe, fetchAdminMe } from '../lib/api';
 
 type AppStatus = 'live' | 'preview' | 'coming-soon';
 type AppCategory = 'planning' | 'promotion' | 'day-of' | 'after-party';
@@ -176,7 +177,7 @@ const apps: AppItem[] = [
     name: 'Payouts',
     description: 'Submit receipts for host reimbursement',
     icon: Receipt,
-    status: 'preview',
+    status: 'live',
     category: 'after-party',
     tab: 'payouts',
   },
@@ -380,6 +381,35 @@ export function AppsHub({
   const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
   const isGppEvent = party?.eventType === 'gpp';
 
+  // Soft-launch gate for the Payouts app (arugula-38633 v1): the tile stays
+  // visible for everyone, but downgrades from 'live' to 'coming-soon' (badge +
+  // unclickable) unless caller is underboss/admin/super_admin. Remove when
+  // opening to all hosts.
+  const [canUsePayouts, setCanUsePayouts] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ub, ad] = await Promise.all([
+          fetchUnderbossMe().catch(() => null),
+          fetchAdminMe().catch(() => null),
+        ]);
+        if (cancelled) return;
+        setCanUsePayouts(Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin));
+      } catch {
+        if (!cancelled) setCanUsePayouts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleApps = apps.map((a) => {
+    if (a.id === 'payouts' && canUsePayouts === false) {
+      return { ...a, status: 'coming-soon' as const };
+    }
+    return a;
+  });
+
   const handleTogglePin = async (appId: string, pin: boolean) => {
     // Optimistic update
     const previousPinned = pinnedApps;
@@ -408,7 +438,7 @@ export function AppsHub({
         </div>
       </div>
       {CATEGORY_ORDER.map(({ key, label }) => {
-        const categoryApps = apps.filter((a) => a.category === key);
+        const categoryApps = visibleApps.filter((a) => a.category === key);
         if (categoryApps.length === 0) return null;
         return (
           <AppSection

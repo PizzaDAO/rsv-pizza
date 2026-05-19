@@ -1,0 +1,275 @@
+[
+  {
+    "_comment_header": "stagioni-29104 — curated outreach community seeds. Initial 30 hand-picked entries covering Bankless DAO city chapters, ETHGlobal 2025+2026 host cities, Devconnect satellites, major L2 hubs, and Network School cities. NO private member data, NO scraped DMs — public organizer handles only. Expand this list freely; seed-curated.cjs is idempotent via (source, contact_url) and will not overwrite manually-set priority or notes."
+  },
+  {
+    "city": "Berlin",
+    "country": "Germany",
+    "communityName": "ETHBerlin",
+    "contactHandle": "@ETHBerlin",
+    "contactUrl": "https://x.com/ETHBerlin",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; annual hackathon; strong overlap with Bankless DAO Berlin node"
+  },
+  {
+    "city": "New York",
+    "country": "United States",
+    "communityName": "Bankless DAO NYC",
+    "contactHandle": "@BanklessNYC",
+    "contactUrl": "https://x.com/BanklessNYC",
+    "contactEmail": null,
+    "notes": "Bankless DAO NYC city node"
+  },
+  {
+    "city": "Buenos Aires",
+    "country": "Argentina",
+    "communityName": "ETH Argentina / Devconnect 2023 host",
+    "contactHandle": "@ETH_Argentina",
+    "contactUrl": "https://x.com/ETH_Argentina",
+    "contactEmail": null,
+    "notes": "Devconnect Argentina 2023 organizers; strong LATAM coordination"
+  },
+  {
+    "city": "Lisbon",
+    "country": "Portugal",
+    "communityName": "ETHLisbon",
+    "contactHandle": "@ETHLisbon",
+    "contactUrl": "https://x.com/ETHLisbon",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; Lisbon crypto residency hub"
+  },
+  {
+    "city": "London",
+    "country": "United Kingdom",
+    "communityName": "ETHGlobal London",
+    "contactHandle": "@ETHGlobal",
+    "contactUrl": "https://x.com/ETHGlobal",
+    "contactEmail": null,
+    "notes": "ETHGlobal London 2024+2025 host coordinator"
+  },
+  {
+    "city": "Amsterdam",
+    "country": "Netherlands",
+    "communityName": "Devconnect Amsterdam alumni",
+    "contactHandle": "@EFDevconnect",
+    "contactUrl": "https://x.com/EFDevconnect",
+    "contactEmail": null,
+    "notes": "Devconnect Amsterdam 2022 alumni network"
+  },
+  {
+    "city": "Toronto",
+    "country": "Canada",
+    "communityName": "ETHToronto",
+    "contactHandle": "@ETHToronto",
+    "contactUrl": "https://x.com/ETHToronto",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; Toronto Blockchain Week host"
+  },
+  {
+    "city": "Mexico City",
+    "country": "Mexico",
+    "communityName": "Ethereum Mexico",
+    "contactHandle": "@EthereumMexico",
+    "contactUrl": "https://x.com/EthereumMexico",
+    "contactEmail": null,
+    "notes": "ETHGlobal Mexico host; major LATAM hub"
+  },
+  {
+    "city": "Bangkok",
+    "country": "Thailand",
+    "communityName": "Devcon 7 Bangkok / Ethereum Thailand",
+    "contactHandle": "@ETHGlobal",
+    "contactUrl": "https://x.com/EthThailand",
+    "contactEmail": null,
+    "notes": "Devcon 7 host city Nov 2024; strong residual organizer network"
+  },
+  {
+    "city": "Singapore",
+    "country": "Singapore",
+    "communityName": "ETHSingapore / TOKEN2049",
+    "contactHandle": "@ETHSingapore",
+    "contactUrl": "https://x.com/ETHSingapore",
+    "contactEmail": null,
+    "notes": "ETHGlobal + TOKEN2049 cluster; APAC hub"
+  },
+  {
+    "city": "Tokyo",
+    "country": "Japan",
+    "communityName": "ETHTokyo",
+    "contactHandle": "@ETHTokyo",
+    "contactUrl": "https://x.com/ETHTokyo",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; annual hackathon"
+  },
+  {
+    "city": "Seoul",
+    "country": "South Korea",
+    "communityName": "ETHSeoul / KBW satellites",
+    "contactHandle": "@ETHSeoul_",
+    "contactUrl": "https://x.com/ETHSeoul_",
+    "contactEmail": null,
+    "notes": "Korea Blockchain Week core organizer overlap"
+  },
+  {
+    "city": "Taipei",
+    "country": "Taiwan",
+    "communityName": "ETHTaipei",
+    "contactHandle": "@ETHTaipei",
+    "contactUrl": "https://x.com/ETHTaipei",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; growing APAC node"
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "communityName": "Devconnect Istanbul alumni",
+    "contactHandle": "@EFDevconnect",
+    "contactUrl": "https://x.com/ETHIstanbul",
+    "contactEmail": null,
+    "notes": "Devconnect 2023 host city alumni; major Turkish dev community"
+  },
+  {
+    "city": "Paris",
+    "country": "France",
+    "communityName": "ETHCC / Paris Blockchain Week",
+    "contactHandle": "@EthCC",
+    "contactUrl": "https://x.com/EthCC",
+    "contactEmail": null,
+    "notes": "ETHCC = largest annual European Ethereum conf"
+  },
+  {
+    "city": "Denver",
+    "country": "United States",
+    "communityName": "ETHDenver",
+    "contactHandle": "@ETHDenver",
+    "contactUrl": "https://x.com/ETHDenver",
+    "contactEmail": null,
+    "notes": "SporkDAO / ETHDenver — largest US hackathon; strong overlap with PizzaDAO contributors"
+  },
+  {
+    "city": "San Francisco",
+    "country": "United States",
+    "communityName": "Bankless DAO SF / ETHSF",
+    "contactHandle": "@BanklessSF",
+    "contactUrl": "https://x.com/BanklessSF",
+    "contactEmail": null,
+    "notes": "Bankless DAO SF node + ETHGlobal SF overlap"
+  },
+  {
+    "city": "Los Angeles",
+    "country": "United States",
+    "communityName": "Bankless DAO LA",
+    "contactHandle": "@BanklessLA",
+    "contactUrl": "https://x.com/BanklessLA",
+    "contactEmail": null,
+    "notes": "Bankless DAO Los Angeles node"
+  },
+  {
+    "city": "Miami",
+    "country": "United States",
+    "communityName": "Bankless DAO Miami",
+    "contactHandle": "@BanklessMia",
+    "contactUrl": "https://x.com/BanklessMia",
+    "contactEmail": null,
+    "notes": "Bankless DAO Miami node; ETH Miami presence"
+  },
+  {
+    "city": "Lagos",
+    "country": "Nigeria",
+    "communityName": "Web3Bridge Africa / ETHLagos",
+    "contactHandle": "@web3bridge",
+    "contactUrl": "https://x.com/web3bridge",
+    "contactEmail": null,
+    "notes": "Largest African web3 dev bootcamp; ETHGlobal Africa partner"
+  },
+  {
+    "city": "Nairobi",
+    "country": "Kenya",
+    "communityName": "Web3Clubs Nairobi",
+    "contactHandle": "@web3clubs",
+    "contactUrl": "https://x.com/web3clubs",
+    "contactEmail": null,
+    "notes": "African student web3 chapter network"
+  },
+  {
+    "city": "Mumbai",
+    "country": "India",
+    "communityName": "ETHMumbai / Devfolio",
+    "contactHandle": "@devfolio",
+    "contactUrl": "https://x.com/devfolio",
+    "contactEmail": null,
+    "notes": "Devfolio runs ETHIndia + many city hackathons"
+  },
+  {
+    "city": "Bangalore",
+    "country": "India",
+    "communityName": "ETHIndia / Bangalore web3 chapter",
+    "contactHandle": "@ETHIndiaco",
+    "contactUrl": "https://x.com/ETHIndiaco",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; India's largest Ethereum hackathon"
+  },
+  {
+    "city": "Manila",
+    "country": "Philippines",
+    "communityName": "ETHManila / Web3 Philippines",
+    "contactHandle": "@ETHManila",
+    "contactUrl": "https://x.com/ETHManila",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; SEA Ethereum hub"
+  },
+  {
+    "city": "Sao Paulo",
+    "country": "Brazil",
+    "communityName": "ETHSaoPaulo",
+    "contactHandle": "@ETHSaoPaulo",
+    "contactUrl": "https://x.com/ETHSaoPaulo",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; LATAM presence"
+  },
+  {
+    "city": "Bogota",
+    "country": "Colombia",
+    "communityName": "Devcon 6 Bogota / ETH Colombia",
+    "contactHandle": "@ETHColombia",
+    "contactUrl": "https://x.com/ETHColombia",
+    "contactEmail": null,
+    "notes": "Devcon 6 host city; strong residual organizer network"
+  },
+  {
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "communityName": "ETHDubai",
+    "contactHandle": "@ETHDubaiConf",
+    "contactUrl": "https://x.com/ETHDubaiConf",
+    "contactEmail": null,
+    "notes": "ETHGlobal partner; MENA hub"
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "communityName": "ETHTLV",
+    "contactHandle": "@ETHTelAviv",
+    "contactUrl": "https://x.com/ETHTelAviv",
+    "contactEmail": null,
+    "notes": "Strong Ethereum core protocol dev community"
+  },
+  {
+    "city": "Chiang Mai",
+    "country": "Thailand",
+    "communityName": "Network School Chiang Mai",
+    "contactHandle": "@thenetworkstate",
+    "contactUrl": "https://x.com/thenetworkstate",
+    "contactEmail": null,
+    "notes": "Network School cohort city; large crypto-nomad population"
+  },
+  {
+    "city": "Zurich",
+    "country": "Switzerland",
+    "communityName": "EthZurich / EthCC satellite",
+    "contactHandle": "@ETHZurich",
+    "contactUrl": "https://x.com/EthereumZurich",
+    "contactEmail": null,
+    "notes": "Swiss Ethereum dev community; Crypto Valley adjacency"
+  }
+]

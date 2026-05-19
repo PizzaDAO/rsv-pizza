@@ -1521,25 +1521,27 @@ model PayoutAudit {
   @@map("payout_audit")
 }
 
-// marinara-67583 + stagioni-29104: Outreach to candidate blockchain communities
-// for GPP 2026 in uncovered cities.
-//
-// NOTE: OutreachCommunity is duplicated from PR #428 (stagioni-29104) to allow
-// `prisma generate` to succeed independently on this branch. Whichever PR
-// merges first wins; the other resolves the dup by removing this model block.
+// ============================================
+// Outreach Communities (stagioni-29104) + Outreach Attempts (marinara-67583)
+// ============================================
+// Admin-only staging table populated by scripts/outreach/scrapers/*.
+// Joined against supreme-43217 gap analysis to produce prioritized
+// contact list consumed by /underboss/outreach (marinara-67583).
+
 model OutreachCommunity {
   id             String    @id @default(cuid())
   city           String
   country        String?
   communityName  String    @map("community_name")
-  source         String
+  source         String    // 'luma' | 'meetup' | 'curated' | 'twitter'
   contactHandle  String?   @map("contact_handle")
   contactUrl     String    @map("contact_url")
   contactEmail   String?   @map("contact_email")
   followerCount  Int?      @map("follower_count")
   activityScore  Decimal?  @map("activity_score") @db.Decimal(10, 4)
-  priority       String?
+  priority       String?   // 'high' | 'medium' | 'low'
   notes          String?
+
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   attempts       OutreachAttempt[]
