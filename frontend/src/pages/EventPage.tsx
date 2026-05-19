@@ -536,7 +536,7 @@ export function EventPage() {
   // alone, then to lat/lng if no address. Both place_id and address are required
   // for the place_id form per Google's docs.
   const googleMapsUrl = event.placeId && event.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
+    ? `https://www.google.com/maps/place/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
     : event.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
       : event.latitude && event.longitude
