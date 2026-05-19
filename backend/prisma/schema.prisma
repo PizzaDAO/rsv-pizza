@@ -195,6 +195,12 @@ model Party {
   // Turtle role selection on RSVP form
   turtleRolesEnabled Boolean @default(false) @map("turtle_roles_enabled")
 
+  // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
+  // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
+  reimbursementCapUsd        Decimal?  @map("reimbursement_cap_usd") @db.Decimal(10, 2)
+  reimbursementCapAppealNote String?   @map("reimbursement_cap_appeal_note")
+  reimbursementCapAppealedAt DateTime? @map("reimbursement_cap_appealed_at") @db.Timestamptz
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

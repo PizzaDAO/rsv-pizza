@@ -296,6 +296,11 @@ export interface Party {
   hostTelegramLinkToken?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
+  // Reimbursement cap (arugula-38633 v2) — populated by underboss validation.
+  // Banner on payout form only renders when reimbursementCapUsd != null.
+  reimbursementCapUsd?: number | null;
+  reimbursementCapAppealNote?: string | null;
+  reimbursementCapAppealedAt?: string | null;
 }
 
 export interface Donation {
@@ -1029,6 +1034,7 @@ export interface UnderbossEvent {
   timezone: string | null;
   duration: number | null;
   country?: string | null;
+  city?: string | null;
   host: { name: string | null; email: string | null };
   hostTelegram?: string | null;
   hostTelegramConnected?: boolean;
@@ -1054,6 +1060,11 @@ export interface UnderbossEvent {
   flyerConfig?: Record<string, any> | null;
   latestSponsorAt: string | null;
   flyerStale: boolean;
+  // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
+  // the heuristic. NULL means "not yet validated".
+  reimbursementCapUsd?: number | null;
+  reimbursementCapAppealNote?: string | null;
+  reimbursementCapAppealedAt?: string | null;
 }
 
 export interface UnderbossStats {

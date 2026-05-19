@@ -64,6 +64,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         telegramGroup: true,
         turtleRolesEnabled: true,
         underbossStatus: true,
+        reimbursementCapUsd: true,
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -137,6 +138,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           telegramGroup: true,
           turtleRolesEnabled: true,
           underbossStatus: true,
+          reimbursementCapUsd: true,
           password: true,
           userId: true,
           user: {
@@ -320,6 +322,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         userId: party.userId,
         sponsors,
         pageViewStats,
+        reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
       },
     });
   } catch (error) {

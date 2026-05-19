@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, Handshake, StickyNote, ChevronLeft, ChevronRight, MessageCircle, Send } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
+import { ReimbursementCapCell } from './ReimbursementCapCell';
 import { IconInput } from '../IconInput';
 import { CopyEmailButton } from '../CopyEmailButton';
 import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpectedGuests, getPartyPhotos } from '../../lib/api';
@@ -566,6 +567,8 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 </span>
                 <span className="text-xs font-medium text-green-400 ml-1">&middot; ${price.toLocaleString()}</span>
               </div>
+              {/* Reimbursement cap controls (arugula-38633 v2) */}
+              <ReimbursementCapCell event={event} onUpdate={onEventUpdate} />
               {/* Inline notes editor */}
               {notesOpen && (
                 <div className="mt-1.5">

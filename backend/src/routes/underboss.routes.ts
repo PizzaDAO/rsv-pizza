@@ -174,6 +174,14 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     flyerConfig: party.flyerConfig || null,
     latestSponsorAt: latestSponsorAtStr,
     flyerStale,
+    // Reimbursement cap (arugula-38633 v2) — exposed so the underboss
+    // dashboard can render Validate/Override controls + appeal indicator.
+    city: party.city || null,
+    reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
+    reimbursementCapAppealNote: party.reimbursementCapAppealNote || null,
+    reimbursementCapAppealedAt: party.reimbursementCapAppealedAt
+      ? new Date(party.reimbursementCapAppealedAt).toISOString()
+      : null,
   };
 }
 

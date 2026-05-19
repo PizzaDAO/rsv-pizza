@@ -9,3 +9,4 @@ export { FunnelTab } from './FunnelTab';
 export { CityScopePicker } from './CityScopePicker';
 export { FakeDetectionTable } from './FakeDetectionTable';
 export { OutreachTab } from './OutreachTab';
+export { ReimbursementCapCell } from './ReimbursementCapCell';

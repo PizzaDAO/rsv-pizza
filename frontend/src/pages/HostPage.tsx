@@ -488,7 +488,12 @@ function HostPageContent() {
               )}
 
               {activeTab === 'payouts' && party && (
-                <PayoutsTab partyId={party.id} />
+                <PayoutsTab
+                  partyId={party.id}
+                  reimbursementCapUsd={party.reimbursementCapUsd}
+                  reimbursementCapAppealNote={party.reimbursementCapAppealNote}
+                  reimbursementCapAppealedAt={party.reimbursementCapAppealedAt}
+                />
               )}
 
               {activeTab === 'gpp' && party && (

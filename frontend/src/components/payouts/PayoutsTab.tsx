@@ -8,6 +8,9 @@ import { PayoutDetailModal } from './PayoutDetailModal';
 
 interface PayoutsTabProps {
   partyId: string;
+  reimbursementCapUsd?: number | null;
+  reimbursementCapAppealNote?: string | null;
+  reimbursementCapAppealedAt?: string | null;
 }
 
 type View = 'list' | 'new';
@@ -21,7 +24,12 @@ type View = 'list' | 'new';
  * full UI; everyone else sees a "coming soon" placeholder. Backend enforces
  * the same restriction. Remove `canAccess` checks here when opening up.
  */
-export const PayoutsTab: React.FC<PayoutsTabProps> = ({ partyId }) => {
+export const PayoutsTab: React.FC<PayoutsTabProps> = ({
+  partyId,
+  reimbursementCapUsd,
+  reimbursementCapAppealNote,
+  reimbursementCapAppealedAt,
+}) => {
   const [view, setView] = useState<View>('list');
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +172,9 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({ partyId }) => {
             partyId={partyId}
             onCreated={handleCreated}
             onCancel={() => setView('list')}
+            reimbursementCapUsd={reimbursementCapUsd}
+            reimbursementCapAppealNote={reimbursementCapAppealNote}
+            reimbursementCapAppealedAt={reimbursementCapAppealedAt}
           />
         </>
       )}

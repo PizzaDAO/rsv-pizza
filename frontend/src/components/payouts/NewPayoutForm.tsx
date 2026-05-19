@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,11 +9,18 @@ import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
+import { AppealCapModal } from './AppealCapModal';
 
 interface NewPayoutFormProps {
   partyId: string;
   onCreated: (payout: Payout) => void;
   onCancel: () => void;
+  /** Reimbursement cap (arugula-38633 v2) — banner only renders if non-null. */
+  reimbursementCapUsd?: number | null;
+  /** Previous appeal note (if any) — shown in re-appeal flow. */
+  reimbursementCapAppealNote?: string | null;
+  /** Previous appeal timestamp — non-null means host has already appealed. */
+  reimbursementCapAppealedAt?: string | null;
 }
 
 const EMPTY_BANK: BankDetails = {
@@ -33,10 +40,23 @@ const EMPTY_BANK: BankDetails = {
  *   6. Save-as-default
  *   7. Submit
  */
-export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({ partyId, onCreated, onCancel }) => {
+export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
+  partyId,
+  onCreated,
+  onCancel,
+  reimbursementCapUsd,
+  reimbursementCapAppealNote,
+  reimbursementCapAppealedAt,
+}) => {
   const { user } = useAuth();
   // Stable id for this in-flight form, used as the storage-path grouping key.
   const [payoutTempId] = useState(() => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  // Cap appeal modal + local mirror of appeal state so submissions update the
+  // banner without requiring the parent to reload the Party context.
+  const [showAppealModal, setShowAppealModal] = useState(false);
+  const [localAppealNote, setLocalAppealNote] = useState<string | null>(reimbursementCapAppealNote ?? null);
+  const [localAppealedAt, setLocalAppealedAt] = useState<string | null>(reimbursementCapAppealedAt ?? null);
 
   const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
   const [pizzaPhotos, setPizzaPhotos] = useState<PizzaPhotoItem[]>([]);
@@ -125,8 +145,36 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({ partyId, onCreated
     }
   };
 
+  const showCapBanner = typeof reimbursementCapUsd === 'number' && reimbursementCapUsd > 0;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 0. Reimbursement cap banner (arugula-38633 v2) — only when underboss-validated */}
+      {showCapBanner && (
+        <div className="card p-4 sm:p-5 border-l-4 border-l-[#ff393a] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <BadgeDollarSign size={22} className="text-[#ff393a] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-theme-text">
+                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}.
+              </p>
+              <p className="text-xs text-theme-text-muted mt-0.5">
+                {localAppealedAt
+                  ? 'Appeal submitted — an underboss will review.'
+                  : 'Submissions above this amount may not be fully reimbursed.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAppealModal(true)}
+            className="text-xs text-theme-text-secondary hover:text-theme-text underline underline-offset-2 whitespace-nowrap"
+          >
+            {localAppealedAt ? 'Update appeal' : 'Appeal cap →'}
+          </button>
+        </div>
+      )}
+
       {/* 1. Receipts */}
       <div className="card p-6">
         <div className="mb-3">
@@ -246,6 +294,20 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({ partyId, onCreated
             : `Submit $${finalAmount.toFixed(2)} payout`}
         </button>
       </div>
+
+      {showAppealModal && showCapBanner && (
+        <AppealCapModal
+          partyId={partyId}
+          capUsd={reimbursementCapUsd!}
+          previousAppealedAt={localAppealedAt}
+          previousNote={localAppealNote}
+          onClose={() => setShowAppealModal(false)}
+          onSubmitted={({ note, appealedAt }) => {
+            setLocalAppealNote(note);
+            setLocalAppealedAt(appealedAt);
+          }}
+        />
+      )}
     </form>
   );
 };

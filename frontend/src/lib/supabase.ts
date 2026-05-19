@@ -774,6 +774,10 @@ export interface DbParty {
   underboss_status?: string | null;
   // Turtle role selection toggle
   turtle_roles_enabled?: boolean;
+  // Reimbursement cap (arugula-38633 v2)
+  reimbursement_cap_usd?: number | null;
+  reimbursement_cap_appeal_note?: string | null;
+  reimbursement_cap_appealed_at?: string | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -842,7 +846,8 @@ export const SAFE_PARTY_COLUMNS = `
   underboss_status,
   flyer_config,
   poster_image_url, poster_generated_at,
-  rollup_image_url, rollup_generated_at
+  rollup_image_url, rollup_generated_at,
+  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at
 `;
 
 /**
@@ -1824,6 +1829,7 @@ export async function updateParty(
     telegram_group?: string | null;
     host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
+    reimbursement_cap_usd?: number | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1898,6 +1904,7 @@ export async function updateParty(
         telegramGroup: updates.telegram_group,
         hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
+        reimbursementCapUsd: updates.reimbursement_cap_usd,
       });
       return true;
     } catch (error) {
