@@ -236,6 +236,19 @@ export function EventsMapPage() {
       ).size,
     [events]
   );
+  const filteredCityCount = useMemo(
+    () => new Set(filteredEvents.map((e) => e.city)).size,
+    [filteredEvents]
+  );
+  const filteredCountryCount = useMemo(
+    () =>
+      new Set(
+        filteredEvents
+          .map((e) => e.country)
+          .filter((c): c is string => !!c && c.trim() !== '')
+      ).size,
+    [filteredEvents]
+  );
 
   return (
     <>
@@ -357,7 +370,14 @@ export function EventsMapPage() {
                   {canModerate && activeFilterCount > 0 ? (
                     <>
                       {filteredEvents.length.toLocaleString()} of{' '}
-                      {events.length.toLocaleString()} matching
+                      {events.length.toLocaleString()} events across{' '}
+                      {filteredCityCount} {filteredCityCount === 1 ? 'city' : 'cities'}
+                      {filteredCountryCount > 0 && (
+                        <>
+                          {' '}in {filteredCountryCount}{' '}
+                          {filteredCountryCount === 1 ? 'country' : 'countries'}
+                        </>
+                      )}
                     </>
                   ) : (
                     <>

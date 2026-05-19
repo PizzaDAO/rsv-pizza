@@ -63,6 +63,7 @@ export default function GPPEventsMap({
   const infoWindowListenerRef = useRef<google.maps.MapsEventListener | null>(
     null
   );
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const [error, setError] = useState(false);
 
   // Filter out events with no valid coordinates
@@ -364,8 +365,11 @@ export default function GPPEventsMap({
         const eventId = event.id;
         marker.addListener('click', () => {
           const latest = eventByIdRef.current.get(eventId) ?? event;
+          // Close first so setContent() doesn't trigger auto-pan against the
+          // previous anchor (which causes the "zoom back to old card" jitter).
+          infoWindow.close();
           infoWindow.setContent(buildInfoContent(latest));
-          infoWindow.open(map, marker);
+          infoWindow.open({ map, anchor: marker });
         });
 
         markers.push(marker);
@@ -405,6 +409,14 @@ export default function GPPEventsMap({
             });
           },
         },
+      });
+
+      if (mapClickListenerRef.current) {
+        mapClickListenerRef.current.remove();
+        mapClickListenerRef.current = null;
+      }
+      mapClickListenerRef.current = map.addListener('click', () => {
+        infoWindow.close();
       });
 
       // Fit bounds to all markers, then cap zoom at 15 on idle
