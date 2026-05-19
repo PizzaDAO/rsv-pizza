@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable } from '../components/underboss';
+import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, OutreachTab } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -69,7 +69,7 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'outreach'>('events');
 
   const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
@@ -564,6 +564,19 @@ export function UnderbossDashboard() {
                 )}
               </button>
             )}
+            <button
+              onClick={() => setActiveTab('outreach')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'outreach'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.outreach')}
+              {activeTab === 'outreach' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -580,6 +593,10 @@ export function UnderbossDashboard() {
 
           {isAdmin && activeTab === 'fake-detection' && (
             <FakeDetectionTable />
+          )}
+
+          {activeTab === 'outreach' && (
+            <OutreachTab isAdmin={isAdmin} />
           )}
 
         </section>

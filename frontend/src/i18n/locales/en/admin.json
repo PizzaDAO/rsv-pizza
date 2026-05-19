@@ -143,7 +143,8 @@
       "events": "Events",
       "cities": "Cities",
       "partners": "Partners",
-      "fakeDetection": "Fake Detection"
+      "fakeDetection": "Fake Detection",
+      "outreach": "Outreach"
     }
   },
   "fakeDetection": {
