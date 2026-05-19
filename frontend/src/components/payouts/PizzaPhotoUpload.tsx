@@ -111,7 +111,7 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
             : 'Drop pizza / event photos here, or click to choose files'}
         </p>
         <p className="text-xs text-theme-text-muted mt-1">
-          {remaining > 0 && `Optional — up to ${remaining} more.`}
+          {remaining > 0 && `Up to ${remaining} more.`}
         </p>
       </div>
 
