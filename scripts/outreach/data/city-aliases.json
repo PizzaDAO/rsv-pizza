@@ -1,0 +1,4 @@
+{
+  "_comment": "Manual overrides for GPP party name -> GeoNames city|ISO2 mapping. Add entries as { \"raw gpp name from event\": \"GeoNames City Name|US\" } when the script logs 'unmatched' warnings. Keys are normalized (lowercase, diacritics stripped, whitespace collapsed) before lookup.",
+  "_example": "saint petersburg|RU"
+}

@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 .env
 .env.local
+scripts/outreach/.env
 
 # Prisma
 backend/prisma/*.db
