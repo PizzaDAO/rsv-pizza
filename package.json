@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "dotenv": "^17.3.1",
+    "googleapis": "^144.0.0",
     "pg": "^8.16.3"
   }
 }
