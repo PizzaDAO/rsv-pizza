@@ -154,6 +154,9 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     hostTelegramLinkToken: dbParty.host_telegram_link_token || null,
     underbossStatus: (dbParty.underboss_status as any) || null,
     turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
+    reimbursementCapUsd: dbParty.reimbursement_cap_usd != null ? Number(dbParty.reimbursement_cap_usd) : null,
+    reimbursementCapAppealNote: dbParty.reimbursement_cap_appeal_note ?? null,
+    reimbursementCapAppealedAt: dbParty.reimbursement_cap_appealed_at ?? null,
     guests,
   };
 }

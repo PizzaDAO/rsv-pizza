@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin, isAdmin, isUnderboss } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
@@ -433,7 +433,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       // the chat_id is webhook-only (set by /api/telegram/webhook when the host
       // sends /start <token> to the bot). Allowing PATCH writes would let a host
       // spoof another user's chat_id.
-      turtleRolesEnabled
+      turtleRolesEnabled,
+      reimbursementCapUsd,
+      // NOTE: reimbursementCapAppealNote + reimbursementCapAppealedAt are NOT
+      // destructured here — appeals flow through the dedicated
+      // POST /:partyId/reimbursement-cap/appeal endpoint so we can timestamp
+      // the appeal and avoid leaking it through the generic PATCH whitelist.
     } = req.body;
 
     // Verify ownership or super admin
@@ -513,6 +518,31 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       mergedCoHosts = ordered;
     }
 
+    // reimbursementCapUsd is settable by underbosses + admins only (arugula-38633 v2).
+    // Hosts who try to set it via this generic PATCH get silently dropped from
+    // the update (rather than 403'd) so the rest of their save still succeeds.
+    let reimbursementCapUsdToWrite: number | null | undefined = undefined;
+    if (reimbursementCapUsd !== undefined) {
+      const allowed = (await isSuperAdmin(req.userEmail))
+        || (await isAdmin(req.userEmail))
+        || (await isUnderboss(req.userEmail));
+      if (allowed) {
+        if (reimbursementCapUsd === null || reimbursementCapUsd === '') {
+          reimbursementCapUsdToWrite = null;
+        } else {
+          const n = Number(reimbursementCapUsd);
+          if (!Number.isFinite(n) || n < 0 || n > 100000) {
+            throw new AppError(
+              'reimbursementCapUsd must be a non-negative number ≤ 100000',
+              400,
+              'VALIDATION_ERROR'
+            );
+          }
+          reimbursementCapUsdToWrite = n;
+        }
+      }
+    }
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -577,6 +607,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
         ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
+        ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
       },
       include: {
         user: { select: { name: true } },
@@ -698,6 +729,56 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
     await triggerWebhook('party.rsvp_opened', party, req.userId!);
 
     res.json({ success: true, message: 'RSVPs reopened' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/reimbursement-cap/appeal - Host appeal of the
+// reimbursement cap (arugula-38633 v2).
+//
+// Intentionally lives in party.routes.ts (NOT payout.routes.ts) so the
+// payouts soft-launch gate does not block hosts — even hosts who can't yet
+// submit a payout may want to register that they think their cap is too low.
+router.post('/:partyId/reimbursement-cap/appeal', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { note } = req.body || {};
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    if (typeof note !== 'string' || note.trim().length === 0) {
+      throw new AppError('Appeal note is required', 400, 'VALIDATION_ERROR');
+    }
+    const trimmed = note.trim();
+    if (trimmed.length > 2000) {
+      throw new AppError('Appeal note must be 2000 characters or fewer', 400, 'VALIDATION_ERROR');
+    }
+
+    const now = new Date();
+    const updated = await prisma.party.update({
+      where: { id: partyId },
+      data: {
+        reimbursementCapAppealNote: trimmed,
+        reimbursementCapAppealedAt: now,
+      },
+      select: {
+        id: true,
+        reimbursementCapUsd: true,
+        reimbursementCapAppealNote: true,
+        reimbursementCapAppealedAt: true,
+      },
+    });
+
+    res.json({
+      partyId: updated.id,
+      reimbursementCapUsd: updated.reimbursementCapUsd != null ? Number(updated.reimbursementCapUsd) : null,
+      reimbursementCapAppealNote: updated.reimbursementCapAppealNote,
+      reimbursementCapAppealedAt: updated.reimbursementCapAppealedAt ? updated.reimbursementCapAppealedAt.toISOString() : null,
+    });
   } catch (error) {
     next(error);
   }

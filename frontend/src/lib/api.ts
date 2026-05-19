@@ -198,6 +198,7 @@ export interface UpdatePartyData {
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
+  reimbursementCapUsd?: number | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -306,6 +307,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
+      reimbursementCapUsd: data.reimbursementCapUsd,
     },
   });
 }
@@ -478,6 +480,10 @@ export interface PublicEvent {
   turtleRolesEnabled?: boolean;
   sponsors?: PublicEventSponsor[];
   pageViewStats?: { totalViews: number; uniqueVisitors: number };
+  // Reimbursement cap (arugula-38633 v2) — public so the host-facing payout
+  // banner can render before re-loading the Party context. NULL when an
+  // underboss has not validated yet.
+  reimbursementCapUsd?: number | null;
 }
 
 // Public Event API (no auth required)
@@ -3951,6 +3957,32 @@ export async function cancelPayout(partyId: string, payoutId: string): Promise<b
     { method: 'DELETE', requireAuth: true }
   );
   return true;
+}
+
+// ============================================================
+// Reimbursement cap appeal (arugula-38633 v2)
+// ============================================================
+
+export interface ReimbursementCapAppealResponse {
+  partyId: string;
+  reimbursementCapUsd: number | null;
+  reimbursementCapAppealNote: string | null;
+  reimbursementCapAppealedAt: string | null;
+}
+
+/**
+ * Host appeals the reimbursement cap. Endpoint lives outside the payouts
+ * soft-launch gate so hosts can still register their objection even if they
+ * can't yet submit payouts.
+ */
+export async function appealReimbursementCap(
+  partyId: string,
+  note: string
+): Promise<ReimbursementCapAppealResponse> {
+  return apiRequest<ReimbursementCapAppealResponse>(
+    `/api/parties/${partyId}/reimbursement-cap/appeal`,
+    { method: 'POST', body: { note }, requireAuth: true }
+  );
 }
 
 export async function previewReceiptOCR(
