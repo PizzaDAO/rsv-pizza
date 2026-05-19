@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
+import { prisma } from './config/database.js';
 
 // Serialize BigInt as string in JSON. The only BigInt in the schema today is
 // parties.host_telegram_chat_id, which is sensitive enough that we never want
@@ -180,9 +181,30 @@ app.use('/api/v1', v1Routes);
 setupSwagger(app);
 app.use('/api/ai-phone', aiPhoneRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.1.0' });
+// Health check — calabrese-58204: now includes a DB round-trip so external
+// uptime monitors can detect connection-pool exhaustion / DB-saturation
+// incidents like the 2026-05-19 outage instead of seeing a healthy app
+// process sitting on a dead pool.
+app.get('/api/health', async (_req, res) => {
+  const start = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const dbMs = Date.now() - start;
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: '1.1.0',
+      dbMs,
+      degraded: dbMs > 1000,
+    });
+  } catch (e: any) {
+    res.status(503).json({
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      error: e?.code || 'DB_UNREACHABLE',
+      dbMs: Date.now() - start,
+    });
+  }
 });
 
 // API documentation page

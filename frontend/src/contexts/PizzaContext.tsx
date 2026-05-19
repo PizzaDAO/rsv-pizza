@@ -24,6 +24,13 @@ interface PizzaContextType {
   // the "Rejected (N)" chip + RejectedGuestsModal for one-click restore.
   guests: Guest[];
   rejectedGuests: Guest[];
+  // calabrese-58204: exposed so the opt-in `useGuestsRealtime` hook on host pages
+  // can push live updates into context without the broad subscription that lived
+  // here previously (which churned the realtime `subscription` table for every
+  // public RSVPer and caused the 2026-05-19 outage). Setters write the raw list
+  // and the derived `guests`/`rejectedGuests` re-compute from it.
+  setGuests: (guests: Guest[]) => void;
+  setParty: React.Dispatch<React.SetStateAction<Party | null>>;
   addGuest: (guest: Omit<Guest, 'id'>) => Promise<void>;
   removeGuest: (id: string) => Promise<void>;
   approveGuest: (id: string) => Promise<void>;
@@ -187,21 +194,12 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // based on the URL parameters. localStorage is only used to remember the last
   // party for the home page redirect.
 
-  // Subscribe to real-time guest updates when party exists
-  useEffect(() => {
-    if (!party) return;
-
-    const unsubscribe = db.subscribeToGuests(party.id, (dbGuests) => {
-      const updatedGuests = dbGuests.map(dbGuestToGuest);
-      setAllGuests(updatedGuests);
-      // party.guests is the visible list — filter rejected (approved===false) here
-      // so the 15+ files that read party.guests inherit the filter automatically.
-      const visibleGuests = updatedGuests.filter(g => g.approved !== false);
-      setParty(prev => prev ? { ...prev, guests: visibleGuests } : null);
-    });
-
-    return unsubscribe;
-  }, [party?.id]);
+  // calabrese-58204: Realtime guest subscription is now OPT-IN per page via
+  // `useGuestsRealtime(partyId, onChange)` from `frontend/src/hooks/useGuestsRealtime.ts`.
+  // The previous global subscription here opened a Supabase Realtime channel for
+  // every public RSVPer (RSVPPage loads PizzaContext too), which churned the
+  // realtime `subscription` table and pinned WAL processing — site outage
+  // 2026-05-19. Do NOT re-add a subscription here. See plans/calabrese-58204-pool-exhaustion-fix.md.
 
   useEffect(() => {
     localStorage.setItem('pizzaPartySettings', JSON.stringify(pizzaSettings));
@@ -526,6 +524,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       updatePartyDietaryOptions,
       guests,
       rejectedGuests,
+      setGuests: setAllGuests,
+      setParty,
       addGuest,
       removeGuest,
       approveGuest,

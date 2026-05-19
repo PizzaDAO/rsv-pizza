@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
+import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
@@ -53,9 +54,19 @@ function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests } = usePizza();
+  const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
+
+  // calabrese-58204: opt-in Supabase Realtime subscription, host-only. See
+  // `frontend/src/hooks/useGuestsRealtime.ts` for the outage context.
+  useGuestsRealtime(party?.id, (nextGuests) => {
+    setGuests(nextGuests);
+    // party.guests is the visible list — drop rejected (approved===false) here
+    // so the consumers that read party.guests inherit the filter automatically.
+    const visibleGuests = nextGuests.filter(g => g.approved !== false);
+    setParty(prev => prev ? { ...prev, guests: visibleGuests } : null);
+  });
 
   const canEdit = useMemo(() => {
     if (!party || !user) return false;
