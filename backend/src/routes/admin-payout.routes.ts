@@ -198,6 +198,7 @@ function serializePayout(row: any): any {
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
     transactionHash: row.transactionHash,
     wireReference: row.wireReference,
+    externalProofUrl: row.externalProofUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     documents: (row.documents || []).map((d: any) => ({
@@ -320,6 +321,163 @@ router.get(
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=host-payouts-export.csv');
       res.send(csvRows.join('\n'));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// POST /api/admin/payouts/external — record an OUT-OF-BAND payment
+//   - For payments that happened OUTSIDE the rsv.pizza flow (Venmo, manual
+//     bank transfer, etc.). Creates a payout row in `paid` status immediately
+//     so the host's "paid so far" reflects it and there's an audit trail.
+//   - Literal `/external` MUST be declared before `/:id` so the literal path wins.
+//   - Auth: admin / super_admin / payment_admin all allowed.
+//   - payment_admin actors are blocked from recording payouts to themselves.
+//   - The plan allows 'other' as a method intent but the DB CHECK only allows
+//     the 3 — we map 'other' → 'wire' and rely on admin_notes for the real
+//     method (e.g. "Other: Venmo").
+// ============================================
+router.post(
+  '/external',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const body = req.body || {};
+
+      const partyId = typeof body.partyId === 'string' ? body.partyId.trim() : '';
+      const hostUserId = typeof body.hostUserId === 'string' ? body.hostUserId.trim() : '';
+      const finalAmountUsd = Number(body.finalAmountUsd);
+      const rawMethod = typeof body.payoutMethod === 'string' ? body.payoutMethod : '';
+      const adminNotes = typeof body.adminNotes === 'string' ? body.adminNotes.trim() : '';
+
+      if (!partyId) {
+        throw new AppError('partyId is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!hostUserId) {
+        throw new AppError('hostUserId is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!Number.isFinite(finalAmountUsd) || finalAmountUsd <= 0) {
+        throw new AppError('finalAmountUsd must be > 0', 400, 'VALIDATION_ERROR');
+      }
+      // 'other' is accepted at the API boundary, but the DB CHECK only allows
+      // the 3 hard rails. We map 'other' → 'wire' and the admin clarifies the
+      // real method in admin_notes (e.g. "Other: Venmo").
+      const ALLOWED_INTENT_METHODS = ['mercury_card', 'wire', 'usdc_base', 'other'] as const;
+      if (!ALLOWED_INTENT_METHODS.includes(rawMethod as any)) {
+        throw new AppError(
+          `payoutMethod must be one of: ${ALLOWED_INTENT_METHODS.join(', ')}`,
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+      const storedMethod = rawMethod === 'other' ? 'wire' : rawMethod;
+      if (!adminNotes) {
+        throw new AppError(
+          'adminNotes is required — please explain why this is being recorded',
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+
+      // Block payment_admin from paying themselves (full admins exempt).
+      assertNotSelfPayout(actor, hostUserId);
+
+      // Verify referenced party + host exist (avoids opaque FK errors).
+      const party = await prisma.party.findUnique({ where: { id: partyId }, select: { id: true } });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+      const host = await prisma.user.findUnique({ where: { id: hostUserId }, select: { id: true } });
+      if (!host) {
+        throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
+      }
+
+      const paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
+      if (Number.isNaN(paidAt.getTime())) {
+        throw new AppError('paidAt must be a valid ISO date', 400, 'VALIDATION_ERROR');
+      }
+
+      const txHash = typeof body.transactionHash === 'string' && body.transactionHash.trim()
+        ? body.transactionHash.trim()
+        : null;
+      const wireRef = typeof body.wireReference === 'string' && body.wireReference.trim()
+        ? body.wireReference.trim()
+        : null;
+      const cardLast4 = typeof body.mercuryCardLast4 === 'string' && body.mercuryCardLast4.trim()
+        ? body.mercuryCardLast4.trim()
+        : null;
+      const extProof = typeof body.externalProofUrl === 'string' && body.externalProofUrl.trim()
+        ? body.externalProofUrl.trim()
+        : null;
+
+      const composedNote = `External payment recorded. ${adminNotes}`;
+
+      const created = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.create({
+          data: {
+            partyId,
+            hostUserId,
+            // Required non-null fields — for external payments we know the
+            // amount already; original currency/rate/extracted all collapse to USD/1.
+            originalAmount: finalAmountUsd as any,
+            originalCurrency: 'USD',
+            exchangeRate: 1.0 as any,
+            extractedAmountUsd: finalAmountUsd as any,
+            finalAmountUsd: finalAmountUsd as any,
+            status: 'paid',
+            payoutMethod: storedMethod,
+            paidAt,
+            transactionHash: txHash,
+            wireReference: wireRef,
+            mercuryCardLast4: cardLast4,
+            externalProofUrl: extProof,
+            adminNotes: composedNote,
+            reviewedBy: actor.email,
+            reviewedAt: paidAt,
+          },
+          include: {
+            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            host: { select: { id: true, name: true, email: true } },
+            documents: { orderBy: { sortOrder: 'asc' } },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        // DB CHECK on payout_audit.actor_kind expects 'super_admin' (with
+        // underscore), but loadActor() returns 'superadmin'. Normalize here.
+        const auditActorKind = actor.actorKind === 'superadmin' ? 'super_admin' : actor.actorKind;
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: row.id,
+            action: 'create',
+            newStatus: 'paid',
+            newAmount: finalAmountUsd as any,
+            actorEmail: actor.email,
+            actorKind: auditActorKind,
+            note: composedNote,
+          },
+        });
+
+        return row;
+      });
+
+      // Refetch with audits included (the create() above already has them empty).
+      const full = await prisma.payout.findUnique({
+        where: { id: created.id },
+        include: {
+          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          host: { select: { id: true, name: true, email: true } },
+          documents: { orderBy: { sortOrder: 'asc' } },
+          audits: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+
+      res.status(201).json({ payout: serializePayout(full || created) });
     } catch (error) {
       next(error);
     }

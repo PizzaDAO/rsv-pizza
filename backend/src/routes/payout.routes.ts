@@ -88,6 +88,7 @@ function serializePayout(p: any) {
     paidAt: p.paidAt ? p.paidAt.toISOString() : null,
     transactionHash: p.transactionHash ?? null,
     wireReference: p.wireReference ?? null,
+    externalProofUrl: p.externalProofUrl ?? null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     documents: Array.isArray(p.documents) ? p.documents.map(serializeDocument) : undefined,

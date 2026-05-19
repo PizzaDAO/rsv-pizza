@@ -1464,9 +1464,30 @@ export interface Payout {
   paidAt: string | null;
   transactionHash: string | null;
   wireReference: string | null;
+  externalProofUrl: string | null;
   createdAt: string;
   updatedAt: string;
   documents: PayoutDocument[];
+}
+
+/**
+ * Input for "Record External Payment" — payments made OUTSIDE the system
+ * (Venmo, manual bank, etc.) recorded by an admin so the host's "paid so far"
+ * is accurate and there's an audit trail. See backend
+ * `POST /api/admin/payouts/external`.
+ */
+export interface ExternalPaymentInput {
+  partyId: string;
+  hostUserId: string;
+  finalAmountUsd: number;
+  /** 'other' is accepted client-side and mapped to 'wire' server-side (DB CHECK only allows the 3). */
+  payoutMethod: PayoutMethod | 'other';
+  paidAt?: string;            // ISO date — defaults to now if omitted
+  transactionHash?: string;   // for usdc_base
+  wireReference?: string;     // for wire / other
+  mercuryCardLast4?: string;  // for mercury_card
+  externalProofUrl?: string;
+  adminNotes: string;         // REQUIRED — must explain why this is being recorded
 }
 
 // Admin-list payout: includes embedded party + host info

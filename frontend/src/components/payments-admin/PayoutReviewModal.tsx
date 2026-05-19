@@ -356,6 +356,23 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </div>
             )}
 
+            {/* External proof (arugula-38633 v2 follow-up) — visible for any
+                payout that has an externalProofUrl set, regardless of status. */}
+            {payout.externalProofUrl && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface text-sm">
+                <h3 className="font-semibold text-theme-text mb-1">External proof</h3>
+                <a
+                  href={payout.externalProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-theme-text-secondary hover:underline break-all"
+                >
+                  {payout.externalProofUrl}
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+            )}
+
             {/* Admin notes (editable) */}
             <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
               <h3 className="font-semibold text-theme-text mb-2 text-sm">Admin notes</h3>
@@ -421,6 +438,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     Mercury card ••••{payout.mercuryCardLast4}
                     {payout.mercuryCardId && <span className="text-emerald-700/70 ml-2">id: {payout.mercuryCardId}</span>}
                   </div>
+                )}
+                {payout.externalProofUrl && (
+                  <a
+                    href={payout.externalProofUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-emerald-800 hover:underline break-all"
+                  >
+                    External proof: {payout.externalProofUrl}
+                    <ExternalLink size={12} />
+                  </a>
                 )}
               </div>
             )}
