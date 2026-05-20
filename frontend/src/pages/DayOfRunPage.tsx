@@ -5,14 +5,14 @@ import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { DayOfDashboard } from '../components/day-of';
-import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
 
 /**
  * /run/:inviteCode — mobile-optimised day-of host dashboard. No `<Layout>`
  * chrome (no header/footer/sidebar) so the entire viewport is dashboard.
  *
- * pepperoni-58341 soft-launch: admin/underboss only (see `useIsAdminOrUnderboss`).
- * Logged-out visitors bounce to /login; logged-in non-admins bounce to /.
+ * salami-39204 approval gate: hosts/cohosts of parties with
+ * `underbossStatus === 'approved'` can access /run/. Logged-out visitors bounce
+ * to /login; logged-in users on unapproved parties bounce to /.
  */
 function DayOfRunPageContent() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -20,21 +20,15 @@ function DayOfRunPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { loadParty, party, partyLoading } = usePizza();
   const [loaded, setLoaded] = useState(false);
-  // pepperoni-58341 soft-launch gate: route is admin/underboss only.
-  const isAdminOrUnderboss = useIsAdminOrUnderboss();
 
   useEffect(() => {
     if (!inviteCode || loaded) return;
     loadParty(inviteCode).then((ok) => setLoaded(true));
   }, [inviteCode, loadParty, loaded]);
 
-  // pepperoni-58341 soft-launch: only admins/underbosses can access /run/
-  // during the gated rollout. They can access ANY party regardless of
-  // host/cohost status (so Snax can dogfood on any event). When we widen
-  // the rollout, restore a `canEdit`-style gate (party.userId === user.id
-  // || party.canEdit || super-admin email — see HostPage.tsx for the
-  // pattern) and combine it with this admin/underboss check.
-  const accessAllowed = isAdminOrUnderboss === true;
+  // salami-39204: gate Day-Of on party approval status instead of the prior
+  // admin/underboss soft-launch check. Only approved parties expose /run/.
+  const accessAllowed = party?.underbossStatus === 'approved';
 
   useEffect(() => {
     if (authLoading || partyLoading) return;
@@ -44,15 +38,13 @@ function DayOfRunPageContent() {
       navigate(`/login?redirect=${encodeURIComponent(`/run/${inviteCode}`)}`, { replace: true });
       return;
     }
-    // Wait for admin/underboss check to resolve before deciding.
-    if (isAdminOrUnderboss === null) return;
-    // Non-admin/underboss users are blocked during soft-launch — redirect to /.
+    // Once the party is loaded, redirect away if it's not approved.
     if (party && !accessAllowed) {
       navigate('/', { replace: true });
     }
-  }, [authLoading, partyLoading, loaded, party, accessAllowed, isAdminOrUnderboss, user, navigate, inviteCode]);
+  }, [authLoading, partyLoading, loaded, party, accessAllowed, user, navigate, inviteCode]);
 
-  if (authLoading || partyLoading || !loaded || !party || isAdminOrUnderboss === null) {
+  if (authLoading || partyLoading || !loaded || !party) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-theme-bg">
         <Loader2 size={32} className="animate-spin text-theme-text-muted" />
