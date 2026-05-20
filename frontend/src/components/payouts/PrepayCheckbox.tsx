@@ -16,7 +16,7 @@ interface PrepayCheckboxProps {
  * unchecking removes it. Admins can also add/remove the tag via /underboss.
  */
 export const PrepayCheckbox: React.FC<PrepayCheckboxProps> = ({ partyId }) => {
-  const { party, loadParty } = usePizza();
+  const { party, setParty } = usePizza();
   const isChecked = Array.isArray(party?.eventTags) && party!.eventTags.includes('prepay');
   // Optimistic local mirror so the toggle feels instant even before the
   // updateParty round-trip resolves and PizzaContext rehydrates.
@@ -35,13 +35,11 @@ export const PrepayCheckbox: React.FC<PrepayCheckboxProps> = ({ partyId }) => {
       : current.filter(t => t !== 'prepay');
     try {
       await updateParty(partyId, { event_tags: nextTags });
-      // Refresh PizzaContext so the new tag list is in the cached party object.
-      // Otherwise switching tabs unmounts this component, optimistic state is
-      // lost, and on remount isChecked reads from stale party.eventTags → the
-      // checkmark appears unset even though the DB has it.
-      // Fire-and-forget (don't await) — keeps the toggle snappy and avoids
-      // the tab-click-reload UX bug we hit with the slider when awaiting.
-      if (party?.inviteCode) loadParty(party.inviteCode);
+      // Optimistic context patch: update the cached party in-place so a
+      // remount (e.g. after tab switch) reads fresh eventTags without a
+      // network refresh. No loadParty() — that triggered a delayed re-render
+      // that felt like a page reload.
+      setParty(prev => (prev ? { ...prev, eventTags: nextTags } : prev));
     } catch {
       // Revert optimistic on failure
       setOptimistic(isChecked);
