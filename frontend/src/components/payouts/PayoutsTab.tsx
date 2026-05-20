@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock, Info, BadgeDollarSign } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Info, BadgeDollarSign } from 'lucide-react';
 import { Payout } from '../../types';
-import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
+import { listPayouts } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { getUnderbossContact } from '../../utils/underbossContacts';
@@ -38,9 +38,10 @@ type View = 'list' | 'new';
  * Routes between the list view and the "new payout" form, and renders a
  * detail modal for past payouts.
  *
- * Soft-launch gate (arugula-38633 v1): only underbosses + admins see the
- * full UI; everyone else sees a "coming soon" placeholder. Backend enforces
- * the same restriction. Remove `canAccess` checks here when opening up.
+ * marzano-49102: Payments is open to all signed-in party hosts/cohosts.
+ * The cap dollar value is gated by the 'go' event_tag at the HostPage source
+ * (props arrive as null when 'go' isn't set), so downstream consumers
+ * naturally hide the number.
  */
 export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   partyId,
@@ -57,33 +58,6 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailPayoutId, setDetailPayoutId] = useState<string | null>(null);
-  const [canAccess, setCanAccess] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [ub, ad] = await Promise.all([
-          fetchUnderbossMe().catch(() => null),
-          fetchAdminMe().catch(() => null),
-        ]);
-        if (cancelled) return;
-        // arugula-38633 v3: host is eligible if the party has an effective
-        // reimbursement cap. The 'go' tag is a SEPARATE downstream signal
-        // that only gates the reimbursement-promise banner (below) — NOT
-        // access. Backend enforces the same per-handler.
-        const hasCap =
-          typeof effectiveReimbursementCapUsd === 'number' &&
-          effectiveReimbursementCapUsd > 0;
-        const eligible =
-          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
-        setCanAccess(eligible);
-      } catch {
-        if (!cancelled) setCanAccess(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [effectiveReimbursementCapUsd]);
 
   const loadPayouts = useCallback(async () => {
     setLoading(true);
@@ -99,41 +73,17 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   }, [partyId]);
 
   useEffect(() => {
-    if (canAccess) loadPayouts();
-  }, [loadPayouts, canAccess]);
+    loadPayouts();
+  }, [loadPayouts]);
 
   // arugula-38633 v2 follow-up: sum already-paid payouts so the host can see
-  // their running reimbursement total. MUST be declared before any conditional
-  // returns below — moving it after would break rules-of-hooks (hook count
-  // changes when canAccess flips null/false → true). Was the source of a hard
-  // React crash that black-screened the page.
+  // their running reimbursement total.
   const totalPaidUsd = useMemo(
     () => payouts
       .filter(p => p.status === 'paid')
       .reduce((s, p) => s + Number(p.finalAmountUsd || 0), 0),
     [payouts]
   );
-
-  if (canAccess === null) {
-    return (
-      <div className="card p-8 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#ff393a]" />
-      </div>
-    );
-  }
-
-  if (canAccess === false) {
-    return (
-      <div className="card p-8 text-center max-w-lg mx-auto">
-        <Lock className="w-10 h-10 text-white/40 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Payments — Coming Soon</h3>
-        <p className="text-sm text-white/60">
-          Host payments are currently in soft launch for underbosses and admins.
-          We'll open it up to all hosts soon — stay tuned.
-        </p>
-      </div>
-    );
-  }
 
   const handleCreated = (created: Payout) => {
     // Optimistic update: prepend to list, then close the form.
@@ -179,17 +129,20 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         PartyHeader, /underboss EventRow, and NewPayoutForm's first-time
         prompt — single source of truth.
       */}
-      {/* Top banner priority (arugula-38633 v3):
+      {/* Top banner priority (marzano-49102):
           1. Missing expected_guests or location → actionable "Set your X to
              get your funding approved" (host can act on it)
-          2. Both set, no cap OR no 'go' tag → "Your underboss is reviewing"
-             (cap value isn't promised until BOTH cap AND go are in place)
-          3. Cap set AND 'go' tag present → emerald cap banner */}
+          2. No effective cap value → "Your underboss is reviewing"
+             (host won't see a $ amount until admin sets cap AND adds 'go')
+          3. Cap value present → emerald cap banner. Note: the cap value
+             arrives here as null when the 'go' event_tag isn't set, because
+             HostPage zeroes it at the source. So `hasCap` alone is the
+             correct gate — keeping `&& hasGo` would be dead, misleading
+             code about where the actual gate lives. */}
       {(() => {
         const needsExpectedGuests = !party?.expectedGuests || party.expectedGuests <= 0;
         const needsLocation = !party?.address;
         const hasCap = typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0;
-        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
 
         if (needsExpectedGuests || needsLocation) {
           const msg =
@@ -205,7 +158,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             </div>
           );
         }
-        if (hasCap && hasGo) {
+        if (hasCap) {
           return (
             <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
               <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />

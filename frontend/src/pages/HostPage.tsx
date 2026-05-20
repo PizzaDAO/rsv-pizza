@@ -531,16 +531,25 @@ function HostPageContent() {
                 <PrintTab />
               )}
 
-              {activeTab === 'payments' && party && (
-                <PayoutsTab
-                  partyId={party.id}
-                  reimbursementCapUsd={party.reimbursementCapUsd}
-                  effectiveReimbursementCapUsd={party.effectiveReimbursementCapUsd}
-                  reimbursementCapAppealNote={party.reimbursementCapAppealNote}
-                  reimbursementCapAppealedAt={party.reimbursementCapAppealedAt}
-                  expectedGuests={party.expectedGuests}
-                />
-              )}
+              {activeTab === 'payments' && party && (() => {
+                // marzano-49102: gate the cap dollar value by the 'go' event_tag.
+                // Pass null when 'go' is not set so every downstream consumer
+                // (PayoutsTab green banner, NewPayoutForm cap banner, PayoutsList
+                // "/ $X remaining" suffix, PaymentDetailsCard → PayoutMethodPicker
+                // Mercury "with a limit of $X" text, AppealCapModal) hides the
+                // dollar amount automatically. Admin-facing UIs still see the cap.
+                const hasGo = Array.isArray(party.eventTags) && party.eventTags.includes('go');
+                return (
+                  <PayoutsTab
+                    partyId={party.id}
+                    reimbursementCapUsd={hasGo ? party.reimbursementCapUsd : null}
+                    effectiveReimbursementCapUsd={hasGo ? party.effectiveReimbursementCapUsd : null}
+                    reimbursementCapAppealNote={party.reimbursementCapAppealNote}
+                    reimbursementCapAppealedAt={party.reimbursementCapAppealedAt}
+                    expectedGuests={party.expectedGuests}
+                  />
+                );
+              })()}
 
               {activeTab === 'gpp' && party && (
                 <div className="space-y-4">
