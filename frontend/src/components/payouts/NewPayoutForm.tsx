@@ -2,8 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePizza } from '../../contexts/PizzaContext';
 import { Payout, PayoutMethod, BankDetails } from '../../types';
 import { createPayout } from '../../lib/api';
+import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
@@ -62,6 +64,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   expectedGuests,
 }) => {
   const { user } = useAuth();
+  const { party } = usePizza();
+  // Party-kit cap: parsed from an event_tag of the form `k40`, `k50`, etc.
+  // When set, the cap banner appends " and up to $Y of party kit expenses".
+  const partyKitCapUsd = parsePartyKitCapFromTags(party?.eventTags);
   // Stable id for this in-flight form, used as the storage-path grouping key.
   const [payoutTempId] = useState(() => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
@@ -184,7 +190,11 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             <BadgeDollarSign size={22} className="text-[#ff393a] mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-theme-text">
-                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}.
+                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}
+                {partyKitCapUsd != null && (
+                  <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
+                )}
+                .
                 {totalPaidUsd > 0 && (
                   <> ${totalPaidUsd.toFixed(2)} paid so far.</>
                 )}

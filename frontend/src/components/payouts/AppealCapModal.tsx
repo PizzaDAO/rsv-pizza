@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, MessageSquare } from 'lucide-react';
+import { Loader2, X, MessageSquare, Info } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { appealReimbursementCap } from '../../lib/api';
+
+// Mirrors HARD_PER_TX_CEILING_USD in backend/src/services/usdc-base.service.ts.
+// Hosts already at this cap can't be pushed higher via the appeal form; they
+// need to talk to an underboss directly.
+const MAX_PER_TX_CEILING_USD = 625;
 
 interface AppealCapModalProps {
   partyId: string;
@@ -83,11 +88,31 @@ export const AppealCapModal: React.FC<AppealCapModalProps> = ({
           <h2 className="text-xl font-bold text-theme-text mb-1">Appeal payment cap</h2>
           <p className="text-sm text-theme-text-muted">
             Your cap is currently <span className="font-medium text-theme-text">${capUsd.toFixed(2)}</span>.
-            Tell us why it should be higher and an underboss will review.
+            {capUsd >= MAX_PER_TX_CEILING_USD
+              ? ' This is the maximum we give out.'
+              : ' Tell us why it should be higher and an underboss will review.'}
           </p>
         </div>
 
-        {success ? (
+        {capUsd >= MAX_PER_TX_CEILING_USD ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl text-sm text-theme-text">
+              <Info size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                ${MAX_PER_TX_CEILING_USD.toFixed(2)} is the most we fund each city.
+                If you have extenuating circumstances, please DM your underboss
+                directly.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full btn-secondary"
+            >
+              Close
+            </button>
+          </div>
+        ) : success ? (
           <div className="space-y-4">
             <div className="bg-green-500/10 border border-green-500/30 text-green-300 p-4 rounded-xl text-sm">
               Thanks — your appeal has been recorded. An underboss will review it
