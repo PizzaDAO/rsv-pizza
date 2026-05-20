@@ -335,9 +335,8 @@ function PhotoLightbox({
 
 export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
   const { t } = useTranslation('partner');
-  // Local state for optimistic updates
-  const [hostStatus, setHostStatus] = useState<HostStatus | null>(event.hostStatus);
-  const [eventTags, setEventTags] = useState<string[]>(event.eventTags || []);
+  // Read tag/status directly from props — parent setAllData drives optimistic
+  // re-render, so local mirrors would just shadow bulk updates until reload.
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesValue, setNotesValue] = useState(event.underbossNotes || '');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -616,10 +615,9 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-theme-text-secondary">{event.host.name || t('eventRow.unknownHost')}</span>
             <HostStatusBadge
-              status={hostStatus}
+              status={event.hostStatus}
               eventId={event.id}
               onUpdate={(s) => {
-                setHostStatus(s);
                 onEventUpdate?.(event.id, { hostStatus: s });
               }}
             />
@@ -631,12 +629,11 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
             </div>
           )}
           <HostTagsPills
-            tags={eventTags}
+            tags={event.eventTags ?? []}
             eventId={event.id}
             event={event}
             partnerTags={partnerTags}
             onUpdate={(tags) => {
-              setEventTags(tags);
               onEventUpdate?.(event.id, { eventTags: tags });
             }}
           />
