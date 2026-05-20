@@ -158,10 +158,27 @@ function HostPageContent() {
   const prevGuestsWithRequests = useRef<number>(0);
   const hasInitialized = useRef(false);
 
+  // arugula-38633 v2: debounced save of the pizza-tab Expected Guests slider
+  // to parties.expected_guests so it stays in sync with the Payments tab and
+  // /underboss editors. 1 s debounce mirrors the underboss EventRow pattern.
+  const expectedGuestsSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!party || orderExpectedGuests == null) return;
+    if (orderExpectedGuests === party.expectedGuests) return;
+    if (expectedGuestsSaveRef.current) clearTimeout(expectedGuestsSaveRef.current);
+    expectedGuestsSaveRef.current = setTimeout(async () => {
+      const ok = await updateParty(party.id, { expected_guests: orderExpectedGuests });
+      if (ok && party.inviteCode) await loadParty(party.inviteCode);
+    }, 1000);
+    return () => {
+      if (expectedGuestsSaveRef.current) clearTimeout(expectedGuestsSaveRef.current);
+    };
+  }, [orderExpectedGuests, party, loadParty]);
+
   useEffect(() => {
     if (!party || guests.length === 0) return;
 
-    const currentExpected = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
+    const currentExpected = orderExpectedGuests ?? party?.expectedGuests ?? party?.maxGuests ?? guests.length;
 
     if (!hasInitialized.current) {
       hasInitialized.current = true;
@@ -354,7 +371,7 @@ function HostPageContent() {
                       <input
                         type="number"
                         min="0"
-                        value={orderExpectedGuests ?? party?.maxGuests ?? guests.length}
+                        value={orderExpectedGuests ?? party?.expectedGuests ?? party?.maxGuests ?? guests.length}
                         onChange={(e) => {
                           const value = e.target.value ? parseInt(e.target.value, 10) : null;
                           setOrderExpectedGuests(value);
@@ -364,7 +381,7 @@ function HostPageContent() {
                     </div>
 
                     {(() => {
-                      const currentValue = orderExpectedGuests ?? party?.maxGuests ?? guests.length;
+                      const currentValue = orderExpectedGuests ?? party?.expectedGuests ?? party?.maxGuests ?? guests.length;
                       const minValue = 0;
                       const baseMax = Math.max(guestsWithRequests, guests.length, currentValue);
                       const dynamicMax = Math.max(baseMax + 10, Math.ceil(baseMax * 1.5));
