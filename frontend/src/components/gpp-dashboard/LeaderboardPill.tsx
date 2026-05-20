@@ -41,7 +41,7 @@ export const LeaderboardPill: React.FC<LeaderboardPillProps> = ({ partyId, metri
 
   if (loading) {
     return (
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-theme-surface border border-theme-stroke text-xs text-theme-text-faint">
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-theme-card border border-theme-stroke text-xs text-theme-text-faint">
         <span className="inline-block w-2 h-2 rounded-full bg-theme-text-faint/40 animate-pulse" />
         <span className="inline-block w-24 h-3 rounded bg-theme-text-faint/20 animate-pulse" />
       </div>
@@ -55,7 +55,7 @@ export const LeaderboardPill: React.FC<LeaderboardPillProps> = ({ partyId, metri
 
   return (
     <div className="inline-flex flex-col gap-0.5">
-      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#ff393a]/15 border border-[#ff393a]/40 text-xs text-theme-text self-start">
+      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-theme-card border border-[#ff393a]/60 text-xs text-theme-text self-start shadow-sm">
         <Medal size={12} className="text-[#ff393a]" />
         <span>
           {t('dashboard.kpis.leaderboardRank', {
