@@ -3874,7 +3874,7 @@ export async function exportAdminPayoutsCsv(filters?: AdminPayoutFilters): Promi
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objectUrl;
-  a.download = `host-payouts-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `host-reimbursements-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(objectUrl);
 }

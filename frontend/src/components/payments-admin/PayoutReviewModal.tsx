@@ -149,7 +149,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-semibold text-theme-text">
-                Payout {payout.id.slice(0, 8)}
+                Reimbursement {payout.id.slice(0, 8)}
               </h2>
               <PayoutStatusPill status={payout.status} size="md" />
               <PayoutMethodIcon method={payout.payoutMethod} showLabel />
@@ -180,7 +180,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         {selfPayoutBlocked && (
           <div className="mx-5 mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-sm text-amber-800 flex items-center gap-2">
             <AlertTriangle size={14} />
-            You are the host on this payout. Payment admins cannot approve/edit their own payouts.
+            You are the host on this reimbursement. Payment admins cannot approve/edit their own reimbursements.
           </div>
         )}
 
@@ -456,7 +456,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             {/* Reject form */}
             {showRejectForm && (
               <div className="rounded-xl border border-red-300 p-3 bg-red-50 text-sm">
-                <h3 className="font-semibold text-red-900 mb-2">Reject this payout</h3>
+                <h3 className="font-semibold text-red-900 mb-2">Reject this reimbursement</h3>
                 <IconInput
                   icon={X}
                   multiline
@@ -493,7 +493,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             {/* Execute payout form (PR 5) */}
             {showExecuteForm && (
               <div className="rounded-xl border border-emerald-300 p-3 bg-emerald-50 text-sm space-y-2">
-                <h3 className="font-semibold text-emerald-900 mb-1">Execute payout</h3>
+                <h3 className="font-semibold text-emerald-900 mb-1">Execute reimbursement</h3>
 
                 {payout.payoutMethod === 'usdc_base' && (
                   <div className="space-y-2">
@@ -597,7 +597,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
                     {busy && <Loader2 size={12} className="animate-spin" />}
-                    {payout.payoutMethod === 'usdc_base' ? 'Send Payout' :
+                    {payout.payoutMethod === 'usdc_base' ? 'Send Reimbursement' :
                       payout.payoutMethod === 'wire' ? 'Confirm wire sent' :
                       'Confirm card issued'}
                   </button>
@@ -719,7 +719,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
               >
                 <Send size={14} />
-                Execute Payout
+                Execute Reimbursement
               </button>
               <button
                 type="button"

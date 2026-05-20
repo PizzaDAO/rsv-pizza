@@ -173,7 +173,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
             <h2 className="text-lg font-semibold text-theme-text">Record External Payment</h2>
             <p className="text-xs text-theme-text-muted mt-0.5">
               Use this for payments made OUTSIDE rsv.pizza (Venmo, manual bank, etc.). Creates a paid
-              payout row immediately and writes an audit entry.
+              reimbursement row immediately and writes an audit entry.
             </p>
           </div>
           <button
@@ -198,7 +198,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               required
             />
             <p className="text-xs text-theme-text-muted mt-1">
-              Paste the party's UUID — find it in the URL of the admin payouts table or in the party admin page.
+              Paste the party's UUID — find it in the URL of the admin reimbursements table or in the party admin page.
             </p>
           </div>
 

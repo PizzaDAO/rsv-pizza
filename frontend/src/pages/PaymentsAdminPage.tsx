@@ -97,7 +97,7 @@ export function PaymentsAdminPage() {
       setTotals(res.totals);
       setNextCursor(res.nextCursor);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load payouts');
+      setErrorMsg(err.message || 'Failed to load reimbursements');
     } finally {
       if (append) setLoadingMore(false);
       else setLoading(false);
@@ -149,7 +149,7 @@ export function PaymentsAdminPage() {
       const d = await getAdminPayout(p.id);
       setDetail(d);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load payout');
+      setErrorMsg(err.message || 'Failed to load reimbursement');
     } finally {
       setDetailLoading(false);
     }
@@ -198,7 +198,7 @@ export function PaymentsAdminPage() {
 
   async function handleBulkApprove() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Approve ${selectedIds.size} payouts?`)) return;
+    if (!window.confirm(`Approve ${selectedIds.size} reimbursements?`)) return;
     setBulkBusy(true);
     try {
       for (const id of Array.from(selectedIds)) {
@@ -229,7 +229,7 @@ export function PaymentsAdminPage() {
 
   async function handleBulkMarkPaid() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Mark ${selectedIds.size} payouts as paid (no transaction refs)?`)) return;
+    if (!window.confirm(`Mark ${selectedIds.size} reimbursements as paid (no transaction refs)?`)) return;
     setBulkBusy(true);
     try {
       for (const id of Array.from(selectedIds)) {

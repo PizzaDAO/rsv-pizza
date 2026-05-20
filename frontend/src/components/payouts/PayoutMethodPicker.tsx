@@ -86,7 +86,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           value="usdc_base"
           icon={<Coins size={18} />}
           title="USDC on Base"
-          description="On-chain payout to your wallet."
+          description="On-chain reimbursement to your wallet."
         />
         <Option
           value="mercury_card"

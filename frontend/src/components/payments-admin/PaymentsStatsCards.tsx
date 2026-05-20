@@ -58,7 +58,7 @@ export const PaymentsStatsCards: React.FC<PaymentsStatsCardsProps> = ({ totals, 
       />
       <StatCard
         icon={<TrendingUp size={14} />}
-        label="Avg payout"
+        label="Avg reimbursement"
         value={formatUsd(totals.avgUsd)}
       />
       <StatCard
