@@ -151,7 +151,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
               <div>
                 <h2 className="text-lg font-semibold text-theme-text">Reimbursements</h2>
                 <p className="text-sm text-theme-text-secondary mt-1">
-                  Upload receipts for out-of-pocket expenses and choose how you want to get paid back.
+                  Upload receipts for expenses and choose how you want to get paid back.
                 </p>
               </div>
               <button
