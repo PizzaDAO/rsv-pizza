@@ -15,6 +15,7 @@
  * wires in the actual Mercury / wire / USDC-via-Privy execution paths.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import {
   requireAuth,
@@ -32,6 +33,33 @@ const router = Router();
 
 const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
+
+/**
+ * Shared Prisma `select` for the embedded `party` on payout responses.
+ *
+ * `expectedGuests` is the host's planning number; `_count.guests` is a
+ * filtered count of confirmed direct RSVPs (status='CONFIRMED' AND
+ * submittedVia IN ('link','rsvp','api')) — bulk-invited rows are excluded
+ * per the project convention (see feedback_invite_vs_link_rsvps memory).
+ * `serializePayout` flattens this to `party.rsvpCount` on the wire.
+ */
+const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
+  id: true,
+  name: true,
+  inviteCode: true,
+  customUrl: true,
+  expectedGuests: true,
+  _count: {
+    select: {
+      guests: {
+        where: {
+          status: 'CONFIRMED',
+          submittedVia: { in: ['link', 'rsvp', 'api'] },
+        },
+      },
+    },
+  },
+};
 
 type AdminActorKind = 'admin' | 'super_admin' | 'payment_admin';
 
@@ -220,6 +248,12 @@ function serializePayout(row: any): any {
           name: row.party.name,
           inviteCode: row.party.inviteCode,
           customUrl: row.party.customUrl,
+          // arugula-38633 v2 follow-up: admin dashboard shows planning vs
+          // actuals. `expectedGuests` is the host's planning number;
+          // `rsvpCount` is the filtered _count of confirmed direct RSVPs
+          // (excludes 'host' / 'host-checkin' / 'invite' rows).
+          expectedGuests: row.party.expectedGuests ?? null,
+          rsvpCount: row.party._count?.guests ?? 0,
         }
       : undefined,
     host: row.host
@@ -260,7 +294,7 @@ router.get(
       const rows = await prisma.payout.findMany({
         where,
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -440,7 +474,7 @@ router.post(
             reviewedAt: paidAt,
           },
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -470,7 +504,7 @@ router.post(
       const full = await prisma.payout.findUnique({
         where: { id: created.id },
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
           documents: { orderBy: { sortOrder: 'asc' } },
           audits: { orderBy: { createdAt: 'desc' } },
@@ -508,7 +542,7 @@ router.get(
       const findArgs: any = {
         where,
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
           documents: { orderBy: { sortOrder: 'asc' } },
         },
@@ -601,7 +635,7 @@ router.get(
       const row = await prisma.payout.findUnique({
         where: { id: req.params.id },
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
           documents: { orderBy: { sortOrder: 'asc' } },
           audits: { orderBy: { createdAt: 'desc' } },
@@ -704,7 +738,7 @@ router.patch(
           where: { id: existing.id },
           data,
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -774,7 +808,7 @@ router.post(
             reviewedAt: new Date(),
           },
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -825,7 +859,7 @@ router.post(
             const refreshed = await prisma.payout.findUnique({
               where: { id: existing.id },
               include: {
-                party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+                party: { select: PAYOUT_PARTY_SELECT },
                 host: { select: { id: true, name: true, email: true } },
                 documents: { orderBy: { sortOrder: 'asc' } },
                 audits: { orderBy: { createdAt: 'desc' } },
@@ -898,7 +932,7 @@ router.post(
             reviewedAt: new Date(),
           },
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -981,7 +1015,7 @@ router.post(
           where: { id: existing.id },
           data,
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -1102,7 +1136,7 @@ async function executePayout(params: {
             transactionHash: result.txHash,
           },
           include: {
-            party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+            party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
             documents: { orderBy: { sortOrder: 'asc' } },
             audits: { orderBy: { createdAt: 'desc' } },
@@ -1164,7 +1198,7 @@ async function executePayout(params: {
           wireReference: wireRef,
         },
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
           documents: { orderBy: { sortOrder: 'asc' } },
           audits: { orderBy: { createdAt: 'desc' } },
@@ -1210,7 +1244,7 @@ async function executePayout(params: {
           mercuryCardId: cardId,
         },
         include: {
-          party: { select: { id: true, name: true, inviteCode: true, customUrl: true } },
+          party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
           documents: { orderBy: { sortOrder: 'asc' } },
           audits: { orderBy: { createdAt: 'desc' } },

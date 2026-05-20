@@ -26,18 +26,18 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   const cityName = event.city
     || event.name.replace(/^Global Pizza Party\s*/i, '').trim()
     || null;
-  const confirmedRsvps = event.guestCount ?? 0;
   const { suggestedUsd, formula } = computeSuggestedReimbursementCap({
     city: cityName,
-    confirmedRsvpCount: confirmedRsvps,
+    expectedGuests: event.expectedGuests ?? null,
   });
+  const hasSuggestion = suggestedUsd != null;
 
   const currentCap = event.reimbursementCapUsd;
   const hasAppeal = !!event.reimbursementCapAppealedAt;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(
-    currentCap != null ? String(currentCap) : String(suggestedUsd)
+    currentCap != null ? String(currentCap) : (suggestedUsd != null ? String(suggestedUsd) : '')
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   }
 
   async function handleValidate() {
+    if (suggestedUsd == null) return;
     await save(suggestedUsd);
   }
 
@@ -88,7 +89,7 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
             if (e.key === 'Enter') { e.preventDefault(); handleOverrideSubmit(); }
             if (e.key === 'Escape') { setEditing(false); setError(null); }
           }}
-          placeholder={String(suggestedUsd)}
+          placeholder={suggestedUsd != null ? String(suggestedUsd) : 'amount'}
           className="!pl-6 py-0.5 text-[10px] w-16 bg-theme-surface border border-theme-stroke rounded text-theme-text"
           autoFocus
         />
@@ -118,6 +119,31 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   }
 
   if (currentCap == null) {
+    if (!hasSuggestion) {
+      // No expected_guests set yet — underboss must fill it in first before
+      // we can produce a suggested cap. Override is still allowed (admin may
+      // know the amount independently).
+      return (
+        <div className="flex items-center gap-1 mt-0.5" title={formula}>
+          <span className="text-[10px] text-theme-text-faint italic">
+            Set expected guests first
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-[9px] px-1 py-0.5 rounded border border-theme-stroke text-theme-text-muted hover:text-theme-text transition-colors"
+            title="Override with a custom value"
+          >
+            Override
+          </button>
+          {hasAppeal && (
+            <span title={event.reimbursementCapAppealNote || 'Host has appealed'}>
+              <AlertCircle size={10} className="text-amber-400" />
+            </span>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="flex items-center gap-1 mt-0.5" title={formula}>
         <span className="text-[10px] text-theme-text-faint">

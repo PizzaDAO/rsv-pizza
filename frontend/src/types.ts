@@ -1502,6 +1502,13 @@ export interface AdminPayout extends Payout {
     name: string;
     inviteCode: string;
     customUrl: string | null;
+    /** Host's planning number (arugula-38633 v2 follow-up). */
+    expectedGuests: number | null;
+    /**
+     * Count of confirmed direct RSVPs — excludes bulk-invited rows.
+     * Backend filter: status='CONFIRMED' AND submittedVia IN ('link','rsvp','api').
+     */
+    rsvpCount: number;
   };
   host: {
     id: string;
