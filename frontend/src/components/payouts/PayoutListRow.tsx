@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, X, ChevronRight, CreditCard, Banknote, Coins, HelpCircle, ImageOff } from 'lucide-react';
 import { Payout, PayoutMethod, PayoutStatus } from '../../types';
-import { cancelPayout } from '../../lib/api';
+import { cancelPayout, fetchAdminMe } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PayoutListRowProps {
   payout: Payout;
@@ -52,7 +53,22 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
   onOpen,
   onCancelled,
 }) => {
+  const { user } = useAuth();
   const [cancelling, setCancelling] = useState(false);
+
+  // gouda-83912: only the submitter (or any admin) may cancel a payout from
+  // the host-side list. Other cohosts can still see and open the row, but
+  // the inline X button is hidden so they don't get a 403 on click.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdminMe()
+      .then(r => { if (!cancelled) setIsAdmin(Boolean(r?.isAdmin)); })
+      .catch(() => { /* unauth or non-admin — leave false */ });
+    return () => { cancelled = true; };
+  }, []);
+  const canModify =
+    isAdmin || (user?.id != null && user.id === payout.hostUserId);
 
   // First pizza photo, or first receipt as a fallback thumbnail
   const thumb = payout.documents.find(d => d.kind === 'pizza')
@@ -121,8 +137,8 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
         {STATUS_LABEL[payout.status]}
       </span>
 
-      {/* Cancel button (only while pending) */}
-      {payout.status === 'pending' && (
+      {/* Cancel button (only while pending, and only for the submitter/admin) */}
+      {payout.status === 'pending' && canModify && (
         <button
           onClick={handleCancel}
           disabled={cancelling}

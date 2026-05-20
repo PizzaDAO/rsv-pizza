@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign } from 'lucide-react';
 import { Payout, PayoutStatus } from '../../types';
-import { getPayout, updatePayout } from '../../lib/api';
+import { getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { methodIcon, methodLabel } from './PayoutListRow';
 import { IconInput } from '../IconInput';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
@@ -45,9 +46,22 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   onClose,
   onUpdated,
 }) => {
+  const { user } = useAuth();
   const [payout, setPayout] = useState<Payout | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // gouda-83912: admin/superadmin viewers may edit any cohost's payout from
+  // the host-side modal (mirrors backend `isAnyAdmin` bypass). Non-admin
+  // cohosts can only edit their own submissions.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdminMe()
+      .then(r => { if (!cancelled) setIsAdmin(Boolean(r?.isAdmin)); })
+      .catch(() => { /* unauth or non-admin — leave false */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // ---- edit state ----
   const [editing, setEditing] = useState(false);
@@ -109,6 +123,13 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   const isProcessingUploads =
     newReceipts.some(r => r.status === 'uploading' || r.status === 'ocring') ||
     newPizzaPhotos.some(p => p.status === 'uploading');
+
+  // gouda-83912: only the submitter (or any admin) may edit / cancel a payout.
+  // Other cohosts on the same party can still see the row but the affordances
+  // are hidden — a read-only caption points at the submitter instead.
+  const canModify = Boolean(
+    payout && (isAdmin || (user?.id != null && user.id === payout.hostUserId))
+  );
 
   const handleSave = async () => {
     if (!payout || saving) return;
@@ -207,7 +228,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {payout && !editing && payout.status === 'pending' && (
+            {payout && !editing && payout.status === 'pending' && canModify && (
               <button
                 type="button"
                 onClick={enterEdit}
@@ -264,6 +285,14 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   {STATUS_LABEL[payout.status]}
                 </span>
               </div>
+
+              {/* gouda-83912: ownership notice for non-owners on pending payouts.
+                  Explains why Edit/Cancel buttons aren't shown. */}
+              {payout.status === 'pending' && !canModify && (
+                <p className="text-xs text-theme-text-muted">
+                  Only {payout.hostName ?? payout.hostEmail ?? 'the submitter'} can modify this.
+                </p>
+              )}
 
               {/* Payout method */}
               <div className="rounded-lg bg-theme-surface-hover p-3 text-sm">

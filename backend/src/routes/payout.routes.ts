@@ -708,6 +708,18 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       );
     }
 
+    // gouda-83912: only the cohost who submitted the payout (or any admin)
+    // may edit it. Other cohosts on the same party can see the row but
+    // cannot mutate it.
+    const isAdminCaller = await isAnyAdmin(req.userEmail);
+    if (!isAdminCaller && existing.hostUserId !== req.userId) {
+      throw new AppError(
+        'Only the cohost who submitted this payment can edit it.',
+        403,
+        'FORBIDDEN_NOT_OWNER',
+      );
+    }
+
     const data: Record<string, any> = {};
 
     if (payoutMethod !== undefined) {
@@ -1076,6 +1088,18 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
         'Only pending payments can be cancelled',
         400,
         'PAYOUT_NOT_PENDING'
+      );
+    }
+
+    // gouda-83912: only the cohost who submitted the payout (or any admin)
+    // may delete it. Other cohosts on the same party can see the row but
+    // cannot mutate it.
+    const isAdminCaller = await isAnyAdmin(req.userEmail);
+    if (!isAdminCaller && existing.hostUserId !== req.userId) {
+      throw new AppError(
+        'Only the cohost who submitted this payment can cancel it.',
+        403,
+        'FORBIDDEN_NOT_OWNER',
       );
     }
 
