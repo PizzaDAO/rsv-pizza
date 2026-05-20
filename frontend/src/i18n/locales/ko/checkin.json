@@ -2,6 +2,11 @@
   "title": "게스트 체크인",
   "loading": "게스트 체크인 중...",
   "vouching": "보증 중…",
+  "attribution": {
+    "checkedInBy": "Checked in by {{name}}",
+    "alsoVouchedBy_one": "Also vouched for by 1 more: {{names}}",
+    "alsoVouchedBy_other": "Also vouched for by {{count}} more: {{names}}"
+  },
   "success": {
     "title": "체크인 완료!",
     "backToDashboard": "이벤트 대시보드로 돌아가기"

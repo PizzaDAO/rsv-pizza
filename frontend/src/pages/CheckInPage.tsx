@@ -5,9 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount } from '../lib/api';
+import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, type Attestation } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 import { GPPClouds } from '../components/GPPClouds';
+
+// provolone-39042: friendly display name for an attestation row.
+const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
 
 const DISCOUNT_CLOUDS = [
   // Mobile clouds — above and below content
@@ -46,6 +49,8 @@ export function CheckInPage() {
   const [hasAttempted, setHasAttempted] = useState(false);
   const [discountData, setDiscountData] = useState<any>(null);
   const [discountChecked, setDiscountChecked] = useState(false);
+  // provolone-39042: check-in attribution history
+  const [attestations, setAttestations] = useState<Attestation[]>([]);
 
   // Pre-auth discount check: if event has ended, show discount flow instead of check-in
   useEffect(() => {
@@ -123,6 +128,8 @@ export function CheckInPage() {
 
         const data = await resp.json();
         setGuestName(data.guest?.name || 'Guest');
+        // provolone-39042: capture attestation history from GET response
+        setAttestations(data.attestations || []);
 
         // If the target guest is already checked in
         if (data.isCheckedIn) {
@@ -145,6 +152,7 @@ export function CheckInPage() {
             const result = await checkInGuest(inviteCode, guestId);
             if (result.success) {
               setGuestName(result.guest?.name || guestName);
+              setAttestations(result.attestations || []);
               if (result.alreadyCheckedIn) {
                 setState('already-checked-in');
                 setCheckedInAt(result.guest?.checkedInAt || null);
@@ -169,6 +177,7 @@ export function CheckInPage() {
           const result = await vouchForGuest(inviteCode, guestId);
           if (result.success) {
             setGuestName(result.guest?.name || guestName);
+            setAttestations(result.attestations || []);
             if (result.alreadyCheckedIn) {
               setState('already-checked-in');
               setCheckedInAt(result.guest?.checkedInAt || null);
@@ -221,6 +230,30 @@ export function CheckInPage() {
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  // provolone-39042: render "Checked in by X" + optional "Also vouched for by N more"
+  const renderAttestationAttribution = () => {
+    if (!attestations || attestations.length === 0) return null;
+    const first = attestations[0];
+    const extras = attestations.slice(1);
+    const previewNames = extras.slice(0, 3).map(attestationDisplay).join(', ');
+    const moreSuffix = extras.length > 3 ? `, +${extras.length - 3} more` : '';
+    return (
+      <div className="mt-3 space-y-1 text-sm">
+        <p className="text-theme-text-secondary">
+          {t('attribution.checkedInBy', { name: attestationDisplay(first) })}
+        </p>
+        {extras.length > 0 && (
+          <p className="text-theme-text-muted text-xs">
+            {t('attribution.alsoVouchedBy', {
+              count: extras.length,
+              names: previewNames + moreSuffix,
+            })}
+          </p>
+        )}
+      </div>
+    );
   };
 
   const renderContent = () => {
@@ -316,6 +349,7 @@ export function CheckInPage() {
               <span>{formatCheckInTime(checkedInAt)}</span>
             </p>
           )}
+          {renderAttestationAttribution()}
         </div>
       );
     }
@@ -333,6 +367,7 @@ export function CheckInPage() {
               <span>{t('alreadyCheckedIn.checkedInAt', { time: formatCheckInTime(checkedInAt) })}</span>
             </p>
           )}
+          {renderAttestationAttribution()}
         </div>
       );
     }

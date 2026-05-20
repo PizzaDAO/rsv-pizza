@@ -234,6 +234,7 @@ model Party {
   payouts               Payout[]
   outreachAttempts      OutreachAttempt[]
   announcements         Announcement[]
+  attestations          GuestAttestation[]
 
   @@map("parties")
 }
@@ -345,8 +346,41 @@ model Guest {
   quizAnswers      QuizAnswer[]
   scorecardItems   GuestScorecardItem[]
 
+  // provolone-39042: peer/host/self attestations for check-in attribution
+  attestationsReceived GuestAttestation[] @relation("AttestationsOfGuest")
+  attestationsGiven    GuestAttestation[] @relation("AttestationsByGuest")
+
   @@index([email])
   @@map("guests")
+}
+
+// ============================================
+// Check-in Attestations (provolone-39042)
+// ============================================
+// Records every check-in attempt — host_admin, peer_guest, or self_host.
+// Multiple attestations per guest are allowed; the DB has a unique COALESCE
+// index on (guest_id, COALESCE(attester_user_id, attester_guest_id::text))
+// that Prisma can't express, so we omit @@unique here and catch
+// P2002/23505 in the route handler instead. DO NOT add a competing
+// @@unique — the migration would try to drop the COALESCE index.
+model GuestAttestation {
+  id               String   @id @default(uuid()) @db.Uuid
+  guestId          String   @map("guest_id") @db.Uuid
+  partyId          String   @map("party_id") @db.Uuid
+  attesterKind     String   @map("attester_kind") // 'host_admin' | 'peer_guest' | 'self_host'
+  attesterUserId   String?  @map("attester_user_id")
+  attesterGuestId  String?  @map("attester_guest_id") @db.Uuid
+  attesterEmail    String?  @map("attester_email")
+  attesterName     String?  @map("attester_name")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  guest         Guest  @relation("AttestationsOfGuest", fields: [guestId], references: [id], onDelete: Cascade)
+  party         Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  attesterGuest Guest? @relation("AttestationsByGuest", fields: [attesterGuestId], references: [id], onDelete: SetNull)
+
+  @@index([partyId, createdAt(sort: Desc)])
+  @@index([guestId])
+  @@map("guest_attestations")
 }
 
 // Social media posts about the event (for reports)

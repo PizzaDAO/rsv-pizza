@@ -1007,6 +1007,15 @@ export async function verifyTweet(slug: string, tweetUrl: string): Promise<{ ver
 }
 
 // Check-in API functions
+
+// provolone-39042: attestation history for "Checked in by X" attribution.
+export interface Attestation {
+  kind: 'host_admin' | 'peer_guest' | 'self_host';
+  name: string | null;
+  email: string | null;
+  at: string;
+}
+
 export interface CheckInResponse {
   success: boolean;
   alreadyCheckedIn: boolean;
@@ -1018,6 +1027,7 @@ export interface CheckInResponse {
     checkedInBy?: string;
   };
   message: string;
+  attestations?: Attestation[];
 }
 
 export async function checkInGuest(inviteCode: string, guestId: string): Promise<CheckInResponse> {
@@ -1059,6 +1069,9 @@ export interface CheckInStatusResponse {
     checkedInBy?: string;
   };
   isCheckedIn: boolean;
+  callerIsTarget?: boolean;
+  callerIsHost?: boolean;
+  attestations?: Attestation[];
 }
 
 export async function getCheckInStatus(inviteCode: string, guestId: string): Promise<CheckInStatusResponse> {
@@ -3318,6 +3331,7 @@ export interface VouchResponse {
     checkedInAt: string;
   };
   message?: string;
+  attestations?: Attestation[];
 }
 
 /** Host/co-host self-check-in (bootstraps the chain of trust) */
