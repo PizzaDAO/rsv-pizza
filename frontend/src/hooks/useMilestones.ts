@@ -24,16 +24,11 @@ const STORAGE_PREFIX = 'dashboardKPIs.celebrated.';
 
 // Hardcoded milestone list — order also controls "nextMilestone" priority.
 export const ALL_MILESTONES: Milestone[] = [
-  { id: 'firstRsvp',       statKey: 'totalRsvps',         threshold: 1,   labelKey: 'host.dashboard.kpis.milestones.firstRsvp' },
   { id: 'rsvps25',         statKey: 'totalRsvps',         threshold: 25,  labelKey: 'host.dashboard.kpis.milestones.rsvps25' },
   { id: 'rsvps50',         statKey: 'totalRsvps',         threshold: 50,  labelKey: 'host.dashboard.kpis.milestones.rsvps50' },
   { id: 'rsvps100',        statKey: 'totalRsvps',         threshold: 100, labelKey: 'host.dashboard.kpis.milestones.rsvps100' },
   { id: 'firstWallet',     statKey: 'walletAddresses',    threshold: 1,   labelKey: 'host.dashboard.kpis.milestones.firstWallet' },
   { id: 'firstNewsletter', statKey: 'newsletterSignups', threshold: 1,   labelKey: 'host.dashboard.kpis.milestones.firstNewsletter' },
-  { id: 'firstPoap',       statKey: 'poapMints',          threshold: 1,   labelKey: 'host.dashboard.kpis.milestones.firstPoap' },
-  // `goalReached` is computed dynamically — `statKey` and `threshold` here are
-  // placeholders so the type still works; the hook resolves it specially.
-  { id: 'goalReached',     statKey: '__goal__',           threshold: 1,   labelKey: 'host.dashboard.kpis.milestones.goalReached' },
 ];
 
 // Map a HostGoals key to its corresponding stat key.
