@@ -20,24 +20,23 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isUnderboss } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 
 const router = Router();
 
-// Path-scope auth + soft-launch gate to /:partyId/payouts ONLY. The router is
-// mounted at /api/parties (alongside many sibling routers including partyRoutes
-// after it), so an unconditioned `router.use(...)` here would gate every
+// Path-scope auth on /:partyId/payouts ONLY. The router is mounted at
+// /api/parties (alongside many sibling routers including partyRoutes after
+// it), so an unconditioned `router.use(...)` here would gate every
 // /api/parties/* request — which broke host guest approvals system-wide.
+//
+// The soft-launch gate USED to live here as a second router.use(), but it
+// runs before route matching so `req.params.partyId` is empty — which made
+// the cap-based eligibility check (arugula-38633 v3) impossible. The gate
+// now lives in each handler via `assertCanUsePayoutsForParty(req, partyId)`,
+// called alongside the existing `canUserEditParty` authorization layer.
 router.use('/:partyId/payouts', requireAuth);
-router.use('/:partyId/payouts', async (req, res, next) => {
-  try {
-    await assertCanUsePayouts(req as AuthRequest);
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
 
 // Aggressive rate limit on the OCR-preview endpoint to prevent OpenAI quota abuse.
 // 20 calls/hour/user, keyed by userId (falls back to IP).
@@ -200,8 +199,9 @@ function validateMethodSpecificFields(
 }
 
 /**
- * Soft-launch gate: this feature is currently limited to underbosses + admins.
- * Remove this check (and all callsites below) when opening up to all hosts.
+ * Soft-launch gate: this feature is open to underbosses + admins, OR to any
+ * host whose party has a reimbursement cap set (validated cap OR numeric
+ * event_tag fallback). See arugula-38633 v3 for context.
  */
 async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
   if (await isSuperAdmin(email)) return true;
@@ -210,14 +210,33 @@ async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
   return false;
 }
 
-async function assertCanUsePayouts(req: AuthRequest): Promise<void> {
-  if (!(await isUnderbossOrAdmin(req.userEmail))) {
-    throw new AppError(
-      'The payments feature is currently in soft launch for underbosses and admins only.',
-      403,
-      'FORBIDDEN',
-    );
-  }
+/**
+ * Returns true if the party has an effective reimbursement cap — either an
+ * underboss-validated `reimbursementCapUsd` value OR a numeric event_tag that
+ * parses as a cap. Delegates to the shared `computeEffectiveCapUsd` helper
+ * so the gate matches the value shown to the host in the UI exactly.
+ */
+async function partyHasCap(partyId: string): Promise<boolean> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  if (!party) return false;
+  const effective = computeEffectiveCapUsd({
+    reimbursementCapUsd: party.reimbursementCapUsd,
+    eventTags: party.eventTags,
+  });
+  return typeof effective === 'number' && effective > 0;
+}
+
+async function assertCanUsePayoutsForParty(req: AuthRequest, partyId: string): Promise<void> {
+  if (await isUnderbossOrAdmin(req.userEmail)) return;
+  if (await partyHasCap(partyId)) return;
+  throw new AppError(
+    'The payments feature is currently in soft launch for underbosses, admins, and parties with a reimbursement cap set.',
+    403,
+    'FORBIDDEN',
+  );
 }
 
 async function isAnyAdmin(email?: string): Promise<boolean> {
@@ -239,6 +258,8 @@ router.post(
       if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
         throw new AppError('imageUrl is required', 400, 'MISSING_IMAGE_URL');
       }
+
+      await assertCanUsePayoutsForParty(req, partyId);
 
       const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
       if (!canEdit) {
@@ -294,6 +315,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       saveAsDefault,
       estimatedAttendance,
     } = req.body || {};
+
+    await assertCanUsePayoutsForParty(req, partyId);
 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
@@ -537,6 +560,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
 router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
+    await assertCanUsePayoutsForParty(req, partyId);
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
@@ -561,6 +585,9 @@ router.get('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response
     const { partyId, payoutId } = req.params;
 
     const adminAccess = await isAnyAdmin(req.userEmail);
+    if (!adminAccess) {
+      await assertCanUsePayoutsForParty(req, partyId);
+    }
     const canEdit = adminAccess || (await canUserEditParty(partyId, req.userId, req.userEmail));
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
@@ -594,6 +621,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       finalAmountUsd,
       mercuryCardLast4,
     } = req.body || {};
+
+    await assertCanUsePayoutsForParty(req, partyId);
 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
@@ -674,6 +703,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, payoutId } = req.params;
+
+    await assertCanUsePayoutsForParty(req, partyId);
 
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
