@@ -4,7 +4,6 @@ import { getReport, getPageViewStats, updateHostGoals } from '../../lib/api';
 import type { PageViewStats } from '../../types';
 import { ReportKPIs } from '../report/ReportKPIs';
 import { LeaderboardPill } from './LeaderboardPill';
-import { MilestoneBadgeStrip } from './MilestoneBadgeStrip';
 import { useMilestones } from '../../hooks/useMilestones';
 import { useMomentum } from '../../hooks/useMomentum';
 import { useConfetti } from '../../hooks/useConfetti';
@@ -101,7 +100,7 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ party, guests }) =
     };
   }, [report, pageViewStats]);
 
-  const { unlocked, justCrossed, nextMilestone } = useMilestones(stats, party.id, localGoals);
+  const { justCrossed } = useMilestones(stats, party.id, localGoals);
 
   const momentum = useMomentum(guests);
   const deltas = useMemo<Record<string, MomentumDelta>>(() => ({
@@ -210,7 +209,6 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ party, guests }) =
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <LeaderboardPill partyId={party.id} />
       </div>
-      <MilestoneBadgeStrip unlocked={unlocked} next={nextMilestone} />
       <ReportKPIs
         report={reportForKpis}
         onChange={() => { /* noop — gamified mode is read-only for stat config */ }}
