@@ -68,17 +68,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           fetchAdminMe().catch(() => null),
         ]);
         if (cancelled) return;
-        // arugula-38633 v3: host is eligible if the party has BOTH an
-        // effective reimbursement cap AND the 'go' event_tag (the explicit
-        // "open this event to the host" signal, settable only by admin /
-        // payment_admin / super_admin via PATCH /api/parties/:id). Backend
-        // enforces the same gate per-handler.
+        // arugula-38633 v3: host is eligible if the party has an effective
+        // reimbursement cap. The 'go' tag is a SEPARATE downstream signal
+        // that only gates the reimbursement-promise banner (below) — NOT
+        // access. Backend enforces the same per-handler.
         const hasCap =
           typeof effectiveReimbursementCapUsd === 'number' &&
           effectiveReimbursementCapUsd > 0;
-        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
         const eligible =
-          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || (hasCap && hasGo);
+          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
         setCanAccess(eligible);
       } catch {
         if (!cancelled) setCanAccess(false);

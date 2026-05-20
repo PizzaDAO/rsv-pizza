@@ -211,13 +211,13 @@ async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
 }
 
 /**
- * Returns true if the party meets the host-gate for Payments: it has an
- * effective reimbursement cap (validated `reimbursementCapUsd` OR a numeric
- * event_tag fallback) AND the `'go'` event_tag is present. The `'go'` tag is
- * the explicit "open this event up to the host" signal — only payment_admin /
- * admin / super_admin can place it (see party.routes.ts PATCH /:id).
+ * Returns true if the party has an effective reimbursement cap — either an
+ * underboss-validated `reimbursementCapUsd` value OR a numeric event_tag
+ * fallback. Cap alone gates host access to Payments; the `'go'` tag is a
+ * SEPARATE downstream signal that controls the reimbursement-promise banner
+ * on the frontend (not gated here).
  */
-async function partyMeetsHostGate(partyId: string): Promise<boolean> {
+async function partyHasCap(partyId: string): Promise<boolean> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
     select: { reimbursementCapUsd: true, eventTags: true },
@@ -227,16 +227,14 @@ async function partyMeetsHostGate(partyId: string): Promise<boolean> {
     reimbursementCapUsd: party.reimbursementCapUsd,
     eventTags: party.eventTags,
   });
-  const hasCap = typeof effective === 'number' && effective > 0;
-  const hasGo = Array.isArray(party.eventTags) && party.eventTags.includes('go');
-  return hasCap && hasGo;
+  return typeof effective === 'number' && effective > 0;
 }
 
 async function assertCanUsePayoutsForParty(req: AuthRequest, partyId: string): Promise<void> {
   if (await isUnderbossOrAdmin(req.userEmail)) return;
-  if (await partyMeetsHostGate(partyId)) return;
+  if (await partyHasCap(partyId)) return;
   throw new AppError(
-    'The payments feature is currently in soft launch for underbosses, admins, and parties opened by an admin (cap set + \'go\' tag).',
+    'The payments feature is currently in soft launch for underbosses, admins, and parties with a reimbursement cap set.',
     403,
     'FORBIDDEN',
   );
