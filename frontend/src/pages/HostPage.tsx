@@ -161,19 +161,23 @@ function HostPageContent() {
   // arugula-38633 v2: debounced save of the pizza-tab Expected Guests slider
   // to parties.expected_guests so it stays in sync with the Payments tab and
   // /underboss editors. 1 s debounce mirrors the underboss EventRow pattern.
+  // NOTE: we deliberately DON'T call loadParty() after the save — the local
+  // orderExpectedGuests state already has the value the slider is reading,
+  // and a loadParty re-fetch would re-render HostPage right when the user is
+  // trying to click another tab. Stale party.expectedGuests on this page is
+  // resolved on the next natural navigation/refresh.
   const expectedGuestsSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!party || orderExpectedGuests == null) return;
     if (orderExpectedGuests === party.expectedGuests) return;
     if (expectedGuestsSaveRef.current) clearTimeout(expectedGuestsSaveRef.current);
     expectedGuestsSaveRef.current = setTimeout(async () => {
-      const ok = await updateParty(party.id, { expected_guests: orderExpectedGuests });
-      if (ok && party.inviteCode) await loadParty(party.inviteCode);
+      await updateParty(party.id, { expected_guests: orderExpectedGuests });
     }, 1000);
     return () => {
       if (expectedGuestsSaveRef.current) clearTimeout(expectedGuestsSaveRef.current);
     };
-  }, [orderExpectedGuests, party, loadParty]);
+  }, [orderExpectedGuests, party]);
 
   useEffect(() => {
     if (!party || guests.length === 0) return;
