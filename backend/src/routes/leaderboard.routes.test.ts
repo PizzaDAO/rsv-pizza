@@ -119,6 +119,92 @@ describe('Leaderboard route — quattro-71244', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ rank: 1, total: 4, topPercent: 25, scope: 'gpp-season' });
+
+      // tomato-71832: the universe query must filter by underbossStatus='approved'.
+      expect(mockPrisma.party.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            eventType: 'gpp',
+            underbossStatus: 'approved',
+            eventTags: { has: 'gpp2026' },
+          }),
+        }),
+      );
+    });
+
+    it('excludes unapproved parties from the ranking universe (tomato-71832)', async () => {
+      // Mixed fixture: A is approved+top-rsvps, B is approved, C is pending
+      // (should NOT be counted), D is approved+zero-rsvps. The route relies on
+      // Prisma to filter by `underbossStatus: 'approved'`, so we simulate that
+      // by returning only the approved parties from `findMany`.
+      mockPrisma.party.findUnique.mockResolvedValue({
+        id: PARTY_A,
+        eventType: 'gpp',
+        eventTags: ['gpp2026'],
+      });
+      // Note: C is intentionally absent — Prisma would have filtered it out
+      // server-side because its underbossStatus is 'pending', not 'approved'.
+      mockPrisma.party.findMany.mockResolvedValue([
+        { id: PARTY_A },
+        { id: PARTY_B },
+        { id: PARTY_D },
+      ]);
+      mockPrisma.guest.groupBy.mockResolvedValue([
+        { partyId: PARTY_A, _count: { _all: 10 } },
+        { partyId: PARTY_B, _count: { _all: 5 } },
+        // D has zero guests; C would have had 99 but it's pending so excluded.
+      ]);
+
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      const res = await request(app)
+        .get(`/api/parties/${PARTY_A}/leaderboard-rank?metric=totalRsvps`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      // total=3 (A, B, D) — pending party C is NOT counted in the denominator.
+      expect(res.body).toEqual({ rank: 1, total: 3, topPercent: 33, scope: 'gpp-season' });
+
+      // Verify the actual Prisma where clause requested the approved filter.
+      expect(mockPrisma.party.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            eventType: 'gpp',
+            underbossStatus: 'approved',
+          }),
+        }),
+      );
+    });
+
+    it('applies the approved filter on the gpp-all fallback scope too (tomato-71832)', async () => {
+      mockPrisma.party.findUnique.mockResolvedValue({
+        id: PARTY_A,
+        eventType: 'gpp',
+        eventTags: [], // no season tag → gpp-all fallback
+      });
+      mockPrisma.party.findMany.mockResolvedValue([{ id: PARTY_A }, { id: PARTY_B }]);
+      mockPrisma.guest.groupBy.mockResolvedValue([
+        { partyId: PARTY_A, _count: { _all: 2 } },
+        { partyId: PARTY_B, _count: { _all: 1 } },
+      ]);
+
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      const res = await request(app)
+        .get(`/api/parties/${PARTY_A}/leaderboard-rank?metric=totalRsvps`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('gpp-all');
+
+      // The fallback path still narrows by underbossStatus='approved'.
+      const call = mockPrisma.party.findMany.mock.calls[0][0];
+      expect(call.where.eventType).toBe('gpp');
+      expect(call.where.underbossStatus).toBe('approved');
+      // No season tag filter on gpp-all.
+      expect(call.where.eventTags).toBeUndefined();
     });
 
     it('uses standard-competition ranking: ties share rank, next-non-tie skips slots', async () => {
