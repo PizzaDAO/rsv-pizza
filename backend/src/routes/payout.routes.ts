@@ -23,6 +23,7 @@ import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { looksLikeEnsName, resolveWalletInput } from '../services/ens.service.js';
+import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
 const router = Router();
 
@@ -231,6 +232,31 @@ async function isAnyAdmin(email?: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * pepperoni-47301: Mercury (our virtual debit card issuer) cannot issue cards
+ * to hosts in sanctioned/restricted countries. When the host (or admin) tries
+ * to submit `mercury_card` for a party whose `country` matches the block list,
+ * we reject with 400 `MERCURY_COUNTRY_BLOCKED`. No-op for any other method or
+ * when `method` is undefined.
+ */
+async function assertMercuryAllowed(
+  partyId: string,
+  method: string | null | undefined,
+): Promise<void> {
+  if (method !== 'mercury_card') return;
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { country: true },
+  });
+  if (isMercuryBlocked(party?.country)) {
+    throw new AppError(
+      `Mercury virtual cards are unavailable in ${party?.country ?? 'this country'} due to compliance restrictions. Please pick another payout method.`,
+      400,
+      'MERCURY_COUNTRY_BLOCKED',
+    );
+  }
+}
+
 // ---------- POST /:partyId/payouts/ocr-preview ----------
 
 router.post(
@@ -354,6 +380,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (hasMethod) {
       validatePayoutMethod(payoutMethod);
       validateMethodSpecificFields(payoutMethod, { payoutWalletAddress, payoutBankDetails });
+      // pepperoni-47301: reject `mercury_card` for parties in sanctioned countries.
+      await assertMercuryAllowed(partyId, payoutMethod);
     }
 
     // Validate every uploaded URL points into our bucket
@@ -728,6 +756,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         payoutWalletAddress: payoutWalletAddress ?? existing.payoutWalletAddress,
         payoutBankDetails: payoutBankDetails ?? (existing.payoutBankDetails as any),
       });
+      // pepperoni-47301: reject `mercury_card` for parties in sanctioned countries.
+      await assertMercuryAllowed(partyId, payoutMethod);
       data.payoutMethod = payoutMethod;
       // Clear stale method-specific fields when method changes
       if (payoutMethod !== 'usdc_base') data.payoutWalletAddress = null;

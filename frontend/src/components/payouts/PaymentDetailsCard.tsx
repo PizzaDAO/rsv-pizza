@@ -5,6 +5,7 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { BankDetails, PayoutMethod } from '../../types';
 import { updateUserMe } from '../../lib/api';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
+import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 
 const EMPTY_BANK: BankDetails = {};
 
@@ -127,6 +128,18 @@ export const PaymentDetailsCard: React.FC = () => {
     if (snapshot === prevSnapshot.current) return;
     prevSnapshot.current = snapshot;
     isDirty.current = true;
+
+    // pepperoni-47301: never autosave `mercury_card` when the party's country
+    // is on Mercury's restricted list — the per-party payout submission would
+    // be rejected by the backend anyway. Surface the reason locally so the
+    // host knows to pick another method.
+    if (method === 'mercury_card' && isMercuryBlocked(party?.country)) {
+      setSaveStatus('error');
+      setSaveError(
+        `Mercury cards are unavailable in ${party?.country ?? 'your country'}. Pick another method.`
+      );
+      return;
+    }
 
     // Don't fire the save until the method-specific fields are valid.
     if (!methodValid) {
