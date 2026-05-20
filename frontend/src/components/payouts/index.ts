@@ -10,3 +10,4 @@ export { PayoutDetailModal } from './PayoutDetailModal';
 export { AppealCapModal } from './AppealCapModal';
 export { ExpectedGuestsCard } from './ExpectedGuestsCard';
 export { PrepayCheckbox } from './PrepayCheckbox';
+export { PaymentDetailsCard } from './PaymentDetailsCard';

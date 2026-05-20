@@ -9,6 +9,7 @@ import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
 import { ExpectedGuestsCard } from './ExpectedGuestsCard';
 import { PrepayCheckbox } from './PrepayCheckbox';
+import { PaymentDetailsCard } from './PaymentDetailsCard';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -82,7 +83,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       const data = await listPayouts(partyId);
       setPayouts(data);
     } catch (err: any) {
-      setError(err?.message || 'Failed to load payments');
+      setError(err?.message || 'Failed to load receipts');
     } finally {
       setLoading(false);
     }
@@ -197,22 +198,28 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
 
       <ExpectedGuestsCard partyId={partyId} expectedGuests={expectedGuests} />
 
+      {/*
+        arugula-38633 v3: persistent payment-method picker. Lives above the
+        receipts list so the host configures once and every future receipt
+        submission reads from the user record (NewPayoutForm no longer asks
+        per-submission). Same vertical band as ExpectedGuestsCard so the
+        "settings vs. activity" split is obvious.
+      */}
+      <PaymentDetailsCard />
+
       {view === 'list' && (
         <>
           <div className="card p-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h2 className="text-lg font-semibold text-theme-text">Payments</h2>
-                <p className="text-sm text-theme-text-secondary mt-1">
-                  Upload receipts for expenses and choose how you want to get paid back.
-                </p>
+                <h2 className="text-lg font-semibold text-theme-text">Receipts</h2>
               </div>
               <button
                 onClick={() => setView('new')}
                 className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
               >
                 <Plus size={16} />
-                New payment
+                New receipt
               </button>
             </div>
           </div>
@@ -236,7 +243,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <ArrowLeft size={16} />
-            Back to payments
+            Back to receipts
           </button>
           <NewPayoutForm
             partyId={partyId}
