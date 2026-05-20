@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Store,
@@ -23,7 +23,6 @@ import {
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
-import { fetchUnderbossMe, fetchAdminMe } from '../lib/api';
 
 type AppStatus = 'live' | 'preview' | 'coming-soon';
 type AppCategory = 'planning' | 'promotion' | 'day-of' | 'after-party';
@@ -381,43 +380,11 @@ export function AppsHub({
   const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
   const isGppEvent = party?.eventType === 'gpp';
 
-  // Soft-launch gate for the Payouts app (arugula-38633 v1+v3): the tile
-  // stays visible for everyone, but downgrades from 'live' to 'coming-soon'
-  // (badge + unclickable) unless caller is underboss/admin/super_admin OR
-  // the party has an effective reimbursement cap (the 'go' tag is a separate
-  // downstream signal that only gates the reimbursement-promise banner inside
-  // the Payments tab — not access). Remove when opening to all hosts.
-  const [canUsePayouts, setCanUsePayouts] = useState<boolean | null>(null);
-  const partyEffectiveCap = party?.effectiveReimbursementCapUsd;
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [ub, ad] = await Promise.all([
-          fetchUnderbossMe().catch(() => null),
-          fetchAdminMe().catch(() => null),
-        ]);
-        if (cancelled) return;
-        // If party hasn't loaded yet, fall back to role-only check (avoids
-        // false-negative "Coming Soon" on opened parties while loading).
-        const hasCap =
-          typeof partyEffectiveCap === 'number' && partyEffectiveCap > 0;
-        const eligible =
-          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
-        setCanUsePayouts(eligible);
-      } catch {
-        if (!cancelled) setCanUsePayouts(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [partyEffectiveCap]);
-
-  const visibleApps = apps.map((a) => {
-    if (a.id === 'payments' && canUsePayouts === false) {
-      return { ...a, status: 'coming-soon' as const };
-    }
-    return a;
-  });
+  // marzano-49102: Payments tile is unconditionally live for all signed-in
+  // party hosts/cohosts. The downstream cap-display gate (hide $ unless the
+  // 'go' event_tag is set) lives in HostPage where Party props are passed
+  // into PayoutsTab.
+  const visibleApps = apps;
 
   const handleTogglePin = async (appId: string, pin: boolean) => {
     // Optimistic update
