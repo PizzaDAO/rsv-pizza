@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   DollarSign,
@@ -13,9 +13,15 @@ import {
   Coins,
   Banknote,
   HelpCircle,
+  Search,
+  Check,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { recordExternalPayment } from '../../lib/api';
+import {
+  recordExternalPayment,
+  searchApprovedParties,
+  type ApprovedPartySearchResult,
+} from '../../lib/api';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 
@@ -32,18 +38,29 @@ type ExternalMethod = PayoutMethod | 'other';
  * in `paid` status immediately so the host's "paid so far" total reflects it
  * and there's an audit trail.
  *
- * No party picker dropdown in v1 — admin pastes the partyId + hostUserId
- * directly (per the plan's "fallback" guidance). Snax can iterate later.
- *
- * arugula-38633 v2 follow-up.
+ * arugula-38633 v2 follow-up — replaces the bare partyId / hostUserId text
+ * inputs with:
+ *   - Party: search-as-you-type over approved parties.
+ *   - Host: dropdown of the selected party's main host + resolvable cohosts.
+ *     Cohosts whose email is not in the User table are excluded server-side.
  */
 export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   onClose,
   onCreated,
 }) => {
-  // Form state
-  const [partyId, setPartyId] = useState('');
+  // Party picker state — `selectedParty` is the source of truth for partyId +
+  // the list of host candidates. `hostUserId` is the chosen userId within
+  // that list (defaults to the main host on selection).
+  const [selectedParty, setSelectedParty] = useState<ApprovedPartySearchResult | null>(null);
   const [hostUserId, setHostUserId] = useState('');
+
+  const [partyQuery, setPartyQuery] = useState('');
+  const [partyResults, setPartyResults] = useState<ApprovedPartySearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Other form state — unchanged from v1.
   const [amountStr, setAmountStr] = useState('');
   const [method, setMethod] = useState<ExternalMethod>('usdc_base');
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().split('T')[0]);
@@ -73,7 +90,44 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Debounced party search — only runs when the picker is "open" (no party
+  // selected yet) and the query has ≥2 chars.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (selectedParty) {
+      // Picker is collapsed; no need to search.
+      setPartyResults([]);
+      setSearching(false);
+      return;
+    }
+    const q = partyQuery.trim();
+    if (q.length < 2) {
+      setPartyResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const rows = await searchApprovedParties(q);
+        setPartyResults(rows);
+      } catch (e: any) {
+        setSearchError(e?.message || 'Search failed');
+        setPartyResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [partyQuery, selectedParty]);
+
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
+
+  // derived: the active partyId (only set once a party is picked).
+  const partyId = selectedParty?.id ?? '';
 
   const canSubmit = useMemo(() => {
     if (!partyId.trim()) return false;
@@ -83,11 +137,27 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     return !submitting && !uploading;
   }, [partyId, hostUserId, amountNum, adminNotes, submitting, uploading]);
 
+  function handlePickParty(p: ApprovedPartySearchResult) {
+    setSelectedParty(p);
+    // Pre-select the main host (always the first candidate, role==='host').
+    setHostUserId(p.hostUserId);
+    setPartyQuery('');
+    setPartyResults([]);
+    setSearchError(null);
+  }
+
+  function handleChangeParty() {
+    setSelectedParty(null);
+    setHostUserId('');
+    setPartyQuery('');
+    setPartyResults([]);
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!partyId.trim()) {
-      setUploadError('Enter party id first so we can group the upload correctly.');
+      setUploadError('Pick a party first so we can group the upload correctly.');
       e.target.value = '';
       return;
     }
@@ -188,33 +258,114 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Party id */}
+          {/* Party picker — search-as-you-type, or selected card */}
           <div>
-            <IconInput
-              icon={Hash}
-              placeholder="Party id (uuid) *"
-              value={partyId}
-              onChange={(e) => setPartyId(e.target.value)}
-              required
-            />
-            <p className="text-xs text-theme-text-muted mt-1">
-              Paste the party's UUID — find it in the URL of the admin payments table or in the party admin page.
-            </p>
+            {selectedParty ? (
+              <div className="flex items-start gap-3 px-3 py-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5">
+                <Check size={16} className="mt-0.5 text-emerald-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-theme-text truncate">
+                    {selectedParty.name}
+                  </div>
+                  <div className="text-xs text-theme-text-muted mt-0.5">
+                    Invite code: {selectedParty.inviteCode}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleChangeParty}
+                  className="text-xs text-theme-text-muted hover:text-theme-text underline shrink-0"
+                >
+                  change
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <IconInput
+                  icon={Search}
+                  placeholder="Search approved parties by name *"
+                  value={partyQuery}
+                  onChange={(e) => setPartyQuery(e.target.value)}
+                  autoComplete="off"
+                />
+                {/* Dropdown — only render when the input is "active" (has any
+                    text, or focus would have produced results). We key off
+                    `partyQuery.length > 0` to avoid an empty floating panel. */}
+                {partyQuery.trim().length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-theme-surface border border-theme-stroke rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {searching && (
+                      <div className="flex items-center gap-2 px-3 py-3 text-xs text-theme-text-muted">
+                        <Loader2 size={14} className="animate-spin" />
+                        Searching…
+                      </div>
+                    )}
+                    {!searching && partyQuery.trim().length < 2 && (
+                      <div className="px-3 py-3 text-xs text-theme-text-muted">
+                        Type at least 2 characters to search.
+                      </div>
+                    )}
+                    {!searching && partyQuery.trim().length >= 2 && partyResults.length === 0 && !searchError && (
+                      <div className="px-3 py-3 text-xs text-theme-text-muted">
+                        No matching approved parties.
+                      </div>
+                    )}
+                    {searchError && (
+                      <div className="px-3 py-3 text-xs text-red-400">{searchError}</div>
+                    )}
+                    {partyResults.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handlePickParty(p)}
+                        className="w-full text-left px-3 py-2 hover:bg-theme-surface-hover border-b border-theme-stroke last:border-b-0"
+                      >
+                        <div className="text-sm text-theme-text truncate">{p.name}</div>
+                        <div className="text-xs text-theme-text-muted mt-0.5">{p.inviteCode}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {!selectedParty && (
+              <p className="text-xs text-theme-text-muted mt-1">
+                Only approved events are searchable. Pick one to populate the party + host fields.
+              </p>
+            )}
           </div>
 
-          {/* Host user id */}
-          <div>
-            <IconInput
-              icon={UserIcon}
-              placeholder="Host user id (cuid) — who is being paid *"
-              value={hostUserId}
-              onChange={(e) => setHostUserId(e.target.value)}
-              required
-            />
-            <p className="text-xs text-theme-text-muted mt-1">
-              The user id of the host receiving this payment. Admin's responsibility to get right.
-            </p>
-          </div>
+          {/* Host picker — only shown once a party is selected */}
+          {selectedParty && (
+            <div>
+              <div className="relative">
+                <UserIcon
+                  size={20}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none"
+                />
+                <select
+                  value={hostUserId}
+                  onChange={(e) => setHostUserId(e.target.value)}
+                  required
+                  className="w-full !pl-14 appearance-none"
+                >
+                  {selectedParty.hostCandidates.map((c) => {
+                    const label = `[${c.role === 'host' ? 'Host' : 'Cohost'}] ` +
+                      `${c.name || 'Unnamed'}` +
+                      (c.email ? ` (${c.email})` : '');
+                    return (
+                      <option key={c.userId} value={c.userId}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <p className="text-xs text-theme-text-muted mt-1">
+                Main host plus cohosts whose email matches a User account. Cohosts without an
+                rsv.pizza account aren't selectable.
+              </p>
+            </div>
+          )}
 
           {/* Amount */}
           <IconInput
