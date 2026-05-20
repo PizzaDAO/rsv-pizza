@@ -65,7 +65,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       const data = await listPayouts(partyId);
       setPayouts(data);
     } catch (err: any) {
-      setError(err?.message || 'Failed to load payouts');
+      setError(err?.message || 'Failed to load reimbursements');
     } finally {
       setLoading(false);
     }
@@ -99,7 +99,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     return (
       <div className="card p-8 text-center max-w-lg mx-auto">
         <Lock className="w-10 h-10 text-white/40 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Payouts — Coming Soon</h3>
+        <h3 className="text-lg font-semibold mb-2">Reimbursements — Coming Soon</h3>
         <p className="text-sm text-white/60">
           Host reimbursements are currently in soft launch for underbosses and admins.
           We'll open it up to all hosts soon — stay tuned.
@@ -151,7 +151,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
               <div>
                 <h2 className="text-lg font-semibold text-theme-text">Reimbursements</h2>
                 <p className="text-sm text-theme-text-secondary mt-1">
-                  Upload receipts for out-of-pocket expenses and choose how you want to get paid back.
+                  Upload receipts for expenses and choose how you want to get paid back.
                 </p>
               </div>
               <button
@@ -159,7 +159,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                 className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
               >
                 <Plus size={16} />
-                New payout
+                New reimbursement
               </button>
             </div>
           </div>
@@ -183,7 +183,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <ArrowLeft size={16} />
-            Back to payouts
+            Back to reimbursements
           </button>
           <NewPayoutForm
             partyId={partyId}

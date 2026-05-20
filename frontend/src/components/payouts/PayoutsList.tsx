@@ -42,7 +42,7 @@ export const PayoutsList: React.FC<PayoutsListProps> = ({
         <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-theme-surface-hover flex items-center justify-center">
           <ReceiptIcon className="w-7 h-7 text-theme-text-muted" />
         </div>
-        <h3 className="text-base font-semibold text-theme-text mb-1">No payouts yet</h3>
+        <h3 className="text-base font-semibold text-theme-text mb-1">No reimbursements yet</h3>
         <p className="text-sm text-theme-text-muted mb-6">
           Submit your first reimbursement to get paid back for pizza or venue costs.
         </p>

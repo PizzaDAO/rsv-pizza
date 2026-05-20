@@ -643,7 +643,7 @@ export function AdminPage() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 text-emerald-800 text-sm font-medium hover:bg-emerald-100 border border-emerald-300"
             >
               <DollarSign size={16} />
-              Manage Host Payouts
+              Manage Host Reimbursements
               <ArrowRight size={14} />
             </a>
           </div>

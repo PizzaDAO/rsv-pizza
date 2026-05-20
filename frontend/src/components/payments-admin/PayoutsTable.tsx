@@ -92,7 +92,7 @@ function ActionsCell({
             onClick={() => onExecute(payout)}
             disabled={busy}
             className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
-            title="Execute Payout"
+            title="Execute Reimbursement"
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
@@ -160,14 +160,14 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
               <tr>
                 <td colSpan={9} className="px-3 py-12 text-center text-theme-text-muted">
                   <Loader2 size={20} className="inline-block animate-spin mr-2" />
-                  Loading payouts…
+                  Loading reimbursements…
                 </td>
               </tr>
             )}
             {!loading && payouts.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-3 py-12 text-center text-theme-text-faint">
-                  No payouts match these filters.
+                  No reimbursements match these filters.
                 </td>
               </tr>
             )}

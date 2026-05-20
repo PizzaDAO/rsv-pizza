@@ -54,7 +54,7 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
 
   const handleCancel = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Cancel this payout request? This cannot be undone.')) return;
+    if (!confirm('Cancel this reimbursement request? This cannot be undone.')) return;
     setCancelling(true);
     try {
       const ok = await cancelPayout(partyId, payout.id);

@@ -164,7 +164,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       });
       onCreated(created);
     } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit payout');
+      setSubmitError(err?.message || 'Failed to submit reimbursement');
     } finally {
       setSubmitting(false);
     }
@@ -349,7 +349,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             ? 'Waiting for uploads…'
             : submitting
             ? 'Submitting…'
-            : `Submit $${finalAmount.toFixed(2)} payout`}
+            : `Submit $${finalAmount.toFixed(2)} reimbursement`}
         </button>
       </div>
 
