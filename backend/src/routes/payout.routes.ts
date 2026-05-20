@@ -188,22 +188,27 @@ function validateMethodSpecificFields(
   if (method === 'wire') {
     const d = body.payoutBankDetails as Record<string, unknown> | undefined;
     if (!d || typeof d !== 'object') {
-      throw new AppError('wire requires payoutBankDetails', 400, 'MISSING_BANK_DETAILS');
-    }
-    if (typeof d.accountHolderName !== 'string' || !d.accountHolderName.trim()) {
-      throw new AppError('payoutBankDetails.accountHolderName is required', 400, 'MISSING_BANK_DETAILS');
-    }
-    if (typeof d.bankName !== 'string' || !d.bankName.trim()) {
-      throw new AppError('payoutBankDetails.bankName is required', 400, 'MISSING_BANK_DETAILS');
-    }
-    // Either US routing+account OR international iban/swift must be present.
-    const hasUs = typeof d.routingNumber === 'string' && typeof d.accountNumber === 'string';
-    const hasIntl = typeof d.iban === 'string' || typeof d.swift === 'string';
-    if (!hasUs && !hasIntl) {
       throw new AppError(
-        'payoutBankDetails must include routingNumber+accountNumber OR iban/swift',
+        'wire requires payoutBankDetails with an email',
         400,
-        'MISSING_BANK_DETAILS'
+        'MISSING_BANK_DETAILS',
+      );
+    }
+    const email = typeof d.email === 'string' ? d.email.trim() : '';
+    if (!email) {
+      throw new AppError(
+        'payoutBankDetails.email is required for wire payouts',
+        400,
+        'MISSING_BANK_EMAIL',
+      );
+    }
+    // Loose email shape check — same regex used elsewhere in the app
+    // (e.g. PaymentDetailsCard.tsx). We're not trying to parse RFC 5322.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new AppError(
+        'payoutBankDetails.email must be a valid email address',
+        400,
+        'INVALID_BANK_EMAIL',
       );
     }
   }
