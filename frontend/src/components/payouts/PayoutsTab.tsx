@@ -5,6 +5,7 @@ import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
+import { ExpectedGuestsCard } from './ExpectedGuestsCard';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -155,6 +156,16 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {/*
+        arugula-38633 v2 follow-up: always-visible expected-guests editor.
+        Lives above the view-switch so it appears in BOTH the list and new-
+        payment views — it's an event-level setting, not per-form. Reads/
+        writes the same `parties.expected_guests` field used by EventForm,
+        PartyHeader, /underboss EventRow, and NewPayoutForm's first-time
+        prompt — single source of truth.
+      */}
+      <ExpectedGuestsCard partyId={partyId} expectedGuests={expectedGuests} />
+
       {view === 'list' && (
         <>
           <div className="card p-6">
