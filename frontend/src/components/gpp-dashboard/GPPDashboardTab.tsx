@@ -17,7 +17,6 @@ export const GPPDashboardTab: React.FC = () => {
   const [dbItems, setDbItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hostsExpanded, setHostsExpanded] = useState(false);
-  const [coHostCount, setCoHostCount] = useState(party?.coHosts?.length ?? 0);
   const [showCompleted, setShowCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -42,7 +41,11 @@ export const GPPDashboardTab: React.FC = () => {
   useEffect(() => {
     if (!party?.id) return;
     loadChecklist();
-  }, [party?.id, loadChecklist]);
+    // pancetta-31624: refetch when in-tab side effects mutate signals that drive
+    // the server-computed autoStates. HostsManager expands inline (mutates
+    // party.coHosts via PizzaContext) and FindVenueModal sets party.address —
+    // without these deps the checkmarks stay stale until reload.
+  }, [party?.id, party?.coHosts?.length, party?.address, party?.addressIsCityDefault, loadChecklist]);
 
   // Map known item names to Lucide icons
   const ICON_MAP: Record<string, LucideIcon> = {
@@ -107,7 +110,7 @@ export const GPPDashboardTab: React.FC = () => {
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
     });
-  }, [party, autoStates, dbItems, coHostCount]);
+  }, [party, autoStates, dbItems, party?.coHosts?.length]);
 
   const completedCount = checklist.filter((c) => c.done).length;
   const totalCount = checklist.length;
@@ -357,7 +360,6 @@ export const GPPDashboardTab: React.FC = () => {
                         partyId={party.id}
                         hostName={party.hostName || ''}
                         initialCoHosts={party.coHosts || []}
-                        onCoHostsChange={(coHosts) => setCoHostCount(coHosts.length)}
                       />
                     </div>
                   )}
