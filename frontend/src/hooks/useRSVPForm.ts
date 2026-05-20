@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
-import { geocodeAddress } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
@@ -155,6 +155,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
   const [pizzeriaRankings, setPizzeriaRankings] = useState<string[]>([]);
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
+  const [pizzeriaError, setPizzeriaError] = useState<string | null>(null);
+  const [pizzeriaSearchAttempted, setPizzeriaSearchAttempted] = useState(false);
   const [suggestedPizzerias, setSuggestedPizzerias] = useState<Pizzeria[]>([]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [venueLocation, setVenueLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -342,6 +344,29 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [eventData.address, eventData.selectedPizzerias, isOpen]);
 
   // ---- Handlers ----
+
+  // nduja-49021: explicit guest-triggered pizzeria search. MUST NOT be wired
+  // into a useEffect — only a click handler may invoke this. See chorizo-72831.
+  const fetchNearbyPizzerias = useCallback(async () => {
+    if (!eventData.address) return;
+    setLoadingPizzerias(true);
+    setPizzeriaError(null);
+    try {
+      const loc = venueLocation ?? await geocodeAddress(eventData.address);
+      if (!loc) {
+        setPizzeriaError('Could not locate event address');
+        return;
+      }
+      if (!venueLocation) setVenueLocation(loc);
+      const results = await searchPizzerias(loc.lat, loc.lng);
+      setNearbyPizzerias(results);
+      setPizzeriaSearchAttempted(true);
+    } catch (err) {
+      setPizzeriaError(err instanceof Error ? err.message : 'Failed to load pizzerias');
+    } finally {
+      setLoadingPizzerias(false);
+    }
+  }, [eventData.address, venueLocation]);
 
   const toggleRole = useCallback((role: string) => {
     setRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
@@ -624,6 +649,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     venueLocation,
     handlePizzeriaClick,
     handleSuggestPizzeria,
+    fetchNearbyPizzerias,
+    pizzeriaError,
+    setPizzeriaError,
+    pizzeriaSearchAttempted,
+    hasAddress: !!eventData.address,
 
     // Handlers
     handleStep1Continue,
