@@ -13,6 +13,7 @@ import { MusicNowPlayingCard } from './MusicNowPlayingCard';
 import { ChecklistTodayCard } from './ChecklistTodayCard';
 import { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
 import { BriefingCard } from './BriefingCard';
+import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
 
 interface DayOfDashboardProps {
   party: Party;
@@ -86,6 +87,7 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
 
       <div className={isMobile ? '' : 'space-y-4'}>
         {isGpp && !briefingFirst && <BriefingCard party={party} />}
+        {isGpp && <SignedPizzaBoxCard party={party} />}
         <LogisticsCard party={party} />
         <PizzaStatusCard party={party} />
         <MusicNowPlayingCard

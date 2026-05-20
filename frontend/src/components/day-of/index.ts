@@ -13,3 +13,4 @@ export { ChecklistTodayCard } from './ChecklistTodayCard';
 export { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
 export { ArtDisplay } from './ArtDisplay';
 export { BriefingCard } from './BriefingCard';
+export { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
