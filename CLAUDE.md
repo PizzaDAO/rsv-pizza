@@ -65,3 +65,9 @@ Use **`mcp__supabase-pizzadao__`** for this project (not `supabase-snax`).
 ## Project-Specific Notes
 - Supabase storage buckets must be created via dashboard, not code
 - **Preview deploys share production backend + DB.** Frontend previews auto-deploy per branch, but the backend only deploys from `master` and the database is a single Supabase instance. New DB columns and backend endpoints must be applied to production **before** they'll work on preview branches.
+
+## Realtime
+
+- The `guests` table is the only app table in the `supabase_realtime` publication.
+- Realtime guest subscription is **opt-in per page** via `useGuestsRealtime(partyId, onChange)` from `frontend/src/hooks/useGuestsRealtime.ts`.
+- **Do NOT re-add the subscription to `PizzaContext`** — the global subscription caused a site-wide outage on 2026-05-19 (every public RSVPer opened a realtime channel, churning the realtime `subscription` table and pinning WAL processing). See `plans/calabrese-58204-pool-exhaustion-fix.md`.
