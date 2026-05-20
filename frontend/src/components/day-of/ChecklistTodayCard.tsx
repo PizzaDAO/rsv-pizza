@@ -22,6 +22,7 @@ const DAY_OF_ITEM_NAMES = new Set([
   'Take group photo',
   'Pay venue final invoice',
   'Get the pizza box signed',
+  'Stack the pizza boxes',
   'Join the PizzaDAO Zoom (static camera)',
   'Join the PizzaDAO StreamYard (phone)',
   'Take a Stand With Crypto group photo',
