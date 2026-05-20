@@ -9,6 +9,11 @@ import { useMilestones } from '../../hooks/useMilestones';
 import { useMomentum } from '../../hooks/useMomentum';
 import { useConfetti } from '../../hooks/useConfetti';
 
+// oregano-49183: low-signal stat keys hidden on the dashboard KPI grid.
+// Report tab (ReportKPIs editable mode) is unaffected — this is a render-time
+// override only; the host's persisted reportStatsConfig is untouched.
+const HIDDEN_ON_DASHBOARD = ['pageViews', 'attendees', 'socialPostViews', 'socialPosts', 'poapMints', 'poapMoments'] as const;
+
 interface DashboardKPIsProps {
   party: Party;
   guests: Guest[];
@@ -179,7 +184,20 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ party, guests }) =
 
   // Hand the report a hydrated copy with the local goals echoed in so the
   // gamified prop and the report share the same view of "current goals".
-  const reportForKpis: EventReport = { ...report, hostGoals: localGoals };
+  // oregano-49183: merge synthetic hidden flags so the dashboard grid shows
+  // only the 4 high-signal stats. This does NOT persist back to the DB; the
+  // host's reportStatsConfig (edited on the Report tab) is untouched.
+  const dashboardStatsConfig: Record<string, { override?: number | null; hidden?: boolean }> = {
+    ...(report.reportStatsConfig ?? {}),
+  };
+  for (const key of HIDDEN_ON_DASHBOARD) {
+    dashboardStatsConfig[key] = { ...dashboardStatsConfig[key], hidden: true };
+  }
+  const reportForKpis: EventReport = {
+    ...report,
+    hostGoals: localGoals,
+    reportStatsConfig: dashboardStatsConfig,
+  };
 
   const socialPostViews = (report.socialPosts || []).reduce(
     (sum, p) => sum + (p.views ?? 0),

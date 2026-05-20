@@ -24,8 +24,8 @@ export const KPIBadge: React.FC<KPIBadgeProps> = ({ milestone, unlocked }) => {
       className={[
         'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all',
         unlocked
-          ? 'bg-[#ff393a]/15 border-[#ff393a]/40 text-theme-text'
-          : 'bg-theme-surface border-theme-stroke text-theme-text-faint opacity-60',
+          ? 'bg-theme-card border-[#ff393a]/60 text-theme-text shadow-sm'
+          : 'bg-theme-card border-theme-stroke text-theme-text-secondary opacity-80',
       ].join(' ')}
       title={label}
     >
