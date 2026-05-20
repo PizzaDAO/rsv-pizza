@@ -36,7 +36,7 @@ const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4
 const LINK_TAB_OPTIONS: readonly string[] = [
   'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
   'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
-  'flyer', 'print',
+  'flyer', 'print', 'payments',
 ];
 
 function sortByDueDate(items: ChecklistDefault[]): ChecklistDefault[] {

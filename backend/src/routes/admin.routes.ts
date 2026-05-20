@@ -202,7 +202,7 @@ router.patch('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, ne
 const ALLOWED_LINK_TABS = [
   'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music',
   'report', 'staff', 'displays', 'raffle', 'budget', 'gpp', 'promo',
-  'flyer', 'print',
+  'flyer', 'print', 'payments',
 ];
 
 function isValidLinkTab(v: unknown): v is string | null {
