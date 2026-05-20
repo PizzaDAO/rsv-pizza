@@ -65,6 +65,19 @@ export async function apiRequest<T>(
   return response.json();
 }
 
+// parmigiano-58729: approval-gated Day-Of broadcast URLs. Backend returns
+// `eligible: false` for non-GPP or non-approved events; `eligible: true` with
+// null URLs means env vars aren't set yet (card shows "Coming soon").
+export interface BroadcastUrlsResponse {
+  zoomUrl: string | null;
+  streamyardUrl: string | null;
+  eligible: boolean;
+}
+
+export function fetchBroadcastUrls(partyId: string): Promise<BroadcastUrlsResponse> {
+  return apiRequest<BroadcastUrlsResponse>(`/api/parties/${partyId}/broadcast-urls`);
+}
+
 // Homepage events (single-call, slim payload)
 export interface UserPartyListItem {
   id: string;

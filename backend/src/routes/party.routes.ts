@@ -1397,4 +1397,40 @@ router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, ne
   }
 });
 
+// GET /api/parties/:partyId/broadcast-urls
+// parmigiano-58729: approval-gated Day-Of broadcast URLs. Replaces the
+// client-side ZOOM_URL / STREAMYARD_URL constants in lib/dayOfConfig.ts so
+// the URLs never ship in the JS bundle for non-eligible viewers.
+//
+// Env vars (set on backend Vercel project):
+//   BROADCAST_ZOOM_URL       - global GPP Zoom meeting link (set when known)
+//   BROADCAST_STREAMYARD_URL - global GPP StreamYard studio link (set when known)
+// While unset, returns null URLs and the card shows "Coming soon".
+router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, underbossStatus: true, eventType: true, userId: true },
+    });
+    if (!party) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const canAccess = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canAccess) throw new AppError('Forbidden', 403, 'FORBIDDEN');
+
+    if (party.eventType !== 'gpp' || party.underbossStatus !== 'approved') {
+      return res.json({ zoomUrl: null, streamyardUrl: null, eligible: false });
+    }
+
+    return res.json({
+      zoomUrl: process.env.BROADCAST_ZOOM_URL || null,
+      streamyardUrl: process.env.BROADCAST_STREAMYARD_URL || null,
+      eligible: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
