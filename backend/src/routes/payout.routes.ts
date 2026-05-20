@@ -329,11 +329,28 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       finalAmountUsd,
       saveAsDefault,
       estimatedAttendance,
+      // bismarck-92103: admin-only override so the resulting Payout row is
+      // credited to the chosen cohost (not the admin creating it). When set
+      // AND the caller is an admin, `recipientHostUserId` replaces the
+      // default `req.userId` for `hostUserId`. Preserves pancetta-37195
+      // attribution — "Submitted by X" reads correctly.
+      recipientHostUserId,
     } = req.body || {};
 
-    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
-      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    // bismarck-92103: admins creating prepayments on behalf of a cohost don't
+    // need party edit access — they're operating from the /payments admin
+    // dashboard. When the recipient override is in play AND the caller is an
+    // admin, skip the canUserEditParty gate. (Self-edit access is still
+    // enforced for all other callers via the existing check.)
+    const recipientOverrideRequested =
+      typeof recipientHostUserId === 'string' && recipientHostUserId.trim().length > 0;
+    const skipPartyEditCheck =
+      recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
+    if (!skipPartyEditCheck) {
+      const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (!canEdit) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
     }
 
     // Validate optional one-shot attendance setup. Only persisted to the party
@@ -542,6 +559,39 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
 
+    // bismarck-92103: admin-only override — if `recipientHostUserId` is set
+    // AND the caller is an admin (or super_admin), the payout is created
+    // ON BEHALF OF that user (`hostUserId` = the recipient, not the admin).
+    // Non-admin callers passing the field are silently ignored — falling
+    // through to `req.userId` keeps the existing behavior intact.
+    let effectiveHostUserId: string = req.userId;
+    const callerIsAdmin = await isAnyAdmin(req.userEmail);
+    if (typeof recipientHostUserId === 'string' && recipientHostUserId.trim()) {
+      if (callerIsAdmin) {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: recipientHostUserId.trim() },
+          select: { id: true },
+        });
+        if (!targetUser) {
+          throw new AppError(
+            'recipientHostUserId does not match any User',
+            400,
+            'INVALID_RECIPIENT_HOST_USER_ID',
+          );
+        }
+        effectiveHostUserId = targetUser.id;
+      }
+    }
+
+    // bismarck-92103: admins can also stamp `adminNotes` directly on the new
+    // payout (used by the prepay-queue "Create prepayment" modal). Non-admin
+    // callers cannot set adminNotes via this endpoint.
+    const adminNotesRaw = (req.body || {}).adminNotes;
+    const initialAdminNotes =
+      callerIsAdmin && typeof adminNotesRaw === 'string' && adminNotesRaw.trim().length > 0
+        ? adminNotesRaw.trim()
+        : null;
+
     // taleggio-30219: resolve the wallet input once, BEFORE the create, so
     // we persist a canonical 0x address even if the host typed an ENS name.
     // Reused by the `saveAsDefault` write below so we don't resolve twice.
@@ -563,7 +613,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     const payout = await prisma.payout.create({
       data: {
         partyId,
-        hostUserId: req.userId,
+        // bismarck-92103: when admins create prepayments on behalf of a
+        // cohost, `effectiveHostUserId` is the cohost; otherwise it's the
+        // authenticated submitter (req.userId).
+        hostUserId: effectiveHostUserId,
         originalAmount: new Decimal(effectiveOriginalAmount),
         originalCurrency: effectiveOriginalCurrency,
         exchangeRate: new Decimal(effectiveExchangeRate),
@@ -583,6 +636,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
           ? hostNotes.trim()
           : null,
+        // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
+        // when an admin creates a prepayment on behalf of a cohost.
+        adminNotes: initialAdminNotes,
         documents: { create: docsToCreateStamped },
       },
       include: {
