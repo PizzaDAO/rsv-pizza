@@ -414,6 +414,8 @@ export const EventDetailsTab: React.FC = () => {
           hideGuests,
           requireApproval,
         });
+        // Refresh PizzaContext so PartyHeader / GuestList / GPPDashboardTab consumers see the saved values
+        if (party?.inviteCode) await loadParty(party.inviteCode);
         // Clear the image file since it's been uploaded
         setEventImageFile(null);
         // Reset saved state after a moment
@@ -476,6 +478,8 @@ export const EventDetailsTab: React.FC = () => {
             })
           ),
         }));
+        // Refresh PizzaContext so PartyHeader / GuestList / GPPDashboardTab consumers see the saved values
+        if (party?.inviteCode) await loadParty(party.inviteCode);
         return true;
       } else {
         throw new Error('Failed to save');
@@ -494,7 +498,8 @@ export const EventDetailsTab: React.FC = () => {
     const success = await saveField('name', { name: name.trim() });
     if (success) {
       setOriginalValues((prev: any) => ({ ...prev, name: name.trim() }));
-      if (party) triggerFlyerRegen(party, loadParty);
+      // Pass the just-saved name explicitly — `party` closure may still hold the old value
+      if (party) triggerFlyerRegen({ ...party, name: name.trim() }, loadParty);
     }
   };
 
@@ -577,7 +582,11 @@ export const EventDetailsTab: React.FC = () => {
         address: newAddress.trim(),
         venueName: newVenueName,
       }));
-      if (party) triggerFlyerRegen(party, loadParty);
+      // Pass just-saved address/venue explicitly — `party` closure may still hold the old values
+      if (party) triggerFlyerRegen(
+        { ...party, address: newAddress.trim() || null, venueName: newVenueName || null },
+        loadParty,
+      );
     }
   };
 
