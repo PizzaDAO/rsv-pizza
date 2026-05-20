@@ -1,5 +1,4 @@
 import { Router, Response, NextFunction } from 'express';
-import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { prisma } from '../config/database.js';
@@ -10,11 +9,6 @@ import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents } from '../helpers/
 import crypto from 'crypto';
 
 const router = Router();
-
-// The global JSON body parser in index.ts uses the default 100kb limit, which
-// is too small for the base64-encoded replacement upload. Bump just this
-// router to 8mb (raw file capped at 5mb below; base64 inflates ~33%).
-router.use(express.json({ limit: '8mb' }));
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
