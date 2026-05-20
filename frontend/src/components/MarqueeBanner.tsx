@@ -38,7 +38,7 @@ export const MarqueeBanner: React.FC = () => {
     <a
       href="https://globalpizza.party"
       aria-label="Find other cities at globalpizza.party"
-      className="block w-full overflow-hidden whitespace-nowrap font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+      className="block w-full whitespace-nowrap font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       style={{
         backgroundColor: '#0497C1',
         color: '#FFFFFF',
@@ -47,9 +47,11 @@ export const MarqueeBanner: React.FC = () => {
         fontSize: '16px',
       }}
     >
-      <div className="marquee-track">
-        <Set />
-        <Set ariaHidden />
+      <div className="block w-full overflow-hidden">
+        <div className="marquee-track">
+          <Set />
+          <Set ariaHidden />
+        </div>
       </div>
     </a>
   );
