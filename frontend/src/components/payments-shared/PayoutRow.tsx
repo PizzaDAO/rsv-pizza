@@ -97,6 +97,16 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
           >
             {admin.party.name}
           </a>
+          {/* arugula-38633 v2 follow-up: planning vs actuals at a glance. */}
+          <div
+            className="text-xs text-theme-text-muted"
+            title="Expected guests (host planning) vs confirmed RSVPs (direct submissions, excludes bulk invites)"
+          >
+            {admin.party.expectedGuests != null ? admin.party.expectedGuests : '—'}
+            {' expected / '}
+            {admin.party.rsvpCount}
+            {' RSVPs'}
+          </div>
         </td>
       )}
 

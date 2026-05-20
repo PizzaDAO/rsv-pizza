@@ -8,3 +8,4 @@ export { PayoutMethodPicker } from './PayoutMethodPicker';
 export { PayoutAmountSummary } from './PayoutAmountSummary';
 export { PayoutDetailModal } from './PayoutDetailModal';
 export { AppealCapModal } from './AppealCapModal';
+export { ExpectedGuestsCard } from './ExpectedGuestsCard';

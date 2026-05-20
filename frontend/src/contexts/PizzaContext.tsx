@@ -5,6 +5,7 @@ import { generateBeverageRecommendations } from '../utils/beverageAlgorithm';
 import { generateWaveRecommendations } from '../utils/waveAlgorithm';
 import { TOPPINGS, DRINK_CATEGORIES, DIETARY_OPTIONS, PIZZA_STYLES, PIZZA_SIZES } from '../constants/options';
 import * as db from '../lib/supabase';
+import { computeEffectiveCapUsd } from '../lib/reimbursementCap';
 
 interface PizzaContextType {
   // Party management
@@ -162,6 +163,12 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     underbossStatus: (dbParty.underboss_status as any) || null,
     turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
     reimbursementCapUsd: dbParty.reimbursement_cap_usd != null ? Number(dbParty.reimbursement_cap_usd) : null,
+    // arugula-38633 v2 follow-up: numeric-tag fallback. Computed client-side
+    // because the host party flows through Supabase (not /api/parties/:id).
+    effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+      reimbursementCapUsd: dbParty.reimbursement_cap_usd,
+      eventTags: dbParty.event_tags,
+    }),
     reimbursementCapAppealNote: dbParty.reimbursement_cap_appeal_note ?? null,
     reimbursementCapAppealedAt: dbParty.reimbursement_cap_appealed_at ?? null,
     // Day-of logistics (pepperoni-58341)
