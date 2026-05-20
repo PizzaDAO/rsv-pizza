@@ -17,10 +17,11 @@ import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
 import { DescriptionEditor } from './DescriptionEditor';
 import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
+import type { Party } from '../types';
 
 export const EventDetailsTab: React.FC = () => {
   const { t } = useTranslation('host');
-  const { party, loadParty } = usePizza();
+  const { party, loadParty, setParty } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -414,6 +415,24 @@ export const EventDetailsTab: React.FC = () => {
           hideGuests,
           requireApproval,
         });
+        // burrata-72104 v2: merge the bulk-saved fields into context so
+        // sibling components see them without a refetch.
+        const bulkPatch: Partial<Party> = {
+          name: name.trim(),
+          date: startDateTime,
+          duration: calculatedDuration,
+          timezone: timezone || null,
+          address: address.trim() || null,
+          venueName: venueName || null,
+          description: description.trim() || null,
+          password: password.trim() || null,
+          customUrl: customUrl.trim() || null,
+          eventImageUrl: imageUrl || null,
+          maxGuests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
+          hideGuests,
+          requireApproval,
+        };
+        setParty(prev => prev ? { ...prev, ...bulkPatch } : prev);
         // Clear the image file since it's been uploaded
         setEventImageFile(null);
         // Reset saved state after a moment
@@ -454,7 +473,21 @@ export const EventDetailsTab: React.FC = () => {
   };
 
   // Save individual field
-  const saveField = async (fieldName: string, updates: Record<string, any>) => {
+  //
+  // burrata-72104 (v2): accepts an optional camelCase `partyPatch` that gets
+  // merged INTO the PizzaContext via `setParty(prev => ({...prev, ...patch}))`
+  // after a successful save. This replaces v1's `loadParty()` everywhere, which
+  // forced a full HostPage re-render and made tab-clicks-after-edit feel like
+  // a page reload (same pain arugula-38633/33e631fe fixed in the pizza slider).
+  //
+  // The patch is typed `Partial<Party>` so TS catches misspelled camelCase
+  // keys at compile time — source of truth for field names is `dbPartyToParty`
+  // in PizzaContext.tsx.
+  const saveField = async (
+    fieldName: string,
+    updates: Record<string, any>,
+    partyPatch?: Partial<Party>,
+  ) => {
     if (!party) return false;
 
     setSavingField(fieldName);
@@ -476,6 +509,11 @@ export const EventDetailsTab: React.FC = () => {
             })
           ),
         }));
+        // burrata-72104 v2: merge the just-saved fields into context so
+        // sibling tabs/components see the update without a full party refetch.
+        if (partyPatch) {
+          setParty(prev => prev ? { ...prev, ...partyPatch } : prev);
+        }
         return true;
       } else {
         throw new Error('Failed to save');
@@ -491,10 +529,14 @@ export const EventDetailsTab: React.FC = () => {
 
   // Save event name
   const saveName = async () => {
-    const success = await saveField('name', { name: name.trim() });
+    const trimmed = name.trim();
+    const success = await saveField('name', { name: trimmed }, { name: trimmed });
     if (success) {
-      setOriginalValues((prev: any) => ({ ...prev, name: name.trim() }));
-      if (party) triggerFlyerRegen(party, loadParty);
+      setOriginalValues((prev: any) => ({ ...prev, name: trimmed }));
+      // triggerFlyerRegen's second arg is its OWN flyer-URL refresh callback
+      // (post-render); NOT a save-time refetch. Pass a forward-patched party
+      // so the flyer renders with the just-saved name.
+      if (party) triggerFlyerRegen({ ...party, name: trimmed }, loadParty);
     }
   };
 
@@ -516,11 +558,19 @@ export const EventDetailsTab: React.FC = () => {
       startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
     }
 
-    const success = await saveField('dateTime', {
-      date: startDateTime,
-      duration: calculatedDuration,
-      timezone: timezone || null,
-    });
+    const success = await saveField(
+      'dateTime',
+      {
+        date: startDateTime,
+        duration: calculatedDuration,
+        timezone: timezone || null,
+      },
+      {
+        date: startDateTime,
+        duration: calculatedDuration,
+        timezone: timezone || null,
+      },
+    );
     if (success) {
       setOriginalValues((prev: any) => ({
         ...prev,
@@ -530,7 +580,9 @@ export const EventDetailsTab: React.FC = () => {
         endTime,
         timezone,
       }));
-      if (party?.inviteCode) await loadParty(party.inviteCode);
+      // burrata-72104 v2: dropped the explicit `loadParty(...)` here — the
+      // saveField partyPatch above now merges the saved fields into context
+      // in-place, avoiding the full HostPage re-render that v1 caused.
       if (party) {
         // Pass a party-shaped object with the just-saved timezone/date/duration so the
         // regen doesn't race the React context refresh and render with stale values.
@@ -544,9 +596,14 @@ export const EventDetailsTab: React.FC = () => {
 
   // Save description
   const saveDescription = async () => {
-    const success = await saveField('description', { description: description.trim() || null });
+    const trimmed = description.trim();
+    const success = await saveField(
+      'description',
+      { description: trimmed || null },
+      { description: trimmed || null },
+    );
     if (success) {
-      setOriginalValues((prev: any) => ({ ...prev, description: description.trim() }));
+      setOriginalValues((prev: any) => ({ ...prev, description: trimmed }));
     }
   };
 
@@ -562,22 +619,45 @@ export const EventDetailsTab: React.FC = () => {
     // from the autocomplete dropdown — otherwise leave it untouched on the server
     const placeId = pendingPlaceIdRef.current;
     pendingPlaceIdRef.current = null;
-    const success = await saveField('location', {
-      address: newAddress.trim() || null,
-      venue_name: newVenueName || null,
+    const trimmedAddress = newAddress.trim() || null;
+    // camelCase patch mirrors the DB payload — only includes fields that the
+    // DB write actually touches (placeId is conditional, matching the payload)
+    const partyPatch: Partial<Party> = {
+      address: trimmedAddress,
+      venueName: newVenueName || null,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
       country: country || null,
       city: city || null,
-      ...(placeId !== null && { place_id: placeId }),
-    });
+      ...(placeId !== null && { placeId }),
+    };
+    const success = await saveField(
+      'location',
+      {
+        address: trimmedAddress,
+        venue_name: newVenueName || null,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+        country: country || null,
+        city: city || null,
+        ...(placeId !== null && { place_id: placeId }),
+      },
+      partyPatch,
+    );
     if (success) {
       setOriginalValues((prev: any) => ({
         ...prev,
         address: newAddress.trim(),
         venueName: newVenueName,
       }));
-      if (party) triggerFlyerRegen(party, loadParty);
+      // Forward-patch party for flyer regen so it uses the just-saved values
+      // (FlyerRegenData.venueName / .address come from Party).
+      if (party) {
+        triggerFlyerRegen(
+          { ...party, address: trimmedAddress, venueName: newVenueName || null },
+          loadParty,
+        );
+      }
     }
   };
 
@@ -594,7 +674,11 @@ export const EventDetailsTab: React.FC = () => {
       }
     }
 
-    const success = await saveField('image', { event_image_url: imageUrl || null });
+    const success = await saveField(
+      'image',
+      { event_image_url: imageUrl || null },
+      { eventImageUrl: imageUrl || null },
+    );
     if (success) {
       setOriginalValues((prev: any) => ({ ...prev, eventImageUrl: imageUrl || '' }));
       setEventImageFile(null);
@@ -602,8 +686,16 @@ export const EventDetailsTab: React.FC = () => {
   };
 
   // Save options (checkbox changes)
-  const saveOptions = async (updates: Record<string, any>) => {
-    await saveField('options', updates);
+  //
+  // burrata-72104 v2: callers pass both the DB-shape snake_case payload AND a
+  // matching camelCase Partial<Party> patch — the second arg flows into
+  // setParty so sibling consumers see the change without a refetch. TS will
+  // catch misspelled camelCase keys here.
+  const saveOptions = async (
+    updates: Record<string, any>,
+    partyPatch: Partial<Party>,
+  ) => {
+    await saveField('options', updates, partyPatch);
   };
 
   // Check if name has changed
@@ -812,7 +904,7 @@ export const EventDetailsTab: React.FC = () => {
                 onChange={() => {
                   const newValue = !requireApproval;
                   setRequireApproval(newValue);
-                  saveOptions({ require_approval: newValue });
+                  saveOptions({ require_approval: newValue }, { requireApproval: newValue });
                 }}
                 label="Require Approval"
               />
@@ -822,7 +914,7 @@ export const EventDetailsTab: React.FC = () => {
                 onChange={() => {
                   const newValue = !hideGuests;
                   setHideGuests(newValue);
-                  saveOptions({ hide_guests: newValue });
+                  saveOptions({ hide_guests: newValue }, { hideGuests: newValue });
                 }}
                 label="Hide Guests"
               />
@@ -835,7 +927,7 @@ export const EventDetailsTab: React.FC = () => {
                   if (!newValue) {
                     // If unchecking, clear max guests and save
                     setMaxGuests('');
-                    saveOptions({ max_guests: null });
+                    saveOptions({ max_guests: null }, { maxGuests: null });
                   }
                 }}
                 label="Limit Guests"
@@ -851,7 +943,8 @@ export const EventDetailsTab: React.FC = () => {
                     onChange={(e) => setMaxGuests(e.target.value)}
                     onBlur={() => {
                       if (maxGuests) {
-                        saveOptions({ max_guests: parseInt(maxGuests, 10) });
+                        const parsed = parseInt(maxGuests, 10);
+                        saveOptions({ max_guests: parsed }, { maxGuests: parsed });
                       }
                     }}
                     placeholder="Capacity"
@@ -866,7 +959,8 @@ export const EventDetailsTab: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onBlur={() => {
-                    saveOptions({ password: password.trim() || null });
+                    const trimmed = password.trim() || null;
+                    saveOptions({ password: trimmed }, { password: trimmed });
                   }}
                   placeholder="Event Password"
                   autoComplete="new-password"
@@ -878,10 +972,13 @@ export const EventDetailsTab: React.FC = () => {
                   onChange={() => {
                     const newValue = !shareToUnlock;
                     setShareToUnlock(newValue);
-                    saveOptions({ share_to_unlock: newValue });
+                    saveOptions({ share_to_unlock: newValue }, { shareToUnlock: newValue });
                     if (!newValue) {
                       setShareTweetText('');
-                      saveOptions({ share_to_unlock: false, share_tweet_text: null });
+                      saveOptions(
+                        { share_to_unlock: false, share_tweet_text: null },
+                        { shareToUnlock: false, shareTweetText: null },
+                      );
                     }
                   }}
                   label="Share to Unlock"
@@ -894,7 +991,8 @@ export const EventDetailsTab: React.FC = () => {
                   value={shareTweetText}
                   onChange={(e) => setShareTweetText(e.target.value)}
                   onBlur={() => {
-                    saveOptions({ share_tweet_text: shareTweetText.trim() || null });
+                    const trimmed = shareTweetText.trim() || null;
+                    saveOptions({ share_tweet_text: trimmed }, { shareTweetText: trimmed });
                   }}
                   placeholder="Custom tweet text (optional)"
                 />
@@ -910,7 +1008,8 @@ export const EventDetailsTab: React.FC = () => {
                 }}
                 onBlur={() => {
                   if (customUrlValid) {
-                    saveOptions({ custom_url: customUrl.trim() || null });
+                    const trimmed = customUrl.trim() || null;
+                    saveOptions({ custom_url: trimmed }, { customUrl: trimmed });
                   }
                 }}
               />
@@ -921,7 +1020,8 @@ export const EventDetailsTab: React.FC = () => {
                 value={telegramGroup}
                 onChange={(e) => setTelegramGroup(e.target.value)}
                 onBlur={() => {
-                  saveOptions({ telegram_group: telegramGroup.trim() || null });
+                  const trimmed = telegramGroup.trim() || null;
+                  saveOptions({ telegram_group: trimmed }, { telegramGroup: trimmed });
                 }}
                 placeholder="Telegram group link (e.g. https://t.me/+abc123)"
               />
@@ -969,7 +1069,7 @@ export const EventDetailsTab: React.FC = () => {
                 onChange={() => {
                   const newValue = !turtleRolesEnabled;
                   setTurtleRolesEnabled(newValue);
-                  saveOptions({ turtle_roles_enabled: newValue });
+                  saveOptions({ turtle_roles_enabled: newValue }, { turtleRolesEnabled: newValue });
                 }}
                 label="Ask RSVP Role (Turtle)"
               />
@@ -984,9 +1084,12 @@ export const EventDetailsTab: React.FC = () => {
                       setNftEnabled(newValue);
                       if (newValue && !nftChain) {
                         setNftChain('base');
-                        saveOptions({ nft_enabled: newValue, nft_chain: 'base' });
+                        saveOptions(
+                          { nft_enabled: newValue, nft_chain: 'base' },
+                          { nftEnabled: newValue, nftChain: 'base' },
+                        );
                       } else {
-                        saveOptions({ nft_enabled: newValue });
+                        saveOptions({ nft_enabled: newValue }, { nftEnabled: newValue });
                       }
                     }}
                     label="Mint Attendance NFT"
@@ -999,7 +1102,7 @@ export const EventDetailsTab: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setNftChain(chain);
-                            saveOptions({ nft_chain: chain });
+                            saveOptions({ nft_chain: chain }, { nftChain: chain });
                           }}
                           className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                             nftChain === chain

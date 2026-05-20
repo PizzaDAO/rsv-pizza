@@ -7,6 +7,7 @@ import { updateParty, addGuestByHost, proxyAvatarToStorage, uploadCoHostAvatar }
 import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtils';
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
+import { usePizza } from '../contexts/PizzaContext';
 
 interface HostsManagerProps {
   partyId: string;
@@ -21,6 +22,12 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   initialCoHosts,
   onCoHostsChange,
 }) => {
+  // burrata-72104 v2: merge co-host saves into party context in-place. We do
+  // NOT pull loadParty here — that was v1's mistake and reintroduced the
+  // tab-click-feels-like-reload pain. setParty(prev => ({...prev, coHosts}))
+  // updates the context without a full refetch.
+  const { setParty } = usePizza();
+
   // Helper: check if a co-host is protected (auto-added partner or underboss)
   const isProtected = (h: CoHost) => h.isUnderboss === true || h.isPartner === true;
 
@@ -167,6 +174,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
           }
         }
         onCoHostsChange?.(coHostsToSave);
+        // burrata-72104 v2: merge into party context in-place so sibling
+        // components (HostPage avatars, etc.) see the update without forcing
+        // a full party refetch / page-reload-feel.
+        setParty(prev => prev ? { ...prev, coHosts: coHostsToSave } : prev);
       }
     } catch (error) {
       console.error('Error saving co-hosts:', error);
