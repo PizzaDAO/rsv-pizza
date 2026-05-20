@@ -166,7 +166,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.party.name}
               </a>
             </div>
-            {/* arugula-38633 v2 follow-up: planning vs actuals, prominent. */}
+            {/* arugula-38633 v2 follow-up: planning vs actuals, prominent.
+                arugula-38633 (cap-everywhere): cap appended when set. */}
             <div
               className="text-xs text-theme-text-secondary mt-1"
               title="Expected guests is the host's planning number. Confirmed RSVPs are direct submissions only (excludes bulk invites)."
@@ -176,6 +177,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               {' · '}
               <span className="font-medium">Confirmed RSVPs:</span>{' '}
               {payout.party.rsvpCount}
+              {payout.party.effectiveReimbursementCapUsd != null && (
+                <>
+                  {' · '}
+                  <span className="font-medium">Cap:</span>{' '}
+                  ${Number(payout.party.effectiveReimbursementCapUsd).toLocaleString()}
+                </>
+              )}
             </div>
           </div>
           <button
