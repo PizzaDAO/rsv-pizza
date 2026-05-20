@@ -3,6 +3,8 @@ import { CreditCard, Banknote, Coins, Mail, Wallet } from 'lucide-react';
 import { PayoutMethod, BankDetails } from '../../types';
 import { IconInput } from '../IconInput';
 import { resolveEnsName } from '../../lib/api';
+import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
+import { usePizza } from '../../contexts/PizzaContext';
 
 // taleggio-30219: mirror of backend `looksLikeEnsName` — accepts dotted
 // names like `vitalik.eth` or `alice.cb.id` and rejects 0x… inputs.
@@ -99,37 +101,59 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, userEmail]);
 
+  // pepperoni-47301: Mercury card payout is unavailable in sanctioned/restricted
+  // countries. We read the party's country from PizzaContext and gate the
+  // Mercury Option below. Falls back to false when there's no party (e.g.
+  // unlikely render outside an event context).
+  const { party } = usePizza();
+  const mercuryBlocked = isMercuryBlocked(party?.country);
+  const mercuryDisabledReason = mercuryBlocked
+    ? `Mercury cards are unavailable in ${party?.country ?? 'your country'} due to compliance restrictions.`
+    : undefined;
+
   const Option: React.FC<{
     value: PayoutMethod;
     icon: React.ReactNode;
     title: string;
     description: string;
-  }> = ({ value, icon, title, description }) => {
+    disabled?: boolean;
+    disabledReason?: string;
+  }> = ({ value, icon, title, description, disabled, disabledReason }) => {
     const active = method === value;
     return (
       <button
         type="button"
-        onClick={() => onMethodChange(value)}
+        disabled={disabled}
+        title={disabled ? disabledReason : undefined}
+        onClick={() => {
+          if (disabled) return;
+          onMethodChange(value);
+        }}
         className={`w-full text-left rounded-xl border p-4 transition-colors ${
-          active
-            ? 'border-[#ff393a] bg-[#ff393a]/5'
-            : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+          disabled
+            ? 'border-theme-stroke bg-theme-surface opacity-60 cursor-not-allowed'
+            : active
+              ? 'border-[#ff393a] bg-[#ff393a]/5'
+              : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
         }`}
       >
         <div className="flex items-start gap-3">
-          <div className={`mt-0.5 ${active ? 'text-[#ff393a]' : 'text-theme-text-muted'}`}>
+          <div className={`mt-0.5 ${active && !disabled ? 'text-[#ff393a]' : 'text-theme-text-muted'}`}>
             {icon}
           </div>
           <div className="flex-1">
             <div className="text-sm font-semibold text-theme-text">{title}</div>
             <div className="text-xs text-theme-text-muted mt-0.5">{description}</div>
+            {disabled && disabledReason && (
+              <div className="text-[10px] text-amber-300 mt-1">{disabledReason}</div>
+            )}
           </div>
           <div
             className={`mt-1 w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-              active ? 'border-[#ff393a]' : 'border-theme-stroke'
+              active && !disabled ? 'border-[#ff393a]' : 'border-theme-stroke'
             }`}
           >
-            {active && <div className="w-2 h-2 rounded-full bg-[#ff393a] m-0.5" />}
+            {active && !disabled && <div className="w-2 h-2 rounded-full bg-[#ff393a] m-0.5" />}
           </div>
         </div>
       </button>
@@ -150,6 +174,8 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           icon={<CreditCard size={18} />}
           title="Mercury virtual card"
           description="We issue you a debit card for the exact amount."
+          disabled={mercuryBlocked}
+          disabledReason={mercuryDisabledReason}
         />
         <Option
           value="wire"

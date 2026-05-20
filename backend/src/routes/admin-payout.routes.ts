@@ -30,6 +30,7 @@ import {
 } from '../services/usdc-base.service.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveWalletInput } from '../services/ens.service.js';
+import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
 const router = Router();
 
@@ -832,6 +833,9 @@ router.patch(
           status: true,
           hostUserId: true,
           finalAmountUsd: true,
+          // pepperoni-47301: partyId is needed to look up `party.country` for
+          // the Mercury sanctioned-country gate below.
+          partyId: true,
         },
       });
 
@@ -877,6 +881,22 @@ router.patch(
       if (payoutMethod !== undefined) {
         if (!ALLOWED_PAYOUT_METHODS.includes(payoutMethod)) {
           throw new AppError('Invalid payoutMethod', 400, 'VALIDATION_ERROR');
+        }
+        // pepperoni-47301: admins are also blocked from forcing `mercury_card`
+        // on a party whose country is on Mercury's restricted list — the
+        // compliance restriction is on the host's location, not the actor.
+        if (payoutMethod === 'mercury_card') {
+          const party = await prisma.party.findUnique({
+            where: { id: existing.partyId },
+            select: { country: true },
+          });
+          if (isMercuryBlocked(party?.country)) {
+            throw new AppError(
+              `Mercury virtual cards are unavailable in ${party?.country ?? 'this country'} due to compliance restrictions. Please pick another payout method.`,
+              400,
+              'MERCURY_COUNTRY_BLOCKED',
+            );
+          }
         }
         data.payoutMethod = payoutMethod;
       }
