@@ -222,7 +222,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
             <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm font-medium text-theme-text">
-              No cap set. Contact your underboss to get your funding approved.
+              Your underboss is reviewing your event to set your payment cap.
             </div>
           </div>
         );
