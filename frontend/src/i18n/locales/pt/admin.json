@@ -30,7 +30,7 @@
     "superAdmin": "Super Admin",
     "admin": "Admin",
     "paymentAdmin": "Payment Admin",
-    "paymentAdminDesc": "Manages host reimbursements only — cannot edit parties or other admins.",
+    "paymentAdminDesc": "Manages host payments only — cannot edit parties or other admins.",
     "removeAdmin": "Remover admin",
     "tableHeaders": {
       "email": "E-mail",

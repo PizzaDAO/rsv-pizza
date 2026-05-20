@@ -58,7 +58,7 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
             checked={selected}
             onChange={() => onSelectToggle?.()}
             className="rounded border-theme-stroke-hover bg-theme-surface"
-            aria-label="Select reimbursement"
+            aria-label="Select payment"
           />
         </td>
       )}

@@ -26,7 +26,7 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
   pending: 'Pending review',
-  approved: 'Approved — reimbursement pending',
+  approved: 'Approved — payment pending',
   rejected: 'Rejected',
   paid: 'Paid',
   failed: 'Failed',
@@ -50,7 +50,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     setError(null);
     getPayout(partyId, payoutId)
       .then(p => { if (!cancelled) setPayout(p); })
-      .catch(err => { if (!cancelled) setError(err?.message || 'Failed to load reimbursement'); })
+      .catch(err => { if (!cancelled) setError(err?.message || 'Failed to load payment'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [partyId, payoutId]);
@@ -66,7 +66,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
       >
         <div className="flex items-start justify-between p-5 border-b border-theme-stroke">
           <div>
-            <h2 className="text-lg font-semibold text-theme-text">Reimbursement details</h2>
+            <h2 className="text-lg font-semibold text-theme-text">Payment details</h2>
             {payout && (
               <p className="text-xs text-theme-text-muted mt-0.5">
                 Submitted {new Date(payout.createdAt).toLocaleString()}
@@ -118,7 +118,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
 
               {/* Payout method */}
               <div className="rounded-lg bg-theme-surface-hover p-3 text-sm">
-                <p className="text-xs text-theme-text-muted mb-1">Reimbursement method</p>
+                <p className="text-xs text-theme-text-muted mb-1">Payment method</p>
                 <p className="inline-flex items-center gap-2 text-theme-text font-medium">
                   {methodIcon(payout.payoutMethod)}
                   {METHOD_LABEL[payout.payoutMethod]}

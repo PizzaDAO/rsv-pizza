@@ -30,7 +30,7 @@
     "superAdmin": "スーパー管理者",
     "admin": "管理者",
     "paymentAdmin": "Payment Admin",
-    "paymentAdminDesc": "Manages host reimbursements only — cannot edit parties or other admins.",
+    "paymentAdminDesc": "Manages host payments only — cannot edit parties or other admins.",
     "removeAdmin": "管理者を削除",
     "tableHeaders": {
       "email": "メール",
