@@ -192,6 +192,11 @@ model Party {
   hiddenGppPhotos Json @default("[]") @map("hidden_gpp_photos") // Array of hidden app.gpp.day photo src paths
   extraGppPhotos  Json @default("[]") @map("extra_gpp_photos") // Array of host-uploaded previous year photo URLs
 
+  // Gamified dashboard goals (quattro-71244): host-set targets per KPI, e.g.
+  // { rsvps: 50, attendees: 30, newsletterSignups: 10 }. Nullable; UI shows
+  // empty goal bar + "Set goal" affordance when null.
+  hostGoals Json? @map("host_goals")
+
   // Quiz settings
   quizEnabled Boolean @default(false) @map("quiz_enabled")
 

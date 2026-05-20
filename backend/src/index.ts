@@ -36,6 +36,7 @@ import budgetRoutes from './routes/budget.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
+import leaderboardRoutes from './routes/leaderboard.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import linkclickRoutes from './routes/linkclick.routes.js';
 import funnelRoutes from './routes/funnel.routes.js';
@@ -159,6 +160,7 @@ app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
+app.use('/api/parties', leaderboardRoutes); // quattro-71244: gamified dashboard leaderboard (host only, before partyRoutes)
 app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);

@@ -6,8 +6,16 @@ import crypto from 'crypto';
 import { canUserEditParty, canUserAccessTab, isSuperAdmin } from '../helpers/partyAccess.js';
 
 // Helper: extends canUserEditParty to also allow sponsors tagged on the event (read-only access)
+//
+// quattro-71244: this now also gates the gamified dashboard KPI block, which
+// co-hosts without the explicit `report` tab still need to see. Per Snax
+// decision #3 we loosen here to "any can-edit user" — that is the same
+// permission set that already sees the underlying guest list, so we are not
+// leaking new data. Tab-scoped writes still flow through `canUserAccessTab`
+// in the PATCH/POST/DELETE handlers below.
 async function canUserViewReport(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
-  // First check normal edit permissions (owner, super admin)
+  // Owner, super admin, GPP global editor, scoped underboss, graphics admin,
+  // or co-host with canEdit === true (regardless of allowedTabs).
   if (await canUserEditParty(partyId, userId, userEmail)) {
     return true;
   }
@@ -141,6 +149,9 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         reportPublicSlug: party.reportPublicSlug,
         reportPassword: party.reportPassword || null,
         reportStatsConfig: party.reportStatsConfig || null,
+
+        // quattro-71244: gamified dashboard host-set KPI goals.
+        hostGoals: (party as any).hostGoals ?? null,
 
         // Related data
         socialPosts: party.socialPosts,
