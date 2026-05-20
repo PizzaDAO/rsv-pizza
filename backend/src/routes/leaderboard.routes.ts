@@ -45,6 +45,8 @@ interface CacheEntry {
 }
 
 const TTL_MS = 5 * 60 * 1000;
+// In-process cache resets naturally on every Vercel redeploy — no manual
+// invalidation needed when the universe filter changes (see tomato-71832).
 const cache = new Map<string, CacheEntry>();
 
 function cacheKey(metric: Metric, scope: ScopeFingerprint): string {
@@ -70,7 +72,11 @@ async function aggregateCounts(metric: Metric, scope: ScopeFingerprint): Promise
     // Gather candidate party IDs in scope first so we can also include
     // zero-RSVP parties in the leaderboard (groupBy on `guests` would skip
     // them — they'd silently be "off-leaderboard" otherwise).
-    const partyWhere: any = { eventType: 'gpp' };
+    //
+    // tomato-71832: narrow the universe to approved events only so the pill's
+    // denominator reflects approved GPP hosts (not pending/rejected). The
+    // approval field is `underbossStatus` (default `'pending'`), NOT `status`.
+    const partyWhere: any = { eventType: 'gpp', underbossStatus: 'approved' };
     if (scope.kind === 'gpp-season' && scope.tag) {
       partyWhere.eventTags = { has: scope.tag };
     }
