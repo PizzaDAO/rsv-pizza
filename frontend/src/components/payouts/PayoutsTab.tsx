@@ -4,6 +4,7 @@ import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
+import { getUnderbossContact } from '../../utils/underbossContacts';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
@@ -67,17 +68,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           fetchAdminMe().catch(() => null),
         ]);
         if (cancelled) return;
-        // arugula-38633 v3: host is eligible if the party has BOTH an
-        // effective reimbursement cap AND the 'go' event_tag (the explicit
-        // "open this event to the host" signal, settable only by admin /
-        // payment_admin / super_admin via PATCH /api/parties/:id). Backend
-        // enforces the same gate per-handler.
+        // arugula-38633 v3: host is eligible if the party has an effective
+        // reimbursement cap. The 'go' tag is a SEPARATE downstream signal
+        // that only gates the reimbursement-promise banner (below) — NOT
+        // access. Backend enforces the same per-handler.
         const hasCap =
           typeof effectiveReimbursementCapUsd === 'number' &&
           effectiveReimbursementCapUsd > 0;
-        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
         const eligible =
-          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || (hasCap && hasGo);
+          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
         setCanAccess(eligible);
       } catch {
         if (!cancelled) setCanAccess(false);
@@ -183,12 +182,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       {/* Top banner priority (arugula-38633 v3):
           1. Missing expected_guests or location → actionable "Set your X to
              get your funding approved" (host can act on it)
-          2. Both set, no cap yet → "No cap set. Contact your underboss"
-          3. Cap set → emerald cap banner */}
+          2. Both set, no cap OR no 'go' tag → "Your underboss is reviewing"
+             (cap value isn't promised until BOTH cap AND go are in place)
+          3. Cap set AND 'go' tag present → emerald cap banner */}
       {(() => {
         const needsExpectedGuests = !party?.expectedGuests || party.expectedGuests <= 0;
         const needsLocation = !party?.address;
         const hasCap = typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0;
+        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
 
         if (needsExpectedGuests || needsLocation) {
           const msg =
@@ -204,7 +205,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             </div>
           );
         }
-        if (hasCap) {
+        if (hasCap && hasGo) {
           return (
             <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
               <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
@@ -222,7 +223,25 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
             <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm font-medium text-theme-text">
-              No cap set. Contact your underboss to get your funding approved.
+              Your underboss is reviewing your event to set your payment cap.
+              {(() => {
+                const contact = getUnderbossContact(party?.country);
+                if (!contact) return null;
+                return (
+                  <>
+                    {' '}Reach them on Telegram:{' '}
+                    <a
+                      href={contact.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#ff393a] hover:underline"
+                    >
+                      {contact.handle}
+                    </a>
+                    .
+                  </>
+                );
+              })()}
             </div>
           </div>
         );
