@@ -73,6 +73,9 @@ model Party {
   venueOrganization       String?   @map("venue_organization")
   venueWebsite            String?   @map("venue_website")
   venueNotes              String?   @map("venue_notes")
+  // Day-of logistics (pepperoni-58341): surfaced on /run/:inviteCode + day-of dashboard tab
+  wifiInfo                String?   @map("wifi_info")
+  parkingNotes            String?   @map("parking_notes")
   maxGuests               Int?      @map("max_guests")
   expectedGuests          Int?      @map("expected_guests")
   hideGuests              Boolean   @default(false) @map("hide_guests")
@@ -230,8 +233,28 @@ model Party {
   scorecardItems        GuestScorecardItem[]
   payouts               Payout[]
   outreachAttempts      OutreachAttempt[]
+  announcements         Announcement[]
 
   @@map("parties")
+}
+
+// pepperoni-58341: Audit log of day-of broadcasts (Telegram + email) sent from
+// the day-of host dashboard. Service-role only (RLS enabled, no policies).
+model Announcement {
+  id             String   @id @default(uuid())
+  partyId        String   @map("party_id") @db.Uuid
+  sentBy         String   @map("sent_by")
+  channels       String[]
+  subject        String?
+  body           String
+  recipientCount Int?     @map("recipient_count")
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@index([partyId, sentAt(sort: Desc)])
+  @@map("announcements")
 }
 
 model PartyStatusAudit {

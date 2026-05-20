@@ -440,6 +440,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       // sends /start <token> to the bot). Allowing PATCH writes would let a host
       // spoof another user's chat_id.
       turtleRolesEnabled,
+      // Day-of logistics (pepperoni-58341)
+      wifiInfo,
+      parkingNotes,
       reimbursementCapUsd,
       // NOTE: reimbursementCapAppealNote + reimbursementCapAppealedAt are NOT
       // destructured here — appeals flow through the dedicated
@@ -613,6 +616,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
         ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
+        ...(wifiInfo !== undefined && { wifiInfo: wifiInfo || null }),
+        ...(parkingNotes !== undefined && { parkingNotes: parkingNotes || null }),
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
       },
       include: {
@@ -1101,6 +1106,292 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
     }
 
     res.json({ guest: updatedGuest });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =============================================================================
+// pepperoni-58341: Day-of event app endpoints
+// =============================================================================
+
+// POST /api/parties/:partyId/guests/walk-in
+// Day-of walk-in capture from the day-of dashboard. Creates a guest in
+// confirmed+approved+checked-in state in a single round-trip.
+router.post('/:partyId/guests/walk-in', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { name, email } = req.body;
+
+    // Per-route auth — NEVER router.use(gate) at a path-less mount: it would
+    // leak to sibling routers mounted at /api/parties (arugula-38633 v2 bug).
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    if (!canAccessDayOf) {
+      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const normalizedEmail = email && typeof email === 'string' ? email.toLowerCase().trim() : null;
+
+    // If a guest with this email already exists for this party, check them in
+    // rather than creating a duplicate (host clicked walk-in for someone who
+    // already RSVP'd online).
+    if (normalizedEmail) {
+      const existing = await prisma.guest.findFirst({
+        where: { partyId, email: normalizedEmail },
+      });
+      if (existing) {
+        const updated = await prisma.guest.update({
+          where: { id: existing.id },
+          data: {
+            status: 'CONFIRMED',
+            approved: true,
+            checkedInAt: existing.checkedInAt || new Date(),
+            checkedInBy: req.userId,
+          },
+        });
+        return res.status(200).json({ guest: updated, alreadyExisted: true });
+      }
+    }
+
+    const guest = await prisma.guest.create({
+      data: {
+        name: name.trim(),
+        email: normalizedEmail,
+        submittedVia: 'host-checkin',
+        status: 'CONFIRMED',
+        approved: true,
+        checkedInAt: new Date(),
+        checkedInBy: req.userId,
+        partyId,
+      },
+    });
+
+    await triggerWebhook('guest.registered', { guest, partyId }, req.userId!);
+
+    res.status(201).json({ guest });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/announce
+// Day-of broadcast: sends a host-authored message via Telegram (to host's
+// connected chat) and/or individual emails to confirmed guests. Persists an
+// audit row to `announcements`.
+router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { subject, body, channels } = req.body || {};
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    if (!canAccessDayOf) {
+      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    // Validate body
+    if (!body || typeof body !== 'string' || body.trim().length === 0) {
+      throw new AppError('body is required', 400, 'VALIDATION_ERROR');
+    }
+    if (body.length > 4096) {
+      throw new AppError('body must be 4096 characters or less', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate channels
+    if (!Array.isArray(channels) || channels.length === 0) {
+      throw new AppError('channels must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    const VALID_CHANNELS = new Set(['telegram', 'email']);
+    const filteredChannels = (channels as unknown[]).filter(
+      (c): c is string => typeof c === 'string' && VALID_CHANNELS.has(c)
+    );
+    if (filteredChannels.length === 0) {
+      throw new AppError('channels must include "telegram" or "email"', 400, 'VALIDATION_ERROR');
+    }
+
+    const emailRequested = filteredChannels.includes('email');
+    const telegramRequested = filteredChannels.includes('telegram');
+
+    // Subject required when emailing
+    if (emailRequested && (!subject || typeof subject !== 'string' || subject.trim().length === 0)) {
+      throw new AppError('subject is required when email channel is selected', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: {
+        id: true,
+        name: true,
+        inviteCode: true,
+        customUrl: true,
+        hostTelegramChatId: true,
+      },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // -----------------------------------------------------------------------
+    // Telegram delivery — sends to host's connected chat (hostTelegramChatId).
+    // The schema has no group chat_id for parties; `telegramGroup` is a URL
+    // string only. If the host hasn't connected Telegram, skip silently.
+    // -----------------------------------------------------------------------
+    let telegramSent = false;
+    if (telegramRequested && party.hostTelegramChatId) {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (botToken) {
+        try {
+          const message = subject ? `*${subject}*\n\n${body}` : body;
+          const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: party.hostTelegramChatId.toString(),
+              text: message,
+              parse_mode: 'Markdown',
+            }),
+          });
+          const tgJson = await tgRes.json();
+          telegramSent = !!tgJson.ok;
+        } catch (err) {
+          console.error('[Day-of announce] Telegram send failed:', err);
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Email delivery — individual sends (no BCC) to confirmed guests with an
+    // email on file. We don't fail the request if a single send errors; the
+    // recipient_count reflects successful sends.
+    // -----------------------------------------------------------------------
+    let emailSentCount = 0;
+    let recipientCount = 0;
+    if (emailRequested) {
+      const recipients = await prisma.guest.findMany({
+        where: {
+          partyId,
+          status: 'CONFIRMED',
+          email: { not: null },
+        },
+        select: { id: true, name: true, email: true },
+      });
+      recipientCount = recipients.length;
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        console.warn('[Day-of announce] RESEND_API_KEY not set, skipping email sends');
+      } else {
+        const baseUrl = 'https://rsv.pizza';
+        const eventUrl = party.customUrl
+          ? `${baseUrl}/${party.customUrl}`
+          : `${baseUrl}/${party.inviteCode}`;
+
+        // Build HTML once (per-recipient personalization only swaps the greeting)
+        const escapedBody = body
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br />');
+
+        for (const recipient of recipients) {
+          if (!recipient.email) continue;
+          const html = `
+            <!DOCTYPE html>
+            <html><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 32px 20px; border-radius: 12px; text-align: center; margin-bottom: 24px;">
+                <h1 style="color: #ffffff; font-size: 24px; margin: 0;">${party.name.replace(/</g, '&lt;')}</h1>
+                <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 8px 0 0 0;">A message from your host</p>
+              </div>
+              <div style="background: #f9f9f9; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: #666;">Hi ${(recipient.name || 'there').replace(/</g, '&lt;')},</p>
+                <div style="font-size: 16px;">${escapedBody}</div>
+              </div>
+              <div style="text-align: center; margin: 24px 0;">
+                <a href="${eventUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600;">View Event Page</a>
+              </div>
+            </body></html>
+          `;
+          try {
+            const r = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'RSV.Pizza <noreply@rsv.pizza>',
+                to: [recipient.email],
+                subject: subject || `Update from ${party.name}`,
+                html,
+              }),
+            });
+            if (r.ok) emailSentCount += 1;
+          } catch (err) {
+            console.error(`[Day-of announce] Resend send failed for guest ${recipient.id}:`, err);
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Persist audit row
+    // -----------------------------------------------------------------------
+    const announcement = await prisma.announcement.create({
+      data: {
+        partyId,
+        sentBy: req.userEmail || req.userId || 'unknown',
+        channels: filteredChannels,
+        subject: subject || null,
+        body,
+        recipientCount: emailRequested ? recipientCount : null,
+      },
+    });
+
+    res.status(201).json({
+      announcementId: announcement.id,
+      recipientCount,
+      channelsSent: {
+        telegram: telegramSent,
+        email: emailSentCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:partyId/announcements — last 10 sent announcements
+router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    if (!canAccessDayOf) {
+      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    const rows = await prisma.announcement.findMany({
+      where: { partyId },
+      orderBy: { sentAt: 'desc' },
+      take: 10,
+    });
+
+    res.json({ announcements: rows });
   } catch (error) {
     next(error);
   }

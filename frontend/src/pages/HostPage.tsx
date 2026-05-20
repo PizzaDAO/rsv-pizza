@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
+import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
@@ -41,19 +42,25 @@ import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
 import { GPPDashboardTab } from '../components/gpp-dashboard';
 import { PayoutsTab } from '../components/payouts';
+import { DayOfTab } from '../components/day-of';
 
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
+type TabType = 'dashboard' | 'day-of' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'day-of', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  // pepperoni-58341 soft-launch gate: Day-Of tab is only visible to
+  // admins + underbosses while the feature is in private beta. `null`
+  // means "still loading" — treat as not allowed for tab visibility
+  // (the tab simply doesn't appear until the check resolves).
+  const isAdminOrUnderboss = useIsAdminOrUnderboss();
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
@@ -180,6 +187,9 @@ function HostPageContent() {
   const tabs = useMemo(() => {
     const coreTabs = [
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
+      // pepperoni-58341: Day-of host dashboard (also mirrored at /run/:inviteCode for mobile).
+      // Soft-launch gate: only visible to admins + underbosses for now.
+      ...(isAdminOrUnderboss ? [{ id: 'day-of' as TabType, label: 'Day Of', icon: Zap }] : []),
       { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
       { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
@@ -200,7 +210,7 @@ function HostPageContent() {
     return allowedTabs === 'all'
       ? allTabs
       : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
-  }, [isGPP, party?.pinnedApps, allowedTabs]);
+  }, [isGPP, party?.pinnedApps, allowedTabs, isAdminOrUnderboss, t]);
 
   // Redirect to first allowed tab if current tab is not permitted
   useEffect(() => {
@@ -281,6 +291,8 @@ function HostPageContent() {
 
         {activeTab === 'dashboard' && party ? (
           <GPPDashboardTab />
+        ) : activeTab === 'day-of' && party ? (
+          <DayOfTab party={party} />
         ) : activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
         ) : activeTab === 'partners' && party ? (
@@ -321,7 +333,7 @@ function HostPageContent() {
               if (party.inviteCode) await loadParty(party.inviteCode);
             }}
           />
-        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'partners' && (
+        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'day-of' && activeTab !== 'partners' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">
               {activeTab === 'guests' && (

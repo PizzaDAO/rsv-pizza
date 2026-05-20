@@ -6,6 +6,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
+import { DayOfRunPage } from './pages/DayOfRunPage';
+import { ArtDisplayPage } from './pages/ArtDisplayPage';
 import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
 import { LoginPage } from './pages/LoginPage';
@@ -65,8 +67,12 @@ function App() {
             <Route path="/rsvp/:inviteCode" element={<RSVPPage />} />
             <Route path="/host/:inviteCode" element={<HostPage />} />
             <Route path="/host/:inviteCode/:tab" element={<HostPage />} />
+            {/* pepperoni-58341: mobile day-of dashboard for hosts/cohosts */}
+            <Route path="/run/:inviteCode" element={<DayOfRunPage />} />
             <Route path="/checkin/:inviteCode/:guestId" element={<CheckInPage />} />
             <Route path="/dj/:inviteCode" element={<DJPage />} />
+            {/* pepperoni-58341: full-bleed art slideshow — more specific than /display/:partyId/:slug */}
+            <Route path="/display/:partyId/art" element={<ArtDisplayPage />} />
             <Route path="/display/:partyId/:slug" element={<DisplayPage />} />
             <Route path="/underboss" element={<UnderbossDashboard />} />
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />

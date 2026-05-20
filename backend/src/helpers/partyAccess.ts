@@ -17,6 +17,7 @@ export const GPP_GLOBAL_EDITORS = [
  */
 export const VALID_TAB_IDS = [
   'dashboard',
+  'day-of',
   'details',
   'guests',
   'pizza',

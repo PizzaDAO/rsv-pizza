@@ -171,6 +171,9 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     }),
     reimbursementCapAppealNote: dbParty.reimbursement_cap_appeal_note ?? null,
     reimbursementCapAppealedAt: dbParty.reimbursement_cap_appealed_at ?? null,
+    // Day-of logistics (pepperoni-58341)
+    wifiInfo: dbParty.wifi_info ?? null,
+    parkingNotes: dbParty.parking_notes ?? null,
     guests,
   };
 }

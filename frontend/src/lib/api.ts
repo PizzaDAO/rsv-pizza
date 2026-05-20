@@ -199,6 +199,9 @@ export interface UpdatePartyData {
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
   reimbursementCapUsd?: number | null;
+  // Day-of logistics (pepperoni-58341)
+  wifiInfo?: string | null;
+  parkingNotes?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -308,6 +311,9 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
+      // Day-of logistics (pepperoni-58341)
+      wifiInfo: data.wifiInfo,
+      parkingNotes: data.parkingNotes,
     },
   });
 }
@@ -4121,3 +4127,67 @@ export async function searchPartiesForOutreach(q: string): Promise<OutreachParty
   return res.parties;
 }
 
+// =============================================================================
+// pepperoni-58341: Day-of event app
+// =============================================================================
+
+export interface DayOfAnnouncement {
+  id: string;
+  partyId: string;
+  sentBy: string;
+  channels: string[];
+  subject: string | null;
+  body: string;
+  recipientCount: number | null;
+  sentAt: string;
+  createdAt: string;
+}
+
+export interface AnnounceResponse {
+  announcementId: string;
+  recipientCount: number;
+  channelsSent: { telegram: boolean; email: number };
+}
+
+export async function sendDayOfAnnouncement(
+  partyId: string,
+  payload: { subject?: string; body: string; channels: Array<'telegram' | 'email'> }
+): Promise<AnnounceResponse> {
+  return apiRequest<AnnounceResponse>(`/api/parties/${partyId}/announce`, {
+    method: 'POST',
+    body: payload,
+    requireAuth: true,
+  });
+}
+
+export async function listDayOfAnnouncements(partyId: string): Promise<DayOfAnnouncement[]> {
+  const res = await apiRequest<{ announcements: DayOfAnnouncement[] }>(
+    `/api/parties/${partyId}/announcements`,
+    { method: 'GET', requireAuth: true }
+  );
+  return res.announcements;
+}
+
+export interface WalkInGuestResponse {
+  guest: {
+    id: string;
+    name: string;
+    email: string | null;
+    checkedInAt: string | null;
+    submittedVia: string;
+    status: string;
+    approved: boolean | null;
+  };
+  alreadyExisted?: boolean;
+}
+
+export async function addWalkInGuest(
+  partyId: string,
+  payload: { name: string; email?: string }
+): Promise<WalkInGuestResponse> {
+  return apiRequest<WalkInGuestResponse>(`/api/parties/${partyId}/guests/walk-in`, {
+    method: 'POST',
+    body: payload,
+    requireAuth: true,
+  });
+}
