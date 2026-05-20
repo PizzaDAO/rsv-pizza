@@ -25,7 +25,8 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
   partyId,
   expectedGuests,
 }) => {
-  const { party, loadParty } = usePizza();
+  const { party, loadParty, guests } = usePizza();
+  const rsvpCount = guests?.length ?? 0;
   // Edit mode is implicit when the value is null (no value yet → show input).
   // For non-null, the host clicks Edit to reveal the input.
   const [editing, setEditing] = useState(false);
@@ -153,6 +154,11 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* RSVP count hint — helps the host estimate */}
+      <p className="text-xs text-theme-text-muted mt-2">
+        {rsvpCount === 1 ? '1 RSVP' : `${rsvpCount} RSVPs`} so far.
+      </p>
 
       {error && (
         <p className="text-xs text-[#ff393a] mt-2">{error}</p>
