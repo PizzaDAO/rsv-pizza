@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
+import { Checkbox } from '../components/Checkbox';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote, getPartyPhotos } from '../lib/api';
 import {
@@ -260,6 +261,9 @@ export function PartnerDashboardPage() {
   // Region filter (simple dropdown like underboss)
   const [regionFilter, setRegionFilter] = useState<string>('all');
 
+  // Admin-only: default to showing only approved events (session-only, no localStorage)
+  const [approvedOnly, setApprovedOnly] = useState(true);
+
   // City chat Telegram links from the master Google Sheet
   const [cityChats, setCityChats] = useState<Map<string, string>>(new Map());
 
@@ -400,6 +404,11 @@ export function PartnerDashboardPage() {
       );
     }
 
+    // Admin-only: default to approved events
+    if (dashboardData?.isAdmin && approvedOnly) {
+      filtered = filtered.filter(e => e.underbossStatus === 'approved');
+    }
+
     // Region filter
     if (regionFilter !== 'all') {
       filtered = filtered.filter(e => e.region === regionFilter);
@@ -423,7 +432,7 @@ export function PartnerDashboardPage() {
     });
 
     return sorted;
-  }, [allEvents, searchQuery, sortBy, regionFilter]);
+  }, [allEvents, searchQuery, sortBy, regionFilter, approvedOnly, dashboardData?.isAdmin]);
 
   const uniqueRegions = useMemo(() => {
     const regions = new Set(allEvents.map(e => e.region).filter(Boolean));
@@ -796,6 +805,15 @@ export function PartnerDashboardPage() {
                     <option key={r.id} value={r.id}>{r.label}</option>
                   ))}
                 </select>
+              )}
+
+              {/* Admin-only: approved-only toggle (default on, session-only) */}
+              {dashboardData?.isAdmin && (
+                <Checkbox
+                  checked={approvedOnly}
+                  onChange={() => setApprovedOnly(v => !v)}
+                  label="Approved events only"
+                />
               )}
 
               {/* {t('filters.clearFilters')} */}
