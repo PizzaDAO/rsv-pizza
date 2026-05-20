@@ -14,3 +14,4 @@ export { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
 export { ArtDisplay } from './ArtDisplay';
 export { BriefingCard } from './BriefingCard';
 export { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
+export { BroadcastJoinCard } from './BroadcastJoinCard';
