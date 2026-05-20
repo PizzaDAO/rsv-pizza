@@ -297,6 +297,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           partyId={partyId}
           payoutId={detailPayoutId}
           onClose={() => setDetailPayoutId(null)}
+          onUpdated={loadPayouts}
         />
       )}
     </div>

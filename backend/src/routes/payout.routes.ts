@@ -669,6 +669,12 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       hostNotes,
       finalAmountUsd,
       mercuryCardLast4,
+      // arugula-38633 (edit-receipts): hosts can swap photos/receipts on
+      // payouts that are still pending. All three arrays are optional and
+      // are applied transactionally below.
+      receiptPhotos,
+      pizzaPhotos,
+      removeDocumentIds,
     } = req.body || {};
 
     await assertCanUsePayoutsForParty(req, partyId);
@@ -680,6 +686,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 
     const existing = await prisma.payout.findFirst({
       where: { id: payoutId, partyId },
+      include: { documents: true },
     });
     if (!existing) {
       throw new AppError('Payment not found', 404, 'NOT_FOUND');
@@ -688,7 +695,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       throw new AppError(
         'Payments can only be edited while pending; this one is ' + existing.status,
         400,
-        'PAYOUT_NOT_PENDING'
+        'NOT_EDITABLE'
       );
     }
 
@@ -735,10 +742,281 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       data.finalAmountUsd = new Decimal(n);
     }
 
-    const updated = await prisma.payout.update({
-      where: { id: payoutId },
-      data,
-      include: { documents: { orderBy: { sortOrder: 'asc' } } },
+    // ---- arugula-38633 (edit-receipts): document edits ----
+
+    // Validate input shapes.
+    if (receiptPhotos !== undefined && !Array.isArray(receiptPhotos)) {
+      throw new AppError('receiptPhotos must be an array', 400, 'INVALID_RECEIPTS');
+    }
+    if (pizzaPhotos !== undefined && !Array.isArray(pizzaPhotos)) {
+      throw new AppError('pizzaPhotos must be an array', 400, 'INVALID_PIZZA_PHOTOS');
+    }
+    if (removeDocumentIds !== undefined && !Array.isArray(removeDocumentIds)) {
+      throw new AppError('removeDocumentIds must be an array', 400, 'INVALID_REMOVE_IDS');
+    }
+
+    const newReceipts: IncomingDocument[] = Array.isArray(receiptPhotos) ? receiptPhotos : [];
+    const newPizza: IncomingDocument[] = Array.isArray(pizzaPhotos) ? pizzaPhotos : [];
+    const removeIds: string[] = Array.isArray(removeDocumentIds)
+      ? removeDocumentIds.filter((s: unknown): s is string => typeof s === 'string')
+      : [];
+
+    if (newReceipts.length > 10) {
+      throw new AppError('Max 10 receipt photos', 400, 'TOO_MANY_RECEIPTS');
+    }
+    if (newPizza.length > 10) {
+      throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
+    }
+
+    // Verify each new URL points into the bucket scoped to this party.
+    for (const r of newReceipts) {
+      if (!r || typeof r.url !== 'string') {
+        throw new AppError('Each receiptPhoto must have a url', 400, 'INVALID_RECEIPT');
+      }
+      assertSupabasePayoutUrl(r.url, partyId);
+    }
+    for (const p of newPizza) {
+      if (!p || typeof p.url !== 'string') {
+        throw new AppError('Each pizzaPhoto must have a url', 400, 'INVALID_PIZZA_PHOTO');
+      }
+      assertSupabasePayoutUrl(p.url, partyId);
+    }
+
+    // Verify every removeId actually belongs to this payout.
+    const existingDocIds = new Set(existing.documents.map(d => d.id));
+    for (const id of removeIds) {
+      if (!existingDocIds.has(id)) {
+        throw new AppError(
+          `Document ${id} does not belong to this payout`,
+          400,
+          'INVALID_REMOVE_ID'
+        );
+      }
+    }
+
+    // Run OCR on each new receipt in parallel BEFORE the transaction so the
+    // transaction stays short and we can roll up the new OCR sum cleanly.
+    const ocrResults = newReceipts.length === 0
+      ? []
+      : await Promise.allSettled(
+          newReceipts.map(async (r) => {
+            try {
+              const ocr = await analyzeReceipt(r.url);
+              const fx = await convertToUSD(ocr.amount, ocr.currency);
+              return { ok: true as const, doc: r, ocr, fx };
+            } catch (err: any) {
+              return { ok: false as const, doc: r, error: err?.message || 'OCR failed' };
+            }
+          })
+        );
+
+    // Build the receipt-document creates from the OCR results.
+    const newReceiptDocs: Array<{
+      kind: string;
+      url: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      ocrAmount: Decimal | null;
+      ocrCurrency: string | null;
+      ocrConfidence: Decimal | null;
+      ocrRaw: any;
+      ocrError: string | null;
+      sortOrder: number;
+    }> = [];
+    let newOcrSum = 0;
+    interface FxHeadline {
+      originalAmount: number;
+      originalCurrency: string;
+      exchangeRate: number;
+    }
+    // Note: typed via an array slot to avoid TS narrowing the `null` initializer
+    // through the forEach closure boundary.
+    const firstFxBox: { value: FxHeadline | null } = { value: null };
+
+    ocrResults.forEach((settled, i) => {
+      const doc = newReceipts[i];
+      const result = settled.status === 'fulfilled' ? settled.value : null;
+      if (result && result.ok) {
+        const { ocr, fx } = result;
+        newOcrSum += fx.usdAmount;
+        if (firstFxBox.value === null) {
+          firstFxBox.value = {
+            originalAmount: fx.originalAmount,
+            originalCurrency: fx.originalCurrency,
+            exchangeRate: fx.exchangeRate,
+          };
+        }
+        newReceiptDocs.push({
+          kind: 'receipt',
+          url: doc.url,
+          fileName: doc.fileName || extractFileName(doc.url),
+          fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
+          mimeType: doc.mimeType || 'image/jpeg',
+          ocrAmount: new Decimal(fx.usdAmount),
+          ocrCurrency: fx.originalCurrency,
+          ocrConfidence: new Decimal(ocr.confidence),
+          ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          ocrError: null,
+          sortOrder: i,
+        });
+      } else {
+        const err = result && !result.ok ? result.error : 'Unexpected OCR result';
+        newReceiptDocs.push({
+          kind: 'receipt',
+          url: doc.url,
+          fileName: doc.fileName || extractFileName(doc.url),
+          fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
+          mimeType: doc.mimeType || 'image/jpeg',
+          ocrAmount: null,
+          ocrCurrency: null,
+          ocrConfidence: null,
+          ocrRaw: null,
+          ocrError: err,
+          sortOrder: i,
+        });
+      }
+    });
+
+    const newPizzaDocs = newPizza.map((p, i) => ({
+      kind: 'pizza',
+      url: p.url,
+      fileName: p.fileName || extractFileName(p.url),
+      fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
+      mimeType: p.mimeType || 'image/jpeg',
+      ocrAmount: null,
+      ocrCurrency: null,
+      ocrConfidence: null,
+      ocrRaw: null,
+      ocrError: null,
+      sortOrder: i,
+    }));
+
+    const documentsChanged = newReceiptDocs.length > 0 || newPizzaDocs.length > 0 || removeIds.length > 0;
+    const explicitAmount = data.finalAmountUsd !== undefined;
+
+    // If receipts changed AND host didn't pass finalAmountUsd, recompute from
+    // the remaining + newly-added receipt OCR sums. We compute *post-removal*
+    // sum by walking the existing docs minus the removed ids.
+    let recomputedAmount: Decimal | null = null;
+    let recomputedExtractedUsd: Decimal | null = null;
+    let recomputedOriginalAmount: Decimal | null = null;
+    let recomputedOriginalCurrency: string | null = null;
+    let recomputedExchangeRate: Decimal | null = null;
+
+    const receiptsChanged = newReceiptDocs.length > 0 || removeIds.some(
+      id => existing.documents.find(d => d.id === id)?.kind === 'receipt'
+    );
+
+    if (receiptsChanged) {
+      const removedSet = new Set(removeIds);
+      const survivingReceipts = existing.documents.filter(
+        d => d.kind === 'receipt' && !removedSet.has(d.id)
+      );
+      const survivingOcrSum = survivingReceipts.reduce(
+        (sum, d) => sum + (d.ocrAmount != null ? Number(d.ocrAmount.toString()) : 0),
+        0
+      );
+      const fullOcrSum = survivingOcrSum + newOcrSum;
+      recomputedExtractedUsd = new Decimal(fullOcrSum);
+
+      if (!explicitAmount && fullOcrSum > 0) {
+        recomputedAmount = new Decimal(fullOcrSum);
+      }
+
+      // If this is the first receipt OCR'd successfully, pull FX headline
+      // fields from it. Otherwise leave existing headline FX in place.
+      const hadAnyOcr = existing.documents.some(
+        d => d.kind === 'receipt' && !removedSet.has(d.id) && d.ocrAmount != null
+      );
+      const fx = firstFxBox.value;
+      if (!hadAnyOcr && fx) {
+        recomputedOriginalAmount = new Decimal(fx.originalAmount);
+        recomputedOriginalCurrency = fx.originalCurrency;
+        recomputedExchangeRate = new Decimal(fx.exchangeRate);
+      }
+    }
+
+    const oldAmount = Number(existing.finalAmountUsd.toString());
+    const newAmount = explicitAmount
+      ? Number((data.finalAmountUsd as Decimal).toString())
+      : (recomputedAmount != null ? Number(recomputedAmount.toString()) : oldAmount);
+    const amountChanged = newAmount !== oldAmount;
+
+    // Single transaction: delete removed docs, insert new docs, update payout,
+    // write the audit row(s).
+    const updated = await prisma.$transaction(async (tx) => {
+      if (removeIds.length > 0) {
+        await tx.payoutDocument.deleteMany({
+          where: { id: { in: removeIds }, payoutId: existing.id },
+        });
+      }
+      if (newReceiptDocs.length > 0 || newPizzaDocs.length > 0) {
+        await tx.payoutDocument.createMany({
+          data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
+            ...d,
+            payoutId: existing.id,
+            ocrRaw: d.ocrRaw === null ? Prisma.JsonNull : (d.ocrRaw as Prisma.InputJsonValue),
+          })),
+        });
+      }
+
+      // Apply scalar updates + (optionally) recomputed amount/FX.
+      const finalData = { ...data };
+      if (recomputedAmount && !explicitAmount) {
+        finalData.finalAmountUsd = recomputedAmount;
+      }
+      if (recomputedExtractedUsd) {
+        finalData.extractedAmountUsd = recomputedExtractedUsd;
+      }
+      if (recomputedOriginalAmount) {
+        finalData.originalAmount = recomputedOriginalAmount;
+        finalData.originalCurrency = recomputedOriginalCurrency;
+        finalData.exchangeRate = recomputedExchangeRate;
+      }
+
+      const row = Object.keys(finalData).length > 0
+        ? await tx.payout.update({
+            where: { id: payoutId },
+            data: finalData,
+            include: { documents: { orderBy: { sortOrder: 'asc' } } },
+          })
+        : await tx.payout.findUniqueOrThrow({
+            where: { id: payoutId },
+            include: { documents: { orderBy: { sortOrder: 'asc' } } },
+          });
+
+      // Audit: write a row when amount changes OR docs change. Mirror the
+      // admin edit_amount shape; use a distinct 'edit_documents' action when
+      // only documents (no amount) changed.
+      const auditActorEmail = req.userEmail || 'unknown';
+      if (amountChanged) {
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'edit_amount',
+            oldAmount: new Decimal(oldAmount) as any,
+            newAmount: new Decimal(newAmount) as any,
+            actorEmail: auditActorEmail,
+            actorKind: 'host',
+            note: documentsChanged
+              ? `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new photo(s), ${removeIds.length} removed)`
+              : 'Host edit',
+          },
+        });
+      } else if (documentsChanged) {
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'edit_documents',
+            actorEmail: auditActorEmail,
+            actorKind: 'host',
+            note: `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new photo(s), ${removeIds.length} removed)`,
+          },
+        });
+      }
+
+      return row;
     });
 
     res.json({ payout: serializePayout(updated) });
