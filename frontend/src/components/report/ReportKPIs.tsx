@@ -1,9 +1,28 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Users, Mail, Wallet, Award, Video, MousePointerClick, FileText } from 'lucide-react';
-import { EventReport, PageViewStats } from '../../types';
+import { EventReport, PageViewStats, HostGoals, MomentumDelta } from '../../types';
+import { GoalBar } from '../gpp-dashboard/GoalBar';
 
 type StatsConfig = Record<string, { override?: number | null; hidden?: boolean }>;
+
+// quattro-71244: optional gamification extras for the read-only branch.
+export interface GamifiedExtras {
+  goals: HostGoals;
+  deltas: Record<string, MomentumDelta>;
+  pulseKeys: Set<string>;
+  onSetGoal: (statKey: string, newGoal: number | null) => void;
+}
+
+// Stat key → matching HostGoals key (subset that supports goals).
+const STAT_TO_GOAL_KEY: Record<string, keyof HostGoals> = {
+  totalRsvps: 'rsvps',
+  attendees: 'attendees',
+  newsletterSignups: 'newsletterSignups',
+  walletAddresses: 'walletAddresses',
+  poapMints: 'poapMints',
+  pageViews: 'pageViews',
+};
 
 interface ReportKPIsProps {
   report: EventReport;
@@ -12,6 +31,7 @@ interface ReportKPIsProps {
   pageViewStats?: PageViewStats | null;
   socialPostViews?: number;
   socialPostCount?: number;
+  gamified?: GamifiedExtras;
 }
 
 interface StatItem {
@@ -22,7 +42,7 @@ interface StatItem {
   color: string;
 }
 
-export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount }: ReportKPIsProps) {
+export function ReportKPIs({ report, onChange, editable = true, pageViewStats, socialPostViews, socialPostCount, gamified }: ReportKPIsProps) {
   const { t } = useTranslation('host');
   const config: StatsConfig = report.reportStatsConfig || {};
 
@@ -64,7 +84,11 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
   if (!editable) {
     // Read-only display mode for preview/public view
     const visibleStats = allStats.filter(s => !isHidden(s.key));
-    const hasAny = visibleStats.some(s => getDisplayValue(s) != null);
+    // When `gamified` is provided, render zero-state tiles too — zeros are
+    // motivating, and the gamified-dashboard wrapper expects the full grid.
+    const hasAny = gamified
+      ? visibleStats.length > 0
+      : visibleStats.some(s => getDisplayValue(s) != null);
     if (!hasAny) return null;
 
     return (
@@ -73,18 +97,49 @@ export function ReportKPIs({ report, onChange, editable = true, pageViewStats, s
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visibleStats.map((stat) => {
             const value = getDisplayValue(stat);
-            if (value === null) return null;
+            // In non-gamified mode, hide null tiles (legacy behavior).
+            if (value === null && !gamified) return null;
             const Icon = stat.icon;
+            const numericValue = value ?? 0;
+
+            // quattro-71244: gamification extras (goals, deltas, pulse).
+            const goalKey = gamified ? STAT_TO_GOAL_KEY[stat.key] : undefined;
+            const goalValue = goalKey != null && gamified ? gamified.goals[goalKey] : undefined;
+            const delta = gamified ? gamified.deltas[stat.key] : undefined;
+            const pulse = gamified?.pulseKeys.has(stat.key) ?? false;
 
             return (
-              <div key={stat.key} className="card p-4">
+              <div
+                key={stat.key}
+                className={`card p-4 ${pulse ? 'animate-pulse-once' : ''}`}
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <Icon size={16} className={stat.color} />
                   <span className="text-xs text-theme-text-secondary">{stat.label}</span>
                 </div>
                 <div className="text-2xl font-bold text-theme-text">
-                  {value.toLocaleString()}
+                  {numericValue.toLocaleString()}
                 </div>
+                {gamified && goalKey != null && (
+                  <GoalBar
+                    value={numericValue}
+                    goal={goalValue}
+                    onSetGoal={(g) => gamified.onSetGoal(stat.key, g)}
+                  />
+                )}
+                {gamified && delta && (delta.lastHour || delta.today || delta.busiestHourLabel) ? (
+                  <div className="mt-2 text-[10px] text-theme-text-faint space-y-0.5">
+                    {delta.lastHour != null && delta.lastHour > 0 && (
+                      <div>{t('dashboard.kpis.deltaLastHour', { n: delta.lastHour })}</div>
+                    )}
+                    {delta.today != null && delta.today > 0 && (
+                      <div>{t('dashboard.kpis.deltaToday', { n: delta.today })}</div>
+                    )}
+                    {delta.busiestHourLabel && (
+                      <div>{t('dashboard.kpis.busiestHour', { label: delta.busiestHourLabel })}</div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             );
           })}

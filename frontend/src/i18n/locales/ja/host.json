@@ -759,5 +759,32 @@
     "eligible": "対象{{count}}名",
     "pickAWinnerBtn": "当選者を選ぶ",
     "winnersThisSession": "今回の当選者（{{count}}）"
+  },
+  "dashboard": {
+    "kpis": {
+      "title": "イベント統計",
+      "setGoal": "目標を設定",
+      "goalLabel": "目標：{{value}}",
+      "percentToGoal": "目標まで{{percent}}%",
+      "goalHit": "目標達成！",
+      "deltaLastHour": "直近1時間で+{{n}}",
+      "deltaToday": "本日{{n}}件",
+      "busiestHour": "ピーク時間：{{label}}",
+      "leaderboardRank": "{{total}}名の{{scope}}中{{rank}}位",
+      "leaderboardTopPct": "{{metric}}でトップ{{percent}}%",
+      "leaderboardScopeGpp": "GPPホスト",
+      "badgeUnlocked": "解除済み",
+      "badgeLocked": "次：{{label}}",
+      "milestones": {
+        "firstRsvp": "最初のRSVP",
+        "rsvps25": "25件のRSVP",
+        "rsvps50": "50件のRSVP",
+        "rsvps100": "100件のRSVP",
+        "firstWallet": "最初のウォレット",
+        "firstNewsletter": "最初のニュースレター登録",
+        "firstPoap": "最初のPOAPミント",
+        "goalReached": "目標達成"
+      }
+    }
   }
 }

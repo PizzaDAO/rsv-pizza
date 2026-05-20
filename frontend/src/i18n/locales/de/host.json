@@ -759,5 +759,32 @@
     "eligible": "{{count}} berechtigt",
     "pickAWinnerBtn": "Gewinner wählen",
     "winnersThisSession": "Gewinner dieser Sitzung ({{count}})"
+  },
+  "dashboard": {
+    "kpis": {
+      "title": "Deine Event-Statistik",
+      "setGoal": "Ziel festlegen",
+      "goalLabel": "Ziel: {{value}}",
+      "percentToGoal": "{{percent}}% bis zum Ziel",
+      "goalHit": "Ziel erreicht!",
+      "deltaLastHour": "+{{n}} in der letzten Stunde",
+      "deltaToday": "{{n}} heute",
+      "busiestHour": "Stärkste Stunde: {{label}}",
+      "leaderboardRank": "#{{rank}} von {{total}} {{scope}}",
+      "leaderboardTopPct": "Top {{percent}}% bei {{metric}}",
+      "leaderboardScopeGpp": "GPP-Gastgebern",
+      "badgeUnlocked": "Freigeschaltet",
+      "badgeLocked": "Nächstes: {{label}}",
+      "milestones": {
+        "firstRsvp": "Erste Zusage",
+        "rsvps25": "25 Zusagen",
+        "rsvps50": "50 Zusagen",
+        "rsvps100": "100 Zusagen",
+        "firstWallet": "Erste Wallet",
+        "firstNewsletter": "Erste Newsletter-Anmeldung",
+        "firstPoap": "Erstes POAP-Mint",
+        "goalReached": "Ziel erreicht"
+      }
+    }
   }
 }
