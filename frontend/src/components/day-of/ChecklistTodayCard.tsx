@@ -21,6 +21,11 @@ const DAY_OF_ITEM_NAMES = new Set([
   'Greet first guests',
   'Take group photo',
   'Pay venue final invoice',
+  'Get the pizza box signed',
+  'Join the PizzaDAO Zoom (static camera)',
+  'Join the PizzaDAO StreamYard (phone)',
+  'Take a Stand With Crypto group photo',
+  'Record the Stand With Crypto shoutout',
 ]);
 
 export const ChecklistTodayCard: React.FC<ChecklistTodayCardProps> = ({
