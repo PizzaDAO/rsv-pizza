@@ -32,6 +32,15 @@ interface NameTag {
   pdf: string;
 }
 
+interface Shirt {
+  id: string;
+  name: string;
+  frontPreview: string;
+  backPreview: string;
+  frontPdf: string;
+  backPdf: string;
+}
+
 const STICKERS: Sticker[] = [
   { id: 'sticker-1', name: 'Pizza The Planet', shape: 'square' },
   { id: 'sticker-2', name: 'Pizza The Planet Badge', shape: 'round' },
@@ -87,6 +96,17 @@ const NAME_TAGS: NameTag[] = [
     description: 'Ninja Turtle themed name tags (without sponsor logos)',
     preview: '/print-assets/name-tags/tmnt-nametags-preview.png',
     pdf: '/print-assets/name-tags/tmnt-nametags.pdf',
+  },
+];
+
+const SHIRTS: Shirt[] = [
+  {
+    id: 'gpp2026-shirt',
+    name: 'Global Pizza Party Shirt',
+    frontPreview: '/print-assets/shirts/gpp2026-shirt-front-preview.png',
+    backPreview: '/print-assets/shirts/gpp2026-shirt-back-preview.png',
+    frontPdf: '/print-assets/shirts/gpp2026-shirt-front.pdf',
+    backPdf: '/print-assets/shirts/gpp2026-shirt-back.pdf',
   },
 ];
 
@@ -328,6 +348,56 @@ function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: stri
                 <Download size={14} />
                 Download PDF
               </a>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Shirts Section */}
+      <section>
+        <h3 className="text-lg font-semibold text-theme-text mb-3">Shirts</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {SHIRTS.map((shirt) => (
+            <div key={shirt.id} className="card p-4 flex flex-col items-center gap-3">
+              <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                  <img
+                    src={shirt.frontPreview}
+                    alt={`${shirt.name} front`}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                  <img
+                    src={shirt.backPreview}
+                    alt={`${shirt.name} back`}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+              <div className="text-center w-full">
+                <p className="text-sm font-medium text-theme-text leading-tight">{shirt.name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 w-full">
+                <a
+                  href={shirt.frontPdf}
+                  download
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+                >
+                  <Download size={14} />
+                  Front PDF
+                </a>
+                <a
+                  href={shirt.backPdf}
+                  download
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors text-sm font-medium"
+                >
+                  <Download size={14} />
+                  Back PDF
+                </a>
+              </div>
             </div>
           ))}
         </div>
