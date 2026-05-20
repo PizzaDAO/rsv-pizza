@@ -99,9 +99,9 @@ export const AppealCapModal: React.FC<AppealCapModalProps> = ({
             <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl text-sm text-theme-text">
               <Info size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
               <div>
-                ${MAX_PER_TX_CEILING_USD.toFixed(2)} is the most we can reimburse per
-                payment. If you have extenuating circumstances, please DM your
-                underboss directly.
+                ${MAX_PER_TX_CEILING_USD.toFixed(2)} is the most we fund each city.
+                If you have extenuating circumstances, please DM your underboss
+                directly.
               </div>
             </div>
             <button
