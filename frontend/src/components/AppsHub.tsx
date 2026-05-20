@@ -384,11 +384,13 @@ export function AppsHub({
   // Soft-launch gate for the Payouts app (arugula-38633 v1+v3): the tile
   // stays visible for everyone, but downgrades from 'live' to 'coming-soon'
   // (badge + unclickable) unless caller is underboss/admin/super_admin OR
-  // the party has an effective reimbursement cap set (validated value OR
-  // numeric event_tag fallback — see helpers/reimbursementCap.ts). Remove
+  // the party has BOTH an effective reimbursement cap AND the 'go' event_tag
+  // (the explicit "open this event to the host" signal, settable only by
+  // admin / payment_admin / super_admin via PATCH /api/parties/:id). Remove
   // when opening to all hosts unconditionally.
   const [canUsePayouts, setCanUsePayouts] = useState<boolean | null>(null);
   const partyEffectiveCap = party?.effectiveReimbursementCapUsd;
+  const partyEventTags = party?.eventTags;
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -399,18 +401,19 @@ export function AppsHub({
         ]);
         if (cancelled) return;
         // If party hasn't loaded yet, fall back to role-only check (avoids
-        // false-negative "Coming Soon" on cap-set parties while loading).
+        // false-negative "Coming Soon" on opened parties while loading).
         const hasCap =
           typeof partyEffectiveCap === 'number' && partyEffectiveCap > 0;
+        const hasGo = Array.isArray(partyEventTags) && partyEventTags.includes('go');
         const eligible =
-          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
+          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || (hasCap && hasGo);
         setCanUsePayouts(eligible);
       } catch {
         if (!cancelled) setCanUsePayouts(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [partyEffectiveCap]);
+  }, [partyEffectiveCap, partyEventTags]);
 
   const visibleApps = apps.map((a) => {
     if (a.id === 'payments' && canUsePayouts === false) {

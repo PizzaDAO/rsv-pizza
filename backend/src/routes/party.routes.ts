@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isSuperAdmin, isAdmin, isUnderboss } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin, isAdmin, isUnderboss, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
@@ -464,6 +464,30 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
       if (customUrl.length < 3 || customUrl.length > 50) {
         throw new AppError('Custom URL must be between 3 and 50 characters', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    // arugula-38633: 'go' tag is the explicit "open Payments to this host"
+    // signal. Adding or removing it is restricted to payment_admin / admin /
+    // super_admin — hosts and underbosses cannot toggle it via PATCH.
+    // isPaymentAdmin() returns true for all three of those roles.
+    if (Array.isArray(eventTags)) {
+      const existing = await prisma.party.findUnique({
+        where: { id },
+        select: { eventTags: true },
+      });
+      const currentTags = existing?.eventTags || [];
+      const hadGo = currentTags.includes('go');
+      const wantsGo = eventTags.includes('go');
+      if (hadGo !== wantsGo) {
+        const canToggleGo = await isPaymentAdmin(req.userEmail);
+        if (!canToggleGo) {
+          throw new AppError(
+            "Only admins and payment admins can add or remove the 'go' tag.",
+            403,
+            'FORBIDDEN_TAG',
+          );
+        }
       }
     }
 

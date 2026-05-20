@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock, Info, BadgeDollarSign } from 'lucide-react';
 import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
+import { usePizza } from '../../contexts/PizzaContext';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
@@ -52,6 +53,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [detailPayoutId, setDetailPayoutId] = useState<string | null>(null);
   const [canAccess, setCanAccess] = useState<boolean | null>(null);
+  const { party } = usePizza();
 
   useEffect(() => {
     let cancelled = false;
@@ -62,13 +64,17 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           fetchAdminMe().catch(() => null),
         ]);
         if (cancelled) return;
-        // arugula-38633 v3: also eligible if the party has an effective
-        // reimbursement cap set (validated value OR numeric event_tag
-        // fallback). Backend enforces the same gate per-handler.
+        // arugula-38633 v3: host is eligible if the party has BOTH an
+        // effective reimbursement cap AND the 'go' event_tag (the explicit
+        // "open this event to the host" signal, settable only by admin /
+        // payment_admin / super_admin via PATCH /api/parties/:id). Backend
+        // enforces the same gate per-handler.
         const hasCap =
           typeof effectiveReimbursementCapUsd === 'number' &&
           effectiveReimbursementCapUsd > 0;
-        const eligible = Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || hasCap;
+        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
+        const eligible =
+          Boolean(ub?.isUnderboss) || Boolean(ad?.isAdmin) || (hasCap && hasGo);
         setCanAccess(eligible);
       } catch {
         if (!cancelled) setCanAccess(false);

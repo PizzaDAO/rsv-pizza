@@ -211,12 +211,13 @@ async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
 }
 
 /**
- * Returns true if the party has an effective reimbursement cap — either an
- * underboss-validated `reimbursementCapUsd` value OR a numeric event_tag that
- * parses as a cap. Delegates to the shared `computeEffectiveCapUsd` helper
- * so the gate matches the value shown to the host in the UI exactly.
+ * Returns true if the party meets the host-gate for Payments: it has an
+ * effective reimbursement cap (validated `reimbursementCapUsd` OR a numeric
+ * event_tag fallback) AND the `'go'` event_tag is present. The `'go'` tag is
+ * the explicit "open this event up to the host" signal — only payment_admin /
+ * admin / super_admin can place it (see party.routes.ts PATCH /:id).
  */
-async function partyHasCap(partyId: string): Promise<boolean> {
+async function partyMeetsHostGate(partyId: string): Promise<boolean> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
     select: { reimbursementCapUsd: true, eventTags: true },
@@ -226,14 +227,16 @@ async function partyHasCap(partyId: string): Promise<boolean> {
     reimbursementCapUsd: party.reimbursementCapUsd,
     eventTags: party.eventTags,
   });
-  return typeof effective === 'number' && effective > 0;
+  const hasCap = typeof effective === 'number' && effective > 0;
+  const hasGo = Array.isArray(party.eventTags) && party.eventTags.includes('go');
+  return hasCap && hasGo;
 }
 
 async function assertCanUsePayoutsForParty(req: AuthRequest, partyId: string): Promise<void> {
   if (await isUnderbossOrAdmin(req.userEmail)) return;
-  if (await partyHasCap(partyId)) return;
+  if (await partyMeetsHostGate(partyId)) return;
   throw new AppError(
-    'The payments feature is currently in soft launch for underbosses, admins, and parties with a reimbursement cap set.',
+    'The payments feature is currently in soft launch for underbosses, admins, and parties opened by an admin (cap set + \'go\' tag).',
     403,
     'FORBIDDEN',
   );
