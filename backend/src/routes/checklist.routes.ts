@@ -197,7 +197,7 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
             VALUES
               (gen_random_uuid(), ${partyId}::uuid, ${d.name}, ${d.due_date}, ${d.is_auto},
                ${d.auto_rule}, ${d.link_tab}, ${d.sort_order}, true, now(), now())
-            ON CONFLICT ON CONSTRAINT checklist_items_party_default_name_unique DO NOTHING
+            ON CONFLICT (party_id, name) WHERE is_default = true DO NOTHING
           `;
         }
       });
