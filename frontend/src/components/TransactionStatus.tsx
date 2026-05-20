@@ -49,7 +49,7 @@ export const TransactionStatus: React.FC<TransactionStatusProps> = ({
         <div>
           <h3 className="text-lg font-bold text-theme-text mb-1">Transaction Pending</h3>
           <p className="text-theme-text-muted text-sm">
-            Waiting for on-chain confirmation...
+            Waiting for onchain confirmation...
           </p>
         </div>
         {txHash && chainId && (

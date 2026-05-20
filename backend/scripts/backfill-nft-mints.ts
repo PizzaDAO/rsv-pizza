@@ -214,9 +214,9 @@ async function main() {
       }
 
       if (data.alreadyMinted) {
-        // Already minted on-chain, but missing from our DB
+        // Already minted onchain, but missing from our DB
         console.log(
-          `  -> Already minted on-chain. Token #${data.tokenId} (DB updated)`
+          `  -> Already minted onchain. Token #${data.tokenId} (DB updated)`
         );
         alreadyMinted++;
       } else {

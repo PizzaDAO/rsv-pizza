@@ -442,7 +442,7 @@ model Donation {
   chainId       Int?    @map("chain_id") // 1 = Ethereum, 8453 = Base
   tokenSymbol   String? @map("token_symbol") // "ETH", "USDC", etc.
   tokenAddress  String? @map("token_address") // null for native ETH
-  txHash        String? @map("tx_hash") // on-chain tx hash
+  txHash        String? @map("tx_hash") // onchain tx hash
   walletAddress String? @map("wallet_address") // donor's wallet
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
