@@ -47,6 +47,12 @@ export const DonationSettings: React.FC = () => {
         if (party.inviteCode) {
           await loadParty(party.inviteCode);
         }
+      } else {
+        // Refresh party context on success so dependent widgets
+        // (e.g. DonationSummary) reflect the saved state without F5.
+        if (party.inviteCode) {
+          await loadParty(party.inviteCode);
+        }
       }
       return success;
     } catch (error) {
