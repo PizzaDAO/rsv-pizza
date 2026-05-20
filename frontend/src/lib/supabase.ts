@@ -869,26 +869,58 @@ function normalizePartyCoHosts<T extends Record<string, any>>(party: T): T {
 }
 
 // Party operations
-export async function createParty(
-  name?: string,
-  hostName?: string,
-  date?: string,
-  pizzaStyle: string = 'new-york',
-  expectedGuests?: number,
-  address?: string,
-  availableBeverages?: string[],
-  duration?: number,
-  password?: string,
-  eventImageUrl?: string,
-  description?: string,
-  customUrl?: string,
-  timezone?: string,
-  hostEmail?: string,
-  hideGuests?: boolean,
-  placeId?: string,
-  venueName?: string,
-  city?: string
-): Promise<DbParty | null> {
+export interface CreatePartyOptions {
+  name?: string;
+  hostName?: string;
+  date?: string;
+  pizzaStyle?: string;
+  expectedGuests?: number;
+  address?: string;
+  availableBeverages?: string[];
+  duration?: number;
+  password?: string;
+  eventImageUrl?: string;
+  description?: string;
+  customUrl?: string;
+  timezone?: string;
+  hostEmail?: string;
+  hideGuests?: boolean;
+  placeId?: string;
+  venueName?: string;
+  city?: string;
+  // calzone-71208: capture country + lat/lng from autocomplete on create.
+  // Without these, ~6% of events (61 of 982 in prod 2026-05-20) shipped with
+  // country IS NULL because EventForm dropped Google's address_components.
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export async function createParty(opts: CreatePartyOptions = {}): Promise<DbParty | null> {
+  const {
+    name,
+    hostName,
+    date,
+    pizzaStyle = 'new-york',
+    expectedGuests,
+    address,
+    availableBeverages,
+    duration,
+    password,
+    eventImageUrl,
+    description,
+    customUrl,
+    timezone,
+    hostEmail,
+    hideGuests,
+    placeId,
+    venueName,
+    city,
+    country,
+    latitude,
+    longitude,
+  } = opts;
+
   // Use API if authenticated (secure path)
   if (isAuthenticated()) {
     try {
@@ -902,6 +934,9 @@ export async function createParty(
         placeId,
         venueName,
         city,
+        country,
+        latitude,
+        longitude,
         availableBeverages,
         duration,
         password,
@@ -975,6 +1010,9 @@ export async function createParty(
       description: description || null,
       custom_url: customUrl || null,
       address: address || null,
+      latitude: latitude !== undefined && latitude !== null ? Number(latitude) : null,
+      longitude: longitude !== undefined && longitude !== null ? Number(longitude) : null,
+      country: country || null,
       place_id: placeId || null,
       venue_name: venueName || null,
       city: city || null,

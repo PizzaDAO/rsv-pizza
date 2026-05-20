@@ -220,7 +220,20 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const createParty = async (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string): Promise<string | null> => {
     setPartyLoading(true);
     try {
-      const dbParty = await db.createParty(name, hostName, date, pizzaSettings.style.id, expectedGuests, address, selectedBeverages, duration, password, eventImageUrl, description, customUrl);
+      const dbParty = await db.createParty({
+        name,
+        hostName,
+        date,
+        pizzaStyle: pizzaSettings.style.id,
+        expectedGuests,
+        address,
+        availableBeverages: selectedBeverages,
+        duration,
+        password,
+        eventImageUrl,
+        description,
+        customUrl,
+      });
       if (dbParty) {
         const newParty = dbPartyToParty(dbParty, []);
         setParty(newParty);
