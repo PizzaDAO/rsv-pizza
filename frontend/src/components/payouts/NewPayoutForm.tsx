@@ -182,7 +182,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             <BadgeDollarSign size={22} className="text-[#ff393a] mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-theme-text">
-                We'll pay you up to ${reimbursementCapUsd!.toFixed(2)}.
+                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}.
                 {totalPaidUsd > 0 && (
                   <> ${totalPaidUsd.toFixed(2)} paid so far.</>
                 )}
@@ -190,7 +190,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
               <p className="text-xs text-theme-text-muted mt-0.5">
                 {localAppealedAt
                   ? 'Appeal submitted — an underboss will review.'
-                  : 'Submissions above this amount may not be fully paid.'}
+                  : 'Submissions above this amount may not be fully reimbursed.'}
               </p>
             </div>
           </div>
