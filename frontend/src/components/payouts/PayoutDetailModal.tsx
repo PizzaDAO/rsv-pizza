@@ -1,13 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { X, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign } from 'lucide-react';
 import { Payout, PayoutStatus } from '../../types';
-import { getPayout } from '../../lib/api';
+import { getPayout, updatePayout } from '../../lib/api';
 import { methodIcon, methodLabel } from './PayoutListRow';
+import { IconInput } from '../IconInput';
+import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
+import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 
 interface PayoutDetailModalProps {
   partyId: string;
   payoutId: string;
   onClose: () => void;
+  /**
+   * Optional callback fired after a successful host edit. Lets the parent
+   * (PayoutsTab) refresh its list so totals / OCR sums stay in sync.
+   */
+  onUpdated?: () => void;
 }
 
 const STATUS_STYLES: Record<PayoutStatus, string> = {
@@ -27,16 +35,32 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
 };
 
 /**
- * Read-only detail view for a single payout. Click outside or X to close.
+ * Detail view for a single payout. Read-only by default; pending payouts
+ * gain an "Edit" affordance that lets the host swap receipts/photos, notes,
+ * and amount before an admin reviews.
  */
 export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   partyId,
   payoutId,
   onClose,
+  onUpdated,
 }) => {
   const [payout, setPayout] = useState<Payout | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ---- edit state ----
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // New uploads since edit-mode was opened (existing docs aren't re-uploaded).
+  const [newReceipts, setNewReceipts] = useState<ReceiptItem[]>([]);
+  const [newPizzaPhotos, setNewPizzaPhotos] = useState<PizzaPhotoItem[]>([]);
+  // IDs of existing documents the host has clicked X on (deferred until save).
+  const [removedDocIds, setRemovedDocIds] = useState<Set<string>>(new Set());
+  const [editNotes, setEditNotes] = useState('');
+  const [editOverrideAmount, setEditOverrideAmount] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +73,119 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     return () => { cancelled = true; };
   }, [partyId, payoutId]);
 
+  // Pre-populate edit fields each time we enter edit mode.
+  const enterEdit = () => {
+    if (!payout) return;
+    setEditing(true);
+    setSaveError(null);
+    setNewReceipts([]);
+    setNewPizzaPhotos([]);
+    setRemovedDocIds(new Set());
+    setEditNotes(payout.hostNotes ?? '');
+    setEditOverrideAmount(
+      payout.finalAmountUsd != null ? String(payout.finalAmountUsd) : ''
+    );
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setSaveError(null);
+    setNewReceipts([]);
+    setNewPizzaPhotos([]);
+    setRemovedDocIds(new Set());
+  };
+
+  // Surviving existing documents (not marked for removal) — drives the
+  // photo grids in edit mode so the host can see what's already attached.
+  const survivingReceipts = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'receipt' && !removedDocIds.has(d.id)),
+    [payout, removedDocIds]
+  );
+  const survivingPizzaPhotos = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'pizza' && !removedDocIds.has(d.id)),
+    [payout, removedDocIds]
+  );
+
+  const isProcessingUploads =
+    newReceipts.some(r => r.status === 'uploading' || r.status === 'ocring') ||
+    newPizzaPhotos.some(p => p.status === 'uploading');
+
+  const handleSave = async () => {
+    if (!payout || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      // Build the patch payload. Only include fields that actually changed.
+      const patch: Parameters<typeof updatePayout>[2] = {};
+
+      // Notes (treat empty string as a clear).
+      const trimmedNotes = editNotes.trim();
+      const originalNotes = (payout.hostNotes ?? '').trim();
+      if (trimmedNotes !== originalNotes) {
+        patch.hostNotes = trimmedNotes.length > 0 ? trimmedNotes : null;
+      }
+
+      // Amount override.
+      const amountStr = editOverrideAmount.trim();
+      if (amountStr !== '') {
+        const parsed = Number(amountStr);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          throw new Error('Amount must be a positive number');
+        }
+        if (parsed !== payout.finalAmountUsd) {
+          patch.finalAmountUsd = parsed;
+        }
+      }
+
+      // New uploads only — items must be `done` with a URL.
+      const newReceiptPayload = newReceipts
+        .filter(r => r.status === 'done' && r.url)
+        .map(r => ({
+          url: r.url!,
+          fileName: r.fileName,
+          fileSize: r.fileSize,
+          mimeType: r.mimeType,
+        }));
+      if (newReceiptPayload.length > 0) {
+        patch.receiptPhotos = newReceiptPayload;
+      }
+      const newPizzaPayload = newPizzaPhotos
+        .filter(p => p.status === 'done' && p.url)
+        .map(p => ({
+          url: p.url!,
+          fileName: p.fileName,
+          fileSize: p.fileSize,
+          mimeType: p.mimeType,
+        }));
+      if (newPizzaPayload.length > 0) {
+        patch.pizzaPhotos = newPizzaPayload;
+      }
+
+      if (removedDocIds.size > 0) {
+        patch.removeDocumentIds = Array.from(removedDocIds);
+      }
+
+      if (Object.keys(patch).length === 0) {
+        // Nothing to do — just exit edit mode.
+        setEditing(false);
+        setSaving(false);
+        return;
+      }
+
+      const updated = await updatePayout(partyId, payoutId, patch);
+      setPayout(updated);
+      setEditing(false);
+      setNewReceipts([]);
+      setNewPizzaPhotos([]);
+      setRemovedDocIds(new Set());
+      onUpdated?.();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -60,20 +197,34 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
       >
         <div className="flex items-start justify-between p-5 border-b border-theme-stroke">
           <div>
-            <h2 className="text-lg font-semibold text-theme-text">Payment details</h2>
+            <h2 className="text-lg font-semibold text-theme-text">
+              {editing ? 'Edit payment' : 'Payment details'}
+            </h2>
             {payout && (
               <p className="text-xs text-theme-text-muted mt-0.5">
                 Submitted {new Date(payout.createdAt).toLocaleString()}
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {payout && !editing && payout.status === 'pending' && (
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+              >
+                <Pencil size={14} />
+                Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="p-5 space-y-5">
@@ -89,7 +240,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
             </div>
           )}
 
-          {payout && (
+          {payout && !editing && (
             <>
               {/* Status + amount */}
               <div className="flex items-start justify-between flex-wrap gap-3">
@@ -240,6 +391,156 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   )}
                 </div>
               )}
+            </>
+          )}
+
+          {payout && editing && (
+            <>
+              <p className="text-xs text-theme-text-muted">
+                You can edit this payment until an admin reviews it. Removed
+                photos are deleted on save.
+              </p>
+
+              {/* Existing receipts — host can click X to mark for removal */}
+              {survivingReceipts.length > 0 && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Existing receipts</p>
+                  <ul className="space-y-2">
+                    {survivingReceipts.map(d => (
+                      <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                          <img src={d.url} alt="" className="w-14 h-14 rounded object-cover" />
+                        </a>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-theme-text truncate">{d.fileName}</p>
+                          {d.ocrAmount != null && (
+                            <p className="text-xs text-theme-text-muted">
+                              ${d.ocrAmount.toFixed(2)} USD
+                              {d.ocrCurrency && d.ocrCurrency !== 'USD' && ` (from ${d.ocrCurrency})`}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
+                          className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          aria-label="Remove receipt"
+                        >
+                          <X size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Add receipts */}
+              <div>
+                <p className="text-xs text-theme-text-muted mb-2">Add receipts</p>
+                <ReceiptUpload
+                  partyId={partyId}
+                  payoutTempId={payout.id}
+                  items={newReceipts}
+                  onChange={setNewReceipts}
+                  maxItems={10}
+                />
+              </div>
+
+              {/* Existing pizza photos — host can click X to mark for removal */}
+              {survivingPizzaPhotos.length > 0 && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Existing pizza / event photos</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {survivingPizzaPhotos.map(d => (
+                      <div key={d.id} className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface group">
+                        <img src={d.url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add pizza photos */}
+              <div>
+                <p className="text-xs text-theme-text-muted mb-2">Add pizza / event photos</p>
+                <PizzaPhotoUpload
+                  partyId={partyId}
+                  payoutTempId={payout.id}
+                  items={newPizzaPhotos}
+                  onChange={setNewPizzaPhotos}
+                  maxItems={10}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <p className="text-xs text-theme-text-muted mb-2">Notes</p>
+                <IconInput
+                  icon={StickyNote}
+                  multiline
+                  rows={3}
+                  placeholder="What was this for? Pizza + venue, etc."
+                  value={editNotes}
+                  onChange={e => setEditNotes(e.target.value)}
+                  maxLength={500}
+                />
+                <p className="text-xs text-theme-text-muted mt-1">{editNotes.length}/500</p>
+              </div>
+
+              {/* Amount override */}
+              <div>
+                <p className="text-xs text-theme-text-muted mb-2">Amount (USD)</p>
+                <IconInput
+                  icon={DollarSign}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Override amount (USD) — leave blank to recompute from receipts"
+                  value={editOverrideAmount}
+                  onChange={e => setEditOverrideAmount(e.target.value)}
+                />
+                <p className="text-xs text-theme-text-muted mt-1">
+                  If you change receipts, we'll re-add the totals automatically unless you set a value here.
+                </p>
+              </div>
+
+              {saveError && (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 inline-flex items-center gap-2">
+                  <AlertCircle size={16} /> {saveError}
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="btn-secondary"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving || isProcessingUploads}
+                  className="btn-primary inline-flex items-center gap-2 justify-center"
+                >
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  {isProcessingUploads
+                    ? 'Waiting for uploads…'
+                    : saving
+                    ? 'Saving…'
+                    : 'Save changes'}
+                </button>
+              </div>
             </>
           )}
         </div>

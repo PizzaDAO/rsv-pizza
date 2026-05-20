@@ -4035,6 +4035,26 @@ export interface UpdatePayoutData {
   mercuryCardLast4?: string | null;
   hostNotes?: string | null;
   finalAmountUsd?: number;
+  /**
+   * arugula-38633 (edit-receipts): hosts can swap receipts/photos on a
+   * payout that is still `status === 'pending'`. New items are append-only
+   * (no IDs); the backend OCRs new receipts and recomputes `finalAmountUsd`
+   * unless an explicit value is supplied.
+   */
+  receiptPhotos?: Array<{
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  }>;
+  pizzaPhotos?: Array<{
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  }>;
+  /** IDs of existing payout_documents rows to delete (must belong to the payout). */
+  removeDocumentIds?: string[];
 }
 
 export async function updatePayout(

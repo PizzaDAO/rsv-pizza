@@ -1444,7 +1444,7 @@ export interface BankDetails {
 
 export interface PayoutAuditEntry {
   id: string;
-  action: 'create' | 'approve' | 'reject' | 'edit_amount' | 'mark_paid' | 'mark_failed' | 'retry' | 'cancel';
+  action: 'create' | 'approve' | 'reject' | 'edit_amount' | 'edit_documents' | 'mark_paid' | 'mark_failed' | 'retry' | 'cancel';
   oldStatus: string | null;
   newStatus: string | null;
   oldAmount: number | null;
