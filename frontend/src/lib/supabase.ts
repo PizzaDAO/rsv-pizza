@@ -725,6 +725,9 @@ export interface DbParty {
   city?: string | null;
   place_id?: string | null;
   venue_name: string | null;
+  // Day-of logistics (pepperoni-58341) — host-only data; NOT added to SAFE_PARTY_COLUMNS
+  wifi_info?: string | null;
+  parking_notes?: string | null;
   rsvp_closed_at: string | null;
   selected_pizzerias: any[] | null;
   co_hosts: any[];
@@ -1809,6 +1812,9 @@ export async function updateParty(
     venueOrganization?: string | null;
     venueWebsite?: string | null;
     venueNotes?: string | null;
+    // Day-of logistics (pepperoni-58341)
+    wifi_info?: string | null;
+    parking_notes?: string | null;
     description?: string | null;
     password?: string | null;
     custom_url?: string | null;
@@ -1931,6 +1937,9 @@ export async function updateParty(
         hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
         reimbursementCapUsd: updates.reimbursement_cap_usd,
+        // Day-of logistics (pepperoni-58341)
+        wifiInfo: updates.wifi_info,
+        parkingNotes: updates.parking_notes,
       });
       return true;
     } catch (error) {

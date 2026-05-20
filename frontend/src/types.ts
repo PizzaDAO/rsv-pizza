@@ -253,6 +253,9 @@ export interface Party {
   venueOrganization: string | null;
   venueWebsite: string | null;
   venueNotes: string | null;
+  // Day-of logistics (pepperoni-58341)
+  wifiInfo?: string | null;
+  parkingNotes?: string | null;
   rsvpClosedAt: string | null;
   coHosts: CoHost[];
   selectedPizzerias?: Pizzeria[];

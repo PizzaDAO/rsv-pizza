@@ -199,6 +199,9 @@ export interface UpdatePartyData {
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
   reimbursementCapUsd?: number | null;
+  // Day-of logistics (pepperoni-58341)
+  wifiInfo?: string | null;
+  parkingNotes?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -308,6 +311,9 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
+      // Day-of logistics (pepperoni-58341)
+      wifiInfo: data.wifiInfo,
+      parkingNotes: data.parkingNotes,
     },
   });
 }
