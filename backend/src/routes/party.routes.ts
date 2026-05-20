@@ -445,6 +445,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       wifiInfo,
       parkingNotes,
       reimbursementCapUsd,
+      // quattro-71244: gamified dashboard goals (JSONB) — per-KPI host targets.
+      hostGoals,
       // NOTE: reimbursementCapAppealNote + reimbursementCapAppealedAt are NOT
       // destructured here — appeals flow through the dedicated
       // POST /:partyId/reimbursement-cap/appeal endpoint so we can timestamp
@@ -577,6 +579,30 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // quattro-71244: validate hostGoals — keep only known-numeric values, clamp
+    // negatives to 0 and cap each at 1,000,000. Drop non-numeric / non-finite
+    // entries silently. Persist `null` if the caller explicitly clears all goals.
+    let hostGoalsToWrite: any | undefined = undefined;
+    if (hostGoals !== undefined) {
+      if (hostGoals === null) {
+        hostGoalsToWrite = null;
+      } else if (typeof hostGoals === 'object' && !Array.isArray(hostGoals)) {
+        const cleaned: Record<string, number> = {};
+        for (const [k, v] of Object.entries(hostGoals)) {
+          const n = typeof v === 'string' ? Number(v) : (v as any);
+          if (typeof n === 'number' && Number.isFinite(n)) {
+            const clamped = Math.min(1_000_000, Math.max(0, Math.floor(n)));
+            cleaned[k] = clamped;
+          }
+        }
+        hostGoalsToWrite = Object.keys(cleaned).length > 0 ? cleaned : null;
+      } else {
+        // Wrong type — treat as a clear (null) rather than 400, matches the
+        // permissive handling other JSONB columns get on this endpoint.
+        hostGoalsToWrite = null;
+      }
+    }
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -645,6 +671,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(wifiInfo !== undefined && { wifiInfo: wifiInfo || null }),
         ...(parkingNotes !== undefined && { parkingNotes: parkingNotes || null }),
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
+        ...(hostGoalsToWrite !== undefined && { hostGoals: hostGoalsToWrite }),
       },
       include: {
         user: { select: { name: true } },
