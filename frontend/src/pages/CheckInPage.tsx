@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { vouchForGuest, getDiscountStatus, claimDiscount } from '../lib/api';
+import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 import { GPPClouds } from '../components/GPPClouds';
 
@@ -137,11 +137,12 @@ export function CheckInPage() {
           return;
         }
 
-        // If caller is host or checked-in guest — vouch for them
-        if (data.callerIsHost || !data.callerIsTarget) {
+        // If caller is host/co-host/admin — use the manual host-check-in route
+        // (bypasses the peer-vouch "must be checked in" gate that doesn't honor admin roles)
+        if (data.callerIsHost) {
           setState('vouching');
           try {
-            const result = await vouchForGuest(inviteCode, guestId);
+            const result = await checkInGuest(inviteCode, guestId);
             if (result.success) {
               setGuestName(result.guest?.name || guestName);
               if (result.alreadyCheckedIn) {
@@ -156,14 +157,37 @@ export function CheckInPage() {
               setErrorMessage(result.message || 'Check-in failed');
             }
           } catch (err: any) {
-            if (err.message?.includes('SELF_VOUCH') || err.message?.includes("can't check yourself")) {
-              setState('show-qr');
-            } else if (err.message?.includes('NOT_CHECKED_IN') || err.message?.includes('must be checked in')) {
-              setState('not-checked-in');
+            setState('error');
+            setErrorMessage(err.message || 'Check-in failed');
+          }
+          return;
+        }
+
+        // Otherwise: peer attestation (caller is a fellow checked-in guest)
+        setState('vouching');
+        try {
+          const result = await vouchForGuest(inviteCode, guestId);
+          if (result.success) {
+            setGuestName(result.guest?.name || guestName);
+            if (result.alreadyCheckedIn) {
+              setState('already-checked-in');
+              setCheckedInAt(result.guest?.checkedInAt || null);
             } else {
-              setState('error');
-              setErrorMessage(err.message || 'Check-in failed');
+              setState('success');
+              setCheckedInAt(result.guest?.checkedInAt || null);
             }
+          } else {
+            setState('error');
+            setErrorMessage(result.message || 'Check-in failed');
+          }
+        } catch (err: any) {
+          if (err.message?.includes('SELF_VOUCH') || err.message?.includes("can't check yourself")) {
+            setState('show-qr');
+          } else if (err.message?.includes('NOT_CHECKED_IN') || err.message?.includes('must be checked in')) {
+            setState('not-checked-in');
+          } else {
+            setState('error');
+            setErrorMessage(err.message || 'Check-in failed');
           }
         }
       } catch (error: any) {
