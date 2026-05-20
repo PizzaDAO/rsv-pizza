@@ -63,14 +63,14 @@ export const PayoutsList: React.FC<PayoutsListProps> = ({
           </div>
           <h3 className="text-base font-semibold text-theme-text mb-1">No payments yet</h3>
           <p className="text-sm text-theme-text-muted mb-6">
-            Submit your first payment to get paid back for pizza or venue costs.
+            Submit your receipts to get paid back for pizza or venue costs.
           </p>
           <button
             onClick={onStartNew}
             className="btn-secondary inline-flex items-center gap-2"
           >
             <Plus size={16} />
-            Submit your first payment
+            Submit your receipts
           </button>
         </div>
       </div>

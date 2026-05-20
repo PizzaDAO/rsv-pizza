@@ -45,9 +45,9 @@ import { PayoutsTab } from '../components/payouts';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payouts' | 'apps';
+type TabType = 'dashboard' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payouts', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -498,7 +498,7 @@ function HostPageContent() {
                 <PrintTab />
               )}
 
-              {activeTab === 'payouts' && party && (
+              {activeTab === 'payments' && party && (
                 <PayoutsTab
                   partyId={party.id}
                   reimbursementCapUsd={party.reimbursementCapUsd}
