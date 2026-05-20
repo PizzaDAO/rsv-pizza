@@ -572,16 +572,16 @@ export function PartnerDashboardPage() {
         </div>
 
         {/* Stats */}
-        {allEvents.length > 0 && (() => {
-          const totalRsvps = allEvents.reduce((sum, e) => sum + (e.rsvpCount || 0), 0);
-          const avgRsvps = allEvents.length > 0 ? Math.round(totalRsvps / allEvents.length) : 0;
-          const totalImpressions = allEvents.reduce((sum, e) => sum + (e.impressions?.totalViews || 0), 0);
-          const totalUniqueVisitors = allEvents.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
-          const totalClicks = allEvents.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
-          const totalUniqueClickers = allEvents.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
+        {events.length > 0 && (() => {
+          const totalRsvps = events.reduce((sum, e) => sum + (e.rsvpCount || 0), 0);
+          const avgRsvps = events.length > 0 ? Math.round(totalRsvps / events.length) : 0;
+          const totalImpressions = events.reduce((sum, e) => sum + (e.impressions?.totalViews || 0), 0);
+          const totalUniqueVisitors = events.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
+          const totalClicks = events.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
+          const totalUniqueClickers = events.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
           // Aggregate clicks: per-partner with per-platform breakdown
           const clicksByPartnerPlatformAgg: Record<string, { total: number; uniqueTotal: number; platforms: Record<string, { clicks: number; uniqueClickers: number }> }> = {};
-          for (const e of allEvents) {
+          for (const e of events) {
             for (const link of e.clickStats?.byLink || []) {
               const baseName = (link.linkLabel || 'Unknown').replace(/_[^_]+$/, '');
               const platform = detectPlatform(link.url);
@@ -595,14 +595,14 @@ export function PartnerDashboardPage() {
             }
           }
           const isSwc = dashboardData?.tag === 'swc';
-          const withVenue = allEvents.filter(e => e.progress?.hasVenue).length;
-          const withBudget = allEvents.filter(e => e.progress?.hasBudget).length;
-          const venueRate = allEvents.length > 0 ? Math.round((withVenue / allEvents.length) * 100) : 0;
-          const budgetRate = allEvents.length > 0 ? Math.round((withBudget / allEvents.length) * 100) : 0;
+          const withVenue = events.filter(e => e.progress?.hasVenue).length;
+          const withBudget = events.filter(e => e.progress?.hasBudget).length;
+          const venueRate = events.length > 0 ? Math.round((withVenue / events.length) * 100) : 0;
+          const budgetRate = events.length > 0 ? Math.round((withBudget / events.length) * 100) : 0;
 
           // Admin-only newsletter signup aggregation
           const isAdmin = dashboardData?.isAdmin === true;
-          const newsletterTotals = isAdmin ? allEvents.reduce((acc, e) => {
+          const newsletterTotals = isAdmin ? events.reduce((acc, e) => {
             const n = e.newsletterSignups;
             if (n) {
               acc.pizzadao += n.pizzadao;
@@ -631,7 +631,7 @@ export function PartnerDashboardPage() {
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><BarChart3 size={16} /></div>
                     <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.events')}</span>
                   </div>
-                  <div className="text-2xl font-bold text-theme-text">{allEvents.length}</div>
+                  <div className="text-2xl font-bold text-theme-text">{events.length}</div>
                 </div>
                 <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
