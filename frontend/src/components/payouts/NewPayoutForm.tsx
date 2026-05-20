@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users, Info } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { Payout, PayoutMethod, BankDetails } from '../../types';
@@ -171,6 +171,9 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   };
 
   const showCapBanner = typeof reimbursementCapUsd === 'number' && reimbursementCapUsd > 0;
+  // arugula-38633 v2 follow-up: when there's no cap (neither underboss-validated
+  // nor a numeric event_tag), show a polite notice in place of the cap banner.
+  const showNoCapNotice = !showCapBanner;
   const showPaidOnlyBanner = !showCapBanner && totalPaidUsd > 0;
 
   return (
@@ -213,6 +216,20 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           <div>
             <p className="text-sm font-medium text-theme-text">
               ${totalPaidUsd.toFixed(2)} paid so far.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* No-cap notice (arugula-38633 v2 follow-up) — renders in place of the
+          cap banner when neither an underboss-validated cap nor a numeric
+          event_tag fallback exists. Same visual slot, muted-warning color. */}
+      {showNoCapNotice && (
+        <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
+          <Info size={22} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-theme-text">
+              No cap set. Set your expected guests and contact your underboss.
             </p>
           </div>
         </div>

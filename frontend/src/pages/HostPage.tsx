@@ -502,6 +502,7 @@ function HostPageContent() {
                 <PayoutsTab
                   partyId={party.id}
                   reimbursementCapUsd={party.reimbursementCapUsd}
+                  effectiveReimbursementCapUsd={party.effectiveReimbursementCapUsd}
                   reimbursementCapAppealNote={party.reimbursementCapAppealNote}
                   reimbursementCapAppealedAt={party.reimbursementCapAppealedAt}
                   expectedGuests={party.expectedGuests}

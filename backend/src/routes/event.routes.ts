@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin } from '../middleware/auth.js';
 import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
@@ -324,6 +325,12 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         sponsors,
         pageViewStats,
         reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
+        // arugula-38633 v2 follow-up: numeric-tag fallback when no
+        // underboss-validated cap exists. See helpers/reimbursementCap.ts.
+        effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+          reimbursementCapUsd: party.reimbursementCapUsd,
+          eventTags: party.eventTags,
+        }),
       },
     });
   } catch (error) {
