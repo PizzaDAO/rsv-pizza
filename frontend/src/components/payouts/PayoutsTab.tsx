@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock, Info } from 'lucide-react';
 import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
 import { PayoutsList } from './PayoutsList';
@@ -164,6 +164,19 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         PartyHeader, /underboss EventRow, and NewPayoutForm's first-time
         prompt — single source of truth.
       */}
+      {/* No-cap notice (arugula-38633 v2 follow-up): moved to the very top
+          of the Payments section so it's the first thing the host sees in
+          either the list or new-payment view. Renders whenever there's no
+          underboss-validated cap AND no numeric event_tag fallback. */}
+      {!(typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0) && (
+        <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
+          <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="text-sm font-medium text-theme-text">
+            No cap set. Set your expected guests and contact your underboss.
+          </div>
+        </div>
+      )}
+
       <ExpectedGuestsCard partyId={partyId} expectedGuests={expectedGuests} />
 
       {view === 'list' && (

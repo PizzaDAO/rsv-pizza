@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Receipt as ReceiptIcon, BadgeDollarSign, Info } from 'lucide-react';
+import { Plus, Receipt as ReceiptIcon, BadgeDollarSign } from 'lucide-react';
 import { Payout } from '../../types';
 import { PayoutListRow } from './PayoutListRow';
 
@@ -39,24 +39,13 @@ export const PayoutsList: React.FC<PayoutsListProps> = ({
   // state otherwise (matches v2 follow-up plan).
   const hasCap = typeof reimbursementCapUsd === 'number' && reimbursementCapUsd > 0;
   const showStatHeader = totalPaidUsd > 0 || hasCap;
-  // arugula-38633 v2 follow-up: when neither an underboss-validated cap nor a
-  // numeric-tag fallback exists, show a polite notice asking the host to set
-  // their expected guests and contact their underboss.
-  const showNoCapNotice = !hasCap;
-
-  const noCapNotice = showNoCapNotice ? (
-    <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
-      <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
-      <div className="text-sm font-medium text-theme-text">
-        No cap set. Set your expected guests and contact your underboss.
-      </div>
-    </div>
-  ) : null;
+  // arugula-38633 v2 follow-up: the no-cap notice has been hoisted to
+  // PayoutsTab (top of the Payments section) so it's always visible in both
+  // list and new-payment views. PayoutsList no longer renders it locally.
 
   if (payouts.length === 0) {
     return (
       <div className="space-y-3">
-        {noCapNotice}
         <div className="card p-10 text-center">
           <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-theme-surface-hover flex items-center justify-center">
             <ReceiptIcon className="w-7 h-7 text-theme-text-muted" />
@@ -91,7 +80,6 @@ export const PayoutsList: React.FC<PayoutsListProps> = ({
         </div>
       )}
 
-      {noCapNotice}
 
       <div className="card p-4 sm:p-6">
         <div className="space-y-2">
