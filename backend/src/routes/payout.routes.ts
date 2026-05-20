@@ -22,6 +22,7 @@ import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
+import { looksLikeEnsName, resolveWalletInput } from '../services/ens.service.js';
 
 const router = Router();
 
@@ -169,9 +170,15 @@ function validateMethodSpecificFields(
 ) {
   if (method === 'usdc_base') {
     const addr = body.payoutWalletAddress;
-    if (typeof addr !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(addr.trim())) {
+    // taleggio-30219: accept either a 0x address OR an ENS-shaped name here.
+    // Actual ENS resolution is deferred to the async write site below — this
+    // validator is synchronous and only checks shape.
+    const trimmed = typeof addr === 'string' ? addr.trim() : '';
+    const is0x = /^0x[0-9a-fA-F]{40}$/.test(trimmed);
+    const isEns = trimmed.length > 0 && looksLikeEnsName(trimmed);
+    if (!is0x && !isEns) {
       throw new AppError(
-        'usdc_base requires a valid 0x… wallet address',
+        'usdc_base requires a valid 0x… wallet address or ENS name (e.g. alice.eth)',
         400,
         'INVALID_WALLET_ADDRESS'
       );
@@ -198,6 +205,23 @@ function validateMethodSpecificFields(
         'MISSING_BANK_DETAILS'
       );
     }
+  }
+}
+
+/**
+ * taleggio-30219: resolve a host-supplied wallet input (0x or ENS) to a
+ * canonical 0x address, converting thrown errors to a 400 AppError so the
+ * existing error-middleware shape carries through.
+ */
+async function resolveWalletOrThrow(input: string): Promise<string> {
+  try {
+    return await resolveWalletInput(input);
+  } catch (err: any) {
+    throw new AppError(
+      err?.message || 'Could not resolve wallet address',
+      400,
+      'INVALID_WALLET_ADDRESS'
+    );
   }
 }
 
@@ -485,6 +509,14 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
 
+    // taleggio-30219: resolve the wallet input once, BEFORE the create, so
+    // we persist a canonical 0x address even if the host typed an ENS name.
+    // Reused by the `saveAsDefault` write below so we don't resolve twice.
+    let resolvedWallet: string | null = null;
+    if (hasMethod && payoutMethod === 'usdc_base' && typeof payoutWalletAddress === 'string') {
+      resolvedWallet = await resolveWalletOrThrow(payoutWalletAddress);
+    }
+
     // pancetta-37195: stamp each new document with the uploader.
     const uploaderUserId = req.userId ?? null;
     const uploaderEmail = req.userEmail ?? null;
@@ -508,9 +540,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         // arugula-38633 v3 follow-up: payoutMethod is optional. Persist null
         // when the host hasn't set their payment details yet.
         payoutMethod: hasMethod ? payoutMethod : null,
-        payoutWalletAddress: hasMethod && payoutMethod === 'usdc_base'
-          ? (payoutWalletAddress as string).trim()
-          : null,
+        payoutWalletAddress: resolvedWallet,
         ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
           ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
           : {}),
@@ -554,8 +584,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           where: { id: req.userId },
           data: {
             preferredPayoutMethod: payoutMethod,
-            ...(payoutMethod === 'usdc_base' && typeof payoutWalletAddress === 'string'
-              ? { payoutWalletAddress: payoutWalletAddress.trim() }
+            // taleggio-30219: reuse the already-resolved 0x — don't resolve
+            // twice (ENS lookups are cheap but not free, and we want a
+            // consistent address across the payout and the user default).
+            ...(payoutMethod === 'usdc_base' && resolvedWallet
+              ? { payoutWalletAddress: resolvedWallet }
               : {}),
             ...(payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
               ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
@@ -691,9 +724,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     }
 
     if (payoutWalletAddress !== undefined) {
+      // taleggio-30219: resolve ENS → 0x before persisting. Null clears the field.
       data.payoutWalletAddress = payoutWalletAddress === null
         ? null
-        : String(payoutWalletAddress).trim();
+        : await resolveWalletOrThrow(String(payoutWalletAddress));
     }
     if (payoutBankDetails !== undefined) {
       data.payoutBankDetails = payoutBankDetails === null

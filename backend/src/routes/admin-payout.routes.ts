@@ -29,6 +29,7 @@ import {
   getUsdcDailyCapStatus,
 } from '../services/usdc-base.service.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import { resolveWalletInput } from '../services/ens.service.js';
 
 const router = Router();
 
@@ -881,9 +882,22 @@ router.patch(
       }
 
       if (payoutWalletAddress !== undefined) {
-        data.payoutWalletAddress = payoutWalletAddress === null
-          ? null
-          : String(payoutWalletAddress).trim();
+        // taleggio-30219: admin override also accepts ENS names; resolve to
+        // 0x before persisting so the execution path (which already expects
+        // 0x) stays untouched.
+        if (payoutWalletAddress === null) {
+          data.payoutWalletAddress = null;
+        } else {
+          try {
+            data.payoutWalletAddress = await resolveWalletInput(String(payoutWalletAddress));
+          } catch (err: any) {
+            throw new AppError(
+              err?.message || 'Could not resolve wallet address',
+              400,
+              'INVALID_WALLET_ADDRESS'
+            );
+          }
+        }
       }
 
       if (payoutBankDetails !== undefined) {
