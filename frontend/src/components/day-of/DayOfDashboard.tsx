@@ -15,6 +15,7 @@ import { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
 import { BriefingCard } from './BriefingCard';
 import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
 import { BroadcastJoinCard } from './BroadcastJoinCard';
+import { StandWithCryptoCard } from './StandWithCryptoCard';
 
 interface DayOfDashboardProps {
   party: Party;
@@ -90,6 +91,7 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         {isGpp && !briefingFirst && <BriefingCard party={party} />}
         {isGpp && <SignedPizzaBoxCard party={party} />}
         {isGpp && <BroadcastJoinCard layout={layout} />}
+        {isGpp && <StandWithCryptoCard party={party} />}
         <LogisticsCard party={party} />
         <PizzaStatusCard party={party} />
         <MusicNowPlayingCard
