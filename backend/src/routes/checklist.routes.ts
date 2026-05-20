@@ -176,26 +176,35 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       return;
     }
 
-    // Delete stale defaults if any (preserves custom items)
-    if (existingDefaults > 0) {
-      await prisma.checklistItem.deleteMany({
-        where: { partyId, isDefault: true },
-      });
-    }
+    // Seed defaults transactionally with row-by-row ON CONFLICT DO NOTHING.
+    // The partial unique index `checklist_items_party_default_name_unique`
+    // on (party_id, name) WHERE is_default = true guarantees that concurrent
+    // seeders cannot both insert the same default row.
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Delete stale defaults if any (preserves custom items).
+        // Only triggers when an earlier partial seed exists (count > 0 but < expected).
+        if (existingDefaults > 0 && existingDefaults < defaults.length) {
+          await tx.checklistItem.deleteMany({
+            where: { partyId, isDefault: true },
+          });
+        }
 
-    // Seed from checklist_defaults table
-    await prisma.checklistItem.createMany({
-      data: defaults.map(d => ({
-        partyId,
-        name: d.name,
-        dueDate: d.due_date,
-        isAuto: d.is_auto,
-        autoRule: d.auto_rule,
-        linkTab: d.link_tab,
-        sortOrder: d.sort_order,
-        isDefault: true,
-      })),
-    });
+        for (const d of defaults) {
+          await tx.$executeRaw`
+            INSERT INTO checklist_items
+              (id, party_id, name, due_date, is_auto, auto_rule, link_tab, sort_order, is_default, created_at, updated_at)
+            VALUES
+              (gen_random_uuid(), ${partyId}::uuid, ${d.name}, ${d.due_date}, ${d.is_auto},
+               ${d.auto_rule}, ${d.link_tab}, ${d.sort_order}, true, now(), now())
+            ON CONFLICT ON CONSTRAINT checklist_items_party_default_name_unique DO NOTHING
+          `;
+        }
+      });
+    } catch (err: any) {
+      // P2002 = unique violation; another concurrent seeder won. Fall through to re-fetch.
+      if (err?.code !== 'P2002') throw err;
+    }
 
     const items = await prisma.checklistItem.findMany({
       where: { partyId },
