@@ -4,6 +4,7 @@ import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
+import { getUnderbossContact } from '../../utils/underbossContacts';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
@@ -223,6 +224,24 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm font-medium text-theme-text">
               Your underboss is reviewing your event to set your payment cap.
+              {(() => {
+                const contact = getUnderbossContact(party?.country);
+                if (!contact) return null;
+                return (
+                  <>
+                    {' '}Reach them on Telegram:{' '}
+                    <a
+                      href={contact.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#ff393a] hover:underline"
+                    >
+                      {contact.handle}
+                    </a>
+                    .
+                  </>
+                );
+              })()}
             </div>
           </div>
         );
