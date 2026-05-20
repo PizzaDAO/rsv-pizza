@@ -341,8 +341,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       validatedAttendance = n;
     }
 
-    if (!Array.isArray(receiptPhotos) || receiptPhotos.length === 0) {
-      throw new AppError('At least one receipt photo is required', 400, 'NO_RECEIPTS');
+    // arugula-38633 v3 follow-up: receipts are now optional. If the host
+    // submits with no receipts, we use `finalAmountUsd` as the source of
+    // truth and default FX fields to USD passthrough below.
+    if (!Array.isArray(receiptPhotos)) {
+      throw new AppError('receiptPhotos must be an array', 400, 'INVALID_RECEIPTS');
     }
     if (!Array.isArray(pizzaPhotos)) {
       throw new AppError('pizzaPhotos must be an array', 400, 'INVALID_PIZZA_PHOTOS');
@@ -353,9 +356,26 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (pizzaPhotos.length > 10) {
       throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
     }
+    // When zero receipts are supplied, finalAmountUsd MUST be a positive number.
+    if (
+      receiptPhotos.length === 0
+      && (typeof finalAmountUsd !== 'number' || !(finalAmountUsd > 0))
+    ) {
+      throw new AppError(
+        'finalAmountUsd is required (and must be > 0) when no receipts are uploaded',
+        400,
+        'NO_AMOUNT',
+      );
+    }
 
-    validatePayoutMethod(payoutMethod);
-    validateMethodSpecificFields(payoutMethod, { payoutWalletAddress, payoutBankDetails });
+    // arugula-38633 v3 follow-up: payoutMethod is now optional. When the
+    // host hasn't set their payment details yet, the payout persists with
+    // payout_method=NULL and the admin nags before execute.
+    const hasMethod = payoutMethod !== undefined && payoutMethod !== null;
+    if (hasMethod) {
+      validatePayoutMethod(payoutMethod);
+      validateMethodSpecificFields(payoutMethod, { payoutWalletAddress, payoutBankDetails });
+    }
 
     // Validate every uploaded URL points into our bucket
     for (const r of receiptPhotos as IncomingDocument[]) {
@@ -371,23 +391,32 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       assertSupabasePayoutUrl(p.url, partyId);
     }
 
-    // OCR every receipt in parallel (Promise.allSettled so one failure doesn't kill the rest).
-    const ocrPromises = (receiptPhotos as IncomingDocument[]).map(async (r) => {
-      try {
-        const ocr = await analyzeReceipt(r.url);
-        const fx = await convertToUSD(ocr.amount, ocr.currency);
-        return { ok: true as const, doc: r, ocr, fx };
-      } catch (err: any) {
-        return { ok: false as const, doc: r, error: err?.message || 'OCR failed' };
-      }
-    });
-    const ocrResults = await Promise.allSettled(ocrPromises);
+    // arugula-38633 v3 follow-up: skip the parallel-OCR step when there are
+    // no receipts — the host supplied `finalAmountUsd` directly. FX fields
+    // collapse to USD passthrough below.
+    const ocrResults: PromiseSettledResult<
+      | { ok: true; doc: IncomingDocument; ocr: any; fx: any }
+      | { ok: false; doc: IncomingDocument; error: string }
+    >[] = receiptPhotos.length === 0
+      ? []
+      : await Promise.allSettled(
+          (receiptPhotos as IncomingDocument[]).map(async (r) => {
+            try {
+              const ocr = await analyzeReceipt(r.url);
+              const fx = await convertToUSD(ocr.amount, ocr.currency);
+              return { ok: true as const, doc: r, ocr, fx };
+            } catch (err: any) {
+              return { ok: false as const, doc: r, error: err?.message || 'OCR failed' };
+            }
+          })
+        );
 
     // Compute the OCR sum + locked exchange rate.
     // Strategy: sum the USD-converted amounts (already locked at submission time
     // via the fx call above). Use the first successful conversion's source/rate
     // as the "headline" exchangeRate + originalCurrency on the row. Per-receipt
-    // detail is preserved on the documents.
+    // detail is preserved on the documents. When there are no receipts at all,
+    // we fall back to USD passthrough using the host-supplied finalAmountUsd.
     let extractedUsdSum = 0;
     let originalAmount = 0;
     let originalCurrency = 'USD';
@@ -485,6 +514,18 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       );
     }
 
+    // arugula-38633 v3 follow-up: zero-receipts path — default the FX fields
+    // to USD passthrough using finalUsd. (extractedUsdSum stays 0; we surface
+    // finalUsd as both originalAmount and extractedAmountUsd so the row reads
+    // cleanly in the admin UI.)
+    const noReceiptsFallback = receiptPhotos.length === 0;
+    const effectiveExtractedUsd = noReceiptsFallback ? finalUsd : extractedUsdSum;
+    const effectiveOriginalAmount = noReceiptsFallback
+      ? finalUsd
+      : (originalAmount || extractedUsdSum);
+    const effectiveOriginalCurrency = noReceiptsFallback ? 'USD' : originalCurrency;
+    const effectiveExchangeRate = noReceiptsFallback ? 1 : exchangeRate;
+
     if (!req.userId) {
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
@@ -494,18 +535,22 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       data: {
         partyId,
         hostUserId: req.userId,
-        originalAmount: new Decimal(originalAmount || extractedUsdSum),
-        originalCurrency,
-        exchangeRate: new Decimal(exchangeRate),
-        extractedAmountUsd: new Decimal(extractedUsdSum),
+        originalAmount: new Decimal(effectiveOriginalAmount),
+        originalCurrency: effectiveOriginalCurrency,
+        exchangeRate: new Decimal(effectiveExchangeRate),
+        extractedAmountUsd: new Decimal(effectiveExtractedUsd),
         finalAmountUsd: new Decimal(finalUsd),
         status: 'pending',
-        payoutMethod,
-        payoutWalletAddress: payoutMethod === 'usdc_base' ? (payoutWalletAddress as string).trim() : null,
-        ...(payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
+        // arugula-38633 v3 follow-up: payoutMethod is optional. Persist null
+        // when the host hasn't set their payment details yet.
+        payoutMethod: hasMethod ? payoutMethod : null,
+        payoutWalletAddress: hasMethod && payoutMethod === 'usdc_base'
+          ? (payoutWalletAddress as string).trim()
+          : null,
+        ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
           ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
           : {}),
-        mercuryCardLast4: payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
+        mercuryCardLast4: hasMethod && payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
           ? mercuryCardLast4.slice(-4)
           : null,
         hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
@@ -531,8 +576,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       }
     }
 
-    // Optional: save host defaults
-    if (saveAsDefault === true) {
+    // Optional: save host defaults. Only meaningful when a method is set —
+    // skip entirely on zero-method submissions (arugula-38633 v3 follow-up).
+    if (saveAsDefault === true && hasMethod) {
       try {
         await prisma.user.update({
           where: { id: req.userId },

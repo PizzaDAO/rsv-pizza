@@ -1460,7 +1460,10 @@ export interface Payout {
   extractedAmountUsd: number;
   finalAmountUsd: number;
   status: PayoutStatus;
-  payoutMethod: PayoutMethod;
+  // arugula-38633 v3 follow-up: null when the host submitted before setting
+  // their payment details. Admin can patch later, or ask the host to set
+  // them via PaymentDetailsCard.
+  payoutMethod: PayoutMethod | null;
   payoutWalletAddress: string | null;
   payoutBankDetails: BankDetails | null;
   mercuryCardId: string | null;

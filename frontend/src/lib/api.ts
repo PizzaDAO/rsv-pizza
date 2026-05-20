@@ -3969,7 +3969,12 @@ export interface CreatePayoutData {
   pizzaPhotos: CreatePayoutPhotoInput[];
   receiptPhotos: CreatePayoutPhotoInput[];
   hostNotes?: string;
-  payoutMethod: PayoutMethod;
+  /**
+   * arugula-38633 v3 follow-up: optional. When omitted/null, the payout is
+   * persisted with payout_method=NULL and admin requests the host set their
+   * payment details before execute.
+   */
+  payoutMethod?: PayoutMethod | null;
   payoutWalletAddress?: string;
   payoutBankDetails?: BankDetails;
   mercuryCardLast4?: string;

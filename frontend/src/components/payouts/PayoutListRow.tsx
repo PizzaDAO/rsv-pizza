@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, X, ChevronRight, CreditCard, Banknote, Coins, ImageOff } from 'lucide-react';
+import { Loader2, X, ChevronRight, CreditCard, Banknote, Coins, HelpCircle, ImageOff } from 'lucide-react';
 import { Payout, PayoutMethod, PayoutStatus } from '../../types';
 import { cancelPayout } from '../../lib/api';
 
@@ -32,11 +32,17 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   failed: 'Failed',
 };
 
-export function methodIcon(method: PayoutMethod): React.ReactNode {
+// arugula-38633 v3 follow-up: helper to display a method (or "Not set" placeholder).
+export function methodLabel(method: PayoutMethod | null): string {
+  return method == null ? 'Not set' : METHOD_LABEL[method];
+}
+
+export function methodIcon(method: PayoutMethod | null): React.ReactNode {
   switch (method) {
     case 'mercury_card': return <CreditCard size={14} />;
     case 'wire':         return <Banknote size={14} />;
     case 'usdc_base':    return <Coins size={14} />;
+    default:             return <HelpCircle size={14} />;
   }
 }
 
@@ -95,7 +101,7 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
         <div className="text-xs text-theme-text-muted flex items-center gap-2 mt-0.5">
           <span className="inline-flex items-center gap-1">
             {methodIcon(payout.payoutMethod)}
-            {METHOD_LABEL[payout.payoutMethod]}
+            {methodLabel(payout.payoutMethod)}
           </span>
           <span aria-hidden>•</span>
           <span>
