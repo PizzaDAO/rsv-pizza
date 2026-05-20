@@ -107,6 +107,16 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
             {admin.party.rsvpCount}
             {' RSVPs'}
           </div>
+          {/* arugula-38633 (cap-everywhere): show resolved reimbursement cap
+              when set. Null = omit the line entirely (the row is already dense). */}
+          {admin.party.effectiveReimbursementCapUsd != null && (
+            <div
+              className="text-xs text-theme-text-muted"
+              title="Reimbursement cap (validated value or max numeric event_tag)"
+            >
+              ${Number(admin.party.effectiveReimbursementCapUsd).toLocaleString()} cap
+            </div>
+          )}
         </td>
       )}
 

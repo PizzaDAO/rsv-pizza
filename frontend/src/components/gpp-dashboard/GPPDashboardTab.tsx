@@ -164,6 +164,31 @@ export const GPPDashboardTab: React.FC = () => {
             <div className="text-xs text-theme-text-muted mt-1">Event Status</div>
           </div>
         )}
+        {/* arugula-38633 (cap-everywhere): surface the effective reimbursement
+            cap on the dashboard so hosts see it at a glance. Clicking the tile
+            jumps to the Payments tab where they can submit receipts / appeal. */}
+        <button
+          type="button"
+          onClick={() => goToTab('payments')}
+          className="card p-4 text-center hover:bg-theme-surface-hover transition-colors cursor-pointer"
+          title={party.effectiveReimbursementCapUsd != null
+            ? 'Reimbursement cap — click to open the Payments tab'
+            : 'No reimbursement cap set yet — click to open the Payments tab'}
+        >
+          {party.effectiveReimbursementCapUsd != null ? (
+            <>
+              <div className="text-2xl font-bold text-theme-text">
+                ${Number(party.effectiveReimbursementCapUsd).toLocaleString()}
+              </div>
+              <div className="text-xs text-theme-text-muted">Reimbursement cap</div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-medium text-amber-400">No cap set</div>
+              <div className="text-xs text-theme-text-muted mt-1">Reimbursement cap</div>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Rejected status callout */}

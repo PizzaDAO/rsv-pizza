@@ -1513,6 +1513,13 @@ export interface AdminPayout extends Payout {
      * Backend filter: status='CONFIRMED' AND submittedVia IN ('link','rsvp','api').
      */
     rsvpCount: number;
+    /**
+     * arugula-38633 (cap-everywhere): resolved reimbursement cap shown on
+     * the /payments admin dashboard rows + review modal. null = no cap.
+     * Precedence: underboss-validated `reimbursementCapUsd` → max numeric
+     * `event_tags` → null. See backend/src/helpers/reimbursementCap.ts.
+     */
+    effectiveReimbursementCapUsd: number | null;
   };
   host: {
     id: string;

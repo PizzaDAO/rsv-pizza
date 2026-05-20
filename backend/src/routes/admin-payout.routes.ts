@@ -28,6 +28,7 @@ import {
   sendUsdcPayment,
   getUsdcDailyCapStatus,
 } from '../services/usdc-base.service.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
 const router = Router();
 
@@ -49,6 +50,12 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   inviteCode: true,
   customUrl: true,
   expectedGuests: true,
+  // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
+  // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
+  // are selected here so `serializePayout` can resolve them via the shared
+  // `computeEffectiveCapUsd` helper (validated cap OR max numeric tag).
+  reimbursementCapUsd: true,
+  eventTags: true,
   _count: {
     select: {
       guests: {
@@ -254,6 +261,12 @@ function serializePayout(row: any): any {
           // (excludes 'host' / 'host-checkin' / 'invite' rows).
           expectedGuests: row.party.expectedGuests ?? null,
           rsvpCount: row.party._count?.guests ?? 0,
+          // arugula-38633 (cap-everywhere): resolved cap (validated value OR
+          // max numeric event_tag). null = no cap set.
+          effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+            reimbursementCapUsd: row.party.reimbursementCapUsd,
+            eventTags: row.party.eventTags,
+          }),
         }
       : undefined,
     host: row.host
