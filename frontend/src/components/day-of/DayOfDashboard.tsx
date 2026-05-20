@@ -90,7 +90,7 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
       <div className={isMobile ? '' : 'space-y-4'}>
         {isGpp && !briefingFirst && <BriefingCard party={party} />}
         {isGpp && <SignedPizzaBoxCard party={party} />}
-        {isGpp && <BroadcastJoinCard layout={layout} />}
+        {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
         {isGpp && <StandWithCryptoCard party={party} />}
         <LogisticsCard party={party} />
         <PizzaStatusCard party={party} />
