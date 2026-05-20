@@ -1297,6 +1297,7 @@ export interface SponsorDashboardEvent {
   region: string | null;
   telegramGroup: string | null;
   eventImageUrl: string | null;
+  underbossStatus?: UnderbossStatus;
   hostName: string | null;
   hostProfile: {
     name: string | null;

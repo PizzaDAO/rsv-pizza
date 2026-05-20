@@ -802,6 +802,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         region: event.region || null,
         telegramGroup: event.telegramGroup || null,
         eventImageUrl: event.eventImageUrl,
+        underbossStatus: event.underbossStatus,
         hostName: event.user?.name || null,
         hostProfile: event.user ? {
           name: event.user.name,
