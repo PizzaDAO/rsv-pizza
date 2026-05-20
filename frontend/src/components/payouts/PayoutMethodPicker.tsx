@@ -98,13 +98,13 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           value="usdc_base"
           icon={<Coins size={18} />}
           title="USDC on Base"
-          description="On-chain payment to your wallet."
+          description="Onchain payment to your wallet."
         />
         <Option
           value="mercury_card"
           icon={<CreditCard size={18} />}
           title="Mercury virtual card"
-          description="We email you a debit card for the exact amount."
+          description="We issue you a debit card for the exact amount."
         />
         <Option
           value="wire"
@@ -124,11 +124,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
                 <span className="text-theme-text font-semibold">${reimbursementCapUsd.toFixed(2)}</span>
               </>
             ) : null}
-            . Mercury will email the card details
-            {userEmail ? <> directly to <span className="text-theme-text">{userEmail}</span></> : ' to the email on your account'}.
-          </p>
-          <p className="mt-2 text-xs text-theme-text-muted">
-            No card or bank info needs to leave RSV.Pizza.
+            .
           </p>
         </div>
       )}

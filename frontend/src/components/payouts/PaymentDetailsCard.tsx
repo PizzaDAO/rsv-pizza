@@ -194,10 +194,6 @@ export const PaymentDetailsCard: React.FC = () => {
           <h3 className="text-base font-semibold text-theme-text">
             Payment details
           </h3>
-          <p className="text-xs text-theme-text-muted mt-1">
-            How do you want to be paid when your receipts are approved? We'll save
-            this for every future receipt.
-          </p>
         </div>
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           {saveStatus === 'saving' && (
