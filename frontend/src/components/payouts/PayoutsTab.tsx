@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Lock, Info, BadgeDollarSign } from 'lucide-react';
 import { Payout } from '../../types';
 import { listPayouts, fetchUnderbossMe, fetchAdminMe } from '../../lib/api';
+import { usePizza } from '../../contexts/PizzaContext';
+import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
@@ -46,6 +48,8 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   reimbursementCapAppealedAt,
   expectedGuests,
 }) => {
+  const { party } = usePizza();
+  const partyKitCapUsd = parsePartyKitCapFromTags(party?.eventTags);
   const [view, setView] = useState<View>('list');
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,7 +177,11 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
           <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
           <div className="text-sm font-medium text-theme-text">
-            Reimbursement cap: ${effectiveReimbursementCapUsd.toFixed(2)}
+            We'll reimburse you for up to ${effectiveReimbursementCapUsd.toFixed(2)}
+            {partyKitCapUsd != null && (
+              <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
+            )}
+            .
           </div>
         </div>
       ) : (
