@@ -42,6 +42,7 @@ model User {
   apiKeys      ApiKey[]
   aiPhoneCalls AIPhoneCall[]
   payouts      Payout[]
+  uploadedPayoutDocuments PayoutDocument[] @relation("PayoutDocumentUploadedBy")
 }
 
 model Party {
@@ -1566,10 +1567,17 @@ model PayoutDocument {
   ocrConfidence Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
   ocrRaw        Json?    @map("ocr_raw")
   ocrError      String?  @map("ocr_error")
+  // pancetta-37195: per-receipt uploader attribution. Both nullable so
+  // historical rows are valid. uploadedByEmail caches the email at upload
+  // time so display still works if the User is later deleted.
+  uploadedByUserId String? @map("uploaded_by_user_id")
+  uploadedByEmail  String? @map("uploaded_by_email")
+  uploadedBy       User?   @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([payoutId])
+  @@index([uploadedByUserId])
   @@map("payout_documents")
 }
 

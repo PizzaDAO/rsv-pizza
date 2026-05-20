@@ -255,6 +255,10 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                       {' '}@ {payout.exchangeRate.toFixed(6)} (locked at submission)
                     </p>
                   )}
+                  {/* pancetta-37195: surface the cohost who created this payout. */}
+                  <p className="text-xs text-theme-text-muted">
+                    Submitted by {payout.hostName ?? payout.hostEmail ?? 'Unknown'}
+                  </p>
                 </div>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLES[payout.status]}`}>
                   {STATUS_LABEL[payout.status]}
@@ -332,6 +336,14 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                           ) : d.ocrError ? (
                             <p className="text-xs text-amber-300">OCR failed: {d.ocrError}</p>
                           ) : null}
+                          {/* pancetta-37195: per-receipt uploader attribution.
+                              Skip the line for historical rows (uploadedByUserId
+                              is null) — don't render "Unknown". */}
+                          {d.uploadedByUserId && (
+                            <p className="text-[10px] text-theme-text-muted truncate">
+                              Uploaded by {d.uploadedByName ?? d.uploadedByEmail ?? 'Unknown'}
+                            </p>
+                          )}
                         </div>
                         <a href={d.url} target="_blank" rel="noreferrer" className="p-1 text-theme-text-muted hover:text-theme-text">
                           <ExternalLink size={14} />
@@ -348,15 +360,23 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   <p className="text-xs text-theme-text-muted mb-2">Pizza / event photos</p>
                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {payout.documents.filter(d => d.kind === 'pizza').map(d => (
-                      <a
-                        key={d.id}
-                        href={d.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="aspect-square rounded-lg overflow-hidden bg-theme-surface"
-                      >
-                        <img src={d.url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
-                      </a>
+                      <div key={d.id} className="space-y-1">
+                        <a
+                          href={d.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block aspect-square rounded-lg overflow-hidden bg-theme-surface"
+                        >
+                          <img src={d.url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                        </a>
+                        {/* pancetta-37195: per-photo uploader attribution.
+                            Hidden for historical rows (null uploadedByUserId). */}
+                        {d.uploadedByUserId && (
+                          <p className="text-[10px] text-theme-text-muted truncate">
+                            Uploaded by {d.uploadedByName ?? d.uploadedByEmail ?? 'Unknown'}
+                          </p>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>

@@ -68,6 +68,10 @@ function serializePayout(p: any) {
     id: p.id,
     partyId: p.partyId,
     hostUserId: p.hostUserId,
+    // pancetta-37195: surface the submitter so cohosts can tell who created
+    // the payout. host is included via the prisma findUnique/findMany below.
+    hostName: p.host?.name ?? null,
+    hostEmail: p.host?.email ?? null,
     originalAmount: numberFromDecimal(p.originalAmount),
     originalCurrency: p.originalCurrency,
     exchangeRate: numberFromDecimal(p.exchangeRate),
@@ -107,6 +111,12 @@ function serializeDocument(d: any) {
     ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
     ocrError: d.ocrError ?? null,
     sortOrder: d.sortOrder,
+    // pancetta-37195: surface the per-doc uploader so cohosts can tell who
+    // attached each receipt/photo. Live name from the join; cached email is
+    // the fallback if the User row is later deleted.
+    uploadedByUserId: d.uploadedByUserId ?? null,
+    uploadedByName: d.uploadedBy?.name ?? null,
+    uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
   };
 }
 
@@ -528,6 +538,15 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
 
+    // pancetta-37195: stamp each new document with the uploader.
+    const uploaderUserId = req.userId ?? null;
+    const uploaderEmail = req.userEmail ?? null;
+    const docsToCreateStamped = docsToCreate.map(d => ({
+      ...d,
+      uploadedByUserId: uploaderUserId,
+      uploadedByEmail: uploaderEmail,
+    }));
+
     // Create the payout + its documents atomically.
     const payout = await prisma.payout.create({
       data: {
@@ -554,9 +573,15 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
           ? hostNotes.trim()
           : null,
-        documents: { create: docsToCreate },
+        documents: { create: docsToCreateStamped },
       },
-      include: { documents: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+      },
     });
 
     // One-shot: persist the host's attendance estimate to the party, but only
@@ -615,7 +640,13 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
 
     const payouts = await prisma.payout.findMany({
       where: { partyId },
-      include: { documents: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -642,7 +673,13 @@ router.get('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response
 
     const payout = await prisma.payout.findFirst({
       where: { id: payoutId, partyId },
-      include: { documents: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+      },
     });
 
     if (!payout) {
@@ -950,10 +987,17 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         });
       }
       if (newReceiptDocs.length > 0 || newPizzaDocs.length > 0) {
+        // pancetta-37195: stamp the editing user on every new document so
+        // the per-receipt "Uploaded by X" line shows the cohost who added it,
+        // not the original payout submitter.
+        const uploaderUserId = req.userId ?? null;
+        const uploaderEmail = req.userEmail ?? null;
         await tx.payoutDocument.createMany({
           data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
             ...d,
             payoutId: existing.id,
+            uploadedByUserId: uploaderUserId,
+            uploadedByEmail: uploaderEmail,
             ocrRaw: d.ocrRaw === null ? Prisma.JsonNull : (d.ocrRaw as Prisma.InputJsonValue),
           })),
         });
@@ -977,11 +1021,23 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         ? await tx.payout.update({
             where: { id: payoutId },
             data: finalData,
-            include: { documents: { orderBy: { sortOrder: 'asc' } } },
+            include: {
+              host: { select: { id: true, name: true, email: true } },
+              documents: {
+                orderBy: { sortOrder: 'asc' },
+                include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+              },
+            },
           })
         : await tx.payout.findUniqueOrThrow({
             where: { id: payoutId },
-            include: { documents: { orderBy: { sortOrder: 'asc' } } },
+            include: {
+              host: { select: { id: true, name: true, email: true } },
+              documents: {
+                orderBy: { sortOrder: 'asc' },
+                include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+              },
+            },
           });
 
       // Audit: write a row when amount changes OR docs change. Mirror the

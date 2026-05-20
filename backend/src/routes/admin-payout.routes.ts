@@ -248,6 +248,11 @@ function serializePayout(row: any): any {
       ocrConfidence: d.ocrConfidence == null ? null : Number(d.ocrConfidence),
       ocrError: d.ocrError,
       sortOrder: d.sortOrder,
+      // pancetta-37195: per-doc uploader attribution. Live name from the
+      // join; cached email is the fallback if the User is later deleted.
+      uploadedByUserId: d.uploadedByUserId ?? null,
+      uploadedByName: d.uploadedBy?.name ?? null,
+      uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
     })),
     party: row.party
       ? {
@@ -617,7 +622,10 @@ router.post(
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -647,7 +655,10 @@ router.post(
         include: {
           party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
-          documents: { orderBy: { sortOrder: 'asc' } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
           audits: { orderBy: { createdAt: 'desc' } },
         },
       });
@@ -685,7 +696,10 @@ router.get(
         include: {
           party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
-          documents: { orderBy: { sortOrder: 'asc' } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: limit + 1,
@@ -781,7 +795,10 @@ router.get(
         include: {
           party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
-          documents: { orderBy: { sortOrder: 'asc' } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
           audits: { orderBy: { createdAt: 'desc' } },
         },
       });
@@ -884,7 +901,10 @@ router.patch(
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -954,7 +974,10 @@ router.post(
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -1005,7 +1028,10 @@ router.post(
               include: {
                 party: { select: PAYOUT_PARTY_SELECT },
                 host: { select: { id: true, name: true, email: true } },
-                documents: { orderBy: { sortOrder: 'asc' } },
+                documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
                 audits: { orderBy: { createdAt: 'desc' } },
               },
             });
@@ -1078,7 +1104,10 @@ router.post(
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -1161,7 +1190,10 @@ router.post(
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -1295,7 +1327,10 @@ async function executePayout(params: {
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
-            documents: { orderBy: { sortOrder: 'asc' } },
+            documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
             audits: { orderBy: { createdAt: 'desc' } },
           },
         });
@@ -1357,7 +1392,10 @@ async function executePayout(params: {
         include: {
           party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
-          documents: { orderBy: { sortOrder: 'asc' } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
           audits: { orderBy: { createdAt: 'desc' } },
         },
       });
@@ -1403,7 +1441,10 @@ async function executePayout(params: {
         include: {
           party: { select: PAYOUT_PARTY_SELECT },
           host: { select: { id: true, name: true, email: true } },
-          documents: { orderBy: { sortOrder: 'asc' } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
           audits: { orderBy: { createdAt: 'desc' } },
         },
       });

@@ -1459,6 +1459,11 @@ export interface PayoutDocument {
   ocrConfidence: number | null;
   ocrError: string | null;
   sortOrder: number;
+  // pancetta-37195: per-doc uploader attribution. Null on historical rows
+  // created before this feature shipped.
+  uploadedByUserId?: string | null;
+  uploadedByName?: string | null;
+  uploadedByEmail?: string | null;
 }
 
 export interface BankDetails {
@@ -1499,6 +1504,9 @@ export interface Payout {
   id: string;
   partyId: string;
   hostUserId: string;
+  // pancetta-37195: submitter name/email so cohosts see "Submitted by X".
+  hostName?: string | null;
+  hostEmail?: string | null;
   originalAmount: number;
   originalCurrency: string;
   exchangeRate: number;
