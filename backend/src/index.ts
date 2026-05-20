@@ -102,6 +102,11 @@ app.use(cors({
 // bounce-rate-heuristic.
 app.use('/api/webhooks/resend', resendWebhookRouter);
 
+// Logo-cleanup upload accepts base64-encoded images up to ~5 MB raw
+// (~6.7 MB base64). Must be registered BEFORE the global express.json()
+// below, or the global 100 KB default fires first.
+app.use('/api/admin/logo-bg-audit', express.json({ limit: '8mb' }));
+
 app.use(express.json());
 
 // Rate limiting
