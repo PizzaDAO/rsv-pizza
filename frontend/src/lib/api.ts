@@ -3851,6 +3851,38 @@ export async function executeAdminPayout(
 }
 
 /**
+ * Search-as-you-type for the Record External Payment modal (arugula-38633 v2).
+ * Backend filters parties.underbossStatus === 'approved' and returns up to 20
+ * matches by name/customUrl/inviteCode. Each row carries the main host plus
+ * any cohosts whose email maps to a User record (others are silently
+ * excluded — Payout.hostUserId must reference a real User).
+ *
+ * Empty / sub-2-char queries return [] from the server.
+ */
+export interface ApprovedPartySearchResult {
+  id: string;
+  name: string;
+  inviteCode: string;
+  hostUserId: string;
+  hostCandidates: Array<{
+    userId: string;
+    name: string | null;
+    email: string | null;
+    role: 'host' | 'cohost';
+  }>;
+}
+
+export async function searchApprovedParties(
+  query: string,
+): Promise<ApprovedPartySearchResult[]> {
+  const params = new URLSearchParams({ q: query });
+  const res = await apiRequest<{ parties: ApprovedPartySearchResult[] }>(
+    `/api/admin/payouts/parties/search?${params.toString()}`,
+  );
+  return res.parties;
+}
+
+/**
  * Record an OUT-OF-BAND payment (Venmo, manual bank, etc.) — creates a new
  * payout row in `paid` status immediately. arugula-38633 v2 follow-up.
  *

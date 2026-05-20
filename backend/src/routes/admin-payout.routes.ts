@@ -281,6 +281,134 @@ function serializePayout(row: any): any {
 }
 
 // ============================================
+// GET /api/admin/payouts/parties/search?q=<query>
+//   - Autocomplete for the "Record External Payment" modal (arugula-38633 v2).
+//   - Filters parties.underbossStatus === 'approved'.
+//   - Matches name / customUrl / inviteCode (case-insensitive contains).
+//   - For each match, returns the main host + cohosts whose email maps to a
+//     User record so the modal can show a host picker dropdown.
+//   - Must be declared BEFORE GET /:id so the literal path wins.
+//   - Empty / <2 char query returns []  — we don't dump the full party list.
+// ============================================
+router.get(
+  '/parties/search',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      if (rawQ.length < 2) {
+        res.json({ parties: [] });
+        return;
+      }
+
+      // Pull approved parties matching name / customUrl / inviteCode. Cap at 20.
+      // Sorted createdAt DESC so the most recent approved events show first —
+      // matches how admins typically remember "the event that was just approved".
+      const parties = await prisma.party.findMany({
+        where: {
+          underbossStatus: 'approved',
+          OR: [
+            { name: { contains: rawQ, mode: 'insensitive' } },
+            { customUrl: { contains: rawQ, mode: 'insensitive' } },
+            { inviteCode: { contains: rawQ, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          inviteCode: true,
+          userId: true,
+          coHosts: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+
+      // Collect every cohost email so we can resolve them all in a single
+      // User.findMany() instead of N round-trips per party.
+      const allCohostEmails = new Set<string>();
+      for (const p of parties) {
+        const list = Array.isArray(p.coHosts) ? (p.coHosts as any[]) : [];
+        for (const ch of list) {
+          if (ch && typeof ch === 'object' && typeof ch.email === 'string' && ch.email.trim()) {
+            allCohostEmails.add(ch.email.trim().toLowerCase());
+          }
+        }
+      }
+
+      const cohostUsers = allCohostEmails.size
+        ? await prisma.user.findMany({
+            where: { email: { in: Array.from(allCohostEmails) } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+      const cohostUserByEmail = new Map<string, { id: string; name: string | null; email: string }>();
+      for (const u of cohostUsers) {
+        cohostUserByEmail.set(u.email.toLowerCase(), u);
+      }
+
+      const results = parties
+        // Skip parties with no linked main host — Payout.hostUserId is FK NOT NULL
+        // and the modal needs a default selection. (Vanishingly rare in practice.)
+        .filter((p) => !!p.user)
+        .map((p) => {
+          const hostCandidates: Array<{
+            userId: string;
+            name: string | null;
+            email: string | null;
+            role: 'host' | 'cohost';
+          }> = [];
+
+          // Main host always first.
+          hostCandidates.push({
+            userId: p.user!.id,
+            name: p.user!.name,
+            email: p.user!.email,
+            role: 'host',
+          });
+
+          const cohostList = Array.isArray(p.coHosts) ? (p.coHosts as any[]) : [];
+          const seenUserIds = new Set<string>([p.user!.id]);
+          for (const ch of cohostList) {
+            if (!ch || typeof ch !== 'object') continue;
+            const email = typeof ch.email === 'string' ? ch.email.trim().toLowerCase() : '';
+            if (!email) continue;
+            const u = cohostUserByEmail.get(email);
+            // Cohosts without a matching User record (or no email at all) are
+            // silently excluded — the modal can only set Payout.hostUserId to
+            // a real User.id.
+            if (!u) continue;
+            // Dedupe: if a cohost row happens to also be the main host (host
+            // listed themselves as cohost), skip the duplicate.
+            if (seenUserIds.has(u.id)) continue;
+            seenUserIds.add(u.id);
+            hostCandidates.push({
+              userId: u.id,
+              name: u.name,
+              email: u.email,
+              role: 'cohost',
+            });
+          }
+
+          return {
+            id: p.id,
+            name: p.name,
+            inviteCode: p.inviteCode,
+            hostUserId: p.user!.id,
+            hostCandidates,
+          };
+        });
+
+      res.json({ parties: results });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // GET /api/admin/payouts/export.csv
 //   - Must be declared BEFORE GET /:id so the literal path wins.
 // ============================================
