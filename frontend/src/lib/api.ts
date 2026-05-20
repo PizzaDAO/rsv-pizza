@@ -208,6 +208,7 @@ export interface UpdatePartyData {
   country?: string | null;
   city?: string | null;
   expectedGuests?: number | null;
+  eventTags?: string[];
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
@@ -320,6 +321,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       country: data.country,
       city: data.city,
       expectedGuests: data.expectedGuests,
+      eventTags: data.eventTags,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
