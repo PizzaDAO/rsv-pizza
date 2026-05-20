@@ -7,6 +7,65 @@ import { triggerWebhook } from '../services/webhook.service.js';
 
 const router = Router();
 
+// provolone-39042: Write a single attestation row. Idempotent: re-attestation
+// by the same person is a no-op via a DB-level UNIQUE index on
+// (guest_id, COALESCE(attester_user_id, attester_guest_id::text)).
+// The unique COALESCE index can't be represented in Prisma's @@unique, so we
+// catch 23505/P2002 here instead.
+async function recordAttestation(params: {
+  partyId: string;
+  guestId: string;
+  attesterKind: 'host_admin' | 'peer_guest' | 'self_host';
+  attesterUserId?: string | null;
+  attesterGuestId?: string | null;
+  attesterEmail?: string | null;
+  attesterName?: string | null;
+}): Promise<void> {
+  try {
+    await prisma.guestAttestation.create({
+      data: {
+        partyId: params.partyId,
+        guestId: params.guestId,
+        attesterKind: params.attesterKind,
+        attesterUserId: params.attesterUserId ?? null,
+        attesterGuestId: params.attesterGuestId ?? null,
+        attesterEmail: params.attesterEmail ?? null,
+        attesterName: params.attesterName ?? null,
+      },
+    });
+  } catch (err: any) {
+    // 23505 = unique_violation. Idempotent: same attester re-scanning is a no-op.
+    if (
+      err?.code === 'P2002' ||
+      err?.code === '23505' ||
+      (typeof err?.message === 'string' && err.message.includes('guest_attestations_guest_attester_unique'))
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
+
+// provolone-39042: helper to fetch attestation history for the API response.
+async function fetchAttestations(guestId: string) {
+  const rows = await prisma.guestAttestation.findMany({
+    where: { guestId },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      attesterKind: true,
+      attesterName: true,
+      attesterEmail: true,
+      createdAt: true,
+    },
+  });
+  return rows.map((a) => ({
+    kind: a.attesterKind,
+    name: a.attesterName,
+    email: a.attesterEmail,
+    at: a.createdAt.toISOString(),
+  }));
+}
+
 // Helper function to check if user can check in guests for a party (host or co-host)
 async function canUserCheckIn(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can check in for any party
@@ -123,8 +182,25 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
       });
     }
 
-    // Already checked in
+    // provolone-39042: look up host name/email for attestation attribution
+    const attester = req.userId
+      ? await prisma.user.findUnique({
+          where: { id: req.userId },
+          select: { email: true, name: true },
+        })
+      : null;
+
+    // Already checked in — still record attestation (no-op if duplicate)
     if (guest.checkedInAt) {
+      await recordAttestation({
+        partyId: party.id,
+        guestId: guest.id,
+        attesterKind: 'self_host',
+        attesterUserId: req.userId,
+        attesterEmail: attester?.email ?? req.userEmail ?? null,
+        attesterName: attester?.name ?? null,
+      });
+      const attestations = await fetchAttestations(guest.id);
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -134,6 +210,7 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
           checkedInAt: guest.checkedInAt,
         },
         message: `${guest.name} is already checked in`,
+        attestations,
       });
     }
 
@@ -146,6 +223,17 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
       },
     });
 
+    // provolone-39042: record self-host attestation
+    await recordAttestation({
+      partyId: party.id,
+      guestId: updatedGuest.id,
+      attesterKind: 'self_host',
+      attesterUserId: req.userId,
+      attesterEmail: attester?.email ?? req.userEmail ?? null,
+      attesterName: attester?.name ?? null,
+    });
+    const attestations = await fetchAttestations(updatedGuest.id);
+
     res.status(200).json({
       success: true,
       guest: {
@@ -154,6 +242,7 @@ router.post('/:inviteCode/self-host', requireAuth, async (req: AuthRequest, res:
         checkedInAt: updatedGuest.checkedInAt,
       },
       message: `${updatedGuest.name} has checked in!`,
+      attestations,
     });
   } catch (error) {
     next(error);
@@ -209,8 +298,25 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError('Guest not found or belongs to a different event', 404, 'GUEST_NOT_FOUND');
     }
 
-    // Already checked in
+    // provolone-39042: always record the peer attestation, even if already
+    // checked in. The DB UNIQUE index dedupes per attester so re-scans by the
+    // same voucher are no-ops, while NEW vouchers get counted as additional
+    // attestations.
+    await recordAttestation({
+      partyId: party.id,
+      guestId: targetGuest.id,
+      attesterKind: 'peer_guest',
+      attesterGuestId: voucher.id,
+      attesterEmail: voucher.email,
+      attesterName: voucher.name,
+    });
+
+    // Already checked in — don't flip checked_in_at, but DO return updated
+    // attestation list (the new voucher should now appear).
     if (targetGuest.checkedInAt) {
+      const attestations = await fetchAttestations(targetGuest.id);
+      // Auto-complete the voucher's "vouch" scorecard item (even for re-scans)
+      autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -220,6 +326,7 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
           checkedInAt: targetGuest.checkedInAt,
         },
         message: `${targetGuest.name} is already checked in`,
+        attestations,
       });
     }
 
@@ -235,6 +342,8 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
     // Auto-complete the voucher's "vouch" scorecard item
     autoCompleteScorecardItem(voucher.id, party.id, 'vouch', undefined, 'auto');
 
+    const attestations = await fetchAttestations(updatedGuest.id);
+
     res.status(200).json({
       success: true,
       guest: {
@@ -243,6 +352,7 @@ router.post('/:inviteCode/vouch', requireAuth, async (req: AuthRequest, res: Res
         checkedInAt: updatedGuest.checkedInAt,
       },
       message: `${updatedGuest.name} has been checked in!`,
+      attestations,
     });
   } catch (error) {
     next(error);
@@ -277,7 +387,28 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
       throw new AppError('Guest was rejected', 400, 'GUEST_REJECTED');
     }
 
+    // provolone-39042: look up host name/email for attestation attribution
+    const attester = req.userId
+      ? await prisma.user.findUnique({
+          where: { id: req.userId },
+          select: { email: true, name: true },
+        })
+      : null;
+
+    // provolone-39042: always record the host attestation (idempotent on
+    // re-scan by the same host). This must happen BEFORE the alreadyCheckedIn
+    // short-circuit so re-scans by NEW hosts add a row.
+    await recordAttestation({
+      partyId: party.id,
+      guestId: guest.id,
+      attesterKind: 'host_admin',
+      attesterUserId: req.userId,
+      attesterEmail: attester?.email ?? req.userEmail ?? null,
+      attesterName: attester?.name ?? null,
+    });
+
     if (guest.checkedInAt) {
+      const attestations = await fetchAttestations(guest.id);
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -289,6 +420,7 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
           checkedInBy: guest.checkedInBy,
         },
         message: `${guest.name} was already checked in`,
+        attestations,
       });
     }
 
@@ -299,6 +431,8 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
         checkedInBy: req.userId, // CUID string; `checkedInBy` column is text, not uuid
       },
     });
+
+    const attestations = await fetchAttestations(updatedGuest.id);
 
     res.status(200).json({
       success: true,
@@ -311,6 +445,7 @@ router.post('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: 
         checkedInBy: updatedGuest.checkedInBy,
       },
       message: `${updatedGuest.name} has been checked in!`,
+      attestations,
     });
   } catch (error) {
     next(error);
@@ -457,11 +592,15 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
       throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
     }
 
+    // provolone-39042: include attestation history for attribution display
+    const attestations = await fetchAttestations(guest.id);
+
     res.json({
       guest,
       isCheckedIn: !!guest.checkedInAt,
       callerIsTarget: isTargetGuest,
       callerIsHost: isHostOrCohost,
+      attestations,
     });
   } catch (error) {
     next(error);

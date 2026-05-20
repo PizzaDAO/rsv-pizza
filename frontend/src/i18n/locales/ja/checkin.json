@@ -2,6 +2,11 @@
   "title": "ゲストチェックイン",
   "loading": "ゲストをチェックイン中...",
   "vouching": "認証中…",
+  "attribution": {
+    "checkedInBy": "Checked in by {{name}}",
+    "alsoVouchedBy_one": "Also vouched for by 1 more: {{names}}",
+    "alsoVouchedBy_other": "Also vouched for by {{count}} more: {{names}}"
+  },
   "success": {
     "title": "チェックイン完了！",
     "backToDashboard": "イベントダッシュボードに戻る"

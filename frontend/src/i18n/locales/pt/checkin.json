@@ -2,6 +2,11 @@
   "title": "Check-in de Convidados",
   "loading": "Fazendo check-in do convidado...",
   "vouching": "Verificando…",
+  "attribution": {
+    "checkedInBy": "Checked in by {{name}}",
+    "alsoVouchedBy_one": "Also vouched for by 1 more: {{names}}",
+    "alsoVouchedBy_other": "Also vouched for by {{count}} more: {{names}}"
+  },
   "success": {
     "title": "Check-in Realizado!",
     "backToDashboard": "Voltar ao Painel do Evento"

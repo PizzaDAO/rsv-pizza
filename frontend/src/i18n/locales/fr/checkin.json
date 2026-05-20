@@ -2,6 +2,11 @@
   "title": "Enregistrement des invités",
   "loading": "Enregistrement de l'invité...",
   "vouching": "Validation…",
+  "attribution": {
+    "checkedInBy": "Checked in by {{name}}",
+    "alsoVouchedBy_one": "Also vouched for by 1 more: {{names}}",
+    "alsoVouchedBy_other": "Also vouched for by {{count}} more: {{names}}"
+  },
   "success": {
     "title": "Enregistré !",
     "backToDashboard": "Retour au tableau de bord"
