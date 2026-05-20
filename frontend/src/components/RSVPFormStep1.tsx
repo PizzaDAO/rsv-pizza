@@ -309,7 +309,7 @@ export function RSVPFormStep1({
       )}
 
       {/* SWC Canada checkbox + info modal */}
-      {form.isSwcCaEvent && (
+      {form.isSwcCaEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <>
           <div className="flex items-center gap-2">
             <button
@@ -378,7 +378,7 @@ export function RSVPFormStep1({
       )}
 
       {/* SWC Australia checkbox + info modal */}
-      {form.isSwcAuEvent && (
+      {form.isSwcAuEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <>
           <div className="flex items-center gap-2">
             <button
@@ -447,7 +447,7 @@ export function RSVPFormStep1({
       )}
 
       {/* SWC EU checkbox + info modal */}
-      {form.isSwcEuEvent && (
+      {form.isSwcEuEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <>
           <div className="flex items-center gap-2">
             <button
@@ -516,7 +516,7 @@ export function RSVPFormStep1({
       )}
 
       {/* SWC UK checkbox + info modal */}
-      {form.isSwcUkEvent && (
+      {form.isSwcUkEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <>
           <div className="flex items-center gap-2">
             <button
@@ -585,7 +585,7 @@ export function RSVPFormStep1({
       )}
 
       {/* SWC Brazil checkbox + info modal */}
-      {form.isSwcBrEvent && (
+      {form.isSwcBrEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
         <>
           <div className="flex items-center gap-2">
             <button
