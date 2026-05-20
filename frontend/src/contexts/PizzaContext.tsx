@@ -13,6 +13,7 @@ interface PizzaContextType {
   partyLoading: boolean;
   createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => Promise<string | null>;
   loadParty: (inviteCode: string) => Promise<boolean>;
+  mergeParty: (updates: Partial<Party>) => void;
   clearParty: () => void;
   getInviteLink: () => string;
   getHostLink: () => string;
@@ -236,6 +237,10 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setPartyLoading(false);
     }
   };
+
+  const mergeParty = useCallback((updates: Partial<Party>) => {
+    setParty(prev => prev ? { ...prev, ...updates } : prev);
+  }, []);
 
   const loadParty = useCallback(async (inviteCode: string): Promise<boolean> => {
     // Clear existing state before loading new party
@@ -528,6 +533,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       partyLoading,
       createParty,
       loadParty,
+      mergeParty,
       clearParty,
       getInviteLink,
       getHostLink,

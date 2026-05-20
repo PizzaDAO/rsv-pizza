@@ -2,7 +2,7 @@
  * Auto-regenerate GPP event flyers when partner status or event details change.
  *
  * Exports:
- *   triggerFlyerRegen(party, loadParty?)        — debounced entry point (3 s per party)
+ *   triggerFlyerRegen(party, mergeParty?)        — debounced entry point (3 s per party)
  *   triggerFlyerRegenForEvents(events)           — batch entry point for underboss context
  *   cancelFlyerRegen(partyId)                    — cancel a pending regen
  */
@@ -63,7 +63,7 @@ export function cancelFlyerRegen(partyId: string): void {
  */
 export function triggerFlyerRegen(
   party: Party,
-  loadParty?: (inviteCode: string) => Promise<boolean>,
+  mergeParty?: (updates: Partial<Party>) => void,
 ): void {
   // Only GPP events get auto-regen
   if (party.eventType !== 'gpp') return;
@@ -86,7 +86,7 @@ export function triggerFlyerRegen(
   // Schedule the regen with a 3-second debounce
   const timer = setTimeout(() => {
     pendingTimers.delete(party.id);
-    doRegen(party, loadParty).catch((err) => {
+    doRegen(party, mergeParty).catch((err) => {
       console.error('[autoRegenFlyer] failed:', err);
     });
   }, 3000);
@@ -167,7 +167,7 @@ export function triggerFlyerRegenForEvents(
 /** The actual render → upload → update pipeline. */
 async function doRegen(
   data: FlyerRegenData,
-  loadParty?: (inviteCode: string) => Promise<boolean>,
+  mergeParty?: (updates: Partial<Party>) => void,
 ): Promise<void> {
   // 1. Load fonts
   await ensureFonts();
@@ -277,8 +277,11 @@ async function doRegen(
     return;
   }
 
-  // 8. Optionally refresh UI
-  if (loadParty && data.inviteCode) {
-    await loadParty(data.inviteCode);
+  // 8. Push the new URL into context so consumers re-render
+  if (mergeParty) {
+    mergeParty({
+      eventImageUrl: uploadedUrl,
+      flyerGeneratedAt: new Date().toISOString(),
+    });
   }
 }

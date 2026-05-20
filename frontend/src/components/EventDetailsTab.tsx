@@ -21,7 +21,7 @@ import type { Party } from '../types';
 
 export const EventDetailsTab: React.FC = () => {
   const { t } = useTranslation('host');
-  const { party, loadParty, setParty } = usePizza();
+  const { party, loadParty, mergeParty, setParty } = usePizza();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -536,7 +536,7 @@ export const EventDetailsTab: React.FC = () => {
       // triggerFlyerRegen's second arg is its OWN flyer-URL refresh callback
       // (post-render); NOT a save-time refetch. Pass a forward-patched party
       // so the flyer renders with the just-saved name.
-      if (party) triggerFlyerRegen({ ...party, name: trimmed }, loadParty);
+      if (party) triggerFlyerRegen({ ...party, name: trimmed }, mergeParty);
     }
   };
 
@@ -588,7 +588,7 @@ export const EventDetailsTab: React.FC = () => {
         // regen doesn't race the React context refresh and render with stale values.
         triggerFlyerRegen(
           { ...party, timezone: timezone || null, date: startDateTime, duration: calculatedDuration },
-          loadParty,
+          mergeParty,
         );
       }
     }
@@ -655,7 +655,7 @@ export const EventDetailsTab: React.FC = () => {
       if (party) {
         triggerFlyerRegen(
           { ...party, address: trimmedAddress, venueName: newVenueName || null },
-          loadParty,
+          mergeParty,
         );
       }
     }
