@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users, AlertCircle } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
-import { Payout, PayoutMethod, BankDetails } from '../../types';
+import { Payout } from '../../types';
 import { createPayout } from '../../lib/api';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
-import { PayoutMethodPicker } from './PayoutMethodPicker';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
 
@@ -36,11 +35,6 @@ interface NewPayoutFormProps {
   expectedGuests?: number | null;
 }
 
-const EMPTY_BANK: BankDetails = {
-  accountHolderName: '',
-  bankName: '',
-};
-
 /**
  * Single-page submission form (no multi-step wizard — matches pizza-faucet-v2).
  *
@@ -50,8 +44,13 @@ const EMPTY_BANK: BankDetails = {
  *   2. Pizza / event photos (multi-upload, no OCR)
  *   3. Notes
  *   4. Amount summary (auto-summed + manual override)
- *   5. Payout method picker
- *   6. Submit
+ *   5. Submit
+ *
+ * Note (arugula-38633 v3): the payout-method picker was hoisted to a
+ * persistent PaymentDetailsCard at the top of the Payments tab. This form
+ * now reads the user's saved `preferredPayoutMethod` / `payoutWalletAddress`
+ * / `payoutBankDetails` from AuthContext and forwards them to `createPayout`
+ * — it no longer asks the host per submission.
  */
 export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   partyId,
@@ -82,10 +81,30 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const [notes, setNotes] = useState('');
   const [overrideAmount, setOverrideAmount] = useState<number | null>(null);
 
-  const [method, setMethod] = useState<PayoutMethod>('mercury_card');
-  const [walletAddress, setWalletAddress] = useState('');
-  const [bankDetails, setBankDetails] = useState<BankDetails>(EMPTY_BANK);
-  const [mercuryCardLast4, setMercuryCardLast4] = useState('');
+  // arugula-38633 v3: read payment method + destination from the
+  // authenticated user record (saved via PaymentDetailsCard at the top of
+  // the Payments tab). When unset, the submit button is disabled and an
+  // inline message points the host upward.
+  const savedMethod = user?.preferredPayoutMethod ?? null;
+  const savedWallet = user?.payoutWalletAddress ?? null;
+  const savedBank = user?.payoutBankDetails ?? null;
+  // Validity mirror of PaymentDetailsCard.methodValid (kept duplicated
+  // intentionally — the card may not yet have persisted a partially typed
+  // wire row when the host clicks Submit).
+  const savedMethodValid = useMemo(() => {
+    if (savedMethod == null) return false;
+    if (savedMethod === 'usdc_base') {
+      return !!savedWallet && /^0x[0-9a-fA-F]{40}$/.test(savedWallet.trim());
+    }
+    if (savedMethod === 'wire') {
+      if (!savedBank) return false;
+      if (!savedBank.accountHolderName?.trim() || !savedBank.bankName?.trim()) return false;
+      const hasUs = !!savedBank.routingNumber?.trim() && !!savedBank.accountNumber?.trim();
+      const hasIntl = !!savedBank.iban?.trim() || !!savedBank.swift?.trim();
+      return hasUs || hasIntl;
+    }
+    return true; // mercury_card has no extra required destination data
+  }, [savedMethod, savedWallet, savedBank]);
 
   // Estimated attendance: asked once per event. Pre-fills from the party's
   // existing `expectedGuests` if set; otherwise the host is prompted.
@@ -109,34 +128,20 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const isProcessing = receipts.some(r => r.status === 'uploading' || r.status === 'ocring')
     || pizzaPhotos.some(p => p.status === 'uploading');
 
-  // Method-specific validity
-  const methodValid = useMemo(() => {
-    if (method === 'usdc_base') {
-      return /^0x[0-9a-fA-F]{40}$/.test(walletAddress.trim());
-    }
-    if (method === 'wire') {
-      if (!bankDetails.accountHolderName?.trim() || !bankDetails.bankName?.trim()) return false;
-      const hasUs = !!bankDetails.routingNumber?.trim() && !!bankDetails.accountNumber?.trim();
-      const hasIntl = !!bankDetails.iban?.trim() || !!bankDetails.swift?.trim();
-      return hasUs || hasIntl;
-    }
-    return true;
-  }, [method, walletAddress, bankDetails]);
-
   // When the attendance section is shown, require a positive integer before submit.
   const attendanceValid = !askForAttendance
     || (estimatedAttendance != null && estimatedAttendance > 0);
 
   const canSubmit = hasUploadedReceipt
     && finalAmount > 0
-    && methodValid
+    && savedMethodValid
     && attendanceValid
     && !isProcessing
     && !submitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || !savedMethod) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -158,11 +163,17 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             mimeType: p.mimeType,
           })),
         hostNotes: notes.trim() || undefined,
-        payoutMethod: method,
-        ...(method === 'usdc_base' ? { payoutWalletAddress: walletAddress.trim() } : {}),
-        ...(method === 'wire' ? { payoutBankDetails: bankDetails } : {}),
-        ...(method === 'mercury_card' && mercuryCardLast4
-          ? { mercuryCardLast4 }
+        // arugula-38633 v3: payout destination is sourced from the user's
+        // PaymentDetailsCard, not the form. Backend payout.routes still
+        // mirrors saveAsDefault → users.* on its end — kept for symmetry,
+        // though PaymentDetailsCard already writes them directly via PATCH
+        // /api/user/me on the host's first save.
+        payoutMethod: savedMethod,
+        ...(savedMethod === 'usdc_base' && savedWallet
+          ? { payoutWalletAddress: savedWallet.trim() }
+          : {}),
+        ...(savedMethod === 'wire' && savedBank
+          ? { payoutBankDetails: savedBank }
           : {}),
         ...(overrideAmount != null ? { finalAmountUsd: overrideAmount } : {}),
         ...(estimatedAttendance != null ? { estimatedAttendance } : {}),
@@ -170,7 +181,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       });
       onCreated(created);
     } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit payment');
+      setSubmitError(err?.message || 'Failed to submit receipt');
     } finally {
       setSubmitting(false);
     }
@@ -318,31 +329,22 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         />
       </div>
 
-      {/* 5. Payout method */}
-      <div className="card p-6">
-        <div className="mb-3">
-          <h3 className="text-base font-semibold text-theme-text">How do you want to be paid?</h3>
-        </div>
-        <PayoutMethodPicker
-          method={method}
-          onMethodChange={setMethod}
-          walletAddress={walletAddress}
-          onWalletAddressChange={setWalletAddress}
-          bankDetails={bankDetails}
-          onBankDetailsChange={setBankDetails}
-          userEmail={user?.email}
-          amountUsd={finalAmount}
-        />
-
-        {/* Hidden last4 field is intentionally omitted — Mercury card numbers come from admin, not host. */}
-        {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
-        {false && <input value={mercuryCardLast4} onChange={e => setMercuryCardLast4(e.target.value)} />}
-      </div>
-
-      {/* 7. Submit */}
+      {/* 5. Submit */}
       {submitError && (
         <div className="card p-4 border-red-500/40 bg-red-500/10 text-sm text-red-300">
           {submitError}
+        </div>
+      )}
+
+      {/* arugula-38633 v3: payout method is now configured in the
+          PaymentDetailsCard above. If the host hasn't set one yet, show an
+          inline hint and disable submit. */}
+      {!savedMethodValid && (
+        <div className="card p-4 border-l-4 border-l-amber-500 flex items-start gap-3">
+          <AlertCircle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-theme-text">
+            Set your <span className="font-semibold">payment details</span> above before submitting a receipt.
+          </p>
         </div>
       )}
 
@@ -364,7 +366,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             ? 'Waiting for uploads…'
             : submitting
             ? 'Submitting…'
-            : `Submit $${finalAmount.toFixed(2)} payment`}
+            : `Submit $${finalAmount.toFixed(2)} receipt`}
         </button>
       </div>
 

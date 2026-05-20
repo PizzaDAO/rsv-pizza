@@ -4238,3 +4238,35 @@ export async function addWalkInGuest(
     requireAuth: true,
   });
 }
+
+// ============================================================
+// User /me payout preferences (arugula-38633 v3)
+// ============================================================
+
+export interface UserMePayoutPrefs {
+  preferredPayoutMethod: PayoutMethod | null;
+  payoutWalletAddress: string | null;
+  payoutBankDetails: BankDetails | null;
+}
+
+export interface UpdateUserMeInput {
+  name?: string;
+  defaultAddress?: string | null;
+  preferredPayoutMethod?: PayoutMethod | null;
+  payoutWalletAddress?: string | null;
+  payoutBankDetails?: BankDetails | null;
+}
+
+/**
+ * PATCH /api/user/me — persistent user record edits. arugula-38633 v3 added
+ * the three payout-preference fields here so the Payment Details card on
+ * the Payments tab can persist them in one round-trip.
+ */
+export async function updateUserMe(
+  data: UpdateUserMeInput
+): Promise<{ id: string; email: string; name?: string | null } & Partial<UserMePayoutPrefs>> {
+  const res = await apiRequest<{
+    user: { id: string; email: string; name?: string | null } & Partial<UserMePayoutPrefs>;
+  }>('/api/user/me', { method: 'PATCH', body: data, requireAuth: true });
+  return res.user;
+}
