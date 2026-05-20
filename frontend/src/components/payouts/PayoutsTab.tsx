@@ -6,6 +6,7 @@ import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
 import { ExpectedGuestsCard } from './ExpectedGuestsCard';
+import { PrepayCheckbox } from './PrepayCheckbox';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -176,6 +177,8 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           </div>
         </div>
       )}
+
+      <PrepayCheckbox partyId={partyId} />
 
       <ExpectedGuestsCard partyId={partyId} expectedGuests={expectedGuests} />
 
