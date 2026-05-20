@@ -484,6 +484,10 @@ export interface PublicEvent {
   // banner can render before re-loading the Party context. NULL when an
   // underboss has not validated yet.
   reimbursementCapUsd?: number | null;
+  // arugula-38633 v2 follow-up: precedence resolution of
+  // reimbursementCapUsd → max(numeric event_tags) → null. Host-facing UI
+  // reads this; /underboss still uses the raw reimbursementCapUsd.
+  effectiveReimbursementCapUsd?: number | null;
 }
 
 // Public Event API (no auth required)

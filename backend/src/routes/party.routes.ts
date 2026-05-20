@@ -6,6 +6,7 @@ import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -398,6 +399,11 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
         user: undefined,
         canEdit: true, // If we reached here, getPartyWithOwnershipCheck verified edit permissions
         allowedTabs, // undefined for owner/admin (all tabs), string[] for restricted co-hosts
+        // arugula-38633 v2 follow-up: numeric-tag fallback for the cap.
+        effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+          reimbursementCapUsd: (party as any).reimbursementCapUsd,
+          eventTags: (party as any).eventTags,
+        }),
       }
     });
   } catch (error) {
@@ -623,6 +629,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...party,
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
+        // arugula-38633 v2 follow-up: numeric-tag fallback for the cap.
+        effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+          reimbursementCapUsd: (party as any).reimbursementCapUsd,
+          eventTags: (party as any).eventTags,
+        }),
       }
     });
   } catch (error) {

@@ -299,6 +299,11 @@ export interface Party {
   // Reimbursement cap (arugula-38633 v2) — populated by underboss validation.
   // Banner on payout form only renders when reimbursementCapUsd != null.
   reimbursementCapUsd?: number | null;
+  // arugula-38633 v2 follow-up: precedence resolution of
+  // reimbursementCapUsd → max(numeric event_tags) → null. Host-facing UI
+  // (Payments tab) reads THIS field; /underboss still uses the raw
+  // reimbursementCapUsd. See lib/reimbursementCap.ts.
+  effectiveReimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
 }

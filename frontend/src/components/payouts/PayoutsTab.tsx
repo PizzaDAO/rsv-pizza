@@ -8,7 +8,17 @@ import { PayoutDetailModal } from './PayoutDetailModal';
 
 interface PayoutsTabProps {
   partyId: string;
+  /**
+   * Raw underboss-validated cap (DB column). Used for the appeal flow only —
+   * host-visible cap display should use `effectiveReimbursementCapUsd`.
+   */
   reimbursementCapUsd?: number | null;
+  /**
+   * arugula-38633 v2 follow-up: effective cap after numeric-tag fallback.
+   * Precedence: reimbursementCapUsd → max(numeric event_tags) → null.
+   * Host-visible UI (banner, stat header, null-cap notice) reads THIS.
+   */
+  effectiveReimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
   /** Threaded to NewPayoutForm — gates the "ask once" attendance prompt. */
@@ -29,6 +39,7 @@ type View = 'list' | 'new';
 export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   partyId,
   reimbursementCapUsd,
+  effectiveReimbursementCapUsd,
   reimbursementCapAppealNote,
   reimbursementCapAppealedAt,
   expectedGuests,
@@ -171,7 +182,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             onStartNew={() => setView('new')}
             partyId={partyId}
             totalPaidUsd={totalPaidUsd}
-            reimbursementCapUsd={reimbursementCapUsd ?? null}
+            reimbursementCapUsd={effectiveReimbursementCapUsd ?? null}
           />
         </>
       )}
@@ -189,7 +200,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             partyId={partyId}
             onCreated={handleCreated}
             onCancel={() => setView('list')}
-            reimbursementCapUsd={reimbursementCapUsd}
+            reimbursementCapUsd={effectiveReimbursementCapUsd}
             reimbursementCapAppealNote={reimbursementCapAppealNote}
             reimbursementCapAppealedAt={reimbursementCapAppealedAt}
             totalPaidUsd={totalPaidUsd}
