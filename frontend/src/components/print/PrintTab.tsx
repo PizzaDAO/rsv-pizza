@@ -140,6 +140,17 @@ function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: stri
         <p className="text-sm text-theme-text-secondary mt-1">
           Download print-ready materials for your event
         </p>
+        <p className="text-sm text-theme-text-secondary mt-1">
+          Need something custom?{' '}
+          <a
+            href="https://www.figma.com/design/itTDjW8plqdUiEGIXlwBP8/PizzaDAO---Marketing?node-id=588-1909&t=gkFsmruefaXmimZs-1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#ff393a] hover:underline font-medium"
+          >
+            Browse the PizzaDAO Figma →
+          </a>
+        </p>
       </div>
 
       {/* Stickers Section */}
