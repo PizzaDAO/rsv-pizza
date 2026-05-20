@@ -98,7 +98,13 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       return !!savedWallet && /^0x[0-9a-fA-F]{40}$/.test(savedWallet.trim());
     }
     if (savedMethod === 'wire') {
+      // arugula-38633 (follow-up): wire is now a single email field; legacy
+      // rows that still have account-holder + routing/IBAN are also accepted
+      // so we don't drop already-saved details from existing hosts.
       if (!savedBank) return false;
+      const email = savedBank.email?.trim() ?? '';
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return true;
+      // Legacy fallback: account-holder + bank-name + (US OR Intl) routing.
       if (!savedBank.accountHolderName?.trim() || !savedBank.bankName?.trim()) return false;
       const hasUs = !!savedBank.routingNumber?.trim() && !!savedBank.accountNumber?.trim();
       const hasIntl = !!savedBank.iban?.trim() || !!savedBank.swift?.trim();

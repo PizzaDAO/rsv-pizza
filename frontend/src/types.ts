@@ -1423,8 +1423,14 @@ export interface PayoutDocument {
 }
 
 export interface BankDetails {
-  accountHolderName: string;
-  bankName: string;
+  // arugula-38633 (follow-up): the wire form was replaced with a single
+  // "email for bank correspondence" field — our bank emails the host to
+  // complete the transaction. Legacy rows (created before this change) still
+  // carry the full account-holder + routing/IBAN payload, so all fields are
+  // kept here as optional for backwards-compatible display in admin views.
+  email?: string;
+  accountHolderName?: string;
+  bankName?: string;
   bankAddress?: string;
   // US bank
   routingNumber?: string;
