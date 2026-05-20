@@ -1,12 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { Checkbox } from '../Checkbox';
 import { useAuth } from '../../contexts/AuthContext';
-import { usePizza } from '../../contexts/PizzaContext';
 import { Payout, PayoutMethod, BankDetails } from '../../types';
 import { createPayout } from '../../lib/api';
-import { updateParty } from '../../lib/supabase';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
@@ -65,12 +62,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   expectedGuests,
 }) => {
   const { user } = useAuth();
-  const { party } = usePizza();
-  const eventHasPrepayTag = Array.isArray(party?.eventTags) && party!.eventTags.includes('prepay');
-  // Pre-check if the event is already tagged 'prepay' — host can leave it
-  // checked or uncheck (uncheck is a no-op; tag is only ever ADDED here, never
-  // removed — admins can remove it in /underboss).
-  const [needsPrepay, setNeedsPrepay] = useState<boolean>(eventHasPrepayTag);
   // Stable id for this in-flight form, used as the storage-path grouping key.
   const [payoutTempId] = useState(() => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
@@ -143,14 +134,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // If host checked the 50% prepay box AND the event isn't already tagged,
-      // append 'prepay' to event_tags before submitting the payment. Non-fatal:
-      // a failed tag add still lets the payment go through (admin can tag manually).
-      if (needsPrepay && !eventHasPrepayTag && party) {
-        const nextTags = Array.from(new Set([...(party.eventTags || []), 'prepay']));
-        await updateParty(partyId, { event_tags: nextTags }).catch(() => null);
-      }
-
       const created = await createPayout(partyId, {
         receiptPhotos: receipts
           .filter(r => r.status === 'done' && r.url)
@@ -344,19 +327,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         {/* Hidden last4 field is intentionally omitted — Mercury card numbers come from admin, not host. */}
         {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
         {false && <input value={mercuryCardLast4} onChange={e => setMercuryCardLast4(e.target.value)} />}
-      </div>
-
-      {/* 6. 50% prepayment request — flags the event by adding the 'prepay' tag */}
-      <div className="card p-6">
-        <Checkbox
-          checked={needsPrepay}
-          onChange={() => setNeedsPrepay(v => !v)}
-          label={
-            eventHasPrepayTag
-              ? "I need 50% prepayment (already requested for this event)"
-              : "I need 50% prepayment for this event"
-          }
-        />
       </div>
 
       {/* 7. Submit */}
