@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -216,6 +216,8 @@ export interface UpdatePartyData {
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
   parkingNotes?: string | null;
+  // quattro-71244: Gamified dashboard host-set goals (JSONB).
+  hostGoals?: HostGoals | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -329,8 +331,39 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       // Day-of logistics (pepperoni-58341)
       wifiInfo: data.wifiInfo,
       parkingNotes: data.parkingNotes,
+      // quattro-71244: gamified-dashboard goal targets.
+      hostGoals: data.hostGoals,
     },
   });
+}
+
+/**
+ * quattro-71244: Convenience for the gamified dashboard's inline goal-setting
+ * UI. Thin wrapper around `updatePartyApi` so callers don't need to know about
+ * the broader UpdatePartyData shape.
+ */
+export async function updateHostGoals(partyId: string, hostGoals: HostGoals) {
+  return updatePartyApi(partyId, { hostGoals });
+}
+
+/**
+ * quattro-71244: Fetches this party's rank against peer GPP events.
+ * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
+ * can gracefully hide instead of crashing the dashboard.
+ */
+export async function getLeaderboardRank(
+  partyId: string,
+  metric: string = 'totalRsvps',
+): Promise<{ rank: number; total: number; topPercent: number; scope: 'gpp-season' | 'gpp-all' } | null> {
+  try {
+    return await apiRequest<{ rank: number; total: number; topPercent: number; scope: 'gpp-season' | 'gpp-all' }>(
+      `/api/parties/${partyId}/leaderboard-rank?metric=${encodeURIComponent(metric)}`,
+      { method: 'GET', requireAuth: true },
+    );
+  } catch (error) {
+    // Graceful hide — leaderboard is decorative, not load-bearing.
+    return null;
+  }
 }
 
 export async function deletePartyApi(partyId: string) {

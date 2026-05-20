@@ -212,6 +212,39 @@ export interface VenueInfo {
   notes: string | null;
 }
 
+// quattro-71244: Gamified host dashboard KPIs
+export type HostGoals = Partial<{
+  rsvps: number;
+  attendees: number;
+  newsletterSignups: number;
+  walletAddresses: number;
+  poapMints: number;
+  pageViews: number;
+}>;
+
+export interface MomentumDelta {
+  lastHour?: number;
+  today?: number;
+  busiestHourLabel?: string | null;
+}
+
+export type MilestoneId =
+  | 'firstRsvp'
+  | 'rsvps25'
+  | 'rsvps50'
+  | 'rsvps100'
+  | 'firstWallet'
+  | 'firstNewsletter'
+  | 'firstPoap'
+  | 'goalReached';
+
+export interface Milestone {
+  id: MilestoneId;
+  labelKey: string;          // i18n key under host.dashboard.kpis.milestones.*
+  statKey: string;           // matches a ReportKPIs stat key
+  threshold: number;         // value of stat that unlocks this badge
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -309,6 +342,9 @@ export interface Party {
   effectiveReimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
+  // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
+  // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
+  hostGoals?: HostGoals | null;
 }
 
 export interface Donation {
@@ -683,6 +719,9 @@ export interface EventReport {
 
   // Calculated stats
   stats: ReportStats;
+
+  // quattro-71244: host-set goal targets, surfaced to the dashboard KPI block.
+  hostGoals?: HostGoals | null;
 }
 
 // Staffing types

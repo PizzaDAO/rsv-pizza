@@ -767,5 +767,32 @@
     "eligible": "{{count}} eligible",
     "pickAWinnerBtn": "Pick a Winner",
     "winnersThisSession": "Winners This Session ({{count}})"
+  },
+  "dashboard": {
+    "kpis": {
+      "title": "Your Event Stats",
+      "setGoal": "Set goal",
+      "goalLabel": "Goal: {{value}}",
+      "percentToGoal": "{{percent}}% to goal",
+      "goalHit": "Goal hit!",
+      "deltaLastHour": "+{{n}} in the last hour",
+      "deltaToday": "{{n}} today",
+      "busiestHour": "Busiest hour: {{label}}",
+      "leaderboardRank": "#{{rank}} of {{total}} {{scope}}",
+      "leaderboardTopPct": "Top {{percent}}% for {{metric}}",
+      "leaderboardScopeGpp": "GPP hosts",
+      "badgeUnlocked": "Unlocked",
+      "badgeLocked": "Next: {{label}}",
+      "milestones": {
+        "firstRsvp": "First RSVP",
+        "rsvps25": "25 RSVPs",
+        "rsvps50": "50 RSVPs",
+        "rsvps100": "100 RSVPs",
+        "firstWallet": "First wallet",
+        "firstNewsletter": "First newsletter signup",
+        "firstPoap": "First POAP mint",
+        "goalReached": "Goal reached"
+      }
+    }
   }
 }

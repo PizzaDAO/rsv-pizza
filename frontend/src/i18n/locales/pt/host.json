@@ -759,5 +759,32 @@
     "eligible": "{{count}} elegíveis",
     "pickAWinnerBtn": "Sortear um Vencedor",
     "winnersThisSession": "Vencedores Desta Sessão ({{count}})"
+  },
+  "dashboard": {
+    "kpis": {
+      "title": "Estatísticas do seu evento",
+      "setGoal": "Definir meta",
+      "goalLabel": "Meta: {{value}}",
+      "percentToGoal": "{{percent}}% até a meta",
+      "goalHit": "Meta atingida!",
+      "deltaLastHour": "+{{n}} na última hora",
+      "deltaToday": "{{n}} hoje",
+      "busiestHour": "Hora de pico: {{label}}",
+      "leaderboardRank": "#{{rank}} de {{total}} {{scope}}",
+      "leaderboardTopPct": "Top {{percent}}% em {{metric}}",
+      "leaderboardScopeGpp": "anfitriões GPP",
+      "badgeUnlocked": "Desbloqueado",
+      "badgeLocked": "Próximo: {{label}}",
+      "milestones": {
+        "firstRsvp": "Primeira confirmação",
+        "rsvps25": "25 confirmações",
+        "rsvps50": "50 confirmações",
+        "rsvps100": "100 confirmações",
+        "firstWallet": "Primeira carteira",
+        "firstNewsletter": "Primeira inscrição na newsletter",
+        "firstPoap": "Primeiro mint de POAP",
+        "goalReached": "Meta atingida"
+      }
+    }
   }
 }

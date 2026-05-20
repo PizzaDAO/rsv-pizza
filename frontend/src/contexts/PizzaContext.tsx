@@ -174,6 +174,8 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     // Day-of logistics (pepperoni-58341)
     wifiInfo: dbParty.wifi_info ?? null,
     parkingNotes: dbParty.parking_notes ?? null,
+    // quattro-71244: gamified-dashboard goal targets.
+    hostGoals: dbParty.host_goals ?? null,
     guests,
   };
 }

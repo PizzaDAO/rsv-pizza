@@ -759,5 +759,32 @@
     "eligible": "{{count}} 位符合条件",
     "pickAWinnerBtn": "抽取获奖者",
     "winnersThisSession": "本次获奖者（{{count}}）"
+  },
+  "dashboard": {
+    "kpis": {
+      "title": "活动数据",
+      "setGoal": "设定目标",
+      "goalLabel": "目标：{{value}}",
+      "percentToGoal": "已完成目标的 {{percent}}%",
+      "goalHit": "目标达成！",
+      "deltaLastHour": "过去 1 小时 +{{n}}",
+      "deltaToday": "今日 {{n}} 位",
+      "busiestHour": "高峰时段：{{label}}",
+      "leaderboardRank": "{{total}} 位{{scope}}中第 {{rank}} 名",
+      "leaderboardTopPct": "{{metric}}前 {{percent}}%",
+      "leaderboardScopeGpp": "GPP 主办人",
+      "badgeUnlocked": "已解锁",
+      "badgeLocked": "下一个：{{label}}",
+      "milestones": {
+        "firstRsvp": "首次 RSVP",
+        "rsvps25": "25 位 RSVP",
+        "rsvps50": "50 位 RSVP",
+        "rsvps100": "100 位 RSVP",
+        "firstWallet": "首个钱包",
+        "firstNewsletter": "首次订阅通讯",
+        "firstPoap": "首次铸造 POAP",
+        "goalReached": "目标达成"
+      }
+    }
   }
 }

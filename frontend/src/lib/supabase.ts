@@ -11,6 +11,7 @@ import {
 } from './api';
 import { uuid } from './utils';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
+import type { HostGoals } from '../types';
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -781,6 +782,8 @@ export interface DbParty {
   reimbursement_cap_usd?: number | null;
   reimbursement_cap_appeal_note?: string | null;
   reimbursement_cap_appealed_at?: string | null;
+  // quattro-71244: gamified-dashboard goal targets (JSONB on parties).
+  host_goals?: HostGoals | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -1864,6 +1867,8 @@ export async function updateParty(
     host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
     reimbursement_cap_usd?: number | null;
+    // quattro-71244: gamified-dashboard goal targets.
+    host_goals?: HostGoals | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1943,6 +1948,8 @@ export async function updateParty(
         // Day-of logistics (pepperoni-58341)
         wifiInfo: updates.wifi_info,
         parkingNotes: updates.parking_notes,
+        // quattro-71244: gamified-dashboard goal targets.
+        hostGoals: updates.host_goals,
       });
       return true;
     } catch (error) {

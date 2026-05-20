@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, X, Lock, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, Lock, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from '../checklist/FindVenueModal';
+import { DashboardKPIs } from './DashboardKPIs';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -127,34 +128,20 @@ export const GPPDashboardTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Quick stats */}
+      {/* quattro-71244: gamified KPI block (LeaderboardPill + Milestone strip +
+          ReportKPIs read-only with goals/deltas/pulse). Supersedes the legacy
+          "Invited / RSVPs / Days Until / Pending Approval" 4-tile mini-grid. */}
+      <DashboardKPIs party={party} guests={guests} />
+
+      {/* Status tiles — kept separate from the KPI block because they're
+          status callouts, not stats. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-theme-text">
-            {guests.filter(g => g.approved !== false && g.status === 'INVITED').length}
-          </div>
-          <div className="text-xs text-theme-text-muted">Invited</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-theme-text">
-            {guests.filter(g => g.approved !== false && g.status !== 'INVITED').length}
-          </div>
-          <div className="text-xs text-theme-text-muted">RSVPs</div>
-        </div>
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-theme-text">
             {daysUntil !== null ? daysUntil : '—'}
           </div>
           <div className="text-xs text-theme-text-muted">Days Until Event</div>
         </div>
-        {party.requireApproval && (
-          <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-theme-text">
-              {guests.filter((g) => g.approved === null).length}
-            </div>
-            <div className="text-xs text-theme-text-muted">Pending Approval</div>
-          </div>
-        )}
         {party.underbossStatus === 'approved' && (
           <div className="card p-4 text-center border border-green-500/30">
             <div className="flex items-center justify-center gap-1.5 text-green-400">

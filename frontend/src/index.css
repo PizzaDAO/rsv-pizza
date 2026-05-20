@@ -732,6 +732,16 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   }
 }
 
+/* quattro-71244: gamified-dashboard KPI tile pulse on live counter increments. */
+@keyframes pulse-once {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 4px rgba(255, 57, 58, 0.25); }
+  100% { transform: scale(1); }
+}
+.animate-pulse-once {
+  animation: pulse-once 600ms ease-out;
+}
+
 /* Pizzeria name label next to red pins on the Participating Pizzerias map.
    Google Maps applies this class to the label container that sits centered on
    the marker anchor — we offset it downward so it sits below the pin with a
