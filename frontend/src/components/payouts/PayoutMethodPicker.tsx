@@ -141,7 +141,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           />
           <p className="text-xs text-theme-text-muted">
             USDC on Base ({/* link omitted intentionally */}
-            <span className="font-mono">0x8335…2913</span>). Double-check this address — on-chain transfers can't be reversed.
+            <span className="font-mono">0x8335…2913</span>). Double-check this address — onchain transfers can't be reversed.
           </p>
         </div>
       )}

@@ -1216,7 +1216,7 @@ router.get(
  * transaction (so we can't leave status updated without an audit trail or
  * vice versa).
  *
- * For `usdc_base` the on-chain send happens BEFORE the DB transaction
+ * For `usdc_base` the onchain send happens BEFORE the DB transaction
  * (because waiting for a Base receipt can take 10-30s and we don't want to
  * hold a Postgres tx open that long). On send-failure we still open a tiny
  * tx to flip status -> failed + write the audit row, so the operator sees

@@ -103,7 +103,7 @@ function getWalletClient() {
   return createWalletClient({ account: getPayoutAccount(), chain: base, transport: http(getRpcUrl()) });
 }
 
-/** Resolve the payout wallet's on-chain address (derived from the private key). */
+/** Resolve the payout wallet's onchain address (derived from the private key). */
 export function getPayoutWalletAddress(): `0x${string}` {
   return getPayoutAccount().address;
 }
@@ -156,7 +156,7 @@ export async function getUsdcDailyCapStatus(): Promise<UsdcDailyCapStatus> {
 
 /**
  * Send `amountUsd` USDC from the payout wallet to `toAddress` on Base.
- * Throws on any pre-flight failure or on-chain revert. Caller must persist the
+ * Throws on any pre-flight failure or onchain revert. Caller must persist the
  * resulting `txHash` on the payout row.
  */
 export async function sendUsdcPayment(toAddress: string, amountUsd: number): Promise<SendUsdcResult> {
@@ -233,7 +233,7 @@ export async function sendUsdcPayment(toAddress: string, amountUsd: number): Pro
     timeout: TX_RECEIPT_TIMEOUT_MS,
   });
   if (receipt.status !== 'success') {
-    throw new Error(`USDC transfer reverted on-chain: tx ${txHash}, status=${receipt.status}`);
+    throw new Error(`USDC transfer reverted onchain: tx ${txHash}, status=${receipt.status}`);
   }
 
   console.log(`[usdc-base] confirmed tx ${txHash} block=${receipt.blockNumber}`);
