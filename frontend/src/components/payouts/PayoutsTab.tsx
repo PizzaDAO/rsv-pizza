@@ -75,6 +75,18 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     if (canAccess) loadPayouts();
   }, [loadPayouts, canAccess]);
 
+  // arugula-38633 v2 follow-up: sum already-paid payouts so the host can see
+  // their running reimbursement total. MUST be declared before any conditional
+  // returns below — moving it after would break rules-of-hooks (hook count
+  // changes when canAccess flips null/false → true). Was the source of a hard
+  // React crash that black-screened the page.
+  const totalPaidUsd = useMemo(
+    () => payouts
+      .filter(p => p.status === 'paid')
+      .reduce((s, p) => s + Number(p.finalAmountUsd || 0), 0),
+    [payouts]
+  );
+
   if (canAccess === null) {
     return (
       <div className="card p-8 flex items-center justify-center">
@@ -105,16 +117,6 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const handleCancelled = (payoutId: string) => {
     setPayouts(prev => prev.filter(p => p.id !== payoutId));
   };
-
-  // arugula-38633 v2 follow-up: sum already-paid payouts so the host can see
-  // their running reimbursement total (and how it compares to the cap, if any).
-  // Computed client-side from the existing list — no backend change needed.
-  const totalPaidUsd = useMemo(
-    () => payouts
-      .filter(p => p.status === 'paid')
-      .reduce((s, p) => s + Number(p.finalAmountUsd || 0), 0),
-    [payouts]
-  );
 
   if (loading) {
     return (
