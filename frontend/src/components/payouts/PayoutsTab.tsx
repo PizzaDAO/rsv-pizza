@@ -184,12 +184,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       {/* Top banner priority (arugula-38633 v3):
           1. Missing expected_guests or location → actionable "Set your X to
              get your funding approved" (host can act on it)
-          2. Both set, no cap yet → "No cap set. Contact your underboss"
-          3. Cap set → emerald cap banner */}
+          2. Both set, no cap OR no 'go' tag → "Your underboss is reviewing"
+             (cap value isn't promised until BOTH cap AND go are in place)
+          3. Cap set AND 'go' tag present → emerald cap banner */}
       {(() => {
         const needsExpectedGuests = !party?.expectedGuests || party.expectedGuests <= 0;
         const needsLocation = !party?.address;
         const hasCap = typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0;
+        const hasGo = Array.isArray(party?.eventTags) && party!.eventTags.includes('go');
 
         if (needsExpectedGuests || needsLocation) {
           const msg =
@@ -205,7 +207,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             </div>
           );
         }
-        if (hasCap) {
+        if (hasCap && hasGo) {
           return (
             <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
               <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
