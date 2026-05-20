@@ -7,6 +7,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -231,7 +232,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, placeId, venueName, city, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, placeId, venueName, city, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -280,6 +281,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         availableToppings: availableToppings || [],
         availableDietaryOptions: availableDietaryOptions || [],
         address: address || null,
+        latitude: latitude !== null && latitude !== undefined ? Number(latitude) : null,
+        longitude: longitude !== null && longitude !== undefined ? Number(longitude) : null,
         placeId: placeId || null,
         venueName: venueName || null,
         city: city || null,
@@ -324,6 +327,17 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 
     // Trigger webhook for party creation
     await triggerWebhook('party.created', party, req.userId!);
+
+    // prosciutto-58472: fire-and-forget auto-populate of selected_pizzerias.
+    // Helper is idempotent + race-safe + never throws; we still wrap in .catch()
+    // as a paranoid second line of defense so a rejected Promise can't crash the
+    // process via unhandled rejection.
+    void autoPopulatePizzerias({
+      partyId: party.id,
+      lat: party.latitude,
+      lng: party.longitude,
+      address: party.address,
+    }).catch(err => console.warn('[autoPopulatePizzerias create]', err));
 
     // Return with hostName for backwards compatibility
     res.status(201).json({
@@ -680,6 +694,28 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
 
     // Trigger webhook for party update
     await triggerWebhook('party.updated', party, req.userId!);
+
+    // prosciutto-58472: fire-and-forget auto-populate of selected_pizzerias
+    // when the host changed the address AND hasn't preselected pizzerias
+    // AND isn't manually setting them in this PATCH. Helper is idempotent +
+    // race-safe + never throws, but we still wrap in .catch() for unhandled
+    // rejection safety.
+    const currentSelected = (party as any).selectedPizzerias;
+    const shouldAutoPopulate =
+      address !== undefined &&
+      address !== null &&
+      (!currentSelected ||
+        (Array.isArray(currentSelected) && currentSelected.length === 0)) &&
+      req.body.selectedPizzerias === undefined;
+
+    if (shouldAutoPopulate) {
+      void autoPopulatePizzerias({
+        partyId: party.id,
+        lat: party.latitude,
+        lng: party.longitude,
+        address: party.address,
+      }).catch(err => console.warn('[autoPopulatePizzerias update]', err));
+    }
 
     // Return with hostName for backwards compatibility
     res.json({
