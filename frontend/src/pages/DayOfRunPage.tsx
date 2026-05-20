@@ -5,13 +5,14 @@ import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { DayOfDashboard } from '../components/day-of';
-
-const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
+import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
 
 /**
  * /run/:inviteCode — mobile-optimised day-of host dashboard. No `<Layout>`
  * chrome (no header/footer/sidebar) so the entire viewport is dashboard.
- * Auth-gated to host or canEdit cohost; logged-out visitors bounce to /login.
+ *
+ * pepperoni-58341 soft-launch: admin/underboss only (see `useIsAdminOrUnderboss`).
+ * Logged-out visitors bounce to /login; logged-in non-admins bounce to /.
  */
 function DayOfRunPageContent() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -19,34 +20,39 @@ function DayOfRunPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { loadParty, party, partyLoading } = usePizza();
   const [loaded, setLoaded] = useState(false);
+  // pepperoni-58341 soft-launch gate: route is admin/underboss only.
+  const isAdminOrUnderboss = useIsAdminOrUnderboss();
 
   useEffect(() => {
     if (!inviteCode || loaded) return;
     loadParty(inviteCode).then((ok) => setLoaded(true));
   }, [inviteCode, loadParty, loaded]);
 
-  // Gate: must be owner / super-admin / canEdit cohost.
-  const canEdit = (() => {
-    if (!party || !user) return false;
-    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
-    if (party.userId === user.id) return true;
-    if (party.canEdit) return true;
-    return false;
-  })();
+  // pepperoni-58341 soft-launch: only admins/underbosses can access /run/
+  // during the gated rollout. They can access ANY party regardless of
+  // host/cohost status (so Snax can dogfood on any event). When we widen
+  // the rollout, restore a `canEdit`-style gate (party.userId === user.id
+  // || party.canEdit || super-admin email — see HostPage.tsx for the
+  // pattern) and combine it with this admin/underboss check.
+  const accessAllowed = isAdminOrUnderboss === true;
 
   useEffect(() => {
     if (authLoading || partyLoading) return;
     if (!loaded) return;
-    if (party && !canEdit) {
-      if (!user) {
-        navigate(`/login?redirect=${encodeURIComponent(`/run/${inviteCode}`)}`, { replace: true });
-      } else {
-        navigate(`/rsvp/${inviteCode}`, { replace: true });
-      }
+    // Logged-out users → bounce to /login so they can sign in.
+    if (!user) {
+      navigate(`/login?redirect=${encodeURIComponent(`/run/${inviteCode}`)}`, { replace: true });
+      return;
     }
-  }, [authLoading, partyLoading, loaded, party, canEdit, user, navigate, inviteCode]);
+    // Wait for admin/underboss check to resolve before deciding.
+    if (isAdminOrUnderboss === null) return;
+    // Non-admin/underboss users are blocked during soft-launch — redirect to /.
+    if (party && !accessAllowed) {
+      navigate('/', { replace: true });
+    }
+  }, [authLoading, partyLoading, loaded, party, accessAllowed, isAdminOrUnderboss, user, navigate, inviteCode]);
 
-  if (authLoading || partyLoading || !loaded || !party) {
+  if (authLoading || partyLoading || !loaded || !party || isAdminOrUnderboss === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-theme-bg">
         <Loader2 size={32} className="animate-spin text-theme-text-muted" />
@@ -54,7 +60,7 @@ function DayOfRunPageContent() {
     );
   }
 
-  if (!canEdit) {
+  if (!accessAllowed) {
     return null;
   }
 

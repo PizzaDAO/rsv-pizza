@@ -5,6 +5,7 @@ import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home,
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
+import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
 import { PartyHeader } from '../components/PartyHeader';
@@ -55,6 +56,11 @@ function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  // pepperoni-58341 soft-launch gate: Day-Of tab is only visible to
+  // admins + underbosses while the feature is in private beta. `null`
+  // means "still loading" — treat as not allowed for tab visibility
+  // (the tab simply doesn't appear until the check resolves).
+  const isAdminOrUnderboss = useIsAdminOrUnderboss();
   const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
@@ -181,8 +187,9 @@ function HostPageContent() {
   const tabs = useMemo(() => {
     const coreTabs = [
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
-      // pepperoni-58341: Day-of host dashboard (also mirrored at /run/:inviteCode for mobile)
-      { id: 'day-of' as TabType, label: 'Day Of', icon: Zap },
+      // pepperoni-58341: Day-of host dashboard (also mirrored at /run/:inviteCode for mobile).
+      // Soft-launch gate: only visible to admins + underbosses for now.
+      ...(isAdminOrUnderboss ? [{ id: 'day-of' as TabType, label: 'Day Of', icon: Zap }] : []),
       { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
       { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
@@ -203,7 +210,7 @@ function HostPageContent() {
     return allowedTabs === 'all'
       ? allTabs
       : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
-  }, [isGPP, party?.pinnedApps, allowedTabs]);
+  }, [isGPP, party?.pinnedApps, allowedTabs, isAdminOrUnderboss, t]);
 
   // Redirect to first allowed tab if current tab is not permitted
   useEffect(() => {
