@@ -347,7 +347,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
             {/* Payout target */}
             <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface text-sm space-y-1">
-              <h3 className="font-semibold text-theme-text mb-1">{PAYOUT_METHOD_LABELS[payout.payoutMethod]}</h3>
+              <h3 className="font-semibold text-theme-text mb-1">
+                {payout.payoutMethod
+                  ? PAYOUT_METHOD_LABELS[payout.payoutMethod]
+                  : 'Payment method not set'}
+              </h3>
+              {/* arugula-38633 v3 follow-up: when method is null, the host
+                  submitted before configuring their PaymentDetailsCard.
+                  Admin should ask them to set it (or PATCH the payout). */}
+              {payout.payoutMethod == null && (
+                <div className="text-xs text-amber-700">
+                  Host has not configured their payment details yet. Ask them to set their
+                  payment method, or edit this payment via the actions menu before executing.
+                </div>
+              )}
               {payout.payoutMethod === 'usdc_base' && payout.payoutWalletAddress && (
                 <div className="font-mono text-xs break-all text-theme-text-secondary">
                   {payout.payoutWalletAddress}
@@ -514,6 +527,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               <div className="rounded-xl border border-emerald-300 p-3 bg-emerald-50 text-sm space-y-2">
                 <h3 className="font-semibold text-emerald-900 mb-1">Execute payment</h3>
 
+                {/* arugula-38633 v3 follow-up: when host submitted without
+                    setting a method, execute is blocked until admin (or host)
+                    fills it in. The server returns MISSING_PAYOUT_METHOD. */}
+                {payout.payoutMethod == null && (
+                  <div className="rounded-md bg-amber-100 border border-amber-300 px-3 py-2 text-amber-900">
+                    No payment method is set on this payout. Ask the host to set their payment
+                    details, or edit this payment to set the method directly, before executing.
+                  </div>
+                )}
+
                 {payout.payoutMethod === 'usdc_base' && (
                   <div className="space-y-2">
                     <p className="text-emerald-900">
@@ -609,6 +632,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     }}
                     disabled={
                       busy ||
+                      payout.payoutMethod == null ||
                       (payout.payoutMethod === 'wire' && !execWireValid) ||
                       (payout.payoutMethod === 'mercury_card' && !execMercuryValid) ||
                       (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress)
@@ -616,7 +640,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
                     {busy && <Loader2 size={12} className="animate-spin" />}
-                    {payout.payoutMethod === 'usdc_base' ? 'Send Payment' :
+                    {payout.payoutMethod == null ? 'Method not set' :
+                      payout.payoutMethod === 'usdc_base' ? 'Send Payment' :
                       payout.payoutMethod === 'wire' ? 'Confirm wire sent' :
                       'Confirm card issued'}
                   </button>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote, BadgeDollarSign, Users, AlertCircle } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
@@ -81,16 +81,17 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const [notes, setNotes] = useState('');
   const [overrideAmount, setOverrideAmount] = useState<number | null>(null);
 
-  // arugula-38633 v3: read payment method + destination from the
+  // arugula-38633 v3 (follow-up): read payment method + destination from the
   // authenticated user record (saved via PaymentDetailsCard at the top of
-  // the Payments tab). When unset, the submit button is disabled and an
-  // inline message points the host upward.
+  // the Payments tab). These are now PURELY optional at submit time — when
+  // unset, the payout persists with payout_method=NULL and admin asks the
+  // host to fill them in before execute.
   const savedMethod = user?.preferredPayoutMethod ?? null;
   const savedWallet = user?.payoutWalletAddress ?? null;
   const savedBank = user?.payoutBankDetails ?? null;
-  // Validity mirror of PaymentDetailsCard.methodValid (kept duplicated
-  // intentionally — the card may not yet have persisted a partially typed
-  // wire row when the host clicks Submit).
+  // We still gate the per-method payload (wallet for usdc, bank for wire)
+  // on a basic validity check so we don't post half-typed data. When
+  // invalid, we just don't forward the method — submit still works.
   const savedMethodValid = useMemo(() => {
     if (savedMethod == null) return false;
     if (savedMethod === 'usdc_base') {
@@ -124,7 +125,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   );
   const finalAmount = overrideAmount != null ? overrideAmount : ocrSum;
 
-  const hasUploadedReceipt = receipts.some(r => r.status === 'done' && r.url);
   const isProcessing = receipts.some(r => r.status === 'uploading' || r.status === 'ocring')
     || pizzaPhotos.some(p => p.status === 'uploading');
 
@@ -132,19 +132,24 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const attendanceValid = !askForAttendance
     || (estimatedAttendance != null && estimatedAttendance > 0);
 
-  const canSubmit = hasUploadedReceipt
-    && finalAmount > 0
-    && savedMethodValid
+  // arugula-38633 v3 follow-up: payment details + receipts are no longer
+  // required for submission. The submit button stays active whenever the
+  // host has entered a positive amount and nothing async is in flight.
+  const canSubmit = finalAmount > 0
     && attendanceValid
     && !isProcessing
     && !submitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !savedMethod) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // arugula-38633 v3 follow-up: only forward the payout method (and its
+      // payload) when it's both set AND validates. Otherwise we omit it
+      // entirely so the backend persists payout_method=NULL.
+      const forwardMethod = savedMethod && savedMethodValid;
       const created = await createPayout(partyId, {
         receiptPhotos: receipts
           .filter(r => r.status === 'done' && r.url)
@@ -163,21 +168,25 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             mimeType: p.mimeType,
           })),
         hostNotes: notes.trim() || undefined,
-        // arugula-38633 v3: payout destination is sourced from the user's
-        // PaymentDetailsCard, not the form. Backend payout.routes still
-        // mirrors saveAsDefault → users.* on its end — kept for symmetry,
-        // though PaymentDetailsCard already writes them directly via PATCH
-        // /api/user/me on the host's first save.
-        payoutMethod: savedMethod,
-        ...(savedMethod === 'usdc_base' && savedWallet
-          ? { payoutWalletAddress: savedWallet.trim() }
+        ...(forwardMethod
+          ? {
+              payoutMethod: savedMethod!,
+              ...(savedMethod === 'usdc_base' && savedWallet
+                ? { payoutWalletAddress: savedWallet.trim() }
+                : {}),
+              ...(savedMethod === 'wire' && savedBank
+                ? { payoutBankDetails: savedBank }
+                : {}),
+              saveAsDefault: true,
+            }
           : {}),
-        ...(savedMethod === 'wire' && savedBank
-          ? { payoutBankDetails: savedBank }
-          : {}),
+        // arugula-38633 v3 follow-up: forward finalAmountUsd whenever the
+        // host has typed an override. Note: with zero receipts, canSubmit
+        // already requires `finalAmount > 0`, which can only come from the
+        // override (ocrSum is 0 with no receipts) — so override is always
+        // set on the no-receipts path.
         ...(overrideAmount != null ? { finalAmountUsd: overrideAmount } : {}),
         ...(estimatedAttendance != null ? { estimatedAttendance } : {}),
-        saveAsDefault: true,
       });
       onCreated(created);
     } catch (err: any) {
@@ -336,17 +345,11 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       )}
 
-      {/* arugula-38633 v3: payout method is now configured in the
-          PaymentDetailsCard above. If the host hasn't set one yet, show an
-          inline hint and disable submit. */}
-      {!savedMethodValid && (
-        <div className="card p-4 border-l-4 border-l-amber-500 flex items-start gap-3">
-          <AlertCircle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-theme-text">
-            Set your <span className="font-semibold">payment details</span> above before submitting a receipt.
-          </p>
-        </div>
-      )}
+      {/* arugula-38633 v3 (follow-up): the amber "set your payment details
+          above before submitting a receipt" notice was removed. Payment
+          details remain in the PaymentDetailsCard at the top of the
+          Payments tab but no longer gate submission — admin asks the host
+          for them later if absent. */}
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
         <button

@@ -1,20 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { X, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
-import { Payout, PayoutStatus, PayoutMethod } from '../../types';
+import { Payout, PayoutStatus } from '../../types';
 import { getPayout } from '../../lib/api';
-import { methodIcon } from './PayoutListRow';
+import { methodIcon, methodLabel } from './PayoutListRow';
 
 interface PayoutDetailModalProps {
   partyId: string;
   payoutId: string;
   onClose: () => void;
 }
-
-const METHOD_LABEL: Record<PayoutMethod, string> = {
-  mercury_card: 'Mercury card',
-  wire: 'Wire transfer',
-  usdc_base: 'USDC on Base',
-};
 
 const STATUS_STYLES: Record<PayoutStatus, string> = {
   pending: 'bg-amber-500/20 text-amber-300',
@@ -121,7 +115,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 <p className="text-xs text-theme-text-muted mb-1">Payment method</p>
                 <p className="inline-flex items-center gap-2 text-theme-text font-medium">
                   {methodIcon(payout.payoutMethod)}
-                  {METHOD_LABEL[payout.payoutMethod]}
+                  {methodLabel(payout.payoutMethod)}
                 </p>
                 {payout.payoutMethod === 'usdc_base' && payout.payoutWalletAddress && (
                   <p className="text-xs text-theme-text-muted font-mono mt-1">

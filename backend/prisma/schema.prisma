@@ -1479,7 +1479,9 @@ model Payout {
   finalAmountUsd      Decimal   @map("final_amount_usd") @db.Decimal(12, 2)
 
   status              String    @default("pending")
-  payoutMethod        String    @map("payout_method")
+  // arugula-38633 v3 follow-up: optional — hosts can submit a payout with
+  // just an amount; admin nags the host for payment details before execute.
+  payoutMethod        String?   @map("payout_method")
 
   payoutWalletAddress String?   @map("payout_wallet_address")
   payoutBankDetails   Json?     @map("payout_bank_details")

@@ -471,7 +471,7 @@ router.get(
           escapeCSV(r.id),
           escapeCSV(r.createdAt.toISOString()),
           escapeCSV(r.status),
-          escapeCSV(r.payoutMethod),
+          escapeCSV(r.payoutMethod ?? ''),
           escapeCSV(r.host?.name || ''),
           escapeCSV(r.host?.email || ''),
           escapeCSV(r.party?.name || ''),
@@ -729,7 +729,10 @@ router.get(
 
       for (const r of allFiltered) {
         byStatus[r.status] = (byStatus[r.status] || 0) + 1;
-        byMethod[r.payoutMethod] = (byMethod[r.payoutMethod] || 0) + 1;
+        // arugula-38633 v3 follow-up: bucket null methods under 'unset' so the
+        // dashboard pills don't drop them from the count.
+        const methodKey = r.payoutMethod ?? 'unset';
+        byMethod[methodKey] = (byMethod[methodKey] || 0) + 1;
         const usd = Number(r.finalAmountUsd);
         sumUsd += usd;
         if (r.status === 'pending') {
@@ -1255,6 +1258,19 @@ async function executePayout(params: {
   }
 
   const finalAmountUsd = Number(existing.finalAmountUsd);
+
+  // arugula-38633 v3 follow-up: payout_method can be null when the host
+  // submitted before setting their payment details. Block execute with a
+  // clear message — admin should ask the host to set their details (or
+  // patch via PATCH /api/admin/payouts/:id).
+  if (existing.payoutMethod == null) {
+    throw new AppError(
+      'This payout has no payment method set. Ask the host to set their payment details, ' +
+        'or patch the payout method directly via PATCH /api/admin/payouts/:id.',
+      400,
+      'MISSING_PAYOUT_METHOD',
+    );
+  }
 
   if (existing.payoutMethod === 'usdc_base') {
     if (!existing.payoutWalletAddress) {
