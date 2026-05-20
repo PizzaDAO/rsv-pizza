@@ -15,7 +15,7 @@ import {
   Wallet, TrendingUp, StickyNote, MessageCircle, MousePointerClick, Eye,
   Instagram, Youtube, Linkedin, Globe, Facebook,
   Camera, ChevronLeft, ChevronRight, X, Link2, Download,
-  Mail, Send,
+  Mail, Send, DollarSign,
 } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
@@ -24,6 +24,13 @@ import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 import { PartnerTimeSeriesChart } from '../components/partner/PartnerTimeSeriesChart';
+
+// Ad-equivalent CPM/CPC/CPL benchmarks for admin-only "Estimated Program Value" card.
+// Mid-range for crypto-niche / Web3-targeted audiences. Tune as needed.
+const VALUE_PER_IMPRESSION = 0.02;   // $20 CPM
+const VALUE_PER_CLICK = 7.50;        // $7.50 CPC (mid of $5–10)
+const VALUE_PER_NEWSLETTER_SIGNUP = 15;  // $15 CPL (mid of $10–25)
+const VALUE_PER_RSVP = 40;           // $40/RSVP (mid of $30–50)
 
 interface DisplayPhoto {
   id: string;
@@ -619,6 +626,15 @@ export function PartnerDashboardPage() {
             ? newsletterTotals.swc + newsletterTotals.swcCa + newsletterTotals.swcAu + newsletterTotals.swcEu + newsletterTotals.swcUk + newsletterTotals.swcBr
             : 0;
 
+          // Admin-only ad-equivalent value (computed from filtered events)
+          const totalMailingListOptIns = newsletterTotals?.pizzadao || 0;
+          const totalSwcOptIns = swcTotal;
+          const valueImpressions = totalImpressions * VALUE_PER_IMPRESSION;
+          const valueClicks = totalClicks * VALUE_PER_CLICK;
+          const valueNewsletter = (totalMailingListOptIns + totalSwcOptIns) * VALUE_PER_NEWSLETTER_SIGNUP;
+          const valueRsvps = totalRsvps * VALUE_PER_RSVP;
+          const valueTotal = valueImpressions + valueClicks + valueNewsletter + valueRsvps;
+
           // Grid columns: expand when admin tiles are present
           const gridColsClass = isSwc
             ? (isAdmin ? 'md:grid-cols-3 lg:grid-cols-5' : 'md:grid-cols-3 lg:grid-cols-5')
@@ -759,6 +775,46 @@ export function PartnerDashboardPage() {
                   </>
                 )}
               </div>
+              {dashboardData?.isAdmin && (
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted">
+                      <DollarSign size={16} />
+                    </div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">
+                      Estimated Program Value · admin
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-theme-text">
+                    ${valueTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-xs text-theme-text-muted mt-1">
+                    Ad-equivalent across {events.length} event{events.length === 1 ? '' : 's'}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-3 border-t border-theme-stroke/50">
+                    <div>
+                      <div className="text-xs text-theme-text-muted">Impressions</div>
+                      <div className="text-base font-semibold text-theme-text">${valueImpressions.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      <div className="text-[10px] text-theme-text-muted">@ $20 CPM</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-theme-text-muted">Clicks</div>
+                      <div className="text-base font-semibold text-theme-text">${valueClicks.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      <div className="text-[10px] text-theme-text-muted">@ $7.50 CPC</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-theme-text-muted">Newsletter</div>
+                      <div className="text-base font-semibold text-theme-text">${valueNewsletter.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      <div className="text-[10px] text-theme-text-muted">@ $15/signup</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-theme-text-muted">RSVPs</div>
+                      <div className="text-base font-semibold text-theme-text">${valueRsvps.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      <div className="text-[10px] text-theme-text-muted">@ $40/RSVP</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
