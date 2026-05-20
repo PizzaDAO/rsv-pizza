@@ -4342,3 +4342,22 @@ export async function updateUserMe(
   }>('/api/user/me', { method: 'PATCH', body: data, requireAuth: true });
   return res.user;
 }
+
+/**
+ * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
+ * via the backend's mainnet-resolver utility endpoint. Returns null on any
+ * failure (404, 400, network). Caller uses this for the live-preview UX in
+ * PayoutMethodPicker — actual persistence resolution happens server-side.
+ */
+export async function resolveEnsName(name: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/ens/resolve?name=${encodeURIComponent(name)}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.address === 'string' ? data.address : null;
+  } catch {
+    return null;
+  }
+}

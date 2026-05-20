@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { resolveWalletInput } from '../services/ens.service.js';
 
 const router = Router();
 
@@ -56,6 +57,27 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
       });
     }
 
+    // taleggio-30219: resolve ENS → 0x before storing the user-default
+    // payout wallet. Either a 0x address or an ENS-shaped name is accepted;
+    // resolution failures bubble out as 400 INVALID_WALLET_ADDRESS.
+    let resolvedWallet: string | null | undefined;
+    if (payoutWalletAddress !== undefined) {
+      if (!payoutWalletAddress) {
+        resolvedWallet = null;
+      } else {
+        try {
+          resolvedWallet = await resolveWalletInput(String(payoutWalletAddress));
+        } catch (err: any) {
+          return res.status(400).json({
+            error: {
+              message: err?.message || 'Could not resolve wallet address',
+              code: 'INVALID_WALLET_ADDRESS',
+            },
+          });
+        }
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: req.userId },
       data: {
@@ -65,9 +87,7 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
           preferredPayoutMethod: preferredPayoutMethod || null,
         }),
         ...(payoutWalletAddress !== undefined && {
-          payoutWalletAddress: payoutWalletAddress
-            ? String(payoutWalletAddress).trim()
-            : null,
+          payoutWalletAddress: resolvedWallet ?? null,
         }),
         ...(payoutBankDetails !== undefined && {
           payoutBankDetails: payoutBankDetails ?? null,
