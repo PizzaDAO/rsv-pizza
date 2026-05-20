@@ -150,6 +150,44 @@ export function RSVPFormStep2({
         </div>
       )}
 
+      {form.hasAddress && form.nearbyPizzerias.length === 0 && (
+        <div className="mt-6">
+          {form.loadingPizzerias && (
+            <div className="flex items-center justify-center gap-2 py-4 text-theme-text-muted">
+              <Loader2 size={16} className="animate-spin" />
+              <span>{t('step2.findingPizzerias')}</span>
+            </div>
+          )}
+
+          {!form.loadingPizzerias && form.pizzeriaError && (
+            <button
+              type="button"
+              onClick={() => form.fetchNearbyPizzerias()}
+              className="w-full rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300 hover:bg-red-500/20 transition"
+            >
+              {t('step2.findPizzeriasError')}
+            </button>
+          )}
+
+          {!form.loadingPizzerias && !form.pizzeriaError && !form.pizzeriaSearchAttempted && (
+            <button
+              type="button"
+              onClick={() => form.fetchNearbyPizzerias()}
+              className="w-full rounded-2xl border border-dashed border-theme-stroke-hover px-4 py-3 text-sm text-theme-text-muted hover:bg-theme-bg-hover transition flex items-center justify-center gap-2"
+            >
+              <MapPin size={16} />
+              <span>{t('step2.findPizzerias')}</span>
+            </button>
+          )}
+
+          {!form.loadingPizzerias && !form.pizzeriaError && form.pizzeriaSearchAttempted && form.nearbyPizzerias.length === 0 && (
+            <p className="text-sm text-theme-text-muted text-center py-2">
+              {t('step2.noPizzeriasFound')}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Pizzeria Rankings */}
       {form.nearbyPizzerias.length > 0 && (
         <div>
