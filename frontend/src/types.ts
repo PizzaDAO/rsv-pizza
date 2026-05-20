@@ -1616,6 +1616,40 @@ export interface AdminPayoutsResponse {
   totals: AdminPayoutTotals;
 }
 
+/**
+ * bismarck-92103: a "prepay candidate" for an event flagged for prepayment.
+ * Surfaced on the /payments admin dashboard so the admin can issue an
+ * advance to a cohost whose payment method is already on file.
+ */
+export interface PrepayCandidate {
+  userId: string;
+  name: string | null;
+  email: string;
+  method: PayoutMethod;
+  /** For usdc_base — the 0x recipient. Null for other methods. */
+  walletAddress: string | null;
+  /**
+   * For wire — the bank-correspondence email from `payoutBankDetails.email`.
+   * Null is OK; PaymentDetailsCard can fill it in later if needed.
+   */
+  bankEmail: string | null;
+  isPrimaryHost: boolean;
+}
+
+export interface PrepayQueueRow {
+  party: {
+    id: string;
+    name: string;
+    customUrl: string | null;
+    country: string | null;
+    effectiveReimbursementCapUsd: number | null;
+    eventTags: string[];
+  };
+  candidates: PrepayCandidate[];
+  /** True when the admin must disambiguate between ≥2 candidates. */
+  hasMultipleCandidates: boolean;
+}
+
 export interface OcrPreviewResult {
   amount: number;             // USD-converted total
   currency: 'USD';

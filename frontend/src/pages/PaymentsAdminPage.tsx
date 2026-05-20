@@ -13,12 +13,14 @@ import {
   executeAdminPayout,
   getUsdcDailyCapRemaining,
   exportAdminPayoutsCsv,
+  fetchPrepayQueue,
 } from '../lib/api';
 import type {
   AdminPayout,
   AdminPayoutDetail,
   AdminPayoutFilters,
   AdminPayoutTotals,
+  PrepayQueueRow,
 } from '../types';
 import { formatUsd } from '../components/payments-shared';
 import {
@@ -28,6 +30,8 @@ import {
   PaymentsStatsCards,
   BulkActionsBar,
   ExternalPaymentModal,
+  PrepayQueueTable,
+  CreatePrepaymentModal,
 } from '../components/payments-admin';
 
 type RoleState =
@@ -66,6 +70,21 @@ export function PaymentsAdminPage() {
 
   // External payment modal (arugula-38633 v2 follow-up)
   const [showExternalModal, setShowExternalModal] = useState(false);
+
+  // bismarck-92103: prepay queue + the "Create prepayment" modal target row.
+  const [prepayQueue, setPrepayQueue] = useState<PrepayQueueRow[]>([]);
+  const [prepayModalRow, setPrepayModalRow] = useState<PrepayQueueRow | null>(null);
+
+  const loadPrepayQueue = useCallback(async () => {
+    try {
+      const rows = await fetchPrepayQueue();
+      setPrepayQueue(rows);
+    } catch {
+      // Non-fatal — the rest of the dashboard works without it. Silently
+      // collapse the section by leaving the array empty.
+      setPrepayQueue([]);
+    }
+  }, []);
 
   // Role gate
   useEffect(() => {
@@ -110,6 +129,14 @@ export function PaymentsAdminPage() {
     loadPage(filters, false);
   }, [filters, role.kind, loadPage]);
 
+  // bismarck-92103: load the prepay queue once admin is allowed in. It's
+  // independent of the payouts filter set, so it doesn't refetch on filter
+  // changes — only after a prepayment is created (see refresh() below).
+  useEffect(() => {
+    if (role.kind !== 'allowed') return;
+    loadPrepayQueue();
+  }, [role.kind, loadPrepayQueue]);
+
   const availableCurrencies = useMemo(() => {
     const set = new Set<string>();
     for (const p of payouts) {
@@ -140,6 +167,13 @@ export function PaymentsAdminPage() {
 
   async function refresh() {
     await loadPage(filters, false);
+  }
+
+  // bismarck-92103: after a prepayment is created, refresh BOTH the payouts
+  // list (so the new pending payout shows up there) and the prepay queue (so
+  // the source row drops off — it now has an in-flight payout).
+  async function handlePrepaymentCreated() {
+    await Promise.all([refresh(), loadPrepayQueue()]);
   }
 
   async function openDetail(p: AdminPayout) {
@@ -326,6 +360,21 @@ export function PaymentsAdminPage() {
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
 
+        {/* bismarck-92103: Prepay queue — only renders when there's at least
+            one matching party (host flagged prepay + saved payment method,
+            no in-flight payouts). */}
+        {prepayQueue.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-base font-semibold text-theme-text mb-3">
+              Prepay queue ({prepayQueue.length} event{prepayQueue.length === 1 ? '' : 's'})
+            </h2>
+            <PrepayQueueTable
+              rows={prepayQueue}
+              onCreatePrepayment={(row) => setPrepayModalRow(row)}
+            />
+          </section>
+        )}
+
         <PayoutsFilterBar
           filters={filters}
           onChange={setFilters}
@@ -484,6 +533,14 @@ export function PaymentsAdminPage() {
           <ExternalPaymentModal
             onClose={() => setShowExternalModal(false)}
             onCreated={() => refresh()}
+          />
+        )}
+
+        {prepayModalRow && (
+          <CreatePrepaymentModal
+            row={prepayModalRow}
+            onClose={() => setPrepayModalRow(null)}
+            onCreated={handlePrepaymentCreated}
           />
         )}
 

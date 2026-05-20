@@ -510,6 +510,261 @@ router.get(
 );
 
 // ============================================
+// GET /api/admin/payouts/prepay-queue — bismarck-92103
+//
+// Surfaces parties flagged for prepayment (`'prepay' ∈ event_tags`) where at
+// least one host (primary host OR cohost matched by email) has saved a
+// `preferredPayoutMethod` on their User record. Drops parties that already
+// have an in-flight payout (pending/approved/paid) to any candidate — those
+// prepayments are already moving and don't need to be nagged about.
+//
+// Literal `/prepay-queue` MUST be declared before `/:id` so the literal path
+// wins on route matching.
+// ============================================
+router.get(
+  '/prepay-queue',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      // 1. All approved parties flagged for prepayment, with their primary host.
+      const parties = await prisma.party.findMany({
+        where: {
+          eventTags: { has: 'prepay' },
+          underbossStatus: 'approved',
+        },
+        select: {
+          id: true,
+          name: true,
+          customUrl: true,
+          country: true,
+          eventTags: true,
+          reimbursementCapUsd: true,
+          coHosts: true,
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              preferredPayoutMethod: true,
+              payoutWalletAddress: true,
+              payoutBankDetails: true,
+            },
+          },
+        },
+      });
+
+      // Filter out parties with no effective cap — nothing to prepay against.
+      const partiesWithCap = parties
+        .map(p => ({
+          p,
+          cap: computeEffectiveCapUsd({
+            reimbursementCapUsd: p.reimbursementCapUsd,
+            eventTags: p.eventTags,
+          }),
+        }))
+        .filter(({ cap }) => cap != null && cap > 0);
+
+      if (partiesWithCap.length === 0) {
+        res.json({ rows: [] });
+        return;
+      }
+
+      // 2. Collect all cohost emails across the surviving parties.
+      const cohostEmails = new Set<string>();
+      for (const { p } of partiesWithCap) {
+        const list = Array.isArray(p.coHosts) ? (p.coHosts as any[]) : [];
+        for (const ch of list) {
+          if (ch && typeof ch === 'object' && typeof ch.email === 'string' && ch.email.trim()) {
+            cohostEmails.add(ch.email.trim().toLowerCase());
+          }
+        }
+      }
+
+      // 3. Resolve cohost emails → User rows (one batched query).
+      const cohostUsers = cohostEmails.size
+        ? await prisma.user.findMany({
+            where: { email: { in: Array.from(cohostEmails) } },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              preferredPayoutMethod: true,
+              payoutWalletAddress: true,
+              payoutBankDetails: true,
+            },
+          })
+        : [];
+      const cohostUserByEmail = new Map<string, typeof cohostUsers[number]>();
+      for (const u of cohostUsers) {
+        cohostUserByEmail.set(u.email.toLowerCase(), u);
+      }
+
+      // 4. For each party, build the candidate list. Primary host first (if
+      //    they have a method), then cohost users with methods.
+      type CandidateInternal = {
+        userId: string;
+        name: string | null;
+        email: string;
+        method: 'mercury_card' | 'wire' | 'usdc_base';
+        walletAddress: string | null;
+        bankEmail: string | null;
+        isPrimaryHost: boolean;
+      };
+
+      function buildCandidate(
+        u: {
+          id: string;
+          name: string | null;
+          email: string;
+          preferredPayoutMethod: string | null;
+          payoutWalletAddress: string | null;
+          payoutBankDetails: any;
+        },
+        isPrimaryHost: boolean,
+      ): CandidateInternal | null {
+        const method = u.preferredPayoutMethod;
+        if (method !== 'mercury_card' && method !== 'wire' && method !== 'usdc_base') {
+          return null;
+        }
+        // For wire, dig bankEmail out of payoutBankDetails JSONB. Null is fine
+        // — PaymentDetailsCard will fill it in at payout-create time.
+        let bankEmail: string | null = null;
+        if (method === 'wire' && u.payoutBankDetails && typeof u.payoutBankDetails === 'object') {
+          const raw = (u.payoutBankDetails as any).email;
+          if (typeof raw === 'string' && raw.trim()) {
+            bankEmail = raw.trim();
+          }
+        }
+        return {
+          userId: u.id,
+          name: u.name,
+          email: u.email,
+          method,
+          walletAddress: method === 'usdc_base' ? u.payoutWalletAddress : null,
+          bankEmail,
+          isPrimaryHost,
+        };
+      }
+
+      type AssembledRow = {
+        partyMeta: {
+          id: string;
+          name: string;
+          customUrl: string | null;
+          country: string | null;
+          effectiveReimbursementCapUsd: number | null;
+          eventTags: string[];
+        };
+        candidates: CandidateInternal[];
+      };
+
+      const assembled: AssembledRow[] = [];
+
+      for (const { p, cap } of partiesWithCap) {
+        const candidates: CandidateInternal[] = [];
+        const seenUserIds = new Set<string>();
+
+        // Primary host first.
+        if (p.user) {
+          const c = buildCandidate(p.user, true);
+          if (c) {
+            candidates.push(c);
+            seenUserIds.add(c.userId);
+          }
+        }
+
+        // Cohosts (dedupe against the primary host id).
+        const cohostList = Array.isArray(p.coHosts) ? (p.coHosts as any[]) : [];
+        for (const ch of cohostList) {
+          if (!ch || typeof ch !== 'object') continue;
+          const email = typeof ch.email === 'string' ? ch.email.trim().toLowerCase() : '';
+          if (!email) continue;
+          const u = cohostUserByEmail.get(email);
+          if (!u) continue;
+          if (seenUserIds.has(u.id)) continue;
+          const c = buildCandidate(u, false);
+          if (!c) continue;
+          candidates.push(c);
+          seenUserIds.add(c.userId);
+        }
+
+        if (candidates.length === 0) continue;
+
+        assembled.push({
+          partyMeta: {
+            id: p.id,
+            name: p.name,
+            customUrl: p.customUrl,
+            country: p.country,
+            effectiveReimbursementCapUsd: cap,
+            eventTags: p.eventTags,
+          },
+          candidates,
+        });
+      }
+
+      if (assembled.length === 0) {
+        res.json({ rows: [] });
+        return;
+      }
+
+      // 5. For each assembled row, drop it if ANY candidate already has an
+      //    in-flight payout for that party. "In-flight" = pending/approved/paid
+      //    (failed/rejected don't count — that prepayment never went through).
+      //    Run as a single grouped query: pull all matching payouts and bucket
+      //    by partyId in memory.
+      const partyIds = assembled.map(r => r.partyMeta.id);
+      const allCandidateUserIds = new Set<string>();
+      for (const r of assembled) {
+        for (const c of r.candidates) {
+          allCandidateUserIds.add(c.userId);
+        }
+      }
+
+      const inFlight = allCandidateUserIds.size
+        ? await prisma.payout.findMany({
+            where: {
+              partyId: { in: partyIds },
+              hostUserId: { in: Array.from(allCandidateUserIds) },
+              status: { in: ['pending', 'approved', 'paid'] },
+            },
+            select: { partyId: true, hostUserId: true },
+          })
+        : [];
+
+      const inFlightByParty = new Map<string, Set<string>>();
+      for (const row of inFlight) {
+        let set = inFlightByParty.get(row.partyId);
+        if (!set) {
+          set = new Set<string>();
+          inFlightByParty.set(row.partyId, set);
+        }
+        set.add(row.hostUserId);
+      }
+
+      const finalRows = assembled
+        .filter(r => {
+          const inFlightSet = inFlightByParty.get(r.partyMeta.id);
+          if (!inFlightSet || inFlightSet.size === 0) return true;
+          // If ANY candidate has an in-flight payout, drop the row entirely.
+          return !r.candidates.some(c => inFlightSet.has(c.userId));
+        })
+        .map(r => ({
+          party: r.partyMeta,
+          candidates: r.candidates,
+          hasMultipleCandidates: r.candidates.length > 1,
+        }));
+
+      res.json({ rows: finalRows });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // POST /api/admin/payouts/external — record an OUT-OF-BAND payment
 //   - For payments that happened OUTSIDE the rsv.pizza flow (Venmo, manual
 //     bank transfer, etc.). Creates a payout row in `paid` status immediately

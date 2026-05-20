@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -3949,6 +3949,18 @@ export async function recordExternalPayment(
 }
 
 /**
+ * bismarck-92103: list approved parties flagged for prepayment whose host(s)
+ * have a saved payment method, excluding parties that already have an
+ * in-flight payout. Surfaced as the "Prepay queue" section on /payments.
+ */
+export async function fetchPrepayQueue(): Promise<PrepayQueueRow[]> {
+  const res = await apiRequest<{ rows: PrepayQueueRow[] }>(
+    '/api/admin/payouts/prepay-queue',
+  );
+  return res.rows;
+}
+
+/**
  * Get the running 24h USDC payout usage + remaining cap (PR 5). Used to render
  * the "Daily cap remaining: $X" hint before the admin confirms a USDC execute.
  */
@@ -4032,6 +4044,15 @@ export interface CreatePayoutData {
    * the party's current value is null. Sent only on the host's first payout.
    */
   estimatedAttendance?: number;
+  /**
+   * bismarck-92103: admin-only override. When set AND caller is an admin,
+   * the resulting Payout row is credited to this User (the recipient cohost)
+   * instead of the calling admin. Non-admin callers passing this field are
+   * silently ignored server-side.
+   */
+  recipientHostUserId?: string;
+  /** Optional admin-supplied note stored on the new payout. */
+  adminNotes?: string;
 }
 
 export async function createPayout(
