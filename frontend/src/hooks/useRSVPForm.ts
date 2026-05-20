@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
@@ -329,38 +329,16 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     }
   }, [isOpen, isEditing, existingGuest]);
 
-  // Fetch pizzerias based on event data
+  // Use host-preselected pizzerias only (no auto-search — avoids Google Places billing).
+  // chorizo-72831
   useEffect(() => {
-    async function fetchPizzerias() {
-      if (!isOpen) return;
-
-      // If host has selected specific pizzerias, use those
-      if (eventData.selectedPizzerias && eventData.selectedPizzerias.length > 0) {
-        setNearbyPizzerias(eventData.selectedPizzerias);
-        if (eventData.address) {
-          geocodeAddress(eventData.address).then(loc => { if (loc) setVenueLocation(loc); });
-        }
-        return;
-      }
-
-      // Otherwise, fall back to auto-fetching based on address
-      if (!eventData.address) return;
-
-      setLoadingPizzerias(true);
-      try {
-        const location = await geocodeAddress(eventData.address);
-        if (location) setVenueLocation(location);
-        if (location) {
-          const results = await searchPizzerias(location.lat, location.lng);
-          setNearbyPizzerias(results.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('Failed to fetch pizzerias:', err);
-      } finally {
-        setLoadingPizzerias(false);
+    if (!isOpen) return;
+    if (eventData.selectedPizzerias && eventData.selectedPizzerias.length > 0) {
+      setNearbyPizzerias(eventData.selectedPizzerias);
+      if (eventData.address) {
+        geocodeAddress(eventData.address).then(loc => { if (loc) setVenueLocation(loc); });
       }
     }
-    fetchPizzerias();
   }, [eventData.address, eventData.selectedPizzerias, isOpen]);
 
   // ---- Handlers ----

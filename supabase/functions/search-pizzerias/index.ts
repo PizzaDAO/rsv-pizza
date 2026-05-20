@@ -10,6 +10,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// chorizo-72831: in-memory cache to avoid re-billing Google Places for the same coords.
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 1000;
+interface CacheEntry { payload: unknown; expiresAt: number; }
+const responseCache = new Map<string, CacheEntry>();
+
+function cacheKey(lat: number, lng: number, radius: number): string {
+  return `${lat.toFixed(3)}_${lng.toFixed(3)}_${radius}`;
+}
+
+function getCached(key: string): unknown | null {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    responseCache.delete(key);
+    return null;
+  }
+  // refresh LRU position
+  responseCache.delete(key);
+  responseCache.set(key, entry);
+  return entry.payload;
+}
+
+function setCached(key: string, payload: unknown): void {
+  if (responseCache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest) responseCache.delete(oldest);
+  }
+  responseCache.set(key, { payload, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
 interface SearchRequest {
   lat: number;
   lng: number;
@@ -169,6 +200,17 @@ serve(async (req) => {
       );
     }
 
+    const key = cacheKey(lat, lng, radius);
+    const cached = getCached(key);
+    const successHeaders = {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+    };
+    if (cached) {
+      return new Response(JSON.stringify(cached), { headers: successHeaders });
+    }
+
     // Search for pizzerias
     const pizzerias = await searchGooglePlaces(lat, lng, radius);
 
@@ -194,10 +236,9 @@ serve(async (req) => {
     };
     pizzerias.sort((a, b) => getScore(b) - getScore(a));
 
-    return new Response(
-      JSON.stringify({ pizzerias }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const payload = { pizzerias };
+    setCached(key, payload);
+    return new Response(JSON.stringify(payload), { headers: successHeaders });
   } catch (error) {
     console.error('Search error:', error);
     return new Response(
