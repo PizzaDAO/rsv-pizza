@@ -173,13 +173,13 @@ const apps: AppItem[] = [
     tab: 'report',
   },
   {
-    id: 'payouts',
+    id: 'payments',
     name: 'Payments',
     description: 'Submit receipts for host payment',
     icon: Receipt,
     status: 'live',
     category: 'after-party',
-    tab: 'payouts',
+    tab: 'payments',
   },
   {
     id: 'merch',
@@ -404,7 +404,7 @@ export function AppsHub({
   }, []);
 
   const visibleApps = apps.map((a) => {
-    if (a.id === 'payouts' && canUsePayouts === false) {
+    if (a.id === 'payments' && canUsePayouts === false) {
       return { ...a, status: 'coming-soon' as const };
     }
     return a;
