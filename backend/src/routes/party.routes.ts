@@ -1038,6 +1038,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             inviteCode: true,
             customUrl: true,
             eventImageUrl: true,
+            venueName: true,
           },
         });
 
@@ -1051,6 +1052,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             partyTimezone: party.timezone,
             partyAddress: party.address,
             partyImageUrl: party.eventImageUrl,
+            venueName: party.venueName,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,
           });
