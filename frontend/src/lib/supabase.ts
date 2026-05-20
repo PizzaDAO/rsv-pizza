@@ -1822,6 +1822,7 @@ export async function updateParty(
     event_image_url?: string | null;
     max_guests?: number | null;
     expected_guests?: number | null;
+    event_tags?: string[];
     hide_guests?: boolean;
     require_approval?: boolean;
     co_hosts?: any[];
@@ -1893,6 +1894,7 @@ export async function updateParty(
         venueNotes: updates.venueNotes,
         maxGuests: updates.max_guests,
         expectedGuests: updates.expected_guests,
+        eventTags: updates.event_tags,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
         availableBeverages: updates.available_beverages,
