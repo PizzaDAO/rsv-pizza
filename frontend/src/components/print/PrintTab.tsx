@@ -35,7 +35,8 @@ interface NameTag {
 interface Shirt {
   id: string;
   name: string;
-  preview: string;
+  frontPreview: string;
+  backPreview: string;
   frontPdf: string;
   backPdf: string;
 }
@@ -102,7 +103,8 @@ const SHIRTS: Shirt[] = [
   {
     id: 'gpp2026-shirt',
     name: 'Global Pizza Party Shirt',
-    preview: '/print-assets/shirts/gpp2026-shirt-preview.png',
+    frontPreview: '/print-assets/shirts/gpp2026-shirt-front-preview.png',
+    backPreview: '/print-assets/shirts/gpp2026-shirt-back-preview.png',
     frontPdf: '/print-assets/shirts/gpp2026-shirt-front.pdf',
     backPdf: '/print-assets/shirts/gpp2026-shirt-back.pdf',
   },
@@ -357,13 +359,23 @@ function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: stri
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {SHIRTS.map((shirt) => (
             <div key={shirt.id} className="card p-4 flex flex-col items-center gap-3">
-              <div className="w-full aspect-video flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
-                <img
-                  src={shirt.preview}
-                  alt={shirt.name}
-                  className="max-w-full max-h-full object-contain"
-                  loading="lazy"
-                />
+              <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                  <img
+                    src={shirt.frontPreview}
+                    alt={`${shirt.name} front`}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="aspect-square flex items-center justify-center overflow-hidden rounded-lg bg-theme-surface">
+                  <img
+                    src={shirt.backPreview}
+                    alt={`${shirt.name} back`}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
               </div>
               <div className="text-center w-full">
                 <p className="text-sm font-medium text-theme-text leading-tight">{shirt.name}</p>
