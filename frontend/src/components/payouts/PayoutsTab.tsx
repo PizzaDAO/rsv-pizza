@@ -180,29 +180,53 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         PartyHeader, /underboss EventRow, and NewPayoutForm's first-time
         prompt — single source of truth.
       */}
-      {/* Cap banner (arugula-38633 v2): always visible at the top of the
-          Payments section. When the underboss has set a cap (or a numeric
-          event_tag fallback exists), shows the value. When neither exists,
-          shows the prompt to set expected_guests + contact underboss. */}
-      {typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0 ? (
-        <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
-          <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-          <div className="text-sm font-medium text-theme-text">
-            We'll reimburse you for up to ${effectiveReimbursementCapUsd.toFixed(2)}
-            {partyKitCapUsd != null && (
-              <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
-            )}
-            .
+      {/* Top banner priority (arugula-38633 v3):
+          1. Missing expected_guests or location → actionable "Set your X to
+             get your funding approved" (host can act on it)
+          2. Both set, no cap yet → "No cap set. Contact your underboss"
+          3. Cap set → emerald cap banner */}
+      {(() => {
+        const needsExpectedGuests = !party?.expectedGuests || party.expectedGuests <= 0;
+        const needsLocation = !party?.address;
+        const hasCap = typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0;
+
+        if (needsExpectedGuests || needsLocation) {
+          const msg =
+            needsExpectedGuests && needsLocation
+              ? 'Set your expected guests and your location to get your funding approved.'
+              : needsExpectedGuests
+                ? 'Set your expected guests to get your funding approved.'
+                : 'Set your location to get your funding approved.';
+          return (
+            <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
+              <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm font-medium text-theme-text">{msg}</div>
+            </div>
+          );
+        }
+        if (hasCap) {
+          return (
+            <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
+              <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm font-medium text-theme-text">
+                We'll reimburse you for up to ${effectiveReimbursementCapUsd!.toFixed(2)}
+                {partyKitCapUsd != null && (
+                  <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
+                )}
+                .
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
+            <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="text-sm font-medium text-theme-text">
+              No cap set. Contact your underboss to get your funding approved.
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
-          <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
-          <div className="text-sm font-medium text-theme-text">
-            No cap set. Set your expected guests and contact your underboss.
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       <PrepayCheckbox partyId={partyId} />
 
