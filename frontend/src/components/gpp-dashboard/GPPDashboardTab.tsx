@@ -11,7 +11,7 @@ import { FindVenueModal } from '../checklist/FindVenueModal';
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
-  const { party, guests } = usePizza();
+  const { party, guests, loadParty } = usePizza();
   const [autoStates, setAutoStates] = useState<AutoCompleteStates | null>(null);
   const [dbItems, setDbItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +203,7 @@ export const GPPDashboardTab: React.FC = () => {
                 setSaving(true);
                 try {
                   await updateUnderbossStatus(party.id, 'listed');
-                  window.location.reload();
+                  if (party?.inviteCode) await loadParty(party.inviteCode);
                 } catch (err) {
                   console.error('Failed to update status:', err);
                 } finally {
@@ -221,7 +221,7 @@ export const GPPDashboardTab: React.FC = () => {
                 setSaving(true);
                 try {
                   await updateUnderbossStatus(party.id, 'hidden');
-                  window.location.reload();
+                  if (party?.inviteCode) await loadParty(party.inviteCode);
                 } catch (err) {
                   console.error('Failed to update status:', err);
                 } finally {

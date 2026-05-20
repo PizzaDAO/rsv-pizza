@@ -142,6 +142,9 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
         ...v,
         isSelected: v.id === venueId ? false : v.isSelected,
       })));
+      // Notify parent to refresh party data so address/venue_name clears
+      // from the Settings tab without a full page reload.
+      onVenueSelect?.();
     } catch (error) {
       console.error('Error deselecting venue:', error);
     } finally {
