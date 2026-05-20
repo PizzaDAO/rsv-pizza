@@ -122,11 +122,17 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                     {payout.payoutWalletAddress}
                   </p>
                 )}
-                {payout.payoutMethod === 'wire' && payout.payoutBankDetails && (
-                  <p className="text-xs text-theme-text-muted mt-1">
-                    {payout.payoutBankDetails.accountHolderName} • {payout.payoutBankDetails.bankName}
-                  </p>
-                )}
+                {payout.payoutMethod === 'wire' && payout.payoutBankDetails && (() => {
+                  // arugula-38633 (follow-up): wire is now a single email
+                  // field. Render the email for new rows; legacy rows still
+                  // have the full account-holder + bank-name pair.
+                  const b = payout.payoutBankDetails;
+                  const legacy = [b.accountHolderName, b.bankName].filter(Boolean).join(' • ');
+                  const text = b.email || legacy;
+                  return text ? (
+                    <p className="text-xs text-theme-text-muted mt-1">{text}</p>
+                  ) : null;
+                })()}
                 {payout.payoutMethod === 'mercury_card' && payout.mercuryCardLast4 && (
                   <p className="text-xs text-theme-text-muted mt-1">
                     Card ending •••• {payout.mercuryCardLast4}

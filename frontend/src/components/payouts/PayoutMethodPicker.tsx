@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, Banknote, Coins, User, Building, Globe, Wallet } from 'lucide-react';
+import { CreditCard, Banknote, Coins, Mail, Wallet } from 'lucide-react';
 import { PayoutMethod, BankDetails } from '../../types';
 import { IconInput } from '../IconInput';
 
@@ -13,19 +13,21 @@ interface PayoutMethodPickerProps {
   bankDetails: BankDetails;
   onBankDetailsChange: (b: BankDetails) => void;
 
-  /** Email shown to user for the Mercury card destination. */
+  /** Email shown to user for the Mercury card destination + prefilled for wire. */
   userEmail?: string;
-  /** Amount in USD, used in copy. */
-  amountUsd: number;
+  /**
+   * arugula-38633 (follow-up): the host's effective reimbursement cap. Used in
+   * the Mercury copy so the host understands the card has a LIMIT, not a fixed
+   * per-receipt amount. When null, we omit the dollar amount entirely.
+   */
+  reimbursementCapUsd?: number | null;
 }
-
-type BankMode = 'us' | 'intl';
 
 /**
  * Radio picker for payout method, with method-specific sub-form.
  *
  *   mercury_card → just a confirmation that we'll email a virtual card
- *   wire         → IconInput grid for bank details (US or international toggle)
+ *   wire         → single email field (our bank emails the host to complete)
  *   usdc_base    → wallet address IconInput
  */
 export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
@@ -36,11 +38,21 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
   bankDetails,
   onBankDetailsChange,
   userEmail,
-  amountUsd,
+  reimbursementCapUsd,
 }) => {
-  const [bankMode, setBankMode] = React.useState<BankMode>(
-    bankDetails.iban || bankDetails.swift ? 'intl' : 'us'
-  );
+  // For wire: prefill the field from the user's auth email if no saved value.
+  // We mirror this into bankDetails on first render of the wire branch so the
+  // auto-save persists it even if the host doesn't touch the field.
+  const wireEmail = bankDetails.email ?? userEmail ?? '';
+  React.useEffect(() => {
+    if (method !== 'wire') return;
+    if (bankDetails.email !== undefined) return; // already set (incl. empty string)
+    if (!userEmail) return;
+    onBankDetailsChange({ ...bankDetails, email: userEmail });
+    // We only want to seed on the first transition into wire mode; deps below
+    // intentionally exclude bankDetails/onBankDetailsChange so we don't loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, userEmail]);
 
   const Option: React.FC<{
     value: PayoutMethod;
@@ -86,13 +98,13 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
           value="usdc_base"
           icon={<Coins size={18} />}
           title="USDC on Base"
-          description="On-chain payment to your wallet."
+          description="Onchain payment to your wallet."
         />
         <Option
           value="mercury_card"
           icon={<CreditCard size={18} />}
           title="Mercury virtual card"
-          description="We email you a debit card for the exact amount."
+          description="We issue you a debit card for the exact amount."
         />
         <Option
           value="wire"
@@ -105,13 +117,14 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
       {method === 'mercury_card' && (
         <div className="rounded-xl border border-theme-stroke bg-theme-surface p-4 text-sm text-theme-text-secondary">
           <p>
-            We'll issue you a Mercury virtual debit card for{' '}
-            <span className="text-theme-text font-semibold">${amountUsd.toFixed(2)} USD</span>.
-            Mercury will email the card details
-            {userEmail ? <> directly to <span className="text-theme-text">{userEmail}</span></> : ' to the email on your account'}.
-          </p>
-          <p className="mt-2 text-xs text-theme-text-muted">
-            No card or bank info needs to leave RSV.Pizza.
+            We'll issue you a Mercury virtual debit card
+            {typeof reimbursementCapUsd === 'number' && reimbursementCapUsd > 0 ? (
+              <>
+                {' '}with a limit of{' '}
+                <span className="text-theme-text font-semibold">${reimbursementCapUsd.toFixed(2)}</span>
+              </>
+            ) : null}
+            .
           </p>
         </div>
       )}
@@ -134,93 +147,18 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
       )}
 
       {method === 'wire' && (
-        <div className="space-y-3">
-          {/* US vs intl toggle */}
-          <div className="inline-flex rounded-lg border border-theme-stroke overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setBankMode('us')}
-              className={`px-3 py-1.5 text-xs font-medium ${
-                bankMode === 'us' ? 'bg-[#ff393a] text-white' : 'text-theme-text-secondary'
-              }`}
-            >
-              US bank
-            </button>
-            <button
-              type="button"
-              onClick={() => setBankMode('intl')}
-              className={`px-3 py-1.5 text-xs font-medium ${
-                bankMode === 'intl' ? 'bg-[#ff393a] text-white' : 'text-theme-text-secondary'
-              }`}
-            >
-              International
-            </button>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <IconInput
-              icon={User}
-              type="text"
-              placeholder="Account holder name"
-              value={bankDetails.accountHolderName || ''}
-              onChange={e => onBankDetailsChange({ ...bankDetails, accountHolderName: e.target.value })}
-              required
-            />
-            <IconInput
-              icon={Building}
-              type="text"
-              placeholder="Bank name"
-              value={bankDetails.bankName || ''}
-              onChange={e => onBankDetailsChange({ ...bankDetails, bankName: e.target.value })}
-              required
-            />
-            {bankMode === 'us' ? (
-              <>
-                <IconInput
-                  type="text"
-                  placeholder="Routing number"
-                  value={bankDetails.routingNumber || ''}
-                  onChange={e => onBankDetailsChange({ ...bankDetails, routingNumber: e.target.value })}
-                  required
-                />
-                <IconInput
-                  type="text"
-                  placeholder="Account number"
-                  value={bankDetails.accountNumber || ''}
-                  onChange={e => onBankDetailsChange({ ...bankDetails, accountNumber: e.target.value })}
-                  required
-                />
-              </>
-            ) : (
-              <>
-                <IconInput
-                  icon={Globe}
-                  type="text"
-                  placeholder="IBAN"
-                  value={bankDetails.iban || ''}
-                  onChange={e => onBankDetailsChange({ ...bankDetails, iban: e.target.value })}
-                />
-                <IconInput
-                  type="text"
-                  placeholder="SWIFT / BIC"
-                  value={bankDetails.swift || ''}
-                  onChange={e => onBankDetailsChange({ ...bankDetails, swift: e.target.value })}
-                />
-              </>
-            )}
-            <IconInput
-              type="text"
-              placeholder="Bank address (optional)"
-              value={bankDetails.bankAddress || ''}
-              onChange={e => onBankDetailsChange({ ...bankDetails, bankAddress: e.target.value })}
-            />
-            <IconInput
-              type="text"
-              placeholder="Notes (intermediary bank, etc.)"
-              value={bankDetails.notes || ''}
-              onChange={e => onBankDetailsChange({ ...bankDetails, notes: e.target.value })}
-            />
-          </div>
+        <div className="space-y-2">
+          <IconInput
+            icon={Mail}
+            type="email"
+            placeholder="Email for bank correspondence"
+            value={wireEmail}
+            onChange={e => onBankDetailsChange({ ...bankDetails, email: e.target.value })}
+            required
+          />
+          <p className="text-xs text-theme-text-muted">
+            We'll send you an email from our bank to complete the transaction.
+          </p>
         </div>
       )}
     </div>

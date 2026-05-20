@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePizza } from '../../contexts/PizzaContext';
 import { BankDetails, PayoutMethod } from '../../types';
 import { updateUserMe } from '../../lib/api';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
 
-const EMPTY_BANK: BankDetails = {
-  accountHolderName: '',
-  bankName: '',
-};
+const EMPTY_BANK: BankDetails = {};
+
+// Loose email check — same shape used elsewhere in the app (e.g. invite forms).
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
@@ -29,6 +30,7 @@ type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
  */
 export const PaymentDetailsCard: React.FC = () => {
   const { user, setUser } = useAuth();
+  const { party } = usePizza();
 
   // Local mirrors of the user's persisted values. These drive PayoutMethodPicker
   // directly so the UI updates instantly; the debounced save flushes to the
@@ -68,6 +70,7 @@ export const PaymentDetailsCard: React.FC = () => {
   useEffect(() => {
     if (
       user?.payoutBankDetails !== undefined
+      && !bankDetails.email
       && !bankDetails.accountHolderName
       && !bankDetails.bankName
     ) {
@@ -84,10 +87,10 @@ export const PaymentDetailsCard: React.FC = () => {
       return /^0x[0-9a-fA-F]{40}$/.test(walletAddress.trim());
     }
     if (method === 'wire') {
-      if (!bankDetails.accountHolderName?.trim() || !bankDetails.bankName?.trim()) return false;
-      const hasUs = !!bankDetails.routingNumber?.trim() && !!bankDetails.accountNumber?.trim();
-      const hasIntl = !!bankDetails.iban?.trim() || !!bankDetails.swift?.trim();
-      return hasUs || hasIntl;
+      // arugula-38633 (follow-up): wire is now a single email field —
+      // our bank emails the host to complete the transaction.
+      const email = bankDetails.email?.trim() ?? '';
+      return EMAIL_REGEX.test(email);
     }
     return true; // mercury_card has no extra required fields
   }, [method, walletAddress, bankDetails]);
@@ -180,13 +183,9 @@ export const PaymentDetailsCard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, walletAddress, bankDetails, methodValid]);
 
-  // PayoutMethodPicker requires non-null method + an amount. For the empty
-  // state we let the user pick a method first; the picker still renders all
-  // three radios and we treat "no method yet" as $0 in the Mercury copy line.
-  // (Mercury copy reads "$0.00 USD" until the host submits an actual receipt;
-  // that's fine — this card is about saving the destination, not amounts.)
+  // PayoutMethodPicker requires non-null method. For the empty state we let
+  // the user pick a method first; the picker still renders all three radios.
   const pickerMethod: PayoutMethod = method ?? 'mercury_card';
-  const hasNothingYet = method == null;
 
   return (
     <div className="card p-6">
@@ -195,10 +194,6 @@ export const PaymentDetailsCard: React.FC = () => {
           <h3 className="text-base font-semibold text-theme-text">
             Payment details
           </h3>
-          <p className="text-xs text-theme-text-muted mt-1">
-            How do you want to be paid when your receipts are approved? We'll save
-            this for every future receipt.
-          </p>
         </div>
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           {saveStatus === 'saving' && (
@@ -225,13 +220,6 @@ export const PaymentDetailsCard: React.FC = () => {
         </div>
       </div>
 
-      {hasNothingYet && (
-        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-theme-text-secondary">
-          Pick a payout method below to enable receipt submissions. You only have
-          to do this once.
-        </div>
-      )}
-
       <PayoutMethodPicker
         method={pickerMethod}
         onMethodChange={(next) => {
@@ -244,7 +232,7 @@ export const PaymentDetailsCard: React.FC = () => {
         bankDetails={bankDetails}
         onBankDetailsChange={setBankDetails}
         userEmail={user?.email}
-        amountUsd={0}
+        reimbursementCapUsd={party?.effectiveReimbursementCapUsd ?? null}
       />
 
       {saveError && (
