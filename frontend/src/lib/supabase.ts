@@ -1764,7 +1764,8 @@ export async function getAllParties(): Promise<DbParty[]> {
 // Subscribe to guest changes (real-time)
 export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[]) => void) {
   const channel = supabase
-    .channel(`guests:${partyId}`)
+    // Unique channel name per subscription: HostPage and DayOfDashboard can both call this with the same partyId, and Supabase realtime throws "cannot add 'postgres_changes' callbacks after subscribe()" if the channel is reused. nduja-91384 prod incident 2026-05-20.
+    .channel(`guests:${partyId}:${crypto.randomUUID()}`)
     .on(
       'postgres_changes',
       {
