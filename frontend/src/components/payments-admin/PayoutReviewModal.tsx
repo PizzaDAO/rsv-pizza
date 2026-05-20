@@ -166,6 +166,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.party.name}
               </a>
             </div>
+            {/* arugula-38633 v2 follow-up: planning vs actuals, prominent. */}
+            <div
+              className="text-xs text-theme-text-secondary mt-1"
+              title="Expected guests is the host's planning number. Confirmed RSVPs are direct submissions only (excludes bulk invites)."
+            >
+              <span className="font-medium">Expected guests:</span>{' '}
+              {payout.party.expectedGuests != null ? payout.party.expectedGuests : '—'}
+              {' · '}
+              <span className="font-medium">Confirmed RSVPs:</span>{' '}
+              {payout.party.rsvpCount}
+            </div>
           </div>
           <button
             type="button"
