@@ -96,7 +96,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             value={filters.payoutMethod ?? 'all'}
             onChange={(e) => update({ payoutMethod: e.target.value as PayoutMethod | 'all' })}
             className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-            aria-label="Filter by reimbursement method"
+            aria-label="Filter by payment method"
           >
             {METHOD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>

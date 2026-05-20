@@ -213,7 +213,7 @@ async function isUnderbossOrAdmin(email?: string): Promise<boolean> {
 async function assertCanUsePayouts(req: AuthRequest): Promise<void> {
   if (!(await isUnderbossOrAdmin(req.userEmail))) {
     throw new AppError(
-      'The reimbursements feature is currently in soft launch for underbosses and admins only.',
+      'The payments feature is currently in soft launch for underbosses and admins only.',
       403,
       'FORBIDDEN',
     );
@@ -453,7 +453,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
 
     if (finalUsd <= 0) {
       throw new AppError(
-        'Could not determine reimbursement amount — OCR returned $0 for all receipts and no manual amount was provided',
+        'Could not determine payment amount — OCR returned $0 for all receipts and no manual amount was provided',
         400,
         'INVALID_AMOUNT'
       );
@@ -572,7 +572,7 @@ router.get('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response
     });
 
     if (!payout) {
-      throw new AppError('Reimbursement not found', 404, 'NOT_FOUND');
+      throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
 
     res.json({ payout: serializePayout(payout) });
@@ -604,11 +604,11 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       where: { id: payoutId, partyId },
     });
     if (!existing) {
-      throw new AppError('Reimbursement not found', 404, 'NOT_FOUND');
+      throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
     if (existing.status !== 'pending') {
       throw new AppError(
-        'Reimbursements can only be edited while pending; this one is ' + existing.status,
+        'Payments can only be edited while pending; this one is ' + existing.status,
         400,
         'PAYOUT_NOT_PENDING'
       );
@@ -684,11 +684,11 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
       where: { id: payoutId, partyId },
     });
     if (!existing) {
-      throw new AppError('Reimbursement not found', 404, 'NOT_FOUND');
+      throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
     if (existing.status !== 'pending') {
       throw new AppError(
-        'Only pending reimbursements can be cancelled',
+        'Only pending payments can be cancelled',
         400,
         'PAYOUT_NOT_PENDING'
       );

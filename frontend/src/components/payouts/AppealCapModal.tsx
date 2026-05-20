@@ -80,7 +80,7 @@ export const AppealCapModal: React.FC<AppealCapModalProps> = ({
         </button>
 
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-theme-text mb-1">Appeal reimbursement cap</h2>
+          <h2 className="text-xl font-bold text-theme-text mb-1">Appeal payment cap</h2>
           <p className="text-sm text-theme-text-muted">
             Your cap is currently <span className="font-medium text-theme-text">${capUsd.toFixed(2)}</span>.
             Tell us why it should be higher and an underboss will review.

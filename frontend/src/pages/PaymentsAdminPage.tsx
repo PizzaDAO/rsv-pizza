@@ -97,7 +97,7 @@ export function PaymentsAdminPage() {
       setTotals(res.totals);
       setNextCursor(res.nextCursor);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load reimbursements');
+      setErrorMsg(err.message || 'Failed to load payments');
     } finally {
       if (append) setLoadingMore(false);
       else setLoading(false);
@@ -149,7 +149,7 @@ export function PaymentsAdminPage() {
       const d = await getAdminPayout(p.id);
       setDetail(d);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load reimbursement');
+      setErrorMsg(err.message || 'Failed to load payment');
     } finally {
       setDetailLoading(false);
     }
@@ -198,7 +198,7 @@ export function PaymentsAdminPage() {
 
   async function handleBulkApprove() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Approve ${selectedIds.size} reimbursements?`)) return;
+    if (!window.confirm(`Approve ${selectedIds.size} payments?`)) return;
     setBulkBusy(true);
     try {
       for (const id of Array.from(selectedIds)) {
@@ -229,7 +229,7 @@ export function PaymentsAdminPage() {
 
   async function handleBulkMarkPaid() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Mark ${selectedIds.size} reimbursements as paid (no transaction refs)?`)) return;
+    if (!window.confirm(`Mark ${selectedIds.size} payments as paid (no transaction refs)?`)) return;
     setBulkBusy(true);
     try {
       for (const id of Array.from(selectedIds)) {
@@ -297,7 +297,7 @@ export function PaymentsAdminPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-theme-text">Host Payments</h1>
             <p className="text-sm text-theme-text-muted">
-              Review, approve, and pay out host reimbursements ({role.role.replace('_', ' ')})
+              Review, approve, and pay out host payments ({role.role.replace('_', ' ')})
             </p>
           </div>
           {totals && totals.totalUsdPending > 0 && (

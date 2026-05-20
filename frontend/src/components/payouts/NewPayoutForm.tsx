@@ -164,7 +164,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       });
       onCreated(created);
     } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit reimbursement');
+      setSubmitError(err?.message || 'Failed to submit payment');
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +182,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             <BadgeDollarSign size={22} className="text-[#ff393a] mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-theme-text">
-                We'll reimburse you up to ${reimbursementCapUsd!.toFixed(2)}.
+                We'll reimburse you for up to ${reimbursementCapUsd!.toFixed(2)}.
                 {totalPaidUsd > 0 && (
                   <> ${totalPaidUsd.toFixed(2)} paid so far.</>
                 )}
@@ -349,7 +349,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             ? 'Waiting for uploads…'
             : submitting
             ? 'Submitting…'
-            : `Submit $${finalAmount.toFixed(2)} reimbursement`}
+            : `Submit $${finalAmount.toFixed(2)} payment`}
         </button>
       </div>
 
