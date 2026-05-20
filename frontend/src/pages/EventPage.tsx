@@ -531,11 +531,13 @@ export function EventPage() {
     );
   };
 
-  // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component)
-  // Prefer place_id + address (opens canonical place card). Fall back to address
-  // alone, then to lat/lng if no address. Both place_id and address are required
-  // for the place_id form per Google's docs.
-  const googleMapsUrl = event.placeId && event.address
+  // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component).
+  // Prefer canonical place_id (ChIJ…) + address — opens the real place card.
+  // Skip query_place_id for Google's address-shell IDs (prefixes Ei…/Ek…), which
+  // are autocomplete fallbacks that don't resolve to a Maps place page. Fall
+  // back to address alone, then to lat/lng if no address.
+  const hasCanonicalPlaceId = event.placeId?.startsWith('ChIJ') ?? false;
+  const googleMapsUrl = hasCanonicalPlaceId && event.address
     ? `https://www.google.com/maps/place/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
     : event.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`

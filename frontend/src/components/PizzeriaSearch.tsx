@@ -316,7 +316,7 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
       !(pizzeria.location.lat === 0 && pizzeria.location.lng === 0);
 
     const googleMapsUrl = hasValidCoords
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId ? `&query_place_id=${pizzeria.placeId}` : ''}`
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId?.startsWith('ChIJ') ? `&query_place_id=${pizzeria.placeId}` : ''}`
       : null;
 
     // Construct static map URL (only for valid coords)
