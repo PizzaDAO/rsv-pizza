@@ -901,7 +901,8 @@ export async function sendApprovalEmail(params: {
   partyDate: Date | null;
   partyTimezone: string | null;
   partyAddress: string | null;
-  partyImageUrl?: string | null;
+  partyImageUrl: string | null;
+  venueName: string | null;
   inviteCode: string;
   customUrl: string | null;
 }) {
@@ -937,13 +938,13 @@ export async function sendApprovalEmail(params: {
 
   const addressText = params.partyAddress || 'Location TBD';
 
-  const flyerBlock = params.partyImageUrl
-    ? `
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${params.partyImageUrl}" alt="${params.partyName}" style="max-width: 100%; border-radius: 12px;" />
-        </div>
-  `
+  const flyerImg = params.partyImageUrl
+    ? `<img src="${params.partyImageUrl}" alt="${params.partyName}" style="width: 100%; max-width: 540px; height: auto; border-radius: 12px; display: block; margin: 0 auto 20px auto;" />`
     : '';
+
+  const whereHtml = params.venueName
+    ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${params.venueName}<br><span style="color: #666; font-size: 14px;">${addressText}</span></p>`
+    : `<p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>`;
 
   const emailHtml = `
     <!DOCTYPE html>
@@ -954,7 +955,6 @@ export async function sendApprovalEmail(params: {
         <title>RSVP Approved</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        ${flyerBlock}
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Approved!</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP has been confirmed</p>
@@ -965,10 +965,11 @@ export async function sendApprovalEmail(params: {
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          ${flyerImg}
           <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
           <p style="margin: 10px 0;"><strong>Event:</strong> ${params.partyName}</p>
           <p style="margin: 10px 0;"><strong>When:</strong> ${dateText}</p>
-          <p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>
+          ${whereHtml}
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
