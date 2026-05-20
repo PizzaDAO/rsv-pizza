@@ -11,7 +11,10 @@ export const BeverageOrderSummary: React.FC = () => {
 
   const totalBeverages = beverageRecommendations.reduce((acc, rec) => acc + rec.quantity, 0);
   const respondedGuests = guests.length;
-  const expectedGuests = party?.maxGuests || respondedGuests;
+  // Prefer the host's planning estimate (expected_guests). Fall back to the
+  // RSVP cap (max_guests) for events that only had a cap set, then to actual
+  // RSVPs. arugula-38633 v2: unify pizza/beverage ordering on expected_guests.
+  const expectedGuests = party?.expectedGuests || party?.maxGuests || respondedGuests;
 
   const handleCopyOrder = () => {
     if (beverageRecommendations.length === 0) return;

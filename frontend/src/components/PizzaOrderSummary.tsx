@@ -221,7 +221,10 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     ? waveRecommendations.reduce((acc, wave) => acc + wave.totalPizzas, 0)
     : recommendations.reduce((acc, pizza) => acc + (pizza.quantity || 1), 0);
   const respondedGuests = guests.length;
-  const expectedGuests = party?.maxGuests || respondedGuests;
+  // Prefer the host's planning estimate (expected_guests). Fall back to the
+  // RSVP cap (max_guests) for events that only had a cap set, then to actual
+  // RSVPs. arugula-38633 v2: unify pizza/beverage ordering on expected_guests.
+  const expectedGuests = party?.expectedGuests || party?.maxGuests || respondedGuests;
 
   const handleCopyOrder = () => {
     if (recommendations.length === 0) return;
@@ -315,7 +318,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
       ? '\n\n=== BEVERAGES (Order Once) ===\n' + beverageRecommendations.map(b => `${b.quantity}x ${b.beverage.name}`).join('\n')
       : '';
 
-    const header = `MULTI-WAVE PIZZA ORDER\nParty: ${party?.name || 'Pizza Party'}\nTotal Guests: ${party?.maxGuests || guests.length}\n\n`;
+    const header = `MULTI-WAVE PIZZA ORDER\nParty: ${party?.name || 'Pizza Party'}\nTotal Guests: ${party?.expectedGuests || party?.maxGuests || guests.length}\n\n`;
 
     navigator.clipboard.writeText(header + allWavesText + beverageText)
       .then(() => {
