@@ -1019,6 +1019,32 @@ export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty 
   return data;
 }
 
+/**
+ * For a GPP party that is NOT approved, find another GPP party in the same
+ * city that IS approved. Returns null if no replacement exists. Used to
+ * redirect old-email-link visitors to a sanctioned party.
+ */
+export async function findApprovedGppPartyInCity(
+  city: string,
+  excludeId: string,
+): Promise<DbParty | null> {
+  const { data, error } = await supabase
+    .from('parties')
+    .select(SAFE_PARTY_COLUMNS)
+    .eq('event_type', 'gpp')
+    .eq('city', city)
+    .eq('underboss_status', 'approved')
+    .neq('id', excludeId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error finding approved GPP party in city:', error);
+    return null;
+  }
+  return (data as DbParty | null) ?? null;
+}
+
 export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | null> {
   const { data, error } = await supabase
     .from('parties')

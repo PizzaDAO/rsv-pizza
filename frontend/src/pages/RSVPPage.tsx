@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
 import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
@@ -95,6 +95,22 @@ export function RSVPPage() {
       if (inviteCode) {
         const foundParty = await getPartyByInviteCodeOrCustomUrl(inviteCode);
         if (foundParty) {
+          // GPP parties must be underboss-approved. If not, redirect to an
+          // approved party in the same city, or fall back to globalpizza.party.
+          if (
+            foundParty.event_type === 'gpp' &&
+            foundParty.underboss_status !== 'approved'
+          ) {
+            const altParty = foundParty.city
+              ? await findApprovedGppPartyInCity(foundParty.city, foundParty.id)
+              : null;
+            if (altParty?.custom_url) {
+              navigate(`/${altParty.custom_url}`, { replace: true });
+            } else {
+              window.location.replace('https://globalpizza.party');
+            }
+            return;
+          }
           setParty(foundParty);
 
           // Check if donations are enabled
