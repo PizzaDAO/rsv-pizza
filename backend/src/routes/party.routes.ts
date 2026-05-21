@@ -2129,8 +2129,10 @@ router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, ne
 // the URLs never ship in the JS bundle for non-eligible viewers.
 //
 // Env vars (set on backend Vercel project):
-//   BROADCAST_ZOOM_URL       - global GPP Zoom meeting link (set when known)
-//   BROADCAST_STREAMYARD_URL - global GPP StreamYard studio link (set when known)
+//   BROADCAST_ZOOM_URL         - global GPP Zoom meeting link (set when known)
+//   BROADCAST_ZOOM_MEETING_ID  - display-formatted meeting ID (e.g. "860 6254 2262")
+//   BROADCAST_ZOOM_PASSCODE    - meeting passcode (e.g. "552142")
+//   BROADCAST_STREAMYARD_URL   - global GPP StreamYard studio link (set when known)
 // While unset, returns null URLs and the card shows "Coming soon".
 router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -2146,11 +2148,19 @@ router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, n
     if (!canAccess) throw new AppError('Forbidden', 403, 'FORBIDDEN');
 
     if (party.eventType !== 'gpp' || party.underbossStatus !== 'approved') {
-      return res.json({ zoomUrl: null, streamyardUrl: null, eligible: false });
+      return res.json({
+        zoomUrl: null,
+        zoomMeetingId: null,
+        zoomPasscode: null,
+        streamyardUrl: null,
+        eligible: false,
+      });
     }
 
     return res.json({
       zoomUrl: process.env.BROADCAST_ZOOM_URL || null,
+      zoomMeetingId: process.env.BROADCAST_ZOOM_MEETING_ID || null,
+      zoomPasscode: process.env.BROADCAST_ZOOM_PASSCODE || null,
       streamyardUrl: process.env.BROADCAST_STREAMYARD_URL || null,
       eligible: true,
     });
