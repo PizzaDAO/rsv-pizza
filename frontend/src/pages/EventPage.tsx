@@ -35,6 +35,7 @@ import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
 import { GuestScorecard } from '../components/scorecard';
+import { OverflowDebug } from '../components/OverflowDebug';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -1472,6 +1473,7 @@ export function EventPage() {
         </div>
       )}
 
+      <OverflowDebug />
       <CornerLinks />
 
       {/* Pizza Chef Easter Egg Modal */}
