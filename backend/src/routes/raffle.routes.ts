@@ -349,6 +349,15 @@ router.post('/:partyId/raffles/:raffleId/enter', async (req: AuthRequest, res: R
       throw new AppError('Guest ID is required', 400, 'VALIDATION_ERROR');
     }
 
+    // porchetta-81402: cancelled events are read-only.
+    const partyState = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { cancelledAt: true },
+    });
+    if (partyState?.cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
+    }
+
     // Get raffle with current entry count
     const raffle = await prisma.raffle.findFirst({
       where: { id: raffleId, partyId },

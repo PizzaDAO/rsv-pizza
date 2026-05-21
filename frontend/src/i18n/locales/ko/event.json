@@ -77,5 +77,11 @@
     "enterPasswordPlaceholder": "비밀번호 입력",
     "incorrectPassword": "비밀번호가 올바르지 않습니다",
     "viewReport": "리포트 보기"
+  },
+  "cancelled": {
+    "bannerTitle": "This event has been cancelled",
+    "reasonLabel": "Reason",
+    "noticeTitle": "Event Cancelled",
+    "noticeBody": "RSVPs are closed for this event."
   }
 }

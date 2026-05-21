@@ -96,6 +96,13 @@ model Party {
   rollupGeneratedAt       DateTime? @map("rollup_generated_at") @db.Timestamptz
   description             String?
   rsvpClosedAt            DateTime? @map("rsvp_closed_at") @db.Timestamptz
+  // porchetta-81402: soft-cancel columns. Replaces the old hard-delete
+  // path (DELETE /api/parties/:id). When cancelled_at is non-null the
+  // public EventPage shows a cancellation banner and the RSVP form is
+  // replaced with a cancellation notice.
+  cancelledAt             DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelledBy             String?   @map("cancelled_by")
+  cancellationReason      String?   @map("cancellation_reason")
   createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 

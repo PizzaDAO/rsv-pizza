@@ -77,5 +77,11 @@
     "enterPasswordPlaceholder": "Entrez le mot de passe",
     "incorrectPassword": "Mot de passe incorrect",
     "viewReport": "Voir le rapport"
+  },
+  "cancelled": {
+    "bannerTitle": "This event has been cancelled",
+    "reasonLabel": "Reason",
+    "noticeTitle": "Event Cancelled",
+    "noticeBody": "RSVPs are closed for this event."
   }
 }

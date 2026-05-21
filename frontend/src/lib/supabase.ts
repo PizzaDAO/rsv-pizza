@@ -3,6 +3,8 @@ import {
   createPartyApi,
   updatePartyApi,
   deletePartyApi,
+  cancelPartyApi,
+  reinstatePartyApi,
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
@@ -784,6 +786,10 @@ export interface DbParty {
   reimbursement_cap_appealed_at?: string | null;
   // quattro-71244: gamified-dashboard goal targets (JSONB on parties).
   host_goals?: HostGoals | null;
+  // porchetta-81402: soft-cancel columns. cancelledAt null = active event.
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -853,7 +859,8 @@ export const SAFE_PARTY_COLUMNS = `
   flyer_config,
   poster_image_url, poster_generated_at,
   rollup_image_url, rollup_generated_at,
-  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at
+  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at,
+  cancelled_at, cancelled_by, cancellation_reason
 `;
 
 /**
@@ -1907,6 +1914,9 @@ export async function updateParty(
     reimbursement_cap_usd?: number | null;
     // quattro-71244: gamified-dashboard goal targets.
     host_goals?: HostGoals | null;
+    // porchetta-81402: edit cancellation reason via PATCH. Cancel/reinstate
+    // themselves go through `cancelParty()` / `reinstateParty()`.
+    cancellation_reason?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1988,6 +1998,8 @@ export async function updateParty(
         parkingNotes: updates.parking_notes,
         // quattro-71244: gamified-dashboard goal targets.
         hostGoals: updates.host_goals,
+        // porchetta-81402: edit cancellation reason via PATCH.
+        cancellationReason: updates.cancellation_reason,
       });
       return true;
     } catch (error) {
@@ -2010,7 +2022,10 @@ export async function updateParty(
 }
 
 export async function deleteParty(partyId: string): Promise<boolean> {
-  // Use API if authenticated (secure path)
+  // porchetta-81402: NOTE — the backend `DELETE /api/parties/:id` is now a
+  // soft-cancel alias (does NOT destroy the row). The frontend prefers
+  // `cancelParty()` directly so the host can pass an optional reason; this
+  // helper is kept for back-compat with any caller that hasn't been migrated.
   if (isAuthenticated()) {
     try {
       await deletePartyApi(partyId);
@@ -2021,7 +2036,8 @@ export async function deleteParty(partyId: string): Promise<boolean> {
     }
   }
 
-  // Fallback to direct Supabase
+  // Fallback to direct Supabase — also kept for back-compat; new code should
+  // use the API.
   const { error } = await supabase
     .from('parties')
     .delete()
@@ -2032,6 +2048,31 @@ export async function deleteParty(partyId: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+// porchetta-81402: soft-cancel + reinstate helpers. These call the new
+// POST endpoints on party.routes.ts; they only require auth (the gate
+// is `canUserEditParty` server-side).
+export async function cancelParty(partyId: string, reason?: string): Promise<boolean> {
+  if (!isAuthenticated()) return false;
+  try {
+    await cancelPartyApi(partyId, reason);
+    return true;
+  } catch (e) {
+    console.error('Error cancelling party via API:', e);
+    return false;
+  }
+}
+
+export async function reinstateParty(partyId: string): Promise<boolean> {
+  if (!isAuthenticated()) return false;
+  try {
+    await reinstatePartyApi(partyId);
+    return true;
+  } catch (e) {
+    console.error('Error reinstating party via API:', e);
+    return false;
+  }
 }
 
 // Get parties for a user (RSVP'd or hosting)

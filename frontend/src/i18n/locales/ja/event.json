@@ -77,5 +77,11 @@
     "enterPasswordPlaceholder": "パスワードを入力",
     "incorrectPassword": "パスワードが正しくありません",
     "viewReport": "レポートを表示"
+  },
+  "cancelled": {
+    "bannerTitle": "This event has been cancelled",
+    "reasonLabel": "Reason",
+    "noticeTitle": "Event Cancelled",
+    "noticeBody": "RSVPs are closed for this event."
   }
 }

@@ -136,6 +136,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   };
 
   if (!isOpen) return null;
+  // porchetta-81402: defense-in-depth — EventPage already hides the RSVP
+  // button on cancelled events, but if a stale tab opens the modal anyway
+  // we don't want it to submit. Drop the modal silently.
+  if (event.cancelledAt) return null;
 
   const isEditing = !!existingGuest;
 

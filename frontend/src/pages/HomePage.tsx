@@ -148,6 +148,15 @@ export function HomePage() {
                             {t('home.host')}
                           </span>
                         )}
+                        {/* porchetta-81402: cancelled pill — hosts see this on
+                            their own cancelled events so they can recognize
+                            them at a glance and reinstate from the dashboard
+                            if it was an accident. */}
+                        {party.cancelledAt && (
+                          <span className="px-2 py-0.5 bg-[#ff393a]/15 border border-[#ff393a]/30 rounded-full text-xs text-[#ff393a] flex-shrink-0">
+                            {t('home.cancelled')}
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-sm text-theme-text-secondary mb-1">

@@ -345,6 +345,12 @@ export interface Party {
   // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
   // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
   hostGoals?: HostGoals | null;
+  // porchetta-81402: soft-cancel state. cancelledAt non-null = host has
+  // cancelled the event. EventPage renders a cancelled banner + replaces
+  // the RSVP form with a cancellation notice. Hosts can reinstate.
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
+  cancellationReason?: string | null;
 }
 
 export interface Donation {
@@ -1117,6 +1123,10 @@ export interface UnderbossEvent {
   // filter, and Mark-reviewed affordance — replaces the legacy
   // reimbursementCapAppealedAt signal which never cleared.
   hasOpenAppeal?: boolean;
+  // porchetta-81402: surfaced so /underboss can badge cancelled events
+  // (filterable so an underboss can spot churn in their region).
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
 }
 
 // quattro-12847: a single row from the appeal-history endpoint.

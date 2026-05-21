@@ -12,7 +12,8 @@
     "guest_one": "{{count}} invité",
     "guest_other": "{{count}} invités",
     "alreadyCreated": "Vous avez déjà créé un événement ?",
-    "viewAllTest": "Voir tous les événements test"
+    "viewAllTest": "Voir tous les événements test",
+    "cancelled": "Cancelled"
   },
   "profile": {
     "title": "Votre profil",

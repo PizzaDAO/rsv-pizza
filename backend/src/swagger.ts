@@ -57,7 +57,9 @@ Receive real-time notifications when events occur:
 |-------|-------------|
 | \`party.created\` | New party created |
 | \`party.updated\` | Party details updated |
-| \`party.deleted\` | Party deleted |
+| \`party.deleted\` | Party cancelled (legacy alias). \`DELETE /api/parties/:id\` no longer destroys data — it soft-cancels the event, preserving the public URL, guests, and child resources. Subscribers that previously listened for \`party.deleted\` should now subscribe to \`party.cancelled\`; the legacy event is kept for backwards compat. |
+| \`party.cancelled\` | Event cancelled (soft-delete). Public URL is preserved, guests stay attached, RSVPs are blocked. |
+| \`party.reinstated\` | Cancelled event was un-cancelled by the host. |
 | \`party.rsvp_closed\` | RSVPs closed |
 | \`party.rsvp_opened\` | RSVPs reopened |
 | \`guest.registered\` | New guest RSVP |
