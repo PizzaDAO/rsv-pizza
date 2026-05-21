@@ -845,6 +845,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     let resultEvents = events;
     if (req.query.swcOnly === 'true') {
       resultEvents = events.filter((e: any) =>
+        e.underbossStatus === 'approved' &&
         Array.isArray(e.eventTags) && e.eventTags.some((t: string) => typeof t === 'string' && t.includes('swc') && t !== 'swc')
       );
     }
