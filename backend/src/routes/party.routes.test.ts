@@ -32,6 +32,25 @@ const mockPrisma = vi.hoisted(() => ({
   admin: {
     findUnique: vi.fn(),
   },
+  graphicsAdmin: {
+    findUnique: vi.fn(),
+  },
+  // $transaction in our bulk-import code is called with an array of Prisma
+  // promises (prisma.guest.create({...}) calls). We resolve each to satisfy
+  // the chunked-insert loop. For the function-form (used by DELETE), invoke
+  // the callback with a tx proxy that includes a stub $executeRaw so the
+  // audit-context helper doesn't crash.
+  $transaction: vi.fn(async (ops: any) => {
+    if (Array.isArray(ops)) {
+      return Promise.all(ops);
+    }
+    const txProxy = {
+      ...mockPrisma,
+      $executeRaw: vi.fn(async () => 1),
+      $executeRawUnsafe: vi.fn(async () => 1),
+    };
+    return ops(txProxy);
+  }),
 }));
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
@@ -434,6 +453,283 @@ describe('Party Routes', () => {
         .send({ name: 'Should fail' });
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/parties/:id/guests/import - Bulk import (calzone-83291)', () => {
+    // The endpoint reuses canUserEditParty + canUserAccessTab. Both helpers
+    // call prisma.party.findUnique. Owner check is `userId === HOST_USER_ID`.
+    // We chain findUnique with successive resolved values for each call site.
+    function mockOwnerAccess() {
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({
+          // canUserEditParty
+          id: PARTY_ID,
+          userId: HOST_USER_ID,
+          coHosts: [],
+        })
+        .mockResolvedValueOnce({
+          // canUserAccessTab
+          userId: HOST_USER_ID,
+          coHosts: [],
+          eventType: 'standard',
+          region: null,
+          name: 'Test Party',
+        });
+    }
+
+    it('inserts guests with submittedVia=import-luma and approved=true by default', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      mockOwnerAccess();
+      mockPrisma.guest.findMany.mockResolvedValueOnce([]); // no existing emails
+      // The transaction returns the same shape as our create payloads with ids.
+      mockPrisma.guest.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: `g-${args.data.email}`, ...args.data })
+      );
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'luma',
+          guests: [
+            { name: 'Alice Sun', email: 'alice@x.com', status: 'CONFIRMED', approved: true },
+            { name: 'Bob Lee', email: 'bob@y.com', status: 'CONFIRMED', approved: true },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.inserted).toBe(2);
+      expect(res.body.skipped).toEqual([]);
+      expect(res.body.errors).toEqual([]);
+      const createCalls = mockPrisma.guest.create.mock.calls;
+      expect(createCalls).toHaveLength(2);
+      expect(createCalls[0][0].data.submittedVia).toBe('import-luma');
+      expect(createCalls[0][0].data.approved).toBe(true);
+      expect(createCalls[0][0].data.status).toBe('CONFIRMED');
+    });
+
+    it('sets approved=null for landing status pending and status=WAITLISTED for waitlist', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      mockOwnerAccess();
+      mockPrisma.guest.findMany.mockResolvedValueOnce([]);
+      mockPrisma.guest.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: 'g-' + Math.random(), ...args.data })
+      );
+
+      await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'luma',
+          guests: [
+            { name: 'Pending Pat', email: 'pat@x.com', status: 'CONFIRMED', approved: null },
+            { name: 'Wait Wendy', email: 'wendy@x.com', status: 'WAITLISTED', approved: null },
+          ],
+        });
+
+      const calls = mockPrisma.guest.create.mock.calls;
+      const pat = calls.find((c: any) => c[0].data.email === 'pat@x.com')?.[0].data;
+      const wendy = calls.find((c: any) => c[0].data.email === 'wendy@x.com')?.[0].data;
+      expect(pat.approved).toBeNull();
+      expect(pat.status).toBe('CONFIRMED');
+      expect(wendy.status).toBe('WAITLISTED');
+      expect(wendy.approved).toBeNull();
+    });
+
+    it('skips rows whose email already exists on the party (case-insensitive)', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      mockOwnerAccess();
+      mockPrisma.guest.findMany.mockResolvedValueOnce([{ email: 'alice@x.com' }]);
+      mockPrisma.guest.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: 'g-new', ...args.data })
+      );
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'luma',
+          guests: [
+            { name: 'Alice Upper', email: 'ALICE@x.com' }, // dup (case-insensitive)
+            { name: 'New Neal', email: 'neal@x.com' },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.inserted).toBe(1);
+      expect(res.body.skipped).toHaveLength(1);
+      expect(res.body.skipped[0].reason).toBe('duplicate');
+      expect(mockPrisma.guest.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('dedups within the input batch (two rows with the same email → one insert)', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      mockOwnerAccess();
+      mockPrisma.guest.findMany.mockResolvedValueOnce([]);
+      mockPrisma.guest.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: 'g-' + Math.random(), ...args.data })
+      );
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'csv',
+          guests: [
+            { name: 'A', email: 'dup@x.com' },
+            { name: 'B', email: 'dup@x.com' },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.inserted).toBe(1);
+      expect(res.body.skipped).toHaveLength(1);
+    });
+
+    it('returns 400 when guests is empty', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      mockOwnerAccess();
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ sourcePlatform: 'luma', guests: [] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 400 when guests > 2000', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      mockOwnerAccess();
+
+      const guests = Array.from({ length: 2001 }, (_, i) => ({
+        name: `Guest ${i}`,
+        email: `g${i}@x.com`,
+      }));
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ sourcePlatform: 'csv', guests });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when sourcePlatform is unknown', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      mockOwnerAccess();
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'partiful',
+          guests: [{ name: 'X', email: 'x@x.com' }],
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 403 for a co-host without "guests" in allowedTabs', async () => {
+      const app = createTestApp();
+      const token = makeToken(OTHER_USER_ID, OTHER_EMAIL);
+
+      // canUserEditParty: co-host with canEdit=true
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({
+          id: PARTY_ID,
+          userId: HOST_USER_ID,
+          coHosts: [{ email: OTHER_EMAIL, canEdit: true, allowedTabs: ['details'] }],
+        })
+        .mockResolvedValueOnce({
+          // canUserAccessTab: co-host with restricted allowedTabs (no 'guests')
+          userId: HOST_USER_ID,
+          coHosts: [{ email: OTHER_EMAIL, canEdit: true, allowedTabs: ['details'] }],
+          eventType: 'standard',
+          region: null,
+          name: 'Test Party',
+        });
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'luma',
+          guests: [{ name: 'X', email: 'x@x.com' }],
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('TAB_ACCESS_DENIED');
+    });
+
+    it('returns 404 for a non-owner non-cohost user', async () => {
+      const app = createTestApp();
+      const token = makeToken('stranger-id', 'stranger@example.com');
+
+      // canUserEditParty: party exists but user has no relation
+      mockPrisma.party.findUnique.mockResolvedValueOnce({
+        id: PARTY_ID,
+        userId: HOST_USER_ID,
+        coHosts: [],
+      });
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'luma',
+          guests: [{ name: 'X', email: 'x@x.com' }],
+        });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('calls triggerWebhook once (not per row) with guest.imported', async () => {
+      const { triggerWebhook } = await import('../services/webhook.service.js');
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+
+      mockOwnerAccess();
+      mockPrisma.guest.findMany.mockResolvedValueOnce([]);
+      mockPrisma.guest.create.mockImplementation((args: any) =>
+        Promise.resolve({ id: 'g-' + Math.random(), ...args.data })
+      );
+
+      const res = await request(app)
+        .post(`/api/parties/${PARTY_ID}/guests/import`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sourcePlatform: 'eventbrite',
+          guests: [
+            { name: 'A', email: 'a@x.com' },
+            { name: 'B', email: 'b@x.com' },
+            { name: 'C', email: 'c@x.com' },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      const calls = (triggerWebhook as any).mock.calls.filter(
+        (c: any[]) => c[0] === 'guest.imported'
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0][1]).toMatchObject({
+        partyId: PARTY_ID,
+        count: 3,
+        source: 'eventbrite',
+      });
     });
   });
 });

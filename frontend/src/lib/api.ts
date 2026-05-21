@@ -404,6 +404,35 @@ export async function removeGuestApi(partyId: string, guestId: string) {
   });
 }
 
+// Bulk import of guests from a Luma/Meetup/Eventbrite/CSV export.
+// See plans/calzone-83291-guest-list-import.md.
+export interface ImportGuestsResult {
+  inserted: number;
+  skipped: Array<{ email: string; reason: string }>;
+  errors: Array<{ index: number; reason: string }>;
+  createdGuestIds: string[];
+}
+
+export interface ImportGuestRow {
+  name: string;
+  email?: string | null;
+  status?: 'CONFIRMED' | 'INVITED' | 'WAITLISTED' | 'CHECKED_IN';
+  approved?: boolean | null;
+}
+
+export async function importGuestsApi(
+  partyId: string,
+  data: {
+    guests: ImportGuestRow[];
+    sourcePlatform: 'luma' | 'meetup' | 'eventbrite' | 'csv';
+  }
+): Promise<ImportGuestsResult> {
+  return apiRequest<ImportGuestsResult>(`/api/parties/${partyId}/guests/import`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
 export async function updateGuestApprovalApi(partyId: string, guestId: string, approved: boolean | null) {
   return apiRequest<{ guest: any }>(`/api/parties/${partyId}/guests/${guestId}/approve`, {
     method: 'PATCH',

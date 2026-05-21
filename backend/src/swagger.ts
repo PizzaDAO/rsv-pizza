@@ -179,7 +179,11 @@ All errors follow a consistent format:
             dietaryRestrictions: { type: 'array', items: { type: 'string' } },
             approved: { type: 'boolean', nullable: true },
             submittedAt: { type: 'string', format: 'date-time' },
-            submittedVia: { type: 'string' },
+            submittedVia: {
+              type: 'string',
+              description:
+                "How the guest row was created: 'link', 'rsvp', 'api', 'host', 'host-checkin', 'invite', or one of the bulk-import sources 'import-luma' / 'import-meetup' / 'import-eventbrite' / 'import-csv'.",
+            },
           },
         },
         Webhook: {

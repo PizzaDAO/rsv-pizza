@@ -66,9 +66,32 @@ function isEmailHeader(cell: string): boolean {
   return EMAIL_HEADERS.has(cell.trim().toLowerCase());
 }
 
+/**
+ * Parse a CSV into raw header + row arrays. Used by the bulk-import flow to
+ * inspect platform-specific headers before mapping. The existing `parseCsv`
+ * (below) is kept as-is for the bulk-invite Promo widget.
+ */
+export function parseCsvWithHeaders(text: string): { headers: string[]; rows: string[][] } {
+  const cleaned = text.replace(/^﻿/, '');
+  const lines = cleaned
+    .split(/\r\n|\n|\r/)
+    .filter((l) => l.length > 0);
+
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  const headers = splitCsvLine(lines[0]);
+  const rows: string[][] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = splitCsvLine(lines[i]);
+    if (cells.every((c) => c.length === 0)) continue;
+    rows.push(cells);
+  }
+  return { headers, rows };
+}
+
 export function parseCsv(text: string): ParsedCsvRow[] {
   // Strip a BOM if present
-  const cleaned = text.replace(/^\uFEFF/, '');
+  const cleaned = text.replace(/^﻿/, '');
 
   // Normalize line endings and split
   const lines = cleaned
