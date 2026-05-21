@@ -4478,6 +4478,40 @@ export async function updateUserMe(
   return res.user;
 }
 
+// ============================================
+// bufala-83291: per-event payment opt-in
+// ============================================
+// Toggles whether the current user is a prepay candidate for a specific
+// event. User-pref autosave (`updateUserMe` above) still tracks HOW to pay;
+// these endpoints control WHETHER a host is considered for a given event.
+
+export interface PaymentOptInState {
+  optedIn: boolean;
+  optedInAt: string | null;
+}
+
+export function getPaymentOptIn(partyId: string): Promise<PaymentOptInState> {
+  return apiRequest<PaymentOptInState>(`/api/parties/${partyId}/payment-opt-in`);
+}
+
+export async function submitPaymentOptIn(
+  partyId: string
+): Promise<{ optedIn: true; optedInAt: string }> {
+  return apiRequest<{ optedIn: true; optedInAt: string }>(
+    `/api/parties/${partyId}/payment-opt-in`,
+    { method: 'POST' }
+  );
+}
+
+export async function removePaymentOptIn(
+  partyId: string
+): Promise<{ optedIn: false }> {
+  return apiRequest<{ optedIn: false }>(
+    `/api/parties/${partyId}/payment-opt-in`,
+    { method: 'DELETE' }
+  );
+}
+
 /**
  * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
  * via the backend's mainnet-resolver utility endpoint. Returns null on any

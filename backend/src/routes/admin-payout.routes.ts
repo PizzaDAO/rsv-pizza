@@ -736,11 +736,17 @@ router.get(
         return;
       }
 
-      // 5. For each assembled row, drop it if ANY candidate already has an
-      //    in-flight payout for that party. "In-flight" = pending/approved/paid
-      //    (failed/rejected don't count — that prepayment never went through).
-      //    Run as a single grouped query: pull all matching payouts and bucket
-      //    by partyId in memory.
+      // 5. bufala-83291: filter each party's candidates to users who have
+      //    EXPLICITLY opted in via the Submit button on PaymentDetailsCard.
+      //    A user-level `preferredPayoutMethod` is the source of HOW to pay
+      //    them; the opt-in row in `party_payment_opt_ins` is the source of
+      //    WHETHER to consider them for a given event. This stops a cohost
+      //    who set payment details on event X from auto-appearing as a
+      //    candidate on every other event they're a cohost on.
+      //
+      //    Backfill at migration time inserted one opt-in row per existing
+      //    payout, so hosts who already submitted a payout remain candidates
+      //    without re-clicking Submit.
       const partyIds = assembled.map(r => r.partyMeta.id);
       const allCandidateUserIds = new Set<string>();
       for (const r of assembled) {
@@ -749,11 +755,59 @@ router.get(
         }
       }
 
-      const inFlight = allCandidateUserIds.size
-        ? await prisma.payout.findMany({
+      const optIns = allCandidateUserIds.size
+        ? await prisma.partyPaymentOptIn.findMany({
             where: {
               partyId: { in: partyIds },
-              hostUserId: { in: Array.from(allCandidateUserIds) },
+              userId: { in: Array.from(allCandidateUserIds) },
+            },
+            select: { partyId: true, userId: true },
+          })
+        : [];
+      const optInByParty = new Map<string, Set<string>>();
+      for (const row of optIns) {
+        let set = optInByParty.get(row.partyId);
+        if (!set) {
+          set = new Set<string>();
+          optInByParty.set(row.partyId, set);
+        }
+        set.add(row.userId);
+      }
+
+      // Apply opt-in filter in place; drop parties where no candidate remains.
+      const optedInAssembled: AssembledRow[] = [];
+      for (const r of assembled) {
+        const optInSet = optInByParty.get(r.partyMeta.id);
+        if (!optInSet || optInSet.size === 0) continue;
+        const filtered = r.candidates.filter(c => optInSet.has(c.userId));
+        if (filtered.length === 0) continue;
+        optedInAssembled.push({ partyMeta: r.partyMeta, candidates: filtered });
+      }
+
+      if (optedInAssembled.length === 0) {
+        res.json({ rows: [] });
+        return;
+      }
+
+      // Recompute candidate-id set after opt-in filtering so the in-flight
+      // query below only fetches payouts we still care about.
+      const filteredCandidateUserIds = new Set<string>();
+      for (const r of optedInAssembled) {
+        for (const c of r.candidates) {
+          filteredCandidateUserIds.add(c.userId);
+        }
+      }
+
+      // 6. For each assembled row, drop it if ANY candidate already has an
+      //    in-flight payout for that party. "In-flight" = pending/approved/paid
+      //    (failed/rejected don't count — that prepayment never went through).
+      //    Run as a single grouped query: pull all matching payouts and bucket
+      //    by partyId in memory.
+      const inFlight = filteredCandidateUserIds.size
+        ? await prisma.payout.findMany({
+            where: {
+              partyId: { in: optedInAssembled.map(r => r.partyMeta.id) },
+              hostUserId: { in: Array.from(filteredCandidateUserIds) },
               status: { in: ['pending', 'approved', 'paid'] },
             },
             select: { partyId: true, hostUserId: true },
@@ -770,7 +824,7 @@ router.get(
         set.add(row.hostUserId);
       }
 
-      const finalRows = assembled
+      const finalRows = optedInAssembled
         .filter(r => {
           const inFlightSet = inFlightByParty.get(r.partyMeta.id);
           if (!inFlightSet || inFlightSet.size === 0) return true;

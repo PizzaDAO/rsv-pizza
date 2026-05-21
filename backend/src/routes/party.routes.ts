@@ -1872,4 +1872,84 @@ router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, n
   }
 });
 
+// ============================================
+// bufala-83291: per-event payment opt-in
+// ============================================
+// User-level payout prefs (`users.preferred_payout_method`) describe HOW to
+// pay a host across all of their events. The /payments prepay queue also
+// requires WHETHER the host has explicitly opted in for a specific event,
+// which is what these endpoints toggle.
+//
+// All three are gated by `canUserEditParty` (host or cohost), so each cohost
+// can only opt themselves in / out, not other cohosts.
+
+// GET /api/parties/:partyId/payment-opt-in — current user's opt-in state
+router.get('/:partyId/payment-opt-in', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const userId = req.userId;
+    if (!userId) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const row = await prisma.partyPaymentOptIn.findUnique({
+      where: { partyId_userId: { partyId, userId } },
+      select: { optedInAt: true },
+    });
+
+    res.json({
+      optedIn: !!row,
+      optedInAt: row?.optedInAt?.toISOString() ?? null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/payment-opt-in — upsert opt-in for current user
+router.post('/:partyId/payment-opt-in', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const userId = req.userId;
+    if (!userId) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    // Upsert: refresh optedInAt on re-submit so the host's most recent
+    // "Submit" click is reflected even if a row already existed.
+    const row = await prisma.partyPaymentOptIn.upsert({
+      where: { partyId_userId: { partyId, userId } },
+      create: { partyId, userId },
+      update: { optedInAt: new Date() },
+      select: { optedInAt: true },
+    });
+
+    res.json({ optedIn: true, optedInAt: row.optedInAt.toISOString() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/parties/:partyId/payment-opt-in — revoke for current user
+router.delete('/:partyId/payment-opt-in', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const userId = req.userId;
+    if (!userId) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    await prisma.partyPaymentOptIn.deleteMany({
+      where: { partyId, userId },
+    });
+
+    res.json({ optedIn: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

@@ -3,7 +3,12 @@ import { Loader2, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
 import { BankDetails, PayoutMethod } from '../../types';
-import { updateUserMe } from '../../lib/api';
+import {
+  updateUserMe,
+  getPaymentOptIn,
+  submitPaymentOptIn,
+  removePaymentOptIn,
+} from '../../lib/api';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
 import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 
@@ -200,6 +205,118 @@ export const PaymentDetailsCard: React.FC = () => {
   // the user pick a method first; the picker still renders all three radios.
   const pickerMethod: PayoutMethod = method ?? 'mercury_card';
 
+  // ============================================
+  // bufala-83291: per-event payment opt-in
+  // ============================================
+  // The autosave above persists the user-LEVEL payout prefs (HOW to pay).
+  // A separate opt-in row in `party_payment_opt_ins` controls WHETHER this
+  // host should be considered a prepay candidate for THIS specific event.
+  // Submitting on event X does not opt the host in on event Y.
+  const partyId = party?.id ?? null;
+  const partyName = party?.name ?? 'this event';
+  const [optInLoaded, setOptInLoaded] = useState(false);
+  const [optedIn, setOptedIn] = useState(false);
+  const [optedInAt, setOptedInAt] = useState<string | null>(null);
+  const [optInPending, setOptInPending] = useState(false);
+  const [optInError, setOptInError] = useState<string | null>(null);
+
+  // Hydrate opt-in state when the party becomes available.
+  useEffect(() => {
+    if (!partyId) {
+      setOptInLoaded(false);
+      setOptedIn(false);
+      setOptedInAt(null);
+      return;
+    }
+    let cancelled = false;
+    setOptInLoaded(false);
+    getPaymentOptIn(partyId)
+      .then((res) => {
+        if (cancelled) return;
+        setOptedIn(res.optedIn);
+        setOptedInAt(res.optedInAt);
+        setOptInLoaded(true);
+      })
+      .catch(() => {
+        // Soft-fail — the Submit button will surface a real error on click.
+        if (cancelled) return;
+        setOptInLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId]);
+
+  const optedInLabel = useMemo(() => {
+    if (!optedInAt) return null;
+    try {
+      return new Date(optedInAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return null;
+    }
+  }, [optedInAt]);
+
+  async function handleSubmitOptIn() {
+    if (!partyId) return;
+    setOptInPending(true);
+    setOptInError(null);
+    // If there's a debounced autosave still pending, flush it now so the user
+    // record is up-to-date before we mark them as opted in. The autosave fires
+    // ~1s after the last edit; we just cancel the timer and run the save inline.
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    try {
+      if (isDirty.current && methodValid && method != null) {
+        const payload = buildPayload();
+        if (payload) {
+          setSaveStatus('saving');
+          const updated = await updateUserMe(payload);
+          setUser({
+            ...(user as NonNullable<typeof user>),
+            preferredPayoutMethod: updated.preferredPayoutMethod ?? null,
+            payoutWalletAddress: updated.payoutWalletAddress ?? null,
+            payoutBankDetails: updated.payoutBankDetails ?? null,
+          });
+          isDirty.current = false;
+          setSaveStatus('saved');
+        }
+      }
+      const res = await submitPaymentOptIn(partyId);
+      setOptedIn(true);
+      setOptedInAt(res.optedInAt);
+    } catch (err: any) {
+      setOptInError(err?.message || 'Failed to submit payment details for this event');
+    } finally {
+      setOptInPending(false);
+    }
+  }
+
+  async function handleRemoveOptIn() {
+    if (!partyId) return;
+    setOptInPending(true);
+    setOptInError(null);
+    try {
+      await removePaymentOptIn(partyId);
+      setOptedIn(false);
+      setOptedInAt(null);
+    } catch (err: any) {
+      setOptInError(err?.message || 'Failed to remove opt-in');
+    } finally {
+      setOptInPending(false);
+    }
+  }
+
+  // Submit is disabled until the host has picked a method and the
+  // method-specific fields validate. Reuses the existing `methodValid` calc
+  // so the gate matches the autosave gate.
+  const submitDisabled = !partyId || optInPending || !methodValid;
+
   return (
     <div className="card p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -250,6 +367,66 @@ export const PaymentDetailsCard: React.FC = () => {
 
       {saveError && (
         <p className="text-xs text-[#ff393a] mt-2">{saveError}</p>
+      )}
+
+      {/*
+        bufala-83291: per-event Submit. The autosave above keeps the user's
+        global default in sync; this section ALSO opts them in for THIS event.
+        Without an opt-in row the host won't appear on /payments as a prepay
+        candidate even if their global payment method is set.
+      */}
+      {partyId && optInLoaded && (
+        <div className="mt-5 border-t border-white/10 pt-4">
+          {!optedIn ? (
+            <div>
+              <button
+                type="button"
+                onClick={handleSubmitOptIn}
+                disabled={submitDisabled}
+                className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {optInPending ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Submitting…
+                  </>
+                ) : (
+                  'Submit my payment details for this event'
+                )}
+              </button>
+              <p className="text-xs text-white/40 mt-2">
+                Submitting opts you in to receive payment for {partyName}. You'll
+                only be paid for events you submit for.
+              </p>
+              {!methodValid && (
+                <p className="text-xs text-white/40 mt-1">
+                  Choose a payout method above before submitting.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2 text-sm text-emerald-500">
+                <Check size={16} />
+                <span>
+                  Submitted for {partyName}
+                  {optedInLabel ? ` on ${optedInLabel}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveOptIn}
+                disabled={optInPending}
+                className="mt-2 text-xs text-white/50 hover:text-white/80 underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {optInPending ? 'Removing…' : "Remove me from this event's payments"}
+              </button>
+            </div>
+          )}
+          {optInError && (
+            <p className="text-xs text-[#ff393a] mt-2">{optInError}</p>
+          )}
+        </div>
       )}
     </div>
   );
