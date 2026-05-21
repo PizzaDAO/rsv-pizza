@@ -1650,9 +1650,9 @@ async function executePayout(params: {
   if (!existing) {
     throw new AppError('Payout not found', 404, 'NOT_FOUND');
   }
-  if (existing.status !== 'approved') {
+  if (existing.status !== 'approved' && existing.status !== 'failed') {
     throw new AppError(
-      `Can only execute an approved payout (current status: ${existing.status})`,
+      `Can only execute an approved or previously-failed payout (current status: ${existing.status})`,
       400,
       'INVALID_STATE',
     );
@@ -1866,9 +1866,9 @@ router.post(
       if (!existing) {
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
-      if (existing.status !== 'approved') {
+      if (existing.status !== 'approved' && existing.status !== 'failed') {
         throw new AppError(
-          `Can only execute an approved payout (current status: ${existing.status})`,
+          `Can only execute an approved or previously-failed payout (current status: ${existing.status})`,
           400,
           'INVALID_STATE',
         );
