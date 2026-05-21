@@ -125,6 +125,10 @@ export interface CreatePartyData {
   placeId?: string;
   venueName?: string | null;
   city?: string;
+  // calzone-71208: country + lat/lng must round-trip from autocomplete on create.
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   maxGuests?: number;
   hideGuests?: boolean;
   requireApproval?: boolean;
@@ -235,6 +239,9 @@ export async function createPartyApi(data: CreatePartyData) {
       placeId: data.placeId,
       venueName: data.venueName,
       city: data.city,
+      country: data.country,
+      latitude: data.latitude,
+      longitude: data.longitude,
       maxGuests: data.maxGuests,
       hideGuests: data.hideGuests,
       requireApproval: data.requireApproval,

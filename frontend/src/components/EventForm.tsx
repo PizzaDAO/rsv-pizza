@@ -31,6 +31,11 @@ export function EventForm() {
   const [partyPlaceId, setPartyPlaceId] = useState<string | null>(null);
   const [partyVenueName, setPartyVenueName] = useState<string | null>(null);
   const [partyCity, setPartyCity] = useState<string | null>(null);
+  // calzone-71208: country + lat/lng were silently dropped on create — 61 of 982
+  // prod events shipped with country IS NULL. Capture them from autocomplete now.
+  const [partyCountry, setPartyCountry] = useState<string | null>(null);
+  const [partyLat, setPartyLat] = useState<number | null>(null);
+  const [partyLng, setPartyLng] = useState<number | null>(null);
   const [partyPassword, setPartyPassword] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
@@ -103,26 +108,28 @@ export function EventForm() {
 
       const imageUrl = formData.eventImageUrl?.trim() || undefined;
 
-      const party = await createPartyAPI(
-        formData.partyName?.trim() || undefined,
-        user?.name || undefined,
-        startDateTime,
-        'new-york',
-        guestCount,
-        formData.partyAddress?.trim() || undefined,
-        [],
+      const party = await createPartyAPI({
+        name: formData.partyName?.trim() || undefined,
+        hostName: user?.name || undefined,
+        date: startDateTime,
+        pizzaStyle: 'new-york',
+        expectedGuests: guestCount,
+        address: formData.partyAddress?.trim() || undefined,
+        availableBeverages: [],
         duration,
         password,
-        imageUrl,
+        eventImageUrl: imageUrl,
         description,
-        urlSlug,
-        formData.timezone || undefined,
-        undefined, // hostEmail
-        formData.hideGuests || false,
-        formData.partyPlaceId || undefined,
-        formData.partyVenueName || undefined,
-        formData.partyCity || undefined
-      );
+        customUrl: urlSlug,
+        timezone: formData.timezone || undefined,
+        hideGuests: formData.hideGuests || false,
+        placeId: formData.partyPlaceId || undefined,
+        venueName: formData.partyVenueName || undefined,
+        city: formData.partyCity || undefined,
+        country: formData.partyCountry ?? null,
+        latitude: formData.partyLat ?? null,
+        longitude: formData.partyLng ?? null,
+      });
 
       setCreating(false);
 
@@ -197,7 +204,11 @@ export function EventForm() {
     if (!user) {
       const formData = {
         partyName, startDate, startTime, endDate, endTime, timezone,
-        expectedGuests, partyAddress, partyPlaceId, partyVenueName, partyCity, partyPassword, eventImageUrl, eventDescription,
+        expectedGuests, partyAddress, partyPlaceId, partyVenueName, partyCity,
+        // calzone-71208: persist country + lat/lng across the auth roundtrip
+        // so we don't lose them when the form is restored post-login.
+        partyCountry, partyLat, partyLng,
+        partyPassword, eventImageUrl, eventDescription,
         customUrl, requireApproval, limitGuests, hideGuests
       };
       sessionStorage.setItem('pendingPartyForm', JSON.stringify(formData));
@@ -247,26 +258,28 @@ export function EventForm() {
         }
       }
 
-      const party = await createPartyAPI(
-        partyName.trim() || undefined,
-        user?.name || undefined,
-        startDateTime,
-        'new-york',
-        guestCount,
-        partyAddress.trim() || undefined,
-        [],
+      const party = await createPartyAPI({
+        name: partyName.trim() || undefined,
+        hostName: user?.name || undefined,
+        date: startDateTime,
+        pizzaStyle: 'new-york',
+        expectedGuests: guestCount,
+        address: partyAddress.trim() || undefined,
+        availableBeverages: [],
         duration,
         password,
-        imageUrl,
+        eventImageUrl: imageUrl,
         description,
-        urlSlug,
-        timezone || undefined,
-        undefined, // hostEmail
+        customUrl: urlSlug,
+        timezone: timezone || undefined,
         hideGuests,
-        partyPlaceId || undefined,
-        partyVenueName || undefined,
-        partyCity || undefined
-      );
+        placeId: partyPlaceId || undefined,
+        venueName: partyVenueName || undefined,
+        city: partyCity || undefined,
+        country: partyCountry,
+        latitude: partyLat,
+        longitude: partyLng,
+      });
 
       setCreating(false);
 
@@ -304,9 +317,21 @@ export function EventForm() {
             // Manual edits without picking from dropdown invalidate captured place_id + venue_name
             setPartyPlaceId(null);
             setPartyVenueName(null);
+            // calzone-71208: also invalidate country/lat/lng so we don't ship
+            // a stale Google answer attached to a hand-typed address.
+            setPartyCountry(null);
+            setPartyLat(null);
+            setPartyLng(null);
           }}
           onTimezoneChange={setTimezone}
-          onCitySelected={(cityData) => setPartyCity(cityData.cityName || null)}
+          onLocationSelected={(loc) => {
+            setPartyLat(loc?.lat ?? null);
+            setPartyLng(loc?.lng ?? null);
+          }}
+          onCitySelected={(cityData) => {
+            setPartyCity(cityData.cityName || null);
+            setPartyCountry(cityData.country || null);
+          }}
           onPlaceSelected={(address, venueName, placeId) => {
             setPartyAddress(address);
             setPartyPlaceId(placeId);

@@ -233,7 +233,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const {
-      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, placeId, venueName, city, maxGuests,
+      name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, placeId, venueName, city, maxGuests,
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
@@ -284,6 +284,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         address: address || null,
         latitude: latitude !== null && latitude !== undefined ? Number(latitude) : null,
         longitude: longitude !== null && longitude !== undefined ? Number(longitude) : null,
+        country: country || null,
         placeId: placeId || null,
         venueName: venueName || null,
         city: city || null,
