@@ -4157,6 +4157,40 @@ export async function appealReimbursementCap(
   );
 }
 
+/**
+ * quattro-12847: Admin or scoped-underboss marks the latest open appeal as
+ * reviewed. Returns the updated appeal row.
+ */
+export async function reviewReimbursementCapAppeal(
+  partyId: string,
+  reviewedNote?: string
+): Promise<{
+  id: string;
+  partyId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+  reviewedNote: string | null;
+}> {
+  return apiRequest(
+    `/api/parties/${partyId}/reimbursement-cap/appeals/review`,
+    { method: 'POST', body: reviewedNote ? { reviewedNote } : {}, requireAuth: true }
+  );
+}
+
+/**
+ * quattro-12847: Fetch full appeal history for an event (newest first).
+ * Admin, scoped underboss, host, or co-host-with-edit may view.
+ */
+export async function fetchReimbursementCapAppeals(
+  partyId: string
+): Promise<import('../types').ReimbursementCapAppealRecord[]> {
+  const res = await apiRequest<{ appeals: import('../types').ReimbursementCapAppealRecord[] }>(
+    `/api/parties/${partyId}/reimbursement-cap/appeals`,
+    { method: 'GET', requireAuth: true }
+  );
+  return res.appeals;
+}
+
 export async function previewReceiptOCR(
   partyId: string,
   imageUrl: string

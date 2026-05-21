@@ -139,6 +139,13 @@ export function UnderbossDashboard() {
     };
   }, [filteredData, activeTab, tableFilteredEvents]);
 
+  // quattro-12847: count of in-scope events with at least one unreviewed
+  // cap appeal — drives the red pill on the Events tab nav.
+  const openAppealCount = useMemo(() => {
+    if (!filteredData) return 0;
+    return filteredData.events.filter((e) => e.hasOpenAppeal === true).length;
+  }, [filteredData]);
+
   useEffect(() => {
     if (activeTab !== 'events') setTableFilteredEvents(null);
   }, [activeTab]);
@@ -519,6 +526,14 @@ export function UnderbossDashboard() {
               }`}
             >
               {t('underbossDashboard.tabs.events')} ({displayData.events.length})
+              {openAppealCount > 0 && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-semibold ml-1.5"
+                  title={`${openAppealCount} event${openAppealCount === 1 ? '' : 's'} with an open cap appeal`}
+                >
+                  {openAppealCount}
+                </span>
+              )}
               {activeTab === 'events' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}

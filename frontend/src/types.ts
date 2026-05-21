@@ -1112,6 +1112,27 @@ export interface UnderbossEvent {
   reimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
+  // quattro-12847: derived server-side from `reimbursement_cap_appeals` rows
+  // where reviewed_at IS NULL. Drives the underboss "open appeal" badge,
+  // filter, and Mark-reviewed affordance — replaces the legacy
+  // reimbursementCapAppealedAt signal which never cleared.
+  hasOpenAppeal?: boolean;
+}
+
+// quattro-12847: a single row from the appeal-history endpoint.
+export interface ReimbursementCapAppealRecord {
+  id: string;
+  partyId: string;
+  hostUserId: string;
+  hostName: string | null;
+  hostEmail: string;
+  note: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+  reviewedByName: string | null;
+  reviewedByEmail: string | null;
+  reviewedNote: string | null;
 }
 
 export interface UnderbossStats {

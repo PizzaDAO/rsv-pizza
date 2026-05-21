@@ -182,6 +182,14 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     reimbursementCapAppealedAt: party.reimbursementCapAppealedAt
       ? new Date(party.reimbursementCapAppealedAt).toISOString()
       : null,
+    // quattro-12847: derived from `_count.reimbursementCapAppeals` (where
+    // reviewedAt IS NULL). The denormalized `reimbursementCapAppealedAt`
+    // column is kept above for backwards compat, but new client code (badge,
+    // filter, Mark-reviewed button) keys off this field.
+    hasOpenAppeal:
+      typeof party._count?.reimbursementCapAppeals === 'number'
+        ? party._count.reimbursementCapAppeals > 0
+        : false,
   };
 }
 
@@ -741,6 +749,9 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
   try {
     const { region } = req.params;
     const scope = scopeFromReq(req);
+    // quattro-12847: optional filter / sort over the open cap-appeal queue.
+    const appealsOnly = req.query.appealsOnly === 'true' || req.query.appealsOnly === '1';
+    const sortMode = typeof req.query.sort === 'string' ? req.query.sort : null;
 
     // Handle "all" region — admins see everything, underbosses see scoped events
     if (region === 'all') {
@@ -771,6 +782,14 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       whereClause = scopedWhere ? { AND: [base, scopedWhere] } : base;
     }
 
+    // quattro-12847: appeals-only narrows further to events with at least one
+    // unreviewed appeal in history.
+    if (appealsOnly) {
+      whereClause = {
+        AND: [whereClause, { reimbursementCapAppeals: { some: { reviewedAt: null } } }],
+      };
+    }
+
     const events = await prisma.party.findMany({
       where: whereClause,
       include: {
@@ -780,10 +799,28 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
         },
         partyKit: { select: { status: true } },
         sponsors: { select: { status: true, amount: true } },
-        _count: { select: { guests: true, photos: true } },
+        _count: {
+          select: {
+            guests: true,
+            photos: true,
+            // quattro-12847: count of unreviewed appeals → `hasOpenAppeal`.
+            reimbursementCapAppeals: { where: { reviewedAt: null } },
+          },
+        },
       },
-      orderBy: { date: 'asc' },
+      orderBy: sortMode === 'appealsFirst' ? undefined : { date: 'asc' },
     });
+
+    if (sortMode === 'appealsFirst') {
+      events.sort((a: any, b: any) => {
+        const aOpen = (a._count?.reimbursementCapAppeals || 0) > 0 ? 1 : 0;
+        const bOpen = (b._count?.reimbursementCapAppeals || 0) > 0 ? 1 : 0;
+        if (aOpen !== bOpen) return bOpen - aOpen;
+        const aDate = a.date ? new Date(a.date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.date ? new Date(b.date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      });
+    }
 
     // Get all underboss emails for co-host filtering
     const allUnderbosses = await prisma.underboss.findMany({
@@ -832,6 +869,9 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const skip = (page - 1) * limit;
+    // quattro-12847: optional filter / sort over the open cap-appeal queue.
+    const appealsOnly = req.query.appealsOnly === 'true' || req.query.appealsOnly === '1';
+    const sortMode = typeof req.query.sort === 'string' ? req.query.sort : null;
 
     const scope = scopeFromReq(req);
     if (!scope.isAdmin && !scope.regions.includes(region) && scope.cities.length === 0) {
@@ -839,8 +879,15 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     }
 
     const scopedWhere = buildScopedWhereClause(scope);
-    const base = { region, eventType: 'gpp' as const };
+    const base: any = { region, eventType: 'gpp' as const };
+    if (appealsOnly) {
+      base.reimbursementCapAppeals = { some: { reviewedAt: null } };
+    }
     const where: any = scopedWhere ? { AND: [base, scopedWhere] } : base;
+
+    // Note: Prisma cannot order directly by a filtered `_count` of a relation,
+    // so for `sort=appealsFirst` we fetch unsorted, then re-sort in JS below.
+    const orderBy: any = sortMode === 'appealsFirst' ? undefined : { date: 'asc' };
 
     const [events, total, allUnderbosses] = await Promise.all([
       prisma.party.findMany({
@@ -852,9 +899,16 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
           },
           partyKit: { select: { status: true } },
           sponsors: { select: { status: true, amount: true } },
-          _count: { select: { guests: true, photos: true } },
+          _count: {
+            select: {
+              guests: true,
+              photos: true,
+              // quattro-12847: count of unreviewed appeals → `hasOpenAppeal`.
+              reimbursementCapAppeals: { where: { reviewedAt: null } },
+            },
+          },
         },
-        orderBy: { date: 'asc' },
+        orderBy,
         skip,
         take: limit,
       }),
@@ -864,6 +918,17 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
         select: { email: true },
       }),
     ]);
+
+    if (sortMode === 'appealsFirst') {
+      events.sort((a: any, b: any) => {
+        const aOpen = (a._count?.reimbursementCapAppeals || 0) > 0 ? 1 : 0;
+        const bOpen = (b._count?.reimbursementCapAppeals || 0) > 0 ? 1 : 0;
+        if (aOpen !== bOpen) return bOpen - aOpen; // open appeals first
+        const aDate = a.date ? new Date(a.date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.date ? new Date(b.date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      });
+    }
     const ubEmails = allUnderbosses.map(u => u.email.toLowerCase());
 
     // Get latest sponsor timestamp per party for flyer staleness detection
@@ -926,7 +991,14 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
           select: { id: true, name: true, category: true, cost: true, status: true },
           orderBy: { createdAt: 'desc' },
         },
-        _count: { select: { guests: true, photos: true } },
+        _count: {
+          select: {
+            guests: true,
+            photos: true,
+            // quattro-12847: feed `hasOpenAppeal` on the detail view too.
+            reimbursementCapAppeals: { where: { reviewedAt: null } },
+          },
+        },
       },
     });
 
