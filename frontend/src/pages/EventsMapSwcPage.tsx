@@ -191,6 +191,7 @@ export function EventsMapSwcPage() {
                 iconHeight={40}
                 iconAnchorX={17}
                 iconAnchorY={40}
+                cluster={false}
               />
             )}
           </Suspense>
