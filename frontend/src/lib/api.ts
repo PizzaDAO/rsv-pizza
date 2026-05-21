@@ -3936,6 +3936,34 @@ export async function executeAdminPayout(
 }
 
 /**
+ * salsiccia-49102: sequentially execute multiple approved USDC payouts.
+ * Backend bails the whole batch (400 INSUFFICIENT_BALANCE) if the hot
+ * wallet's USDC balance is less than the sum of amounts; per-row results
+ * include status='paid' (+ txHash) or status='failed' (+ error).
+ *
+ * The backend enforces:
+ *   - 50-id sanity cap per request (400 BULK_TOO_LARGE if over)
+ *   - eligibility filter (USDC + approved + valid 0x wallet) — non-eligible
+ *     ids are silently dropped from the response, NOT echoed back
+ *   - sequential execution (nonce safety for the single-signer hot wallet)
+ */
+export interface BulkSendResult {
+  id: string;
+  success: boolean;
+  status: 'paid' | 'failed';
+  txHash?: string;
+  error?: string;
+}
+
+export async function bulkExecutePayouts(ids: string[]): Promise<BulkSendResult[]> {
+  const res = await apiRequest<{ results: BulkSendResult[] }>(`/api/admin/payouts/bulk-execute`, {
+    method: 'POST',
+    body: { ids },
+  });
+  return res.results;
+}
+
+/**
  * Search-as-you-type for the Record External Payment modal (arugula-38633 v2).
  * Backend filters parties.underbossStatus === 'approved' and returns up to 20
  * matches by name/customUrl/inviteCode. Each row carries the main host plus

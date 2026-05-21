@@ -8,5 +8,6 @@ export { PrepayQueueTable } from './PrepayQueueTable';
 export { CreatePrepaymentModal } from './CreatePrepaymentModal';
 export { HostPaymentDetailsModal } from './HostPaymentDetailsModal';
 export { ExportSafeJsonModal } from './ExportSafeJsonModal';
+export { BulkSendModal } from './BulkSendModal';
 export { RejectReasonModal } from './RejectReasonModal';
 export { HotWalletCard } from './HotWalletCard';
