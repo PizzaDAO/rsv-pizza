@@ -90,14 +90,14 @@ function ActionsCell({
         </>
       )}
 
-      {status === 'approved' && (
+      {(status === 'approved' || status === 'failed') && (
         <>
           <button
             type="button"
             onClick={() => onExecute(payout)}
             disabled={busy}
             className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
-            title="Execute Payment"
+            title={status === 'failed' ? 'Retry Payment' : 'Execute Payment'}
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>

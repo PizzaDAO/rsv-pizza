@@ -108,9 +108,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
   const isPending = payout.status === 'pending';
-  const isApproved = payout.status === 'approved';
+  const isFailed = payout.status === 'failed';
+  // passata-49102: failed payouts are now re-executable, so treat them like
+  // 'approved' for the Execute affordance (button + form).
+  const isApproved = payout.status === 'approved' || isFailed;
   const isPaid = payout.status === 'paid';
-  const isClosed = payout.status === 'rejected' || payout.status === 'failed';
+  // 'failed' is no longer "closed" — it has the Execute (Retry) button instead
+  // of Re-open. Only 'rejected' remains terminal-until-reopened.
+  const isClosed = payout.status === 'rejected';
 
   // For Mercury, last4 must be exactly 4 digits before the button enables.
   const execMercuryValid = /^\d{4}$/.test(execCardLast4.trim());
@@ -763,7 +768,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
               >
                 <Send size={14} />
-                Execute Payment
+                {isFailed ? 'Retry Payment' : 'Execute Payment'}
               </button>
               <button
                 type="button"
