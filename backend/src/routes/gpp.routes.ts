@@ -8,6 +8,7 @@ import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 import { geocodeCity } from '../lib/geocode.js';
 import { haversineKm } from '../lib/distance.js';
+import { getCountryCode } from '../lib/countryCode.js';
 
 const router = Router();
 
@@ -694,6 +695,7 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     endTime: event.endTime,
     timezone: event.timezone,
     country: event.country,
+    countryCode: getCountryCode(event.country),
     region: event.region,
     address: event.address,
     venueName: event.venueName,
