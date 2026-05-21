@@ -17,7 +17,7 @@ import { rateLimit } from 'express-rate-limit';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
@@ -231,10 +231,9 @@ async function resolveWalletOrThrow(input: string): Promise<string> {
   }
 }
 
+// payment_admin is the superset role for /payments — covers admin + super_admin too.
 async function isAnyAdmin(email?: string): Promise<boolean> {
-  if (await isSuperAdmin(email)) return true;
-  if (await isAdmin(email)) return true;
-  return false;
+  return isPaymentAdmin(email);
 }
 
 /**
@@ -349,6 +348,13 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (!skipPartyEditCheck) {
       const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
       if (!canEdit) {
+        if (recipientOverrideRequested) {
+          throw new AppError(
+            'Only payment admins, admins, or super admins can create prepayments on behalf of other hosts.',
+            403,
+            'FORBIDDEN_PREPAY',
+          );
+        }
         throw new AppError('Party not found', 404, 'NOT_FOUND');
       }
     }
