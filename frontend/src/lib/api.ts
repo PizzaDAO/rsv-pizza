@@ -3985,6 +3985,28 @@ export async function recordExternalPayment(
 }
 
 /**
+ * siciliana-69183: fetch a host's saved payment details for the admin
+ * HostPaymentDetailsModal (host-name click in prepay queue + payouts table).
+ * Backed by `GET /api/admin/users/:userId/payment-details`. Admin-gated.
+ */
+export interface UserPaymentDetails {
+  userId: string;
+  name: string | null;
+  email: string;
+  preferredPayoutMethod: PayoutMethod | null;
+  payoutWalletAddress: string | null;
+  payoutBankDetails: { email?: string | null } | null;
+  totalPayouts: number;
+  latestPayoutAt: string | null;
+}
+
+export async function fetchUserPaymentDetails(userId: string): Promise<UserPaymentDetails> {
+  return apiRequest<UserPaymentDetails>(
+    `/api/admin/users/${encodeURIComponent(userId)}/payment-details`,
+  );
+}
+
+/**
  * bismarck-92103: list approved parties flagged for prepayment whose host(s)
  * have a saved payment method, excluding parties that already have an
  * in-flight payout. Surfaced as the "Prepay queue" section on /payments.

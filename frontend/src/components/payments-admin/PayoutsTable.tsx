@@ -15,6 +15,11 @@ interface PayoutsTableProps {
   onMarkPaid: (payout: AdminPayout) => void;
   /** Opens the modal so the admin can execute via the method-specific confirmation form. */
   onExecute: (payout: AdminPayout) => void;
+  /**
+   * siciliana-69183: open the read-only HostPaymentDetailsModal for the given
+   * User.id. Surfaced when the admin clicks the host name in a row.
+   */
+  onHostClick?: (userId: string) => void;
   busyRowId?: string | null;
   loading?: boolean;
   loadingMore?: boolean;
@@ -122,6 +127,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onEdit,
   onMarkPaid,
   onExecute,
+  onHostClick,
   busyRowId,
   loading,
   loadingMore,
@@ -180,6 +186,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                 selected={selectedIds.has(p.id)}
                 onSelectToggle={() => onToggleSelect(p.id)}
                 onClick={() => onRowClick(p)}
+                onHostClick={onHostClick}
                 actions={
                   <ActionsCell
                     payout={p}

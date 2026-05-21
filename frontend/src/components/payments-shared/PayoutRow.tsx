@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
@@ -22,6 +23,12 @@ interface PayoutRowProps {
   onClick?: () => void;
   /** Extra cell rendered at the end of the row (admin actions menu). */
   actions?: React.ReactNode;
+  /**
+   * siciliana-69183: when set + showAdminColumns is on, the host-name cell
+   * becomes a button that opens the read-only HostPaymentDetailsModal for
+   * `payout.hostUserId`. Parent owns the modal state.
+   */
+  onHostClick?: (userId: string) => void;
 }
 
 /**
@@ -38,6 +45,7 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
   onSelectToggle,
   onClick,
   actions,
+  onHostClick,
 }) => {
   const admin = payout as AdminPayout;
   const firstPizza = (payout.documents || []).find((d) => d.kind === 'pizza');
@@ -76,8 +84,22 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       {showAdminColumns && admin.host && (
-        <td className="px-3 py-3 text-sm">
-          <div className="font-medium text-theme-text">{admin.host.name || '—'}</div>
+        <td className="px-3 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+          {/* siciliana-69183: when `onHostClick` is wired, the host name becomes
+              a button that opens the read-only HostPaymentDetailsModal. Falls
+              back to plain text for any callsite that doesn't want the modal. */}
+          {onHostClick && payout.hostUserId ? (
+            <button
+              type="button"
+              onClick={() => onHostClick(payout.hostUserId)}
+              className="font-medium text-theme-text hover:text-[#E52828] hover:underline text-left"
+              title="View saved payment details"
+            >
+              {admin.host.name || admin.host.email || '—'}
+            </button>
+          ) : (
+            <div className="font-medium text-theme-text">{admin.host.name || '—'}</div>
+          )}
           {admin.host.email && (
             <div className="text-xs text-theme-text-muted">
               <ClickableEmail email={admin.host.email} />
@@ -88,15 +110,16 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
 
       {showAdminColumns && admin.party && (
         <td className="px-3 py-3 text-sm">
-          <a
-            href={`/host/${admin.party.inviteCode}`}
-            className="text-theme-text hover:underline"
+          {/* siciliana-69183: link to the host dashboard's Settings tab. Slug is
+              customUrl ?? inviteCode to match user-facing URLs. Tab id 'details'
+              is the canonical Settings tab id (see tabPermissions.ts). */}
+          <Link
+            to={`/host/${admin.party.customUrl ?? admin.party.inviteCode}/details`}
+            className="text-theme-text hover:text-[#E52828] hover:underline"
             onClick={(e) => e.stopPropagation()}
-            target="_blank"
-            rel="noopener noreferrer"
           >
             {admin.party.name}
-          </a>
+          </Link>
           {/* arugula-38633 v2 follow-up: planning vs actuals at a glance. */}
           <div
             className="text-xs text-theme-text-muted"

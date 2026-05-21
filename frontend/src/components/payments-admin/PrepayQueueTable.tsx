@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, Star } from 'lucide-react';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 import { PayoutMethodIcon, PAYOUT_METHOD_LABELS } from '../payments-shared';
@@ -6,6 +7,12 @@ import { PayoutMethodIcon, PAYOUT_METHOD_LABELS } from '../payments-shared';
 interface PrepayQueueTableProps {
   rows: PrepayQueueRow[];
   onCreatePrepayment: (row: PrepayQueueRow) => void;
+  /**
+   * siciliana-69183: open the read-only HostPaymentDetailsModal for the chosen
+   * candidate. Parent (`PaymentsAdminPage`) owns the modal state — we just
+   * surface the click event with the User.id.
+   */
+  onHostClick?: (userId: string) => void;
 }
 
 /**
@@ -21,21 +28,46 @@ function stripGppPrefix(name: string): string {
  * bismarck-92103: small chip rendered per candidate inside the Hosts cell.
  * Method icon comes from the shared PayoutMethodIcon. Primary host gets a
  * star prefix so the admin can distinguish them at a glance.
+ *
+ * siciliana-69183: becomes a button when `onClick` is supplied so the admin
+ * can drill into the candidate's saved payment details.
  */
-const HostChip: React.FC<{ candidate: PrepayCandidate }> = ({ candidate }) => {
+const HostChip: React.FC<{
+  candidate: PrepayCandidate;
+  onClick?: () => void;
+}> = ({ candidate, onClick }) => {
   const displayName = candidate.name && candidate.name.trim()
     ? candidate.name
     : candidate.email;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-theme-surface-hover border border-theme-stroke text-xs text-theme-text"
-      title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]}`}
-    >
+  const inner = (
+    <>
       {candidate.isPrimaryHost && (
         <Star size={11} className="text-amber-500 shrink-0" aria-label="Primary host" />
       )}
       <PayoutMethodIcon method={candidate.method} size={12} />
       <span className="truncate max-w-[12rem]">{displayName}</span>
+    </>
+  );
+  const baseClass =
+    'inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-theme-surface-hover border border-theme-stroke text-xs text-theme-text';
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${baseClass} hover:border-theme-stroke-hover hover:bg-theme-surface-active cursor-pointer`}
+        title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]} · click for payment details`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <span
+      className={baseClass}
+      title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]}`}
+    >
+      {inner}
     </span>
   );
 };
@@ -43,6 +75,7 @@ const HostChip: React.FC<{ candidate: PrepayCandidate }> = ({ candidate }) => {
 export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
   rows,
   onCreatePrepayment,
+  onHostClick,
 }) => {
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
@@ -59,6 +92,11 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
           <tbody>
             {rows.map((row) => {
               const cap = row.party.effectiveReimbursementCapUsd;
+              // siciliana-69183: event name links into the host dashboard's
+              // Settings tab. Slug is `customUrl ?? id` to match user-facing
+              // URLs. Tab id `'details'` is the canonical Settings tab (see
+              // `frontend/src/lib/tabPermissions.ts`).
+              const eventSlug = row.party.customUrl ?? row.party.id;
               return (
                 <tr
                   key={row.party.id}
@@ -66,9 +104,12 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                 >
                   <td className="px-3 py-3 align-top">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-theme-text truncate">
+                      <Link
+                        to={`/host/${eventSlug}/details`}
+                        className="font-medium text-theme-text hover:text-[#E52828] hover:underline truncate"
+                      >
                         {stripGppPrefix(row.party.name)}
-                      </span>
+                      </Link>
                       {row.hasMultipleCandidates && (
                         <span
                           className="inline-flex items-center text-amber-500"
@@ -87,7 +128,11 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                   <td className="px-3 py-3 align-top">
                     <div className="flex flex-wrap gap-1.5">
                       {row.candidates.map((c) => (
-                        <HostChip key={c.userId} candidate={c} />
+                        <HostChip
+                          key={c.userId}
+                          candidate={c}
+                          onClick={onHostClick ? () => onHostClick(c.userId) : undefined}
+                        />
                       ))}
                     </div>
                   </td>

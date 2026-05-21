@@ -32,6 +32,8 @@ import {
   ExternalPaymentModal,
   PrepayQueueTable,
   CreatePrepaymentModal,
+  HostPaymentDetailsModal,
+  ExportSafeJsonModal,
 } from '../components/payments-admin';
 
 type RoleState =
@@ -74,6 +76,29 @@ export function PaymentsAdminPage() {
   // bismarck-92103: prepay queue + the "Create prepayment" modal target row.
   const [prepayQueue, setPrepayQueue] = useState<PrepayQueueRow[]>([]);
   const [prepayModalRow, setPrepayModalRow] = useState<PrepayQueueRow | null>(null);
+
+  // siciliana-69183: clickable host name opens the read-only payment-details
+  // modal. Holds the User.id; null = modal closed.
+  const [hostDetailUserId, setHostDetailUserId] = useState<string | null>(null);
+
+  // siciliana-69183: Safe Transaction Builder JSON export. Modal is mounted
+  // when true; the modal itself filters non-USDC / missing-wallet rows.
+  const [showSafeExportModal, setShowSafeExportModal] = useState(false);
+
+  // siciliana-69183: tiny toast stack (matches AdminLogoCleanup pattern).
+  // Surfaces post-prepayment success + post-export confirmations.
+  type Toast = { id: number; message: string; kind: 'success' | 'error' };
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const pushToast = useCallback(
+    (message: string, kind: 'success' | 'error' = 'success') => {
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [...prev, { id, message, kind }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 3000);
+    },
+    [],
+  );
 
   const loadPrepayQueue = useCallback(async () => {
     try {
@@ -145,6 +170,14 @@ export function PaymentsAdminPage() {
     return Array.from(set).sort();
   }, [payouts]);
 
+  // siciliana-69183: derive the AdminPayout objects matching `selectedIds` for
+  // the Safe-export modal. The modal itself filters non-USDC / missing-wallet
+  // rows; we just hand it the full selection.
+  const selectedPayouts = useMemo(
+    () => payouts.filter((p) => selectedIds.has(p.id)),
+    [payouts, selectedIds],
+  );
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -172,8 +205,17 @@ export function PaymentsAdminPage() {
   // bismarck-92103: after a prepayment is created, refresh BOTH the payouts
   // list (so the new pending payout shows up there) and the prepay queue (so
   // the source row drops off — it now has an in-flight payout).
-  async function handlePrepaymentCreated() {
+  // siciliana-69183: also flash a success toast with the host + amount so
+  // it's clear where the new payout went (the source row drops off the prepay
+  // queue silently otherwise).
+  async function handlePrepaymentCreated(summary?: { hostName: string; amountUsd: number }) {
     await Promise.all([refresh(), loadPrepayQueue()]);
+    if (summary) {
+      pushToast(
+        `Created prepayment for ${summary.hostName} — $${summary.amountUsd.toFixed(2)}`,
+        'success',
+      );
+    }
   }
 
   async function openDetail(p: AdminPayout) {
@@ -371,6 +413,7 @@ export function PaymentsAdminPage() {
             <PrepayQueueTable
               rows={prepayQueue}
               onCreatePrepayment={(row) => setPrepayModalRow(row)}
+              onHostClick={(userId) => setHostDetailUserId(userId)}
             />
           </section>
         )}
@@ -387,6 +430,7 @@ export function PaymentsAdminPage() {
           onApprove={handleBulkApprove}
           onReject={handleBulkReject}
           onMarkPaid={handleBulkMarkPaid}
+          onExportSafeJson={() => setShowSafeExportModal(true)}
           onClear={clearSelection}
           busy={bulkBusy}
         />
@@ -408,6 +452,7 @@ export function PaymentsAdminPage() {
           onEdit={openDetail}
           onMarkPaid={handleRowMarkPaid}
           onExecute={openDetail}
+          onHostClick={(userId) => setHostDetailUserId(userId)}
           busyRowId={rowBusyId}
           loading={loading}
           loadingMore={loadingMore}
@@ -542,6 +587,46 @@ export function PaymentsAdminPage() {
             onClose={() => setPrepayModalRow(null)}
             onCreated={handlePrepaymentCreated}
           />
+        )}
+
+        {/* siciliana-69183: read-only host payment-details modal — opens when
+            the admin clicks a host name on the prepay queue or payouts table. */}
+        <HostPaymentDetailsModal
+          userId={hostDetailUserId}
+          onClose={() => setHostDetailUserId(null)}
+        />
+
+        {/* siciliana-69183: Safe Transaction Builder batch export. */}
+        {showSafeExportModal && (
+          <ExportSafeJsonModal
+            selected={selectedPayouts}
+            onClose={() => setShowSafeExportModal(false)}
+            onExported={(summary) => {
+              pushToast(
+                `Exported Safe batch: ${summary.included} transfer${summary.included === 1 ? '' : 's'}` +
+                  (summary.skipped > 0 ? ` (${summary.skipped} skipped)` : ''),
+                'success',
+              );
+            }}
+          />
+        )}
+
+        {/* siciliana-69183: toast stack (bottom-right, 3s auto-dismiss). */}
+        {toasts.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+            {toasts.map((t) => (
+              <div
+                key={t.id}
+                className={`pointer-events-auto rounded-lg px-4 py-3 text-sm shadow-lg border-l-4 ${
+                  t.kind === 'success'
+                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-100'
+                    : 'bg-red-500/15 border-red-500 text-red-100'
+                }`}
+              >
+                {t.message}
+              </div>
+            ))}
+          </div>
         )}
 
         {/* meUserId placeholder to silence unused-warning while client-side comparison stays optional */}

@@ -9,7 +9,12 @@ import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 interface CreatePrepaymentModalProps {
   row: PrepayQueueRow;
   onClose: () => void;
-  onCreated: () => void;
+  /**
+   * siciliana-69183: now receives a small summary so the parent can surface a
+   * post-create toast ("Created prepayment for X — $Y"). The arg is optional
+   * for backward-compat with any existing callsite that doesn't need it.
+   */
+  onCreated: (summary?: { hostName: string; amountUsd: number }) => void;
 }
 
 /**
@@ -95,7 +100,11 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
         hostNotes: 'Prepayment created by admin',
         recipientHostUserId: selectedCandidate.userId,
       });
-      onCreated();
+      onCreated({
+        hostName:
+          (selectedCandidate.name && selectedCandidate.name.trim()) || selectedCandidate.email,
+        amountUsd: amountNum,
+      });
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Failed to create prepayment');
