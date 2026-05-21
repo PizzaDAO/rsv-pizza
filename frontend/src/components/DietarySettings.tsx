@@ -6,7 +6,7 @@ import { IconInput } from './IconInput';
 import { DIETARY_OPTIONS } from '../constants/options';
 
 export const DietarySettings: React.FC = () => {
-  const { party, updatePartyDietaryOptions } = usePizza();
+  const { party, updatePartyDietaryOptions, updatePartyShowToppingsOnRsvp } = usePizza();
   const [selectedOptions, setSelectedOptions] = useState<string[]>(
     (party?.availableDietaryOptions || []).filter(id => !id.startsWith('custom-'))
   );
@@ -54,6 +54,17 @@ export const DietarySettings: React.FC = () => {
       <div className="flex items-center gap-2 mb-4">
         <Leaf size={20} className="text-[#ff393a]" />
         <h2 className="text-xl font-bold text-theme-text">Dietary Options</h2>
+      </div>
+
+      <div className="mb-4 pb-4 border-b border-theme-stroke">
+        <Checkbox
+          checked={!!party?.showToppingsOnRsvp}
+          onChange={() => updatePartyShowToppingsOnRsvp(!party?.showToppingsOnRsvp)}
+          label="Also show topping preferences on RSVP form"
+        />
+        <p className="text-xs text-theme-text-muted mt-2 ml-7">
+          When on, guests can like/dislike toppings on the RSVP form. Otherwise only dietary options show.
+        </p>
       </div>
 
       <p className="text-xs text-theme-text-muted mb-4">

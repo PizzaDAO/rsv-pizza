@@ -172,6 +172,7 @@ export interface UpdatePartyData {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
@@ -290,6 +291,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
       availableDietaryOptions: data.availableDietaryOptions,
+      showToppingsOnRsvp: data.showToppingsOnRsvp,
       selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
@@ -530,6 +532,7 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   availableDietaryOptions: string[];
+  showToppingsOnRsvp?: boolean;
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
