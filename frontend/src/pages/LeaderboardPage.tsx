@@ -1,8 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Trophy, MapPin, Users, CheckCircle2, Image as ImageIcon, Send } from 'lucide-react';
-import { Layout } from '../components/Layout';
+import {
+  ArrowLeft,
+  Loader2,
+  Trophy,
+  MapPin,
+  Users,
+  CheckCircle2,
+  Image as ImageIcon,
+  Send,
+} from 'lucide-react';
 import {
   fetchLeaderboard,
   LeaderboardResponse,
@@ -20,10 +28,20 @@ type TabKey = 'parties' | 'countries';
 const PAGE_SIZE = 50;
 const MAX_LIMIT = 200;
 
+// GPP visual tokens — kept in sync with GPPLandingPage / GPPPizzeriasPage.
+const C = {
+  skyTop: '#7EC8E3',
+  skyBot: '#B6E4F7',
+  red: '#E52828',
+  redHover: '#CC2020',
+  darkText: '#1a1a1a',
+  mutedText: '#555',
+};
+
 function CountryFlag({ code }: { code: string | null }) {
   if (!code) {
     return (
-      <span className="inline-flex items-center justify-center w-6 h-4 rounded-sm bg-white/10 text-[8px] text-white/50">
+      <span className="inline-flex items-center justify-center w-6 h-4 rounded-sm bg-gray-100 text-[8px] text-gray-400">
         ??
       </span>
     );
@@ -57,7 +75,7 @@ function BreakdownChip({
   if (!value) return null;
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] text-white/60"
+      className="inline-flex items-center gap-1 text-[11px] text-[#555]"
       title={label}
     >
       <Icon size={12} />
@@ -70,12 +88,12 @@ function LeaderboardPartyRowView({ row }: { row: LeaderboardPartyRow }) {
   return (
     <Link
       to={`/${row.slug}`}
-      className="flex items-center gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors"
+      className="flex items-center gap-3 px-4 py-3 border-b border-black/[0.06] hover:bg-black/[0.03] transition-colors last:border-b-0"
     >
-      <div className="flex-shrink-0 w-8 text-center text-base font-semibold text-white/70 tabular-nums">
+      <div className="flex-shrink-0 w-8 text-center text-base font-bold tabular-nums" style={{ color: C.red }}>
         {row.rank}
       </div>
-      <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
+      <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
         {row.eventImageUrl ? (
           <img
             src={row.eventImageUrl}
@@ -84,17 +102,17 @@ function LeaderboardPartyRowView({ row }: { row: LeaderboardPartyRow }) {
             loading="lazy"
           />
         ) : (
-          <Trophy size={18} className="text-white/30" />
+          <Trophy size={18} className="text-gray-400" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-semibold text-white truncate">
+          <span className="text-sm font-semibold text-[#1a1a1a] truncate">
             {row.name}
           </span>
           <CountryFlag code={row.countryCode} />
         </div>
-        <div className="flex items-center gap-2 text-[12px] text-white/50 mt-0.5 truncate">
+        <div className="flex items-center gap-2 text-[12px] text-[#555] mt-0.5 truncate">
           {row.city && (
             <span className="inline-flex items-center gap-1">
               <MapPin size={11} />
@@ -124,10 +142,10 @@ function LeaderboardPartyRowView({ row }: { row: LeaderboardPartyRow }) {
         </div>
       </div>
       <div className="flex-shrink-0 text-right">
-        <div className="text-base font-semibold text-white tabular-nums">
+        <div className="text-base font-bold tabular-nums" style={{ color: C.red }}>
           {row.score.toLocaleString(undefined, { maximumFractionDigits: 1 })}
         </div>
-        <div className="text-[10px] uppercase tracking-wide text-white/40">
+        <div className="text-[10px] uppercase tracking-wide text-gray-500">
           score
         </div>
       </div>
@@ -137,25 +155,25 @@ function LeaderboardPartyRowView({ row }: { row: LeaderboardPartyRow }) {
 
 function LeaderboardCountryRowView({ row }: { row: LeaderboardCountryRow }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
-      <div className="flex-shrink-0 w-8 text-center text-base font-semibold text-white/70 tabular-nums">
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-black/[0.06] last:border-b-0">
+      <div className="flex-shrink-0 w-8 text-center text-base font-bold tabular-nums" style={{ color: C.red }}>
         {row.rank}
       </div>
       <CountryFlag code={row.countryCode} />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-white truncate">
+        <div className="text-sm font-semibold text-[#1a1a1a] truncate">
           {row.country}
         </div>
-        <div className="text-[12px] text-white/50">
+        <div className="text-[12px] text-[#555]">
           {row.partyCount.toLocaleString()}{' '}
           {row.partyCount === 1 ? 'party' : 'parties'}
         </div>
       </div>
       <div className="flex-shrink-0 text-right">
-        <div className="text-base font-semibold text-white tabular-nums">
+        <div className="text-base font-bold tabular-nums" style={{ color: C.red }}>
           {row.score.toLocaleString(undefined, { maximumFractionDigits: 1 })}
         </div>
-        <div className="text-[10px] uppercase tracking-wide text-white/40">
+        <div className="text-[10px] uppercase tracking-wide text-gray-500">
           score
         </div>
       </div>
@@ -236,8 +254,18 @@ export function LeaderboardPage() {
     return `${partyTotal.toLocaleString()} ${partyTotal === 1 ? 'party' : 'parties'}`;
   }, [tabParam, partyTotal, countryTotal]);
 
+  // Segmented-control button helper for consistent styling.
+  const segBtn = (active: boolean) =>
+    `px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+      active
+        ? 'text-white shadow-sm'
+        : 'text-[#555] hover:text-[#1a1a1a]'
+    }`;
+  const segBtnStyle = (active: boolean) =>
+    active ? { background: C.red } : { background: 'transparent' };
+
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>Leaderboard | RSV.Pizza</title>
         <meta
@@ -246,134 +274,164 @@ export function LeaderboardPage() {
         />
       </Helmet>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
-        <div className="flex items-center gap-3 mb-2">
-          <Trophy size={22} className="text-[#E52828]" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+      <div
+        className="min-h-screen flex flex-col"
+        style={{
+          background: `linear-gradient(180deg, ${C.skyTop} 0%, ${C.skyBot} 100%)`,
+        }}
+      >
+        {/* Top bar — matches GPPPizzeriasPage */}
+        <header
+          className="flex items-center gap-4 px-4 py-3 sm:px-6"
+          style={{ height: 64 }}
+        >
+          <Link
+            to="/gpp"
+            className="flex items-center gap-1.5 text-sm font-medium text-white/80 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={16} />
+            Back to GPP
+          </Link>
+          <h1 className="text-lg font-bold text-white tracking-tight">
             Leaderboard
           </h1>
-        </div>
-        <p className="text-sm text-white/60 mb-6">
-          Approved Global Pizza Party events ranked by guest engagement.
-        </p>
+        </header>
 
-        {/* Tab + window segmented controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/5 p-1 self-start">
-            <button
-              type="button"
-              onClick={() => setTab('parties')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                tabParam === 'parties'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Parties
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('countries')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                tabParam === 'countries'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Countries
-            </button>
-          </div>
-          <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/5 p-1 self-start">
-            <button
-              type="button"
-              onClick={() => setWindow('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                windowParam === 'all'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              All-time
-            </button>
-            <button
-              type="button"
-              onClick={() => setWindow('year')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                windowParam === 'year'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              2026
-            </button>
-          </div>
-        </div>
-
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={28} className="animate-spin text-white/40" />
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-            {error}{' '}
-            <button
-              type="button"
-              onClick={() => load(windowParam, limit)}
-              className="ml-2 underline text-red-100 hover:text-white"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && data && (
-          <>
-            <div className="text-xs text-white/40 mb-2 tabular-nums">
-              {headline}
+        {/* Content */}
+        <div className="flex-1">
+          <div className="max-w-3xl mx-auto px-4 py-4 sm:py-8">
+            {/* Hero title */}
+            <div className="flex items-center gap-3 mb-2">
+              <Trophy size={24} className="text-white drop-shadow-sm" />
+              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                Leaderboard
+              </h2>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-              {tabParam === 'parties' ? (
-                partyRows.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-white/50">
-                    No parties yet for this window.
-                  </div>
-                ) : (
-                  partyRows.map((row) => (
-                    <LeaderboardPartyRowView key={row.id} row={row} />
-                  ))
-                )
-              ) : countryRows.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-white/50">
-                  No countries yet for this window.
-                </div>
-              ) : (
-                countryRows.map((row) => (
-                  <LeaderboardCountryRowView key={row.country} row={row} />
-                ))
-              )}
-            </div>
+            <p className="text-sm text-white/85 mb-5">
+              Approved Global Pizza Party events ranked by guest engagement.
+            </p>
 
-            {tabParam === 'parties' && hasMore && (
-              <div className="flex justify-center mt-4">
+            {/* Tab + window segmented controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm">
                 <button
                   type="button"
-                  onClick={showMore}
-                  className="px-4 py-2 rounded-lg border border-white/15 bg-white/5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                  onClick={() => setTab('parties')}
+                  className={segBtn(tabParam === 'parties')}
+                  style={segBtnStyle(tabParam === 'parties')}
                 >
-                  Show more
+                  Parties
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('countries')}
+                  className={segBtn(tabParam === 'countries')}
+                  style={segBtnStyle(tabParam === 'countries')}
+                >
+                  Countries
+                </button>
+              </div>
+              <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setWindow('all')}
+                  className={segBtn(windowParam === 'all')}
+                  style={segBtnStyle(windowParam === 'all')}
+                >
+                  All-time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWindow('year')}
+                  className={segBtn(windowParam === 'year')}
+                  style={segBtnStyle(windowParam === 'year')}
+                >
+                  2026
+                </button>
+              </div>
+            </div>
+
+            {loading && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={28} className="animate-spin text-[#E52828]" />
+              </div>
+            )}
+
+            {error && !loading && (
+              <div className="rounded-2xl border border-black/[0.08] bg-white/90 backdrop-blur-sm shadow-lg p-5 text-sm text-red-600 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => load(windowParam, limit)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:-translate-y-0.5 self-start"
+                  style={{ background: C.red }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = C.redHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = C.red;
+                  }}
+                >
+                  Retry
                 </button>
               </div>
             )}
 
-            <div className="text-[11px] text-white/30 mt-6 text-center">
-              Score = link RSVPs + 0.3 invite RSVPs + 2 check-ins + 0.5 photos
-              (max 100 photos).
-            </div>
-          </>
-        )}
+            {!loading && !error && data && (
+              <>
+                <div className="text-xs text-white/80 mb-2 tabular-nums">
+                  {headline}
+                </div>
+                <div className="rounded-2xl border border-black/[0.08] bg-white/90 backdrop-blur-sm shadow-lg overflow-hidden">
+                  {tabParam === 'parties' ? (
+                    partyRows.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-[#555]">
+                        No parties yet for this window.
+                      </div>
+                    ) : (
+                      partyRows.map((row) => (
+                        <LeaderboardPartyRowView key={row.id} row={row} />
+                      ))
+                    )
+                  ) : countryRows.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-[#555]">
+                      No countries yet for this window.
+                    </div>
+                  ) : (
+                    countryRows.map((row) => (
+                      <LeaderboardCountryRowView key={row.country} row={row} />
+                    ))
+                  )}
+                </div>
+
+                {tabParam === 'parties' && hasMore && (
+                  <div className="flex justify-center mt-4">
+                    <button
+                      type="button"
+                      onClick={showMore}
+                      className="px-5 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:-translate-y-0.5 shadow-sm"
+                      style={{ background: C.red }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = C.redHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = C.red;
+                      }}
+                    >
+                      Show more
+                    </button>
+                  </div>
+                )}
+
+                <div className="text-[11px] text-white/70 mt-6 text-center">
+                  Score = link RSVPs + 0.3 invite RSVPs + 2 check-ins + 0.5 photos
+                  (max 100 photos).
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
-    </Layout>
+    </>
   );
 }
