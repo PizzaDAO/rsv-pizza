@@ -6,3 +6,5 @@ export { BulkActionsBar } from './BulkActionsBar';
 export { ExternalPaymentModal } from './ExternalPaymentModal';
 export { PrepayQueueTable } from './PrepayQueueTable';
 export { CreatePrepaymentModal } from './CreatePrepaymentModal';
+export { HostPaymentDetailsModal } from './HostPaymentDetailsModal';
+export { ExportSafeJsonModal } from './ExportSafeJsonModal';

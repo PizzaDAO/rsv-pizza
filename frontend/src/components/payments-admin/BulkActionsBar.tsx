@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, DollarSign, Loader2 } from 'lucide-react';
+import { Check, X, DollarSign, Loader2, FileJson } from 'lucide-react';
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -7,6 +7,11 @@ interface BulkActionsBarProps {
   onReject: () => void;
   onMarkPaid: () => void;
   onClear: () => void;
+  /**
+   * siciliana-69183: open the ExportSafeJsonModal for the current selection.
+   * The modal itself filters non-USDC / missing-wallet rows.
+   */
+  onExportSafeJson?: () => void;
   busy?: boolean;
 }
 
@@ -16,6 +21,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   onReject,
   onMarkPaid,
   onClear,
+  onExportSafeJson,
   busy = false,
 }) => {
   if (selectedCount === 0) return null;
@@ -50,6 +56,18 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
           <DollarSign size={14} />
           Mark paid
         </button>
+        {onExportSafeJson && (
+          <button
+            type="button"
+            onClick={onExportSafeJson}
+            disabled={busy}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
+            title="Bundle selected USDC payouts as a Gnosis Safe Transaction Builder batch"
+          >
+            <FileJson size={14} />
+            Export Safe JSON
+          </button>
+        )}
         <button
           type="button"
           onClick={onClear}

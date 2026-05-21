@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest, isAdmin, isSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
@@ -137,6 +137,95 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next:
     next(error);
   }
 });
+
+// ============================================
+// GET /api/admin/users/:userId/payment-details — siciliana-69183
+//
+// Returns a user's saved payment-details for the admin /payments dashboard.
+// Surfaced when an admin clicks a host chip / "Submitted by X" caption in the
+// prepay queue + payouts table. Gated to admin / super_admin / payment_admin
+// only (same role set that can already see the /payments dashboard).
+//
+// Returns only what the admin needs to verify / route a payment:
+// preferred method, wallet address (for usdc_base), bank email (for wire),
+// plus a "totalPayouts + latestPayoutAt" context blurb. We intentionally do
+// NOT return the full bank-details JSON (routing/account numbers etc.) —
+// admins don't need it on this surface (Mercury / wire happen out-of-band).
+// ============================================
+router.get(
+  '/users/:userId/payment-details',
+  requireAuth,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isPaymentAdmin(req.userEmail))) {
+        throw new AppError('Payments admin access required', 403, 'FORBIDDEN');
+      }
+
+      const userId = req.params.userId?.trim();
+      if (!userId) {
+        throw new AppError('userId is required', 400, 'VALIDATION_ERROR');
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          preferredPayoutMethod: true,
+          payoutWalletAddress: true,
+          payoutBankDetails: true,
+        },
+      });
+      if (!user) {
+        throw new AppError('User not found', 404, 'NOT_FOUND');
+      }
+
+      // Activity context — how many payouts this user has on the system, and
+      // the most recent one (any status). Helps the admin sanity-check: a
+      // user with 0 payouts and no latest is a brand-new host.
+      const [totalPayouts, latest] = await Promise.all([
+        prisma.payout.count({ where: { hostUserId: userId } }),
+        prisma.payout.findFirst({
+          where: { hostUserId: userId },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+      ]);
+
+      // Strip bank details to just the correspondence email (the only piece
+      // an admin needs to reach the host about the wire). Keeps routing /
+      // account numbers off the wire.
+      let bankEmail: string | null = null;
+      const bd = user.payoutBankDetails as any;
+      if (bd && typeof bd === 'object' && typeof bd.email === 'string' && bd.email.trim()) {
+        bankEmail = bd.email.trim();
+      }
+
+      // Validate the persisted method against the 3 hard rails. Anything else
+      // is treated as unset so the UI shows the "Not set" state instead of a
+      // garbage label.
+      const rawMethod = user.preferredPayoutMethod;
+      const method =
+        rawMethod === 'mercury_card' || rawMethod === 'wire' || rawMethod === 'usdc_base'
+          ? rawMethod
+          : null;
+
+      res.json({
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        preferredPayoutMethod: method,
+        payoutWalletAddress: user.payoutWalletAddress,
+        payoutBankDetails: bankEmail !== null ? { email: bankEmail } : null,
+        totalPayouts,
+        latestPayoutAt: latest?.createdAt ? latest.createdAt.toISOString() : null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // GET /api/admin/gpp-nft — Get current GPP NFT settings
 router.get('/gpp-nft', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
