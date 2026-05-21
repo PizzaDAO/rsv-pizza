@@ -537,13 +537,15 @@ export function EventPage() {
   };
 
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component).
-  // Prefer canonical place_id (ChIJ…) + address — opens the real place card.
+  // Per Google's Maps Universal URL spec, `/maps/search/?api=1` with both
+  // `query` and `query_place_id` opens the canonical place card. `/maps/place/?api=1`
+  // is not a valid action and Google falls back to a generic IP-located map view.
   // Skip query_place_id for Google's address-shell IDs (prefixes Ei…/Ek…), which
   // are autocomplete fallbacks that don't resolve to a Maps place page. Fall
   // back to address alone, then to lat/lng if no address.
   const hasCanonicalPlaceId = event.placeId?.startsWith('ChIJ') ?? false;
   const googleMapsUrl = hasCanonicalPlaceId && event.address
-    ? `https://www.google.com/maps/place/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
     : event.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
       : event.latitude && event.longitude
