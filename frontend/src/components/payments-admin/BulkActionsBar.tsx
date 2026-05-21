@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, DollarSign, Loader2, FileJson } from 'lucide-react';
+import { Check, X, DollarSign, Loader2, FileJson, Send } from 'lucide-react';
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -12,6 +12,17 @@ interface BulkActionsBarProps {
    * The modal itself filters non-USDC / missing-wallet rows.
    */
   onExportSafeJson?: () => void;
+  /**
+   * salsiccia-49102: open the BulkSendModal for the current selection.
+   * Button only enabled when `eligibleBulkSendCount > 0` (USDC + approved).
+   */
+  onBulkSend?: () => void;
+  /**
+   * Number of selected rows that are eligible for bulk USDC send
+   * (usdc_base + approved + valid 0x wallet). When 0, the "Bulk Send" button
+   * is grayed out + tooltip explains why.
+   */
+  eligibleBulkSendCount?: number;
   busy?: boolean;
 }
 
@@ -22,6 +33,8 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   onMarkPaid,
   onClear,
   onExportSafeJson,
+  onBulkSend,
+  eligibleBulkSendCount = 0,
   busy = false,
 }) => {
   if (selectedCount === 0) return null;
@@ -56,6 +69,22 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
           <DollarSign size={14} />
           Mark paid
         </button>
+        {onBulkSend && (
+          <button
+            type="button"
+            onClick={onBulkSend}
+            disabled={busy || eligibleBulkSendCount === 0}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              eligibleBulkSendCount === 0
+                ? 'No eligible USDC payouts selected (need approved or failed + valid 0x wallet)'
+                : `Send USDC from the hot wallet to ${eligibleBulkSendCount} recipient${eligibleBulkSendCount === 1 ? '' : 's'}`
+            }
+          >
+            <Send size={14} />
+            Bulk Send{eligibleBulkSendCount > 0 ? ` (${eligibleBulkSendCount})` : ''}
+          </button>
+        )}
         {onExportSafeJson && (
           <button
             type="button"

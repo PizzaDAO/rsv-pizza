@@ -28,6 +28,7 @@ import {
   sendUsdcPayment,
   getUsdcDailyCapStatus,
   getPayoutWalletAddress,
+  getPayoutWalletBalanceUsd,
 } from '../services/usdc-base.service.js';
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
@@ -1882,6 +1883,213 @@ router.post(
       });
 
       res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// salsiccia-49102: POST /api/admin/payouts/bulk-execute
+//
+// Sequentially executes `sendUsdcPayment` for each eligible (USDC, approved,
+// valid 0x wallet) payout in the request body. Sequential — NOT Promise.all —
+// because the hot wallet has a single signer and viem's WalletClient manages
+// nonces per process; concurrent sends would race the nonce calculation.
+//
+// Pre-flight: fetches hot-wallet USDC balance once before the loop. If
+// balance < SUM(amounts), returns 400 INSUFFICIENT_BALANCE with the shortfall
+// so the admin doesn't watch payouts fail one-by-one mid-batch. (The per-tx
+// pre-flight inside sendUsdcPayment will still catch issues that arise after
+// the first sends drain the balance.)
+//
+// Each per-payout call delegates to the shared `executePayout` helper, which
+// already (a) sends the onchain tx, (b) flips status -> paid + writes a
+// mark_paid audit on success, (c) flips status -> failed + writes a
+// mark_failed audit on send-failure. We additionally write a single
+// `bulk_execute` audit per row so the batch context is preserved.
+//
+// Request body: { ids: string[] }   (max 50)
+// Response: BulkSendResult[] in the SAME order as the eligible ids submitted.
+// ============================================
+
+const BULK_EXECUTE_MAX_IDS = 50;
+const USDC_BASE_WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
+
+interface BulkSendResult {
+  id: string;
+  success: boolean;
+  status: 'paid' | 'failed';
+  txHash?: string;
+  error?: string;
+}
+
+router.post(
+  '/bulk-execute',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+
+      const rawIds = (req.body && Array.isArray(req.body.ids)) ? req.body.ids : null;
+      if (!rawIds || rawIds.length === 0) {
+        throw new AppError('ids must be a non-empty array', 400, 'VALIDATION_ERROR');
+      }
+      if (rawIds.length > BULK_EXECUTE_MAX_IDS) {
+        throw new AppError(
+          `Too many ids: ${rawIds.length} > ${BULK_EXECUTE_MAX_IDS}. ` +
+            `Split the selection into smaller batches.`,
+          400,
+          'BULK_TOO_LARGE',
+        );
+      }
+
+      const ids: string[] = [];
+      for (const v of rawIds) {
+        if (typeof v !== 'string' || !v.trim()) {
+          throw new AppError('ids must be an array of non-empty strings', 400, 'VALIDATION_ERROR');
+        }
+        ids.push(v.trim());
+      }
+
+      // Single Prisma query for all candidates — then filter in-memory to the
+      // eligible subset (USDC + approved + valid 0x wallet). Anything missing
+      // from the DB result is silently skipped (caller's selection may
+      // include a row that was just paid/rejected by another admin).
+      const rows = await prisma.payout.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          status: true,
+          payoutMethod: true,
+          payoutWalletAddress: true,
+          finalAmountUsd: true,
+          hostUserId: true,
+        },
+      });
+
+      const eligible: typeof rows = [];
+      for (const r of rows) {
+        if (r.payoutMethod !== 'usdc_base') continue;
+        // passata-49102: also accept 'failed' so admins can re-try previously
+        // failed USDC payouts from the same bulk-send UI without first
+        // flipping them back to 'approved'. Matches the single-execute
+        // handler's allowed-statuses set.
+        if (r.status !== 'approved' && r.status !== 'failed') continue;
+        if (!r.payoutWalletAddress || !USDC_BASE_WALLET_RE.test(r.payoutWalletAddress)) continue;
+        // Self-payout guard applies to payment_admin actors. Drop these from
+        // the eligible set so the batch doesn't 403 mid-loop; admin can
+        // execute them via another admin.
+        try {
+          assertNotSelfPayout(actor, r.hostUserId);
+        } catch {
+          continue;
+        }
+        eligible.push(r);
+      }
+
+      if (eligible.length === 0) {
+        // Empty batch is a 400 rather than a 200 with [] — the UI should
+        // never reach here (it filters client-side too) so this is most
+        // likely a stale selection.
+        throw new AppError(
+          'No eligible payouts in selection (need USDC + approved/failed + valid 0x wallet)',
+          400,
+          'NO_ELIGIBLE_PAYOUTS',
+        );
+      }
+
+      // Pre-flight balance check — one RPC call, bail the whole batch if
+      // funds are insufficient. Per-tx pre-flight inside sendUsdcPayment
+      // still runs (and will catch issues mid-batch if balance drains).
+      const totalUsd = eligible.reduce((sum, r) => sum + Number(r.finalAmountUsd), 0);
+      try {
+        const { address, balanceUsd } = await getPayoutWalletBalanceUsd();
+        if (balanceUsd < totalUsd) {
+          const shortfall = totalUsd - balanceUsd;
+          throw new AppError(
+            `Insufficient USDC balance: wallet ${address} has $${balanceUsd.toFixed(2)}, ` +
+              `batch needs $${totalUsd.toFixed(2)} (short $${shortfall.toFixed(2)})`,
+            400,
+            'INSUFFICIENT_BALANCE',
+          );
+        }
+      } catch (err: any) {
+        // Re-throw AppErrors as-is; wrap viem/RPC errors into a 503 so the
+        // admin sees a clear remediation hint instead of a raw stack.
+        if (err instanceof AppError) throw err;
+        const errMsg = err?.message || String(err);
+        console.error(`[admin-payout] bulk-execute pre-flight balance check failed: ${errMsg}`);
+        throw new AppError(
+          `Pre-flight balance check failed: ${errMsg}`,
+          503,
+          'BALANCE_CHECK_FAILED',
+        );
+      }
+
+      // SEQUENTIAL execution — nonce safety. Do NOT switch to Promise.all.
+      const results: BulkSendResult[] = [];
+      for (const row of eligible) {
+        const priorStatus = row.status; // 'approved' or 'failed' (passata-49102)
+        try {
+          const updated = await executePayout({
+            payoutId: row.id,
+            actor: { email: actor.email, actorKind: actor.actorKind },
+            body: {},
+          });
+          // Record a batch-context audit alongside the mark_paid audit that
+          // executePayout already wrote.
+          await prisma.payoutAudit.create({
+            data: {
+              payoutId: row.id,
+              action: 'bulk_execute',
+              oldStatus: priorStatus,
+              newStatus: 'paid',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: `Bulk-send: ${eligible.length} payouts in batch`,
+            },
+          }).catch((e) => {
+            // Audit-row failure shouldn't bubble — the mark_paid audit was
+            // already written by executePayout.
+            console.warn(`[admin-payout] bulk_execute audit write failed for ${row.id}:`, e?.message || e);
+          });
+          results.push({
+            id: row.id,
+            success: true,
+            status: 'paid',
+            txHash: updated?.transactionHash ?? undefined,
+          });
+        } catch (err: any) {
+          // executePayout already flipped status -> failed + wrote a
+          // mark_failed audit for USDC send-failures (lines 1722-1744 above).
+          // Add a batch-context audit so the row's audit log shows "this
+          // failure was part of a bulk send".
+          const errMsg = err?.message || String(err);
+          await prisma.payoutAudit.create({
+            data: {
+              payoutId: row.id,
+              action: 'bulk_execute',
+              oldStatus: priorStatus,
+              newStatus: 'failed',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: `Bulk-send failure: ${errMsg.slice(0, 400)}`,
+            },
+          }).catch((e) => {
+            console.warn(`[admin-payout] bulk_execute failure-audit write failed for ${row.id}:`, e?.message || e);
+          });
+          results.push({
+            id: row.id,
+            success: false,
+            status: 'failed',
+            error: errMsg,
+          });
+        }
+      }
+
+      res.json({ results });
     } catch (error) {
       next(error);
     }

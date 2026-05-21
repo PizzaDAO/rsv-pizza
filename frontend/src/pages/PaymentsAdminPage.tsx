@@ -35,9 +35,11 @@ import {
   CreatePrepaymentModal,
   HostPaymentDetailsModal,
   ExportSafeJsonModal,
+  BulkSendModal,
   RejectReasonModal,
   HotWalletCard,
 } from '../components/payments-admin';
+import type { BulkSendResult } from '../lib/api';
 
 type RoleState =
   | { kind: 'loading' }
@@ -114,6 +116,11 @@ export function PaymentsAdminPage() {
   // siciliana-69183: Safe Transaction Builder JSON export. Modal is mounted
   // when true; the modal itself filters non-USDC / missing-wallet rows.
   const [showSafeExportModal, setShowSafeExportModal] = useState(false);
+
+  // salsiccia-49102: BulkSendModal — sequentially executes USDC payouts via
+  // backend POST /api/admin/payouts/bulk-execute. Modal does its own
+  // eligibility filter; we just hand it `selectedPayouts`.
+  const [showBulkSend, setShowBulkSend] = useState(false);
 
   // crudo-91827: in-app reject-reason modal target. Replaces window.prompt()
   // which gets silently blocked by popup blockers / Brave / Arc / extensions.
@@ -223,6 +230,23 @@ export function PaymentsAdminPage() {
     () => payouts.filter((p) => selectedIds.has(p.id)),
     [payouts, selectedIds],
   );
+
+  // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
+  // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
+  // wallet — passata-49102 added failed-status retry) so the BulkActionsBar
+  // button label + tooltip match what the server will actually execute.
+  // Kept in this file (not in BulkSendModal) so the bar can show the count
+  // even when the modal is closed.
+  const eligibleBulkSendCount = useMemo(() => {
+    const re = /^0x[0-9a-fA-F]{40}$/;
+    return selectedPayouts.filter(
+      (p) =>
+        p.payoutMethod === 'usdc_base' &&
+        (p.status === 'approved' || p.status === 'failed') &&
+        !!p.payoutWalletAddress &&
+        re.test(p.payoutWalletAddress),
+    ).length;
+  }, [selectedPayouts]);
 
   // pomodoro-58294: sort the prepay queue client-side. 'newest' is a no-op so
   // we preserve backend ordering; the city sort strips the "Global Pizza Party"
@@ -570,6 +594,8 @@ export function PaymentsAdminPage() {
           onReject={handleBulkReject}
           onMarkPaid={handleBulkMarkPaid}
           onExportSafeJson={() => setShowSafeExportModal(true)}
+          onBulkSend={() => setShowBulkSend(true)}
+          eligibleBulkSendCount={eligibleBulkSendCount}
           onClear={clearSelection}
           busy={bulkBusy}
         />
@@ -764,6 +790,25 @@ export function PaymentsAdminPage() {
             }}
           />
         )}
+
+        {/* salsiccia-49102: bulk USDC send for selected approved payouts.
+            onComplete refreshes BOTH the payouts list (so paid rows flip to
+            'paid') and the prepay queue (so the source rows drop off). */}
+        <BulkSendModal
+          isOpen={showBulkSend}
+          selectedPayouts={selectedPayouts}
+          onCancel={() => setShowBulkSend(false)}
+          onComplete={async (results: BulkSendResult[]) => {
+            const paid = results.filter((r) => r.status === 'paid').length;
+            const failed = results.filter((r) => r.status === 'failed').length;
+            pushToast(
+              `Bulk send: ${paid} paid${failed > 0 ? `, ${failed} failed` : ''}`,
+              failed > 0 ? 'error' : 'success',
+            );
+            clearSelection();
+            await Promise.all([refresh(), loadPrepayQueue()]);
+          }}
+        />
 
         {/* siciliana-69183: toast stack (bottom-right, 3s auto-dismiss). */}
         {toasts.length > 0 && (
