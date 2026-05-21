@@ -43,6 +43,8 @@ model User {
   aiPhoneCalls AIPhoneCall[]
   payouts      Payout[]
   uploadedPayoutDocuments PayoutDocument[] @relation("PayoutDocumentUploadedBy")
+  reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
+  reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
 }
 
 model Party {
@@ -241,8 +243,31 @@ model Party {
   outreachAttempts      OutreachAttempt[]
   announcements         Announcement[]
   attestations          GuestAttestation[]
+  reimbursementCapAppeals ReimbursementCapAppeal[]
 
   @@map("parties")
+}
+
+// quattro-12847: Full history of host reimbursement-cap appeals.
+// The denormalized `parties.reimbursement_cap_appealed_at` / `_appeal_note`
+// columns remain as a cache of the latest appeal for legacy reads; new code
+// keys off this table so underbosses can mark appeals as reviewed and view
+// the full history of past appeals + resolutions.
+model ReimbursementCapAppeal {
+  id               String   @id @default(uuid()) @db.Uuid
+  partyId          String   @map("party_id") @db.Uuid
+  party            Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  hostUserId       String   @map("host_user_id")
+  host             User     @relation("ReimbursementCapAppealsByHost", fields: [hostUserId], references: [id])
+  note             String
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewedByUserId String?  @map("reviewed_by_user_id")
+  reviewedBy       User?    @relation("ReimbursementCapAppealsReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewedNote     String?  @map("reviewed_note")
+
+  @@index([partyId])
+  @@map("reimbursement_cap_appeals")
 }
 
 // pepperoni-58341: Audit log of day-of broadcasts (Telegram + email) sent from

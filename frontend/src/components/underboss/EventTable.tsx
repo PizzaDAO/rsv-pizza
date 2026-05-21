@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, ArrowUpDown, ThumbsUp, ThumbsDown, ChevronDown, Check, X, DollarSign } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import { EventRow } from './EventRow';
 import { EventCard } from './EventCard';
 import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from '../../lib/api';
@@ -21,7 +22,7 @@ interface EventTableProps {
   isAdmin?: boolean;
 }
 
-type SortField = 'name' | 'date' | 'guestCount' | 'progress';
+type SortField = 'name' | 'date' | 'guestCount' | 'progress' | 'appealsFirst';
 type SortDir = 'asc' | 'desc';
 
 // Filterable progress keys (skip "Event" always-true and "Prep" always-false)
@@ -98,6 +99,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [rsvpComparator, setRsvpComparator] = useState<'>' | '<'>('>');
   const [rsvpThreshold, setRsvpThreshold] = useState<string>('');
+  // quattro-12847: client-side "Open appeals only" filter. Client-side keeps
+  // the filter live (no refetch) and works against whatever `events` slice
+  // the parent passes in. Backend supports an equivalent `appealsOnly=true`
+  // query param for callers that want server-side narrowing.
+  const [appealsOnly, setAppealsOnly] = useState<boolean>(false);
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -219,6 +225,11 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       }
     }
 
+    // quattro-12847: "open cap appeals only" filter
+    if (appealsOnly) {
+      result = result.filter((e) => e.hasOpenAppeal === true);
+    }
+
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -237,12 +248,25 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         case 'progress':
           cmp = countProgress(a) - countProgress(b);
           break;
+        case 'appealsFirst': {
+          // quattro-12847: events with open cap appeals first; tie-break by date asc.
+          const aOpen = a.hasOpenAppeal ? 1 : 0;
+          const bOpen = b.hasOpenAppeal ? 1 : 0;
+          if (aOpen !== bOpen) {
+            // Always show open appeals first regardless of sortDir
+            return bOpen - aOpen;
+          }
+          const aDate = a.date ? new Date(a.date).getTime() : Number.MAX_SAFE_INTEGER;
+          const bDate = b.date ? new Date(b.date).getTime() : Number.MAX_SAFE_INTEGER;
+          cmp = aDate - bDate;
+          break;
+        }
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold, appealsOnly]);
 
   useEffect(() => {
     onFilteredEventsChange?.(filteredEvents);
@@ -297,7 +321,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     progressExcludes.length > 0 ||
     regionFilter !== 'all' ||
     tagFilter !== 'all' ||
-    rsvpThreshold.trim() !== '';
+    rsvpThreshold.trim() !== '' ||
+    appealsOnly;
 
   return (
     <div className="space-y-3">
@@ -408,6 +433,33 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           />
         </div>
 
+        {/* quattro-12847: Open cap-appeals only + sort-by-appeals-first */}
+        <Checkbox
+          checked={appealsOnly}
+          onChange={() => setAppealsOnly((v) => !v)}
+          label="Open appeals only"
+          size={14}
+          labelClassName="text-xs text-theme-text-secondary"
+        />
+        <select
+          value={sortField === 'appealsFirst' ? 'appealsFirst' : 'default'}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'appealsFirst') {
+              setSortField('appealsFirst');
+              setSortDir('asc');
+            } else {
+              setSortField('date');
+              setSortDir('asc');
+            }
+          }}
+          className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
+          aria-label="Sort"
+        >
+          <option value="default">Sort: default</option>
+          <option value="appealsFirst">Sort: appeals first</option>
+        </select>
+
         {/* Clear filters link */}
         {hasActiveFilters && (
           <button
@@ -417,6 +469,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setRegionFilter('all');
               setTagFilter('all');
               setRsvpThreshold('');
+              setAppealsOnly(false);
             }}
             className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
           >

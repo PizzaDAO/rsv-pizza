@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
@@ -912,11 +913,144 @@ router.post('/:partyId/reimbursement-cap/appeal', async (req: AuthRequest, res: 
       },
     });
 
+    // quattro-12847: also insert a row into the appeal-history table so
+    // underbosses can mark each appeal reviewed and view past appeals.
+    // The denormalized columns above are kept as a backwards-compat cache.
+    if (req.userId) {
+      await prisma.reimbursementCapAppeal.create({
+        data: {
+          partyId,
+          hostUserId: req.userId,
+          note: trimmed,
+        },
+      });
+    }
+
     res.json({
       partyId: updated.id,
       reimbursementCapUsd: updated.reimbursementCapUsd != null ? Number(updated.reimbursementCapUsd) : null,
       reimbursementCapAppealNote: updated.reimbursementCapAppealNote,
       reimbursementCapAppealedAt: updated.reimbursementCapAppealedAt ? updated.reimbursementCapAppealedAt.toISOString() : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/reimbursement-cap/appeals/review (quattro-12847)
+// Mark the latest unreviewed appeal as reviewed. Admin OR underboss-in-scope only.
+router.post('/:partyId/reimbursement-cap/appeals/review', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { reviewedNote } = req.body ?? {};
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, region: true, name: true, city: true, eventType: true },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Authz: admin OR underboss whose scope includes this party.
+    let allowed = false;
+    if (await isAdmin(req.userEmail)) {
+      allowed = true;
+    } else if (await isUnderboss(req.userEmail)) {
+      const scope = await getUnderbossScope(req.userEmail);
+      if (partyMatchesScope(party, scope)) {
+        allowed = true;
+      }
+    }
+    if (!allowed) {
+      throw new AppError('Only an underboss or admin can review cap appeals', 403, 'FORBIDDEN');
+    }
+
+    const open = await prisma.reimbursementCapAppeal.findFirst({
+      where: { partyId, reviewedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!open) {
+      throw new AppError('No open appeal to review', 404, 'NO_OPEN_APPEAL');
+    }
+    const updated = await prisma.reimbursementCapAppeal.update({
+      where: { id: open.id },
+      data: {
+        reviewedAt: new Date(),
+        reviewedByUserId: req.userId ?? null,
+        reviewedNote: typeof reviewedNote === 'string' && reviewedNote.trim() ? reviewedNote.trim() : null,
+      },
+    });
+    res.json({
+      id: updated.id,
+      partyId: updated.partyId,
+      reviewedAt: updated.reviewedAt ? updated.reviewedAt.toISOString() : null,
+      reviewedByUserId: updated.reviewedByUserId,
+      reviewedNote: updated.reviewedNote,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:partyId/reimbursement-cap/appeals (quattro-12847)
+// Return the full appeal history (newest first). Admin OR underboss-in-scope
+// OR the party host themselves may view.
+router.get('/:partyId/reimbursement-cap/appeals', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, region: true, name: true, city: true, eventType: true, userId: true },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    let allowed = false;
+    if (party.userId && party.userId === req.userId) {
+      allowed = true;
+    } else if (await isAdmin(req.userEmail)) {
+      allowed = true;
+    } else if (await isUnderboss(req.userEmail)) {
+      const scope = await getUnderbossScope(req.userEmail);
+      if (partyMatchesScope(party, scope)) {
+        allowed = true;
+      }
+    } else {
+      // Co-host with edit permission can also view (delegated host).
+      const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (canEdit) allowed = true;
+    }
+    if (!allowed) {
+      throw new AppError('Not authorized to view appeal history', 403, 'FORBIDDEN');
+    }
+
+    const appeals = await prisma.reimbursementCapAppeal.findMany({
+      where: { partyId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        reviewedBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.json({
+      appeals: appeals.map((a) => ({
+        id: a.id,
+        partyId: a.partyId,
+        hostUserId: a.hostUserId,
+        hostName: a.host?.name ?? null,
+        hostEmail: a.host?.email ?? '',
+        note: a.note,
+        createdAt: a.createdAt.toISOString(),
+        reviewedAt: a.reviewedAt ? a.reviewedAt.toISOString() : null,
+        reviewedByUserId: a.reviewedByUserId,
+        reviewedByName: a.reviewedBy?.name ?? null,
+        reviewedByEmail: a.reviewedBy?.email ?? null,
+        reviewedNote: a.reviewedNote,
+      })),
     });
   } catch (error) {
     next(error);

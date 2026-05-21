@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Check, Edit2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { computeSuggestedReimbursementCap } from '../../utils/reimbursementCap';
-import { updatePartyApi } from '../../lib/api';
+import { updatePartyApi, reviewReimbursementCapAppeal } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
+import { AppealHistoryModal } from './AppealHistoryModal';
 
 interface ReimbursementCapCellProps {
   event: UnderbossEvent;
@@ -33,7 +34,12 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   const hasSuggestion = suggestedUsd != null;
 
   const currentCap = event.reimbursementCapUsd;
-  const hasAppeal = !!event.reimbursementCapAppealedAt;
+  // quattro-12847: switch from the legacy denormalized timestamp to the
+  // history-table-derived `hasOpenAppeal`. Fall back to the legacy field if
+  // the backend on this preview hasn't been redeployed yet.
+  const hasOpenAppeal = typeof event.hasOpenAppeal === 'boolean'
+    ? event.hasOpenAppeal
+    : !!event.reimbursementCapAppealedAt;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(
@@ -41,6 +47,69 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  async function handleMarkReviewed(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (reviewing) return;
+    setReviewing(true);
+    setReviewError(null);
+    try {
+      await reviewReimbursementCapAppeal(event.id);
+      onUpdate?.(event.id, { hasOpenAppeal: false });
+    } catch (err: any) {
+      setReviewError(err?.message || 'Failed to mark reviewed');
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  function renderAppealAffordance() {
+    if (!hasOpenAppeal) {
+      // Even with no open appeal, surface a History entry-point when there's
+      // a known past appeal (so reviewers can re-read the resolved note).
+      if (!event.reimbursementCapAppealedAt) return null;
+      return (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setHistoryOpen(true); }}
+          className="text-[9px] px-1 py-0.5 rounded border border-theme-stroke text-theme-text-faint hover:text-theme-text-muted transition-colors"
+          title="View appeal history"
+        >
+          History
+        </button>
+      );
+    }
+    return (
+      <>
+        <span title={event.reimbursementCapAppealNote || 'Host has an open appeal'}>
+          <AlertCircle size={10} className="text-amber-400" />
+        </span>
+        <button
+          type="button"
+          onClick={handleMarkReviewed}
+          disabled={reviewing}
+          className="text-[9px] px-1 py-0.5 rounded border border-theme-stroke text-theme-text-muted hover:text-theme-text transition-colors disabled:opacity-40"
+          title="Mark this appeal as reviewed"
+        >
+          {reviewing ? <Loader2 size={9} className="inline animate-spin" /> : 'Mark reviewed'}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setHistoryOpen(true); }}
+          className="text-[9px] px-1 py-0.5 rounded border border-theme-stroke text-theme-text-faint hover:text-theme-text-muted transition-colors"
+          title="View appeal history"
+        >
+          History
+        </button>
+        {reviewError && (
+          <span className="text-[9px] text-red-400" title={reviewError}>!</span>
+        )}
+      </>
+    );
+  }
 
   async function save(value: number | null) {
     setSaving(true);
@@ -136,10 +205,9 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
           >
             Override
           </button>
-          {hasAppeal && (
-            <span title={event.reimbursementCapAppealNote || 'Host has appealed'}>
-              <AlertCircle size={10} className="text-amber-400" />
-            </span>
+          {renderAppealAffordance()}
+          {historyOpen && (
+            <AppealHistoryModal partyId={event.id} onClose={() => setHistoryOpen(false)} />
           )}
         </div>
       );
@@ -166,10 +234,9 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
         >
           Override
         </button>
-        {hasAppeal && (
-          <span title={event.reimbursementCapAppealNote || 'Host has appealed'}>
-            <AlertCircle size={10} className="text-amber-400" />
-          </span>
+        {renderAppealAffordance()}
+        {historyOpen && (
+          <AppealHistoryModal partyId={event.id} onClose={() => setHistoryOpen(false)} />
         )}
       </div>
     );
@@ -188,10 +255,9 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
       >
         <Edit2 size={9} />
       </button>
-      {hasAppeal && (
-        <span title={event.reimbursementCapAppealNote || 'Host has appealed'}>
-          <AlertCircle size={10} className="text-amber-400" />
-        </span>
+      {renderAppealAffordance()}
+      {historyOpen && (
+        <AppealHistoryModal partyId={event.id} onClose={() => setHistoryOpen(false)} />
       )}
     </div>
   );
