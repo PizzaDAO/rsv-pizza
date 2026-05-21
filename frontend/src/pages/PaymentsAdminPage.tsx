@@ -101,6 +101,11 @@ export function PaymentsAdminPage() {
   // on tab refresh — no persistence.
   const [prepaySearch, setPrepaySearch] = useState('');
 
+  // pomodoro-58294: client-side sort for the prepay queue. Default 'newest'
+  // preserves whatever order the backend sent.
+  type PrepaySortKey = 'newest' | 'country_asc' | 'country_desc' | 'city_asc' | 'city_desc';
+  const [prepaySort, setPrepaySort] = useState<PrepaySortKey>('newest');
+
   // siciliana-69183: clickable host name opens the read-only payment-details
   // modal. Holds the User.id; null = modal closed.
   const [hostDetailUserId, setHostDetailUserId] = useState<string | null>(null);
@@ -217,6 +222,33 @@ export function PaymentsAdminPage() {
     () => payouts.filter((p) => selectedIds.has(p.id)),
     [payouts, selectedIds],
   );
+
+  // pomodoro-58294: sort the prepay queue client-side. 'newest' is a no-op so
+  // we preserve backend ordering; the city sort strips the "Global Pizza Party"
+  // prefix so events sort by their actual locality. Sort runs over the
+  // lardo-58294 filtered list so search + sort compose cleanly.
+  const sortedPrepayQueue = useMemo(() => {
+    if (prepaySort === 'newest') return filteredPrepayQueue;
+    const stripCity = (name: string) =>
+      name.replace(/^Global Pizza Party\s+/i, '').trim();
+    const out = [...filteredPrepayQueue];
+    out.sort((a, b) => {
+      if (prepaySort === 'country_asc' || prepaySort === 'country_desc') {
+        const ca = (a.party.country ?? '').toLowerCase();
+        const cb = (b.party.country ?? '').toLowerCase();
+        const cmp = ca.localeCompare(cb);
+        return prepaySort === 'country_asc' ? cmp : -cmp;
+      }
+      if (prepaySort === 'city_asc' || prepaySort === 'city_desc') {
+        const ca = stripCity(a.party.name).toLowerCase();
+        const cb = stripCity(b.party.name).toLowerCase();
+        const cmp = ca.localeCompare(cb);
+        return prepaySort === 'city_asc' ? cmp : -cmp;
+      }
+      return 0;
+    });
+    return out;
+  }, [filteredPrepayQueue, prepaySort]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -469,30 +501,50 @@ export function PaymentsAdminPage() {
             one matching party (host flagged prepay + saved payment method,
             no in-flight payouts).
             lardo-58294: client-side substring search above the table; header
-            count flips to "{filtered} of {total}" while a query is active. */}
+            count flips to "{filtered} of {total}" while a query is active.
+            pomodoro-58294: client-side sort control (country / city) sits on
+            the same row to the right of the search input. */}
         {prepayQueue.length > 0 && (
           <section className="mb-6">
             <h2 className="text-base font-semibold text-theme-text mb-3">
               {prepaySearch.trim()
-                ? `Prepay queue (${filteredPrepayQueue.length} of ${prepayQueue.length} events)`
+                ? `Prepay queue (${sortedPrepayQueue.length} of ${prepayQueue.length} events)`
                 : `Prepay queue (${prepayQueue.length} event${prepayQueue.length === 1 ? '' : 's'})`}
             </h2>
-            <div className="mb-3 max-w-md">
-              <IconInput
-                icon={Search}
-                type="text"
-                value={prepaySearch}
-                onChange={(e) => setPrepaySearch(e.target.value)}
-                placeholder="Search city, country, or host…"
-              />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="max-w-md flex-1">
+                <IconInput
+                  icon={Search}
+                  type="text"
+                  value={prepaySearch}
+                  onChange={(e) => setPrepaySearch(e.target.value)}
+                  placeholder="Search city, country, or host…"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wide text-theme-text-muted">
+                  Sort:
+                </span>
+                <select
+                  value={prepaySort}
+                  onChange={(e) => setPrepaySort(e.target.value as PrepaySortKey)}
+                  className="bg-theme-surface border border-theme-stroke rounded text-sm text-theme-text px-2 py-1"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="country_asc">Country (A→Z)</option>
+                  <option value="country_desc">Country (Z→A)</option>
+                  <option value="city_asc">City (A→Z)</option>
+                  <option value="city_desc">City (Z→A)</option>
+                </select>
+              </div>
             </div>
-            {filteredPrepayQueue.length === 0 ? (
+            {prepayQueue.length > 0 && sortedPrepayQueue.length === 0 ? (
               <p className="text-sm text-theme-text-muted">
                 No matches for "{prepaySearch.trim()}"
               </p>
             ) : (
               <PrepayQueueTable
-                rows={filteredPrepayQueue}
+                rows={sortedPrepayQueue}
                 onCreatePrepayment={(row) => setPrepayModalRow(row)}
                 onHostClick={(userId) => setHostDetailUserId(userId)}
               />
