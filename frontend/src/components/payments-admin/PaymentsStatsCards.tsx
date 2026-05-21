@@ -17,12 +17,12 @@ interface StatCardProps {
 
 const StatCard: React.FC<StatCardProps> = ({ icon, label, value, tone = 'default' }) => {
   const toneClass =
-    tone === 'amber' ? 'border-amber-300 bg-amber-50' :
-    tone === 'emerald' ? 'border-emerald-300 bg-emerald-50' :
+    tone === 'amber' ? 'border-amber-500/30 bg-amber-500/10' :
+    tone === 'emerald' ? 'border-emerald-500/30 bg-emerald-500/10' :
     'border-theme-stroke bg-theme-surface';
   return (
     <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-theme-text-muted mb-1">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-theme-text-secondary mb-1">
         {icon}
         <span>{label}</span>
       </div>
