@@ -527,6 +527,20 @@ router.get(
   requireAnyAdminOrPaymentAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      // salame-58921: PizzaDAO (the platform admin user) and underbosses were
+      // showing up as candidate "hosts" because they're set as primary host
+      // (`parties.userId`) or appear in `parties.coHosts` on parties they
+      // administer. They have a User-level `preferredPayoutMethod` set for
+      // other reasons (e.g. PizzaDAO collects a refund USDC address), so the
+      // existing filter let them through. Only actual event hosts should be
+      // paid. Pre-fetch the staff email sets ONCE per request and filter the
+      // per-party candidate list against them below.
+      const [adminEmails, underbossEmails] = await Promise.all([
+        prisma.admin.findMany({ select: { email: true } }).then(rows => new Set(rows.map(r => r.email.toLowerCase()))),
+        prisma.underboss.findMany({ where: { isActive: true }, select: { email: true } }).then(rows => new Set(rows.map(r => r.email.toLowerCase()))),
+      ]);
+      const staffEmails = new Set<string>([...adminEmails, ...underbossEmails]);
+
       // 1. All approved parties flagged for prepayment, with their primary host.
       const parties = await prisma.party.findMany({
         where: {
@@ -667,7 +681,10 @@ router.get(
         const seenUserIds = new Set<string>();
 
         // Primary host first.
-        if (p.user) {
+        // salame-58921: skip if this User's email is a platform admin or
+        // active underboss — they shouldn't be paid as event hosts even when
+        // they're listed as `parties.userId` on events they administer.
+        if (p.user && !staffEmails.has(p.user.email.toLowerCase())) {
           const c = buildCandidate(p.user, true);
           if (c) {
             candidates.push(c);
@@ -681,6 +698,9 @@ router.get(
           if (!ch || typeof ch !== 'object') continue;
           const email = typeof ch.email === 'string' ? ch.email.trim().toLowerCase() : '';
           if (!email) continue;
+          // salame-58921: skip staff emails before the User lookup so admins
+          // / underbosses listed as cohosts never become candidates.
+          if (staffEmails.has(email)) continue;
           const u = cohostUserByEmail.get(email);
           if (!u) continue;
           if (seenUserIds.has(u.id)) continue;
@@ -690,6 +710,9 @@ router.get(
           seenUserIds.add(c.userId);
         }
 
+        // After staff-filtering: drop the party entirely if no real hosts have
+        // a payment method set. `hasMultipleCandidates` (below) is derived from
+        // this filtered list, so it's automatically post-filter.
         if (candidates.length === 0) continue;
 
         assembled.push({
