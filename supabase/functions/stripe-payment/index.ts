@@ -3,6 +3,7 @@ import Stripe from 'https://esm.sh/stripe@14.11.0?target=deno';
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const STRIPE_ISSUING_CARDHOLDER_ID = Deno.env.get('STRIPE_ISSUING_CARDHOLDER_ID') || '';
+const STRIPE_PAYMENT_METHOD_CONFIG = Deno.env.get('STRIPE_PAYMENT_METHOD_CONFIG') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +68,21 @@ interface GetDonationStatusRequest {
   paymentIntentId: string;
 }
 
+interface CreateOrderPaymentRequest {
+  action: 'create_order_payment';
+  amount: number; // in cents
+  orderId: string;
+  partyId: string;
+  pizzeriaName: string;
+  customerEmail?: string;
+}
+
+interface RefundPaymentRequest {
+  action: 'refund_payment';
+  paymentIntentId: string;
+  reason?: string;
+}
+
 type StripeRequest =
   | CreatePaymentIntentRequest
   | CreateVirtualCardRequest
@@ -75,7 +91,9 @@ type StripeRequest =
   | CreateCustomerRequest
   | GetSetupIntentRequest
   | CreateDonationIntentRequest
-  | GetDonationStatusRequest;
+  | GetDonationStatusRequest
+  | CreateOrderPaymentRequest
+  | RefundPaymentRequest;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -115,6 +133,11 @@ serve(async (req) => {
           customer: request.customerId,
           payment_method_types: ['card'],
           usage: 'off_session', // Allow charging later without customer present
+          payment_method_options: {
+            card: {
+              request_three_d_secure: 'any',
+            },
+          },
         });
 
         return new Response(
@@ -272,6 +295,70 @@ serve(async (req) => {
             status: donationStatus.status,
             amount: donationStatus.amount,
             chargeId: donationStatus.latest_charge,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'create_order_payment': {
+        // Sanitize pizzeria name for statement descriptor (alphanumeric + spaces only, max 22 chars)
+        const sanitizedPizzeriaName = request.pizzeriaName
+          .replace(/[^a-zA-Z0-9 ]/g, '')
+          .trim()
+          .substring(0, 22);
+
+        // Build PaymentIntent params
+        const orderPaymentParams: Record<string, unknown> = {
+          amount: request.amount,
+          currency: 'usd',
+          capture_method: 'automatic',
+          payment_method_options: {
+            card: {
+              request_three_d_secure: 'any',
+            },
+          },
+          receipt_email: request.customerEmail,
+          statement_descriptor_suffix: sanitizedPizzeriaName,
+          metadata: {
+            type: 'order_payment',
+            orderId: request.orderId,
+            partyId: request.partyId,
+            pizzeriaName: request.pizzeriaName,
+          },
+        };
+
+        // Only include payment_method_configuration if the env var is set
+        if (STRIPE_PAYMENT_METHOD_CONFIG) {
+          orderPaymentParams.payment_method_configuration = STRIPE_PAYMENT_METHOD_CONFIG;
+        } else {
+          // Fallback: just enable cards via automatic_payment_methods
+          orderPaymentParams.automatic_payment_methods = { enabled: true };
+        }
+
+        const orderPaymentIntent = await stripe.paymentIntents.create(orderPaymentParams as Stripe.PaymentIntentCreateParams);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            paymentIntentId: orderPaymentIntent.id,
+            clientSecret: orderPaymentIntent.client_secret,
+            status: orderPaymentIntent.status,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'refund_payment': {
+        const refund = await stripe.refunds.create({
+          payment_intent: request.paymentIntentId,
+          reason: (request.reason as Stripe.RefundCreateParams.Reason) || 'requested_by_customer',
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            refundId: refund.id,
+            status: refund.status,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
