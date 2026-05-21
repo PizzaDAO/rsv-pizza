@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, Lock, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, Lock, ShieldCheck, ExternalLink, type LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
-import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem } from '../../lib/api';
-import { AutoCompleteStates, ChecklistItem } from '../../types';
+import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem, listPayouts } from '../../lib/api';
+import { AutoCompleteStates, ChecklistItem, Payout } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from '../checklist/FindVenueModal';
 import { DashboardKPIs } from './DashboardKPIs';
+import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 
 export const GPPDashboardTab: React.FC = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -21,6 +22,10 @@ export const GPPDashboardTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
+  // polpetta-49102: surface latest payouts on the dashboard so hosts don't
+  // need to switch to the Payments tab to confirm a prepayment landed.
+  const [recentPayouts, setRecentPayouts] = useState<Payout[]>([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(true);
 
   const loadChecklist = useCallback(async () => {
     if (!party?.id) return;
@@ -46,6 +51,29 @@ export const GPPDashboardTab: React.FC = () => {
     // party.coHosts via PizzaContext) and FindVenueModal sets party.address —
     // without these deps the checkmarks stay stale until reload.
   }, [party?.id, party?.coHosts?.length, party?.address, party?.addressIsCityDefault, loadChecklist]);
+
+  // polpetta-49102: load latest payouts for the Payments section. Newest-first
+  // ordering comes from the backend; we slice the top 5 for the dashboard.
+  useEffect(() => {
+    if (!party?.id) return;
+    let cancelled = false;
+    setPayoutsLoading(true);
+    listPayouts(party.id)
+      .then((rows) => {
+        if (cancelled) return;
+        const sorted = [...rows].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        setRecentPayouts(sorted.slice(0, 5));
+        setPayoutsLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRecentPayouts([]);
+        setPayoutsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [party?.id]);
 
   // Map known item names to Lucide icons
   const ICON_MAP: Record<string, LucideIcon> = {
@@ -253,6 +281,84 @@ export const GPPDashboardTab: React.FC = () => {
         </div>
       )}
 
+      {/* polpetta-49102: Payments section — latest 5 payouts surfaced on the
+          dashboard so hosts can see prepayment / receipt state at a glance
+          without switching to the Payments tab. Uses the same data source
+          (GET /api/parties/:partyId/payouts, arugula-38633) and the shared
+          PayoutStatusPill so colors stay in sync with the full tab. */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-semibold text-theme-text">Payments</h3>
+          <button
+            type="button"
+            onClick={() => goToTab('payments')}
+            className="text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+          >
+            See all &rarr; Payments tab
+          </button>
+        </div>
+        <p className="text-xs text-theme-text-muted mb-4">
+          Latest receipts and prepayments for this event
+        </p>
+
+        {payoutsLoading ? (
+          <div className="space-y-2">
+            <div className="animate-pulse h-12 bg-theme-surface rounded-lg" />
+            <div className="animate-pulse h-12 bg-theme-surface rounded-lg" />
+            <div className="animate-pulse h-12 bg-theme-surface rounded-lg" />
+          </div>
+        ) : recentPayouts.length === 0 ? (
+          <p className="text-sm text-theme-text-muted py-4">
+            No payments yet. Submit a receipt or wait for a prepayment.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {recentPayouts.map((payout) => {
+              const rel = relativeTime(new Date(payout.createdAt));
+              const abs = new Date(payout.createdAt).toLocaleString();
+              return (
+                <div
+                  key={payout.id}
+                  onClick={() => goToTab('payments')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      goToTab('payments');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-theme-surface transition-colors cursor-pointer"
+                >
+                  <PayoutStatusPill status={payout.status} />
+                  <span className="text-sm font-medium text-theme-text">
+                    ${Number(payout.finalAmountUsd).toFixed(2)}
+                  </span>
+                  <span
+                    className="text-xs text-theme-text-muted"
+                    title={abs}
+                  >
+                    {rel}
+                  </span>
+                  {payout.status === 'paid' && payout.transactionHash && (
+                    <a
+                      href={`https://basescan.org/tx/${payout.transactionHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+                    >
+                      view on Basescan
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Checklist progress */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
@@ -389,3 +495,22 @@ export const GPPDashboardTab: React.FC = () => {
     </div>
   );
 };
+
+/**
+ * polpetta-49102: small "x minutes / hours / days ago" formatter.
+ * Mirrors the helper in PayoutRow.tsx (kept local to avoid widening a
+ * shared module's surface for one consumer).
+ */
+function relativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(mo / 12)}y ago`;
+}
