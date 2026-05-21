@@ -34,6 +34,7 @@ import {
   CreatePrepaymentModal,
   HostPaymentDetailsModal,
   ExportSafeJsonModal,
+  RejectReasonModal,
 } from '../components/payments-admin';
 
 type RoleState =
@@ -84,6 +85,15 @@ export function PaymentsAdminPage() {
   // siciliana-69183: Safe Transaction Builder JSON export. Modal is mounted
   // when true; the modal itself filters non-USDC / missing-wallet rows.
   const [showSafeExportModal, setShowSafeExportModal] = useState(false);
+
+  // crudo-91827: in-app reject-reason modal target. Replaces window.prompt()
+  // which gets silently blocked by popup blockers / Brave / Arc / extensions.
+  // `null` = modal closed; either `single` (one row) or `bulk` (multi-select).
+  const [rejectTarget, setRejectTarget] = useState<
+    | { kind: 'single'; id: string; hostName: string }
+    | { kind: 'bulk'; ids: string[] }
+    | null
+  >(null);
 
   // siciliana-69183: tiny toast stack (matches AdminLogoCleanup pattern).
   // Surfaces post-prepayment success + post-export confirmations.
@@ -239,7 +249,9 @@ export function PaymentsAdminPage() {
     setRowBusyId(id);
     try {
       await approveAdminPayout(id);
-      await refresh();
+      // crudo-91827: refresh BOTH lists — an approved prepayment row stays in
+      // the payouts table but may affect prepay-queue derivations.
+      await Promise.all([refresh(), loadPrepayQueue()]);
     } catch (err: any) {
       setErrorMsg(err.message || 'Approve failed');
     } finally {
@@ -247,18 +259,15 @@ export function PaymentsAdminPage() {
     }
   }
 
+  // crudo-91827: opens the in-app reject-reason modal. The actual reject work
+  // is done by `confirmReject` once the admin types a reason and confirms.
   async function handleRowReject(id: string) {
-    const reason = window.prompt('Rejection reason (visible to host):');
-    if (!reason || !reason.trim()) return;
-    setRowBusyId(id);
-    try {
-      await rejectAdminPayout(id, reason.trim());
-      await refresh();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Reject failed');
-    } finally {
-      setRowBusyId(null);
-    }
+    const row = payouts.find((p) => p.id === id);
+    setRejectTarget({
+      kind: 'single',
+      id,
+      hostName: row?.host?.name ?? row?.host?.email ?? 'this host',
+    });
   }
 
   async function handleRowMarkPaid(p: AdminPayout) {
@@ -281,25 +290,49 @@ export function PaymentsAdminPage() {
         await approveAdminPayout(id).catch(() => null);
       }
       clearSelection();
-      await refresh();
+      // crudo-91827: refresh BOTH lists for the same reason as the row variant.
+      await Promise.all([refresh(), loadPrepayQueue()]);
     } finally {
       setBulkBusy(false);
     }
   }
 
+  // crudo-91827: opens the in-app reject-reason modal in bulk mode. Actual
+  // reject work is done by `confirmReject` once the admin confirms.
   async function handleBulkReject() {
     if (selectedIds.size === 0) return;
-    const reason = window.prompt('Rejection reason (applied to all selected):');
-    if (!reason || !reason.trim()) return;
-    setBulkBusy(true);
-    try {
-      for (const id of Array.from(selectedIds)) {
-        await rejectAdminPayout(id, reason.trim()).catch(() => null);
+    setRejectTarget({ kind: 'bulk', ids: Array.from(selectedIds) });
+  }
+
+  // crudo-91827: invoked by RejectReasonModal once the admin types a reason
+  // and clicks Reject. Performs the actual API call(s), refreshes BOTH the
+  // payouts list AND the prepay queue (a rejected prepayment correctly
+  // re-appears in the queue), and closes the modal on success.
+  async function confirmReject(reason: string) {
+    if (!rejectTarget) return;
+    if (rejectTarget.kind === 'single') {
+      setRowBusyId(rejectTarget.id);
+      try {
+        await rejectAdminPayout(rejectTarget.id, reason);
+        await Promise.all([refresh(), loadPrepayQueue()]);
+        setRejectTarget(null);
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Reject failed');
+      } finally {
+        setRowBusyId(null);
       }
-      clearSelection();
-      await refresh();
-    } finally {
-      setBulkBusy(false);
+    } else {
+      setBulkBusy(true);
+      try {
+        for (const id of rejectTarget.ids) {
+          await rejectAdminPayout(id, reason).catch(() => null);
+        }
+        setSelectedIds(new Set());
+        await Promise.all([refresh(), loadPrepayQueue()]);
+        setRejectTarget(null);
+      } finally {
+        setBulkBusy(false);
+      }
     }
   }
 
@@ -594,6 +627,21 @@ export function PaymentsAdminPage() {
         <HostPaymentDetailsModal
           userId={hostDetailUserId}
           onClose={() => setHostDetailUserId(null)}
+        />
+
+        {/* crudo-91827: in-app reject-reason modal. Replaces window.prompt()
+            which gets silently blocked by popup blockers in some browsers. */}
+        <RejectReasonModal
+          isOpen={!!rejectTarget}
+          context={
+            rejectTarget?.kind === 'single'
+              ? { kind: 'single', hostName: rejectTarget.hostName }
+              : rejectTarget?.kind === 'bulk'
+              ? { kind: 'bulk', count: rejectTarget.ids.length }
+              : { kind: 'single', hostName: '' }
+          }
+          onCancel={() => setRejectTarget(null)}
+          onConfirm={confirmReject}
         />
 
         {/* siciliana-69183: Safe Transaction Builder batch export. */}
