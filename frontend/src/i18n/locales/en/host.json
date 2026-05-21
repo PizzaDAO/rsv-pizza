@@ -838,6 +838,14 @@
         "firstPoap": "First POAP mint",
         "goalReached": "Goal reached"
       }
+    },
+    "ticker": {
+      "empty": "No RSVPs yet",
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago",
+      "recentRsvps": "Recent RSVPs"
     }
   }
 }

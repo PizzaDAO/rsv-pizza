@@ -90,6 +90,10 @@ export function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     status: dbGuest.status || 'CONFIRMED',
     waitlistPosition: dbGuest.waitlist_position || null,
     promotedAt: dbGuest.promoted_at || null,
+    // tartufo-49271: surface submitted_via so the live RSVP ticker can filter
+    // out bulk-invited rows. Optional on the app-level Guest; default-accept
+    // when undefined to keep legacy rows visible.
+    submittedVia: dbGuest.submitted_via,
   };
 }
 

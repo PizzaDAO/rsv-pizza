@@ -793,6 +793,14 @@
         "firstPoap": "Erstes POAP-Mint",
         "goalReached": "Ziel erreicht"
       }
+    },
+    "ticker": {
+      "empty": "Noch keine Zusagen",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {{count}} Min.",
+      "hoursAgo": "vor {{count}} Std.",
+      "daysAgo": "vor {{count}} T.",
+      "recentRsvps": "Aktuelle Zusagen"
     }
   }
 }

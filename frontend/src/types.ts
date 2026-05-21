@@ -36,6 +36,10 @@ export interface Guest {
   status?: GuestStatus;
   waitlistPosition?: number | null;
   promotedAt?: string | null;
+  // tartufo-49271: surfaces guests.submitted_via so the live RSVP ticker can
+  // filter to direct-RSVP signals (link/rsvp/api) and skip bulk-invited rows.
+  // Optional + default-accept-undefined so older rows still flow through.
+  submittedVia?: string;
 }
 
 export interface PizzaStyle {
