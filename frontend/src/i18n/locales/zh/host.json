@@ -785,6 +785,14 @@
         "firstPoap": "首次铸造 POAP",
         "goalReached": "目标达成"
       }
+    },
+    "ticker": {
+      "empty": "暂无 RSVP",
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前",
+      "recentRsvps": "最近的 RSVP"
     }
   }
 }

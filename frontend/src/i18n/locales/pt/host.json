@@ -785,6 +785,14 @@
         "firstPoap": "Primeiro mint de POAP",
         "goalReached": "Meta atingida"
       }
+    },
+    "ticker": {
+      "empty": "Ainda sem confirmações",
+      "justNow": "agora mesmo",
+      "minutesAgo": "há {{count}} min",
+      "hoursAgo": "há {{count}} h",
+      "daysAgo": "há {{count}} d",
+      "recentRsvps": "Confirmações recentes"
     }
   }
 }

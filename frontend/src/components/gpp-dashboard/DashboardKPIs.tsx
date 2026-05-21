@@ -4,6 +4,7 @@ import { getReport, getPageViewStats, updateHostGoals } from '../../lib/api';
 import type { PageViewStats } from '../../types';
 import { ReportKPIs } from '../report/ReportKPIs';
 import { LeaderboardPill } from './LeaderboardPill';
+import { LiveRSVPTicker } from './LiveRSVPTicker';
 import { useMilestones } from '../../hooks/useMilestones';
 import { useMomentum } from '../../hooks/useMomentum';
 import { useConfetti } from '../../hooks/useConfetti';
@@ -206,6 +207,7 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ party, guests }) =
 
   return (
     <div className="space-y-4">
+      <LiveRSVPTicker guests={guests} />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <LeaderboardPill partyId={party.id} />
       </div>
