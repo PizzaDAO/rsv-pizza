@@ -135,13 +135,13 @@ const apps: AppItem[] = [
 
   // Day-of
   {
-    id: 'day-of',
-    name: 'Day Of',
+    id: 'party-guide',
+    name: 'Party Guide',
     description: 'Live event-day dashboard: check-in, announcements, photos, broadcast',
     icon: Zap,
     status: 'live',
     category: 'day-of',
-    tab: 'day-of',
+    tab: 'party-guide',
   },
   {
     id: 'music-dj',
@@ -398,12 +398,12 @@ export function AppsHub({
   // parties. The downstream cap-display gate (hide $ unless the 'go'
   // event_tag is set) lives in HostPage where Party props are passed
   // into PayoutsTab.
-  // pancetta-19834: Day-Of tile is also gated on approval — the underlying
+  // pancetta-19834: Party Guide tile is also gated on approval — the underlying
   // tab is only added to HostPage's coreTabs when isApproved, so showing the
   // tile to unapproved-party hosts would dead-end the click.
   const visibleApps = isApproved
     ? apps
-    : apps.filter(a => a.id !== 'payments' && a.id !== 'day-of');
+    : apps.filter(a => a.id !== 'payments' && a.id !== 'party-guide');
 
   const handleTogglePin = async (appId: string, pin: boolean) => {
     // Optimistic update

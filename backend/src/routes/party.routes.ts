@@ -1855,9 +1855,9 @@ router.post('/:partyId/guests/walk-in', async (req: AuthRequest, res: Response, 
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -1921,9 +1921,9 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate body
@@ -2106,9 +2106,9 @@ router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, ne
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const rows = await prisma.announcement.findMany({

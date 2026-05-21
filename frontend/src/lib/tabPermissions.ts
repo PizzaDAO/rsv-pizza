@@ -25,7 +25,7 @@ import { CoHost } from '../types';
 
 export type TabId =
   | 'dashboard'
-  | 'day-of'
+  | 'party-guide'
   | 'details'
   | 'guests'
   | 'pizza'
@@ -59,7 +59,7 @@ export interface HostTab {
  */
 export const ALL_HOST_TABS: HostTab[] = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'day-of', label: 'Day Of', icon: Zap },
+  { id: 'party-guide', label: 'Party Guide', icon: Zap },
   { id: 'details', label: 'Settings', icon: Settings },
   { id: 'guests', label: 'Guests', icon: Users },
   { id: 'pizza', label: 'Pizza & Drinks', icon: Pizza },

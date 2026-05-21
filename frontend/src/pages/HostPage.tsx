@@ -46,9 +46,9 @@ import { DayOfTab } from '../components/day-of';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'day-of' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
+type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'day-of', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -211,7 +211,7 @@ function HostPageContent() {
       // /run/:inviteCode for mobile). Approval gate: visible to hosts/cohosts of
       // approved parties (underbossStatus === 'approved'), regardless of admin
       // or underboss role.
-      ...(isApproved ? [{ id: 'day-of' as TabType, label: 'Day Of', icon: Zap }] : []),
+      ...(isApproved ? [{ id: 'party-guide' as TabType, label: 'Party Guide', icon: Zap }] : []),
       { id: 'details' as TabType, label: t('tabs.settings'), icon: Settings },
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
       { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
@@ -221,10 +221,10 @@ function HostPageContent() {
     // Build pinned tabs from party.pinnedApps
     // bresaola-49185: filter out 'payments' for unapproved parties so the
     // Payments tab is hidden from the pinned tab strip until approval lands.
-    // pancetta-19834: same gate for 'day-of' — the core-tab listing already
-    // conditions Day Of on isApproved above, so an old pin shouldn't leak in.
+    // pancetta-19834: same gate for 'party-guide' — the core-tab listing already
+    // conditions Party Guide on isApproved above, so an old pin shouldn't leak in.
     const pinnedTabs = (party?.pinnedApps ?? [])
-      .filter(appId => isApproved || (appId !== 'payments' && appId !== 'day-of'))
+      .filter(appId => isApproved || (appId !== 'payments' && appId !== 'party-guide'))
       .map(appId => {
         const appDef = PINNABLE_APPS.find(a => a.id === appId);
         if (!appDef) return null;
@@ -329,7 +329,7 @@ function HostPageContent() {
 
         {activeTab === 'dashboard' && party ? (
           <GPPDashboardTab />
-        ) : activeTab === 'day-of' && party ? (
+        ) : activeTab === 'party-guide' && party ? (
           <DayOfTab party={party} />
         ) : activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
@@ -371,7 +371,7 @@ function HostPageContent() {
               mergeParty({ coHosts: updated });
             }}
           />
-        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'day-of' && activeTab !== 'partners' && (
+        ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'party-guide' && activeTab !== 'partners' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">
               {activeTab === 'guests' && (
