@@ -11,6 +11,7 @@ import { PayoutDetailModal } from './PayoutDetailModal';
 import { ExpectedGuestsCard } from './ExpectedGuestsCard';
 import { PrepayCheckbox } from './PrepayCheckbox';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
+import { AppealCapModal } from './AppealCapModal';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -58,6 +59,8 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailPayoutId, setDetailPayoutId] = useState<string | null>(null);
+  // mascarpone-58927: inline appeal trigger in the green reimburse banner.
+  const [showAppealModal, setShowAppealModal] = useState(false);
 
   const loadPayouts = useCallback(async () => {
     setLoading(true);
@@ -168,6 +171,18 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                   <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
                 )}
                 .
+                {/*
+                  mascarpone-58927: surface the cap-appeal trigger here so it's
+                  discoverable without opening NewPayoutForm. AppealCapModal
+                  handles the re-appeal hint internally via previousAppealedAt.
+                */}
+                <button
+                  type="button"
+                  onClick={() => setShowAppealModal(true)}
+                  className="text-emerald-300 hover:underline ml-2 text-sm"
+                >
+                  Appeal
+                </button>
               </div>
             </div>
           );
@@ -270,6 +285,25 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           payoutId={detailPayoutId}
           onClose={() => setDetailPayoutId(null)}
           onUpdated={loadPayouts}
+        />
+      )}
+
+      {/*
+        mascarpone-58927: AppealCapModal is the same modal NewPayoutForm uses.
+        Opened via the inline "Appeal" link in the green cap banner above.
+        previousAppealedAt / previousNote come from PizzaContext (party); the
+        modal renders a re-appeal hint when previousAppealedAt is set.
+      */}
+      {showAppealModal && partyId && (
+        <AppealCapModal
+          partyId={partyId}
+          capUsd={effectiveReimbursementCapUsd ?? 0}
+          previousAppealedAt={party?.reimbursementCapAppealedAt ?? null}
+          previousNote={party?.reimbursementCapAppealNote ?? null}
+          onClose={() => setShowAppealModal(false)}
+          onSubmitted={() => {
+            setShowAppealModal(false);
+          }}
         />
       )}
     </div>
