@@ -15,6 +15,14 @@ interface GPPEventsMapProps {
   // the public /map view. Defaults to false so the public landing page stays
   // on-brand even if a caller forgets to pass it.
   isModerator?: boolean;
+  // Optional overrides for the non-moderator pin icon. Defaults preserve the
+  // existing public /map behavior (Molto Benny pizza pin). Used by /map/swc to
+  // swap in the composite Benny + SWC shield pin (cacciatore-72814).
+  iconUrl?: string;
+  iconWidth?: number;
+  iconHeight?: number;
+  iconAnchorX?: number;
+  iconAnchorY?: number;
 }
 
 // Semantic colors keyed on underbossStatus. Keep in sync with STATUS_LEGEND
@@ -52,6 +60,11 @@ export default function GPPEventsMap({
   height = '100%',
   canModerate = false,
   isModerator = false,
+  iconUrl = '/molto-benny-btc.svg',
+  iconWidth = 38,
+  iconHeight = 38,
+  iconAnchorX = 19,
+  iconAnchorY = 38,
 }: GPPEventsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -356,9 +369,9 @@ export default function GPPEventsMap({
           icon: isModerator
             ? makeMarkerIcon(event.underbossStatus)
             : {
-                url: '/molto-benny-btc.svg',
-                scaledSize: new google.maps.Size(38, 38),
-                anchor: new google.maps.Point(19, 38),
+                url: iconUrl,
+                scaledSize: new google.maps.Size(iconWidth, iconHeight),
+                anchor: new google.maps.Point(iconAnchorX, iconAnchorY),
               },
         });
 
@@ -458,7 +471,7 @@ export default function GPPEventsMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validEvents, cityChats, canModerate, isModerator]);
+  }, [validEvents, cityChats, canModerate, isModerator, iconUrl, iconWidth, iconHeight, iconAnchorX, iconAnchorY]);
 
   if (error) {
     return (

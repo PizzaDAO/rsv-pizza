@@ -3543,13 +3543,16 @@ interface GPPEventsApiPayload {
   offset: number;
 }
 
-export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean): Promise<GPPEventMapItem[]> {
+export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, includeAll?: boolean, swcOnly?: boolean): Promise<GPPEventMapItem[]> {
   const params: string[] = ['limit=2000'];
   if (curated) params.push('curated=1');
   // `statuses=all` is the auth-gated path on the backend — only returns
   // rejected/hidden events when the caller is an authenticated underboss/admin.
   // Unauthenticated callers silently fall back to the filtered view.
   if (includeAll) params.push('statuses=all');
+  // cacciatore-72814: SWC-only filter for /map/swc. Backend filters server-side
+  // by `eventTags` containing any "swc*" tag except the bare "swc" tag.
+  if (swcOnly) params.push('swcOnly=true');
   if (force) params.push(`_t=${Date.now()}`);
   const url = `/api/gpp/events?${params.join('&')}`;
   const data = await apiRequest<GPPEventsApiPayload>(url, {

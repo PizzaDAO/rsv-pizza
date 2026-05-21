@@ -41,6 +41,9 @@ function SponsorIntakeRedirect() {
 
 const GraphicsDashboard = React.lazy(() => import('./pages/GraphicsDashboard').then(m => ({ default: m.GraphicsDashboard })));
 const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').then(m => ({ default: m.GraphicsFlyerEdit })));
+// cacciatore-72814: super-admin-only SWC variant of /map (lazy because the
+// page is admin-only and rarely visited).
+const EventsMapSwcPage = React.lazy(() => import('./pages/EventsMapSwcPage').then(m => ({ default: m.EventsMapSwcPage })));
 
 function App() {
   return (
@@ -56,6 +59,8 @@ function App() {
             <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
             {/* /map must come before /:slug */}
             <Route path="/map" element={<EventsMapPage />} />
+            {/* cacciatore-72814: /map/swc super-admin-only variant; must come before /:slug */}
+            <Route path="/map/swc" element={<Suspense fallback={null}><EventsMapSwcPage /></Suspense>} />
             {/* /partners must come before /:slug */}
             <Route path="/partners" element={<PartnersPage />} />
             {/* /payments must come before /:slug */}

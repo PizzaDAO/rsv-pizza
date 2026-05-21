@@ -823,13 +823,25 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
+    // cacciatore-72814: optional post-filter for SWC-flagged events.
+    // Keeps an event when its `eventTags` array contains at least one tag
+    // including the substring "swc" (e.g. "swc-2026", "swc-bali") but NOT
+    // the bare string "swc". Done in JS so we don't have to teach Prisma
+    // about array-substring matching.
+    let resultEvents = events;
+    if (req.query.swcOnly === 'true') {
+      resultEvents = events.filter((e: any) =>
+        Array.isArray(e.eventTags) && e.eventTags.some((t: string) => typeof t === 'string' && t.includes('swc') && t !== 'swc')
+      );
+    }
+
     res.set(
       'Cache-Control',
       callerIsModerator ? 'private, no-store' : 'public, max-age=300'
     );
     res.json({
-      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
-      total,
+      events: resultEvents.map((e) => formatGppEvent(e, callerIsModerator)),
+      total: req.query.swcOnly === 'true' ? resultEvents.length : total,
       limit: parsedLimit,
       offset: parsedOffset,
     });
