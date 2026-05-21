@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, X, ChevronRight, CreditCard, Banknote, Coins, HelpCircle, ImageOff } from 'lucide-react';
+import { Loader2, X, ChevronRight, CreditCard, Banknote, Coins, HelpCircle, ImageOff, ExternalLink } from 'lucide-react';
 import { Payout, PayoutMethod, PayoutStatus } from '../../types';
 import { cancelPayout, fetchAdminMe } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -112,6 +112,21 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
             <span className="text-xs text-theme-text-muted font-normal">
               ({payout.originalAmount.toLocaleString()} {payout.originalCurrency})
             </span>
+          )}
+          {/* boscaiola-49102: inline BaseScan tx link for paid payouts.
+              Mirrors the GPP dashboard Payments preview so the full list and
+              the dashboard preview render identically. */}
+          {payout.status === 'paid' && payout.transactionHash && (
+            <a
+              href={`https://basescan.org/tx/${payout.transactionHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-theme-text-muted hover:text-theme-text underline-offset-2 hover:underline ml-2 inline-flex items-center gap-0.5 font-normal"
+            >
+              view tx
+              <ExternalLink size={12} />
+            </a>
           )}
         </div>
         <div className="text-xs text-theme-text-muted flex items-center gap-2 mt-0.5">
