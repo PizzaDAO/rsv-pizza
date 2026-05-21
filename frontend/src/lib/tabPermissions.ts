@@ -5,6 +5,7 @@ import {
   Users,
   Pizza,
   Camera,
+  Coins,
   Handshake,
   MapPin,
   Music,
@@ -42,6 +43,7 @@ export type TabId =
   | 'promo'
   | 'flyer'
   | 'print'
+  | 'payments'
   | 'apps';
 
 export interface HostTab {
@@ -75,6 +77,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'promo', label: 'Promo', icon: Megaphone },
   { id: 'flyer', label: 'Flyer', icon: FileImage },
   { id: 'print', label: 'Print', icon: Printer },
+  { id: 'payments', label: 'Payments', icon: Coins },
   { id: 'apps', label: 'Apps', icon: LayoutGrid },
 ];
 
