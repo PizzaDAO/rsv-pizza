@@ -760,6 +760,40 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
+// GET /api/parties/:partyId/cohosts/full - Get unsanitized co_hosts JSONB
+//
+// gorgonzola-31204: Frontend Supabase reads strip `email` from co_hosts (PII).
+// HostsManager needs the unsanitized array so its edit modal preloads each
+// cohost's email and saves don't silently wipe the field — losing the email
+// breaks `check-host` matching and hides the Host Dashboard button on the
+// public EventPage for that cohost.
+//
+// Auth-gated by canUserEditParty (same gate as PATCH /api/parties/:id), so
+// only users who can already edit the party can read cohost emails.
+router.get('/:partyId/cohosts/full', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { coHosts: true },
+    });
+
+    if (!party) {
+      return res.status(404).json({ error: 'party not found' });
+    }
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      return res.status(403).json({ error: 'not authorized' });
+    }
+
+    return res.json({ coHosts: party.coHosts ?? [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/:id/invite-link - Get invite link
 router.get('/:id/invite-link', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

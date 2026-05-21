@@ -8,6 +8,7 @@ import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtil
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 import { usePizza } from '../contexts/PizzaContext';
+import { apiRequest } from '../lib/api';
 
 interface HostsManagerProps {
   partyId: string;
@@ -31,7 +32,18 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   // Helper: check if a co-host is protected (auto-added partner or underboss)
   const isProtected = (h: CoHost) => h.isUnderboss === true || h.isPartner === true;
 
-  // Co-hosts state — includes ALL co-hosts (manual + protected)
+  // gorgonzola-31204: `initialCoHosts` is read through Supabase, which strips
+  // `email` via sanitizeCoHosts (PII protection for public reads). Use the
+  // backend GET /api/parties/:partyId/cohosts/full endpoint as the
+  // source-of-truth so the edit modal preloads emails and save handlers don't
+  // silently wipe them.
+  //
+  // IMPORTANT: All hooks must stay above any conditional/early return
+  // (see arugula-38633 incident in MEMORY).
+  const [fullCoHosts, setFullCoHosts] = useState<CoHost[] | null>(null);
+
+  // Co-hosts state — includes ALL co-hosts (manual + protected).
+  // Prefer the unsanitized fetch when available; fall back to props otherwise.
   const [coHosts, setCoHosts] = useState<CoHost[]>(initialCoHosts);
 
   // Visible co-hosts: filter out protected entries (auto-added underboss/partner)
@@ -41,10 +53,36 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     [coHosts]
   );
 
-  // Sync from props when enriched data arrives asynchronously
+  // Sync from props when enriched data arrives asynchronously — but only if
+  // we don't have unsanitized data yet. Once `fullCoHosts` is populated, we
+  // trust local state (which save handlers keep in sync) over the sanitized
+  // props.
   useEffect(() => {
-    setCoHosts(initialCoHosts);
-  }, [initialCoHosts]);
+    if (fullCoHosts === null) {
+      setCoHosts(initialCoHosts);
+    }
+  }, [initialCoHosts, fullCoHosts]);
+
+  // Fetch the unsanitized cohosts (with email) on mount / partyId change.
+  // Silent fallback on error — render falls back to sanitized props.
+  useEffect(() => {
+    if (!partyId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiRequest<{ coHosts: CoHost[] }>(
+          `/api/parties/${partyId}/cohosts/full`
+        );
+        if (cancelled) return;
+        const next = Array.isArray(data.coHosts) ? data.coHosts : [];
+        setFullCoHosts(next);
+        setCoHosts(next);
+      } catch {
+        // Silent fallback — keep sanitized props as source of truth.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [partyId]);
 
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostEmail, setNewCoHostEmail] = useState('');
@@ -167,6 +205,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
       // and preserves protected entry data from DB
       const success = await updateParty(partyId, { co_hosts: coHostsToSave });
       if (success) {
+        // gorgonzola-31204: keep the unsanitized source-of-truth in sync with
+        // what we just wrote, so a subsequent sanitized-prop refresh doesn't
+        // shadow it back to email-stripped data.
+        setFullCoHosts(coHostsToSave);
         // Only add as guest for non-protected co-hosts with email
         for (const coHost of coHostsToSave) {
           if (coHost.email && !isProtected(coHost)) {
