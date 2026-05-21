@@ -112,6 +112,11 @@ function HostPageContent() {
   }, [isOwnerOrAdmin, party?.allowedTabs]);
 
   const isGPP = party?.eventType === 'gpp';
+  // bresaola-49185: gate the Payments app behind party approval. Unapproved
+  // parties never see Payments in the tab bar, in /apps, or via direct URL.
+  // Derived at component scope (above any early return) per the React Rules
+  // of Hooks — see arugula-38633 v2 incident in MEMORY.
+  const isApproved = party?.underbossStatus === 'approved';
   const defaultTab: TabType = isGPP ? 'dashboard' : 'details';
   const activeTab: TabType = (tab && ALL_VALID_TABS.includes(tab as TabType)) ? tab as TabType : defaultTab;
 
@@ -200,7 +205,6 @@ function HostPageContent() {
 
   // All hooks must be called before any conditional returns (React Rules of Hooks)
   const tabs = useMemo(() => {
-    const isApproved = party?.underbossStatus === 'approved';
     const coreTabs = [
       ...(isGPP ? [{ id: 'dashboard' as TabType, label: t('tabs.dashboard'), icon: Home }] : []),
       // pepperoni-58341 / salami-39204: Day-of host dashboard (also mirrored at
@@ -215,11 +219,15 @@ function HostPageContent() {
     ];
 
     // Build pinned tabs from party.pinnedApps
-    const pinnedTabs = (party?.pinnedApps ?? []).map(appId => {
-      const appDef = PINNABLE_APPS.find(a => a.id === appId);
-      if (!appDef) return null;
-      return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
-    }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
+    // bresaola-49185: filter out 'payments' for unapproved parties so the
+    // Payments tab is hidden from the pinned tab strip until approval lands.
+    const pinnedTabs = (party?.pinnedApps ?? [])
+      .filter(appId => isApproved || appId !== 'payments')
+      .map(appId => {
+        const appDef = PINNABLE_APPS.find(a => a.id === appId);
+        if (!appDef) return null;
+        return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
+      }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
 
     const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: t('tabs.apps'), icon: LayoutGrid }];
 
@@ -228,7 +236,7 @@ function HostPageContent() {
     return allowedTabs === 'all'
       ? allTabs
       : allTabs.filter(t => t.id === 'apps' || allowedTabs.includes(t.id));
-  }, [isGPP, party?.pinnedApps, party?.underbossStatus, allowedTabs, t]);
+  }, [isGPP, isApproved, party?.pinnedApps, allowedTabs, t]);
 
   // Redirect to first allowed tab if current tab is not permitted
   useEffect(() => {
@@ -241,6 +249,16 @@ function HostPageContent() {
       }
     }
   }, [activeTab, allowedTabs, party, tabs]);
+
+  // bresaola-49185: bounce direct navigation to /host/:invite/payments when
+  // the party isn't approved yet. The tab-bar filter hides the tab, but a
+  // user with a bookmark or pasted URL would still hit the active-tab branch.
+  useEffect(() => {
+    if (!party) return;
+    if (activeTab === 'payments' && !isApproved) {
+      setActiveTab(defaultTab);
+    }
+  }, [activeTab, isApproved, party, defaultTab]);
 
   if (authLoading || partyLoading || (inviteCode && inviteCode !== loadedCode)) {
     return (
@@ -528,7 +546,7 @@ function HostPageContent() {
                 <PrintTab />
               )}
 
-              {activeTab === 'payments' && party && (() => {
+              {activeTab === 'payments' && party && isApproved && (() => {
                 // marzano-49102: gate the cap dollar value by the 'go' event_tag.
                 // Pass null when 'go' is not set so every downstream consumer
                 // (PayoutsTab green banner, NewPayoutForm cap banner, PayoutsList

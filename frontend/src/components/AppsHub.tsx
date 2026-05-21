@@ -379,12 +379,16 @@ export function AppsHub({
   const { loadParty, party } = usePizza();
   const [pinnedApps, setPinnedApps] = useState<string[]>(initialPinnedApps);
   const isGppEvent = party?.eventType === 'gpp';
+  // bresaola-49185: hide the Payments tile from unapproved parties. The
+  // backend rejects POST/PATCH/ocr-preview with 403 in lockstep so direct
+  // API calls also fail until the party is approved.
+  const isApproved = party?.underbossStatus === 'approved';
 
-  // marzano-49102: Payments tile is unconditionally live for all signed-in
-  // party hosts/cohosts. The downstream cap-display gate (hide $ unless the
-  // 'go' event_tag is set) lives in HostPage where Party props are passed
+  // marzano-49102: Payments tile is live for hosts/cohosts of approved
+  // parties. The downstream cap-display gate (hide $ unless the 'go'
+  // event_tag is set) lives in HostPage where Party props are passed
   // into PayoutsTab.
-  const visibleApps = apps;
+  const visibleApps = isApproved ? apps : apps.filter(a => a.id !== 'payments');
 
   const handleTogglePin = async (appId: string, pin: boolean) => {
     // Optimistic update

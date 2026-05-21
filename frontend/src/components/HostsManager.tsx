@@ -27,7 +27,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   // NOT pull loadParty here — that was v1's mistake and reintroduced the
   // tab-click-feels-like-reload pain. setParty(prev => ({...prev, coHosts}))
   // updates the context without a full refetch.
-  const { setParty } = usePizza();
+  // bresaola-49185: also read party.underbossStatus to gate the Payments
+  // permission row in the cohost picker for unapproved parties.
+  const { setParty, party } = usePizza();
+  const isApproved = party?.underbossStatus === 'approved';
 
   // Helper: check if a co-host is protected (auto-added partner or underboss)
   const isProtected = (h: CoHost) => h.isUnderboss === true || h.isPartner === true;
@@ -162,7 +165,9 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   // Tabs available for permission assignment (exclude 'apps' which is always visible)
-  const permissionTabs = ALL_HOST_TABS.filter(t => t.id !== 'apps');
+  // bresaola-49185: also hide 'payments' from unapproved parties so cohost
+  // permissions don't drift against the actual UI / backend gate.
+  const permissionTabs = ALL_HOST_TABS.filter(t => t.id !== 'apps' && (isApproved || t.id !== 'payments'));
 
   const getPermissionSummary = (coHost: CoHost): string => {
     if (!Array.isArray(coHost.allowedTabs)) return 'All tabs';
