@@ -3635,6 +3635,68 @@ export async function fetchGppPartners(): Promise<GPPPartnersResponse> {
   return apiRequest<GPPPartnersResponse>('/api/gpp/partners', { requireAuth: false });
 }
 
+// stromboli-71593: Public leaderboard (approved GPP parties + countries)
+
+export type LeaderboardWindow = 'all' | 'year';
+
+export interface LeaderboardPartyRow {
+  rank: number;
+  id: string;
+  name: string;
+  hostName: string | null;
+  city: string | null;
+  slug: string;
+  url: string;
+  country: string | null;
+  countryCode: string | null;
+  eventImageUrl: string | null;
+  score: number;
+  breakdown: {
+    linkRsvps: number;
+    inviteRsvps: number;
+    checkIns: number;
+    photos: number;
+  };
+}
+
+export interface LeaderboardCountryRow {
+  rank: number;
+  country: string;
+  countryCode: string | null;
+  partyCount: number;
+  score: number;
+}
+
+export interface LeaderboardResponse {
+  window: LeaderboardWindow;
+  computedAt: string;
+  parties: {
+    rows: LeaderboardPartyRow[];
+    total: number;
+    limit: number;
+    offset: number;
+  };
+  countries: {
+    rows: LeaderboardCountryRow[];
+    total: number;
+  };
+}
+
+export async function fetchLeaderboard(
+  windowKey: LeaderboardWindow = 'all',
+  limit = 50,
+  offset = 0,
+): Promise<LeaderboardResponse> {
+  const params = new URLSearchParams();
+  params.set('window', windowKey);
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  return apiRequest<LeaderboardResponse>(
+    `/api/leaderboard?${params.toString()}`,
+    { requireAuth: false },
+  );
+}
+
 // RSVP Funnel Stats (Underboss dashboard)
 
 export interface FunnelEventStats {

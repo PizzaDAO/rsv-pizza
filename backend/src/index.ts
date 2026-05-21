@@ -37,6 +37,7 @@ import payoutRoutes from './routes/payout.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import leaderboardRoutes from './routes/leaderboard.routes.js';
+import publicLeaderboardRoutes from './routes/publicLeaderboard.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import linkclickRoutes from './routes/linkclick.routes.js';
 import funnelRoutes from './routes/funnel.routes.js';
@@ -177,6 +178,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
+app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/scorecard', scorecardRoutes);
