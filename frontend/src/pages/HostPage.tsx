@@ -221,8 +221,10 @@ function HostPageContent() {
     // Build pinned tabs from party.pinnedApps
     // bresaola-49185: filter out 'payments' for unapproved parties so the
     // Payments tab is hidden from the pinned tab strip until approval lands.
+    // pancetta-19834: same gate for 'day-of' — the core-tab listing already
+    // conditions Day Of on isApproved above, so an old pin shouldn't leak in.
     const pinnedTabs = (party?.pinnedApps ?? [])
-      .filter(appId => isApproved || appId !== 'payments')
+      .filter(appId => isApproved || (appId !== 'payments' && appId !== 'day-of'))
       .map(appId => {
         const appDef = PINNABLE_APPS.find(a => a.id === appId);
         if (!appDef) return null;
