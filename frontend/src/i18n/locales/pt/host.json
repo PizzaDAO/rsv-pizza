@@ -794,6 +794,17 @@
         "goalReached": "Meta atingida"
       }
     },
+    "share": {
+      "buttonLabel": "Compartilhar progresso",
+      "modalTitle": "Compartilhe seu progresso",
+      "download": "Baixar",
+      "copy": "Copiar",
+      "copySuccess": "Copiado para a área de transferência",
+      "copyFailed": "Falha ao copiar",
+      "generating": "Gerando…",
+      "generateFailed": "Não foi possível gerar a imagem",
+      "close": "Fechar"
+    },
     "ticker": {
       "empty": "Ainda sem confirmações",
       "justNow": "agora mesmo",

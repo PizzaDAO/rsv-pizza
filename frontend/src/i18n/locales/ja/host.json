@@ -794,6 +794,17 @@
         "goalReached": "目標達成"
       }
     },
+    "share": {
+      "buttonLabel": "進捗をシェア",
+      "modalTitle": "あなたの進捗をシェア",
+      "download": "ダウンロード",
+      "copy": "コピー",
+      "copySuccess": "クリップボードにコピーしました",
+      "copyFailed": "コピーに失敗しました",
+      "generating": "生成中…",
+      "generateFailed": "画像を生成できませんでした",
+      "close": "閉じる"
+    },
     "ticker": {
       "empty": "まだRSVPはありません",
       "justNow": "たった今",

@@ -839,6 +839,17 @@
         "goalReached": "Goal reached"
       }
     },
+    "share": {
+      "buttonLabel": "Share progress",
+      "modalTitle": "Share your progress",
+      "download": "Download",
+      "copy": "Copy",
+      "copySuccess": "Copied to clipboard",
+      "copyFailed": "Copy failed",
+      "generating": "Generating…",
+      "generateFailed": "Could not generate image",
+      "close": "Close"
+    },
     "ticker": {
       "empty": "No RSVPs yet",
       "justNow": "just now",
