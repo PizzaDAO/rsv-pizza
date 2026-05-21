@@ -872,6 +872,45 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// vesuvio-91824: cap /gpp/pizzerias map at top-3 per event, ranked by
+// `(rating ?? 3.5) - 0.3 * distanceMiles` to event venue. Mirrors the
+// vesuvio-58492 RSVP modal ranking server-side so the world map isn't
+// over-represented by events that pre-selected many pizzerias.
+const TOP_PIZZERIA_LIMIT = 3;
+const DISTANCE_WEIGHT_PER_MILE = 0.3;
+const KM_TO_MILES = 0.621371;
+
+function rankPizzeriasForEvent(
+  list: any[],
+  venue: { lat: number | null; lng: number | null },
+): any[] {
+  const venueHasCoords =
+    typeof venue.lat === 'number' &&
+    typeof venue.lng === 'number' &&
+    !(venue.lat === 0 && venue.lng === 0);
+
+  return list
+    .map((p, idx) => {
+      const rating = typeof p.rating === 'number' ? p.rating : 3.5;
+      const loc = p.location;
+      const pizzeriaHasCoords =
+        loc &&
+        typeof loc.lat === 'number' &&
+        typeof loc.lng === 'number' &&
+        !(loc.lat === 0 && loc.lng === 0);
+
+      const distanceMiles =
+        venueHasCoords && pizzeriaHasCoords
+          ? haversineKm({ lat: venue.lat as number, lng: venue.lng as number }, loc) * KM_TO_MILES
+          : 0;
+
+      return { p, idx, score: rating - distanceMiles * DISTANCE_WEIGHT_PER_MILE };
+    })
+    .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
+    .slice(0, TOP_PIZZERIA_LIMIT)
+    .map((x) => x.p);
+}
+
 // GET /api/gpp/pizzerias - All GPP pizzerias (flattened across events)
 router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -892,6 +931,8 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
         customUrl: true,
         inviteCode: true,
         address: true,
+        latitude: true,
+        longitude: true,
         selectedPizzerias: true,
       },
     });
@@ -905,7 +946,12 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventCity = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || 'Unknown';
       const eventSlug = party.customUrl || party.inviteCode;
 
-      for (const p of raw as any[]) {
+      const ranked = rankPizzeriasForEvent(raw as any[], {
+        lat: party.latitude,
+        lng: party.longitude,
+      });
+
+      for (const p of ranked) {
         // Strip heavy fields, keep photoUrl if previously cached
         const { photos, orderingOptions, ...light } = p;
         pizzerias.push({ ...light, eventId: party.id, eventCity, eventSlug });
