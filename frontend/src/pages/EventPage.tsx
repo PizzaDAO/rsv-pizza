@@ -35,6 +35,7 @@ import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
 import { GuestScorecard } from '../components/scorecard';
+import posthog from 'posthog-js';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -145,6 +146,10 @@ export function EventPage() {
         const foundEvent = result;
         if (foundEvent) {
           setEvent(foundEvent);
+          posthog.capture('event_page_viewed', {
+            eventName: foundEvent.name,
+            inviteCode: foundEvent.inviteCode,
+          });
           setCanEditAsCoHost(false);
 
           // Check if logged-in user has already RSVP'd and fetch their data
