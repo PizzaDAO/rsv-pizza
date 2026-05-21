@@ -8,6 +8,11 @@ import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS }
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import {
+  capValuesDiffer,
+  recordCapChange,
+  resolveCapActorKind,
+} from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 
 // Helper function to get party with ownership check
@@ -595,6 +600,19 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // fennel-49102: snapshot the prior cap value so we can log only real
+    // changes to reimbursement_cap_audit. Skipped when the request doesn't
+    // touch the cap (either field omitted or caller wasn't authorized to
+    // write it) so non-cap PATCHes pay no extra round trip.
+    let priorCapUsd: any = undefined;
+    if (reimbursementCapUsdToWrite !== undefined) {
+      const prior = await prisma.party.findUnique({
+        where: { id },
+        select: { reimbursementCapUsd: true },
+      });
+      priorCapUsd = prior?.reimbursementCapUsd ?? null;
+    }
+
     // quattro-71244: validate hostGoals — keep only known-numeric values, clamp
     // negatives to 0 and cap each at 1,000,000. Drop non-numeric / non-finite
     // entries silently. Persist `null` if the caller explicitly clears all goals.
@@ -693,6 +711,25 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         user: { select: { name: true } },
       },
     });
+
+    // fennel-49102: log cap changes to reimbursement_cap_audit so admins
+    // can answer "who set this party's $X cap?". Idempotent edits (same
+    // value as already on record) are skipped so we don't fill the table
+    // with noise.
+    if (
+      reimbursementCapUsdToWrite !== undefined &&
+      capValuesDiffer(priorCapUsd, reimbursementCapUsdToWrite)
+    ) {
+      const actorKind = await resolveCapActorKind(req.userEmail);
+      await recordCapChange({
+        partyId: id,
+        oldCapUsd: priorCapUsd,
+        newCapUsd: reimbursementCapUsdToWrite,
+        actorEmail: req.userEmail || 'unknown',
+        actorKind,
+        note: 'PATCH /api/parties/:id',
+      });
+    }
 
     // Trigger webhook for party update
     await triggerWebhook('party.updated', party, req.userId!);
@@ -1051,6 +1088,65 @@ router.get('/:partyId/reimbursement-cap/appeals', async (req: AuthRequest, res: 
         reviewedByName: a.reviewedBy?.name ?? null,
         reviewedByEmail: a.reviewedBy?.email ?? null,
         reviewedNote: a.reviewedNote,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:partyId/reimbursement-cap/audit (fennel-49102)
+// Per-row history of cap changes — newest first, capped at 50 rows.
+// Authz mirrors the /reimbursement-cap/appeals endpoint above:
+// admin OR underboss-in-scope OR the party host (or an edit-permission
+// co-host).
+router.get('/:partyId/reimbursement-cap/audit', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { id: true, region: true, name: true, city: true, eventType: true, userId: true },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    let allowed = false;
+    if (party.userId && party.userId === req.userId) {
+      allowed = true;
+    } else if (await isAdmin(req.userEmail)) {
+      allowed = true;
+    } else if (await isUnderboss(req.userEmail)) {
+      const scope = await getUnderbossScope(req.userEmail);
+      if (partyMatchesScope(party, scope)) {
+        allowed = true;
+      }
+    } else {
+      // Co-host with edit permission can also view (delegated host).
+      const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (canEdit) allowed = true;
+    }
+    if (!allowed) {
+      throw new AppError('Not authorized to view cap audit history', 403, 'FORBIDDEN');
+    }
+
+    const rows = await prisma.reimbursementCapAudit.findMany({
+      where: { partyId },
+      orderBy: { setAt: 'desc' },
+      take: 50,
+    });
+
+    res.json({
+      audits: rows.map((r) => ({
+        id: r.id,
+        partyId: r.partyId,
+        oldCapUsd: r.oldCapUsd != null ? Number(r.oldCapUsd) : null,
+        newCapUsd: r.newCapUsd != null ? Number(r.newCapUsd) : null,
+        actorEmail: r.actorEmail,
+        actorKind: r.actorKind,
+        setAt: r.setAt.toISOString(),
+        note: r.note,
       })),
     });
   } catch (error) {

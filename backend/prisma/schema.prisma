@@ -246,6 +246,7 @@ model Party {
   announcements         Announcement[]
   attestations          GuestAttestation[]
   reimbursementCapAppeals ReimbursementCapAppeal[]
+  reimbursementCapAudits  ReimbursementCapAudit[]
 
   @@map("parties")
 }
@@ -306,6 +307,27 @@ model PartyStatusAudit {
   @@index([partyId])
   @@index([createdAt(sort: Desc)])
   @@map("party_status_audit")
+}
+
+// fennel-49102: Per-row audit trail for `parties.reimbursement_cap_usd`
+// changes. Mirrors the PartyStatusAudit shape from pizzaiolo-97053 so we
+// can answer "who set this party's $X cap?" — old/new cap values + the
+// actor's email and role (admin/super_admin/payment_admin/underboss/host/system).
+// No historical backfill: rows that pre-date this audit have no actor info.
+model ReimbursementCapAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  partyId     String   @map("party_id") @db.Uuid
+  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  oldCapUsd   Decimal? @map("old_cap_usd") @db.Decimal(10, 2)
+  newCapUsd   Decimal? @map("new_cap_usd") @db.Decimal(10, 2)
+  actorEmail  String   @map("actor_email")
+  actorKind   String   @map("actor_kind")
+  setAt       DateTime @default(now()) @map("set_at") @db.Timestamptz
+  note        String?
+
+  @@index([partyId])
+  @@index([setAt(sort: Desc)])
+  @@map("reimbursement_cap_audit")
 }
 
 model Guest {
