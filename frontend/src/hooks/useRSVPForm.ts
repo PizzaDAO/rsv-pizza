@@ -1,13 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
-import { searchPizzerias, geocodeAddress } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress, calculateDistanceMiles } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 import { findActiveRegion } from '../lib/optinAbRegions';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
+
+// ---- Ranking helpers (vesuvio-58492) ----
+
+// Cap the RSVP "Favorite Pizzerias" list to the top N entries ranked by a
+// weighted score combining rating and distance from the venue. Istanbul GPP
+// had ~15+ host-selected pizzerias which overwhelmed the form.
+const TOP_PIZZERIA_LIMIT = 3;
+const DISTANCE_WEIGHT_PER_MILE = 0.3;
+
+function rankPizzerias(
+  list: Pizzeria[],
+  venue: { lat: number; lng: number } | null,
+): Pizzeria[] {
+  return [...list]
+    .map(p => {
+      const rating = p.rating ?? 3.5;
+      const hasDistance =
+        !!venue &&
+        !!p.location &&
+        p.location.lat !== 0 &&
+        p.location.lng !== 0;
+      const distance = hasDistance
+        ? calculateDistanceMiles(venue.lat, venue.lng, p.location.lat, p.location.lng)
+        : 0;
+      return { p, score: rating - distance * DISTANCE_WEIGHT_PER_MILE };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, TOP_PIZZERIA_LIMIT)
+    .map(x => x.p);
+}
 
 // ---- Types ----
 
@@ -333,14 +363,21 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   // Use host-preselected pizzerias only (no auto-search — avoids Google Places billing).
   // chorizo-72831
+  // vesuvio-58492: cap to top 3 by weighted (rating - distance*0.3) score before
+  // setting state, so large host-selected lists (Istanbul GPP had 15+) don't
+  // overwhelm the RSVP form.
   useEffect(() => {
     if (!isOpen) return;
-    if (eventData.selectedPizzerias && eventData.selectedPizzerias.length > 0) {
-      setNearbyPizzerias(eventData.selectedPizzerias);
-      if (eventData.address) {
-        geocodeAddress(eventData.address).then(loc => { if (loc) setVenueLocation(loc); });
-      }
-    }
+    if (!eventData.selectedPizzerias || eventData.selectedPizzerias.length === 0) return;
+    const selected = eventData.selectedPizzerias;
+    let cancelled = false;
+    (async () => {
+      const loc = eventData.address ? await geocodeAddress(eventData.address) : null;
+      if (cancelled) return;
+      if (loc) setVenueLocation(loc);
+      setNearbyPizzerias(rankPizzerias(selected, loc));
+    })();
+    return () => { cancelled = true; };
   }, [eventData.address, eventData.selectedPizzerias, isOpen]);
 
   // ---- Handlers ----
@@ -359,7 +396,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       }
       if (!venueLocation) setVenueLocation(loc);
       const results = await searchPizzerias(loc.lat, loc.lng);
-      setNearbyPizzerias(results);
+      // vesuvio-58492: cap to top 3 by weighted (rating - distance*0.3) score.
+      setNearbyPizzerias(rankPizzerias(results, loc));
       setPizzeriaSearchAttempted(true);
     } catch (err) {
       setPizzeriaError(err instanceof Error ? err.message : 'Failed to load pizzerias');
