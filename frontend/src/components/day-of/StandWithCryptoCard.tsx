@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Shield, Loader2, Check, Camera, Video } from 'lucide-react';
+import { Shield, Loader2, Check, Camera, Video, ImagePlus, Upload } from 'lucide-react';
 import { Party } from '../../types';
 import { uploadEventPhoto, uploadEventVideo } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi, getPartyPhotos } from '../../lib/api';
@@ -21,15 +21,22 @@ type UploadState = {
  *   2. Shoutout video (tagged 'swc-video', videos bucket)
  *
  * Each section shows a ✓ once its tagged file exists. Card dims to 50%
- * once BOTH are done; both upload buttons remain active throughout.
+ * once BOTH are done; all upload buttons remain active throughout.
+ *
+ * Each section has two distinct buttons:
+ *   - Photo: "Take a Photo" (capture) / "Upload from library" (no capture)
+ *   - Video: "Record video" (capture) / "Upload video" (no capture)
+ * Both buttons in a section share the same upload handler.
  *
  * Visibility gate (isGpp) is the caller's responsibility (DayOfDashboard).
  */
 export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party, onUploaded }) => {
   // ---- HOOKS (all above any early return) -------------------------------
   const { user } = useAuth();
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
+  const photoCameraRef = useRef<HTMLInputElement>(null);
+  const photoLibraryRef = useRef<HTMLInputElement>(null);
+  const videoCameraRef = useRef<HTMLInputElement>(null);
+  const videoLibraryRef = useRef<HTMLInputElement>(null);
 
   const [photoState, setPhotoState] = useState<UploadState>({ uploading: false, error: null });
   const [videoState, setVideoState] = useState<UploadState>({ uploading: false, error: null });
@@ -110,13 +117,15 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
   const onPhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handlePhotoFile(file);
-    if (photoInputRef.current) photoInputRef.current.value = '';
+    if (photoCameraRef.current) photoCameraRef.current.value = '';
+    if (photoLibraryRef.current) photoLibraryRef.current.value = '';
   };
 
   const onVideoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleVideoFile(file);
-    if (videoInputRef.current) videoInputRef.current.value = '';
+    if (videoCameraRef.current) videoCameraRef.current.value = '';
+    if (videoLibraryRef.current) videoLibraryRef.current.value = '';
   };
 
   const bothDone = hasPhoto && hasVideo;
@@ -153,7 +162,7 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
         </p>
         <button
           type="button"
-          onClick={() => photoInputRef.current?.click()}
+          onClick={() => photoCameraRef.current?.click()}
           disabled={photoState.uploading}
           className="w-full bg-[#ff393a] text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
         >
@@ -165,15 +174,31 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
           ) : (
             <>
               <Camera size={16} />
-              {hasPhoto ? 'Upload another group photo' : 'Upload group photo'}
+              Take a Photo
             </>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => photoLibraryRef.current?.click()}
+          disabled={photoState.uploading}
+          className="w-full bg-theme-surface-hover text-theme-text rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-white/10 hover:bg-white/10 transition-colors"
+        >
+          <ImagePlus size={14} />
+          Upload from library
+        </button>
         <input
-          ref={photoInputRef}
+          ref={photoCameraRef}
           type="file"
           accept="image/*"
           capture="environment"
+          className="hidden"
+          onChange={onPhotoSelected}
+        />
+        <input
+          ref={photoLibraryRef}
+          type="file"
+          accept="image/*"
           className="hidden"
           onChange={onPhotoSelected}
         />
@@ -197,7 +222,7 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
         </p>
         <button
           type="button"
-          onClick={() => videoInputRef.current?.click()}
+          onClick={() => videoCameraRef.current?.click()}
           disabled={videoState.uploading}
           className="w-full bg-[#ff393a] text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
         >
@@ -209,15 +234,31 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
           ) : (
             <>
               <Video size={16} />
-              {hasVideo ? 'Upload another shoutout video' : 'Upload shoutout video'}
+              Record video
             </>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => videoLibraryRef.current?.click()}
+          disabled={videoState.uploading}
+          className="w-full bg-theme-surface-hover text-theme-text rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-white/10 hover:bg-white/10 transition-colors"
+        >
+          <Upload size={14} />
+          Upload video
+        </button>
         <input
-          ref={videoInputRef}
+          ref={videoCameraRef}
           type="file"
           accept="video/*"
           capture="environment"
+          className="hidden"
+          onChange={onVideoSelected}
+        />
+        <input
+          ref={videoLibraryRef}
+          type="file"
+          accept="video/*"
           className="hidden"
           onChange={onVideoSelected}
         />
