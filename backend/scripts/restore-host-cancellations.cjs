@@ -24,6 +24,16 @@
  *   publication for the duration of the apply phase and ADD it back in
  *   a try/finally so the publication is restored even on error.
  *
+ * Column-type encoding:
+ *   Each target table's columns are introspected at runtime via
+ *   `information_schema.columns` (data_type + udt_name). Values from
+ *   `record_data` are encoded based on the actual column type — JSON-
+ *   stringified for `jsonb`/`json`, passed through as JS arrays for
+ *   `ARRAY` (node-pg handles array literal formatting), pass-through
+ *   for everything else. This replaces a hand-maintained allowlist
+ *   that previously misclassified several `text[]` columns as JSONB
+ *   and made every party insert fail with `malformed array literal`.
+ *
  * Slug collisions:
  *   - custom_url collisions get rewritten to `<original>-cancelled-<shortid>`
  *   - invite_code collisions get a fresh cuid
@@ -116,54 +126,13 @@ const GENERATED_COLUMNS_BY_TABLE = {
   parties: new Set(['co_hosts_public']),
 };
 
-// JSONB columns per table — values from record_data need to be re-stringified
-// before binding (`pg` stringifies plain JS objects but Postgres needs
-// the JSON text representation for JSONB, and arrays in `record_data` are
-// already JSON-shaped).
-const JSONB_COLUMNS_BY_TABLE = {
-  parties: new Set([
-    'co_hosts',
-    'selected_pizzerias',
-    'suggested_amounts',
-    'pinned_apps',
-    'host_tags',
-    'host_goals',
-    'hidden_gpp_photos',
-    'extra_gpp_photos',
-    'flyer_config',
-    'external_links',
-    'report_stats_config',
-  ]),
-  guests: new Set(['suggested_pizzerias']),
-  displays: new Set(['content_config']),
-  raffles: new Set([]),
-  performers: new Set([]),
-  budget_items: new Set([]),
-  checklist_items: new Set([]),
-  social_posts: new Set([]),
-  notable_attendees: new Set([]),
-  party_kits: new Set([]),
-  orders: new Set(['pizzas']),
-  donations: new Set([]),
-  sponsors: new Set([]),
-  sponsor_checklist_items: new Set([]),
-  partner_event_notes: new Set([]),
-  raffle_prizes: new Set([]),
-  raffle_entries: new Set([]),
-  raffle_winners: new Set([]),
-  venues: new Set([]),
-  venue_photos: new Set([]),
-  staff: new Set([]),
-  photos: new Set([]),
-};
-
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
 async function fetchTableColumns(client, tableName) {
   const res = await client.query(
     `
-    SELECT column_name, is_generated
+    SELECT column_name, is_generated, data_type, udt_name
     FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = $1
     `,
@@ -171,12 +140,14 @@ async function fetchTableColumns(client, tableName) {
   );
   const live = new Set();
   const generated = new Set();
+  const types = new Map();
   for (const row of res.rows) {
     if (row.is_generated === 'ALWAYS') {
       generated.add(row.column_name);
     } else {
       live.add(row.column_name);
     }
+    types.set(row.column_name, { data_type: row.data_type, udt_name: row.udt_name });
   }
   // Merge static knowledge so an env without the column metadata still
   // sees `co_hosts_public` as generated.
@@ -184,14 +155,37 @@ async function fetchTableColumns(client, tableName) {
   if (staticallyKnown) {
     for (const col of staticallyKnown) generated.add(col);
   }
-  return { live, generated };
+  return { live, generated, types };
+}
+
+function encodeArrayValue(val) {
+  // node-pg formats JS arrays into Postgres array literals natively, so the
+  // preferred shape is a JS array.
+  if (val === null || val === undefined) return null;
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    // record_data may already contain a JSON-shaped string (e.g. '["a","b"]').
+    const trimmed = val.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // Fall through — wrap as a single-element array below.
+      }
+    }
+    return [val];
+  }
+  // Anything else (number, bool, object) — wrap as a single-element array so
+  // the bind doesn't blow up; deletion_log values for ARRAY columns should
+  // realistically only be arrays or null, so this is defensive.
+  return [val];
 }
 
 function buildInsertParams(tableName, recordData, columnInfo) {
   const cols = [];
   const placeholders = [];
   const values = [];
-  const jsonb = JSONB_COLUMNS_BY_TABLE[tableName] || new Set();
   let i = 1;
   for (const [col, val] of Object.entries(recordData)) {
     if (!columnInfo.live.has(col)) continue;
@@ -200,16 +194,19 @@ function buildInsertParams(tableName, recordData, columnInfo) {
     placeholders.push(`$${i++}`);
     if (val === null || val === undefined) {
       values.push(null);
-    } else if (jsonb.has(col)) {
+      continue;
+    }
+    const typeInfo = columnInfo.types ? columnInfo.types.get(col) : null;
+    const dataType = typeInfo ? typeInfo.data_type : null;
+    if (dataType === 'jsonb' || dataType === 'json') {
       // pg's JSONB binding expects a string OR will JSONify a JS object.
       // Be explicit so arrays/objects from record_data round-trip correctly.
       values.push(JSON.stringify(val));
-    } else if (typeof val === 'object' && !(val instanceof Date)) {
-      // Defensive: anything object-shaped that isn't in our jsonb allowlist
-      // is most likely also JSONB — stringify rather than risk a binding
-      // failure.
-      values.push(JSON.stringify(val));
+    } else if (dataType === 'ARRAY') {
+      // node-pg formats JS arrays into Postgres array literals.
+      values.push(encodeArrayValue(val));
     } else {
+      // Date / string / number / bool / etc. — pass through unchanged.
       values.push(val);
     }
   }
