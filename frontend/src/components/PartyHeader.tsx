@@ -100,11 +100,10 @@ export const PartyHeader: React.FC = () => {
       // Upload image if file is selected
       let imageUrl = eventImageUrl.trim() || undefined;
       if (eventImageFile) {
-        const uploadedUrl = await uploadEventImage(eventImageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          setImageError('Failed to upload image. Please try again.');
+        try {
+          imageUrl = await uploadEventImage(eventImageFile);
+        } catch (err) {
+          setImageError(err instanceof Error ? err.message : 'Failed to upload image. Please try again.');
           setCreating(false);
           return;
         }

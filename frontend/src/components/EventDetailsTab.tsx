@@ -345,11 +345,10 @@ export const EventDetailsTab: React.FC = () => {
       // Upload image if file is selected
       let imageUrl = eventImageUrl.trim() || undefined;
       if (eventImageFile) {
-        const uploadedUrl = await uploadEventImage(eventImageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          throw new Error('Failed to upload image. Please ensure the storage bucket is configured or use an image URL instead.');
+        try {
+          imageUrl = await uploadEventImage(eventImageFile);
+        } catch (err) {
+          throw new Error(err instanceof Error ? err.message : 'Failed to upload image. Please ensure the storage bucket is configured or use an image URL instead.');
         }
       }
 
@@ -665,11 +664,10 @@ export const EventDetailsTab: React.FC = () => {
   const saveImage = async () => {
     let imageUrl = eventImageUrl.trim() || undefined;
     if (eventImageFile) {
-      const uploadedUrl = await uploadEventImage(eventImageFile);
-      if (uploadedUrl) {
-        imageUrl = uploadedUrl;
-      } else {
-        setMessage({ type: 'error', text: 'Failed to upload image' });
+      try {
+        imageUrl = await uploadEventImage(eventImageFile);
+      } catch (err) {
+        setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to upload image' });
         return;
       }
     }

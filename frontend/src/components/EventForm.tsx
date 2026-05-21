@@ -237,11 +237,10 @@ export function EventForm() {
 
       let imageUrl = eventImageUrl.trim() || undefined;
       if (eventImageFile) {
-        const uploadedUrl = await uploadEventImage(eventImageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          setImageError(t('eventForm.imageUploadFailed'));
+        try {
+          imageUrl = await uploadEventImage(eventImageFile);
+        } catch (err) {
+          setImageError(err instanceof Error ? err.message : t('eventForm.imageUploadFailed'));
           setCreating(false);
           return;
         }
