@@ -32,7 +32,7 @@ const SPONSOR_BOX_MAX = 1080;
 
 export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { t } = useTranslation('host');
-  const { party, mergeParty } = usePizza();
+  const { party, loadParty, mergeParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
