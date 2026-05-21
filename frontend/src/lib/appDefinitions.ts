@@ -38,7 +38,7 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'raffle', name: 'Raffle', tab: 'raffle', icon: Ticket },
   { id: 'budget', name: 'Budget', tab: 'budget', icon: Calculator },
   { id: 'checklist', name: 'Checklist', tab: 'checklist', icon: ListChecks },
-  { id: 'day-of', name: 'Day Of', tab: 'day-of', icon: Zap },
+  { id: 'party-guide', name: 'Party Guide', tab: 'party-guide', icon: Zap },
   { id: 'party-kit', name: 'Party Kit', tab: 'gpp', icon: Package },
   { id: 'marketing-promo', name: 'Promo', tab: 'promo', icon: Megaphone },
   { id: 'flyer', name: 'Flyer', tab: 'flyer', icon: FileImage },
