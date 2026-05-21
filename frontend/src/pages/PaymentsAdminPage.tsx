@@ -36,6 +36,7 @@ import {
   HostPaymentDetailsModal,
   ExportSafeJsonModal,
   RejectReasonModal,
+  HotWalletCard,
 } from '../components/payments-admin';
 
 type RoleState =
@@ -462,6 +463,10 @@ export function PaymentsAdminPage() {
             Export CSV
           </button>
         </div>
+
+        {/* coppa-91827: hot wallet address + ETH/USDC balances so admins know
+            where to deposit funds and can verify they landed. Self-fetches. */}
+        <HotWalletCard />
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
 
