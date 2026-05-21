@@ -14,7 +14,7 @@ interface FindVenueModalProps {
 
 export const FindVenueModal: React.FC<FindVenueModalProps> = ({ open, onClose, onSaved }) => {
   const { t } = useTranslation('host');
-  const { party, loadParty } = usePizza();
+  const { party, mergeParty } = usePizza();
   const [address, setAddress] = useState('');
   const [venueName, setVenueName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,10 +61,20 @@ export const FindVenueModal: React.FC<FindVenueModalProps> = ({ open, onClose, o
         setError(t('venue.findVenueSaveError'));
         return;
       }
-      if (party.inviteCode) {
-        await loadParty(party.inviteCode);
-      }
-      triggerFlyerRegen(party, loadParty);
+      const trimmedAddress = address.trim();
+      mergeParty({
+        address: trimmedAddress,
+        venueName: venueName || null,
+        ...(pendingCoordsRef.current ? {
+          latitude: pendingCoordsRef.current.lat,
+          longitude: pendingCoordsRef.current.lng,
+        } : {}),
+        ...(pendingPlaceIdRef.current ? { placeId: pendingPlaceIdRef.current } : {}),
+      });
+      triggerFlyerRegen(
+        { ...party, address: trimmedAddress, venueName: venueName || null },
+        mergeParty,
+      );
       if (onSaved) {
         await onSaved();
       }

@@ -30,7 +30,7 @@ interface SponsorCRMProps {
 
 export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const { t } = useTranslation('host');
-  const { party, loadParty } = usePizza();
+  const { party, mergeParty } = usePizza();
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,8 +195,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
           && (previousSponsor.logoUrl || null) !== (data.logoUrl || null);
 
         if (willBeOnFlyer || wasOnFlyer !== willBeOnFlyer || (wasOnFlyer && logoChanged)) {
-          if (party.inviteCode) await loadParty(party.inviteCode);
-          triggerFlyerRegen(party, loadParty);
+          triggerFlyerRegen(party, mergeParty);
         }
       }
 
@@ -225,8 +224,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
       // Auto-regenerate flyer if deleted sponsor was on the flyer
       if (party && deletedSponsor && FLYER_SPONSOR_STATUSES.has(deletedSponsor.status) && deletedSponsor.logoUrl) {
-        if (party.inviteCode) await loadParty(party.inviteCode);
-        triggerFlyerRegen(party, loadParty);
+        triggerFlyerRegen(party, mergeParty);
       }
     }
   };
@@ -282,8 +280,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
 
       // Auto-regenerate flyer when a sponsor transitions to/from a flyer status
       if (party && (FLYER_SPONSOR_STATUSES.has(oldStatus) || FLYER_SPONSOR_STATUSES.has(newStatus))) {
-        if (party.inviteCode) await loadParty(party.inviteCode);
-        triggerFlyerRegen(party, loadParty);
+        triggerFlyerRegen(party, mergeParty);
       }
     } catch {
       // Revert on failure

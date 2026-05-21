@@ -55,7 +55,7 @@ function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { loadParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
+  const { loadParty, mergeParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
 
@@ -348,7 +348,7 @@ function HostPageContent() {
                 ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
                 : [...existing, newCoHost];
               await updateParty(party.id, { co_hosts: updated });
-              if (party.inviteCode) await loadParty(party.inviteCode);
+              mergeParty({ coHosts: updated });
             }}
           />
         ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'day-of' && activeTab !== 'partners' && (

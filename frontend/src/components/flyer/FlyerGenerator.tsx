@@ -32,7 +32,7 @@ const SPONSOR_BOX_MAX = 1080;
 
 export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { t } = useTranslation('host');
-  const { party, loadParty } = usePizza();
+  const { party, mergeParty } = usePizza();
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
@@ -387,7 +387,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       ? existing.map((c, i) => i === existingIdx ? { ...c, ...newCoHost, id: c.id } : c)
       : [...existing, newCoHost];
     await updateParty(party.id, { co_hosts: updated });
-    if (party.inviteCode) await loadParty(party.inviteCode);
+    mergeParty({ coHosts: updated });
   };
 
   // Load both Hub 191 fonts, then trigger re-render for accurate fitText measurements
@@ -759,9 +759,11 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       // Cancel any pending auto-regen so it doesn't overwrite the manual flyer
       cancelFlyerRegen(party.id);
 
-      if (party.inviteCode) {
-        await loadParty(party.inviteCode);
-      }
+      mergeParty({
+        eventImageUrl: uploadedUrl,
+        flyerGeneratedAt: new Date().toISOString(),
+        flyerConfig: flyerConfigValue,
+      });
 
       setSetImageState('success');
       setTimeout(() => setSetImageState('idle'), 2000);
