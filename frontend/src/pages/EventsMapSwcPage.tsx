@@ -189,7 +189,7 @@ export function EventsMapSwcPage() {
                 iconUrl="/molto-benny-swc.svg"
                 iconWidth={64}
                 iconHeight={32}
-                iconAnchorX={15}
+                iconAnchorX={21}
                 iconAnchorY={32}
                 cluster={false}
               />
