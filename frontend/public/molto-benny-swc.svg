@@ -1,5 +1,5 @@
 <svg width="1400" height="700" viewBox="0 0 1400 700" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="benny" transform="translate(0, 27)">
+<g id="benny" transform="translate(182, 350) scale(0.5)">
 <g id="graphic" clip-path="url(#clip0_5803_3851)">
 <g id="white">
 <path id="Vector" d="M305.28 188.452C320.797 240.483 327.447 231.616 285.777 234.107C265.254 238.167 251.43 253.51 236.162 219.337C220.868 185.164 218.477 148.276 243.061 142.024C262.165 133.481 294.57 152.61 305.28 188.477V188.452Z" fill="white"/>
@@ -80,7 +80,7 @@
 </clipPath>
 </defs>
 </g>
-<g id="swc-shield" transform="translate(730, 27) scale(20.1875)">
+<g id="swc-shield" transform="translate(888, 350) scale(10.09375)">
 <path d="M7.99953 0H0V14.3441C0.529429 21.8907 5.48357 28.3825 12.5714 30.8204L16 32V0H7.99953Z" fill="url(#paint0_linear_swc_shield)" stroke="#1a1a1a" stroke-width="0.25"/>
 <path d="M24.0005 0H16V32L19.4286 30.8185C26.5183 28.3806 31.4706 21.8878 32 14.3413V0H23.9995H24.0005Z" fill="url(#paint1_linear_swc_shield)" stroke="#1a1a1a" stroke-width="0.25"/>
 </g>
