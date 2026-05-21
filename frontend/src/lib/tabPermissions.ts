@@ -5,7 +5,7 @@ import {
   Users,
   Pizza,
   Camera,
-  CreditCard,
+  Coins,
   Handshake,
   MapPin,
   Music,
@@ -77,7 +77,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'promo', label: 'Promo', icon: Megaphone },
   { id: 'flyer', label: 'Flyer', icon: FileImage },
   { id: 'print', label: 'Print', icon: Printer },
-  { id: 'payments', label: 'Payments', icon: CreditCard },
+  { id: 'payments', label: 'Payments', icon: Coins },
   { id: 'apps', label: 'Apps', icon: LayoutGrid },
 ];
 
