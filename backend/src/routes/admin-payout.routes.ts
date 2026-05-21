@@ -211,6 +211,12 @@ function buildPayoutWhere(query: Request['query']): any {
     }
   }
 
+  // tartufo-58291: hide payouts from unapproved parties from the admin queue
+  // + CSV export. Existing rows from before the bresaola-49185 backend gate
+  // shouldn't surface in routine review. Stats/totals reuse this same `where`
+  // so they stay consistent.
+  where.party = { underbossStatus: 'approved' };
+
   return where;
 }
 
