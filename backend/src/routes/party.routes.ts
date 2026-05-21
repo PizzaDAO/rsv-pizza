@@ -247,7 +247,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationRecipientUrl, donationEthAddress
+      donationRecipientUrl, donationEthAddress, showToppingsOnRsvp
     } = req.body;
 
     // Generate default party name if not provided
@@ -314,6 +314,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         donationRecipient: donationRecipient || null,
         donationRecipientUrl: donationRecipientUrl || null,
         donationEthAddress: donationEthAddress || null,
+        showToppingsOnRsvp: showToppingsOnRsvp || false,
       },
       include: {
         user: { select: { name: true } },
@@ -446,7 +447,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const { id } = req.params;
     const {
       name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, city, placeId, venueName, maxGuests,
-      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, showToppingsOnRsvp, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
       eventTags,
@@ -673,6 +674,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
         ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
+        ...(showToppingsOnRsvp !== undefined && { showToppingsOnRsvp }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),

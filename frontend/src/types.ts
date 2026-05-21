@@ -264,6 +264,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   maxGuests: number | null;
   expectedGuests?: number | null;
   hideGuests: boolean;
