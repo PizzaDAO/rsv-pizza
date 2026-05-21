@@ -1,24 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Loader2 } from 'lucide-react';
 import { getScorecard, completeScorecardItem, ScorecardItem as ScorecardItemType } from '../../lib/api';
-import { ScorecardItem, ScorecardItemKey } from './ScorecardItem';
+import { ScorecardItem, ScorecardItemKey, ActionContext } from './ScorecardItem';
 
 interface GuestScorecardProps {
   inviteCode: string;
+  eventName: string;
+  eventImageUrl: string | null;
+  customUrl: string | null;
+  telegramUrl: string | null;
+  twitterHandles: string[];
+  guestId: string;
+  guestName: string;
+  onOpenPhotos: () => void;
+  onOpenScanner: () => void;
 }
 
 const ITEM_ORDER: ScorecardItemKey[] = [
   'post',
   'photo',
   'vouch',
-  'pizza_selfie',
   'sign_pizza_box',
   'join_telegram',
   'follow_pizzadao',
-  'signup_pizzadao',
 ];
 
-export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
+export function GuestScorecard({ inviteCode, eventName, eventImageUrl, customUrl, telegramUrl, twitterHandles, guestId, guestName, onOpenPhotos, onOpenScanner }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
   const [totalItems, setTotalItems] = useState(8);
@@ -67,6 +74,18 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
     }
   };
 
+  const actionContext: ActionContext = {
+    eventName,
+    eventUrl: `https://rsv.pizza/${customUrl || inviteCode}`,
+    inviteCode,
+    guestId,
+    guestName,
+    twitterHandles,
+    telegramUrl,
+    onOpenPhotos,
+    onOpenScanner,
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-6">
@@ -108,7 +127,7 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
         <p className="text-xs text-white/50 mt-1.5 mb-2">
           {isComplete
             ? 'All tasks completed! You are a Pizza Chef!'
-            : `Complete tasks to earn your Pizza Chef title`}
+            : `Level up your pizza party playing card`}
         </p>
       </div>
 
@@ -124,6 +143,7 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
                 completed={item.completed}
                 loading={completingItem === key}
                 onComplete={handleComplete}
+                actionContext={actionContext}
               />
             </div>
           );
