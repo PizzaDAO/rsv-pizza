@@ -36,6 +36,7 @@ import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { notifyHostOfPaymentExecution } from '../services/payoutTelegramNotify.js';
+import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 
 const router = Router();
 
@@ -1732,6 +1733,11 @@ async function executePayout(params: {
       void notifyHostOfPaymentExecution(existing.id, 'paid', {
         txHash: result.txHash,
       });
+      // cipolla-49102: fire-and-forget email to the host's User.email.
+      // Runs alongside Telegram (which is USDC-only) — same contract.
+      void emailHostOfPaymentExecution(existing.id, 'paid', {
+        txHash: result.txHash,
+      });
       return updated;
     } catch (err: any) {
       // Flip to failed + record the error so the admin UI shows what happened.
@@ -1757,6 +1763,10 @@ async function executePayout(params: {
       // boscaiola-49102: fire-and-forget Telegram DM on failure too.
       // Same fire-and-forget contract — never blocks or throws.
       void notifyHostOfPaymentExecution(existing.id, 'failed', {
+        error: errMsg,
+      });
+      // cipolla-49102: fire-and-forget email on failure too.
+      void emailHostOfPaymentExecution(existing.id, 'failed', {
         error: errMsg,
       });
       throw new AppError(`USDC payout failed: ${errMsg}`, 502, 'USDC_SEND_FAILED');
@@ -1801,6 +1811,9 @@ async function executePayout(params: {
       });
       return row;
     });
+    // cipolla-49102: fire-and-forget email to the host's User.email.
+    // No txHash for wire — helper omits the link.
+    void emailHostOfPaymentExecution(existing.id, 'paid');
     return updated;
   }
 
@@ -1851,6 +1864,9 @@ async function executePayout(params: {
       });
       return row;
     });
+    // cipolla-49102: fire-and-forget email to the host's User.email.
+    // No txHash for mercury_card — helper omits the link.
+    void emailHostOfPaymentExecution(existing.id, 'paid');
     return updated;
   }
 
