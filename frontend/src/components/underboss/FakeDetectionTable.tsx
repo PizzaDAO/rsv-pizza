@@ -58,12 +58,19 @@ function flagLabel(name: string): string {
 
 function FlagPill({ flag }: { flag: FakeDetectionRow['flags'][number] }) {
   if (!flag.fired) return null;
+  const hasDetail = !!flag.detail && flag.detail.trim().length > 0;
   return (
     <span
-      title={`${flag.name} — ${flag.detail}`}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/15 text-red-700 border border-red-500/30"
+      title={`${flag.name}${hasDetail ? ` — ${flag.detail}` : ''}`}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/15 text-red-700 border border-red-500/30 max-w-full"
     >
       <span>{flagLabel(flag.name)}</span>
+      {hasDetail && (
+        <>
+          <span className="text-red-700/50">·</span>
+          <span className="text-red-700/70 tabular-nums truncate max-w-[180px]">{flag.detail}</span>
+        </>
+      )}
       <span className="text-red-700/60 tabular-nums">+{flag.weight}</span>
     </span>
   );
