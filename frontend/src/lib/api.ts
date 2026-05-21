@@ -4031,6 +4031,28 @@ export async function getUsdcDailyCapRemaining(): Promise<{
 }
 
 /**
+ * coppa-91827: fetch the payout hot wallet's public address + live ETH (gas)
+ * and USDC balances on Base. Admin-only. Used by `HotWalletCard` at the top
+ * of /payments so admins know where to deposit and can verify funds landed.
+ *
+ * Returns 503 if `USDC_PAYOUT_WALLET_PRIVATE_KEY` is not set on backend Vercel
+ * — apiRequest will throw with the backend-provided remediation message.
+ */
+export interface PayoutWalletInfo {
+  address: string;
+  chainId: number;
+  ethBalance: string;        // human-readable, e.g. "0.05273"
+  ethBalanceWei: string;     // BigInt string in wei
+  usdcBalance: string;       // human-readable, e.g. "1250.00"
+  usdcBalanceUnits: string;  // BigInt string in 6-decimal base units
+  fetchedAt: string;         // ISO timestamp
+}
+
+export async function fetchPayoutWalletInfo(): Promise<PayoutWalletInfo> {
+  return apiRequest<PayoutWalletInfo>('/api/admin/payout-wallet/info');
+}
+
+/**
  * Triggers the CSV export endpoint and downloads the file to the browser.
  * Returns nothing — fires a download via a temporary <a> element.
  */

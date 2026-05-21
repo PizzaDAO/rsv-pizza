@@ -9,3 +9,4 @@ export { CreatePrepaymentModal } from './CreatePrepaymentModal';
 export { HostPaymentDetailsModal } from './HostPaymentDetailsModal';
 export { ExportSafeJsonModal } from './ExportSafeJsonModal';
 export { RejectReasonModal } from './RejectReasonModal';
+export { HotWalletCard } from './HotWalletCard';

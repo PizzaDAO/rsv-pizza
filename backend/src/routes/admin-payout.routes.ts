@@ -27,7 +27,10 @@ import { AppError } from '../middleware/error.js';
 import {
   sendUsdcPayment,
   getUsdcDailyCapStatus,
+  getPayoutWalletAddress,
 } from '../services/usdc-base.service.js';
+import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
+import { base } from 'viem/chains';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
@@ -1836,3 +1839,75 @@ router.post(
 export { requireAnyAdminOrPaymentAdmin, isFullAdmin };
 
 export default router;
+
+// ============================================
+// coppa-91827: payout-wallet info sub-router
+//
+// Mounted separately at `/api/admin/payout-wallet` (see backend/src/index.ts)
+// so the URL contract `/api/admin/payout-wallet/info` is a sibling of, not a
+// child under, `/api/admin/payouts/*`. Lives in this file so the auth helper
+// (`isPaymentAdmin`) and the wallet helper (`getPayoutWalletAddress`) stay
+// colocated with the rest of the payout admin surface.
+//
+// GET /info — returns the hot wallet's public address (derived from
+// USDC_PAYOUT_WALLET_PRIVATE_KEY) plus live ETH (gas) and USDC balances on
+// Base mainnet so admins can deposit funds and verify they landed without
+// leaving the dashboard.
+// ============================================
+const USDC_BASE_ADDRESS_FOR_INFO: `0x${string}` = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+export const payoutWalletRouter = Router();
+
+payoutWalletRouter.get(
+  '/info',
+  requireAuth,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isPaymentAdmin(req.userEmail))) {
+        throw new AppError('Admin only', 403, 'FORBIDDEN');
+      }
+
+      // Resolve the address before opening any RPC. If the env var is missing
+      // or malformed, surface a 503 with a clear remediation hint instead of
+      // leaking the underlying viem error.
+      let address: `0x${string}`;
+      try {
+        address = getPayoutWalletAddress();
+      } catch (err: any) {
+        console.error('[admin-payout-wallet] getPayoutWalletAddress failed:', err?.message || err);
+        throw new AppError(
+          'Hot wallet not configured — set USDC_PAYOUT_WALLET_PRIVATE_KEY on backend Vercel.',
+          503,
+          'HOT_WALLET_NOT_CONFIGURED',
+        );
+      }
+
+      const client = createPublicClient({
+        chain: base,
+        transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
+      });
+
+      const [ethRaw, usdcRaw] = await Promise.all([
+        client.getBalance({ address }),
+        client.readContract({
+          address: USDC_BASE_ADDRESS_FOR_INFO,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [address],
+        }) as Promise<bigint>,
+      ]);
+
+      res.json({
+        address,
+        chainId: 8453,
+        ethBalance: formatUnits(ethRaw, 18),
+        ethBalanceWei: ethRaw.toString(),
+        usdcBalance: formatUnits(usdcRaw, 6),
+        usdcBalanceUnits: usdcRaw.toString(),
+        fetchedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
