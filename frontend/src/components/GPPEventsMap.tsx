@@ -23,6 +23,11 @@ interface GPPEventsMapProps {
   iconHeight?: number;
   iconAnchorX?: number;
   iconAnchorY?: number;
+  // When true (default), markers are grouped into clusters at low zoom levels
+  // via MarkerClusterer. When false, every marker is rendered individually at
+  // every zoom level. Used by /map/swc (salami-29485) to surface all SWC pins
+  // regardless of proximity.
+  cluster?: boolean;
 }
 
 // Semantic colors keyed on underbossStatus. Keep in sync with STATUS_LEGEND
@@ -65,6 +70,7 @@ export default function GPPEventsMap({
   iconHeight = 38,
   iconAnchorX = 19,
   iconAnchorY = 38,
+  cluster = true,
 }: GPPEventsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -391,38 +397,45 @@ export default function GPPEventsMap({
 
       markersRef.current = markers;
 
-      // Create clusterer with red bubbles (Benny's shoe color: #FF0029)
-      clustererRef.current = new MarkerClusterer({
-        map,
-        markers,
-        renderer: {
-          render: ({ count, position }) => {
-            const svg = window.btoa(`
-              <svg fill="#FF0029" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
-                <circle cx="120" cy="120" opacity=".6" r="70" />
-                <circle cx="120" cy="120" opacity=".3" r="90" />
-                <circle cx="120" cy="120" opacity=".2" r="110" />
-                <circle cx="120" cy="120" opacity=".1" r="130" />
-              </svg>
-            `);
-            return new google.maps.Marker({
-              position,
-              icon: {
-                url: `data:image/svg+xml;base64,${svg}`,
-                scaledSize: new google.maps.Size(45, 45),
-              },
-              label: {
-                text: String(count),
-                color: 'rgba(255,255,255,0.9)',
-                fontSize: '12px',
-                fontWeight: '600',
-              },
-              title: `${count} events`,
-              zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
-            });
+      if (cluster) {
+        // Create clusterer with red bubbles (Benny's shoe color: #FF0029)
+        clustererRef.current = new MarkerClusterer({
+          map,
+          markers,
+          renderer: {
+            render: ({ count, position }) => {
+              const svg = window.btoa(`
+                <svg fill="#FF0029" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+                  <circle cx="120" cy="120" opacity=".6" r="70" />
+                  <circle cx="120" cy="120" opacity=".3" r="90" />
+                  <circle cx="120" cy="120" opacity=".2" r="110" />
+                  <circle cx="120" cy="120" opacity=".1" r="130" />
+                </svg>
+              `);
+              return new google.maps.Marker({
+                position,
+                icon: {
+                  url: `data:image/svg+xml;base64,${svg}`,
+                  scaledSize: new google.maps.Size(45, 45),
+                },
+                label: {
+                  text: String(count),
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                },
+                title: `${count} events`,
+                zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+              });
+            },
           },
-        },
-      });
+        });
+      } else {
+        // Clustering disabled — render every marker individually on the map.
+        for (const marker of markers) {
+          marker.setMap(map);
+        }
+      }
 
       if (mapClickListenerRef.current) {
         mapClickListenerRef.current.remove();
@@ -471,7 +484,7 @@ export default function GPPEventsMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
-  }, [validEvents, cityChats, canModerate, isModerator, iconUrl, iconWidth, iconHeight, iconAnchorX, iconAnchorY]);
+  }, [validEvents, cityChats, canModerate, isModerator, iconUrl, iconWidth, iconHeight, iconAnchorX, iconAnchorY, cluster]);
 
   if (error) {
     return (

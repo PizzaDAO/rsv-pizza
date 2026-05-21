@@ -159,11 +159,20 @@ router.post('/:id/donations', async (req: Request, res: Response, next: NextFunc
     // Validate party exists and has donations enabled
     const party = await prisma.party.findUnique({
       where: { id },
-      select: { id: true, donationEnabled: true },
+      select: { id: true, donationEnabled: true, cancelledAt: true },
     });
 
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // porchetta-81402: block donations on cancelled events. Stripe payment
+    // intents that are already in flight (created before cancel) may still
+    // charge — the donation row stays in status=pending until the webhook
+    // resolves them, which is acceptable since the donation itself is real
+    // money the host received. The check here only blocks NEW intents.
+    if (party.cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
     }
 
     if (!party.donationEnabled) {

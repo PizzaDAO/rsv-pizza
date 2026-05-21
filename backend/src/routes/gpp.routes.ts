@@ -650,6 +650,10 @@ const gppEventSelect = {
   eventTags: true,
   underbossStatus: true,
   rsvpClosedAt: true,
+  // porchetta-81402: surface cancelled state so moderator views (which
+  // include cancelled events) can render a "Cancelled" badge.
+  cancelledAt: true,
+  cancellationReason: true,
   createdAt: true,
   coHosts: true,
   _count: {
@@ -712,6 +716,10 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     approved: event.underbossStatus === 'approved',
     community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
+    // porchetta-81402: included in the public GPP shape so consumers
+    // (apps.gpp.day, admin tools) can flag cancelled events even after
+    // they're filtered out of the default `/events` listing.
+    cancelledAt: event.cancelledAt ? new Date(event.cancelledAt).toISOString() : null,
   };
 
   if (!callerIsModerator) return base;
@@ -791,13 +799,19 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       includeAllStatuses = true;
     }
 
-    const where: any = { eventType: 'gpp' };
+    let where: any = { eventType: 'gpp' };
     if (req.query.curated === '1') {
       where.underbossStatus = { in: ['approved', 'listed'] };
     } else if (includeAllStatuses) {
       // moderator view — no underbossStatus filter; returns rejected/hidden too
     } else {
       where.underbossStatus = { notIn: ['rejected', 'hidden'] };
+    }
+    // porchetta-81402: cancelled events are hidden from the public GPP map +
+    // listings (moderator views still see them so they can verify the cancel
+    // was intentional and reach out to the host if needed).
+    if (!includeAllStatuses) {
+      where.cancelledAt = null;
     }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
@@ -807,6 +821,26 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     }
     if (region) {
       where.region = region as string;
+    }
+
+    // tropea-58294: swcOnly filter must run in SQL, not as a JS post-filter on
+    // the already-truncated take(N) result. Previously, take(500) capped the
+    // findMany BEFORE the JS .filter() ran, so SWC+approved events older than
+    // the 500th-newest GPP event were silently dropped (54 of 74 returned).
+    // We pre-fetch the distinct list of swc-* tags from event_tags and add
+    // hasSome + underbossStatus='approved' to the prisma where clause so the
+    // take/count happen against the filtered set.
+    if (req.query.swcOnly === 'true') {
+      const swcTagRows = await prisma.$queryRaw<Array<{ tag: string }>>`
+        SELECT DISTINCT t AS tag FROM parties, unnest(event_tags) t
+        WHERE t LIKE '%swc%' AND t <> 'swc'
+      `;
+      const swcTags = swcTagRows.map(r => r.tag);
+      where = {
+        eventType: 'gpp',
+        underbossStatus: 'approved',
+        eventTags: { hasSome: swcTags },
+      };
     }
 
     const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
@@ -823,25 +857,13 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
-    // cacciatore-72814: optional post-filter for SWC-flagged events.
-    // Keeps an event when its `eventTags` array contains at least one tag
-    // including the substring "swc" (e.g. "swc-2026", "swc-bali") but NOT
-    // the bare string "swc". Done in JS so we don't have to teach Prisma
-    // about array-substring matching.
-    let resultEvents = events;
-    if (req.query.swcOnly === 'true') {
-      resultEvents = events.filter((e: any) =>
-        Array.isArray(e.eventTags) && e.eventTags.some((t: string) => typeof t === 'string' && t.includes('swc') && t !== 'swc')
-      );
-    }
-
     res.set(
       'Cache-Control',
       callerIsModerator ? 'private, no-store' : 'public, max-age=300'
     );
     res.json({
-      events: resultEvents.map((e) => formatGppEvent(e, callerIsModerator)),
-      total: req.query.swcOnly === 'true' ? resultEvents.length : total,
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
+      total,
       limit: parsedLimit,
       offset: parsedOffset,
     });
@@ -857,6 +879,9 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       eventType: 'gpp',
       selectedPizzerias: { not: Prisma.DbNull },
       underbossStatus: { notIn: ['rejected', 'hidden'] },
+      // porchetta-81402: cancelled events shouldn't surface their pizzerias
+      // on the public /gpp/pizzerias roll-up.
+      cancelledAt: null,
     };
 
     const parties = await prisma.party.findMany({

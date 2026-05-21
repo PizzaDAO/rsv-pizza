@@ -88,6 +88,8 @@ export interface UserPartyListItem {
   eventImageUrl: string | null;
   guestCount: number;
   role: 'host' | 'guest' | 'cohost';
+  // porchetta-81402: HomePage renders a "Cancelled" pill on cancelled events.
+  cancelledAt?: string | null;
 }
 
 export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
@@ -172,6 +174,7 @@ export interface UpdatePartyData {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
@@ -222,6 +225,9 @@ export interface UpdatePartyData {
   parkingNotes?: string | null;
   // quattro-71244: Gamified dashboard host-set goals (JSONB).
   hostGoals?: HostGoals | null;
+  // porchetta-81402: edit cancellation reason via PATCH (cancel/reinstate go
+  // through dedicated POST endpoints).
+  cancellationReason?: string | null;
 }
 
 export async function createPartyApi(data: CreatePartyData) {
@@ -290,6 +296,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
       availableDietaryOptions: data.availableDietaryOptions,
+      showToppingsOnRsvp: data.showToppingsOnRsvp,
       selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
@@ -340,6 +347,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       parkingNotes: data.parkingNotes,
       // quattro-71244: gamified-dashboard goal targets.
       hostGoals: data.hostGoals,
+      // porchetta-81402: edit cancellation reason via PATCH.
+      cancellationReason: data.cancellationReason,
     },
   });
 }
@@ -374,8 +383,27 @@ export async function getLeaderboardRank(
 }
 
 export async function deletePartyApi(partyId: string) {
+  // porchetta-81402: the backend handler is now a soft-cancel alias — the row
+  // and its children stay intact. New code should call `cancelPartyApi` to
+  // pass an optional reason; this helper is kept for back-compat.
   return apiRequest<{ success: boolean }>(`/api/parties/${partyId}`, {
     method: 'DELETE',
+  });
+}
+
+// porchetta-81402: cancel + reinstate. Reason is optional free text — the
+// backend trims and truncates to 500 chars. Reinstate symmetrically clears
+// the cancel columns and does NOT touch rsvp_closed_at.
+export async function cancelPartyApi(partyId: string, reason?: string) {
+  return apiRequest<{ success: boolean; party: any }>(`/api/parties/${partyId}/cancel`, {
+    method: 'POST',
+    body: { reason: reason || null },
+  });
+}
+
+export async function reinstatePartyApi(partyId: string) {
+  return apiRequest<{ success: boolean; party: any }>(`/api/parties/${partyId}/reinstate`, {
+    method: 'POST',
   });
 }
 
@@ -530,6 +558,7 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   availableDietaryOptions: string[];
+  showToppingsOnRsvp?: boolean;
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -578,6 +607,10 @@ export interface PublicEvent {
   // reimbursementCapUsd → max(numeric event_tags) → null. Host-facing UI
   // reads this; /underboss still uses the raw reimbursementCapUsd.
   effectiveReimbursementCapUsd?: number | null;
+  // porchetta-81402: soft-cancel state. cancelledAt non-null = EventPage
+  // shows a cancelled banner + replaces the RSVP button with a notice card.
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
 }
 
 // Public Event API (no auth required)

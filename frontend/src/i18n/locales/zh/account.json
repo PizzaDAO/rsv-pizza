@@ -12,7 +12,8 @@
     "guest_one": "{{count}} 位来宾",
     "guest_other": "{{count}} 位来宾",
     "alreadyCreated": "已经创建了派对？",
-    "viewAllTest": "查看所有测试活动"
+    "viewAllTest": "查看所有测试活动",
+    "cancelled": "Cancelled"
   },
   "profile": {
     "title": "您的个人资料",

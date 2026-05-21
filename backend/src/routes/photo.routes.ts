@@ -256,11 +256,16 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
     // Get party to check if photos are enabled and moderation setting
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { id: true, photosEnabled: true, photoModeration: true },
+      select: { id: true, photosEnabled: true, photoModeration: true, cancelledAt: true },
     });
 
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // porchetta-81402: cancelled events are read-only.
+    if (party.cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
     }
 
     if (!party.photosEnabled) {

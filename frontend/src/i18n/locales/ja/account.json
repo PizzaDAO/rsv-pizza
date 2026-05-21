@@ -12,7 +12,8 @@
     "guest_one": "{{count}}名のゲスト",
     "guest_other": "{{count}}名のゲスト",
     "alreadyCreated": "すでにパーティーを作成しましたか？",
-    "viewAllTest": "すべてのテストイベントを表示"
+    "viewAllTest": "すべてのテストイベントを表示",
+    "cancelled": "Cancelled"
   },
   "profile": {
     "title": "あなたのプロフィール",

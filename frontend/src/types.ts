@@ -36,6 +36,10 @@ export interface Guest {
   status?: GuestStatus;
   waitlistPosition?: number | null;
   promotedAt?: string | null;
+  // tartufo-49271: surfaces guests.submitted_via so the live RSVP ticker can
+  // filter to direct-RSVP signals (link/rsvp/api) and skip bulk-invited rows.
+  // Optional + default-accept-undefined so older rows still flow through.
+  submittedVia?: string;
 }
 
 export interface PizzaStyle {
@@ -260,6 +264,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   maxGuests: number | null;
   expectedGuests?: number | null;
   hideGuests: boolean;
@@ -345,6 +350,12 @@ export interface Party {
   // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
   // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
   hostGoals?: HostGoals | null;
+  // porchetta-81402: soft-cancel state. cancelledAt non-null = host has
+  // cancelled the event. EventPage renders a cancelled banner + replaces
+  // the RSVP form with a cancellation notice. Hosts can reinstate.
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
+  cancellationReason?: string | null;
 }
 
 export interface Donation {
@@ -1117,6 +1128,10 @@ export interface UnderbossEvent {
   // filter, and Mark-reviewed affordance — replaces the legacy
   // reimbursementCapAppealedAt signal which never cleared.
   hasOpenAppeal?: boolean;
+  // porchetta-81402: surfaced so /underboss can badge cancelled events
+  // (filterable so an underboss can spot churn in their region).
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
 }
 
 // quattro-12847: a single row from the appeal-history endpoint.

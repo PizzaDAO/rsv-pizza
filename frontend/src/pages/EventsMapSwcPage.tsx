@@ -187,10 +187,11 @@ export function EventsMapSwcPage() {
                 canModerate
                 isModerator={false}
                 iconUrl="/molto-benny-swc.svg"
-                iconWidth={56}
-                iconHeight={40}
-                iconAnchorX={16}
-                iconAnchorY={40}
+                iconWidth={64}
+                iconHeight={32}
+                iconAnchorX={21}
+                iconAnchorY={32}
+                cluster={false}
               />
             )}
           </Suspense>

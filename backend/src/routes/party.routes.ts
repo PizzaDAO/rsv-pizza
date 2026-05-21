@@ -86,6 +86,9 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       address: true,
       eventImageUrl: true,
       coHosts: true,
+      // porchetta-81402: surface cancellation state so HomePage can render
+      // the "Cancelled" pill on cancelled events.
+      cancelledAt: true,
       _count: { select: { guests: true } },
     };
 
@@ -170,6 +173,8 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       eventImageUrl: p.eventImageUrl,
       guestCount: p._count?.guests ?? 0,
       role: p.role,
+      // porchetta-81402: HomePage renders a "Cancelled" pill from this field.
+      cancelledAt: p.cancelledAt ? p.cancelledAt.toISOString() : null,
     }));
 
     // Sort by date ascending (nulls last)
@@ -242,7 +247,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationRecipientUrl, donationEthAddress
+      donationRecipientUrl, donationEthAddress, showToppingsOnRsvp
     } = req.body;
 
     // Generate default party name if not provided
@@ -309,6 +314,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         donationRecipient: donationRecipient || null,
         donationRecipientUrl: donationRecipientUrl || null,
         donationEthAddress: donationEthAddress || null,
+        showToppingsOnRsvp: showToppingsOnRsvp || false,
       },
       include: {
         user: { select: { name: true } },
@@ -425,6 +431,9 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
           reimbursementCapUsd: (party as any).reimbursementCapUsd,
           eventTags: (party as any).eventTags,
         }),
+        // porchetta-81402: `findUnique` without `select` already returns the
+        // 3 cancel columns, so we don't need to splice them in here — the
+        // spread above carries them through. Listed for documentation.
       }
     });
   } catch (error) {
@@ -438,7 +447,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const { id } = req.params;
     const {
       name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, city, placeId, venueName, maxGuests,
-      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, showToppingsOnRsvp, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
       eventTags,
@@ -468,6 +477,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       reimbursementCapUsd,
       // quattro-71244: gamified dashboard goals (JSONB) — per-KPI host targets.
       hostGoals,
+      // porchetta-81402: host can edit the free-text cancellation reason
+      // without re-cancelling. Cancel/reinstate themselves go through their
+      // dedicated POST endpoints — NOT through this PATCH whitelist.
+      cancellationReason,
       // NOTE: reimbursementCapAppealNote + reimbursementCapAppealedAt are NOT
       // destructured here — appeals flow through the dedicated
       // POST /:partyId/reimbursement-cap/appeal endpoint so we can timestamp
@@ -661,6 +674,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
         ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
+        ...(showToppingsOnRsvp !== undefined && { showToppingsOnRsvp }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
@@ -706,6 +720,14 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(parkingNotes !== undefined && { parkingNotes: parkingNotes || null }),
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
         ...(hostGoalsToWrite !== undefined && { hostGoals: hostGoalsToWrite }),
+        // porchetta-81402: allow editing the cancellation reason (truncated to
+        // 500 chars to match the cancel-handler limit). Empty string clears it.
+        ...(cancellationReason !== undefined && {
+          cancellationReason:
+            typeof cancellationReason === 'string' && cancellationReason.trim()
+              ? cancellationReason.trim().slice(0, 500)
+              : null,
+        }),
       },
       include: {
         user: { select: { name: true } },
@@ -774,23 +796,167 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
-// DELETE /api/parties/:id - Delete party
-router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+// ============================================
+// porchetta-81402: Cancel / reinstate endpoints
+// ============================================
+// `DELETE /api/parties/:id` used to hard-delete the party row, which
+// destroyed the public URL, every guest RSVP, sponsors, donations,
+// photos, and so on. The new flow soft-cancels by writing
+// `cancelled_at` / `cancelled_by` / `cancellation_reason` — the row
+// and its children stay intact, the public URL stays live (showing a
+// "this event has been cancelled" banner), and a host can reinstate
+// with one click. The DELETE route is preserved as a back-compat
+// alias that routes to the same soft-cancel handler.
+//
+// Audit: when the `party_status_audit` table exists in the DB we
+// also record cancel/reinstate transitions. The table was introduced
+// by pizzaiolo-97053 (2026-05-15); the existence check keeps the new
+// handlers running in environments where that migration hasn't been
+// applied yet.
+
+async function softCancelParty(
+  partyId: string,
+  userEmail: string | undefined,
+  reason: string | null,
+) {
+  return prisma.party.update({
+    where: { id: partyId },
+    data: {
+      cancelledAt: new Date(),
+      cancelledBy: userEmail || 'unknown',
+      cancellationReason:
+        reason && reason.trim() ? reason.trim().slice(0, 500) : null,
+    },
+  });
+}
+
+async function recordPartyStatusAuditIfTableExists(args: {
+  partyId: string;
+  action: 'cancel' | 'reinstate';
+  oldStatus: string | null;
+  newStatus: string;
+  actorEmail: string;
+  reason?: string | null;
+}) {
+  try {
+    const result = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT to_regclass('party_status_audit') IS NOT NULL AS exists
+    `;
+    if (!result[0]?.exists) return;
+    // Column shape mirrors the PartyStatusAudit Prisma model from
+    // pizzaiolo-97053 (action / old_status / new_status / actor_email /
+    // actor_kind / reason). We log actor_kind='host' because the cancel/
+    // reinstate routes are auth-gated to host + cohost-with-canEdit only;
+    // super_admins reach this path too but logging them as 'host' is the
+    // same convention used by the other party.routes audit writes.
+    await prisma.$executeRaw`
+      INSERT INTO party_status_audit
+        (party_id, action, old_status, new_status, actor_email, actor_kind, reason)
+      VALUES
+        (${args.partyId}::uuid, ${args.action}, ${args.oldStatus}, ${args.newStatus},
+         ${args.actorEmail}, 'host', ${args.reason ?? null})
+    `;
+  } catch (err) {
+    // Audit is best-effort — never let a logging failure roll back the
+    // user-visible cancel/reinstate.
+    console.warn('[porchetta-81402] party_status_audit insert failed:', err);
+  }
+}
+
+// POST /api/parties/:id/cancel - Soft-cancel the event
+router.post('/:id/cancel', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
-    // Verify ownership or super admin
     const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    await prisma.$transaction(async (tx) => {
-      await setDeleteContext(tx, req.userEmail, 'host_dashboard');
-      await tx.party.delete({ where: { id } });
+    const reason: string | null = (req.body || {}).reason ?? null;
+    const party = await softCancelParty(id, req.userEmail, reason);
+
+    await recordPartyStatusAuditIfTableExists({
+      partyId: id,
+      action: 'cancel',
+      oldStatus: 'active',
+      newStatus: 'cancelled',
+      actorEmail: req.userEmail || 'unknown',
+      reason: party.cancellationReason,
     });
 
-    // Trigger webhook for party deletion
+    // New event for new consumers + legacy `party.deleted` for back-compat.
+    await triggerWebhook('party.cancelled', party, req.userId!);
+    await triggerWebhook('party.deleted', { id }, req.userId!);
+
+    res.json({ success: true, party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:id/reinstate - Un-cancel the event
+router.post('/:id/reinstate', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // NOTE: reinstating intentionally does NOT touch rsvp_closed_at — if
+    // the host had closed RSVPs separately, they stay closed.
+    const party = await prisma.party.update({
+      where: { id },
+      data: {
+        cancelledAt: null,
+        cancelledBy: null,
+        cancellationReason: null,
+      },
+    });
+
+    await recordPartyStatusAuditIfTableExists({
+      partyId: id,
+      action: 'reinstate',
+      oldStatus: 'cancelled',
+      newStatus: 'active',
+      actorEmail: req.userEmail || 'unknown',
+    });
+
+    await triggerWebhook('party.reinstated', party, req.userId!);
+
+    res.json({ success: true, party });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/parties/:id - LEGACY ALIAS that now soft-cancels instead of
+// destroying the row. Old API clients (and the frontend `deletePartyApi`
+// helper before this PR) hit this path; new code should use POST /cancel
+// with an optional reason in the body. There is no reason here because
+// DELETE bodies are not part of the existing API contract.
+router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    const party = await softCancelParty(id, req.userEmail, null);
+
+    await recordPartyStatusAuditIfTableExists({
+      partyId: id,
+      action: 'cancel',
+      oldStatus: 'active',
+      newStatus: 'cancelled',
+      actorEmail: req.userEmail || 'unknown',
+    });
+
+    await triggerWebhook('party.cancelled', party, req.userId!);
     await triggerWebhook('party.deleted', { id }, req.userId!);
 
     res.json({ success: true });
@@ -896,6 +1062,21 @@ router.post('/:id/open-rsvp', async (req: AuthRequest, res: Response, next: Next
     const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // porchetta-81402: a cancelled event must be reinstated before its RSVP
+    // toggle can be reopened — otherwise the host could "open" RSVPs that
+    // would then 410 on submit, which is confusing UX.
+    const current = await prisma.party.findUnique({
+      where: { id },
+      select: { cancelledAt: true },
+    });
+    if (current?.cancelledAt) {
+      throw new AppError(
+        'This event has been cancelled. Reinstate it before reopening RSVPs.',
+        410,
+        'EVENT_CANCELLED',
+      );
     }
 
     const party = await prisma.party.update({
@@ -1174,6 +1355,16 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // porchetta-81402: block host-side adds on cancelled events. Hosts must
+    // reinstate first before they can keep adding guests.
+    const partyState = await prisma.party.findUnique({
+      where: { id },
+      select: { cancelledAt: true },
+    });
+    if (partyState?.cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
     }
 
     // Check if guest with this email already exists for this party

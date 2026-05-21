@@ -3,6 +3,8 @@ import {
   createPartyApi,
   updatePartyApi,
   deletePartyApi,
+  cancelPartyApi,
+  reinstatePartyApi,
   addGuestByHostApi,
   removeGuestApi,
   updateGuestApprovalApi,
@@ -711,6 +713,7 @@ export interface DbParty {
   available_beverages: string[];
   available_toppings: string[];
   available_dietary_options: string[];
+  show_toppings_on_rsvp?: boolean;
   max_guests: number | null;
   expected_guests?: number | null;
   hide_guests: boolean;
@@ -784,6 +787,10 @@ export interface DbParty {
   reimbursement_cap_appealed_at?: string | null;
   // quattro-71244: gamified-dashboard goal targets (JSONB on parties).
   host_goals?: HostGoals | null;
+  // porchetta-81402: soft-cancel columns. cancelledAt null = active event.
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
 }
 
 export type DbGuestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WAITLISTED';
@@ -825,7 +832,7 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, available_dietary_options, max_guests, expected_guests, hide_guests,
+  pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, hide_guests,
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, latitude, longitude, country, city, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
@@ -853,7 +860,8 @@ export const SAFE_PARTY_COLUMNS = `
   flyer_config,
   poster_image_url, poster_generated_at,
   rollup_image_url, rollup_generated_at,
-  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at
+  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at,
+  cancelled_at, cancelled_by, cancellation_reason
 `;
 
 /**
@@ -963,6 +971,7 @@ export async function createParty(opts: CreatePartyOptions = {}): Promise<DbPart
         available_beverages: party.availableBeverages || [],
         available_toppings: party.availableToppings || [],
         available_dietary_options: party.availableDietaryOptions || [],
+        show_toppings_on_rsvp: party.showToppingsOnRsvp ?? false,
         max_guests: party.maxGuests,
         hide_guests: party.hideGuests || false,
         event_image_url: party.eventImageUrl,
@@ -1404,6 +1413,20 @@ export async function updatePartyDietaryOptions(partyId: string, availableDietar
   if (!success) return null;
 
   // Fetch the updated party
+  const { data } = await supabase
+    .from('parties')
+    .select(SAFE_PARTY_COLUMNS)
+    .eq('id', partyId)
+    .single();
+
+  if (data) normalizePartyCoHosts(data);
+  return data;
+}
+
+export async function updatePartyShowToppingsOnRsvp(partyId: string, value: boolean): Promise<DbParty | null> {
+  const success = await updateParty(partyId, { show_toppings_on_rsvp: value });
+  if (!success) return null;
+
   const { data } = await supabase
     .from('parties')
     .select(SAFE_PARTY_COLUMNS)
@@ -1870,6 +1893,8 @@ export async function updateParty(
     timezone?: string | null;
     available_beverages?: string[];
     available_toppings?: string[];
+    available_dietary_options?: string[];
+    show_toppings_on_rsvp?: boolean;
     selected_pizzerias?: any[];  // Pizzeria objects
     donation_enabled?: boolean;
     donation_goal?: number | null;
@@ -1907,6 +1932,9 @@ export async function updateParty(
     reimbursement_cap_usd?: number | null;
     // quattro-71244: gamified-dashboard goal targets.
     host_goals?: HostGoals | null;
+    // porchetta-81402: edit cancellation reason via PATCH. Cancel/reinstate
+    // themselves go through `cancelParty()` / `reinstateParty()`.
+    cancellation_reason?: string | null;
   }
 ): Promise<boolean> {
   // Use API if authenticated (secure path)
@@ -1943,6 +1971,7 @@ export async function updateParty(
         availableBeverages: updates.available_beverages,
         availableToppings: updates.available_toppings,
         availableDietaryOptions: updates.available_dietary_options,
+        showToppingsOnRsvp: updates.show_toppings_on_rsvp,
         selectedPizzerias: updates.selected_pizzerias,
         password: updates.password,
         eventImageUrl: updates.event_image_url,
@@ -1988,6 +2017,8 @@ export async function updateParty(
         parkingNotes: updates.parking_notes,
         // quattro-71244: gamified-dashboard goal targets.
         hostGoals: updates.host_goals,
+        // porchetta-81402: edit cancellation reason via PATCH.
+        cancellationReason: updates.cancellation_reason,
       });
       return true;
     } catch (error) {
@@ -2010,7 +2041,10 @@ export async function updateParty(
 }
 
 export async function deleteParty(partyId: string): Promise<boolean> {
-  // Use API if authenticated (secure path)
+  // porchetta-81402: NOTE — the backend `DELETE /api/parties/:id` is now a
+  // soft-cancel alias (does NOT destroy the row). The frontend prefers
+  // `cancelParty()` directly so the host can pass an optional reason; this
+  // helper is kept for back-compat with any caller that hasn't been migrated.
   if (isAuthenticated()) {
     try {
       await deletePartyApi(partyId);
@@ -2021,7 +2055,8 @@ export async function deleteParty(partyId: string): Promise<boolean> {
     }
   }
 
-  // Fallback to direct Supabase
+  // Fallback to direct Supabase — also kept for back-compat; new code should
+  // use the API.
   const { error } = await supabase
     .from('parties')
     .delete()
@@ -2032,6 +2067,31 @@ export async function deleteParty(partyId: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+// porchetta-81402: soft-cancel + reinstate helpers. These call the new
+// POST endpoints on party.routes.ts; they only require auth (the gate
+// is `canUserEditParty` server-side).
+export async function cancelParty(partyId: string, reason?: string): Promise<boolean> {
+  if (!isAuthenticated()) return false;
+  try {
+    await cancelPartyApi(partyId, reason);
+    return true;
+  } catch (e) {
+    console.error('Error cancelling party via API:', e);
+    return false;
+  }
+}
+
+export async function reinstateParty(partyId: string): Promise<boolean> {
+  if (!isAuthenticated()) return false;
+  try {
+    await reinstatePartyApi(partyId);
+    return true;
+  } catch (e) {
+    console.error('Error reinstating party via API:', e);
+    return false;
+  }
 }
 
 // Get parties for a user (RSVP'd or hosting)

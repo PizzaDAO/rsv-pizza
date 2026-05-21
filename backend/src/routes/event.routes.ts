@@ -29,6 +29,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         availableBeverages: true,
         availableToppings: true,
         availableDietaryOptions: true,
+        showToppingsOnRsvp: true,
         address: true,
         latitude: true,
         longitude: true,
@@ -41,6 +42,11 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         eventImageUrl: true,
         description: true,
         rsvpClosedAt: true,
+        // porchetta-81402: public event page renders a cancelled banner +
+        // disables the RSVP form when cancelledAt is non-null. The optional
+        // free-text reason is shown below the banner.
+        cancelledAt: true,
+        cancellationReason: true,
         coHosts: true,
         selectedPizzerias: true,
         eventType: true,
@@ -104,6 +110,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           availableBeverages: true,
           availableToppings: true,
           availableDietaryOptions: true,
+          showToppingsOnRsvp: true,
           address: true,
           latitude: true,
           longitude: true,
@@ -116,6 +123,11 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           eventImageUrl: true,
           description: true,
           rsvpClosedAt: true,
+          // porchetta-81402: same as the invite-code branch — include cancel
+          // columns so the public event page can render the cancelled banner
+          // when reached via a customUrl.
+          cancelledAt: true,
+          cancellationReason: true,
           coHosts: true,
           selectedPizzerias: true,
           eventType: true,
@@ -281,6 +293,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         availableBeverages: party.availableBeverages,
         availableToppings: party.availableToppings,
         availableDietaryOptions: party.availableDietaryOptions,
+        showToppingsOnRsvp: party.showToppingsOnRsvp,
         address: party.address,
         latitude: party.latitude,
         longitude: party.longitude,
@@ -293,6 +306,9 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         eventImageUrl: party.eventImageUrl,
         description: party.description,
         rsvpClosedAt: party.rsvpClosedAt,
+        // porchetta-81402: include cancelled state in the public event payload.
+        cancelledAt: party.cancelledAt,
+        cancellationReason: party.cancellationReason,
         coHosts: sanitizedCoHosts,
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,

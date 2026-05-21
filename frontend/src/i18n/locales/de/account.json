@@ -12,7 +12,8 @@
     "guest_one": "{{count}} Gast",
     "guest_other": "{{count}} Gäste",
     "alreadyCreated": "Bereits eine Party erstellt?",
-    "viewAllTest": "Alle Test-Events anzeigen"
+    "viewAllTest": "Alle Test-Events anzeigen",
+    "cancelled": "Cancelled"
   },
   "profile": {
     "title": "Ihr Profil",

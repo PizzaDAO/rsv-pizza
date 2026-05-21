@@ -2,10 +2,10 @@
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Trash2, Calendar, Play, DollarSign, Wand2, MessageCircle, Send, Check } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Ban, RefreshCcw, Calendar, Play, DollarSign, Wand2, MessageCircle, Send, Check } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
-import { updateParty, uploadEventImage, deleteParty } from '../lib/supabase';
+import { updateParty, uploadEventImage, cancelParty, reinstateParty } from '../lib/supabase';
 import { mintHostTelegramConnectToken, disconnectHostTelegram } from '../lib/api';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
@@ -91,8 +91,12 @@ export const EventDetailsTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // porchetta-81402: cancel state (was `deleting` / `showDeleteConfirm` before
+  // the destructive delete was converted to a non-destructive soft-cancel).
+  const [cancelling, setCancelling] = useState(false);
+  const [reinstating, setReinstating] = useState(false);
+  const [showCancelPrompt, setShowCancelPrompt] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [showDateTimeModal, setShowDateTimeModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
@@ -448,27 +452,61 @@ export const EventDetailsTab: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  // porchetta-81402: soft-cancel the event. The host stays on this page (no
+  // redirect to home), the public URL keeps working, and the host can
+  // reinstate via the symmetric button — no confirm modal needed for
+  // reinstate because the action is reversible.
+  const handleCancel = async () => {
     if (!party) return;
 
-    setDeleting(true);
+    setCancelling(true);
     setMessage(null);
 
     try {
-      const success = await deleteParty(party.id);
+      const success = await cancelParty(party.id, cancelReason);
       if (success) {
-        setMessage({ type: 'success', text: 'Event deleted successfully' });
-        // Redirect to home page after a short delay
-        setTimeout(() => {
-          navigate('/');
-        }, 1500);
+        const trimmed = cancelReason.trim().slice(0, 500) || null;
+        // Merge in-place so the dashboard renders the cancelled state without
+        // re-fetching — same pattern as `arugula-38633` v2 / `burrata-72104`.
+        mergeParty({
+          cancelledAt: new Date().toISOString(),
+          cancellationReason: trimmed,
+        });
+        setShowCancelPrompt(false);
+        setCancelReason('');
       } else {
-        throw new Error('Failed to delete event');
+        throw new Error('Failed to cancel event');
       }
     } catch (error) {
-      console.error('Error deleting party:', error);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to delete event' });
-      setDeleting(false);
+      console.error('Error cancelling party:', error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to cancel event' });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleReinstate = async () => {
+    if (!party) return;
+
+    setReinstating(true);
+    setMessage(null);
+
+    try {
+      const success = await reinstateParty(party.id);
+      if (success) {
+        mergeParty({
+          cancelledAt: null,
+          cancelledBy: null,
+          cancellationReason: null,
+        });
+      } else {
+        throw new Error('Failed to reinstate event');
+      }
+    } catch (error) {
+      console.error('Error reinstating party:', error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to reinstate event' });
+    } finally {
+      setReinstating(false);
     }
   };
 
@@ -1138,48 +1176,86 @@ export const EventDetailsTab: React.FC = () => {
           </div>
         )}
 
-        {/* Cancel Event Button */}
-        <button
-          type="button"
-          onClick={() => setShowDeleteConfirm(true)}
-          disabled={deleting}
-          className="w-full bg-[#ff393a]/10 hover:bg-[#ff393a]/20 border border-[#ff393a]/30 text-[#ff393a] hover:text-[#ff5a5b] font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-        >
-          <Trash2 size={18} />
-          {t('eventDetails.deleteEvent')}
-        </button>
+        {/* porchetta-81402: Cancel / Reinstate button — symmetric, no confirm
+            modal for reinstate because the action is reversible
+            (`feedback_reversible_actions_no_confirm`). Cancel still uses a
+            modal so the host can optionally provide a reason. */}
+        {party.cancelledAt ? (
+          <button
+            type="button"
+            onClick={handleReinstate}
+            disabled={reinstating}
+            className="w-full bg-[#39d98a]/10 hover:bg-[#39d98a]/20 border border-[#39d98a]/30 text-[#39d98a] hover:text-[#5be0a4] font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            {reinstating ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                {t('eventDetails.reinstating')}
+              </>
+            ) : (
+              <>
+                <RefreshCcw size={18} />
+                {t('eventDetails.reinstateEvent')}
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowCancelPrompt(true)}
+            disabled={cancelling}
+            className="w-full bg-[#ff393a]/10 hover:bg-[#ff393a]/20 border border-[#ff393a]/30 text-[#ff393a] hover:text-[#ff5a5b] font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <Ban size={18} />
+            {t('eventDetails.cancelEvent')}
+          </button>
+        )}
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && createPortal(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-theme-text mb-3">{t('eventDetails.deleteConfirmTitle')}</h2>
-            <p className="text-theme-text-secondary mb-6">
-              {t('eventDetails.deleteConfirmMessage')}
+      {/* porchetta-81402: Cancel modal — optional free-text reason input.
+          Backend truncates to 500 chars; we mirror the limit here. */}
+      {showCancelPrompt && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => !cancelling && setShowCancelPrompt(false)}>
+          <div
+            className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-theme-text mb-3">{t('eventDetails.cancelConfirmTitle')}</h2>
+            <p className="text-theme-text-secondary mb-4">
+              {t('eventDetails.cancelConfirmMessage')}
             </p>
+            <div className="mb-4">
+              <IconInput
+                icon={FileText}
+                multiline
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                maxLength={500}
+                placeholder={t('eventDetails.cancelReasonPlaceholder')}
+              />
+            </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
+                onClick={() => setShowCancelPrompt(false)}
+                disabled={cancelling}
                 className="flex-1 btn-secondary"
               >
                 {t('eventDetails.cancel')}
               </button>
               <button
-                onClick={handleDelete}
-                disabled={deleting}
+                onClick={handleCancel}
+                disabled={cancelling}
                 className="flex-1 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
               >
-                {deleting ? (
+                {cancelling ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Deleting...
+                    {t('eventDetails.cancelling')}
                   </>
                 ) : (
                   <>
-                    <Trash2 size={18} />
-                    {t('eventDetails.deleteConfirmButton')}
+                    <Ban size={18} />
+                    {t('eventDetails.cancelConfirmButton')}
                   </>
                 )}
               </button>

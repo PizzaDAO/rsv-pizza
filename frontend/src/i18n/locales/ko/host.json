@@ -454,7 +454,15 @@
     "deleteConfirmTitle": "이벤트 삭제",
     "deleteConfirmMessage": "이 이벤트를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "deleteConfirmButton": "이벤트 삭제",
-    "cancel": "취소"
+    "cancel": "취소",
+    "cancelEvent": "Cancel event",
+    "cancelConfirmTitle": "Cancel this event?",
+    "cancelConfirmMessage": "RSVPs will close and the event page will show a cancellation banner. Guests stay attached to the event and you can reinstate it at any time.",
+    "cancelConfirmButton": "Cancel Event",
+    "cancelReasonPlaceholder": "Optional: why is this event cancelled?",
+    "cancelling": "Cancelling...",
+    "reinstateEvent": "Reinstate event",
+    "reinstating": "Reinstating..."
   },
   "beverages": {
     "drinks": "음료",

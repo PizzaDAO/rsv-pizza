@@ -349,6 +349,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         customUrl: true,
         eventImageUrl: true,
         rsvpClosedAt: true,
+        // porchetta-81402: block RSVP submission on cancelled events.
+        cancelledAt: true,
         maxGuests: true,
         requireApproval: true,
         userId: true,
@@ -370,6 +372,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           customUrl: true,
           eventImageUrl: true,
           rsvpClosedAt: true,
+          // porchetta-81402: block RSVP submission on cancelled events.
+          cancelledAt: true,
           maxGuests: true,
           requireApproval: true,
           userId: true,
@@ -397,6 +401,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             customUrl: true,
             eventImageUrl: true,
             rsvpClosedAt: true,
+            // porchetta-81402: block RSVP submission on cancelled events.
+            cancelledAt: true,
             maxGuests: true,
             requireApproval: true,
             userId: true,
@@ -409,6 +415,13 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
 
     if (!party) {
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // porchetta-81402: 410 GONE when the host has cancelled the event.
+    // Checked BEFORE the rsvp_closed_at check so the reason surfaced to the
+    // submitter is "cancelled" (more accurate) rather than "closed".
+    if ((party as any).cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
     }
 
     // Check if RSVPs are closed

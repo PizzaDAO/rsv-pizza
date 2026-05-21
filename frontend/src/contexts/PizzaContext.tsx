@@ -20,6 +20,7 @@ interface PizzaContextType {
   updatePartyBeverages: (beverages: string[]) => Promise<void>;
   updatePartyToppings: (toppings: string[]) => Promise<void>;
   updatePartyDietaryOptions: (dietaryOptions: string[]) => Promise<void>;
+  updatePartyShowToppingsOnRsvp: (value: boolean) => Promise<void>;
   // Guest management
   // Note: `guests` is the visible list (excludes guests with `approved === false`).
   // `rejectedGuests` is the host-rejected list (approved === false), surfaced via
@@ -90,6 +91,10 @@ export function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
     status: dbGuest.status || 'CONFIRMED',
     waitlistPosition: dbGuest.waitlist_position || null,
     promotedAt: dbGuest.promoted_at || null,
+    // tartufo-49271: surface submitted_via so the live RSVP ticker can filter
+    // out bulk-invited rows. Optional on the app-level Guest; default-accept
+    // when undefined to keep legacy rows visible.
+    submittedVia: dbGuest.submitted_via,
   };
 }
 
@@ -109,6 +114,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     availableBeverages: dbParty.available_beverages || [],
     availableToppings: dbParty.available_toppings || [],
     availableDietaryOptions: dbParty.available_dietary_options || [],
+    showToppingsOnRsvp: dbParty.show_toppings_on_rsvp ?? false,
     maxGuests: dbParty.max_guests,
     expectedGuests: dbParty.expected_guests || null,
     hideGuests: dbParty.hide_guests || false,
@@ -177,6 +183,10 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     parkingNotes: dbParty.parking_notes ?? null,
     // quattro-71244: gamified-dashboard goal targets.
     hostGoals: dbParty.host_goals ?? null,
+    // porchetta-81402: soft-cancel state.
+    cancelledAt: dbParty.cancelled_at ?? null,
+    cancelledBy: dbParty.cancelled_by ?? null,
+    cancellationReason: dbParty.cancellation_reason ?? null,
     guests,
   };
 }
@@ -490,6 +500,18 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  // gorgonzola-41822: optimistic merge instead of full re-fetch — avoids the
+  // page-reload feel that loadParty/setParty(dbPartyToParty(...)) trigger.
+  const updatePartyShowToppingsOnRsvp = async (value: boolean) => {
+    if (!party) return;
+    mergeParty({ showToppingsOnRsvp: value });
+    const dbParty = await db.updatePartyShowToppingsOnRsvp(party.id, value);
+    if (!dbParty) {
+      // Revert on failure
+      mergeParty({ showToppingsOnRsvp: !value });
+    }
+  };
+
   const generateRecommendations = () => {
     if (!party) return;
 
@@ -553,6 +575,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       updatePartyBeverages,
       updatePartyToppings,
       updatePartyDietaryOptions,
+      updatePartyShowToppingsOnRsvp,
       guests,
       rejectedGuests,
       setGuests: setAllGuests,

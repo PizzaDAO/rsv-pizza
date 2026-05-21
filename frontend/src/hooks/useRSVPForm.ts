@@ -59,6 +59,7 @@ export interface RSVPEventData {
   availableBeverages: string[];
   availableToppings: string[];
   availableDietaryOptions: string[];
+  showToppingsOnRsvp?: boolean;
   selectedPizzerias?: Pizzeria[];
   turtleRolesEnabled?: boolean;
 }
@@ -101,6 +102,7 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     availableBeverages: event.availableBeverages || [],
     availableToppings: event.availableToppings || [],
     availableDietaryOptions: event.availableDietaryOptions || [],
+    showToppingsOnRsvp: event.showToppingsOnRsvp ?? false,
     selectedPizzerias: event.selectedPizzerias,
     turtleRolesEnabled: event.turtleRolesEnabled,
   };
@@ -125,6 +127,7 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     availableBeverages: party.available_beverages || [],
     availableToppings: party.available_toppings || [],
     availableDietaryOptions: party.available_dietary_options || [],
+    showToppingsOnRsvp: party.show_toppings_on_rsvp ?? false,
     selectedPizzerias: party.selected_pizzerias as Pizzeria[] | undefined,
     turtleRolesEnabled: party.turtle_roles_enabled,
   };
@@ -711,6 +714,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     availableBeverages: eventData.availableBeverages,
     availableToppings: eventData.availableToppings,
     availableDietaryOptions: eventData.availableDietaryOptions,
+    showToppingsOnRsvp: eventData.showToppingsOnRsvp ?? false,
 
     // Reset
     resetForm,

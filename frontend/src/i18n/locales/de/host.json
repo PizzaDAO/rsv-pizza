@@ -454,7 +454,15 @@
     "deleteConfirmTitle": "Event löschen",
     "deleteConfirmMessage": "Sind Sie sicher, dass Sie dieses Event löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
     "deleteConfirmButton": "Event löschen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "cancelEvent": "Cancel event",
+    "cancelConfirmTitle": "Cancel this event?",
+    "cancelConfirmMessage": "RSVPs will close and the event page will show a cancellation banner. Guests stay attached to the event and you can reinstate it at any time.",
+    "cancelConfirmButton": "Cancel Event",
+    "cancelReasonPlaceholder": "Optional: why is this event cancelled?",
+    "cancelling": "Cancelling...",
+    "reinstateEvent": "Reinstate event",
+    "reinstating": "Reinstating..."
   },
   "beverages": {
     "drinks": "Getränke",
@@ -796,6 +804,14 @@
       "generating": "Wird erstellt…",
       "generateFailed": "Bild konnte nicht erstellt werden",
       "close": "Schließen"
+    },
+    "ticker": {
+      "empty": "Noch keine Zusagen",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {{count}} Min.",
+      "hoursAgo": "vor {{count}} Std.",
+      "daysAgo": "vor {{count}} T.",
+      "recentRsvps": "Aktuelle Zusagen"
     }
   }
 }
