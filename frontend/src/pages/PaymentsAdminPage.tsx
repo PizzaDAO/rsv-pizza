@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ShieldX, Loader2, DollarSign, Download, Plus } from 'lucide-react';
+import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { IconInput } from '../components/IconInput';
 import {
   fetchAdminMe,
   listAdminPayouts,
@@ -48,6 +49,24 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   currency: 'all',
 };
 
+// lardo-58294: substring filter shared between the search input and the
+// "no matches" hint. Strips the "Global Pizza Party " prefix from party.name
+// so typing a city matches what's actually rendered in the table.
+function matchesPrepaySearch(row: PrepayQueueRow, q: string): boolean {
+  if (!q) return true;
+  const needle = q.toLowerCase().trim();
+  if (!needle) return true;
+  const nameStripped = row.party.name.replace(/^Global Pizza Party\s+/i, '').toLowerCase();
+  if (nameStripped.includes(needle)) return true;
+  if (row.party.name.toLowerCase().includes(needle)) return true;
+  if (row.party.country?.toLowerCase().includes(needle)) return true;
+  for (const c of row.candidates) {
+    if ((c.name ?? '').toLowerCase().includes(needle)) return true;
+    if (c.email.toLowerCase().includes(needle)) return true;
+  }
+  return false;
+}
+
 export function PaymentsAdminPage() {
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
   const [filters, setFilters] = useState<AdminPayoutFilters>(DEFAULT_FILTERS);
@@ -77,6 +96,10 @@ export function PaymentsAdminPage() {
   // bismarck-92103: prepay queue + the "Create prepayment" modal target row.
   const [prepayQueue, setPrepayQueue] = useState<PrepayQueueRow[]>([]);
   const [prepayModalRow, setPrepayModalRow] = useState<PrepayQueueRow | null>(null);
+
+  // lardo-58294: local-only substring filter for the prepay queue. Cleared
+  // on tab refresh — no persistence.
+  const [prepaySearch, setPrepaySearch] = useState('');
 
   // siciliana-69183: clickable host name opens the read-only payment-details
   // modal. Holds the User.id; null = modal closed.
@@ -171,6 +194,13 @@ export function PaymentsAdminPage() {
     if (role.kind !== 'allowed') return;
     loadPrepayQueue();
   }, [role.kind, loadPrepayQueue]);
+
+  // lardo-58294: apply the substring filter. When the search is empty this
+  // is identity-equal to prepayQueue.
+  const filteredPrepayQueue = useMemo(
+    () => prepayQueue.filter((row) => matchesPrepaySearch(row, prepaySearch)),
+    [prepayQueue, prepaySearch],
+  );
 
   const availableCurrencies = useMemo(() => {
     const set = new Set<string>();
@@ -437,17 +467,36 @@ export function PaymentsAdminPage() {
 
         {/* bismarck-92103: Prepay queue — only renders when there's at least
             one matching party (host flagged prepay + saved payment method,
-            no in-flight payouts). */}
+            no in-flight payouts).
+            lardo-58294: client-side substring search above the table; header
+            count flips to "{filtered} of {total}" while a query is active. */}
         {prepayQueue.length > 0 && (
           <section className="mb-6">
             <h2 className="text-base font-semibold text-theme-text mb-3">
-              Prepay queue ({prepayQueue.length} event{prepayQueue.length === 1 ? '' : 's'})
+              {prepaySearch.trim()
+                ? `Prepay queue (${filteredPrepayQueue.length} of ${prepayQueue.length} events)`
+                : `Prepay queue (${prepayQueue.length} event${prepayQueue.length === 1 ? '' : 's'})`}
             </h2>
-            <PrepayQueueTable
-              rows={prepayQueue}
-              onCreatePrepayment={(row) => setPrepayModalRow(row)}
-              onHostClick={(userId) => setHostDetailUserId(userId)}
-            />
+            <div className="mb-3 max-w-md">
+              <IconInput
+                icon={Search}
+                type="text"
+                value={prepaySearch}
+                onChange={(e) => setPrepaySearch(e.target.value)}
+                placeholder="Search city, country, or host…"
+              />
+            </div>
+            {filteredPrepayQueue.length === 0 ? (
+              <p className="text-sm text-theme-text-muted">
+                No matches for "{prepaySearch.trim()}"
+              </p>
+            ) : (
+              <PrepayQueueTable
+                rows={filteredPrepayQueue}
+                onCreatePrepayment={(row) => setPrepayModalRow(row)}
+                onHostClick={(userId) => setHostDetailUserId(userId)}
+              />
+            )}
           </section>
         )}
 
