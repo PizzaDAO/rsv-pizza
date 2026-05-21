@@ -35,6 +35,7 @@ import { base } from 'viem/chains';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
+import { notifyHostOfPaymentExecution } from '../services/payoutTelegramNotify.js';
 
 const router = Router();
 
@@ -1725,6 +1726,12 @@ async function executePayout(params: {
         });
         return row;
       });
+      // boscaiola-49102: fire-and-forget Telegram DM to the linked host.
+      // NOT awaited — payout success must not depend on Telegram reachability.
+      // Skips silently when host hasn't linked Telegram (no chat_id).
+      void notifyHostOfPaymentExecution(existing.id, 'paid', {
+        txHash: result.txHash,
+      });
       return updated;
     } catch (err: any) {
       // Flip to failed + record the error so the admin UI shows what happened.
@@ -1746,6 +1753,11 @@ async function executePayout(params: {
             note: `USDC send failed: ${errMsg.slice(0, 500)}`,
           },
         });
+      });
+      // boscaiola-49102: fire-and-forget Telegram DM on failure too.
+      // Same fire-and-forget contract — never blocks or throws.
+      void notifyHostOfPaymentExecution(existing.id, 'failed', {
+        error: errMsg,
       });
       throw new AppError(`USDC payout failed: ${errMsg}`, 502, 'USDC_SEND_FAILED');
     }
