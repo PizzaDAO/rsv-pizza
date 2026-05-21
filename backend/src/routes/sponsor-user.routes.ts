@@ -55,13 +55,17 @@ sponsorUserAdminRouter.get('/list', requireAuth, async (req: AuthRequest, res: R
       },
     });
 
-    // Count events per tag for admin UI
+    // Count events per tag for admin UI.
+    // porchetta-81402: exclude cancelled events from tag counts so admins
+    // see "live" partner footprint, not historical-including-cancelled.
     const tagCounts: Record<string, number> = {};
     const uniqueTags = [...new Set(sponsorUsers.map(su => su.tag))];
     if (uniqueTags.length > 0) {
       for (const tag of uniqueTags) {
         const count = await prisma.party.count({
-          where: tag === 'pizzadao' ? {} : { eventTags: { has: tag } },
+          where: tag === 'pizzadao'
+            ? { cancelledAt: null }
+            : { eventTags: { has: tag }, cancelledAt: null },
         });
         tagCounts[tag] = count;
       }
@@ -545,6 +549,11 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       where.underbossStatus = 'approved';
     }
 
+    // porchetta-81402: cancelled events are excluded from sponsor-user
+    // listings/tag counts so partners don't see (and don't get billed for)
+    // events that won't happen.
+    where.cancelledAt = null;
+
     // Find events
     const events = await prisma.party.findMany({
       where,
@@ -995,6 +1004,9 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
         points: [],
       });
     }
+
+    // porchetta-81402: exclude cancelled events from sponsor trend lines.
+    where.cancelledAt = null;
 
     const events = await prisma.party.findMany({
       where,

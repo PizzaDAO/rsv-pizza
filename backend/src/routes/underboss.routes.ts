@@ -174,6 +174,11 @@ function formatEvent(party: any, underbossEmails: string[] = [], latestSponsorMa
     flyerConfig: party.flyerConfig || null,
     latestSponsorAt: latestSponsorAtStr,
     flyerStale,
+    // porchetta-81402: surface cancelled state so the underboss dashboard
+    // can badge / filter cancelled events. Kept INCLUDED (not excluded) so
+    // an underboss can spot churn in their region.
+    cancelledAt: party.cancelledAt ? new Date(party.cancelledAt).toISOString() : null,
+    cancellationReason: party.cancellationReason || null,
     // Reimbursement cap (arugula-38633 v2) — exposed so the underboss
     // dashboard can render Validate/Override controls + appeal indicator.
     city: party.city || null,

@@ -650,6 +650,10 @@ const gppEventSelect = {
   eventTags: true,
   underbossStatus: true,
   rsvpClosedAt: true,
+  // porchetta-81402: surface cancelled state so moderator views (which
+  // include cancelled events) can render a "Cancelled" badge.
+  cancelledAt: true,
+  cancellationReason: true,
   createdAt: true,
   coHosts: true,
   _count: {
@@ -712,6 +716,10 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     approved: event.underbossStatus === 'approved',
     community: event.underbossStatus === 'listed',
     rsvpOpen: !event.rsvpClosedAt,
+    // porchetta-81402: included in the public GPP shape so consumers
+    // (apps.gpp.day, admin tools) can flag cancelled events even after
+    // they're filtered out of the default `/events` listing.
+    cancelledAt: event.cancelledAt ? new Date(event.cancelledAt).toISOString() : null,
   };
 
   if (!callerIsModerator) return base;
@@ -799,6 +807,12 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     } else {
       where.underbossStatus = { notIn: ['rejected', 'hidden'] };
     }
+    // porchetta-81402: cancelled events are hidden from the public GPP map +
+    // listings (moderator views still see them so they can verify the cancel
+    // was intentional and reach out to the host if needed).
+    if (!includeAllStatuses) {
+      where.cancelledAt = null;
+    }
     if (city) {
       where.name = { contains: city as string, mode: 'insensitive' };
     }
@@ -845,6 +859,9 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       eventType: 'gpp',
       selectedPizzerias: { not: Prisma.DbNull },
       underbossStatus: { notIn: ['rejected', 'hidden'] },
+      // porchetta-81402: cancelled events shouldn't surface their pizzerias
+      // on the public /gpp/pizzerias roll-up.
+      cancelledAt: null,
     };
 
     const parties = await prisma.party.findMany({

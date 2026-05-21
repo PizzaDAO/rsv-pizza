@@ -387,6 +387,15 @@ router.post('/:partyId/sponsors', requireAuth, async (req: AuthRequest, res: Res
       throw new AppError(`Invalid sponsorship type. Must be one of: ${validTypes.join(', ')}`, 400, 'VALIDATION_ERROR');
     }
 
+    // porchetta-81402: cancelled events are read-only.
+    const partyState = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { cancelledAt: true },
+    });
+    if (partyState?.cancelledAt) {
+      throw new AppError('This event has been cancelled', 410, 'EVENT_CANCELLED');
+    }
+
     // Append to the end of the sort order for this party
     const lastSponsor = await prisma.sponsor.findFirst({
       where: { partyId },

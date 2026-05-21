@@ -66,7 +66,7 @@ router.get('/', requireApiKey(SCOPES.WEBHOOKS_READ), async (req: ApiKeyRequest, 
  *                 type: array
  *                 items:
  *                   type: string
- *                   enum: [party.created, party.updated, party.deleted, party.rsvp_closed, party.rsvp_opened, guest.registered, guest.updated, guest.approved, guest.declined, guest.removed]
+ *                   enum: [party.created, party.updated, party.deleted, party.cancelled, party.reinstated, party.rsvp_closed, party.rsvp_opened, guest.registered, guest.updated, guest.approved, guest.declined, guest.removed]
  *     responses:
  *       201:
  *         description: Webhook created successfully

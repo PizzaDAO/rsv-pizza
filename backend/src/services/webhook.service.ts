@@ -5,7 +5,14 @@ import { createWebhookSignature } from '../middleware/apiKey.js';
 export const WEBHOOK_EVENTS = [
   'party.created',
   'party.updated',
+  // porchetta-81402: `party.deleted` is now a legacy alias for `party.cancelled`.
+  // The DELETE /api/parties/:id route was converted to a soft-cancel handler so
+  // hosts can recover from accidental "delete" clicks and we stop losing guest
+  // history. Both events are fired; new consumers should listen to
+  // `party.cancelled` / `party.reinstated`.
   'party.deleted',
+  'party.cancelled',
+  'party.reinstated',
   'party.rsvp_closed',
   'party.rsvp_opened',
   'guest.registered',
