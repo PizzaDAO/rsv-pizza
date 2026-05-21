@@ -77,8 +77,18 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         </div>
       )}
 
-      <div className={isMobile ? '' : 'xl:col-span-2 space-y-4'}>
+      {/* StatusHeader pulse first — countdown + checked-in is the live signal. */}
+      <div className={isMobile ? '' : 'xl:col-span-3'}>
         <StatusHeader party={party} guests={guests} />
+      </div>
+
+      {/* capicola-71402: Pizza order is the #1 day-of task. Promoted directly
+          under the status pulse and spans the full width on desktop. */}
+      <div className={isMobile ? '' : 'xl:col-span-3'}>
+        <PizzaStatusCard party={party} guests={guests} />
+      </div>
+
+      <div className={isMobile ? '' : 'xl:col-span-2 space-y-4'}>
         <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
         <AnnouncePanel
           partyId={party.id}
@@ -95,7 +105,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
         {isGpp && <StandWithCryptoCard party={party} />}
         <LogisticsCard party={party} />
-        <PizzaStatusCard party={party} />
         <MusicNowPlayingCard
           partyId={party.id}
           inviteCode={party.inviteCode}
