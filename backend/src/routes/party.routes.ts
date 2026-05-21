@@ -980,6 +980,185 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
   }
 });
 
+// POST /api/parties/:id/guests/import - Bulk-import guest lists exported from
+// Luma / Meetup / Eventbrite / Generic CSV. See plans/calzone-83291-guest-list-import.md.
+//
+// submittedVia is set to `import-${sourcePlatform}` (e.g. 'import-luma') so
+// fake-detection / partner scoring can distinguish imported rows from real
+// RSVPs. Inserts run in chunks of 50 rows with a 100ms gap to bound the
+// supabase_realtime fan-out burst.
+const IMPORT_SOURCE_ALLOWLIST = ['luma', 'meetup', 'eventbrite', 'csv'] as const;
+type ImportSource = typeof IMPORT_SOURCE_ALLOWLIST[number];
+const IMPORT_HARD_CAP = 2000;
+const IMPORT_CHUNK_SIZE = 50;
+const IMPORT_CHUNK_GAP_MS = 100;
+const IMPORT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.post('/:id/guests/import', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    // Verify ownership or super admin
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Verify co-host has access to the guests tab
+    const canAccessGuests = await canUserAccessTab(id, req.userEmail, req.userId, 'guests');
+    if (!canAccessGuests) {
+      throw new AppError('You do not have access to the guests tab', 403, 'TAB_ACCESS_DENIED');
+    }
+
+    const { guests, sourcePlatform } = req.body as {
+      guests?: Array<{
+        name?: string;
+        email?: string | null;
+        status?: 'CONFIRMED' | 'INVITED' | 'WAITLISTED' | 'CHECKED_IN';
+        approved?: boolean | null;
+      }>;
+      sourcePlatform?: string;
+    };
+
+    if (!sourcePlatform || !IMPORT_SOURCE_ALLOWLIST.includes(sourcePlatform as ImportSource)) {
+      throw new AppError(
+        `sourcePlatform must be one of: ${IMPORT_SOURCE_ALLOWLIST.join(', ')}`,
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+    if (!Array.isArray(guests) || guests.length === 0) {
+      throw new AppError('guests must be a non-empty array', 400, 'VALIDATION_ERROR');
+    }
+    if (guests.length > IMPORT_HARD_CAP) {
+      throw new AppError(
+        `Max ${IMPORT_HARD_CAP} guests per import; split the file into multiple uploads`,
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    const submittedVia = `import-${sourcePlatform}`;
+
+    // Prefetch existing emails on the party for dedup (case-insensitive)
+    const existing = await prisma.guest.findMany({
+      where: { partyId: id },
+      select: { email: true },
+    });
+    const existingEmails = new Set(
+      existing
+        .map((g) => (g.email ? g.email.toLowerCase() : null))
+        .filter((e): e is string => !!e)
+    );
+
+    const skipped: Array<{ email: string; reason: string }> = [];
+    const errors: Array<{ index: number; reason: string }> = [];
+    const toInsert: Array<{
+      name: string;
+      email: string | null;
+      status: 'CONFIRMED' | 'INVITED' | 'WAITLISTED' | 'CHECKED_IN';
+      approved: boolean | null;
+      checkedInAt: Date | null;
+      checkedInBy: string | null;
+    }> = [];
+
+    guests.forEach((row, idx) => {
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      if (!name) {
+        errors.push({ index: idx, reason: 'missing name' });
+        return;
+      }
+      const rawEmail = typeof row.email === 'string' ? row.email.trim() : '';
+      const normalizedEmail = rawEmail ? rawEmail.toLowerCase() : '';
+      if (rawEmail && !IMPORT_EMAIL_REGEX.test(rawEmail)) {
+        errors.push({ index: idx, reason: 'invalid email' });
+        return;
+      }
+      if (normalizedEmail) {
+        if (existingEmails.has(normalizedEmail)) {
+          skipped.push({ email: rawEmail, reason: 'duplicate' });
+          return;
+        }
+        existingEmails.add(normalizedEmail); // dedup within this batch too
+      }
+
+      const incomingStatus = row.status;
+      const status: 'CONFIRMED' | 'INVITED' | 'WAITLISTED' | 'CHECKED_IN' =
+        incomingStatus === 'WAITLISTED' ||
+        incomingStatus === 'INVITED' ||
+        incomingStatus === 'CHECKED_IN'
+          ? incomingStatus
+          : 'CONFIRMED';
+
+      const approved =
+        row.approved !== undefined
+          ? row.approved
+          : status === 'INVITED' || status === 'WAITLISTED'
+            ? null
+            : true;
+
+      const isCheckedIn = status === 'CHECKED_IN';
+
+      toInsert.push({
+        name,
+        email: normalizedEmail || null,
+        status,
+        approved,
+        checkedInAt: isCheckedIn ? new Date() : null,
+        checkedInBy: isCheckedIn ? (req.userEmail ?? null) : null,
+      });
+    });
+
+    const createdGuestIds: string[] = [];
+
+    // Insert in chunks of IMPORT_CHUNK_SIZE rows with a small gap between chunks
+    // to bound the supabase_realtime WAL fan-out burst.
+    for (let i = 0; i < toInsert.length; i += IMPORT_CHUNK_SIZE) {
+      const chunk = toInsert.slice(i, i + IMPORT_CHUNK_SIZE);
+      const ops = chunk.map((g) =>
+        prisma.guest.create({
+          data: {
+            name: g.name,
+            email: g.email,
+            dietaryRestrictions: [],
+            likedToppings: [],
+            dislikedToppings: [],
+            likedBeverages: [],
+            dislikedBeverages: [],
+            submittedVia,
+            partyId: id,
+            status: g.status,
+            approved: g.approved,
+            checkedInAt: g.checkedInAt,
+            checkedInBy: g.checkedInBy,
+          },
+        })
+      );
+      const created = await prisma.$transaction(ops);
+      created.forEach((g) => createdGuestIds.push(g.id));
+      if (i + IMPORT_CHUNK_SIZE < toInsert.length) {
+        await new Promise((r) => setTimeout(r, IMPORT_CHUNK_GAP_MS));
+      }
+    }
+
+    // Single webhook per import (not per row).
+    await triggerWebhook(
+      'guest.imported',
+      { partyId: id, count: createdGuestIds.length, source: sourcePlatform },
+      req.userId!
+    );
+
+    res.status(200).json({
+      inserted: createdGuestIds.length,
+      skipped,
+      errors,
+      createdGuestIds,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // DELETE /api/parties/:partyId/guests/:guestId - Remove guest
 router.delete('/:partyId/guests/:guestId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

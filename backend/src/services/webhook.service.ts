@@ -16,6 +16,7 @@ export const WEBHOOK_EVENTS = [
   'guest.waitlisted',
   'guest.promoted',
   'guest.checkin_undone', // mushroom-31723: emitted when a host un-checks-in a guest
+  'guest.imported',       // calzone-83291: emitted once per bulk-import (Luma/Meetup/Eventbrite/CSV)
 ] as const;
 
 export type WebhookEvent = typeof WEBHOOK_EVENTS[number];

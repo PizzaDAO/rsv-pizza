@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { TableRow } from './TableRow';
 import { Guest } from '../types';
-import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Mail, Check, X, ArrowUpCircle, Loader2, Ban } from 'lucide-react';
+import { UserRoundX, Users, Clock, Search, CheckCircle2, Download, Upload, Mail, Check, X, ArrowUpCircle, Loader2, Ban } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
 import { RejectedGuestsModal } from './RejectedGuestsModal';
 import { InvitedGuestsModal } from './InvitedGuestsModal';
+import { ImportGuestsModal } from './ImportGuestsModal';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
 
 export const GuestList: React.FC = () => {
@@ -19,6 +20,7 @@ export const GuestList: React.FC = () => {
   const [togglingNotableId, setTogglingNotableId] = useState<string | null>(null);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const [showInvitedModal, setShowInvitedModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -146,6 +148,16 @@ export const GuestList: React.FC = () => {
       (guest.email && guest.email.toLowerCase().includes(query))
     );
   }, [guests, searchQuery]);
+
+  // Lowercase email set for dup-detection in the Import modal. Declared
+  // here (above the early return below) to satisfy the hooks-ordering rule.
+  const existingEmailsSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of guests) {
+      if (g.email) set.add(g.email.toLowerCase());
+    }
+    return set;
+  }, [guests]);
 
   if (guests.length === 0) {
     return (
@@ -354,13 +366,23 @@ export const GuestList: React.FC = () => {
               </button>
             )}
           </div>
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
-          >
-            <Download size={14} />
-            {t('guests.exportCsv')}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+            >
+              <Upload size={14} />
+              {t('guests.importButton', { defaultValue: 'Import' })}
+            </button>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-1.5 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+            >
+              <Download size={14} />
+              {t('guests.exportCsv')}
+            </button>
+          </div>
         </div>
 
         <div className="mb-4">
@@ -582,6 +604,14 @@ export const GuestList: React.FC = () => {
         isOpen={showInvitedModal}
         onClose={() => setShowInvitedModal(false)}
         invitedGuests={invitedGuests}
+      />
+
+      {/* Import guests modal (calzone-83291). Reads existing emails for dup
+          hints; on success it triggers loadParty() to refresh the list. */}
+      <ImportGuestsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        existingEmails={existingEmailsSet}
       />
     </>
   );
