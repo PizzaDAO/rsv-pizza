@@ -289,6 +289,11 @@ export function EventPage() {
   };
 
   const handleRSVP = () => {
+    // porchetta-81402: defense-in-depth. The button is replaced with a
+    // cancellation card when `cancelledAt` is set, so this branch only
+    // fires if a caller bypasses the UI (e.g. a stale tab cached the old
+    // button). Drop the call rather than open a modal that would 410.
+    if (event?.cancelledAt) return;
     setShowRSVPModal(true);
   };
 
@@ -699,6 +704,23 @@ export function EventPage() {
       )}
 
       <div className="max-w-[1212px] mx-auto py-8 px-4">
+        {/* porchetta-81402: cancelled banner. Shown above the event card so
+            visitors see the cancel state before anything else. Past RSVPers
+            still see the full event details below — the page is preserved. */}
+        {event.cancelledAt && (
+          <div
+            className="mb-6 rounded-2xl border border-[#ff393a]/50 bg-[#ff393a]/10 p-6 text-center"
+            data-testid="event-cancelled-banner"
+          >
+            <h2 className="text-2xl font-bold text-[#ff5a5b]">{t('cancelled.bannerTitle')}</h2>
+            {event.cancellationReason && (
+              <p className="mt-2 text-base text-theme-text-secondary">
+                <span className="font-medium text-theme-text">{t('cancelled.reasonLabel')}:</span>{' '}
+                {event.cancellationReason}
+              </p>
+            )}
+          </div>
+        )}
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-[400px,1fr] gap-0 md:gap-8">
             {/* Left Column - Image and Host Info (Desktop only) */}
@@ -959,9 +981,21 @@ export function EventPage() {
                       </a>
                     )}
 
-                    {/* RSVP Button (+ Check In) - Desktop */}
+                    {/* RSVP Button (+ Check In) - Desktop
+                        porchetta-81402: replace with cancelled-card when the
+                        host has cancelled the event. Check-in button is also
+                        hidden — historical check-in records still exist via
+                        the dedicated /checkin route. */}
                     <div className="pt-1">
-                      {showCheckIn ? (
+                      {event.cancelledAt ? (
+                        <div
+                          className="w-full rounded-xl border border-[#ff393a]/30 bg-[#ff393a]/5 px-4 py-3 text-center"
+                          data-testid="rsvp-cancelled-card-desktop"
+                        >
+                          <p className="text-base font-medium text-[#ff5a5b]">{t('cancelled.noticeTitle')}</p>
+                          <p className="text-sm text-theme-text-secondary mt-1">{t('cancelled.noticeBody')}</p>
+                        </div>
+                      ) : showCheckIn ? (
                         <div className="flex gap-2">
                           <button
                             ref={mobileRsvpRef}
@@ -1090,9 +1124,18 @@ export function EventPage() {
                   </a>
                 )}
 
-                {/* RSVP Button (+ Check In) - Mobile only */}
+                {/* RSVP Button (+ Check In) - Mobile only
+                    porchetta-81402: same cancelled treatment as desktop. */}
                 <div className="pt-4 md:hidden">
-                  {showCheckIn ? (
+                  {event.cancelledAt ? (
+                    <div
+                      className="w-[85%] mx-auto rounded-xl border border-[#ff393a]/30 bg-[#ff393a]/5 px-4 py-3 text-center"
+                      data-testid="rsvp-cancelled-card-mobile"
+                    >
+                      <p className="text-base font-medium text-[#ff5a5b]">{t('cancelled.noticeTitle')}</p>
+                      <p className="text-sm text-theme-text-secondary mt-1">{t('cancelled.noticeBody')}</p>
+                    </div>
+                  ) : showCheckIn ? (
                     <div className="flex gap-2 w-[85%] mx-auto">
                       <button
                         data-testid="rsvp-button"
@@ -1429,8 +1472,9 @@ export function EventPage() {
         document.body
       )}
 
-      {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view */}
-      {showStickyRsvp && (
+      {/* Sticky RSVP button — mobile only, appears when inline button scrolls out of view.
+          porchetta-81402: hidden on cancelled events to mirror the inline button. */}
+      {showStickyRsvp && !event.cancelledAt && (
         <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-theme-card/95 backdrop-blur-sm border-b border-theme-stroke px-4 py-2.5">
           {showCheckIn ? (
             <div className="flex gap-2">

@@ -497,7 +497,15 @@
     "deleteConfirmTitle": "Delete Event",
     "deleteConfirmMessage": "Are you sure you want to delete this event? This action cannot be undone.",
     "deleteConfirmButton": "Delete Event",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "cancelEvent": "Cancel event",
+    "cancelConfirmTitle": "Cancel this event?",
+    "cancelConfirmMessage": "RSVPs will close and the event page will show a cancellation banner. Guests stay attached to the event and you can reinstate it at any time.",
+    "cancelConfirmButton": "Cancel Event",
+    "cancelReasonPlaceholder": "Optional: why is this event cancelled?",
+    "cancelling": "Cancelling...",
+    "reinstateEvent": "Reinstate event",
+    "reinstating": "Reinstating..."
   },
   "beverages": {
     "drinks": "Drinks",

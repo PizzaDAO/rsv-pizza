@@ -12,7 +12,8 @@
     "guest_one": "게스트 {{count}}명",
     "guest_other": "게스트 {{count}}명",
     "alreadyCreated": "이미 파티를 만드셨나요?",
-    "viewAllTest": "모든 테스트 이벤트 보기"
+    "viewAllTest": "모든 테스트 이벤트 보기",
+    "cancelled": "Cancelled"
   },
   "profile": {
     "title": "내 프로필",

@@ -177,6 +177,10 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     parkingNotes: dbParty.parking_notes ?? null,
     // quattro-71244: gamified-dashboard goal targets.
     hostGoals: dbParty.host_goals ?? null,
+    // porchetta-81402: soft-cancel state.
+    cancelledAt: dbParty.cancelled_at ?? null,
+    cancelledBy: dbParty.cancelled_by ?? null,
+    cancellationReason: dbParty.cancellation_reason ?? null,
     guests,
   };
 }

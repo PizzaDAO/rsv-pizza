@@ -8,6 +8,7 @@
     "createParty": "Create Party",
     "noEvents": "No {{filter}} events",
     "host": "Host",
+    "cancelled": "Cancelled",
     "dateTbd": "Date TBD",
     "guest_one": "{{count}} guest",
     "guest_other": "{{count}} guests",
