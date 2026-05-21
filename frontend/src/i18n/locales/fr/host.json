@@ -785,6 +785,17 @@
         "firstPoap": "Premier mint POAP",
         "goalReached": "Objectif atteint"
       }
+    },
+    "share": {
+      "buttonLabel": "Partager les progrès",
+      "modalTitle": "Partagez vos progrès",
+      "download": "Télécharger",
+      "copy": "Copier",
+      "copySuccess": "Copié dans le presse-papiers",
+      "copyFailed": "Échec de la copie",
+      "generating": "Génération…",
+      "generateFailed": "Impossible de générer l'image",
+      "close": "Fermer"
     }
   }
 }

@@ -785,6 +785,17 @@
         "firstPoap": "Erstes POAP-Mint",
         "goalReached": "Ziel erreicht"
       }
+    },
+    "share": {
+      "buttonLabel": "Fortschritt teilen",
+      "modalTitle": "Teile deinen Fortschritt",
+      "download": "Herunterladen",
+      "copy": "Kopieren",
+      "copySuccess": "In die Zwischenablage kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+      "generating": "Wird erstellt…",
+      "generateFailed": "Bild konnte nicht erstellt werden",
+      "close": "Schließen"
     }
   }
 }

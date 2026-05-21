@@ -785,6 +785,17 @@
         "firstPoap": "首次铸造 POAP",
         "goalReached": "目标达成"
       }
+    },
+    "share": {
+      "buttonLabel": "分享进度",
+      "modalTitle": "分享你的进度",
+      "download": "下载",
+      "copy": "复制",
+      "copySuccess": "已复制到剪贴板",
+      "copyFailed": "复制失败",
+      "generating": "生成中…",
+      "generateFailed": "无法生成图片",
+      "close": "关闭"
     }
   }
 }
