@@ -42,6 +42,7 @@ model User {
   apiKeys      ApiKey[]
   aiPhoneCalls AIPhoneCall[]
   payouts      Payout[]
+  paymentOptIns PartyPaymentOptIn[] @relation("PartyPaymentOptIns")
   uploadedPayoutDocuments PayoutDocument[] @relation("PayoutDocumentUploadedBy")
   reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
   reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
@@ -240,6 +241,7 @@ model Party {
   slugAliases           SlugAlias[]
   scorecardItems        GuestScorecardItem[]
   payouts               Payout[]
+  paymentOptIns         PartyPaymentOptIn[]
   outreachAttempts      OutreachAttempt[]
   announcements         Announcement[]
   attestations          GuestAttestation[]
@@ -1576,6 +1578,33 @@ model Payout {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("payouts")
+}
+
+// ============================================
+// Per-event payment opt-in (bufala-83291)
+// ============================================
+// A row here means "this user has explicitly opted in to receive payment
+// for this event." The /payments prepay queue filters candidate hosts to
+// users with a matching opt-in row, so cohosts who set their user-level
+// payment details on one event don't automatically become prepay candidates
+// on every other event they're a cohost on.
+//
+// User-level payment prefs (`users.preferred_payout_method`, etc.) remain
+// the source of HOW to pay; this table answers WHETHER to consider them.
+//
+// Backfilled at migration time from `payouts` so any host who has already
+// submitted a real payout for an event keeps appearing as a candidate
+// without re-clicking Submit.
+model PartyPaymentOptIn {
+  partyId    String   @map("party_id") @db.Uuid
+  party      Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation("PartyPaymentOptIns", fields: [userId], references: [id], onDelete: Cascade)
+  optedInAt  DateTime @default(now()) @map("opted_in_at") @db.Timestamptz
+
+  @@id([partyId, userId])
+  @@index([partyId])
+  @@map("party_payment_opt_ins")
 }
 
 model PayoutDocument {
