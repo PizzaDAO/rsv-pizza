@@ -237,6 +237,32 @@ async function isAnyAdmin(email?: string): Promise<boolean> {
 }
 
 /**
+ * bresaola-49185: Payments app is gated on party approval. Unapproved parties
+ * cannot submit/edit payouts or run OCR previews — those actions all create or
+ * mutate Payout rows and we don't want them piling up before underboss review.
+ *
+ * GET and DELETE are NOT gated: hosts must still be able to see existing
+ * payouts and cancel pending ones even if approval is later revoked.
+ *
+ * Throws 403 PARTY_NOT_APPROVED when the party isn't approved (or doesn't
+ * exist — we don't leak the existence distinction since the action is gated
+ * regardless).
+ */
+async function assertPartyApproved(partyId: string): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { underbossStatus: true },
+  });
+  if (!party || party.underbossStatus !== 'approved') {
+    throw new AppError(
+      'This event must be approved before submitting payments.',
+      403,
+      'PARTY_NOT_APPROVED',
+    );
+  }
+}
+
+/**
  * pepperoni-47301: Mercury (our virtual debit card issuer) cannot issue cards
  * to hosts in sanctioned/restricted countries. When the host (or admin) tries
  * to submit `mercury_card` for a party whose `country` matches the block list,
@@ -279,6 +305,11 @@ router.post(
       if (!canEdit) {
         throw new AppError('Party not found', 404, 'NOT_FOUND');
       }
+
+      // bresaola-49185: block OCR previews on unapproved parties — the
+      // surrounding Payments UI is hidden, but a determined direct caller
+      // would otherwise still burn OpenAI quota.
+      await assertPartyApproved(partyId);
 
       assertSupabasePayoutUrl(imageUrl, partyId);
 
@@ -358,6 +389,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         throw new AppError('Party not found', 404, 'NOT_FOUND');
       }
     }
+
+    // bresaola-49185: block payout creation on unapproved parties. Admins
+    // creating prepayments still need the party to be approved — there's no
+    // legitimate reason to disburse funds for a party the underboss hasn't
+    // approved yet.
+    await assertPartyApproved(partyId);
 
     // Validate optional one-shot attendance setup. Only persisted to the party
     // below if the party's current expectedGuests is null (see updateMany call).
@@ -787,6 +824,11 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
+
+    // bresaola-49185: block edits on unapproved parties (e.g. if approval
+    // was revoked after the payout was first created). GET + DELETE remain
+    // open so hosts can still see and cancel pending rows.
+    await assertPartyApproved(partyId);
 
     const existing = await prisma.payout.findFirst({
       where: { id: payoutId, partyId },
