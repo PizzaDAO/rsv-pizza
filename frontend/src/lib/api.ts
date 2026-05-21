@@ -70,6 +70,8 @@ export async function apiRequest<T>(
 // null URLs means env vars aren't set yet (card shows "Coming soon").
 export interface BroadcastUrlsResponse {
   zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
   streamyardUrl: string | null;
   eligible: boolean;
 }
