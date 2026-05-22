@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, FeedPhoto } from '../lib/api';
@@ -32,7 +32,7 @@ export function PhotosFeedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<FeedPhoto | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<string | null>(null);
@@ -77,11 +77,18 @@ export function PhotosFeedPage() {
   }, [loadPage]);
 
   useEffect(() => {
-    if (!selected) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null); };
+    if (selectedIdx === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedIdx(null);
+      else if (e.key === 'ArrowLeft') {
+        setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i));
+      } else if (e.key === 'ArrowRight') {
+        setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i));
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected]);
+  }, [selectedIdx, photos.length]);
 
   return (
     <Layout>
@@ -104,7 +111,7 @@ export function PhotosFeedPage() {
           <EmptyState />
         ) : (
           <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
-            {photos.map(p => <FeedTile key={p.id} photo={p} onOpen={() => setSelected(p)} />)}
+            {photos.map((p, idx) => <FeedTile key={p.id} photo={p} onOpen={() => setSelectedIdx(idx)} />)}
           </div>
         )}
 
@@ -125,7 +132,16 @@ export function PhotosFeedPage() {
         )}
       </div>
 
-      {selected && <FeedLightbox photo={selected} onClose={() => setSelected(null)} />}
+      {selectedIdx !== null && photos[selectedIdx] && (
+        <FeedLightbox
+          photo={photos[selectedIdx]}
+          hasPrev={selectedIdx > 0}
+          hasNext={selectedIdx < photos.length - 1}
+          onPrev={() => setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i))}
+          onNext={() => setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i))}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
     </Layout>
   );
 }
@@ -164,10 +180,35 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   );
 }
 
-function FeedLightbox({ photo, onClose }: { photo: FeedPhoto; onClose: () => void }) {
+function FeedLightbox({
+  photo, onClose, onPrev, onNext, hasPrev, hasNext,
+}: {
+  photo: FeedPhoto;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+}) {
   const isVideo = photo.mimeType?.startsWith('video/');
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <button
+        onClick={(e) => { e.stopPropagation(); onPrev(); }}
+        disabled={!hasPrev}
+        aria-label="Previous photo"
+        className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronLeft size={28} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onNext(); }}
+        disabled={!hasNext}
+        aria-label="Next photo"
+        className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronRight size={28} />
+      </button>
       <div className="max-w-5xl w-full max-h-[90vh] bg-theme-header rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex-1 flex items-center justify-center bg-black min-h-0">
           {isVideo ? (
