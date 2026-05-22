@@ -17,6 +17,8 @@ import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
 import { PizzaBoxStackCard } from './PizzaBoxStackCard';
 import { BroadcastJoinCard } from './BroadcastJoinCard';
 import { StandWithCryptoCard } from './StandWithCryptoCard';
+import { StreamOnScreenCard } from './StreamOnScreenCard';
+import { CollapsibleCard } from './CollapsibleCard';
 
 interface DayOfDashboardProps {
   party: Party;
@@ -66,38 +68,111 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
   // genoa-44102: Two-column layout on desktop — important day-of actions on
   // the left, supporting/reference info on the right. Mobile stays single-
   // column stacked with the same left-then-right priority order.
+  //
+  // prosciutto-78201: MusicNowPlayingCard moved from the right column into
+  // the left column directly under PizzaStatusCard; new StreamOnScreenCard
+  // takes the top spot in the right column.
   const leftColumn = (
     <>
-      <PizzaStatusCard party={party} guests={guests} />
-      {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
-      <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
-      <AnnouncePanel
-        partyId={party.id}
-        onSent={() => setAnnHistoryKey((k) => k + 1)}
-      />
+      <CollapsibleCard id="pizza" partyId={party.id} title="Order the pizza">
+        <PizzaStatusCard party={party} guests={guests} />
+      </CollapsibleCard>
+      <CollapsibleCard id="music" partyId={party.id} title="Music">
+        <MusicNowPlayingCard
+          partyId={party.id}
+          inviteCode={party.inviteCode}
+          hideOpenTabLink={isMobile}
+        />
+      </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="broadcast"
+          partyId={party.id}
+          title="Join the global PizzaDAO broadcast"
+        >
+          <BroadcastJoinCard partyId={party.id} layout={layout} />
+        </CollapsibleCard>
+      )}
+      <CollapsibleCard id="check-in" partyId={party.id} title="Check-in">
+        <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
+      </CollapsibleCard>
+      <CollapsibleCard id="announce" partyId={party.id} title="Announce">
+        <AnnouncePanel
+          partyId={party.id}
+          onSent={() => setAnnHistoryKey((k) => k + 1)}
+        />
+      </CollapsibleCard>
       {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
-      <StandWithCryptoCard party={party} />
+      <CollapsibleCard id="swc" partyId={party.id} title="Stand With Crypto">
+        <StandWithCryptoCard party={party} />
+      </CollapsibleCard>
     </>
   );
 
   const rightColumn = (
     <>
-      <MusicNowPlayingCard
+      <CollapsibleCard
+        id="stream-on-screen"
         partyId={party.id}
-        inviteCode={party.inviteCode}
-        hideOpenTabLink={isMobile}
-      />
-      {isGpp && !briefingFirst && <BriefingCard party={party} />}
-      <ChecklistTodayCard
+        title="Put the stream on screen"
+      >
+        <StreamOnScreenCard />
+      </CollapsibleCard>
+      {isGpp && !briefingFirst && (
+        <CollapsibleCard
+          id="briefing"
+          partyId={party.id}
+          title="PizzaDAO mic-announcement"
+        >
+          <BriefingCard party={party} />
+        </CollapsibleCard>
+      )}
+      <CollapsibleCard
+        id="checklist"
         partyId={party.id}
-        inviteCode={party.inviteCode}
-        hideOpenTabLink={isMobile}
-      />
-      <PhotoQuickCaptureCard party={party} />
-      {isGpp && <SignedPizzaBoxCard party={party} />}
-      {isGpp && <PizzaBoxStackCard party={party} />}
-      <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
-      <LogisticsCard party={party} />
+        title="Today's checklist"
+      >
+        <ChecklistTodayCard
+          partyId={party.id}
+          inviteCode={party.inviteCode}
+          hideOpenTabLink={isMobile}
+        />
+      </CollapsibleCard>
+      <CollapsibleCard
+        id="photo-quick-capture"
+        partyId={party.id}
+        title="Quick photo"
+      >
+        <PhotoQuickCaptureCard party={party} />
+      </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="signed-box"
+          partyId={party.id}
+          title="Sign a pizza box together"
+        >
+          <SignedPizzaBoxCard party={party} />
+        </CollapsibleCard>
+      )}
+      {isGpp && (
+        <CollapsibleCard
+          id="box-tower"
+          partyId={party.id}
+          title="Stack the pizza boxes"
+        >
+          <PizzaBoxStackCard party={party} />
+        </CollapsibleCard>
+      )}
+      <CollapsibleCard
+        id="announcement-history"
+        partyId={party.id}
+        title="Sent today"
+      >
+        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
+      </CollapsibleCard>
+      <CollapsibleCard id="logistics" partyId={party.id} title="Logistics">
+        <LogisticsCard party={party} />
+      </CollapsibleCard>
     </>
   );
 
