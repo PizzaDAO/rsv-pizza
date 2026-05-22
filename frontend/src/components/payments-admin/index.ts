@@ -5,7 +5,6 @@ export { PaymentsStatsCards } from './PaymentsStatsCards';
 export { BulkActionsBar } from './BulkActionsBar';
 export { ExternalPaymentModal } from './ExternalPaymentModal';
 export { PrepayQueueTable } from './PrepayQueueTable';
-export { PartyTotalsTable } from './PartyTotalsTable';
 export { CreatePrepaymentModal } from './CreatePrepaymentModal';
 export { HostPaymentDetailsModal } from './HostPaymentDetailsModal';
 export { ExportSafeJsonModal } from './ExportSafeJsonModal';

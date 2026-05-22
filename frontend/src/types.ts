@@ -1678,18 +1678,6 @@ export interface AdminPayoutTotals {
   totalUsdThisMonth: number;
   avgUsd: number;
   awaitingReview: number;
-  /**
-   * parmigiana-58291: per-party rollup of `status === 'paid'` rows over the
-   * filtered set, sorted descending by `totalPaidUsd`. Same `where` clause as
-   * the dashboard pills, so country / method / date filters all apply.
-   */
-  byParty: Array<{
-    partyId: string;
-    partyName: string;
-    country: string | null;
-    totalPaidUsd: number;
-    payoutCount: number;
-  }>;
 }
 
 export interface AdminPayoutsResponse {

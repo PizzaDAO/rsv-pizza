@@ -1222,11 +1222,12 @@ router.get(
 
       const avgUsd = allFiltered.length > 0 ? sumUsd / allFiltered.length : 0;
 
-      // parmigiana-58291: sort descending by totalPaidUsd so the biggest
-      // recipients sit at the top of the dashboard rollup.
-      const byParty = Array.from(partyTotals.values()).sort(
-        (a, b) => b.totalPaidUsd - a.totalPaidUsd,
-      );
+      // taleggio-49183: the parmigiana-58291 top-level `byParty` aggregate
+      // was removed — the per-row "Already paid: $X (N)" rendering on each
+      // PayoutRow (populated below from `pagePaidTotals`) already shows the
+      // same information under each event name, so the top-level list was
+      // duplicative. The `partyTotals` Map above is left intact in case
+      // future serialization consumers depend on it.
 
       // parmigiana-89172: attach a per-party "already paid" rollup to each
       // row's nested `party` object so the PayoutsTable can render an
@@ -1262,7 +1263,6 @@ router.get(
           totalUsdThisMonth,
           avgUsd,
           awaitingReview,
-          byParty,
         },
       });
     } catch (error) {
