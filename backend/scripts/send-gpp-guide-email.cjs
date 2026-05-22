@@ -21,6 +21,10 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// Load .env.local first (real secrets live there per project convention),
+// then .env fills in any gaps. dotenv doesn't overwrite existing keys.
+const _envLocal = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(_envLocal)) require('dotenv').config({ path: _envLocal });
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // ---------------------------------------------------------------------------
@@ -195,7 +199,7 @@ SELECT
   u.email        AS host_email,
   u.name         AS host_name
 FROM parties p
-JOIN users u ON p.user_id = u.id
+JOIN "User" u ON p.user_id = u.id
 WHERE p.event_type = 'gpp'
   AND p.underboss_status = 'approved'
 ORDER BY p.date ASC NULLS LAST;
