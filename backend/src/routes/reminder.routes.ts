@@ -172,18 +172,11 @@ function buildReminderHtml(params: {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Reminder: ${partyName}</title>
-        <style>
-          @font-face {
-            font-family: 'Hub 191 Display';
-            src: url('https://www.rsv.pizza/fonts/Hub-191-Display.otf') format('opentype');
-            font-display: swap;
-          }
-        </style>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         ${flyerBlock}
         <div style="background: linear-gradient(180deg, #c8e8f2 0%, #9dd5e8 100%); padding: 44px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-family: 'Hub 191 Display', Impact, 'Arial Black', sans-serif; font-size: 44px; font-weight: 900; margin: 0; letter-spacing: 2px; text-shadow: 2px 2px 0 #1a3a4a, 3px 3px 0 #1a3a4a, 4px 4px 0 #1a3a4a;">See you in <span style="color: #ff393a; text-shadow: 2px 2px 0 #ffffff, 3px 3px 0 #ffffff;">4 HOURS!</span></h1>
+          <img src="https://www.rsv.pizza/reminder-see-you-in-4-hours.png" alt="See you in 4 hours!" width="540" style="display: block; margin: 0 auto; max-width: 100%; height: auto;" />
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
