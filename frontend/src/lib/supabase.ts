@@ -1363,6 +1363,7 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     .from('guests')
     .select('*')
     .eq('party_id', party.id)
+    .neq('status', 'INVITED')
     .order('submitted_at', { ascending: true });
 
   const [, { data: guests, error: guestsError }] = await Promise.all([enrichPromise, guestsPromise]);
@@ -1772,6 +1773,7 @@ export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
     .from('guests')
     .select('*')
     .eq('party_id', partyId)
+    .neq('status', 'INVITED')
     .order('submitted_at', { ascending: true });
 
   if (error) {
