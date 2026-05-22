@@ -124,6 +124,22 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                         {row.party.country}
                       </div>
                     )}
+                    {/* parmigiana-89172: inline "already paid" total so the
+                        admin sees prior payouts to this party before clicking
+                        Create prepayment again. Amber when the paid total has
+                        reached or exceeded the effective cap. */}
+                    {row.partyPaidCount > 0 && (
+                      <div
+                        className={`text-[11px] mt-0.5 ${
+                          row.party.effectiveReimbursementCapUsd != null &&
+                          row.partyPaidUsd >= row.party.effectiveReimbursementCapUsd
+                            ? 'text-amber-300'
+                            : 'text-theme-text-muted'
+                        }`}
+                      >
+                        Already paid: ${row.partyPaidUsd.toFixed(2)} ({row.partyPaidCount})
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3 align-top">
                     <div className="flex flex-wrap gap-1.5">

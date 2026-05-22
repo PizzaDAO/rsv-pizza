@@ -1617,6 +1617,18 @@ export interface AdminPayout extends Payout {
      * `event_tags` → null. See backend/src/helpers/reimbursementCap.ts.
      */
     effectiveReimbursementCapUsd: number | null;
+    /**
+     * parmigiana-89172: per-party sum of `status === 'paid'` payouts (all
+     * methods — USDC, wire, Mercury). Surfaced inline on PayoutRow to
+     * warn admins before they accidentally double-pay. Optional so older
+     * cached payloads don't break TS during a rolling deploy.
+     */
+    paidTotalUsd?: number;
+    /**
+     * parmigiana-89172: count of paid payouts that contribute to
+     * `paidTotalUsd`. Shown in parens, e.g. "Already paid: $470.00 (2)".
+     */
+    paidTotalCount?: number;
   };
   host: {
     id: string;
@@ -1704,6 +1716,18 @@ export interface PrepayQueueRow {
   candidates: PrepayCandidate[];
   /** True when the admin must disambiguate between ≥2 candidates. */
   hasMultipleCandidates: boolean;
+  /**
+   * parmigiana-89172: per-party sum of `status === 'paid'` payouts (all
+   * methods). Surfaced as an inline "Already paid: $X (N)" line under the
+   * city name so admins don't accidentally double-pay. Always present from
+   * the backend — defaults to 0 for parties with no prior paid payouts.
+   */
+  partyPaidUsd: number;
+  /**
+   * parmigiana-89172: count of paid payouts that contribute to
+   * `partyPaidUsd`. Shown in parens, e.g. "Already paid: $600.00 (2)".
+   */
+  partyPaidCount: number;
 }
 
 export interface OcrPreviewResult {
