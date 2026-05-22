@@ -1,15 +1,18 @@
-# pancetta-58112 — VideoQuickCaptureCard in Party Guide
+# pancetta-58112 — Unified "Quick photo or video" card in Party Guide
 
 ## Goal
-Add a "Quick video" capture card to the day-of host dashboard
-(`DayOfDashboard`), mirroring the existing `PhotoQuickCaptureCard`.
+Extend the existing day-of host `PhotoQuickCaptureCard` (in `DayOfDashboard`)
+to accept BOTH photos and videos through a single unified CTA, instead of
+introducing a separate VideoQuickCaptureCard.
 
 ## Why
-Video upload infrastructure exists end-to-end (storage bucket, helper,
-backend endpoint accepting video MIME types, gallery Videos tab), but
-there is no dedicated entry point in the Party Guide. Hosts can record
-short videos on their phone — surfacing this beside the photo card makes
-the feature discoverable. Snax confirmed the photo-card mirror approach.
+Video upload infrastructure already exists end-to-end (storage bucket,
+`uploadEventVideo` helper, backend endpoint accepting video MIME types and
+storing `duration`, gallery Videos sub-tab). The host-side day-of capture
+card was photo-only. Snax redirected from the dual-card approach to a
+single unified "Upload photo or video" card — the OS-level camera capture
+prompt already lets the user choose photo vs video on mobile, so two cards
+are unnecessary clutter.
 
 ## Out of scope (explicit)
 - Backend / Prisma / Supabase migrations / column grants — none needed.
@@ -17,33 +20,31 @@ the feature discoverable. Snax confirmed the photo-card mirror approach.
 - `PhotoUpload.tsx` / `PhotoGallery` — already video-aware.
 - Party-level video toggle — videos use existing `photosEnabled` /
   `photoModeration` gating.
-- Refactoring `uploadEventVideo`'s return shape — out of scope.
+- Refactoring `uploadEventVideo` / `uploadEventPhoto` return shapes.
 
 ## Files touched
-1. NEW `frontend/src/components/day-of/VideoQuickCaptureCard.tsx`
-   — direct mirror of `PhotoQuickCaptureCard.tsx`. Swaps:
-   - `uploadEventPhoto` → `uploadEventVideo` (storage helper)
-   - `Camera`/`ImagePlus` → `Video`/`Film` icons
-   - `accept="image/*"` → `accept="video/*"`
-   - Button copy: "Take a Photo" → "Record a Video";
-     "Upload from library" → "Upload a video"
-   - Adds helper line `≤50MB · ≤5 min · mp4 / webm / mov`
-   - Forwards `duration` from upload result to `uploadPhoto` API
-     (backend already accepts it)
-   - Generic error on `null` upload result: "Upload failed — check size
-     (≤50MB) and length (≤5 min)" (precise reason is `console.error`'d
-     inside the helper)
+1. EDIT `frontend/src/components/day-of/PhotoQuickCaptureCard.tsx`
+   - Import `uploadEventVideo` alongside `uploadEventPhoto`.
+   - Header: "Quick photo" → "Quick photo or video".
+   - Primary CTA: "Take a Photo" → "Take photo or video".
+   - Secondary CTA: "Upload from library" (unchanged); icon swapped to
+     a neutral `Upload`.
+   - File inputs: `accept="image/*"` → `accept="image/*,video/*"` on both.
+   - `handleFile`: branch on `file.type.startsWith('video/')` and route
+     to `uploadEventVideo` (passes `duration`) or `uploadEventPhoto`.
+   - Helper line below buttons:
+     "Photos up to 10MB · videos up to 50MB and 5 min · mp4/webm/mov".
 2. EDIT `frontend/src/components/day-of/DayOfDashboard.tsx`
-   — import + new `<CollapsibleCard id="video-quick-capture" />`
-   immediately after `photo-quick-capture` in `rightColumn`.
-3. EDIT `frontend/src/components/day-of/index.ts`
-   — add named export.
+   - `CollapsibleCard` title "Quick photo" → "Quick photo or video".
+3. EDIT `frontend/src/components/day-of/index.ts` — no change vs current
+   master (only removes the dropped `VideoQuickCaptureCard` export from
+   the prior dual-card commit).
 
 ## Verification
-- [ ] Vercel preview → host Party Guide → "Quick video" appears under
-      "Quick photo" in the right column (desktop) / stacked (mobile).
-- [ ] Record a short phone video via "Record a Video" → uploads → shows
-      success message; appears in PhotoGallery Videos sub-tab.
-- [ ] Upload a >50MB file (or a >5min clip) via "Upload a video" → shows
-      "Upload failed — check size (≤50MB) and length (≤5 min)".
-- [ ] `npm run typecheck` (frontend) passes.
+- [ ] Vercel preview → host Party Guide → single "Quick photo or video"
+      card in right column; both buttons accept photos and videos.
+- [ ] Phone capture button → OS prompts photo vs video → both upload.
+- [ ] Library button → file picker accepts images and videos.
+- [ ] >10MB image OR >50MB video OR >5min clip → constraint-specific
+      error message.
+- [ ] `npx tsc --noEmit` (frontend) passes.

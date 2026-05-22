@@ -10,7 +10,6 @@ import { PizzaStatusCard } from './PizzaStatusCard';
 import { MusicNowPlayingCard } from './MusicNowPlayingCard';
 import { ChecklistTodayCard } from './ChecklistTodayCard';
 import { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
-import { VideoQuickCaptureCard } from './VideoQuickCaptureCard';
 import { BriefingCard } from './BriefingCard';
 import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
 import { PizzaBoxStackCard } from './PizzaBoxStackCard';
@@ -133,16 +132,9 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
       <CollapsibleCard
         id="photo-quick-capture"
         partyId={party.id}
-        title="Quick photo"
+        title="Quick photo or video"
       >
         <PhotoQuickCaptureCard party={party} />
-      </CollapsibleCard>
-      <CollapsibleCard
-        id="video-quick-capture"
-        partyId={party.id}
-        title="Quick video"
-      >
-        <VideoQuickCaptureCard party={party} />
       </CollapsibleCard>
       {isGpp && (
         <CollapsibleCard

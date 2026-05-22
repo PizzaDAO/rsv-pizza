@@ -11,7 +11,6 @@ export { PizzaStatusCard } from './PizzaStatusCard';
 export { MusicNowPlayingCard } from './MusicNowPlayingCard';
 export { ChecklistTodayCard } from './ChecklistTodayCard';
 export { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
-export { VideoQuickCaptureCard } from './VideoQuickCaptureCard';
 export { ArtDisplay } from './ArtDisplay';
 export { BriefingCard } from './BriefingCard';
 export { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
