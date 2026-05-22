@@ -1,5 +1,6 @@
 import React from 'react';
-import { Tv } from 'lucide-react';
+import { Tv, Youtube, Twitter } from 'lucide-react';
+import { STREAM_YOUTUBE_URL, STREAM_X_URL } from '../../lib/dayOfConfig';
 
 /**
  * prosciutto-78201: Day-of prompt for hosts to put the global PizzaDAO
@@ -7,9 +8,8 @@ import { Tv } from 'lucide-react';
  * — even non-GPP events may want to display the broader PizzaDAO stream
  * for the vibes; if a host has no screen they'll just ignore the card.
  *
- * Placeholder state: the real stream URL is TBD. Until it lands, render
- * the same "Coming soon" disabled styling as BroadcastJoinCard so hosts
- * recognise the pattern. Snax will swap in the URL later.
+ * porchetta-19384: Replaced the "link coming" placeholder with two real
+ * buttons — YouTube + X — opening the public PizzaDAO stream URLs.
  */
 export const StreamOnScreenCard: React.FC = () => {
   return (
@@ -26,22 +26,31 @@ export const StreamOnScreenCard: React.FC = () => {
         stream up on it so guests can feel the worldwide party.
       </p>
 
-      <div
-        aria-disabled="true"
-        className="relative w-full rounded-xl py-4 px-4 text-center bg-[#ff393a]/40 opacity-60 cursor-not-allowed text-white"
-      >
-        <span className="flex items-center justify-center gap-2 font-semibold text-base">
-          <Tv size={18} />
-          Open the stream
-        </span>
-        <span className="block text-xs font-normal text-white/70 mt-1.5 leading-snug">
-          A single shareable link to the GPP livestream — open it on the
-          venue's screen.
-        </span>
-        <span className="absolute top-1.5 right-2 text-[10px] uppercase tracking-wider text-white/60 bg-black/40 rounded px-1.5 py-0.5">
-          link coming
-        </span>
+      <div className="flex flex-col md:flex-row gap-2">
+        <a
+          href={STREAM_YOUTUBE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4 bg-[#ff0000] hover:bg-[#cc0000] transition-colors text-white font-semibold text-base"
+        >
+          <Youtube size={18} />
+          Watch on YouTube
+        </a>
+        <a
+          href={STREAM_X_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4 bg-black hover:bg-neutral-800 transition-colors text-white font-semibold text-base"
+        >
+          <Twitter size={18} />
+          Watch on X
+        </a>
       </div>
+
+      <p className="text-xs text-white/40">
+        Put one of these up on a TV or projector to share the global PizzaDAO
+        stream at your event.
+      </p>
     </div>
   );
 };
