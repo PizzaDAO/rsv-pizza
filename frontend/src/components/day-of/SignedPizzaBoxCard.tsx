@@ -91,7 +91,7 @@ export const SignedPizzaBoxCard: React.FC<SignedPizzaBoxCardProps> = ({ party, o
         <div className="flex items-center gap-2">
           <PenLine size={18} className="text-[#ff393a]" />
           <h3 className="text-lg font-semibold text-theme-text">
-            Get the pizza box signed
+            Sign a pizza box together
           </h3>
         </div>
         {hasSignedBox && (
