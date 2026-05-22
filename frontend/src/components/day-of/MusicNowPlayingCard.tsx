@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Music, ChevronRight, Loader2 } from 'lucide-react';
+import { Music, ChevronRight, Loader2, ExternalLink } from 'lucide-react';
 import { Performer } from '../../types';
 import { getPerformers } from '../../lib/api';
 
@@ -68,6 +68,16 @@ export const MusicNowPlayingCard: React.FC<MusicNowPlayingCardProps> = ({
           </a>
         )}
       </div>
+
+      <a
+        href="https://mix.pizzadao.xyz"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:text-[#ff5a5b] hover:underline"
+      >
+        <ExternalLink size={14} />
+        Open the PizzaDAO Mix
+      </a>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-theme-text-muted">

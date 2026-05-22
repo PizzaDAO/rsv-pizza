@@ -63,51 +63,74 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
 
   const briefingFirst = isGpp && briefingWindowActive;
 
+  // genoa-44102: Two-column layout on desktop — important day-of actions on
+  // the left, supporting/reference info on the right. Mobile stays single-
+  // column stacked with the same left-then-right priority order.
+  const leftColumn = (
+    <>
+      <PizzaStatusCard party={party} guests={guests} />
+      {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
+      <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
+      <AnnouncePanel
+        partyId={party.id}
+        onSent={() => setAnnHistoryKey((k) => k + 1)}
+      />
+      {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
+      <StandWithCryptoCard party={party} />
+    </>
+  );
+
+  const rightColumn = (
+    <>
+      <MusicNowPlayingCard
+        partyId={party.id}
+        inviteCode={party.inviteCode}
+        hideOpenTabLink={isMobile}
+      />
+      {isGpp && !briefingFirst && <BriefingCard party={party} />}
+      <ChecklistTodayCard
+        partyId={party.id}
+        inviteCode={party.inviteCode}
+        hideOpenTabLink={isMobile}
+      />
+      <PhotoQuickCaptureCard party={party} />
+      {isGpp && <SignedPizzaBoxCard party={party} />}
+      {isGpp && <PizzaBoxStackCard party={party} />}
+      <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
+      <LogisticsCard party={party} />
+    </>
+  );
+
   return (
     <div
       className={
         isMobile
           ? 'space-y-4 pb-8'
-          : 'grid grid-cols-1 xl:grid-cols-3 gap-4'
+          : 'grid grid-cols-1 lg:grid-cols-2 gap-4'
       }
     >
       {briefingFirst && (
-        <div className={isMobile ? '' : 'xl:col-span-3'}>
+        <div className={isMobile ? '' : 'lg:col-span-2'}>
           <BriefingCard party={party} highlighted />
         </div>
       )}
 
-      <div className={isMobile ? '' : 'xl:col-span-2 space-y-4'}>
+      {/* StatusHeader pulse first — countdown + checked-in is the live signal. */}
+      <div className={isMobile ? '' : 'lg:col-span-2'}>
         <StatusHeader party={party} guests={guests} />
-        <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
-        <AnnouncePanel
-          partyId={party.id}
-          onSent={() => setAnnHistoryKey((k) => k + 1)}
-        />
-        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
-        <PhotoQuickCaptureCard party={party} />
       </div>
 
-      <div className={isMobile ? '' : 'space-y-4'}>
-        {isGpp && !briefingFirst && <BriefingCard party={party} />}
-        {isGpp && <SignedPizzaBoxCard party={party} />}
-        {isGpp && <PizzaBoxStackCard party={party} />}
-        {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
-        {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
-        <StandWithCryptoCard party={party} />
-        <LogisticsCard party={party} />
-        <PizzaStatusCard party={party} />
-        <MusicNowPlayingCard
-          partyId={party.id}
-          inviteCode={party.inviteCode}
-          hideOpenTabLink={isMobile}
-        />
-        <ChecklistTodayCard
-          partyId={party.id}
-          inviteCode={party.inviteCode}
-          hideOpenTabLink={isMobile}
-        />
-      </div>
+      {isMobile ? (
+        <>
+          {leftColumn}
+          {rightColumn}
+        </>
+      ) : (
+        <>
+          <div className="space-y-4">{leftColumn}</div>
+          <div className="space-y-4">{rightColumn}</div>
+        </>
+      )}
     </div>
   );
 };
