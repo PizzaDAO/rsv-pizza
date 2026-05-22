@@ -18,7 +18,8 @@ export function EventsMapAllPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchGppEventsForMap()
+    // Approved-only (curated=true filters client-side to underbossStatus === 'approved').
+    fetchGppEventsForMap(false, true)
       .then((data) => {
         setEvents(data);
         setLoading(false);
