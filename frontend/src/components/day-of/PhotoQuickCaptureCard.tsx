@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Loader2 } from 'lucide-react';
+import { Camera, Loader2, ImagePlus } from 'lucide-react';
 import { Party } from '../../types';
 import { uploadEventPhoto } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi } from '../../lib/api';
@@ -11,13 +11,17 @@ interface PhotoQuickCaptureCardProps {
 }
 
 /**
- * Day-of one-tap photo capture. Mobile browsers open the rear camera via
- * `capture="environment"`. Reuses uploadEventPhoto for the storage write
- * + the public uploadPhoto API to register the photo on the party.
+ * Day-of one-tap photo capture. Two distinct buttons:
+ *   - "Take a Photo": opens the camera directly via `capture="environment"`
+ *   - "Upload from library": opens the file picker (no capture attribute)
+ *
+ * Both buttons share the same `handleFile` upload pipeline; the only
+ * difference is which hidden input is triggered.
  */
 export const PhotoQuickCaptureCard: React.FC<PhotoQuickCaptureCardProps> = ({ party, onUploaded }) => {
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSuccess, setLastSuccess] = useState(false);
@@ -54,8 +58,9 @@ export const PhotoQuickCaptureCard: React.FC<PhotoQuickCaptureCardProps> = ({ pa
   const onSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    // Reset so the same file can be picked again
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    // Reset both inputs so the same file can be picked again from either source
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (libraryInputRef.current) libraryInputRef.current.value = '';
   };
 
   return (
@@ -67,7 +72,7 @@ export const PhotoQuickCaptureCard: React.FC<PhotoQuickCaptureCardProps> = ({ pa
 
       <button
         type="button"
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => cameraInputRef.current?.click()}
         disabled={uploading}
         className="w-full bg-[#ff393a] text-white rounded-xl py-6 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
@@ -79,16 +84,33 @@ export const PhotoQuickCaptureCard: React.FC<PhotoQuickCaptureCardProps> = ({ pa
         ) : (
           <>
             <Camera size={20} />
-            Take a photo
+            Take a Photo
           </>
         )}
       </button>
 
+      <button
+        type="button"
+        onClick={() => libraryInputRef.current?.click()}
+        disabled={uploading}
+        className="w-full bg-theme-surface-hover text-theme-text rounded-xl py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-white/10 hover:bg-white/10 transition-colors"
+      >
+        <ImagePlus size={16} />
+        Upload from library
+      </button>
+
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
+        className="hidden"
+        onChange={onSelected}
+      />
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
         className="hidden"
         onChange={onSelected}
       />

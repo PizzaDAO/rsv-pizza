@@ -75,7 +75,8 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         partyId={party.id}
         onSent={() => setAnnHistoryKey((k) => k + 1)}
       />
-      {isGpp && <StandWithCryptoCard party={party} />}
+      {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
+      <StandWithCryptoCard party={party} />
     </>
   );
 

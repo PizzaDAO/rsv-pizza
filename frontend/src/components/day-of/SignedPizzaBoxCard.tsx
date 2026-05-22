@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PenLine, Loader2, Check, Camera } from 'lucide-react';
+import { PenLine, Loader2, Check, Camera, ImagePlus } from 'lucide-react';
 import { Party } from '../../types';
 import { uploadEventPhoto } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi, getPartyPhotos } from '../../lib/api';
@@ -16,12 +16,18 @@ interface SignedPizzaBoxCardProps {
  * the responsibility of the caller (DayOfDashboard); render-time check is
  * a defensive fallback. Done-state is detected by the existence of any
  * party photo tagged 'signed-box'; the card dims to 50% but keeps the
- * upload button active (multiple boxes possible).
+ * upload buttons active (multiple boxes possible).
+ *
+ * Two distinct buttons:
+ *   - "Take a Photo": opens camera directly (`capture="environment"`)
+ *   - "Upload from library": opens file picker (no capture attribute)
+ * Both share the same `handleFile` upload pipeline.
  */
 export const SignedPizzaBoxCard: React.FC<SignedPizzaBoxCardProps> = ({ party, onUploaded }) => {
   // ---- HOOKS (all above any early return) -------------------------------
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSignedBox, setHasSignedBox] = useState(false);
@@ -71,7 +77,8 @@ export const SignedPizzaBoxCard: React.FC<SignedPizzaBoxCardProps> = ({ party, o
   const onSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (libraryInputRef.current) libraryInputRef.current.value = '';
   };
 
   return (
@@ -103,7 +110,7 @@ export const SignedPizzaBoxCard: React.FC<SignedPizzaBoxCardProps> = ({ party, o
 
       <button
         type="button"
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => cameraInputRef.current?.click()}
         disabled={uploading}
         className="w-full bg-[#ff393a] text-white rounded-xl py-4 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
@@ -115,16 +122,33 @@ export const SignedPizzaBoxCard: React.FC<SignedPizzaBoxCardProps> = ({ party, o
         ) : (
           <>
             <Camera size={18} />
-            Upload signed box photo
+            Take a Photo
           </>
         )}
       </button>
 
+      <button
+        type="button"
+        onClick={() => libraryInputRef.current?.click()}
+        disabled={uploading}
+        className="w-full bg-theme-surface-hover text-theme-text rounded-xl py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-white/10 hover:bg-white/10 transition-colors"
+      >
+        <ImagePlus size={16} />
+        Upload from library
+      </button>
+
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
+        className="hidden"
+        onChange={onSelected}
+      />
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
         className="hidden"
         onChange={onSelected}
       />
