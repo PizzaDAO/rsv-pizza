@@ -3879,6 +3879,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.payoutMethod && filters.payoutMethod !== 'all') params.set('payoutMethod', filters.payoutMethod);
   if (filters.partyId) params.set('partyId', filters.partyId);
   if (filters.hostEmail) params.set('hostEmail', filters.hostEmail);
+  // bruschetta-58291: country filter — exact-match `parties.country`.
+  if (filters.country && filters.country !== 'all') params.set('country', filters.country);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
   if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
