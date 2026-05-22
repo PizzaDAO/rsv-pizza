@@ -84,7 +84,7 @@ export function PhotosFeedPage() {
         ) : photos.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 [column-fill:_balance]">
+          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
             {photos.map(p => <FeedTile key={p.id} photo={p} onOpen={() => setSelected(p)} />)}
           </div>
         )}
@@ -114,12 +114,15 @@ export function PhotosFeedPage() {
 function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   const isVideo = photo.mimeType?.startsWith('video/');
   const src = cdnUrl(photo.url);
+  const aspectRatio = photo.width && photo.height
+    ? `${photo.width} / ${photo.height}`
+    : undefined;
   return (
     <button onClick={onOpen} className="mb-3 block w-full break-inside-avoid rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity">
-      <div className="relative">
+      <div className="relative w-full" style={{ aspectRatio }}>
         {isVideo ? (
           <>
-            <video src={src} preload="metadata" muted className="w-full h-auto block" />
+            <video src={src} preload="metadata" muted className="w-full h-full object-cover block" />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="bg-black/50 rounded-full p-3">
                 <Play size={24} className="text-white fill-white" />
@@ -127,7 +130,7 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
             </div>
           </>
         ) : (
-          <img src={src} alt={photo.caption || ''} loading="lazy" className="w-full h-auto block" />
+          <img src={src} alt={photo.caption || ''} loading="lazy" className="w-full h-full object-cover block" />
         )}
       </div>
       {(photo.party.city || photo.party.name) && (
