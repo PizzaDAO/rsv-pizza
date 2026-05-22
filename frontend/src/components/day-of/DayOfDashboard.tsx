@@ -4,10 +4,8 @@ import { useGuestsRealtime } from '../../hooks/useGuestsRealtime';
 import * as db from '../../lib/supabase';
 import { dbGuestToGuest } from '../../contexts/PizzaContext';
 import { StatusHeader } from './StatusHeader';
-import { CheckInPanel } from './CheckInPanel';
 import { AnnouncePanel } from './AnnouncePanel';
 import { AnnouncementHistory } from './AnnouncementHistory';
-import { LogisticsCard } from './LogisticsCard';
 import { PizzaStatusCard } from './PizzaStatusCard';
 import { MusicNowPlayingCard } from './MusicNowPlayingCard';
 import { ChecklistTodayCard } from './ChecklistTodayCard';
@@ -84,27 +82,15 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           hideOpenTabLink={isMobile}
         />
       </CollapsibleCard>
-      {isGpp && (
-        <CollapsibleCard
-          id="broadcast"
-          partyId={party.id}
-          title="Join the global PizzaDAO broadcast"
-        >
-          <BroadcastJoinCard partyId={party.id} layout={layout} />
-        </CollapsibleCard>
-      )}
-      <CollapsibleCard id="check-in" partyId={party.id} title="Check-in">
-        <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
+      {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
+      <CollapsibleCard id="swc" partyId={party.id} title="Stand With Crypto">
+        <StandWithCryptoCard party={party} />
       </CollapsibleCard>
       <CollapsibleCard id="announce" partyId={party.id} title="Announce">
         <AnnouncePanel
           partyId={party.id}
           onSent={() => setAnnHistoryKey((k) => k + 1)}
         />
-      </CollapsibleCard>
-      {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
-      <CollapsibleCard id="swc" partyId={party.id} title="Stand With Crypto">
-        <StandWithCryptoCard party={party} />
       </CollapsibleCard>
     </>
   );
@@ -118,6 +104,15 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
       >
         <StreamOnScreenCard />
       </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="broadcast"
+          partyId={party.id}
+          title="Join the global PizzaDAO broadcast"
+        >
+          <BroadcastJoinCard partyId={party.id} layout={layout} />
+        </CollapsibleCard>
+      )}
       {isGpp && !briefingFirst && (
         <CollapsibleCard
           id="briefing"
@@ -127,17 +122,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           <BriefingCard party={party} />
         </CollapsibleCard>
       )}
-      <CollapsibleCard
-        id="checklist"
-        partyId={party.id}
-        title="Today's checklist"
-      >
-        <ChecklistTodayCard
-          partyId={party.id}
-          inviteCode={party.inviteCode}
-          hideOpenTabLink={isMobile}
-        />
-      </CollapsibleCard>
       <CollapsibleCard
         id="photo-quick-capture"
         partyId={party.id}
@@ -169,9 +153,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         title="Sent today"
       >
         <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
-      </CollapsibleCard>
-      <CollapsibleCard id="logistics" partyId={party.id} title="Logistics">
-        <LogisticsCard party={party} />
       </CollapsibleCard>
     </>
   );
