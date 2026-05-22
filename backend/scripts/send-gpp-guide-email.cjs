@@ -118,6 +118,69 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+function formatEventDate(dateStr, timezone) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const tz = timezone || 'UTC';
+  try {
+    const datePart = d.toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric',
+      timeZone: tz,
+    });
+    const timePart = d.toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit',
+      timeZone: tz,
+    });
+    return `${datePart} at ${timePart}`;
+  } catch {
+    return d.toUTCString();
+  }
+}
+
+function countdownText(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return 'Happening now!';
+  const minutes = Math.round(ms / 60000);
+  const hours = Math.round(ms / 3600000);
+  const days = Math.round(ms / 86400000);
+  if (minutes < 60) return `See you in ${Math.max(1, minutes)} minute${minutes === 1 ? '' : 's'}`;
+  if (hours < 24) return `See you in ${hours} hour${hours === 1 ? '' : 's'}`;
+  if (days < 7) return `See you in ${days} day${days === 1 ? '' : 's'}`;
+  return null;
+}
+
+function renderEventCard(e, options = {}) {
+  const url = `https://rsv.pizza/host/${e.invite_code}/party-guide`;
+  const when = formatEventDate(e.event_date, e.timezone);
+  const countdown = options.showCountdown ? countdownText(e.event_date) : null;
+  const venueLine = e.venue_name ? escapeHtml(e.venue_name) : '';
+  const addressLine = e.address ? `<br><span style="color: #777; font-size: 14px;">${escapeHtml(e.address)}</span>` : '';
+  const whereBlock = (venueLine || addressLine)
+    ? `<p style="margin: 4px 0; color: #444;"><strong style="color: #333;">Where:</strong> ${venueLine}${addressLine}</p>`
+    : '';
+  const whenBlock = when
+    ? `<p style="margin: 4px 0; color: #444;"><strong style="color: #333;">When:</strong> ${escapeHtml(when)}</p>`
+    : '';
+  const countdownBlock = countdown
+    ? `<p style="margin: 14px 0 8px 0; color: #ff6b35; font-weight: 600; font-size: 15px;">${escapeHtml(countdown)}</p>`
+    : '';
+  return `<div style="border: 1px solid #e5e5e5; border-radius: 12px; padding: 24px; margin: 16px 0; background: #fafafa;">
+      <h2 style="margin: 0 0 12px 0; font-size: 20px; color: #222;">${escapeHtml(e.event_name || 'Global Pizza Party')}</h2>
+      ${whenBlock}
+      ${whereBlock}
+      ${countdownBlock}
+      <div style="text-align: center; margin-top: 16px;">
+        <a href="${url}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px;">
+          Open Party Guide
+        </a>
+      </div>
+    </div>`;
+}
+
 function buildPartyGuideEmail(recipient) {
   const firstName =
     (recipient.name && String(recipient.name).split(/\s+/)[0]) || 'host';
@@ -129,33 +192,13 @@ function buildPartyGuideEmail(recipient) {
     ? primaryEvent.event_name || 'your Global Pizza Party'
     : `Your ${events.length} Global Pizza Parties`;
   const introLine = single
-    ? "We've put together a Party Guide tab on your host dashboard to help you run a great Global Pizza Party 2026. Everything you need is now one click away."
-    : `We've put together a Party Guide tab on each of your host dashboards to help you run great Global Pizza Parties 2026. Everything you need is now one click away — for all ${events.length} of your events.`;
+    ? "We've put together a Party Guide tab on your host dashboard. Everything you need to run a great Global Pizza Party is now one click away."
+    : `We've put together a Party Guide tab on each of your host dashboards — everything you need is one click away, for all ${events.length} of your events.`;
 
-  const ctaBlock = single
-    ? `<div style="text-align: center; margin: 30px 0;">
-      <a href="${primaryUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-        Open your Party Guide
-      </a>
-    </div>
-
-    <p style="font-size: 14px; color: #666; text-align: center; margin: 20px 0;">
-      Or paste this link into your browser:<br>
-      <a href="${primaryUrl}" style="color: #ff393a; word-break: break-all;">${primaryUrl}</a>
-    </p>`
-    : `<div style="margin: 30px 0;">
-      <p style="font-size: 14px; color: #666; text-align: center; margin: 0 0 16px 0;">Open your Party Guide for each event:</p>
-      ${events
-        .map((e) => {
-          const url = `https://rsv.pizza/host/${e.invite_code}/party-guide`;
-          return `<div style="text-align: center; margin: 0 0 10px 0;">
-        <a href="${url}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; min-width: 240px;">
-          ${escapeHtml(e.event_name || 'Open Party Guide')}
-        </a>
-      </div>`;
-        })
-        .join('\n      ')}
-    </div>`;
+  // Show the countdown only on the soonest event card (events[0] after sort).
+  const cardsBlock = events
+    .map((e, i) => renderEventCard(e, { showCountdown: i === 0 }))
+    .join('\n    ');
 
   const html = `<!DOCTYPE html>
 <html>
@@ -166,7 +209,8 @@ function buildPartyGuideEmail(recipient) {
   </head>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
     <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-      <h1 style="color: #ffffff; font-size: 28px; margin: 0 0 10px 0;">Your Party Guide is ready 🍕</h1>
+      <img src="https://rsv.pizza/molto-benny.png" alt="Molto Benny" width="96" height="96" style="display: block; margin: 0 auto 16px auto; width: 96px; height: 96px;">
+      <h1 style="color: #ffffff; font-size: 28px; margin: 0 0 10px 0;">Your Party Guide is ready</h1>
       <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">${escapeHtml(heroSubtitle)}</p>
     </div>
 
@@ -187,7 +231,7 @@ function buildPartyGuideEmail(recipient) {
       </ul>
     </div>
 
-    ${ctaBlock}
+    ${cardsBlock}
 
     <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
       <p>Questions? Reply to this email or reach out on <a href="https://t.me/pizzadao" style="color: #ff393a;">Telegram</a>.</p>
@@ -220,6 +264,8 @@ SELECT
   p.date         AS event_date,
   p.timezone,
   p.co_hosts,
+  p.address,
+  p.venue_name,
   u.email        AS host_email,
   u.name         AS host_name
 FROM parties p
@@ -250,15 +296,21 @@ function flattenAndDedup(rows) {
   const flat = [];
   let partnerSkips = 0;
   for (const row of rows) {
+    const eventFields = {
+      invite_code: row.invite_code,
+      event_name: row.event_name,
+      event_date: row.event_date,
+      country: row.country,
+      timezone: row.timezone,
+      venue_name: row.venue_name,
+      address: row.address,
+    };
     if (row.host_email && row.host_email.trim()) {
       flat.push({
         email: row.host_email.toLowerCase().trim(),
         name: row.host_name,
         role: 'host',
-        invite_code: row.invite_code,
-        event_name: row.event_name,
-        event_date: row.event_date,
-        country: row.country,
+        ...eventFields,
       });
     }
     const coHosts = Array.isArray(row.co_hosts) ? row.co_hosts : [];
@@ -272,10 +324,7 @@ function flattenAndDedup(rows) {
         email: ch.email.toLowerCase().trim(),
         name: ch.name || row.host_name,
         role: 'cohost',
-        invite_code: row.invite_code,
-        event_name: row.event_name,
-        event_date: row.event_date,
-        country: row.country,
+        ...eventFields,
       });
     }
   }
@@ -287,6 +336,9 @@ function flattenAndDedup(rows) {
       invite_code: r.invite_code,
       event_date: r.event_date,
       country: r.country,
+      timezone: r.timezone,
+      venue_name: r.venue_name,
+      address: r.address,
     };
     const existing = byEmail.get(r.email);
     if (!existing) {
