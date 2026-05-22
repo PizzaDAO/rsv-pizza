@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -3958,6 +3958,11 @@ export async function markAdminPayoutPaid(
  *   - usdc_base    → no body required; server sends via Privy server-wallet
  *   - wire         → { wireReference: string } REQUIRED
  *   - mercury_card → { mercuryCardLast4: 'NNNN', mercuryCardId?: string, note?: string } REQUIRED
+ *
+ * `allowOverPerAddressCap` (bianco-89172): forwarded to the server to bypass
+ * the per-address $626 cumulative cap when the admin has acknowledged the
+ * warning in PayoutReviewModal.
+ *
  * Returns the updated payout. Throws on any server-side validation/execution failure.
  */
 export async function executeAdminPayout(
@@ -3967,6 +3972,7 @@ export async function executeAdminPayout(
     mercuryCardLast4?: string;
     mercuryCardId?: string;
     note?: string;
+    allowOverPerAddressCap?: boolean;
   } = {},
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {
@@ -3996,12 +4002,38 @@ export interface BulkSendResult {
   error?: string;
 }
 
-export async function bulkExecutePayouts(ids: string[]): Promise<BulkSendResult[]> {
+export async function bulkExecutePayouts(
+  ids: string[],
+  opts?: { allowOverPerAddressCap?: boolean },
+): Promise<BulkSendResult[]> {
+  const body: { ids: string[]; allowOverPerAddressCap?: boolean } = { ids };
+  if (opts?.allowOverPerAddressCap) body.allowOverPerAddressCap = true;
   const res = await apiRequest<{ results: BulkSendResult[] }>(`/api/admin/payouts/bulk-execute`, {
     method: 'POST',
-    body: { ids },
+    body,
   });
   return res.results;
+}
+
+/**
+ * bianco-89172: fetch the cumulative paid-USDC total for a single recipient
+ * wallet, optionally with a "wouldExceed" check for a proposed additional
+ * amount. Backs the per-address $626 cap warning in PayoutReviewModal +
+ * BulkSendModal. Returns `wouldExceed: null` when `amount` is omitted.
+ *
+ * Admin-only — throws via `apiRequest` if the caller is not a payment admin.
+ */
+export async function fetchWalletPaidTotal(
+  address: string,
+  amount?: number,
+): Promise<WalletPaidTotal> {
+  const params = new URLSearchParams({ address });
+  if (amount != null && Number.isFinite(amount)) {
+    params.set('amount', String(amount));
+  }
+  return apiRequest<WalletPaidTotal>(
+    `/api/admin/payouts/wallet-paid-total?${params.toString()}`,
+  );
 }
 
 /**

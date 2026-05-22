@@ -29,6 +29,8 @@ import {
   getUsdcDailyCapStatus,
   getPayoutWalletAddress,
   getPayoutWalletBalanceUsd,
+  getPerAddressPaidTotals,
+  PER_ADDRESS_HARD_CAP_USD,
 } from '../services/usdc-base.service.js';
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
@@ -1761,6 +1763,67 @@ router.get(
   },
 );
 
+// ============================================
+// bianco-89172: GET /api/admin/payouts/wallet-paid-total
+//
+// Returns cumulative paid USDC for a single recipient wallet, optionally with
+// a `wouldExceed` flag for a proposed additional amount. Backs the warning
+// panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
+// already received $Y; sending $Z more would push past the $626 per-address
+// cap" before they fire off a duplicate payment.
+//
+// Query params:
+//   address (required): 0x...40 hex chars (case-insensitive)
+//   amount  (optional): proposed additional USD. When set, response includes
+//                       wouldExceed = (paidUsd + amount > capUsd). When
+//                       omitted, wouldExceed = null.
+//
+// Admin-only (isPaymentAdmin via requireAnyAdminOrPaymentAdmin).
+// ============================================
+router.get(
+  '/wallet-paid-total',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const addressRaw = typeof req.query.address === 'string' ? req.query.address.trim() : '';
+      if (!addressRaw || !/^0x[0-9a-fA-F]{40}$/.test(addressRaw)) {
+        throw new AppError(
+          'address query param must be a valid 0x-prefixed 40-char hex wallet',
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+
+      let amount: number | null = null;
+      if (req.query.amount != null && req.query.amount !== '') {
+        const parsed = Number(req.query.amount);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new AppError(
+            'amount query param must be a non-negative number',
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        amount = parsed;
+      }
+
+      const { paidUsd, paidCount } = await getPerAddressPaidTotals(addressRaw);
+      const wouldExceed = amount == null ? null : paidUsd + amount > PER_ADDRESS_HARD_CAP_USD;
+
+      res.json({
+        address: addressRaw,
+        paidUsd,
+        paidCount,
+        capUsd: PER_ADDRESS_HARD_CAP_USD,
+        wouldExceed,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 /**
  * Shared executor used by both the explicit POST /:id/execute route and the
  * `autoExecute: true` branch of POST /:id/approve. Branches on payoutMethod
@@ -1784,8 +1847,14 @@ async function executePayout(params: {
     actorKind: AdminActorKind;
   };
   body: any;
+  /**
+   * bianco-89172: when true, skip the per-address $626 cumulative cap
+   * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
+   * the warning's acknowledgement checkbox has been ticked.
+   */
+  allowOverPerAddressCap?: boolean;
 }) {
-  const { payoutId, actor, body } = params;
+  const { payoutId, actor, body, allowOverPerAddressCap } = params;
 
   const existing = await prisma.payout.findUnique({
     where: { id: payoutId },
@@ -1834,7 +1903,9 @@ async function executePayout(params: {
     }
 
     try {
-      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd);
+      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd, {
+        allowOverPerAddressCap: !!allowOverPerAddressCap,
+      });
 
       const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.update({
@@ -2056,6 +2127,10 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
+        // bianco-89172: admin can acknowledge the per-address $626 cap
+        // warning via the PayoutReviewModal checkbox; the frontend forwards
+        // the flag here.
+        allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
       });
 
       res.json({ payout: serializePayout(updated) });
@@ -2204,6 +2279,11 @@ router.post(
         );
       }
 
+      // bianco-89172: a single batch-level acknowledgement covers every row.
+      // BulkSendModal disables Send when any selected wallet would exceed the
+      // per-address cap unless the admin ticks "Allow over-cap sends".
+      const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
+
       // SEQUENTIAL execution — nonce safety. Do NOT switch to Promise.all.
       const results: BulkSendResult[] = [];
       for (const row of eligible) {
@@ -2213,6 +2293,7 @@ router.post(
             payoutId: row.id,
             actor: { email: actor.email, actorKind: actor.actorKind },
             body: {},
+            allowOverPerAddressCap,
           });
           // Record a batch-context audit alongside the mark_paid audit that
           // executePayout already wrote.

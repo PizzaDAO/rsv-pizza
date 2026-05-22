@@ -13,6 +13,7 @@ import {
   markAdminPayoutPaid,
   executeAdminPayout,
   getUsdcDailyCapRemaining,
+  fetchWalletPaidTotal,
   exportAdminPayoutsCsv,
   fetchPrepayQueue,
 } from '../lib/api';
@@ -762,6 +763,13 @@ export function PaymentsAdminPage() {
             fetchUsdcCapRemaining={async () => {
               try {
                 return await getUsdcDailyCapRemaining();
+              } catch {
+                return null;
+              }
+            }}
+            fetchWalletPaidTotal={async (address, amount) => {
+              try {
+                return await fetchWalletPaidTotal(address, amount);
               } catch {
                 return null;
               }
