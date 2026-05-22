@@ -46,6 +46,8 @@ const GraphicsFlyerEdit = React.lazy(() => import('./pages/GraphicsFlyerEdit').t
 // cacciatore-72814: super-admin-only SWC variant of /map (lazy because the
 // page is admin-only and rarely visited).
 const EventsMapSwcPage = React.lazy(() => import('./pages/EventsMapSwcPage').then(m => ({ default: m.EventsMapSwcPage })));
+// focaccia-58293: public no-clustering variant of /map (lazy to keep main bundle small).
+const EventsMapAllPage = React.lazy(() => import('./pages/EventsMapAllPage').then(m => ({ default: m.EventsMapAllPage })));
 
 function App() {
   return (
@@ -63,6 +65,8 @@ function App() {
             <Route path="/map" element={<EventsMapPage />} />
             {/* cacciatore-72814: /map/swc super-admin-only variant; must come before /:slug */}
             <Route path="/map/swc" element={<Suspense fallback={null}><EventsMapSwcPage /></Suspense>} />
+            {/* focaccia-58293: /map/all public no-clustering variant; must come before /:slug */}
+            <Route path="/map/all" element={<Suspense fallback={null}><EventsMapAllPage /></Suspense>} />
             {/* /partners must come before /:slug */}
             <Route path="/partners" element={<PartnersPage />} />
             {/* stromboli-71593: /leaderboard + /gpp/leaderboard must come before /:slug */}
