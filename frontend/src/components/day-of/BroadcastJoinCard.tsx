@@ -39,7 +39,7 @@ const BroadcastButton: React.FC<BroadcastButtonProps> = ({
         {label}
         {ready && <ExternalLink size={14} className="opacity-70" />}
       </span>
-      <span className="block text-xs font-normal text-white/70 mt-1.5 leading-snug">
+      <span className="block text-xs font-medium text-[#ffffff]/90 mt-1.5 leading-snug">
         {subtitle}
       </span>
       {!ready && (
