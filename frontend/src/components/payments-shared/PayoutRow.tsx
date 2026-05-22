@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
@@ -102,21 +103,40 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
 
       {showAdminColumns && admin.host && (
         <td className="px-3 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-          {/* siciliana-69183: when `onHostClick` is wired, the host name becomes
-              a button that opens the read-only HostPaymentDetailsModal. Falls
-              back to plain text for any callsite that doesn't want the modal. */}
-          {onHostClick && payout.hostUserId ? (
-            <button
-              type="button"
-              onClick={() => onHostClick(payout.hostUserId)}
-              className="font-medium text-theme-text hover:text-[#E52828] hover:underline text-left"
-              title="View saved payment details"
-            >
-              {admin.host.name || admin.host.email || '—'}
-            </button>
-          ) : (
-            <div className="font-medium text-theme-text">{admin.host.name || '—'}</div>
-          )}
+          <div className="flex items-center gap-1.5">
+            {/* siciliana-69183: when `onHostClick` is wired, the host name becomes
+                a button that opens the read-only HostPaymentDetailsModal. Falls
+                back to plain text for any callsite that doesn't want the modal. */}
+            {onHostClick && payout.hostUserId ? (
+              <button
+                type="button"
+                onClick={() => onHostClick(payout.hostUserId)}
+                className="font-medium text-theme-text hover:text-[#E52828] hover:underline text-left"
+                title="View saved payment details"
+              >
+                {admin.host.name || admin.host.email || '—'}
+              </button>
+            ) : (
+              <div className="font-medium text-theme-text">{admin.host.name || '—'}</div>
+            )}
+            {/* paesana-89172: amber warning when the payout's recipient IS the
+                party's primary host (parties.userId) but the primary host
+                isn't in co_hosts — meaning the recipient is invisible on the
+                event UI. Backfill should make this 0-hit for legacy data;
+                this is the defensive flag for any new occurrences. */}
+            {admin.party
+              && admin.party.primaryHostInCohosts === false
+              && admin.party.userId != null
+              && admin.party.userId === payout.hostUserId && (
+                <span
+                  className="inline-flex items-center text-amber-500 shrink-0"
+                  title="This host isn't shown on the event page — they may not be the active organizer."
+                  aria-label="Primary host not visible in cohost list"
+                >
+                  <AlertTriangle size={14} />
+                </span>
+              )}
+          </div>
           {admin.host.email && (
             <div className="text-xs text-theme-text-muted">
               <ClickableEmail email={admin.host.email} />

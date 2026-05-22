@@ -1629,6 +1629,21 @@ export interface AdminPayout extends Payout {
      * `paidTotalUsd`. Shown in parens, e.g. "Already paid: $470.00 (2)".
      */
     paidTotalCount?: number;
+    /**
+     * paesana-89172: owner User id (parties.userId). Paired with
+     * `primaryHostInCohosts` so the frontend can flag rows where the payout
+     * recipient is the primary host but they aren't visible on the event UI
+     * (= missing from co_hosts). Optional for backward-compat with cached
+     * payloads during rolling deploys.
+     */
+    userId?: string | null;
+    /**
+     * paesana-89172: true when the primary host's email appears in co_hosts.
+     * False means the primary host is invisible on the event page — admins
+     * should double-check before paying out to them. Optional for
+     * backward-compat.
+     */
+    primaryHostInCohosts?: boolean;
   };
   host: {
     id: string;
@@ -1714,6 +1729,19 @@ export interface PrepayQueueRow {
     country: string | null;
     effectiveReimbursementCapUsd: number | null;
     eventTags: string[];
+    /**
+     * paesana-89172: owner User id (parties.userId). Paired with
+     * `primaryHostInCohosts` so the prepay-queue table can flag rows where
+     * the candidate is the primary host but they aren't visible on the
+     * event UI. Optional for backward-compat with cached payloads.
+     */
+    userId?: string | null;
+    /**
+     * paesana-89172: true when the primary host's email appears in
+     * co_hosts. False = invisible owner — flag amber on the candidate
+     * chip. Optional for backward-compat.
+     */
+    primaryHostInCohosts?: boolean;
   };
   candidates: PrepayCandidate[];
   /** True when the admin must disambiguate between ≥2 candidates. */

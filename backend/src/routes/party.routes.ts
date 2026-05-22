@@ -275,11 +275,30 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       select: { name: true },
     });
 
-    // Build coHosts array with host email if provided
-    const hostCoHosts = req.userEmail
-      ? [{ id: crypto.randomUUID(), name: user?.name || '', email: req.userEmail, showOnEvent: false }]
-      : [];
-    const finalCoHosts = coHosts || hostCoHosts;
+    // paesana-89172: ALWAYS ensure the primary host (req.userEmail) appears in
+    // the co_hosts array — otherwise the Hosts UI hides them and the prepay
+    // queue treats them as an invisible recipient. Merge the client-supplied
+    // coHosts with a synthesized entry for the creator (case-insensitive email
+    // match) when missing. showOnEvent + canEdit default true so the owner is
+    // visible on the event page and can manage it.
+    const baseCoHosts: any[] = Array.isArray(coHosts) ? [...coHosts] : [];
+    if (req.userEmail) {
+      const creatorEmail = req.userEmail.toLowerCase();
+      const alreadyPresent = baseCoHosts.some(
+        (h: any) => h && typeof h === 'object' && typeof h.email === 'string'
+          && h.email.toLowerCase() === creatorEmail
+      );
+      if (!alreadyPresent) {
+        baseCoHosts.push({
+          id: crypto.randomUUID(),
+          name: user?.name || req.userEmail,
+          email: req.userEmail,
+          showOnEvent: true,
+          canEdit: true,
+        });
+      }
+    }
+    const finalCoHosts = baseCoHosts;
 
     const party = await prisma.party.create({
       data: {
@@ -982,7 +1001,21 @@ router.get('/:partyId/cohosts/full', async (req: AuthRequest, res: Response, nex
 
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { coHosts: true },
+      // paesana-89172: also return the primary host (parties.userId) so the
+      // HostsManager can render an "Owner" row even when the owner's email
+      // isn't in co_hosts yet. Without this, owners created via the v1 API
+      // or older code paths vanish from the Hosts UI.
+      select: {
+        coHosts: true,
+        userId: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+            profilePictureUrl: true,
+          },
+        },
+      },
     });
 
     if (!party) {
@@ -994,7 +1027,17 @@ router.get('/:partyId/cohosts/full', async (req: AuthRequest, res: Response, nex
       return res.status(403).json({ error: 'not authorized' });
     }
 
-    return res.json({ coHosts: party.coHosts ?? [] });
+    return res.json({
+      coHosts: party.coHosts ?? [],
+      primaryHost: party.user
+        ? {
+            userId: party.userId,
+            name: party.user.name,
+            email: party.user.email,
+            avatar_url: party.user.profilePictureUrl,
+          }
+        : null,
+    });
   } catch (error) {
     next(error);
   }
