@@ -5,12 +5,25 @@ import { Loader2, Play, MapPin } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, FeedPhoto } from '../lib/api';
-import { countryNameToFlag } from '../utils/countryFlag';
+import { countryNameToAlpha2 } from '../utils/countryFlag';
 
-// Sentinel returned by countryNameToFlag when the country name doesn't map
-// to an ISO-3166 alpha-2 code. When we see this, we fall back to the MapPin
-// icon so we don't show the world-map emoji here.
-const MAP_EMOJI_FALLBACK = '\u{1F5FA}\u{FE0F}';
+const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@3.3.0/flags';
+
+function CircleFlag({ country, size = 14 }: { country: string | null; size?: number }) {
+  const code = countryNameToAlpha2(country);
+  if (!code) return null;
+  return (
+    <img
+      src={`${FLAG_BASE}/${code}.svg`}
+      alt={country || ''}
+      width={size}
+      height={size}
+      loading="lazy"
+      className="rounded-full inline-block shrink-0"
+      style={{ width: size, height: size }}
+    />
+  );
+}
 
 export function PhotosFeedPage() {
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
@@ -140,13 +153,10 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
         )}
       </div>
       {(photo.party.city || photo.party.name) && (
-        <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1">
-          {(() => {
-            const flag = countryNameToFlag(photo.party.country);
-            return flag && flag !== MAP_EMOJI_FALLBACK
-              ? <span className="text-sm leading-none" aria-label={photo.party.country || ''}>{flag}</span>
-              : <MapPin size={11} />;
-          })()}
+        <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1.5">
+          {countryNameToAlpha2(photo.party.country)
+            ? <CircleFlag country={photo.party.country} size={14} />
+            : <MapPin size={11} />}
           <span className="truncate">{photo.party.city || photo.party.name}</span>
         </div>
       )}
@@ -169,13 +179,12 @@ function FeedLightbox({ photo, onClose }: { photo: FeedPhoto; onClose: () => voi
         <div className="p-4 border-t border-theme-stroke">
           {photo.caption && <p className="text-theme-text mb-2">{photo.caption}</p>}
           <p className="text-theme-text-muted text-sm flex items-center gap-2">
-            {(() => {
-              const flag = countryNameToFlag(photo.party.country);
-              return flag && flag !== MAP_EMOJI_FALLBACK
-                ? <span className="text-base leading-none" aria-label={photo.party.country || ''}>{flag}</span>
-                : <MapPin size={12} />;
-            })()}
-            <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">{photo.party.name}</Link>
+            {countryNameToAlpha2(photo.party.country)
+              ? <CircleFlag country={photo.party.country} size={18} />
+              : <MapPin size={12} />}
+            <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">
+              {photo.party.name}
+            </Link>
             {photo.party.city && <span>· {photo.party.city}{photo.party.country ? `, ${photo.party.country}` : ''}</span>}
           </p>
         </div>
