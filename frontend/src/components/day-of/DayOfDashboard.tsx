@@ -92,6 +92,13 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           onSent={() => setAnnHistoryKey((k) => k + 1)}
         />
       </CollapsibleCard>
+      <CollapsibleCard
+        id="announcement-history"
+        partyId={party.id}
+        title="Sent today"
+      >
+        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
+      </CollapsibleCard>
     </>
   );
 
@@ -147,13 +154,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           <PizzaBoxStackCard party={party} />
         </CollapsibleCard>
       )}
-      <CollapsibleCard
-        id="announcement-history"
-        partyId={party.id}
-        title="Sent today"
-      >
-        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
-      </CollapsibleCard>
     </>
   );
 
