@@ -343,6 +343,24 @@ export function EventPage() {
     [event?.selectedPizzerias, event?.latitude, event?.longitude],
   );
 
+  // Normalize sponsor twitter handles for the scorecard share tweet
+  // (mortadella-58492). Must be declared above the early returns below.
+  const partnerHandles = useMemo(() => {
+    if (!event?.sponsors) return [];
+    const handles = event.sponsors
+      .map(s => (s.brandTwitter || '').trim().replace(/^@/, ''))
+      .filter(Boolean)
+      .filter(h => h.toLowerCase() !== 'pizza_dao');
+    const seen = new Set<string>();
+    return handles.filter(h => {
+      const k = h.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [event?.sponsors]);
+  const eventUrl = event ? `https://rsv.pizza/${event.customUrl || event.inviteCode || ''}` : '';
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1279,6 +1297,8 @@ export function EventPage() {
                     onScanGuest={handleScorecardScanGuest}
                     onTakeSelfie={handleScorecardTakeSelfie}
                     refreshSignal={scorecardRefresh}
+                    eventUrl={eventUrl}
+                    partnerHandles={partnerHandles}
                   />
                 )}
 

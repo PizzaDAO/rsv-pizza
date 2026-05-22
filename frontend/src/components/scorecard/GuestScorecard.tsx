@@ -10,6 +10,10 @@ interface GuestScorecardProps {
   onTakeSelfie?: () => void;
   /** When this number changes, the scorecard refetches its items. */
   refreshSignal?: number;
+  /** Public event URL, used as the second line in the share tweet. */
+  eventUrl?: string;
+  /** Sponsor Twitter handles (no `@`, deduped, excluding `pizza_dao`). */
+  partnerHandles?: string[];
 }
 
 const ITEM_ORDER: ScorecardItemKey[] = [
@@ -29,6 +33,8 @@ export function GuestScorecard({
   onScanGuest,
   onTakeSelfie,
   refreshSignal,
+  eventUrl,
+  partnerHandles,
 }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
@@ -146,6 +152,8 @@ export function GuestScorecard({
                 onUploadPhoto={onUploadPhoto}
                 onScanGuest={onScanGuest}
                 onTakeSelfie={onTakeSelfie}
+                eventUrl={eventUrl}
+                partnerHandles={partnerHandles}
               />
             </div>
           );
