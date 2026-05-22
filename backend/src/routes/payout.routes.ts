@@ -925,13 +925,43 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (!existing) {
       throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
-    if (existing.status !== 'pending') {
+
+    // provolone-39042: split doc-only edits from amount/method/wallet edits so
+    // hosts can attach receipts to already-approved payouts (Adama incident:
+    // host couldn't add a receipt to their $200 approved wire). The admin
+    // PATCH route stays unrestricted — this is host-side only.
+    const hasAmountOrMethodChanges =
+      payoutMethod !== undefined ||
+      payoutWalletAddress !== undefined ||
+      payoutBankDetails !== undefined ||
+      finalAmountUsd !== undefined ||
+      mercuryCardLast4 !== undefined ||
+      hostNotes !== undefined;
+
+    // Paid/failed/rejected payouts are frozen entirely on the host side.
+    if (
+      existing.status === 'paid' ||
+      existing.status === 'rejected' ||
+      existing.status === 'failed'
+    ) {
       throw new AppError(
-        'Payments can only be edited while pending; this one is ' + existing.status,
+        `Payments cannot be edited once ${existing.status}.`,
         400,
         'NOT_EDITABLE'
       );
     }
+
+    // Approved payouts: doc-only edits allowed, but amount/method/wallet/notes
+    // are frozen so the admin-approved amount can't be silently changed.
+    if (existing.status === 'approved' && hasAmountOrMethodChanges) {
+      throw new AppError(
+        'Approved payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.',
+        400,
+        'APPROVED_NOT_EDITABLE'
+      );
+    }
+
+    // Pending payouts fall through unchanged — anything goes.
 
     // gouda-83912: only the cohost who submitted the payout (or any admin)
     // may edit it. Other cohosts on the same party can see the row but
@@ -1164,7 +1194,13 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       id => existing.documents.find(d => d.id === id)?.kind === 'receipt'
     );
 
-    if (receiptsChanged) {
+    // provolone-39042: only pending payouts auto-recompute finalAmountUsd from
+    // the OCR sum when receipts change. Approved payouts keep their
+    // admin-approved amount even if new receipts are attached — the OCR sum
+    // becomes informational only.
+    const allowRecompute = existing.status === 'pending';
+
+    if (receiptsChanged && allowRecompute) {
       const removedSet = new Set(removeIds);
       const survivingReceipts = existing.documents.filter(
         d => d.kind === 'receipt' && !removedSet.has(d.id)
