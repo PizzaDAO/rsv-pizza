@@ -7,6 +7,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -1297,12 +1298,10 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
           ? `${baseUrl}/${party.customUrl}`
           : `${baseUrl}/${party.inviteCode}`;
 
-        // Build HTML once (per-recipient personalization only swaps the greeting)
-        const escapedBody = body
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\n/g, '<br />');
+        // Build HTML once (per-recipient personalization only swaps the greeting).
+        // Body supports `[label](url)` markdown links (http/https/mailto only);
+        // invalid schemes (e.g. javascript:) render as literal text.
+        const escapedBody = renderAnnouncementBodyHtml(body);
 
         for (const recipient of recipients) {
           if (!recipient.email) continue;
