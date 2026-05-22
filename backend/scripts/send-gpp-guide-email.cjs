@@ -105,7 +105,7 @@ const LOG_PATH = path.join(tmpDir, 'gpp-guide-send-log.json');
 // Email template (hand-rolled, inline styles)
 // ---------------------------------------------------------------------------
 
-const SUBJECT = 'Your Global Pizza Party guide is ready 🍕';
+const SUBJECT = 'Your Hosting Guide for the Global Pizza Party';
 const FROM = 'RSV.Pizza <noreply@rsv.pizza>';
 
 function escapeHtml(s) {
