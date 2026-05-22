@@ -1085,6 +1085,10 @@ router.get(
 
       // Totals — computed over the filtered set (NOT just the current page),
       // so the dashboard pills reflect the user's current filters.
+      // parmigiana-58291: also pull party { id, name, country } so we can build
+      // the per-party totals rollup without a second query. Reuses the same
+      // `where` clause, so the existing tartufo/bruschetta filters (status,
+      // method, country, dateRange) and the approval gate all still apply.
       const allFiltered = await prisma.payout.findMany({
         where,
         select: {
@@ -1093,6 +1097,13 @@ router.get(
           finalAmountUsd: true,
           createdAt: true,
           paidAt: true,
+          party: {
+            select: {
+              id: true,
+              name: true,
+              country: true,
+            },
+          },
         },
       });
 
@@ -1103,6 +1114,14 @@ router.get(
       let totalUsdThisMonth = 0;
       let sumUsd = 0;
       let awaitingReview = 0;
+
+      // parmigiana-58291: per-party rollup over `status === 'paid'` rows.
+      // Keyed by party.id; we accumulate sum + count and resolve to a sorted
+      // array (descending by totalPaidUsd) for the response.
+      const partyTotals = new Map<
+        string,
+        { partyId: string; partyName: string; country: string | null; totalPaidUsd: number; payoutCount: number }
+      >();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1123,10 +1142,35 @@ router.get(
           if (r.paidAt && r.paidAt >= startOfMonth) {
             totalUsdThisMonth += usd;
           }
+          // parmigiana-58291: accumulate per-party totals. Only `paid` rows
+          // count — pending/approved/rejected don't represent USD that left
+          // the wallet. Guard against the (theoretically impossible) missing
+          // party relation so a single bad row can't 500 the dashboard.
+          if (r.party) {
+            const existing = partyTotals.get(r.party.id);
+            if (existing) {
+              existing.totalPaidUsd += usd;
+              existing.payoutCount += 1;
+            } else {
+              partyTotals.set(r.party.id, {
+                partyId: r.party.id,
+                partyName: r.party.name,
+                country: r.party.country,
+                totalPaidUsd: usd,
+                payoutCount: 1,
+              });
+            }
+          }
         }
       }
 
       const avgUsd = allFiltered.length > 0 ? sumUsd / allFiltered.length : 0;
+
+      // parmigiana-58291: sort descending by totalPaidUsd so the biggest
+      // recipients sit at the top of the dashboard rollup.
+      const byParty = Array.from(partyTotals.values()).sort(
+        (a, b) => b.totalPaidUsd - a.totalPaidUsd,
+      );
 
       res.json({
         payouts: page.map(serializePayout),
@@ -1139,6 +1183,7 @@ router.get(
           totalUsdThisMonth,
           avgUsd,
           awaitingReview,
+          byParty,
         },
       });
     } catch (error) {

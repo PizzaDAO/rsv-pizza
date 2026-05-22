@@ -11,6 +11,15 @@ import {
   formatOriginalCurrency,
 } from '../payments-shared';
 
+/**
+ * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
+ * the city stays visible in the review-modal header. Same convention as
+ * PayoutRow and PrepayQueueTable — inlined here to match those callsites.
+ */
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
   /** When set, indicates the actor would be paying themselves — disables mutate buttons. */
@@ -168,7 +177,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 rel="noopener noreferrer"
                 className="hover:underline"
               >
-                {payout.party.name}
+                {stripGppPrefix(payout.party.name)}
               </a>
             </div>
             {/* arugula-38633 v2 follow-up: planning vs actuals, prominent.
