@@ -24,6 +24,7 @@ import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { looksLikeEnsName, resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
 const router = Router();
 
@@ -283,6 +284,62 @@ async function assertMercuryAllowed(
       `Mercury virtual cards are unavailable in ${party?.country ?? 'this country'} due to compliance restrictions. Please pick another payout method.`,
       400,
       'MERCURY_COUNTRY_BLOCKED',
+    );
+  }
+}
+
+/**
+ * tiramisu-49102: hard per-party cap enforcement.
+ *
+ * Sums every existing payout for the party that is `pending | approved | paid`
+ * and rejects with 409 PARTY_CAP_EXCEEDED if `usedUsd + proposedUsd` would
+ * exceed the party's `effectiveReimbursementCapUsd` (validated cap OR max
+ * numeric event tag). Parties without an effective cap stay uncapped.
+ *
+ * Skips a row when `ignorePayoutId` is supplied — used by PATCH edits so the
+ * row being edited doesn't count against itself.
+ */
+async function assertWithinPartyCap(
+  partyId: string,
+  proposedUsd: number,
+  ignorePayoutId?: string,
+): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  if (!party) {
+    // Defensive — callers above already verified the party exists.
+    throw new AppError('Party not found', 404, 'NOT_FOUND');
+  }
+
+  const effectiveCap = computeEffectiveCapUsd({
+    reimbursementCapUsd: party.reimbursementCapUsd,
+    eventTags: party.eventTags,
+  });
+  if (effectiveCap == null) return;
+
+  const where: any = {
+    partyId,
+    status: { in: ['paid', 'pending', 'approved'] },
+  };
+  if (ignorePayoutId) {
+    where.id = { not: ignorePayoutId };
+  }
+  const existingTotal = await prisma.payout.aggregate({
+    where,
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd = existingTotal._sum.finalAmountUsd
+    ? Number(existingTotal._sum.finalAmountUsd.toString())
+    : 0;
+  const remainingUsd = Math.max(0, effectiveCap - usedUsd);
+
+  if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
+    throw new AppError(
+      `This payment would exceed the party's $${effectiveCap.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
+      409,
+      'PARTY_CAP_EXCEEDED',
     );
   }
 }
@@ -585,6 +642,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         'INVALID_AMOUNT'
       );
     }
+
+    // tiramisu-49102: hard cap — block creates that would push the cumulative
+    // paid+pending+approved total past the party's effective cap. Parties
+    // without an effective cap stay uncapped.
+    await assertWithinPartyCap(partyId, finalUsd);
 
     // arugula-38633 v3 follow-up: zero-receipts path — default the FX fields
     // to USD passthrough using finalUsd. (extractedUsdSum stays 0; we surface
@@ -900,6 +962,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       if (!Number.isFinite(n) || n <= 0) {
         throw new AppError('finalAmountUsd must be a positive number', 400, 'INVALID_AMOUNT');
       }
+      // tiramisu-49102: re-check per-party cap when the host edits the
+      // amount. Exclude THIS row from the existing-total so the edit doesn't
+      // count against itself.
+      await assertWithinPartyCap(partyId, n, payoutId);
       data.finalAmountUsd = new Decimal(n);
     }
 
@@ -1103,6 +1169,13 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ? Number((data.finalAmountUsd as Decimal).toString())
       : (recomputedAmount != null ? Number(recomputedAmount.toString()) : oldAmount);
     const amountChanged = newAmount !== oldAmount;
+
+    // tiramisu-49102: re-check per-party cap when a receipt-edit causes the
+    // amount to be recomputed (explicit-amount edits are checked above).
+    // Exclude THIS row from the existing-total so it doesn't count against itself.
+    if (amountChanged && !explicitAmount) {
+      await assertWithinPartyCap(partyId, newAmount, payoutId);
+    }
 
     // Single transaction: delete removed docs, insert new docs, update payout,
     // write the audit row(s).

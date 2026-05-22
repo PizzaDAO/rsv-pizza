@@ -23,6 +23,7 @@ import type {
   AdminPayoutFilters,
   AdminPayoutTotals,
   PrepayQueueRow,
+  PrepayCandidate,
 } from '../types';
 import { formatUsd } from '../components/payments-shared';
 import {
@@ -327,6 +328,61 @@ export function PaymentsAdminPage() {
         'success',
       );
     }
+  }
+
+  /**
+   * tiramisu-49102: "Pay again to this wallet" from PayoutReviewModal.
+   * Closes the review modal and opens CreatePrepaymentModal pre-filled with
+   * the same party + host + payout-method/destination as the existing payout.
+   * The synthetic PrepayQueueRow mirrors the shape the prepay-queue endpoint
+   * normally emits — a single PrepayCandidate derived from the paid payout's
+   * host + method + walletAddress/bankEmail. CreatePrepaymentModal handles the
+   * cap-remaining clamp + the existing 50%-of-cap default.
+   */
+  function handlePayAgain(payout: AdminPayoutDetail) {
+    if (!payout.host?.id || !payout.payoutMethod || !payout.host.email) return;
+
+    const bankEmail =
+      payout.payoutMethod === 'wire' &&
+      payout.payoutBankDetails &&
+      typeof (payout.payoutBankDetails as any).email === 'string'
+        ? ((payout.payoutBankDetails as any).email as string).trim() || null
+        : null;
+
+    const candidate: PrepayCandidate = {
+      userId: payout.host.id,
+      name: payout.host.name ?? null,
+      email: payout.host.email,
+      method: payout.payoutMethod,
+      walletAddress:
+        payout.payoutMethod === 'usdc_base' ? payout.payoutWalletAddress ?? null : null,
+      bankEmail,
+      // We don't carry primary/cohost role here — the modal only uses it for
+      // a star icon. Default to false; the admin already knows who they're
+      // paying because the modal came from a specific payout row.
+      isPrimaryHost: false,
+    };
+
+    const syntheticRow: PrepayQueueRow = {
+      party: {
+        id: payout.party.id,
+        name: payout.party.name,
+        customUrl: payout.party.customUrl,
+        country: payout.party.country,
+        effectiveReimbursementCapUsd: payout.party.effectiveReimbursementCapUsd,
+        // We don't carry eventTags on AdminPayout.party; the modal only reads
+        // it for the cap-fallback display, and `effectiveReimbursementCapUsd`
+        // is already resolved upstream.
+        eventTags: [],
+      },
+      candidates: [candidate],
+      hasMultipleCandidates: false,
+      partyPaidUsd: payout.party.paidTotalUsd ?? 0,
+      partyPaidCount: payout.party.paidTotalCount ?? 0,
+    };
+
+    setDetail(null);
+    setPrepayModalRow(syntheticRow);
   }
 
   async function openDetail(p: AdminPayout) {
@@ -765,6 +821,7 @@ export function PaymentsAdminPage() {
                 return null;
               }
             }}
+            onPayAgain={handlePayAgain}
           />
         )}
         {showExternalModal && (

@@ -45,10 +45,20 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
 }) => {
   const { party, candidates } = row;
   const cap = party.effectiveReimbursementCapUsd ?? 0;
+  // tiramisu-49102: cap-remaining = cap minus what's already been paid for
+  // this party. `partyPaidUsd` is what BISMARCK-92103 attached to PrepayQueueRow
+  // from the prepay-queue endpoint; the synthetic row built by the Pay-again
+  // path uses the same field. null = no cap configured (uncapped event).
+  const paidSoFar = row.partyPaidUsd ?? 0;
+  const remainingUsd: number | null = cap > 0 ? Math.max(0, cap - paidSoFar) : null;
   // bianco-89172: keep the cents — `Math.round(0.5 * 625)` gave 313, off by
   // 50¢ from the actual half. payouts.final_amount_usd is numeric(12,2) so
   // decimals round-trip through the backend without loss.
-  const defaultAmount = cap > 0 ? (cap / 2).toFixed(2) : '1.00';
+  // tiramisu-49102: clamp the default to whatever's actually left under the
+  // cap (so a paid-down event doesn't pre-fill an over-cap default).
+  const rawDefault = cap > 0 ? cap / 2 : 1;
+  const defaultAmount =
+    remainingUsd != null ? Math.min(rawDefault, remainingUsd).toFixed(2) : rawDefault.toFixed(2);
 
   const mercuryBlocked = isMercuryBlocked(party.country);
 
@@ -83,11 +93,18 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
+  // tiramisu-49102: client-side cap-remaining clamp. Disables submit when the
+  // typed amount exceeds the remaining cap; backend also enforces with 409
+  // PARTY_CAP_EXCEEDED if this slips through (e.g. concurrent admin sends).
+  const exceedsRemaining =
+    remainingUsd != null && Number.isFinite(amountNum) && amountNum > remainingUsd + 1e-9;
+
   const canSubmit =
     !!selectedCandidate &&
     !(selectedCandidate.method === 'mercury_card' && mercuryBlocked) &&
     Number.isFinite(amountNum) &&
     amountNum > 0 &&
+    !exceedsRemaining &&
     !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -238,6 +255,27 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             <p className="text-xs text-theme-text-muted mt-1">
               Default is 50% of the event's reimbursement cap. Edit if needed.
             </p>
+            {/* tiramisu-49102: cap-remaining hint. Shown when an effective cap
+                exists. paidSoFar > 0 means there's already a payout against
+                this party (the Pay-again path) so the admin sees exactly how
+                much headroom is left. */}
+            {remainingUsd != null && (
+              <p
+                className={`text-xs mt-1 ${
+                  exceedsRemaining ? 'text-red-500' : 'text-theme-text-muted'
+                }`}
+              >
+                Remaining: ${remainingUsd.toFixed(2)}
+                {paidSoFar > 0 && (
+                  <> &middot; Already paid: ${paidSoFar.toFixed(2)} of ${cap.toFixed(2)} cap</>
+                )}
+              </p>
+            )}
+            {exceedsRemaining && remainingUsd != null && (
+              <p className="text-xs text-red-500 mt-1">
+                Exceeds cap: ${remainingUsd.toFixed(2)} remaining
+              </p>
+            )}
           </div>
 
           {/* Internal note (optional) */}
