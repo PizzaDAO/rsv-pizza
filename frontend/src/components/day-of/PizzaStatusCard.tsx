@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pizza, Phone, ExternalLink, Check, Users } from 'lucide-react';
+import { Pizza, Phone, ExternalLink, Check, Users, Salad, CupSoda } from 'lucide-react';
 import { Party, Guest } from '../../types';
 import { Checkbox } from '../Checkbox';
 import { usePizza } from '../../contexts/PizzaContext';
@@ -168,10 +168,9 @@ export const PizzaStatusCard: React.FC<PizzaStatusCardProps> = ({ party, guests 
           </div>
 
           {/* Headline counts */}
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-            <span className="text-theme-text">
-              <span className="font-semibold">{guestStats.total}</span>{' '}
-              {guestStats.total === 1 ? 'guest' : 'guests'}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-base font-semibold text-theme-text">
+              {guestStats.total} {guestStats.total === 1 ? 'guest' : 'guests'}
             </span>
             {guestStats.waitlisted > 0 && (
               <span className="text-theme-text-muted text-xs">
@@ -182,18 +181,19 @@ export const PizzaStatusCard: React.FC<PizzaStatusCardProps> = ({ party, guests 
 
           {/* Dietary breakdown */}
           {dietaryCounts.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-theme-text-faint mb-1">
+            <div className="mt-3 pt-3 border-t border-theme-stroke/40">
+              <p className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-theme-text-secondary mb-2">
+                <Salad size={14} className="text-purple-400" />
                 Dietary
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {dietaryCounts.map(({ label, count }) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-200 text-xs border border-purple-500/30"
+                    className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-theme-surface-hover border border-theme-stroke text-theme-text text-xs"
                   >
                     <span>{label}</span>
-                    <span className="px-1 rounded bg-purple-500/30 text-purple-100 font-semibold">
+                    <span className="inline-flex items-center justify-center min-w-[1.5rem] px-2 py-0.5 rounded-full bg-purple-500 text-white text-xs font-bold ml-1.5">
                       {count}
                     </span>
                   </span>
@@ -204,18 +204,19 @@ export const PizzaStatusCard: React.FC<PizzaStatusCardProps> = ({ party, guests 
 
           {/* Top toppings */}
           {topToppings.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-theme-text-faint mb-1">
+            <div className="mt-3 pt-3 border-t border-theme-stroke/40">
+              <p className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-theme-text-secondary mb-2">
+                <Pizza size={14} className="text-[#ff393a]" />
                 Top toppings
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {topToppings.map(({ label, count }) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#ff393a]/15 text-[#ff8a8b] text-xs border border-[#ff393a]/30"
+                    className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-theme-surface-hover border border-theme-stroke text-theme-text text-xs"
                   >
                     <span>{label}</span>
-                    <span className="px-1 rounded bg-[#ff393a]/30 text-white font-semibold">
+                    <span className="inline-flex items-center justify-center min-w-[1.5rem] px-2 py-0.5 rounded-full bg-[#ff393a] text-white text-xs font-bold ml-1.5">
                       {count}
                     </span>
                   </span>
@@ -226,18 +227,19 @@ export const PizzaStatusCard: React.FC<PizzaStatusCardProps> = ({ party, guests 
 
           {/* Top beverages (hide for GPP events — beverages are de-emphasized there) */}
           {!isGppEvent && topBeverages.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-theme-text-faint mb-1">
+            <div className="mt-3 pt-3 border-t border-theme-stroke/40">
+              <p className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-theme-text-secondary mb-2">
+                <CupSoda size={14} className="text-blue-400" />
                 Top beverages
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {topBeverages.map(({ label, count }) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-200 text-xs border border-blue-500/30"
+                    className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-theme-surface-hover border border-theme-stroke text-theme-text text-xs"
                   >
                     <span>{label}</span>
-                    <span className="px-1 rounded bg-blue-500/30 text-blue-100 font-semibold">
+                    <span className="inline-flex items-center justify-center min-w-[1.5rem] px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-bold ml-1.5">
                       {count}
                     </span>
                   </span>
