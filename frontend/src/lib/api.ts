@@ -3878,7 +3878,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.status && filters.status !== 'all') params.set('status', filters.status);
   if (filters.payoutMethod && filters.payoutMethod !== 'all') params.set('payoutMethod', filters.payoutMethod);
   if (filters.partyId) params.set('partyId', filters.partyId);
-  if (filters.hostEmail) params.set('hostEmail', filters.hostEmail);
+  // salame-83472: unified search — host email|name OR party name.
+  if (filters.search) params.set('search', filters.search);
   // bruschetta-58291: country filter — exact-match `parties.country`.
   if (filters.country && filters.country !== 'all') params.set('country', filters.country);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);

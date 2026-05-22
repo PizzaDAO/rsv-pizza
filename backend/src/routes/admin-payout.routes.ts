@@ -192,11 +192,19 @@ function buildPayoutWhere(query: Request['query']): any {
     where.partyId = partyId.trim();
   }
 
-  const hostEmail = query.hostEmail;
-  if (typeof hostEmail === 'string' && hostEmail.trim().length > 0) {
-    where.host = {
-      email: { contains: hostEmail.trim().toLowerCase(), mode: 'insensitive' as const },
-    };
+  // salame-83472: unified search — matches host.email, host.name, OR party.name
+  // (case-insensitive contains). Replaces the previous `hostEmail`-only filter.
+  // The implicit AND with the existing top-level `where.party` (underbossStatus
+  // 'approved' from tartufo-58291 + optional country from bruschetta-58291) is
+  // preserved by Prisma because top-level OR is AND'd with other top-level keys.
+  const search = query.search;
+  if (typeof search === 'string' && search.trim().length > 0) {
+    const needle = search.trim();
+    where.OR = [
+      { host: { email: { contains: needle, mode: 'insensitive' as const } } },
+      { host: { name: { contains: needle, mode: 'insensitive' as const } } },
+      { party: { name: { contains: needle, mode: 'insensitive' as const } } },
+    ];
   }
 
   const currency = query.currency;
