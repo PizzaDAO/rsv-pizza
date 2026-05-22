@@ -90,6 +90,12 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // `computeEffectiveCapUsd` helper (validated cap OR max numeric tag).
   reimbursementCapUsd: true,
   eventTags: true,
+  // paesana-89172: needed to derive `primaryHostInCohosts` — admin warning
+  // when a payout's recipient is the primary host but they're not in the
+  // co_hosts JSONB (= invisible on the event UI).
+  userId: true,
+  coHosts: true,
+  user: { select: { email: true } },
   _count: {
     select: {
       guests: {
@@ -353,6 +359,26 @@ function buildPayoutWhere(query: Request['query']): any {
   return where;
 }
 
+/**
+ * paesana-89172: returns true when the party's primary host (party.user.email)
+ * is present in the co_hosts JSONB array (case-insensitive email match), OR
+ * the party doesn't have a User joined (rare). Returns false ONLY when we know
+ * the primary host's email AND it's missing from co_hosts — that's the
+ * suspicious-payment signal: the recipient is the event owner but they're
+ * invisible in the Hosts UI / public page.
+ */
+function isPrimaryHostInCohosts(party: any): boolean {
+  if (!party || typeof party !== 'object') return true;
+  const ownerEmail = party.user?.email ? String(party.user.email).toLowerCase() : null;
+  if (!ownerEmail) return true; // can't determine — don't flag
+  const list = Array.isArray(party.coHosts) ? party.coHosts : [];
+  return list.some((ch: any) =>
+    ch && typeof ch === 'object'
+    && typeof ch.email === 'string'
+    && ch.email.toLowerCase() === ownerEmail
+  );
+}
+
 /** Shape a Prisma payout row for the API response. */
 function serializePayout(row: any): any {
   return {
@@ -421,6 +447,13 @@ function serializePayout(row: any): any {
             reimbursementCapUsd: row.party.reimbursementCapUsd,
             eventTags: row.party.eventTags,
           }),
+          // paesana-89172: surface the owner's id + a flag for whether they
+          // appear in the co_hosts array. Frontend pairs this with
+          // `payout.hostUserId` to flag suspicious admin-created prepayments
+          // whose recipient is the primary host but isn't visible on the
+          // event UI.
+          userId: row.party.userId ?? null,
+          primaryHostInCohosts: isPrimaryHostInCohosts(row.party),
         }
       : undefined,
     host: row.host
@@ -817,6 +850,11 @@ router.get(
           country: string | null;
           effectiveReimbursementCapUsd: number | null;
           eventTags: string[];
+          // paesana-89172: primary host (parties.userId) + whether they
+          // appear in co_hosts. Frontend flags amber when a candidate's
+          // userId matches but the primary host isn't visible.
+          userId: string | null;
+          primaryHostInCohosts: boolean;
         };
         candidates: CandidateInternal[];
       };
@@ -870,6 +908,11 @@ router.get(
             country: p.country,
             effectiveReimbursementCapUsd: cap,
             eventTags: p.eventTags,
+            // paesana-89172: shape this party for the warning helper. The
+            // prepay-queue select already pulls `userId`, `coHosts`, and
+            // `user.email` — reuse them via `isPrimaryHostInCohosts`.
+            userId: p.userId ?? null,
+            primaryHostInCohosts: isPrimaryHostInCohosts(p),
           },
           candidates,
         });

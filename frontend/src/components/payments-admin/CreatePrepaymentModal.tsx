@@ -229,6 +229,17 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                           <Star size={12} className="text-amber-500 shrink-0" />
                         )}
                         <span className="truncate">{label}</span>
+                        {/* paesana-89172: amber warning when this candidate
+                            is the primary host of an event where the primary
+                            host isn't in co_hosts (= invisible on the public
+                            event page). Doesn't block selection. */}
+                        {c.isPrimaryHost && party.primaryHostInCohosts === false && (
+                          <AlertTriangle
+                            size={12}
+                            className="text-amber-500 shrink-0"
+                            aria-label="Primary host is not visible on the event page"
+                          />
+                        )}
                       </div>
                       <div className="text-xs text-theme-text-muted truncate">
                         {c.email}
@@ -239,6 +250,17 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                           {PAYOUT_METHOD_LABELS[c.method]}
                         </span>
                       </div>
+                      {/* paesana-89172: explainer text under the chosen
+                          recipient when they're the invisible primary host. */}
+                      {c.isPrimaryHost && party.primaryHostInCohosts === false && (
+                        <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-500">
+                          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                          <span>
+                            This host isn't shown on the event page — confirm
+                            they're the active organizer before paying.
+                          </span>
+                        </div>
+                      )}
                       {disabled && (
                         <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-500">
                           <AlertTriangle size={12} className="mt-0.5 shrink-0" />

@@ -37,14 +37,23 @@ function stripGppPrefix(name: string): string {
  *
  * siciliana-69183: becomes a button when `onClick` is supplied so the admin
  * can drill into the candidate's saved payment details.
+ *
+ * paesana-89172: when the candidate is the primary host AND the primary host
+ * isn't in co_hosts, suffix an amber AlertTriangle. Means "this person
+ * isn't shown on the event page — confirm before paying."
  */
 const HostChip: React.FC<{
   candidate: PrepayCandidate;
+  invisiblePrimaryHost?: boolean;
   onClick?: () => void;
-}> = ({ candidate, onClick }) => {
+}> = ({ candidate, invisiblePrimaryHost = false, onClick }) => {
   const displayName = candidate.name && candidate.name.trim()
     ? candidate.name
     : candidate.email;
+  const showInvisibleWarning = candidate.isPrimaryHost && invisiblePrimaryHost;
+  const titleSuffix = showInvisibleWarning
+    ? ' · NOT VISIBLE on event page — confirm this is the right host'
+    : '';
   const inner = (
     <>
       {candidate.isPrimaryHost && (
@@ -52,6 +61,13 @@ const HostChip: React.FC<{
       )}
       <PayoutMethodIcon method={candidate.method} size={12} />
       <span className="truncate max-w-[12rem]">{displayName}</span>
+      {showInvisibleWarning && (
+        <AlertTriangle
+          size={12}
+          className="text-amber-500 shrink-0"
+          aria-label="Primary host is not visible on the event page"
+        />
+      )}
     </>
   );
   const baseClass =
@@ -62,7 +78,7 @@ const HostChip: React.FC<{
         type="button"
         onClick={onClick}
         className={`${baseClass} hover:border-theme-stroke-hover hover:bg-theme-surface-active cursor-pointer`}
-        title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]} · click for payment details`}
+        title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]} · click for payment details${titleSuffix}`}
       >
         {inner}
       </button>
@@ -71,7 +87,7 @@ const HostChip: React.FC<{
   return (
     <span
       className={baseClass}
-      title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]}`}
+      title={`${displayName} — ${PAYOUT_METHOD_LABELS[candidate.method]}${titleSuffix}`}
     >
       {inner}
     </span>
@@ -153,6 +169,10 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                         <HostChip
                           key={c.userId}
                           candidate={c}
+                          // paesana-89172: pass through the party-level
+                          // "primary host missing from co_hosts" flag so the
+                          // chip can render the amber warning.
+                          invisiblePrimaryHost={row.party.primaryHostInCohosts === false}
                           onClick={onHostClick ? () => onHostClick(c.userId) : undefined}
                         />
                       ))}
