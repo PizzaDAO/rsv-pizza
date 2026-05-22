@@ -725,6 +725,8 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@index([partyId, status])
+  // margherita-43821: composite index supporting GET /api/photos/feed
+  @@index([starred, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("photos")
 }
 

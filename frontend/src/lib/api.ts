@@ -4598,3 +4598,43 @@ export async function resolveEnsName(name: string): Promise<string | null> {
     return null;
   }
 }
+
+// ============================================
+// margherita-43821: public photos feed
+// ============================================
+
+export interface FeedPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  mimeType: string;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+  party: { slug: string; name: string; city: string | null; country: string | null };
+}
+
+export interface PhotosFeedResponse {
+  photos: FeedPhoto[];
+  nextCursor: string | null;
+}
+
+export async function getPhotosFeed(
+  cursor: string | null,
+  limit: number = 24
+): Promise<PhotosFeedResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (cursor) params.append('cursor', cursor);
+    params.append('limit', String(limit));
+    return await apiRequest<PhotosFeedResponse>(
+      `/api/photos/feed?${params.toString()}`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch (e) {
+    console.error('Error fetching photos feed:', e);
+    return null;
+  }
+}
