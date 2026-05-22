@@ -1072,10 +1072,21 @@ router.post(
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
 
-      // acciuga-62583: hard per-submission $625 ceiling (no override).
-      // Enforced BEFORE the party-cap check so the error message is clearer
-      // even on uncapped events. Out-of-band records still get split.
-      assertWithinPerSubmissionCap(finalAmountUsd);
+      // acciuga-62583: hard per-submission $625 ceiling — enforced BEFORE the
+      // party-cap check so the error message is clearer even on uncapped
+      // events. Out-of-band records still get split by default.
+      // aglio-62584: admin override available here too — when the admin is
+      // recording an out-of-band payment that intentionally exceeds the cap
+      // (e.g. backfilling a pre-cap historical wire) they can pass
+      // `allowOverSubmissionCap: true`.
+      if (
+        finalAmountUsd > PER_SUBMISSION_MAX_USD &&
+        body.allowOverSubmissionCap === true
+      ) {
+        // admin acknowledged — proceed
+      } else {
+        assertWithinPerSubmissionCap(finalAmountUsd);
+      }
 
       // tiramisu-49102: hard cap — block external records that would push the
       // cumulative paid+pending+approved past the party's effective cap.
@@ -1453,9 +1464,20 @@ router.patch(
         if (oldAmount !== newAmount) {
           amountChanged = true;
           data.finalAmountUsd = parsed;
-          // acciuga-62583: hard per-submission $625 ceiling. Applies even to
-          // admin amount edits — there's no override path.
-          assertWithinPerSubmissionCap(parsed);
+          // aglio-62584: admin override for the acciuga-62583 per-submission
+          // cap. When the admin is intentionally setting an over-cap amount
+          // (e.g. editing a grandfathered $750 row, or splitting on their own),
+          // they can pass `allowOverSubmissionCap: true` to bypass. The modal
+          // surfaces an amber warning + ack Checkbox before forwarding the
+          // flag. Host-side PATCH (payout.routes.ts) still has no override.
+          if (
+            parsed > PER_SUBMISSION_MAX_USD &&
+            req.body?.allowOverSubmissionCap === true
+          ) {
+            // admin acknowledged — proceed
+          } else {
+            assertWithinPerSubmissionCap(parsed);
+          }
           // tiramisu-49102: re-check per-party cap when admin edits amount.
           // Exclude THIS row from the existing-total so the edit doesn't
           // count against itself.

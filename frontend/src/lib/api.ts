@@ -3909,6 +3909,12 @@ export async function updateAdminPayout(
     payoutWalletAddress?: string | null;
     payoutBankDetails?: BankDetails | null;
     note?: string;
+    /**
+     * aglio-62584: admin override for the acciuga-62583 per-submission
+     * $625 cap. Forwarded only when the admin has ticked the ack Checkbox
+     * in PayoutReviewModal's amount-edit form (or recordExternalPayment).
+     */
+    allowOverSubmissionCap?: boolean;
   },
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}`, {

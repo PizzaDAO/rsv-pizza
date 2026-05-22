@@ -750,15 +750,26 @@ export function PaymentsAdminPage() {
                 setModalBusy(false);
               }
             }}
-            onSaveAmount={async (newAmount, note) => {
+            onSaveAmount={async (newAmount, opts) => {
               setModalBusy(true);
               try {
-                await updateAdminPayout(detail.id, { finalAmountUsd: newAmount, note });
+                await updateAdminPayout(detail.id, {
+                  finalAmountUsd: newAmount,
+                  note: opts?.note,
+                  // aglio-62584: forward the admin's per-submission cap
+                  // acknowledgement so the backend bypasses the 400.
+                  allowOverSubmissionCap: opts?.allowOverSubmissionCap,
+                });
                 const fresh = await getAdminPayout(detail.id);
                 setDetail(fresh);
                 await refresh();
+                return;
               } catch (err: any) {
-                setErrorMsg(err.message || 'Save failed');
+                // aglio-62584: return the message instead of swallowing it
+                // into the page-level error so PayoutReviewModal can render
+                // it inline (was previously silent — clicking Save on a
+                // grandfathered $750 row just did nothing visible).
+                return err?.message || 'Save failed';
               } finally {
                 setModalBusy(false);
               }
