@@ -45,7 +45,10 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
 }) => {
   const { party, candidates } = row;
   const cap = party.effectiveReimbursementCapUsd ?? 0;
-  const defaultAmount = Math.max(1, Math.round(0.5 * cap));
+  // bianco-89172: keep the cents — `Math.round(0.5 * 625)` gave 313, off by
+  // 50¢ from the actual half. payouts.final_amount_usd is numeric(12,2) so
+  // decimals round-trip through the backend without loss.
+  const defaultAmount = cap > 0 ? (cap / 2).toFixed(2) : '1.00';
 
   const mercuryBlocked = isMercuryBlocked(party.country);
 
@@ -59,7 +62,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   }, [candidates, mercuryBlocked]);
 
   const [selectedUserId, setSelectedUserId] = useState<string>(initialCandidateId);
-  const [amountStr, setAmountStr] = useState(String(defaultAmount));
+  const [amountStr, setAmountStr] = useState(defaultAmount);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

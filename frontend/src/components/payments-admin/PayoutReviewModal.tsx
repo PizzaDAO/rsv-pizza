@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
-import type { AdminPayoutDetail, PayoutAuditEntry } from '../../types';
+import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
   PayoutMethodIcon,
@@ -39,18 +40,29 @@ interface PayoutReviewModalProps {
   /**
    * Execute payout (PR 5). For USDC → no body, server sends via Privy.
    * For wire / mercury_card → admin-supplied refs.
+   *
+   * `allowOverPerAddressCap` (bianco-89172): forwarded when the admin has
+   * acknowledged the per-address $626 cap warning by ticking the override
+   * checkbox in the execute form.
    */
   onExecute: (body: {
     wireReference?: string;
     mercuryCardLast4?: string;
     mercuryCardId?: string;
     note?: string;
+    allowOverPerAddressCap?: boolean;
   }) => Promise<void> | void;
   /**
    * Optional fetcher for the USDC daily-cap-remaining hint. Only called when
    * the admin opens the USDC execute confirmation. Returns null if unavailable.
    */
   fetchUsdcCapRemaining?: () => Promise<{ usedUsd: number; capUsd: number; remainingUsd: number } | null>;
+  /**
+   * bianco-89172: optional fetcher for the per-address paid total + would-exceed
+   * check. Called when a USDC execute form opens so we can render the cap
+   * warning panel before the admin clicks Send. Returns null if unavailable.
+   */
+  fetchWalletPaidTotal?: (address: string, amount: number) => Promise<WalletPaidTotal | null>;
   /** Re-open (clear rejected/failed) — uses mark-paid plumbing or a future endpoint. */
   onReopen?: () => Promise<void> | void;
   busy?: boolean;
@@ -67,6 +79,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onMarkPaid,
   onExecute,
   fetchUsdcCapRemaining,
+  fetchWalletPaidTotal,
   onReopen,
   busy = false,
 }) => {
@@ -95,6 +108,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     { usedUsd: number; capUsd: number; remainingUsd: number } | null
   >(null);
   const [usdcCapLoading, setUsdcCapLoading] = useState(false);
+
+  // bianco-89172: per-address $626 cap warning state. `walletPaidTotal` is
+  // null until the USDC execute form opens; `overrideCap` is the admin's
+  // acknowledgement of the warning (required to enable Execute when
+  // `wouldExceed === true`).
+  const [walletPaidTotal, setWalletPaidTotal] = useState<WalletPaidTotal | null>(null);
+  const [walletPaidLoading, setWalletPaidLoading] = useState(false);
+  const [overrideCap, setOverrideCap] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -136,6 +157,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     setExecCardLast4('');
     setExecCardId('');
     setExecNote('');
+    // bianco-89172: clear the per-address cap state on every open so the
+    // ack checkbox doesn't carry over from a previous Execute attempt.
+    setWalletPaidTotal(null);
+    setOverrideCap(false);
     if (payout.payoutMethod === 'usdc_base' && fetchUsdcCapRemaining) {
       setUsdcCapLoading(true);
       try {
@@ -145,6 +170,26 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         setUsdcCap(null);
       } finally {
         setUsdcCapLoading(false);
+      }
+    }
+    // bianco-89172: fetch the per-address paid-total for the recipient wallet
+    // so we can warn the admin if this payout would push past the $626 cap.
+    if (
+      payout.payoutMethod === 'usdc_base' &&
+      payout.payoutWalletAddress &&
+      fetchWalletPaidTotal
+    ) {
+      setWalletPaidLoading(true);
+      try {
+        const total = await fetchWalletPaidTotal(
+          payout.payoutWalletAddress,
+          Number(payout.finalAmountUsd),
+        );
+        setWalletPaidTotal(total);
+      } catch {
+        setWalletPaidTotal(null);
+      } finally {
+        setWalletPaidLoading(false);
       }
     }
   }
@@ -573,6 +618,51 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="text-emerald-800/70">Daily cap status unavailable.</span>
                       )}
                     </div>
+                    {/* bianco-89172: per-address $626 cap warning. Only shown
+                        when the proposed send would push the recipient's
+                        cumulative paid total past the cap. The admin must
+                        explicitly tick the override checkbox; until they do,
+                        the Send button below is disabled. */}
+                    {walletPaidLoading && (
+                      <div className="text-xs text-emerald-800/80 inline-flex items-center gap-1">
+                        <Loader2 size={10} className="animate-spin" /> Checking per-address total…
+                      </div>
+                    )}
+                    {!walletPaidLoading && walletPaidTotal?.wouldExceed && payout.payoutWalletAddress && (
+                      <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                          <div className="flex-1 text-sm">
+                            <div className="font-medium text-amber-200 mb-1">
+                              Per-address cap warning
+                            </div>
+                            <div className="text-theme-text-secondary text-xs">
+                              Wallet{' '}
+                              <code className="font-mono text-[11px]">
+                                {payout.payoutWalletAddress.slice(0, 6)}…{payout.payoutWalletAddress.slice(-4)}
+                              </code>{' '}
+                              has already received{' '}
+                              <b>${walletPaidTotal.paidUsd.toFixed(2)}</b>{' '}
+                              across {walletPaidTotal.paidCount} payout
+                              {walletPaidTotal.paidCount === 1 ? '' : 's'}. Sending{' '}
+                              <b>${Number(payout.finalAmountUsd).toFixed(2)}</b> would push the total to{' '}
+                              <b>
+                                ${(walletPaidTotal.paidUsd + Number(payout.finalAmountUsd)).toFixed(2)}
+                              </b>
+                              , exceeding the ${walletPaidTotal.capUsd} per-address cap.
+                            </div>
+                            <div className="mt-3">
+                              <Checkbox
+                                checked={overrideCap}
+                                onChange={() => setOverrideCap((v) => !v)}
+                                label="I acknowledge — proceed anyway"
+                                labelClassName="text-sm text-amber-100"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -632,6 +722,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       if (payout.payoutMethod === 'wire' && !execWireValid) return;
                       if (payout.payoutMethod === 'mercury_card' && !execMercuryValid) return;
                       if (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress) return;
+                      // bianco-89172: block submit if the per-address cap would
+                      // exceed and the admin hasn't ticked the override.
+                      if (
+                        payout.payoutMethod === 'usdc_base' &&
+                        walletPaidTotal?.wouldExceed &&
+                        !overrideCap
+                      ) {
+                        return;
+                      }
                       await onExecute({
                         wireReference: payout.payoutMethod === 'wire' ? execWireRef.trim() : undefined,
                         mercuryCardLast4:
@@ -641,6 +740,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             ? execCardId.trim()
                             : undefined,
                         note: execNote.trim() || undefined,
+                        // bianco-89172: forward the admin's acknowledgement so
+                        // the server bypasses its own per-address cap check.
+                        allowOverPerAddressCap:
+                          payout.payoutMethod === 'usdc_base' && walletPaidTotal?.wouldExceed
+                            ? overrideCap
+                            : undefined,
                       });
                       setShowExecuteForm(false);
                     }}
@@ -649,7 +754,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       payout.payoutMethod == null ||
                       (payout.payoutMethod === 'wire' && !execWireValid) ||
                       (payout.payoutMethod === 'mercury_card' && !execMercuryValid) ||
-                      (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress)
+                      (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress) ||
+                      // bianco-89172: disabled until ack when the cap would exceed.
+                      (payout.payoutMethod === 'usdc_base' &&
+                        !!walletPaidTotal?.wouldExceed &&
+                        !overrideCap)
                     }
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >

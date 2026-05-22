@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Loader2, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from 'lucide-react';
-import type { AdminPayout } from '../../types';
-import { bulkExecutePayouts, type BulkSendResult } from '../../lib/api';
+import { Checkbox } from '../Checkbox';
+import type { AdminPayout, WalletPaidTotal } from '../../types';
+import { bulkExecutePayouts, fetchWalletPaidTotal, type BulkSendResult } from '../../lib/api';
 
 interface BulkSendModalProps {
   isOpen: boolean;
@@ -35,6 +36,14 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   const [phase, setPhase] = useState<Phase>('idle');
   const [results, setResults] = useState<BulkSendResult[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // bianco-89172: per-wallet prior-paid totals (lowercased addr → WalletPaidTotal).
+  // Fetched once per modal-open, then locally combined with the in-batch
+  // amounts to determine which wallets would push past the $626 cap. The
+  // admin must tick `overrideCap` to enable Send when any wallet would exceed.
+  const [walletTotals, setWalletTotals] = useState<Map<string, WalletPaidTotal>>(new Map());
+  const [walletTotalsLoading, setWalletTotalsLoading] = useState(false);
+  const [overrideCap, setOverrideCap] = useState(false);
 
   // Eligibility filter — keep in sync with backend bulk-execute filter
   // (USDC + approved-or-failed + valid 0x wallet). passata-49102 added
@@ -71,8 +80,81 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
       setPhase('idle');
       setResults([]);
       setErrorMsg(null);
+      setWalletTotals(new Map());
+      setOverrideCap(false);
     }
   }, [isOpen]);
+
+  // bianco-89172: fetch prior-paid totals for every distinct recipient wallet
+  // in the selection. Skipped when modal isn't open or no eligible rows.
+  // Failures fall back to an empty entry per address so the rest of the UI
+  // still renders — the server-side pre-flight will still catch issues.
+  useEffect(() => {
+    if (!isOpen || eligible.length === 0) return;
+    let cancelled = false;
+    const distinctAddrs = Array.from(
+      new Set(eligible.map((p) => (p.payoutWalletAddress || '').toLowerCase()).filter(Boolean)),
+    );
+    if (distinctAddrs.length === 0) return;
+    setWalletTotalsLoading(true);
+    Promise.all(
+      distinctAddrs.map(async (addr) => {
+        try {
+          const total = await fetchWalletPaidTotal(addr);
+          return [addr, total] as const;
+        } catch {
+          return [
+            addr,
+            { address: addr, paidUsd: 0, paidCount: 0, capUsd: 626, wouldExceed: null },
+          ] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setWalletTotals(new Map(entries));
+      setWalletTotalsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // `eligible` is derived from `selectedPayouts` and is stable per modal open
+    // (the parent re-renders the modal closed/open on selection change), so
+    // this re-runs only when the modal opens or the selection changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedPayouts]);
+
+  // bianco-89172: combine prior-paid + in-batch amounts per wallet to figure
+  // out which selected rows would push the recipient past the cap. Returns
+  // {overCapRowIds, overCapWalletCount, capUsd} — used for the disabled state
+  // on Send + the warning panel.
+  const capAnalysis = useMemo(() => {
+    if (walletTotals.size === 0 || eligible.length === 0) {
+      return { overCapRowIds: new Set<string>(), overCapWalletCount: 0, capUsd: 626 };
+    }
+    // First, sum up each wallet's in-batch total.
+    const inBatchByWallet = new Map<string, number>();
+    for (const p of eligible) {
+      const addr = (p.payoutWalletAddress || '').toLowerCase();
+      if (!addr) continue;
+      inBatchByWallet.set(addr, (inBatchByWallet.get(addr) || 0) + Number(p.finalAmountUsd || 0));
+    }
+    let capUsd = 626;
+    const overCapWallets = new Set<string>();
+    for (const [addr, batchTotal] of inBatchByWallet.entries()) {
+      const wt = walletTotals.get(addr);
+      if (!wt) continue;
+      capUsd = wt.capUsd; // server is the source of truth — same for every row
+      if (wt.paidUsd + batchTotal > wt.capUsd) {
+        overCapWallets.add(addr);
+      }
+    }
+    const overCapRowIds = new Set<string>();
+    for (const p of eligible) {
+      const addr = (p.payoutWalletAddress || '').toLowerCase();
+      if (overCapWallets.has(addr)) overCapRowIds.add(p.id);
+    }
+    return { overCapRowIds, overCapWalletCount: overCapWallets.size, capUsd };
+  }, [walletTotals, eligible]);
 
   // Close on Escape (only when not sending — never cancel an in-flight batch)
   useEffect(() => {
@@ -92,11 +174,16 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
 
   async function handleSend() {
     if (eligible.length === 0) return;
+    // bianco-89172: block submit if any row is over-cap and the admin hasn't
+    // ticked the override checkbox.
+    if (capAnalysis.overCapWalletCount > 0 && !overrideCap) return;
     setPhase('sending');
     setErrorMsg(null);
     try {
       const ids = eligible.map((p) => p.id);
-      const res = await bulkExecutePayouts(ids);
+      const res = await bulkExecutePayouts(ids, {
+        allowOverPerAddressCap: capAnalysis.overCapWalletCount > 0 ? overrideCap : false,
+      });
       setResults(res);
       setPhase('done');
       onComplete(res);
@@ -178,6 +265,84 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
               </div>
             )}
 
+            {/* bianco-89172: per-address cap warning. Surfaces a count of
+                wallets in this selection whose prior-paid + in-batch total
+                would exceed the $626 cap, and requires an explicit override
+                checkbox to enable Send. The server-side pre-flight is the
+                ultimate gate; this is just defense-in-depth for admins. */}
+            {walletTotalsLoading && eligible.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface-hover border border-theme-stroke text-xs text-theme-text-muted mb-4">
+                <Loader2 size={12} className="animate-spin" />
+                Checking per-address cap…
+              </div>
+            )}
+            {!walletTotalsLoading && capAnalysis.overCapWalletCount > 0 && (
+              <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mb-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium text-amber-200 mb-1">
+                      Per-address cap warning
+                    </div>
+                    <div className="text-theme-text-secondary text-xs">
+                      {capAnalysis.overCapWalletCount} selected wallet
+                      {capAnalysis.overCapWalletCount === 1 ? '' : 's'} would exceed the
+                      ${capAnalysis.capUsd} per-address cap once this batch sends
+                      ({capAnalysis.overCapRowIds.size} row
+                      {capAnalysis.overCapRowIds.size === 1 ? '' : 's'} in this batch).
+                    </div>
+                    <div className="mt-3">
+                      <Checkbox
+                        checked={overrideCap}
+                        onChange={() => setOverrideCap((v) => !v)}
+                        label="Allow over-cap sends — I acknowledge"
+                        labelClassName="text-sm text-amber-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* bianco-89172: per-row indicator so admins can see WHICH wallets
+                in their selection would exceed. Folded into the existing
+                eligibility list (kept concise — first 8 rows). */}
+            {capAnalysis.overCapRowIds.size > 0 && (
+              <ul className="space-y-1 mb-4 max-h-[20vh] overflow-y-auto text-xs">
+                {eligible
+                  .filter((p) => capAnalysis.overCapRowIds.has(p.id))
+                  .slice(0, 8)
+                  .map((p) => {
+                    const addr = p.payoutWalletAddress || '';
+                    const shortAddr =
+                      addr.length >= 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+                    const wt = walletTotals.get(addr.toLowerCase());
+                    return (
+                      <li
+                        key={p.id}
+                        className="flex items-baseline gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20"
+                      >
+                        <AlertTriangle size={10} className="text-amber-400 shrink-0 self-center" />
+                        <span className="font-mono text-[11px] text-amber-100">{shortAddr}</span>
+                        <span className="text-theme-text-muted">
+                          ${Number(p.finalAmountUsd).toFixed(2)}
+                        </span>
+                        {wt && (
+                          <span className="text-amber-300/80">
+                            prior ${wt.paidUsd.toFixed(2)}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                {capAnalysis.overCapRowIds.size > 8 && (
+                  <li className="text-theme-text-muted text-[11px] px-2">
+                    …and {capAnalysis.overCapRowIds.size - 8} more.
+                  </li>
+                )}
+              </ul>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-theme-stroke">
               <button
                 type="button"
@@ -189,7 +354,12 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={eligible.length === 0}
+                disabled={
+                  eligible.length === 0 ||
+                  walletTotalsLoading ||
+                  // bianco-89172: block Send when over-cap and admin hasn't ack'd
+                  (capAnalysis.overCapWalletCount > 0 && !overrideCap)
+                }
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send size={14} />

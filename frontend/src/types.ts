@@ -1641,6 +1641,20 @@ export interface AdminPayoutDetail extends AdminPayout {
   audits: PayoutAuditEntry[];
 }
 
+/**
+ * bianco-89172: cumulative paid-USDC summary for a single recipient wallet.
+ * Backs the per-address $626 cap warning in PayoutReviewModal + BulkSendModal.
+ * `wouldExceed` is null when no proposed `amount` was supplied to the
+ * `/wallet-paid-total` endpoint; true / false when one was.
+ */
+export interface WalletPaidTotal {
+  address: string;
+  paidUsd: number;
+  paidCount: number;
+  capUsd: number;
+  wouldExceed: boolean | null;
+}
+
 export interface AdminPayoutFilters {
   status?: PayoutStatus | 'all';
   payoutMethod?: PayoutMethod | 'all';

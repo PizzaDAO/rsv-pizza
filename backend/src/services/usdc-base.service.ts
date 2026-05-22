@@ -40,6 +40,16 @@ const DEFAULT_PER_TX_CAP_USD = 200;
 const DEFAULT_DAILY_CAP_USD = 2000;
 const TX_RECEIPT_TIMEOUT_MS = 90_000;
 
+/**
+ * bianco-89172: per-address cumulative cap. No single 0x address should ever
+ * receive more than $626 USDC across all parties without explicit admin
+ * acknowledgement. Matches HARD_PER_TX_CEILING_USD + $1 cushion (so a single
+ * at-the-ceiling tx doesn't accidentally trip this) while still catching the
+ * double-payment scenarios observed in Osogbo ($626) and Seropédica ($600).
+ * Override via `sendUsdcPayment(addr, amt, { allowOverPerAddressCap: true })`.
+ */
+export const PER_ADDRESS_HARD_CAP_USD = 626;
+
 const ERC20_TRANSFER_ABI = [
   {
     inputs: [
@@ -155,11 +165,64 @@ export async function getUsdcDailyCapStatus(): Promise<UsdcDailyCapStatus> {
 }
 
 /**
+ * bianco-89172: cumulative USDC paid to a single recipient wallet across all
+ * parties + payouts. Used by the per-address hard cap pre-flight (below) and
+ * by the admin warning endpoint that surfaces the same number in the UI.
+ *
+ * Sums `payouts.finalAmountUsd` where status='paid' AND payoutMethod='usdc_base'
+ * AND payoutWalletAddress matches `toAddress` case-insensitively (wallets are
+ * hex; mixed-case checksum addresses shouldn't slip through this check).
+ */
+export async function getPerAddressPaidTotalUsd(toAddress: string): Promise<number> {
+  if (!toAddress) return 0;
+  const sum = await prisma.payout.aggregate({
+    where: {
+      status: 'paid',
+      payoutMethod: 'usdc_base',
+      payoutWalletAddress: { equals: toAddress, mode: 'insensitive' },
+    },
+    _sum: { finalAmountUsd: true },
+  });
+  return sum._sum.finalAmountUsd ? Number(sum._sum.finalAmountUsd.toString()) : 0;
+}
+
+/**
+ * bianco-89172: same shape as `getPerAddressPaidTotalUsd` but also returns the
+ * count of contributing rows so the admin UI can show "$X across N payouts".
+ */
+export async function getPerAddressPaidTotals(
+  toAddress: string,
+): Promise<{ paidUsd: number; paidCount: number }> {
+  if (!toAddress) return { paidUsd: 0, paidCount: 0 };
+  const agg = await prisma.payout.aggregate({
+    where: {
+      status: 'paid',
+      payoutMethod: 'usdc_base',
+      payoutWalletAddress: { equals: toAddress, mode: 'insensitive' },
+    },
+    _sum: { finalAmountUsd: true },
+    _count: { _all: true },
+  });
+  return {
+    paidUsd: agg._sum.finalAmountUsd ? Number(agg._sum.finalAmountUsd.toString()) : 0,
+    paidCount: agg._count?._all ?? 0,
+  };
+}
+
+/**
  * Send `amountUsd` USDC from the payout wallet to `toAddress` on Base.
  * Throws on any pre-flight failure or onchain revert. Caller must persist the
  * resulting `txHash` on the payout row.
+ *
+ * `opts.allowOverPerAddressCap` (bianco-89172): bypass the per-address $626
+ * cumulative-paid pre-flight. Required when the admin has acknowledged the
+ * warning in PayoutReviewModal / BulkSendModal. Default false.
  */
-export async function sendUsdcPayment(toAddress: string, amountUsd: number): Promise<SendUsdcResult> {
+export async function sendUsdcPayment(
+  toAddress: string,
+  amountUsd: number,
+  opts?: { allowOverPerAddressCap?: boolean },
+): Promise<SendUsdcResult> {
   // 1. Address validation
   if (!toAddress || !isAddress(toAddress)) {
     throw new Error(`Invalid recipient address: ${toAddress}`);
@@ -201,6 +264,21 @@ export async function sendUsdcPayment(toAddress: string, amountUsd: number): Pro
       `Daily USDC cap exceeded: $${usedUsd.toFixed(2)} already paid in last 24h + $${amountUsd.toFixed(2)} > ` +
         `$${dailyCapUsd.toFixed(2)} cap (USDC_PAYOUT_DAILY_CAP_USD)`,
     );
+  }
+
+  // 6. Per-address cumulative cap (bianco-89172). Prevents double-paying the
+  // same wallet across parties without an explicit admin ack. The override
+  // path is gated by `opts.allowOverPerAddressCap` — the admin UI sets this
+  // only when an admin has ticked the acknowledgement checkbox.
+  if (!opts?.allowOverPerAddressCap) {
+    const perAddressTotal = await getPerAddressPaidTotalUsd(recipient);
+    if (perAddressTotal + amountUsd > PER_ADDRESS_HARD_CAP_USD) {
+      throw new Error(
+        `This wallet has already received $${perAddressTotal.toFixed(2)} USDC. ` +
+          `Sending $${amountUsd.toFixed(2)} more would exceed the $${PER_ADDRESS_HARD_CAP_USD} per-address cap. ` +
+          `Set allowOverPerAddressCap=true to acknowledge and proceed.`,
+      );
+    }
   }
 
   // Encode ERC-20 transfer calldata via viem
