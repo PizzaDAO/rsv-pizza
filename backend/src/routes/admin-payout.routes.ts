@@ -206,6 +206,59 @@ async function fetchPaidTotalsByParty(
   return m;
 }
 
+/**
+ * tiramisu-49102: hard per-party cap enforcement. Sums every payout for the
+ * party that is `pending | approved | paid` and throws 409 PARTY_CAP_EXCEEDED
+ * if `usedUsd + proposedUsd` exceeds the party's `effectiveReimbursementCapUsd`
+ * (validated cap OR max numeric event tag). Parties without an effective cap
+ * stay uncapped.
+ *
+ * `ignorePayoutId` excludes a row from the existing-total — used by PATCH so a
+ * row being edited doesn't count against itself.
+ */
+async function assertWithinPartyCap(
+  partyId: string,
+  proposedUsd: number,
+  ignorePayoutId?: string,
+): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  if (!party) {
+    throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+  }
+  const effectiveCap = computeEffectiveCapUsd({
+    reimbursementCapUsd: party.reimbursementCapUsd,
+    eventTags: party.eventTags,
+  });
+  if (effectiveCap == null) return;
+
+  const where: any = {
+    partyId,
+    status: { in: ['paid', 'pending', 'approved'] },
+  };
+  if (ignorePayoutId) {
+    where.id = { not: ignorePayoutId };
+  }
+  const existingTotal = await prisma.payout.aggregate({
+    where,
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd = existingTotal._sum.finalAmountUsd
+    ? Number(existingTotal._sum.finalAmountUsd.toString())
+    : 0;
+  const remainingUsd = Math.max(0, effectiveCap - usedUsd);
+
+  if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
+    throw new AppError(
+      `This payment would exceed the party's $${effectiveCap.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
+      409,
+      'PARTY_CAP_EXCEEDED',
+    );
+  }
+}
+
 /** Build a Prisma `where` clause from query-string filters. */
 function buildPayoutWhere(query: Request['query']): any {
   const where: any = {};
@@ -998,6 +1051,10 @@ router.post(
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
 
+      // tiramisu-49102: hard cap — block external records that would push the
+      // cumulative paid+pending+approved past the party's effective cap.
+      await assertWithinPartyCap(partyId, finalAmountUsd);
+
       const paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
       if (Number.isNaN(paidAt.getTime())) {
         throw new AppError('paidAt must be a valid ISO date', 400, 'VALIDATION_ERROR');
@@ -1297,7 +1354,18 @@ router.get(
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
 
-      res.json({ payout: serializePayout(row) });
+      const serialized = serializePayout(row);
+      // tiramisu-49102: attach per-party "already paid" totals to the detail
+      // response too so the Pay-again button on PayoutReviewModal can populate
+      // the synthetic PrepayQueueRow with `partyPaidUsd` for the CreatePrepayment
+      // modal's remaining-cap clamp. Cheap one-row aggregate.
+      if (serialized.party?.id) {
+        const totals = await fetchPaidTotalsByParty([serialized.party.id]);
+        const t = totals.get(serialized.party.id);
+        serialized.party.paidTotalUsd = t?.paidUsd ?? 0;
+        serialized.party.paidTotalCount = t?.paidCount ?? 0;
+      }
+      res.json({ payout: serialized });
     } catch (error) {
       next(error);
     }
@@ -1359,6 +1427,10 @@ router.patch(
         if (oldAmount !== newAmount) {
           amountChanged = true;
           data.finalAmountUsd = parsed;
+          // tiramisu-49102: re-check per-party cap when admin edits amount.
+          // Exclude THIS row from the existing-total so the edit doesn't
+          // count against itself.
+          await assertWithinPartyCap(existing.partyId, parsed, existing.id);
         }
       }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -65,6 +65,13 @@ interface PayoutReviewModalProps {
   fetchWalletPaidTotal?: (address: string, amount: number) => Promise<WalletPaidTotal | null>;
   /** Re-open (clear rejected/failed) — uses mark-paid plumbing or a future endpoint. */
   onReopen?: () => Promise<void> | void;
+  /**
+   * tiramisu-49102: "Pay again to this wallet" — only surfaced when this
+   * payout is already `paid`. Parent opens CreatePrepaymentModal pre-filled
+   * with the same party + host + method/destination so the admin can issue a
+   * follow-up payment without leaving the modal.
+   */
+  onPayAgain?: (payout: AdminPayoutDetail) => void;
   busy?: boolean;
 }
 
@@ -81,6 +88,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   fetchUsdcCapRemaining,
   fetchWalletPaidTotal,
   onReopen,
+  onPayAgain,
   busy = false,
 }) => {
   const [editingAmount, setEditingAmount] = useState(false);
@@ -910,6 +918,38 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               Re-open
             </button>
           )}
+          {/* tiramisu-49102: Pay-again button. Surfaced only when status is
+              paid AND we have enough to pre-fill the CreatePrepaymentModal —
+              i.e. a method is set, and (for USDC) a wallet, or (for wire) a
+              bank email. Mercury-card replays only need the host + party.
+              Parent handler builds a synthetic PrepayQueueRow and opens the
+              modal. */}
+          {isPaid && onPayAgain && payout.host?.id && payout.host?.email && payout.payoutMethod && (() => {
+            const m = payout.payoutMethod;
+            const eligible =
+              (m === 'usdc_base' && !!payout.payoutWalletAddress) ||
+              (m === 'wire' &&
+                payout.payoutBankDetails &&
+                typeof (payout.payoutBankDetails as any).email === 'string' &&
+                ((payout.payoutBankDetails as any).email as string).trim().length > 0) ||
+              m === 'mercury_card';
+            if (!eligible) return null;
+            const label =
+              m === 'usdc_base'
+                ? 'Pay again to this wallet'
+                : 'Send another payment';
+            return (
+              <button
+                type="button"
+                onClick={() => onPayAgain(payout)}
+                disabled={busy || selfPayoutBlocked}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                <Repeat2 size={14} />
+                {label}
+              </button>
+            );
+          })()}
           <button
             type="button"
             onClick={onClose}
