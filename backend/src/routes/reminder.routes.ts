@@ -176,8 +176,8 @@ function buildReminderHtml(params: {
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         ${flyerBlock}
         <div style="background: linear-gradient(180deg, #c8e8f2 0%, #9dd5e8 100%); padding: 44px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 38px; font-weight: 900; margin: 0 0 10px 0; letter-spacing: 1px; text-shadow: 2px 2px 0 #1a3a4a, 3px 3px 0 #1a3a4a, 4px 4px 0 #1a3a4a;">🍕 See you in <span style="color: #ff393a; text-shadow: 2px 2px 0 #ffffff, 3px 3px 0 #ffffff;">4 HOURS!</span></h1>
-          <p style="color: #1a3a4a; font-size: 16px; font-weight: 700; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px;">Get ready to party</p>
+          <img src="https://www.rsv.pizza/molto-benny.png" alt="" height="80" style="display: block; margin: 0 auto 12px auto; max-width: 80px;" />
+          <h1 style="color: #ffffff; font-size: 38px; font-weight: 900; margin: 0; letter-spacing: 1px; text-shadow: 2px 2px 0 #1a3a4a, 3px 3px 0 #1a3a4a, 4px 4px 0 #1a3a4a;">See you in <span style="color: #ff393a; text-shadow: 2px 2px 0 #ffffff, 3px 3px 0 #ffffff;">4 HOURS!</span></h1>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
