@@ -32,6 +32,7 @@ import {
   BulkActionsBar,
   ExternalPaymentModal,
   PrepayQueueTable,
+  PartyTotalsTable,
   CreatePrepaymentModal,
   HostPaymentDetailsModal,
   ExportSafeJsonModal,
@@ -538,6 +539,20 @@ export function PaymentsAdminPage() {
         <HotWalletCard />
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
+
+        {/* parmigiana-58291: per-party totals — rendered above the Prepay
+            queue so admins see who's been paid before deciding on the next
+            prepayment. Sorted descending by totalPaidUsd by the backend.
+            Hidden while totals are still loading or empty. */}
+        {totals && totals.byParty.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-base font-semibold text-theme-text mb-3">
+              Totals by party ({totals.byParty.length} event
+              {totals.byParty.length === 1 ? '' : 's'})
+            </h2>
+            <PartyTotalsTable rows={totals.byParty} />
+          </section>
+        )}
 
         {/* bismarck-92103: Prepay queue — only renders when there's at least
             one matching party (host flagged prepay + saved payment method,

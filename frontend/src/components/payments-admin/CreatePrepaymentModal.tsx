@@ -6,6 +6,16 @@ import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 import { createPayout } from '../../lib/api';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 
+/**
+ * parmigiana-58291: strip the "Global Pizza Party " prefix from event names
+ * everywhere this modal shows the party name (title + default note +
+ * placeholder). Same convention as PayoutRow and PrepayQueueTable — inlined
+ * here to match those callsites.
+ */
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
 interface CreatePrepaymentModalProps {
   row: PrepayQueueRow;
   onClose: () => void;
@@ -96,7 +106,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             ? { email: selectedCandidate.bankEmail }
             : undefined,
         finalAmountUsd: amountNum,
-        adminNotes: notes.trim() || `Prepayment for ${party.name}`,
+        adminNotes: notes.trim() || `Prepayment for ${stripGppPrefix(party.name)}`,
         hostNotes: 'Prepayment created by admin',
         recipientHostUserId: selectedCandidate.userId,
       });
@@ -127,7 +137,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
         <div className="flex items-center gap-3 px-5 py-4 border-b border-theme-stroke">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold text-theme-text truncate">
-              Prepay {party.name}
+              Prepay {stripGppPrefix(party.name)}
             </h2>
             {cap > 0 && (
               <p className="text-xs text-theme-text-muted mt-0.5">
@@ -232,7 +242,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             icon={Pencil}
             multiline
             rows={3}
-            placeholder={`Internal note (optional, defaults to "Prepayment for ${party.name}")`}
+            placeholder={`Internal note (optional, defaults to "Prepayment for ${stripGppPrefix(party.name)}")`}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             maxLength={500}
