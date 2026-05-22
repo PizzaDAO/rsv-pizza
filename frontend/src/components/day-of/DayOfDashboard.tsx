@@ -132,7 +132,7 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
       <CollapsibleCard
         id="photo-quick-capture"
         partyId={party.id}
-        title="Quick photo"
+        title="Quick photo or video"
       >
         <PhotoQuickCaptureCard party={party} />
       </CollapsibleCard>
