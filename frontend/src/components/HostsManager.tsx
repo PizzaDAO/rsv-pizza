@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Send, ArrowRightLeft } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import HostFormModal from './HostFormModal';
@@ -8,7 +8,9 @@ import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtil
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 import { usePizza } from '../contexts/PizzaContext';
-import { apiRequest } from '../lib/api';
+import { apiRequest, fetchPartyOwner } from '../lib/api';
+import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
+import TransferOwnershipModal from './admin/TransferOwnershipModal';
 
 interface HostsManagerProps {
   partyId: string;
@@ -162,6 +164,45 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
     })();
     return () => { cancelled = true; };
   }, [partyId]);
+
+  // fontina-91827: admin-only "Transfer ownership" affordance under the
+  // primary host row. The hook resolves to null while loading, then true/false.
+  // The owner-info lookup is deferred until the admin actually opens the modal
+  // so we don't hit the backend on every host page render.
+  const isAdminCaller = useIsAdminOrUnderboss();
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [primaryOwner, setPrimaryOwner] = useState<{ email: string; name: string | null } | null>(null);
+  const [primaryOwnerError, setPrimaryOwnerError] = useState<string | null>(null);
+  const [loadingPrimaryOwner, setLoadingPrimaryOwner] = useState(false);
+
+  const openTransferModal = async () => {
+    setPrimaryOwnerError(null);
+    if (primaryOwner) {
+      setShowTransferModal(true);
+      return;
+    }
+    // paesana-89172 already fetches the primary host into `primaryHost`; if
+    // that's populated we don't need a second network call.
+    if (primaryHost?.email) {
+      setPrimaryOwner({ email: primaryHost.email, name: primaryHost.name });
+      setShowTransferModal(true);
+      return;
+    }
+    setLoadingPrimaryOwner(true);
+    try {
+      const data = await fetchPartyOwner(partyId);
+      if (!data.ownerEmail) {
+        setPrimaryOwnerError('This event has no primary owner on record.');
+        return;
+      }
+      setPrimaryOwner({ email: data.ownerEmail, name: data.ownerName });
+      setShowTransferModal(true);
+    } catch (e) {
+      setPrimaryOwnerError(e instanceof Error ? e.message : 'Failed to load owner');
+    } finally {
+      setLoadingPrimaryOwner(false);
+    }
+  };
 
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostEmail, setNewCoHostEmail] = useState('');
@@ -521,18 +562,39 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
             haven't yet loaded the primaryHost data (network fallback)
             AND the owner isn't already in the cohosts array. */}
         {hostName && !primaryHost && !ownerCoHost && (
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-[#ff393a]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-white font-medium truncate">{hostName}</p>
-                  <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
+          <div className="p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-[#ff393a]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-white font-medium truncate">{hostName}</p>
+                    <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
+                  </div>
                 </div>
               </div>
             </div>
+            {/* fontina-91827: admin-only Transfer ownership affordance even in
+                the legacy/network-fallback render path. */}
+            {isAdminCaller && (
+              <div className="mt-2 pl-[52px] flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={openTransferModal}
+                  disabled={loadingPrimaryOwner}
+                  className="text-xs text-white/50 hover:text-[#ff393a] transition-colors flex items-center gap-1 disabled:opacity-50"
+                  title="Admin only — reassign event ownership to another registered user"
+                >
+                  <ArrowRightLeft size={12} />
+                  {loadingPrimaryOwner ? 'Loading…' : 'Transfer ownership →'}
+                </button>
+                {primaryOwnerError && (
+                  <span className="text-xs text-[#ff393a]">{primaryOwnerError}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -656,7 +718,25 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               >
                 Edit
               </button>
+              {/* fontina-91827: admin-only Transfer-ownership affordance,
+                  rendered next to Edit on the Owner row. Hidden for
+                  non-admin callers and non-owner rows. */}
+              {isOwnerRow && isAdminCaller && (
+                <button
+                  type="button"
+                  onClick={openTransferModal}
+                  disabled={loadingPrimaryOwner}
+                  className="text-white/50 hover:text-[#ff393a] text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                  title="Admin only — reassign event ownership to another registered user"
+                >
+                  <ArrowRightLeft size={12} />
+                  {loadingPrimaryOwner ? 'Loading…' : 'Transfer ownership →'}
+                </button>
+              )}
             </div>
+            {isOwnerRow && primaryOwnerError && (
+              <div className="mt-1 pl-9 text-xs text-[#ff393a]">{primaryOwnerError}</div>
+            )}
 
             {/* Tab permissions expander (only when canEdit is true) */}
             {coHost.canEdit && (
@@ -839,6 +919,27 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
         onSubmit={addCoHost}
         submitting={savingHost}
       />
+
+      {/* fontina-91827: admin-only ownership transfer modal */}
+      {primaryOwner && (
+        <TransferOwnershipModal
+          isOpen={showTransferModal}
+          partyId={partyId}
+          currentOwnerName={primaryOwner.name}
+          currentOwnerEmail={primaryOwner.email}
+          candidateCoHosts={coHosts
+            .filter(h => !!h.email)
+            .map(h => ({ name: h.name, email: h.email as string }))}
+          onClose={() => setShowTransferModal(false)}
+          onTransferred={() => {
+            // Hard reload — ownership change fundamentally rewires the host
+            // session (the calling admin may have just lost edit power on
+            // this party; the new owner needs the full host UI). Letting
+            // the existing party context settle without a reload is risky.
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 };

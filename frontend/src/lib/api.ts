@@ -2628,6 +2628,37 @@ export async function removeAdmin(id: string): Promise<void> {
   await apiRequest(`/api/admin/${id}`, { method: 'DELETE' });
 }
 
+// fontina-91827: admin-only lookup for a party's current owner email + name.
+// Used by TransferOwnershipModal so the admin UI can render "Currently owned
+// by X (email)" without depending on the host-gated cohosts/full endpoint.
+export async function fetchPartyOwner(partyId: string): Promise<{
+  partyId: string;
+  ownerId: string | null;
+  ownerEmail: string | null;
+  ownerName: string | null;
+}> {
+  return apiRequest(`/api/admin/parties/${partyId}/owner`);
+}
+
+// fontina-91827: admin-only event ownership transfer. Atomically updates
+// parties.user_id, removes the old owner from co_hosts, deletes their
+// party_payment_opt_ins row, and canonicalizes the new owner with
+// canEdit:true + showOnEvent:true in the cohost array.
+export async function transferEventOwnership(
+  partyId: string,
+  body: {
+    newOwnerEmail: string;
+    removeOldFromCoHosts?: boolean;
+    deleteOldOptIn?: boolean;
+    note?: string;
+  },
+): Promise<{ ok: true; partyId: string; newOwnerId: string; newOwnerEmail: string }> {
+  return apiRequest(`/api/admin/parties/${partyId}/transfer-ownership`, {
+    method: 'POST',
+    body,
+  });
+}
+
 // Underboss Admin API (management)
 
 export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
