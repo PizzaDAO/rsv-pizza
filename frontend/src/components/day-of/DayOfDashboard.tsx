@@ -84,15 +84,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           hideOpenTabLink={isMobile}
         />
       </CollapsibleCard>
-      {isGpp && (
-        <CollapsibleCard
-          id="broadcast"
-          partyId={party.id}
-          title="Join the global PizzaDAO broadcast"
-        >
-          <BroadcastJoinCard partyId={party.id} layout={layout} />
-        </CollapsibleCard>
-      )}
       <CollapsibleCard id="check-in" partyId={party.id} title="Check-in">
         <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
       </CollapsibleCard>
@@ -118,6 +109,15 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
       >
         <StreamOnScreenCard />
       </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="broadcast"
+          partyId={party.id}
+          title="Join the global PizzaDAO broadcast"
+        >
+          <BroadcastJoinCard partyId={party.id} layout={layout} />
+        </CollapsibleCard>
+      )}
       {isGpp && !briefingFirst && (
         <CollapsibleCard
           id="briefing"
@@ -127,17 +127,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           <BriefingCard party={party} />
         </CollapsibleCard>
       )}
-      <CollapsibleCard
-        id="checklist"
-        partyId={party.id}
-        title="Today's checklist"
-      >
-        <ChecklistTodayCard
-          partyId={party.id}
-          inviteCode={party.inviteCode}
-          hideOpenTabLink={isMobile}
-        />
-      </CollapsibleCard>
       <CollapsibleCard
         id="photo-quick-capture"
         partyId={party.id}
