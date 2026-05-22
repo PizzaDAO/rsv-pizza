@@ -19,6 +19,7 @@ import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
+import photoFeedRoutes from './routes/photo-feed.routes.js';
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
@@ -145,6 +146,7 @@ app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
+app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
