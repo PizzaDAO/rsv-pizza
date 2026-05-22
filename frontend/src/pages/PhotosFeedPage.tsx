@@ -1,16 +1,29 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, FeedPhoto } from '../lib/api';
-import { countryNameToFlag } from '../utils/countryFlag';
+import { countryNameToAlpha2 } from '../utils/countryFlag';
 
-// Sentinel returned by countryNameToFlag when the country name doesn't map
-// to an ISO-3166 alpha-2 code. When we see this, we fall back to the MapPin
-// icon so we don't show the world-map emoji here.
-const MAP_EMOJI_FALLBACK = '\u{1F5FA}\u{FE0F}';
+const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@3.3.0/flags';
+
+function CircleFlag({ country, size = 14 }: { country: string | null; size?: number }) {
+  const code = countryNameToAlpha2(country);
+  if (!code) return null;
+  return (
+    <img
+      src={`${FLAG_BASE}/${code}.svg`}
+      alt={country || ''}
+      width={size}
+      height={size}
+      loading="lazy"
+      className="rounded-full inline-block shrink-0"
+      style={{ width: size, height: size }}
+    />
+  );
+}
 
 export function PhotosFeedPage() {
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
@@ -19,7 +32,7 @@ export function PhotosFeedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<FeedPhoto | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<string | null>(null);
@@ -64,11 +77,18 @@ export function PhotosFeedPage() {
   }, [loadPage]);
 
   useEffect(() => {
-    if (!selected) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null); };
+    if (selectedIdx === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedIdx(null);
+      else if (e.key === 'ArrowLeft') {
+        setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i));
+      } else if (e.key === 'ArrowRight') {
+        setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i));
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected]);
+  }, [selectedIdx, photos.length]);
 
   return (
     <Layout>
@@ -91,7 +111,7 @@ export function PhotosFeedPage() {
           <EmptyState />
         ) : (
           <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
-            {photos.map(p => <FeedTile key={p.id} photo={p} onOpen={() => setSelected(p)} />)}
+            {photos.map((p, idx) => <FeedTile key={p.id} photo={p} onOpen={() => setSelectedIdx(idx)} />)}
           </div>
         )}
 
@@ -112,7 +132,16 @@ export function PhotosFeedPage() {
         )}
       </div>
 
-      {selected && <FeedLightbox photo={selected} onClose={() => setSelected(null)} />}
+      {selectedIdx !== null && photos[selectedIdx] && (
+        <FeedLightbox
+          photo={photos[selectedIdx]}
+          hasPrev={selectedIdx > 0}
+          hasNext={selectedIdx < photos.length - 1}
+          onPrev={() => setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i))}
+          onNext={() => setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i))}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
     </Layout>
   );
 }
@@ -140,13 +169,10 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
         )}
       </div>
       {(photo.party.city || photo.party.name) && (
-        <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1">
-          {(() => {
-            const flag = countryNameToFlag(photo.party.country);
-            return flag && flag !== MAP_EMOJI_FALLBACK
-              ? <span className="text-sm leading-none" aria-label={photo.party.country || ''}>{flag}</span>
-              : <MapPin size={11} />;
-          })()}
+        <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1.5">
+          {countryNameToAlpha2(photo.party.country)
+            ? <CircleFlag country={photo.party.country} size={14} />
+            : <MapPin size={11} />}
           <span className="truncate">{photo.party.city || photo.party.name}</span>
         </div>
       )}
@@ -154,10 +180,35 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   );
 }
 
-function FeedLightbox({ photo, onClose }: { photo: FeedPhoto; onClose: () => void }) {
+function FeedLightbox({
+  photo, onClose, onPrev, onNext, hasPrev, hasNext,
+}: {
+  photo: FeedPhoto;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+}) {
   const isVideo = photo.mimeType?.startsWith('video/');
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <button
+        onClick={(e) => { e.stopPropagation(); onPrev(); }}
+        disabled={!hasPrev}
+        aria-label="Previous photo"
+        className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronLeft size={28} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onNext(); }}
+        disabled={!hasNext}
+        aria-label="Next photo"
+        className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronRight size={28} />
+      </button>
       <div className="max-w-5xl w-full max-h-[90vh] bg-theme-header rounded-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex-1 flex items-center justify-center bg-black min-h-0">
           {isVideo ? (
@@ -169,13 +220,12 @@ function FeedLightbox({ photo, onClose }: { photo: FeedPhoto; onClose: () => voi
         <div className="p-4 border-t border-theme-stroke">
           {photo.caption && <p className="text-theme-text mb-2">{photo.caption}</p>}
           <p className="text-theme-text-muted text-sm flex items-center gap-2">
-            {(() => {
-              const flag = countryNameToFlag(photo.party.country);
-              return flag && flag !== MAP_EMOJI_FALLBACK
-                ? <span className="text-base leading-none" aria-label={photo.party.country || ''}>{flag}</span>
-                : <MapPin size={12} />;
-            })()}
-            <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">{photo.party.name}</Link>
+            {countryNameToAlpha2(photo.party.country)
+              ? <CircleFlag country={photo.party.country} size={18} />
+              : <MapPin size={12} />}
+            <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">
+              {photo.party.name}
+            </Link>
             {photo.party.city && <span>· {photo.party.city}{photo.party.country ? `, ${photo.party.country}` : ''}</span>}
           </p>
         </div>
