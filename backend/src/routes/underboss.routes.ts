@@ -787,6 +787,11 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
       whereClause = scopedWhere ? { AND: [base, scopedWhere] } : base;
     }
 
+    // porchetta-81402 + provolone-58291: hide cancelled events from underboss
+    // list/stats/rollups, mirroring sponsor-user behavior. Cancelled events
+    // remain reachable by direct ID via /:region/events/:partyId.
+    whereClause = { ...whereClause, cancelledAt: null };
+
     // quattro-12847: appeals-only narrows further to events with at least one
     // unreviewed appeal in history.
     if (appealsOnly) {
@@ -884,7 +889,10 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
     }
 
     const scopedWhere = buildScopedWhereClause(scope);
-    const base: any = { region, eventType: 'gpp' as const };
+    // porchetta-81402 + provolone-58291: hide cancelled events from underboss
+    // paginated event list, mirroring sponsor-user behavior. `count` shares the
+    // same `where`, so pagination totals stay in sync with the visible rows.
+    const base: any = { region, eventType: 'gpp' as const, cancelledAt: null };
     if (appealsOnly) {
       base.reimbursementCapAppeals = { some: { reviewedAt: null } };
     }
@@ -1053,7 +1061,9 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
     }
 
     const scopedWhere = buildScopedWhereClause(scope);
-    const base = { region, eventType: 'gpp' as const };
+    // porchetta-81402 + provolone-58291: hide cancelled events from underboss
+    // aggregate stats, mirroring sponsor-user behavior.
+    const base = { region, eventType: 'gpp' as const, cancelledAt: null };
     const where: any = scopedWhere ? { AND: [base, scopedWhere] } : base;
 
     const [events, allUnderbosses] = await Promise.all([
