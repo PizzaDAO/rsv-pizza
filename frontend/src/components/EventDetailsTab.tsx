@@ -52,6 +52,8 @@ export const EventDetailsTab: React.FC = () => {
   const [telegramGroup, setTelegramGroup] = useState('');
   const [telegramEditMode, setTelegramEditMode] = useState(false);
   const [turtleRolesEnabled, setTurtleRolesEnabled] = useState(false);
+  // margherita-58471: T-4h reminder opt-out. Default true to match Prisma + DB default.
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   // Host Telegram bot connection (sausage-24183)
   const [connecting, setConnecting] = useState(false);
@@ -180,6 +182,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyNftChain = party.nftChain || 'base';
       const partyTelegramGroup = party.telegramGroup || '';
       const partyTurtleRolesEnabled = party.turtleRolesEnabled || false;
+      const partyRemindersEnabled = party.remindersEnabled !== false;
 
       // Set form values
       setName(partyName);
@@ -207,6 +210,7 @@ export const EventDetailsTab: React.FC = () => {
       setTelegramGroup(partyTelegramGroup);
       setTelegramEditMode(false);
       setTurtleRolesEnabled(partyTurtleRolesEnabled);
+      setRemindersEnabled(partyRemindersEnabled);
 
       // Store original values
       setOriginalValues({
@@ -1149,6 +1153,16 @@ export const EventDetailsTab: React.FC = () => {
                   saveOptions({ turtle_roles_enabled: newValue }, { turtleRolesEnabled: newValue });
                 }}
                 label="Ask RSVP Role (Turtle)"
+              />
+
+              <Checkbox
+                checked={remindersEnabled}
+                onChange={() => {
+                  const newValue = !remindersEnabled;
+                  setRemindersEnabled(newValue);
+                  saveOptions({ reminders_enabled: newValue }, { remindersEnabled: newValue });
+                }}
+                label="Send guests a reminder 4 hours before"
               />
 
               {/* NFT Settings — hidden for GPP events (managed from /admin) */}

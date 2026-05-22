@@ -18,5 +18,8 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/event-reminders", "schedule": "*/15 * * * *" }
+  ]
 }
