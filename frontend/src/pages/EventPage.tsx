@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -31,6 +31,7 @@ import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
+import { rankPizzerias } from '../lib/pizzeriaRank';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
@@ -318,6 +319,18 @@ export function EventPage() {
       setEditPasswordInput('');
     }
   };
+
+  // Cap "On the Menu" to top-3 pizzerias by the shared ranking helper
+  // (stracchino-22301). Must be declared above the early returns below.
+  const topPizzerias = useMemo(
+    () => rankPizzerias(
+      event?.selectedPizzerias ?? [],
+      event?.latitude != null && event?.longitude != null
+        ? { lat: event.latitude, lng: event.longitude }
+        : null,
+    ),
+    [event?.selectedPizzerias, event?.latitude, event?.longitude],
+  );
 
   if (loading) {
     return (
@@ -1404,9 +1417,9 @@ export function EventPage() {
                 <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
 
                 {/* Participating Pizzerias Section */}
-                {event.selectedPizzerias && event.selectedPizzerias.length > 0 && (
+                {topPizzerias.length > 0 && (
                   <ParticipatingPizzerias
-                    pizzerias={event.selectedPizzerias}
+                    pizzerias={topPizzerias}
                     venueAddress={event.address}
                     eventSlug={slug}
                   />
