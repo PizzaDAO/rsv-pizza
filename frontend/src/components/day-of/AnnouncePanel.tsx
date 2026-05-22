@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Send, Megaphone, Loader2, MessageCircle, Mail } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { sendDayOfAnnouncement, AnnounceResponse } from '../../lib/api';
+import { tokenizeMarkdownLinks } from '../../lib/markdownLinks';
 
 interface AnnouncePanelProps {
   partyId: string;
@@ -27,6 +28,8 @@ export const AnnouncePanel: React.FC<AnnouncePanelProps> = ({ partyId, onSent })
     body.trim().length > 0 &&
     (telegramOn || emailOn) &&
     (!emailOn || subject.trim().length > 0);
+
+  const previewTokens = useMemo(() => tokenizeMarkdownLinks(body), [body]);
 
   const handleSend = async () => {
     if (!canSend || sending) return;
@@ -94,12 +97,29 @@ export const AnnouncePanel: React.FC<AnnouncePanelProps> = ({ partyId, onSent })
         value={body}
         onChange={(e) => setBody((e.target as HTMLTextAreaElement).value)}
       />
+      <p className="text-xs text-white/40">
+        Tip: embed a link with [label](https://url) — applies to email only.
+      </p>
 
       {body && (
         <div className="text-xs text-theme-text-muted bg-white/5 rounded p-3 whitespace-pre-line border border-white/10">
           <p className="uppercase tracking-wide mb-1 text-[10px]">Preview</p>
           {subject && <p className="font-semibold text-theme-text mb-1">{subject}</p>}
-          {body}
+          {previewTokens.map((tok, i) =>
+            tok.kind === 'link' ? (
+              <a
+                key={i}
+                href={tok.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#ff393a', textDecoration: 'underline' }}
+              >
+                {tok.label}
+              </a>
+            ) : (
+              <span key={i}>{tok.text}</span>
+            )
+          )}
         </div>
       )}
 
