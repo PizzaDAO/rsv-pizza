@@ -50,6 +50,7 @@ export const EventDetailsTab: React.FC = () => {
   const [nftEnabled, setNftEnabled] = useState(false);
   const [nftChain, setNftChain] = useState<string>('base');
   const [telegramGroup, setTelegramGroup] = useState('');
+  const [telegramEditMode, setTelegramEditMode] = useState(false);
   const [turtleRolesEnabled, setTurtleRolesEnabled] = useState(false);
 
   // Host Telegram bot connection (sausage-24183)
@@ -204,6 +205,7 @@ export const EventDetailsTab: React.FC = () => {
       setNftEnabled(partyNftEnabled);
       setNftChain(partyNftChain);
       setTelegramGroup(partyTelegramGroup);
+      setTelegramEditMode(false);
       setTurtleRolesEnabled(partyTurtleRolesEnabled);
 
       // Store original values
@@ -1052,17 +1054,54 @@ export const EventDetailsTab: React.FC = () => {
                 }}
               />
 
-              <IconInput
-                icon={MessageCircle}
-                type="url"
-                value={telegramGroup}
-                onChange={(e) => setTelegramGroup(e.target.value)}
-                onBlur={() => {
-                  const trimmed = telegramGroup.trim() || null;
-                  saveOptions({ telegram_group: trimmed }, { telegramGroup: trimmed });
-                }}
-                placeholder="Telegram group link (e.g. https://t.me/+abc123)"
-              />
+              {telegramGroup.trim() && !telegramEditMode ? (
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-theme-stroke bg-theme-surface/50">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MessageCircle size={16} className="text-theme-text-muted shrink-0" />
+                    <span className="text-xs text-theme-text-muted shrink-0">✓ Connected to</span>
+                    <a
+                      href={telegramGroup}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-theme-text underline underline-offset-2 truncate"
+                    >
+                      {telegramGroup.replace(/^https?:\/\//, '')}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setTelegramEditMode(true)}
+                      className="text-xs text-theme-text-muted hover:text-theme-text"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTelegramGroup('');
+                        saveOptions({ telegram_group: null }, { telegramGroup: null });
+                      }}
+                      className="text-xs text-theme-text-muted hover:text-red-400"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <IconInput
+                  icon={MessageCircle}
+                  type="url"
+                  value={telegramGroup}
+                  onChange={(e) => setTelegramGroup(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = telegramGroup.trim() || null;
+                    saveOptions({ telegram_group: trimmed }, { telegramGroup: trimmed });
+                    setTelegramEditMode(false);
+                  }}
+                  placeholder="Telegram group link (e.g. https://t.me/+abc123)"
+                />
+              )}
 
               {/* Host Telegram bot connection (sausage-24183) */}
               <div>
