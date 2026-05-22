@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag, Video } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
@@ -14,6 +14,12 @@ interface PhotoGalleryProps {
   uploaderEmail?: string;
   guestId?: string;
   photoModeration?: boolean;
+  /**
+   * Optional ref the gallery populates on mount with a function that opens
+   * the upload picker. Callers (e.g. EventPage) can call this to programmatically
+   * trigger an upload flow without restructuring the gallery internals.
+   */
+  triggerUploadRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 type FilterOption = 'all' | 'starred' | 'pending';
@@ -26,6 +32,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   uploaderEmail,
   guestId,
   photoModeration = false,
+  triggerUploadRef,
 }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [stats, setStats] = useState<PhotoStats | null>(null);
@@ -40,6 +47,18 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
+
+  // Expose an imperative trigger so callers can programmatically open the upload picker.
+  // Populated/cleared in an effect to avoid mutating refs during render.
+  useEffect(() => {
+    if (!triggerUploadRef) return;
+    triggerUploadRef.current = () => setShowUpload(true);
+    return () => {
+      if (triggerUploadRef.current) {
+        triggerUploadRef.current = null;
+      }
+    };
+  }, [triggerUploadRef]);
 
   // Split photos into images and videos for tab filtering
   const imagePhotos = useMemo(() => photos.filter(p => !p.mimeType?.startsWith('video/')), [photos]);
