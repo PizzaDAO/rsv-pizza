@@ -175,9 +175,9 @@ function buildReminderHtml(params: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         ${flyerBlock}
-        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 See you in 4 hours!</h1>
-          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">A friendly reminder about your event tonight</p>
+        <div style="background: linear-gradient(180deg, #c8e8f2 0%, #9dd5e8 100%); padding: 44px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 38px; font-weight: 900; margin: 0 0 10px 0; letter-spacing: 1px; text-shadow: 2px 2px 0 #1a3a4a, 3px 3px 0 #1a3a4a, 4px 4px 0 #1a3a4a;">🍕 See you in <span style="color: #ff393a; text-shadow: 2px 2px 0 #ffffff, 3px 3px 0 #ffffff;">4 HOURS!</span></h1>
+          <p style="color: #1a3a4a; font-size: 16px; font-weight: 700; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px;">Get ready to party</p>
         </div>
 
         <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
