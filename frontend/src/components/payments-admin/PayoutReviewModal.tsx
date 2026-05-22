@@ -21,6 +21,16 @@ function stripGppPrefix(name: string): string {
   return name.replace(/^Global Pizza Party\s+/i, '');
 }
 
+/**
+ * aglio-62584: client-side mirror of backend `PER_SUBMISSION_MAX_USD` (see
+ * admin-payout.routes.ts). Inlined here so the modal can render an amber
+ * warning + ack Checkbox BEFORE submitting an over-cap edit. The server is
+ * still the source of truth — if this constant drifts, the backend will
+ * 400 with PER_SUBMISSION_CAP_EXCEEDED and the inline error panel
+ * surfaces the message.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
   /** When set, indicates the actor would be paying themselves — disables mutate buttons. */
@@ -28,7 +38,20 @@ interface PayoutReviewModalProps {
   onClose: () => void;
   onApprove: (note?: string) => Promise<void> | void;
   onReject: (reason: string) => Promise<void> | void;
-  onSaveAmount: (newAmount: number, note?: string) => Promise<void> | void;
+  /**
+   * aglio-62584: `allowOverSubmissionCap` is forwarded when the admin has
+   * acknowledged the amber $625 cap warning by ticking the override
+   * Checkbox below the amount input. Parent should forward to
+   * `updateAdminPayout`'s `allowOverSubmissionCap` field.
+   *
+   * Returns a string error message (NOT throws) when the save fails — the
+   * modal renders it inline below the Save button so the failure isn't
+   * silent. Returning `void` (or resolving to `undefined`) means success.
+   */
+  onSaveAmount: (
+    newAmount: number,
+    opts?: { note?: string; allowOverSubmissionCap?: boolean },
+  ) => Promise<string | void> | string | void;
   onSaveAdminNotes: (notes: string) => Promise<void> | void;
   onMarkPaid: (refs: {
     wireReference?: string;
@@ -95,6 +118,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [draftAmount, setDraftAmount] = useState(String(payout.finalAmountUsd));
   const [adminNotes, setAdminNotes] = useState(payout.adminNotes ?? '');
   const [adminNotesDirty, setAdminNotesDirty] = useState(false);
+
+  // aglio-62584: per-submission $625 cap override + inline error surface.
+  // `ackOverSubmissionCap` is required before Save enables when the draft
+  // amount exceeds the cap; `saveAmountError` renders inline below the
+  // Save button when the backend (or any other failure path) rejects.
+  const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
+  const [saveAmountError, setSaveAmountError] = useState<string | null>(null);
 
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -313,6 +343,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     onClick={() => {
                       setDraftAmount(String(payout.finalAmountUsd));
                       setEditingAmount(true);
+                      // aglio-62584: clear any stale cap-ack / error state
+                      // from a prior open so the warning behaviour is fresh.
+                      setAckOverSubmissionCap(false);
+                      setSaveAmountError(null);
                     }}
                     disabled={selfPayoutBlocked || busy}
                     className="inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text disabled:opacity-50"
@@ -323,37 +357,122 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
               </div>
               {editingAmount ? (
-                <div className="flex items-center gap-2">
-                  <IconInput
-                    icon={DollarSign}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Final USD amount"
-                    value={draftAmount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftAmount(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const n = Number(draftAmount);
-                      if (!Number.isFinite(n) || n < 0) return;
-                      await onSaveAmount(n);
-                      setEditingAmount(false);
-                    }}
-                    disabled={busy}
-                    className="px-3 py-2 rounded-lg bg-[#E52828] text-white text-sm disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingAmount(false)}
-                    className="px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:bg-theme-surface-hover"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                (() => {
+                  // aglio-62584: per-submission cap warning + ack. Recompute
+                  // on every render so the warning toggles as the admin types.
+                  const draftNum = Number(draftAmount);
+                  const draftIsValid = Number.isFinite(draftNum) && draftNum >= 0;
+                  const exceedsCap = draftIsValid && draftNum > PER_SUBMISSION_MAX_USD;
+                  const saveDisabled =
+                    busy || !draftIsValid || (exceedsCap && !ackOverSubmissionCap);
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <IconInput
+                          icon={DollarSign}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Final USD amount"
+                          value={draftAmount}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setDraftAmount(e.target.value);
+                            // Clear stale error once the admin starts typing again.
+                            if (saveAmountError) setSaveAmountError(null);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!draftIsValid) return;
+                            if (exceedsCap && !ackOverSubmissionCap) return;
+                            setSaveAmountError(null);
+                            try {
+                              const result = await onSaveAmount(draftNum, {
+                                allowOverSubmissionCap: exceedsCap
+                                  ? ackOverSubmissionCap
+                                  : undefined,
+                              });
+                              // aglio-62584: parent may return a string instead
+                              // of throwing — surface it inline.
+                              if (typeof result === 'string' && result.length > 0) {
+                                setSaveAmountError(result);
+                                return;
+                              }
+                              setEditingAmount(false);
+                              setAckOverSubmissionCap(false);
+                            } catch (err: any) {
+                              setSaveAmountError(
+                                (err && (err.message || String(err))) ||
+                                  'Save failed — please try again.',
+                              );
+                            }
+                          }}
+                          disabled={saveDisabled}
+                          className="px-3 py-2 rounded-lg bg-[#E52828] text-white text-sm disabled:opacity-50"
+                        >
+                          {busy ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAmount(false);
+                            setAckOverSubmissionCap(false);
+                            setSaveAmountError(null);
+                          }}
+                          className="px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:bg-theme-surface-hover"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {/* aglio-62584: amber warning + ack Checkbox when the
+                          typed value exceeds the per-submission cap. The
+                          backend will reject the save unless the modal
+                          forwards `allowOverSubmissionCap: true`. */}
+                      {exceedsCap && (
+                        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                          <div className="flex items-start gap-2.5">
+                            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                            <div className="flex-1 text-sm">
+                              <div className="font-medium text-amber-200 mb-1">
+                                Per-submission cap warning
+                              </div>
+                              <div className="text-theme-text-secondary text-xs">
+                                Payments are normally capped at{' '}
+                                <b>${PER_SUBMISSION_MAX_USD}</b> per submission.
+                                Saving <b>${draftNum.toFixed(2)}</b> requires an
+                                explicit override (used for grandfathered or
+                                pre-cap rows).
+                              </div>
+                              <div className="mt-3">
+                                <Checkbox
+                                  checked={ackOverSubmissionCap}
+                                  onChange={() => setAckOverSubmissionCap((v) => !v)}
+                                  label={`I acknowledge — this exceeds the $${PER_SUBMISSION_MAX_USD} per-submission cap`}
+                                  labelClassName="text-sm text-amber-100"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* aglio-62584: inline error surface so save failures
+                          aren't silent. Covers backend rejections (bad
+                          wallet, party cap exceeded, etc.) and network
+                          errors. */}
+                      {saveAmountError && (
+                        <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10">
+                          <div className="flex items-start gap-2.5">
+                            <AlertTriangle className="text-red-300 mt-0.5 flex-shrink-0" size={16} />
+                            <div className="flex-1 text-sm text-red-100">
+                              {saveAmountError}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <div>
                   <div className="text-2xl font-semibold text-theme-text">

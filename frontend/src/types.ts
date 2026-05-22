@@ -1589,6 +1589,13 @@ export interface ExternalPaymentInput {
   mercuryCardLast4?: string;  // for mercury_card
   externalProofUrl?: string;
   adminNotes: string;         // REQUIRED — must explain why this is being recorded
+  /**
+   * aglio-62584: admin override for the acciuga-62583 per-submission $625
+   * cap. Set to `true` when backfilling a pre-cap historical out-of-band
+   * payment that legitimately exceeded $625. Without this, finalAmountUsd
+   * > $625 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
+   */
+  allowOverSubmissionCap?: boolean;
 }
 
 // Admin-list payout: includes embedded party + host info
