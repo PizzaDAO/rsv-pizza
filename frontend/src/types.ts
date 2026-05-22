@@ -1633,7 +1633,8 @@ export interface AdminPayoutFilters {
   status?: PayoutStatus | 'all';
   payoutMethod?: PayoutMethod | 'all';
   partyId?: string;
-  hostEmail?: string;
+  /** salame-83472: unified search — host email|name OR party name (case-insensitive contains). */
+  search?: string;
   /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
   country?: string;
   currency?: string;

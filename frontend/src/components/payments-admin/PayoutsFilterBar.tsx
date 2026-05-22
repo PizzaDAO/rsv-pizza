@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Mail, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { AdminPayoutFilters, PayoutMethod, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
@@ -75,14 +75,14 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
-        {/* Host search */}
+        {/* salame-83472: unified search — host email|name OR party name. */}
         <div className="md:col-span-2">
           <IconInput
-            icon={Mail}
+            icon={Search}
             type="search"
-            placeholder="Filter by host email"
-            value={filters.hostEmail || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ hostEmail: e.target.value })}
+            placeholder="Search hosts and parties"
+            value={filters.search || ''}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ search: e.target.value })}
           />
         </div>
 
