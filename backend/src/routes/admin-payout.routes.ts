@@ -1633,7 +1633,13 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          partyId: true,
+          finalAmountUsd: true,
+        },
       });
 
       if (!existing) {
@@ -1648,6 +1654,18 @@ router.post(
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      // bocconcini-49102: re-run the per-submission + per-party cap checks at
+      // approve time so rows created/edited BEFORE the cap rules landed (or
+      // rows whose party's cap was tightened after creation) can't be pushed
+      // through to `approved` (and from there to `paid`). Helpers are
+      // idempotent — better to over-check than to under-check.
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      await assertWithinPartyCap(
+        existing.partyId,
+        Number(existing.finalAmountUsd),
+        existing.id,
+      );
 
       const { note, autoExecute } = req.body || {};
 
@@ -1834,7 +1852,13 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          partyId: true,
+          finalAmountUsd: true,
+        },
       });
 
       if (!existing) {
@@ -1845,6 +1869,16 @@ router.post(
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      // bocconcini-49102: re-run the per-submission + per-party cap checks at
+      // mark-paid time too. mark-paid is the manual override that records an
+      // out-of-band payment for an existing row — same gates apply.
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      await assertWithinPartyCap(
+        existing.partyId,
+        Number(existing.finalAmountUsd),
+        existing.id,
+      );
 
       const {
         wireReference,
@@ -2031,6 +2065,7 @@ async function executePayout(params: {
       payoutMethod: true,
       finalAmountUsd: true,
       payoutWalletAddress: true,
+      partyId: true,
     },
   });
   if (!existing) {
@@ -2045,6 +2080,17 @@ async function executePayout(params: {
   }
 
   const finalAmountUsd = Number(existing.finalAmountUsd);
+
+  // bocconcini-49102: re-run the per-submission + per-party cap checks at
+  // execute time so rows approved before the cap rules landed (or rows whose
+  // party cap was tightened after approval) can't be pushed through to
+  // `paid`. Covers BOTH the direct POST /:id/execute route and the
+  // `autoExecute: true` branch of POST /:id/approve, plus per-row checks in
+  // POST /bulk-execute (which serially calls this helper). `assertWithinPartyCap`
+  // re-queries on every call, so successive bulk rows see the freshly-paid
+  // earlier rows in their `usedUsd` totals.
+  assertWithinPerSubmissionCap(finalAmountUsd);
+  await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
 
   // arugula-38633 v3 follow-up: payout_method can be null when the host
   // submitted before setting their payment details. Block execute with a
