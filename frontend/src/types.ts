@@ -1598,6 +1598,11 @@ export interface AdminPayout extends Payout {
     name: string;
     inviteCode: string;
     customUrl: string | null;
+    /**
+     * bruschetta-58291: surface country on the /payments admin queue.
+     * Free-form string from `parties.country` (e.g. 'USA', 'Spain').
+     */
+    country: string | null;
     /** Host's planning number (arugula-38633 v2 follow-up). */
     expectedGuests: number | null;
     /**
@@ -1629,6 +1634,8 @@ export interface AdminPayoutFilters {
   payoutMethod?: PayoutMethod | 'all';
   partyId?: string;
   hostEmail?: string;
+  /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
+  country?: string;
   currency?: string;
   dateFrom?: string;
   dateTo?: string;

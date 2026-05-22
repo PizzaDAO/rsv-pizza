@@ -9,6 +9,12 @@ interface PayoutsFilterBarProps {
   onChange: (next: AdminPayoutFilters) => void;
   onReset: () => void;
   availableCurrencies: string[];
+  /**
+   * bruschetta-58291: distinct, non-null `party.country` values across the
+   * currently-loaded payouts. Mirrors the `availableCurrencies` pattern —
+   * derived in `PaymentsAdminPage` from the loaded set. Sorted ascending.
+   */
+  availableCountries: string[];
 }
 
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
@@ -39,6 +45,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   onChange,
   onReset,
   availableCurrencies,
+  availableCountries,
 }) => {
   const update = (patch: Partial<AdminPayoutFilters>) => {
     onChange({ ...filters, ...patch, cursor: undefined });
@@ -67,7 +74,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
         {/* Host search */}
         <div className="md:col-span-2">
           <IconInput
@@ -114,6 +121,23 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
           >
             <option value="all">All currencies</option>
             {availableCurrencies.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* bruschetta-58291: Country dropdown — populated from the loaded
+            payout set (parallels availableCurrencies). Backend filters by
+            exact `parties.country` match. */}
+        <div>
+          <select
+            value={filters.country ?? 'all'}
+            onChange={(e) => update({ country: e.target.value })}
+            className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+            aria-label="Filter by country"
+          >
+            <option value="all">All countries</option>
+            {availableCountries.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>

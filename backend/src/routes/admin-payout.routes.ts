@@ -57,6 +57,9 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   name: true,
   inviteCode: true,
   customUrl: true,
+  // bruschetta-58291: surface the party's country on the /payments admin
+  // queue rows + power the Country filter dropdown in PayoutsFilterBar.
+  country: true,
   expectedGuests: true,
   // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
   // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
@@ -213,11 +216,24 @@ function buildPayoutWhere(query: Request['query']): any {
     }
   }
 
+  // bruschetta-58291: optional country filter — pulled out before assembling
+  // `where.party` below so it merges cleanly with the tartufo-58291
+  // `underbossStatus: 'approved'` filter (must NOT overwrite that gate).
+  const country = query.country;
+  const countryClause =
+    typeof country === 'string' && country !== 'all' && country.trim().length > 0
+      ? { country: country.trim() }
+      : {};
+
   // tartufo-58291: hide payouts from unapproved parties from the admin queue
   // + CSV export. Existing rows from before the bresaola-49185 backend gate
   // shouldn't surface in routine review. Stats/totals reuse this same `where`
-  // so they stay consistent.
-  where.party = { underbossStatus: 'approved' };
+  // so they stay consistent. bruschetta-58291: merged with optional country
+  // filter so both apply.
+  where.party = {
+    underbossStatus: 'approved',
+    ...countryClause,
+  };
 
   return where;
 }
@@ -274,6 +290,10 @@ function serializePayout(row: any): any {
           name: row.party.name,
           inviteCode: row.party.inviteCode,
           customUrl: row.party.customUrl,
+          // bruschetta-58291: surface the party's country on the wire so the
+          // /payments queue can render it as a subtitle and populate the
+          // Country filter dropdown.
+          country: row.party.country ?? null,
           // arugula-38633 v2 follow-up: admin dashboard shows planning vs
           // actuals. `expectedGuests` is the host's planning number;
           // `rsvpCount` is the filtered _count of confirmed direct RSVPs

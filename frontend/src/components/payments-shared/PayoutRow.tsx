@@ -6,6 +6,16 @@ import { PayoutStatusPill } from './PayoutStatusPill';
 import { PayoutMethodIcon } from './PayoutMethodIcon';
 import { formatPayoutAmount } from './formatPayoutAmount';
 
+/**
+ * bruschetta-58291: strip the "Global Pizza Party " prefix from event names so
+ * the city stays visible on the /payments admin queue without burning column
+ * width. Same helper as PrepayQueueTable — inlined here for now (the helper is
+ * defined locally in both places).
+ */
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
 interface PayoutRowProps {
   /**
    * A Payout (host view) or AdminPayout (admin view, with embedded host +
@@ -118,8 +128,15 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
             className="text-theme-text hover:text-[#E52828] hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
-            {admin.party.name}
+            {/* bruschetta-58291: strip "Global Pizza Party " so the city is
+                visible. Same convention as PrepayQueueTable. */}
+            {stripGppPrefix(admin.party.name)}
           </Link>
+          {/* bruschetta-58291: country subtitle so admins can scan by region
+              at a glance. Omitted when null to keep dense rows clean. */}
+          {admin.party.country && (
+            <div className="text-xs text-theme-text-muted">{admin.party.country}</div>
+          )}
           {/* arugula-38633 v2 follow-up: planning vs actuals at a glance. */}
           <div
             className="text-xs text-theme-text-muted"

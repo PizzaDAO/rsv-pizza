@@ -50,6 +50,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   status: 'all',
   payoutMethod: 'all',
   currency: 'all',
+  // bruschetta-58291: country filter default — 'all' means no filter.
+  country: 'all',
 };
 
 // lardo-58294: substring filter shared between the search input and the
@@ -219,6 +221,17 @@ export function PaymentsAdminPage() {
     const set = new Set<string>();
     for (const p of payouts) {
       if (p.originalCurrency) set.add(p.originalCurrency.toUpperCase());
+    }
+    return Array.from(set).sort();
+  }, [payouts]);
+
+  // bruschetta-58291: derive the country dropdown set from the currently-loaded
+  // payouts (mirrors `availableCurrencies` above). Backend exposes country via
+  // PAYOUT_PARTY_SELECT; null countries are skipped.
+  const availableCountries = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of payouts) {
+      if (p.party.country) set.add(p.party.country);
     }
     return Array.from(set).sort();
   }, [payouts]);
@@ -586,6 +599,7 @@ export function PaymentsAdminPage() {
           onChange={setFilters}
           onReset={() => setFilters(DEFAULT_FILTERS)}
           availableCurrencies={availableCurrencies}
+          availableCountries={availableCountries}
         />
 
         <BulkActionsBar
