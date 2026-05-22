@@ -132,6 +132,27 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
                 visible. Same convention as PrepayQueueTable. */}
             {stripGppPrefix(admin.party.name)}
           </Link>
+          {/* parmigiana-89172: inline "already paid" total per party so admins
+              see prior payouts to this party before clicking Execute again.
+              Includes the current row if its own status is paid — that's the
+              intended behavior ("total sent to this party as of right now").
+              Amber when the paid total has reached or exceeded the effective
+              reimbursement cap. */}
+          {admin.party.paidTotalCount != null &&
+            admin.party.paidTotalCount > 0 && (
+              <div
+                className={`text-[11px] mt-0.5 ${
+                  admin.party.effectiveReimbursementCapUsd != null &&
+                  (admin.party.paidTotalUsd ?? 0) >=
+                    admin.party.effectiveReimbursementCapUsd
+                    ? 'text-amber-300'
+                    : 'text-theme-text-muted'
+                }`}
+              >
+                Already paid: ${(admin.party.paidTotalUsd ?? 0).toFixed(2)} (
+                {admin.party.paidTotalCount})
+              </div>
+            )}
           {/* bruschetta-58291: country subtitle so admins can scan by region
               at a glance. Omitted when null to keep dense rows clean. */}
           {admin.party.country && (

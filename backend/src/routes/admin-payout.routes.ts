@@ -173,6 +173,37 @@ function escapeCSV(value: string): string {
   return value;
 }
 
+/**
+ * parmigiana-89172: aggregate `status === 'paid'` payout totals per party in a
+ * single groupBy query. Used to surface an "Already paid" warning inline on
+ * both the prepay queue rows AND the admin payouts table rows, so admins don't
+ * accidentally double-pay (Osogbo, Seropédica, Dar es Salaam all got two USDC
+ * sends within hours of each other before this landed).
+ *
+ * Returns a Map keyed by partyId so callers can do O(1) lookups. Parties with
+ * no paid payouts are simply absent from the map — callers should default to
+ * `{ paidUsd: 0, paidCount: 0 }` for those.
+ */
+async function fetchPaidTotalsByParty(
+  partyIds: string[],
+): Promise<Map<string, { paidUsd: number; paidCount: number }>> {
+  if (partyIds.length === 0) return new Map();
+  const rows = await prisma.payout.groupBy({
+    by: ['partyId'],
+    where: { partyId: { in: partyIds }, status: 'paid' },
+    _sum: { finalAmountUsd: true },
+    _count: { id: true },
+  });
+  const m = new Map<string, { paidUsd: number; paidCount: number }>();
+  for (const r of rows) {
+    m.set(r.partyId, {
+      paidUsd: r._sum.finalAmountUsd ? Number(r._sum.finalAmountUsd.toString()) : 0,
+      paidCount: r._count.id,
+    });
+  }
+  return m;
+}
+
 /** Build a Prisma `where` clause from query-string filters. */
 function buildPayoutWhere(query: Request['query']): any {
   const where: any = {};
@@ -874,7 +905,22 @@ router.get(
           hasMultipleCandidates: r.candidates.length > 1,
         }));
 
-      res.json({ rows: finalRows });
+      // parmigiana-89172: attach per-party "already paid" totals so the
+      // admin sees inline warning before clicking Create Prepayment again.
+      // Single aggregate query keyed by partyId; default 0/0 for parties
+      // with no prior paid payouts.
+      const finalPartyIds = finalRows.map(r => r.party.id);
+      const paidTotals = await fetchPaidTotalsByParty(finalPartyIds);
+      const rowsWithPaidTotals = finalRows.map(r => {
+        const totals = paidTotals.get(r.party.id);
+        return {
+          ...r,
+          partyPaidUsd: totals?.paidUsd ?? 0,
+          partyPaidCount: totals?.paidCount ?? 0,
+        };
+      });
+
+      res.json({ rows: rowsWithPaidTotals });
     } catch (error) {
       next(error);
     }
@@ -1180,8 +1226,31 @@ router.get(
         (a, b) => b.totalPaidUsd - a.totalPaidUsd,
       );
 
+      // parmigiana-89172: attach a per-party "already paid" rollup to each
+      // row's nested `party` object so the PayoutsTable can render an
+      // inline "Already paid: $X (N)" warning under the event name. Per
+      // PARTY, not per payout — collect the unique partyIds in the page
+      // and run one aggregate query.
+      const pagePartyIds = Array.from(
+        new Set(
+          page
+            .map(p => (p as any).party?.id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      );
+      const pagePaidTotals = await fetchPaidTotalsByParty(pagePartyIds);
+      const serializedPayouts = page.map(p => {
+        const serialized = serializePayout(p);
+        if (serialized.party?.id) {
+          const totals = pagePaidTotals.get(serialized.party.id);
+          serialized.party.paidTotalUsd = totals?.paidUsd ?? 0;
+          serialized.party.paidTotalCount = totals?.paidCount ?? 0;
+        }
+        return serialized;
+      });
+
       res.json({
-        payouts: page.map(serializePayout),
+        payouts: serializedPayouts,
         nextCursor,
         totals: {
           byStatus,
