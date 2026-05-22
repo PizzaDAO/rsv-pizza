@@ -5,6 +5,7 @@ import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
 import { PayoutMethodIcon } from './PayoutMethodIcon';
 import { formatPayoutAmount } from './formatPayoutAmount';
+import { CapInlineEditor } from './CapInlineEditor';
 
 /**
  * bruschetta-58291: strip the "Global Pizza Party " prefix from event names so
@@ -39,6 +40,11 @@ interface PayoutRowProps {
    * `payout.hostUserId`. Parent owns the modal state.
    */
   onHostClick?: (userId: string) => void;
+  /**
+   * montasio-49102: parent re-fetches the payouts list after an inline cap
+   * edit so the row reflects the new value.
+   */
+  onCapUpdated?: (partyId: string) => void;
 }
 
 /**
@@ -56,6 +62,7 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
   onClick,
   actions,
   onHostClick,
+  onCapUpdated,
 }) => {
   const admin = payout as AdminPayout;
   const firstPizza = (payout.documents || []).find((d) => d.kind === 'pizza');
@@ -168,16 +175,23 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
             {admin.party.rsvpCount}
             {' RSVPs'}
           </div>
-          {/* arugula-38633 (cap-everywhere): show resolved reimbursement cap
-              when set. Null = omit the line entirely (the row is already dense). */}
-          {admin.party.effectiveReimbursementCapUsd != null && (
-            <div
-              className="text-xs text-theme-text-muted"
-              title="Reimbursement cap (validated value or max numeric event_tag)"
-            >
-              ${Number(admin.party.effectiveReimbursementCapUsd).toLocaleString()} cap
-            </div>
-          )}
+          {/* arugula-38633 (cap-everywhere): show resolved reimbursement cap.
+              montasio-49102: inline editor so admins can change the cap
+              without bouncing to the underboss dashboard. Always rendered in
+              admin mode so admins can set a cap on parties that don't have
+              one yet. */}
+          <div
+            className="text-xs text-theme-text-muted mt-0.5 inline-flex items-center gap-1"
+            title="Reimbursement cap (validated value or max numeric event_tag)"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CapInlineEditor
+              partyId={admin.party.id}
+              currentCapUsd={admin.party.effectiveReimbursementCapUsd ?? null}
+              onUpdated={() => onCapUpdated?.(admin.party.id)}
+            />
+            <span>cap</span>
+          </div>
         </td>
       )}
 

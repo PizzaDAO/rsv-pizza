@@ -20,6 +20,11 @@ interface PayoutsTableProps {
    * User.id. Surfaced when the admin clicks the host name in a row.
    */
   onHostClick?: (userId: string) => void;
+  /**
+   * montasio-49102: parent re-fetches the payouts list after an inline cap
+   * edit so the row reflects the new value.
+   */
+  onCapUpdated?: (partyId: string) => void;
   busyRowId?: string | null;
   loading?: boolean;
   loadingMore?: boolean;
@@ -128,6 +133,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onMarkPaid,
   onExecute,
   onHostClick,
+  onCapUpdated,
   busyRowId,
   loading,
   loadingMore,
@@ -187,6 +193,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                 onSelectToggle={() => onToggleSelect(p.id)}
                 onClick={() => onRowClick(p)}
                 onHostClick={onHostClick}
+                onCapUpdated={onCapUpdated}
                 actions={
                   <ActionsCell
                     payout={p}
