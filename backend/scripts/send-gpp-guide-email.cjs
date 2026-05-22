@@ -526,7 +526,10 @@ async function runSend(recipients, opts) {
   const N = filtered.length;
   console.log(`Sending to ${N} recipient(s)...`);
 
-  const BATCH_SIZE = 10;
+  // Resend hard limit is 5 req/sec on our tier. Batch of 4 + 1100ms delay
+  // keeps us at ~3.6 req/sec with a safe margin. The bulk-invite pattern
+  // (10/500ms) breaches the limit and 429s most of the batch above ~50 sends.
+  const BATCH_SIZE = 4;
   let attempted = 0;
   for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
     const batch = filtered.slice(i, i + BATCH_SIZE);
@@ -547,7 +550,7 @@ async function runSend(recipients, opts) {
       })
     );
     if (i + BATCH_SIZE < filtered.length) {
-      await new Promise((res) => setTimeout(res, 500));
+      await new Promise((res) => setTimeout(res, 1100));
     }
   }
 
