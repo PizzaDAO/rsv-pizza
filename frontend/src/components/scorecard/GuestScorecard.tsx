@@ -5,6 +5,11 @@ import { ScorecardItem, ScorecardItemKey } from './ScorecardItem';
 
 interface GuestScorecardProps {
   inviteCode: string;
+  onUploadPhoto?: () => void;
+  onScanGuest?: () => void;
+  onTakeSelfie?: () => void;
+  /** When this number changes, the scorecard refetches its items. */
+  refreshSignal?: number;
 }
 
 const ITEM_ORDER: ScorecardItemKey[] = [
@@ -18,7 +23,13 @@ const ITEM_ORDER: ScorecardItemKey[] = [
   'signup_pizzadao',
 ];
 
-export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
+export function GuestScorecard({
+  inviteCode,
+  onUploadPhoto,
+  onScanGuest,
+  onTakeSelfie,
+  refreshSignal,
+}: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
   const [totalItems, setTotalItems] = useState(8);
@@ -48,6 +59,14 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
   useEffect(() => {
     fetchScorecard();
   }, [fetchScorecard]);
+
+  // Refetch when the parent bumps `refreshSignal` (e.g. after a photo upload,
+  // a successful vouch, or a selfie upload — all of which auto-complete a
+  // scorecard item on the backend).
+  useEffect(() => {
+    if (refreshSignal === undefined) return;
+    fetchScorecard();
+  }, [refreshSignal, fetchScorecard]);
 
   const handleComplete = async (itemKey: ScorecardItemKey, proofUrl?: string, proofType?: string) => {
     setCompletingItem(itemKey);
@@ -124,6 +143,9 @@ export function GuestScorecard({ inviteCode }: GuestScorecardProps) {
                 completed={item.completed}
                 loading={completingItem === key}
                 onComplete={handleComplete}
+                onUploadPhoto={onUploadPhoto}
+                onScanGuest={onScanGuest}
+                onTakeSelfie={onTakeSelfie}
               />
             </div>
           );
