@@ -198,7 +198,7 @@ export const BroadcastJoinCard: React.FC<BroadcastJoinCardProps> = ({ partyId, l
       </p>
 
       <div className={isMobile ? 'flex flex-col gap-3' : 'flex flex-col sm:flex-row gap-3'}>
-        <div className="flex-1 flex flex-col gap-2">
+        <div className="flex-1">
           <BroadcastButton
             url={eligible ? zoomUrl : null}
             label="Join Zoom (static camera)"
@@ -207,28 +207,6 @@ export const BroadcastJoinCard: React.FC<BroadcastJoinCardProps> = ({ partyId, l
             loading={loading}
             unavailableLabel={unavailableLabel}
           />
-          {showZoomDetails && (
-            <div className="flex flex-col gap-1 px-1">
-              {zoomMeetingId && (
-                <CopyDetailRow
-                  label="Meeting ID"
-                  value={zoomMeetingId}
-                  copyKey="meeting-id"
-                  copiedKey={copiedKey}
-                  onCopy={handleCopy}
-                />
-              )}
-              {zoomPasscode && (
-                <CopyDetailRow
-                  label="Passcode"
-                  value={zoomPasscode}
-                  copyKey="passcode"
-                  copiedKey={copiedKey}
-                  onCopy={handleCopy}
-                />
-              )}
-            </div>
-          )}
         </div>
         <div className="flex-1">
           <BroadcastButton
@@ -241,6 +219,29 @@ export const BroadcastJoinCard: React.FC<BroadcastJoinCardProps> = ({ partyId, l
           />
         </div>
       </div>
+
+      {showZoomDetails && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          {zoomMeetingId && (
+            <CopyDetailRow
+              label="Meeting ID"
+              value={zoomMeetingId}
+              copyKey="meeting-id"
+              copiedKey={copiedKey}
+              onCopy={handleCopy}
+            />
+          )}
+          {zoomPasscode && (
+            <CopyDetailRow
+              label="Passcode"
+              value={zoomPasscode}
+              copyKey="passcode"
+              copiedKey={copiedKey}
+              onCopy={handleCopy}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
