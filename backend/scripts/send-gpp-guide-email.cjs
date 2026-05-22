@@ -689,7 +689,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('FATAL:', err && err.stack ? err.stack : err);
-  process.exit(1);
-});
+// Expose helpers so one-off scripts can synthesize recipients (e.g., to
+// resend to an address that bypasses the DB-derived pool due to a typo'd
+// User.email that collides with a clean duplicate).
+module.exports = { buildPartyGuideEmail, formatEventDate, countdownText };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('FATAL:', err && err.stack ? err.stack : err);
+    process.exit(1);
+  });
+}
