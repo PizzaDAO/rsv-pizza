@@ -144,9 +144,9 @@ function buildPartyGuideEmail(recipient) {
     <div style="background: #fff4e6; padding: 20px; border-radius: 12px; margin: 30px 0;">
       <h3 style="margin: 0 0 10px 0; color: #ff6b35; font-size: 16px;">Inside the guide:</h3>
       <ul style="margin: 0; padding-left: 20px; color: #444;">
-        <li>{bullet 1}</li>
-        <li>{bullet 2}</li>
-        <li>{bullet 3}</li>
+        <li>All the links and media you need</li>
+        <li>All the photos you should take</li>
+        <li>Reminders on everything you might forget!</li>
       </ul>
     </div>
 
