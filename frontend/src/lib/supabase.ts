@@ -1291,6 +1291,28 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   return party;
 }
 
+async function fetchAllGuests(partyId: string): Promise<DbGuest[]> {
+  const all: DbGuest[] = [];
+  const CHUNK = 1000;
+  for (let from = 0; ; from += CHUNK) {
+    const { data, error } = await supabase
+      .from('guests')
+      .select('*')
+      .eq('party_id', partyId)
+      .neq('status', 'INVITED')
+      .order('submitted_at', { ascending: true })
+      .range(from, from + CHUNK - 1);
+    if (error) {
+      console.error('Error fetching guests page:', error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < CHUNK) break;
+  }
+  return all;
+}
+
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
   // Single query: match on custom_url OR invite_code
   const { data: partyData, error: partyError } = await supabase
@@ -1359,21 +1381,11 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     }
   })();
 
-  const guestsPromise = supabase
-    .from('guests')
-    .select('*')
-    .eq('party_id', party.id)
-    .neq('status', 'INVITED')
-    .order('submitted_at', { ascending: true });
+  const guestsPromise = fetchAllGuests(party.id);
 
-  const [, { data: guests, error: guestsError }] = await Promise.all([enrichPromise, guestsPromise]);
+  const [, guestsResult] = await Promise.all([enrichPromise, guestsPromise]);
 
-  if (guestsError) {
-    console.error('Error fetching guests:', guestsError);
-    return { party, guests: [] };
-  }
-
-  return { party, guests: guests || [] };
+  return { party, guests: guestsResult };
 }
 
 export async function updatePartyBeverages(partyId: string, availableBeverages: string[]): Promise<DbParty | null> {
@@ -1769,18 +1781,7 @@ export async function promoteGuest(guestId: string, partyId: string): Promise<bo
 }
 
 export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
-  const { data, error } = await supabase
-    .from('guests')
-    .select('*')
-    .eq('party_id', partyId)
-    .neq('status', 'INVITED')
-    .order('submitted_at', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching guests:', error);
-    return [];
-  }
-  return data || [];
+  return fetchAllGuests(partyId);
 }
 
 // Check if a user is already a guest at a party by email
