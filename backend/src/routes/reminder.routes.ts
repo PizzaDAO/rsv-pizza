@@ -100,6 +100,7 @@ interface ReminderEventCtx {
   partyTimezone: string | null;
   partyAddress: string | null;
   partyVenueName: string | null;
+  partyImageUrl: string | null;
   inviteCode: string;
   customUrl: string | null;
 }
@@ -151,13 +152,18 @@ function buildReminderHtml(params: {
   unsubUrl: string;
   venueName: string | null;
   address: string | null;
+  imageUrl: string | null;
 }): string {
-  const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address } =
+  const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address, imageUrl } =
     params;
 
   const whereHtml = venueName && address
     ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${venueName}<br><span style="color: #666; font-size: 14px;">${address}</span></p>`
     : `<p style="margin: 10px 0;"><strong>Where:</strong> ${addressText}</p>`;
+
+  const flyerBlock = imageUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${imageUrl}" alt="${partyName}" style="max-width: 100%; border-radius: 12px;" /></div>`
+    : '';
 
   return `
     <!DOCTYPE html>
@@ -168,6 +174,7 @@ function buildReminderHtml(params: {
         <title>Reminder: ${partyName}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        ${flyerBlock}
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
           <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 See you in 4 hours!</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">A friendly reminder about your event tonight</p>
@@ -242,6 +249,7 @@ async function sendReminderEmail(
     unsubUrl,
     venueName: ctx.partyVenueName,
     address: ctx.partyAddress,
+    imageUrl: ctx.partyImageUrl,
   });
   const text = buildReminderText({
     guestName: guest.name,
@@ -327,6 +335,7 @@ router.get('/cron/event-reminders', async (req: Request, res: Response, next: Ne
         timezone: true,
         address: true,
         venueName: true,
+        eventImageUrl: true,
         inviteCode: true,
         customUrl: true,
       },
@@ -372,6 +381,7 @@ router.get('/cron/event-reminders', async (req: Request, res: Response, next: Ne
           partyTimezone: party.timezone,
           partyAddress: party.address,
           partyVenueName: party.venueName,
+          partyImageUrl: party.eventImageUrl,
           inviteCode: party.inviteCode,
           customUrl: party.customUrl,
         },
