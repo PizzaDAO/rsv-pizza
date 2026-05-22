@@ -6,7 +6,7 @@
  *   GET    /:partyId/payouts                List payouts for a party (host view)
  *   GET    /:partyId/payouts/:payoutId      Detail (host or any admin)
  *   PATCH  /:partyId/payouts/:payoutId      Update (host, while status='pending' only)
- *   DELETE /:partyId/payouts/:payoutId      Cancel (host, while status='pending' only)
+ *   DELETE /:partyId/payouts/:payoutId      Withdraw (host, while status IN 'pending'|'approved')
  *   POST   /:partyId/payouts/ocr-preview    OCR a single uploaded image without saving
  *
  * Admin execution + approval/rejection endpoints land in PR 4 / PR 5.
@@ -52,6 +52,15 @@ const ocrPreviewLimiter = rateLimit({
 // Valid payout methods (mirrors the CHECK constraint in the DB)
 const PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 type PayoutMethod = (typeof PAYOUT_METHODS)[number];
+
+// gelato-72831: hosts can withdraw their own payment requests while the row is
+// still in a non-terminal state. `pending` is the initial state; `approved`
+// means an admin OK'd it but no money has moved yet (Mercury card not issued,
+// USDC not sent, wire not initiated). Withdrawing an approved row is the
+// host's only out when the admin approved a non-compliant amount (e.g.
+// post-bocconcini-49102 cap recheck would now reject the row at execute time).
+// `paid`, `rejected`, and `failed` remain terminal from the host side.
+const WITHDRAWABLE_STATUSES = ['pending', 'approved'] as const;
 
 // ---------- helpers ----------
 
@@ -243,7 +252,7 @@ async function isAnyAdmin(email?: string): Promise<boolean> {
  * mutate Payout rows and we don't want them piling up before underboss review.
  *
  * GET and DELETE are NOT gated: hosts must still be able to see existing
- * payouts and cancel pending ones even if approval is later revoked.
+ * payouts and withdraw pending/approved ones even if approval is later revoked.
  *
  * Throws 403 PARTY_NOT_APPROVED when the party isn't approved (or doesn't
  * exist — we don't leak the existence distinction since the action is gated
@@ -1330,11 +1339,11 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
     if (!existing) {
       throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
-    if (existing.status !== 'pending') {
+    if (!WITHDRAWABLE_STATUSES.includes(existing.status as (typeof WITHDRAWABLE_STATUSES)[number])) {
       throw new AppError(
-        'Only pending payments can be cancelled',
+        'This payment can no longer be withdrawn',
         400,
-        'PAYOUT_NOT_PENDING'
+        'PAYOUT_NOT_WITHDRAWABLE'
       );
     }
 
@@ -1344,7 +1353,7 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
     const isAdminCaller = await isAnyAdmin(req.userEmail);
     if (!isAdminCaller && existing.hostUserId !== req.userId) {
       throw new AppError(
-        'Only the cohost who submitted this payment can cancel it.',
+        'Only the cohost who submitted this payment can withdraw it.',
         403,
         'FORBIDDEN_NOT_OWNER',
       );

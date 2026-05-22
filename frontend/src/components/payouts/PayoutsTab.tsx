@@ -285,6 +285,9 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           payoutId={detailPayoutId}
           onClose={() => setDetailPayoutId(null)}
           onUpdated={loadPayouts}
+          // gelato-72831: refresh the list when a withdraw happens from inside
+          // the modal so the row disappears immediately.
+          onWithdrawn={() => loadPayouts()}
         />
       )}
 
