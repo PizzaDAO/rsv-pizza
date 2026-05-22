@@ -16,7 +16,7 @@ type UploadState = {
 };
 
 /**
- * GPP-only Stand With Crypto sponsor activation. Two independent uploads:
+ * Stand With Crypto sponsor activation. Two independent uploads:
  *   1. Group photo with SWC signs (tagged 'swc-photo', images bucket)
  *   2. Shoutout video (tagged 'swc-video', videos bucket)
  *
@@ -28,8 +28,26 @@ type UploadState = {
  *   - Video: "Record video" (capture) / "Upload video" (no capture)
  * Both buttons in a section share the same upload handler.
  *
- * Visibility gate (isGpp) is the caller's responsibility (DayOfDashboard).
+ * Visibility: self-gated on `party.eventTags` containing any tag with
+ * `'swc'` substring (case-insensitive) — `swc`, `swcbr`, `swceu`, etc.
+ * Variant copy (e.g. `swcbr` → "Juntos Por Cripto") is selected from
+ * SWC_VARIANT_LABELS; everything else falls through to the default.
  */
+const SWC_VARIANT_LABELS: Record<string, { title: string; signsLabel: string; shoutout: string }> = {
+  swcbr: {
+    title: 'Juntos Por Cripto',
+    signsLabel: 'Juntos Por Cripto signs',
+    shoutout: 'Juntos Por Cripto',
+  },
+  // default falls through to "Stand With Crypto"
+};
+
+const DEFAULT_LABEL = {
+  title: 'Stand With Crypto',
+  signsLabel: 'SWC signs',
+  shoutout: 'Stand With Crypto',
+};
+
 export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party, onUploaded }) => {
   // ---- HOOKS (all above any early return) -------------------------------
   const { user } = useAuth();
@@ -43,6 +61,18 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
 
   const [hasPhoto, setHasPhoto] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
+
+  // Tag-based visibility gate + variant label selection. The first eventTag
+  // whose lowercase form contains 'swc' wins (swc, swcbr, swceu, swcus, ...).
+  const swcTag = React.useMemo(
+    () =>
+      (party.eventTags ?? [])
+        .map((t) => t.toLowerCase())
+        .find((t) => t.includes('swc')),
+    [party.eventTags],
+  );
+  const hasSwcTag = !!swcTag;
+  const label = (swcTag && SWC_VARIANT_LABELS[swcTag]) || DEFAULT_LABEL;
 
   const refresh = React.useCallback(async () => {
     try {
@@ -130,6 +160,9 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
 
   const bothDone = hasPhoto && hasVideo;
 
+  // Self-gate: hide entirely unless party has an SWC-prefixed eventTag.
+  if (!hasSwcTag) return null;
+
   return (
     <div
       className={`card p-5 space-y-4 transition-opacity ${
@@ -138,11 +171,11 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
     >
       <div className="flex items-center gap-2">
         <Shield size={18} className="text-[#ff393a]" />
-        <h3 className="text-lg font-semibold text-theme-text">Stand With Crypto</h3>
+        <h3 className="text-lg font-semibold text-theme-text">{label.title}</h3>
       </div>
 
       <p className="text-sm leading-relaxed text-theme-text-secondary">
-        Stand With Crypto is sponsoring GPP 2026. Help us deliver:
+        {label.title} is sponsoring GPP 2026. Help us deliver:
       </p>
 
       {/* Photo section ----------------------------------------------------- */}
@@ -154,11 +187,11 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
             <span className="w-4 h-4" />
           )}
           <h4 className="text-sm font-semibold text-theme-text">
-            Upload group photo with SWC signs
+            Upload group photo with {label.signsLabel}
           </h4>
         </div>
         <p className="text-xs text-theme-text-muted">
-          Get everyone in the shot holding the SWC signs.
+          Get everyone in the shot holding the {label.signsLabel}.
         </p>
         <button
           type="button"
@@ -214,11 +247,11 @@ export const StandWithCryptoCard: React.FC<StandWithCryptoCardProps> = ({ party,
             <span className="w-4 h-4" />
           )}
           <h4 className="text-sm font-semibold text-theme-text">
-            Upload SWC shoutout video
+            Upload {label.shoutout} shoutout video
           </h4>
         </div>
         <p className="text-xs text-theme-text-muted">
-          ~10–20 seconds of the crowd shouting "Stand With Crypto!" at the camera works great.
+          ~10–20 seconds of the crowd shouting "{label.shoutout}!" at the camera works great.
         </p>
         <button
           type="button"

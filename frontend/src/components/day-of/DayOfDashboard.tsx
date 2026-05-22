@@ -93,7 +93,8 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
         {isGpp && <SignedPizzaBoxCard party={party} />}
         {isGpp && <PizzaBoxStackCard party={party} />}
         {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
-        {isGpp && <StandWithCryptoCard party={party} />}
+        {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
+        <StandWithCryptoCard party={party} />
         <LogisticsCard party={party} />
         <PizzaStatusCard party={party} />
         <MusicNowPlayingCard
