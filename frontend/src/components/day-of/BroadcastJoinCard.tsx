@@ -51,7 +51,7 @@ const BroadcastButton: React.FC<BroadcastButtonProps> = ({
   );
 
   const baseClasses =
-    'relative flex-1 rounded-xl py-4 px-4 text-white text-center transition-opacity';
+    'relative block w-full rounded-xl py-4 px-4 text-white text-center transition-opacity';
 
   if (!ready || !url) {
     return (
