@@ -652,6 +652,7 @@ export function PaymentsAdminPage() {
                 rows={sortedPrepayQueue}
                 onCreatePrepayment={(row) => setPrepayModalRow(row)}
                 onHostClick={(userId) => setHostDetailUserId(userId)}
+                onPartyUpdated={() => loadPrepayQueue()}
               />
             )}
           </section>
@@ -695,6 +696,7 @@ export function PaymentsAdminPage() {
           onMarkPaid={handleRowMarkPaid}
           onExecute={openDetail}
           onHostClick={(userId) => setHostDetailUserId(userId)}
+          onCapUpdated={() => refresh()}
           busyRowId={rowBusyId}
           loading={loading}
           loadingMore={loadingMore}

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Star } from 'lucide-react';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
-import { PayoutMethodIcon, PAYOUT_METHOD_LABELS } from '../payments-shared';
+import { PayoutMethodIcon, PAYOUT_METHOD_LABELS, CapInlineEditor } from '../payments-shared';
 
 interface PrepayQueueTableProps {
   rows: PrepayQueueRow[];
@@ -13,6 +13,12 @@ interface PrepayQueueTableProps {
    * surface the click event with the User.id.
    */
   onHostClick?: (userId: string) => void;
+  /**
+   * montasio-49102: parent refreshes the prepay queue after an inline cap
+   * edit so the row reflects the new value (and any downstream "already paid
+   * vs cap" indicators).
+   */
+  onPartyUpdated?: (partyId: string) => void;
 }
 
 /**
@@ -76,6 +82,7 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
   rows,
   onCreatePrepayment,
   onHostClick,
+  onPartyUpdated,
 }) => {
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
@@ -91,7 +98,6 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const cap = row.party.effectiveReimbursementCapUsd;
               // siciliana-69183: event name links into the host dashboard's
               // Settings tab. Slug is `customUrl ?? id` to match user-facing
               // URLs. Tab id `'details'` is the canonical Settings tab (see
@@ -153,7 +159,13 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                     </div>
                   </td>
                   <td className="px-3 py-3 align-top text-theme-text">
-                    {cap != null ? `$${cap.toLocaleString()}` : '—'}
+                    {/* montasio-49102: inline edit so admins can change the
+                        cap without bouncing to the underboss dashboard. */}
+                    <CapInlineEditor
+                      partyId={row.party.id}
+                      currentCapUsd={row.party.effectiveReimbursementCapUsd ?? null}
+                      onUpdated={() => onPartyUpdated?.(row.party.id)}
+                    />
                   </td>
                   <td className="px-3 py-3 align-top text-right">
                     <button
