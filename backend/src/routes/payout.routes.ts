@@ -289,6 +289,27 @@ async function assertMercuryAllowed(
 }
 
 /**
+ * acciuga-62583: hard per-submission ceiling of $625. Independent of the
+ * per-party cap (tiramisu-49102): even on uncapped parties, no single payout
+ * row can exceed $625. Same numeric value as `HARD_PER_TX_CEILING_USD` in
+ * usdc-base.service.ts (the USDC-execute ceiling) but enforced here at
+ * SUBMISSION time across all methods — no override path. Hosts split larger
+ * expenses across multiple submissions.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
+function assertWithinPerSubmissionCap(amountUsd: number) {
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
+  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+    throw new AppError(
+      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      400,
+      'PER_SUBMISSION_CAP_EXCEEDED',
+    );
+  }
+}
+
+/**
  * tiramisu-49102: hard per-party cap enforcement.
  *
  * Sums every existing payout for the party that is `pending | approved | paid`
@@ -643,6 +664,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       );
     }
 
+    // acciuga-62583: hard per-submission ceiling of $625 (no override).
+    // Enforced BEFORE the party-cap check so the host gets the clearer
+    // "split your submission" guidance even on uncapped events.
+    assertWithinPerSubmissionCap(finalUsd);
+
     // tiramisu-49102: hard cap — block creates that would push the cumulative
     // paid+pending+approved total past the party's effective cap. Parties
     // without an effective cap stay uncapped.
@@ -962,6 +988,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       if (!Number.isFinite(n) || n <= 0) {
         throw new AppError('finalAmountUsd must be a positive number', 400, 'INVALID_AMOUNT');
       }
+      // acciuga-62583: hard per-submission $625 ceiling — enforced before the
+      // party-cap check so the message is clearer on uncapped events.
+      assertWithinPerSubmissionCap(n);
       // tiramisu-49102: re-check per-party cap when the host edits the
       // amount. Exclude THIS row from the existing-total so the edit doesn't
       // count against itself.
@@ -1169,6 +1198,12 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ? Number((data.finalAmountUsd as Decimal).toString())
       : (recomputedAmount != null ? Number(recomputedAmount.toString()) : oldAmount);
     const amountChanged = newAmount !== oldAmount;
+
+    // acciuga-62583: hard per-submission $625 ceiling on the recomputed amount
+    // (explicit-amount edits are checked above next to the validation).
+    if (amountChanged && !explicitAmount) {
+      assertWithinPerSubmissionCap(newAmount);
+    }
 
     // tiramisu-49102: re-check per-party cap when a receipt-edit causes the
     // amount to be recomputed (explicit-amount edits are checked above).

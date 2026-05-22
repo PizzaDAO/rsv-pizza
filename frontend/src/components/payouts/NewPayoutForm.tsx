@@ -11,6 +11,13 @@ import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
 
+/**
+ * acciuga-62583: hard per-submission ceiling of $625. Matches backend
+ * `PER_SUBMISSION_CAP_EXCEEDED` (400) — UI disables submit + shows inline
+ * error so the host can split the request before posting. No override path.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
 interface NewPayoutFormProps {
   partyId: string;
   onCreated: (payout: Payout) => void;
@@ -138,10 +145,15 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const attendanceValid = !askForAttendance
     || (estimatedAttendance != null && estimatedAttendance > 0);
 
+  // acciuga-62583: hard $625 per-submission cap. Hosts split larger expenses
+  // into multiple submissions. Matches backend `PER_SUBMISSION_CAP_EXCEEDED`.
+  const exceedsPerSubmissionCap = finalAmount > PER_SUBMISSION_MAX_USD;
+
   // arugula-38633 v3 follow-up: payment details + receipts are no longer
   // required for submission. The submit button stays active whenever the
   // host has entered a positive amount and nothing async is in flight.
   const canSubmit = finalAmount > 0
+    && finalAmount <= PER_SUBMISSION_MAX_USD
     && attendanceValid
     && !isProcessing
     && !submitting;
@@ -348,6 +360,15 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       {submitError && (
         <div className="card p-4 border-red-500/40 bg-red-500/10 text-sm text-red-300">
           {submitError}
+        </div>
+      )}
+
+      {/* acciuga-62583: per-submission $625 ceiling. Same visual treatment as
+          submitError so the host sees the gate before clicking Submit. */}
+      {exceedsPerSubmissionCap && (
+        <div className="card p-4 border-red-500/40 bg-red-500/10 text-sm text-red-300">
+          Payment requests are limited to ${PER_SUBMISSION_MAX_USD} per submission.
+          Reduce the amount or split into multiple submissions.
         </div>
       )}
 

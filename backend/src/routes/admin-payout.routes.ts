@@ -46,6 +46,27 @@ const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'fai
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
+ * acciuga-62583: hard per-submission ceiling of $625 — same value as
+ * `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the USDC-execute ceiling)
+ * but enforced here at SUBMISSION time across all admin create/edit paths
+ * (external POST + PATCH). No override path. Inlined here per task spec —
+ * mirror of the helper in payout.routes.ts so we don't extract a shared module
+ * just for two callsites.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
+function assertWithinPerSubmissionCap(amountUsd: number) {
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
+  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+    throw new AppError(
+      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      400,
+      'PER_SUBMISSION_CAP_EXCEEDED',
+    );
+  }
+}
+
+/**
  * Shared Prisma `select` for the embedded `party` on payout responses.
  *
  * `expectedGuests` is the host's planning number; `_count.guests` is a
@@ -1051,6 +1072,11 @@ router.post(
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
 
+      // acciuga-62583: hard per-submission $625 ceiling (no override).
+      // Enforced BEFORE the party-cap check so the error message is clearer
+      // even on uncapped events. Out-of-band records still get split.
+      assertWithinPerSubmissionCap(finalAmountUsd);
+
       // tiramisu-49102: hard cap — block external records that would push the
       // cumulative paid+pending+approved past the party's effective cap.
       await assertWithinPartyCap(partyId, finalAmountUsd);
@@ -1427,6 +1453,9 @@ router.patch(
         if (oldAmount !== newAmount) {
           amountChanged = true;
           data.finalAmountUsd = parsed;
+          // acciuga-62583: hard per-submission $625 ceiling. Applies even to
+          // admin amount edits — there's no override path.
+          assertWithinPerSubmissionCap(parsed);
           // tiramisu-49102: re-check per-party cap when admin edits amount.
           // Exclude THIS row from the existing-total so the edit doesn't
           // count against itself.
