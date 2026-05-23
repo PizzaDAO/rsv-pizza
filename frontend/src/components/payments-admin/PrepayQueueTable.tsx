@@ -94,6 +94,24 @@ const HostChip: React.FC<{
   );
 };
 
+/**
+ * regina-89172: shared "already paid" caption — rendered in both the desktop
+ * table cell and the mobile card so behavior stays in lockstep.
+ */
+const AlreadyPaidCaption: React.FC<{ row: PrepayQueueRow }> = ({ row }) => {
+  if (row.partyPaidCount <= 0) return null;
+  const overCap =
+    row.party.effectiveReimbursementCapUsd != null &&
+    row.partyPaidUsd >= row.party.effectiveReimbursementCapUsd;
+  return (
+    <div
+      className={`text-[11px] mt-0.5 ${overCap ? 'text-amber-300' : 'text-theme-text-muted'}`}
+    >
+      Already paid: ${row.partyPaidUsd.toFixed(2)} ({row.partyPaidCount})
+    </div>
+  );
+};
+
 export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
   rows,
   onCreatePrepayment,
@@ -102,7 +120,80 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
 }) => {
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* regina-89172: mobile card list (<640px). Each row becomes a stacked
+          block so 4–5 fields lay out cleanly without horizontal scroll. */}
+      <ul className="sm:hidden divide-y divide-theme-stroke">
+        {rows.map((row) => {
+          const eventSlug = row.party.customUrl ?? row.party.id;
+          return (
+            <li key={row.party.id} className="p-3 space-y-2">
+              <div>
+                <div className="flex items-start gap-2">
+                  <Link
+                    to={`/host/${eventSlug}/details`}
+                    className="font-medium text-theme-text hover:text-[#E52828] hover:underline break-words flex-1 min-w-0"
+                  >
+                    {stripGppPrefix(row.party.name)}
+                  </Link>
+                  {row.hasMultipleCandidates && (
+                    <span
+                      className="inline-flex items-center text-amber-500 shrink-0 mt-0.5"
+                      title="Multiple hosts have payment methods — pick one when creating the prepayment"
+                    >
+                      <AlertTriangle size={14} />
+                    </span>
+                  )}
+                </div>
+                {row.party.country && (
+                  <div className="text-xs text-theme-text-muted mt-0.5">
+                    {row.party.country}
+                  </div>
+                )}
+                <AlreadyPaidCaption row={row} />
+              </div>
+
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-theme-text-muted mb-1">
+                  Host(s)
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {row.candidates.map((c) => (
+                    <HostChip
+                      key={c.userId}
+                      candidate={c}
+                      invisiblePrimaryHost={row.party.primaryHostInCohosts === false}
+                      onClick={onHostClick ? () => onHostClick(c.userId) : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-theme-text inline-flex items-center gap-1">
+                  <span className="text-[11px] uppercase tracking-wide text-theme-text-muted">
+                    Cap
+                  </span>
+                  <CapInlineEditor
+                    partyId={row.party.id}
+                    currentCapUsd={row.party.effectiveReimbursementCapUsd ?? null}
+                    onUpdated={() => onPartyUpdated?.(row.party.id)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onCreatePrepayment(row)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shrink-0"
+                >
+                  Create prepayment
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop table (≥640px). */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
@@ -150,18 +241,7 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                         admin sees prior payouts to this party before clicking
                         Create prepayment again. Amber when the paid total has
                         reached or exceeded the effective cap. */}
-                    {row.partyPaidCount > 0 && (
-                      <div
-                        className={`text-[11px] mt-0.5 ${
-                          row.party.effectiveReimbursementCapUsd != null &&
-                          row.partyPaidUsd >= row.party.effectiveReimbursementCapUsd
-                            ? 'text-amber-300'
-                            : 'text-theme-text-muted'
-                        }`}
-                      >
-                        Already paid: ${row.partyPaidUsd.toFixed(2)} ({row.partyPaidCount})
-                      </div>
-                    )}
+                    <AlreadyPaidCaption row={row} />
                   </td>
                   <td className="px-3 py-3 align-top">
                     <div className="flex flex-wrap gap-1.5">

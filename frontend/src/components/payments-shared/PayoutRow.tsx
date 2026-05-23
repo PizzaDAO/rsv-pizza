@@ -102,8 +102,8 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       {showAdminColumns && admin.host && (
-        <td className="px-3 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-1.5">
+        <td className="px-3 py-3 text-sm min-w-[10rem]" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 flex-wrap">
             {/* siciliana-69183: when `onHostClick` is wired, the host name becomes
                 a button that opens the read-only HostPaymentDetailsModal. Falls
                 back to plain text for any callsite that doesn't want the modal. */}
@@ -114,10 +114,10 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
                 className="font-medium text-theme-text hover:text-[#E52828] hover:underline text-left"
                 title="View saved payment details"
               >
-                {admin.host.name || admin.host.email || '—'}
+                <span className="break-words">{admin.host.name || admin.host.email || '—'}</span>
               </button>
             ) : (
-              <div className="font-medium text-theme-text">{admin.host.name || '—'}</div>
+              <div className="font-medium text-theme-text break-words">{admin.host.name || '—'}</div>
             )}
             {/* paesana-89172: amber warning when the payout's recipient IS the
                 party's primary host (parties.userId) but the primary host
@@ -146,7 +146,7 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       )}
 
       {showAdminColumns && admin.party && (
-        <td className="px-3 py-3 text-sm">
+        <td className="px-3 py-3 text-sm min-w-[10rem]">
           {/* siciliana-69183: link to the host dashboard's Settings tab. Slug is
               customUrl ?? inviteCode to match user-facing URLs. Tab id 'details'
               is the canonical Settings tab id (see tabPermissions.ts). */}

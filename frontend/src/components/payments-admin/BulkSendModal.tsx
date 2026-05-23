@@ -204,7 +204,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
       }}
     >
       <div
-        className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke"
+        className="card p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3 mb-4">

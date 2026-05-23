@@ -238,7 +238,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
