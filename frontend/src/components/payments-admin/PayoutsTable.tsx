@@ -144,8 +144,10 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
 
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+      {/* regina-89172: horizontal scroll wrapper with min-w on the table so
+          columns stay legible at mobile widths instead of squishing. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
               <th className="px-3 py-3 w-10">

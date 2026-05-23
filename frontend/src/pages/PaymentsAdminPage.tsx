@@ -616,8 +616,8 @@ export function PaymentsAdminPage() {
                 ? `Prepay queue (${sortedPrepayQueue.length} of ${prepayQueue.length} events)`
                 : `Prepay queue (${prepayQueue.length} event${prepayQueue.length === 1 ? '' : 's'})`}
             </h2>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="max-w-md flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+              <div className="sm:max-w-md sm:flex-1">
                 <IconInput
                   icon={Search}
                   type="text"
@@ -626,7 +626,7 @@ export function PaymentsAdminPage() {
                   placeholder="Search city, country, or host…"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs uppercase tracking-wide text-theme-text-muted">
                   Sort:
                 </span>

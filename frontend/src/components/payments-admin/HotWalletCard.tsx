@@ -125,7 +125,7 @@ export const HotWalletCard: React.FC = () => {
       ) : loading && !info ? (
         <div className="space-y-3">
           <div className="h-8 rounded-md bg-theme-surface-hover animate-pulse" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="h-16 rounded-md bg-theme-surface-hover animate-pulse" />
             <div className="h-16 rounded-md bg-theme-surface-hover animate-pulse" />
           </div>
@@ -149,7 +149,7 @@ export const HotWalletCard: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="rounded-md border border-theme-stroke bg-theme-surface p-3">
               <div className="text-xs uppercase tracking-wide text-theme-text-secondary mb-1">
                 ETH for gas

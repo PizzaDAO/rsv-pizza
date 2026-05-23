@@ -26,7 +26,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, tone = 'default
         {icon}
         <span>{label}</span>
       </div>
-      <div className="text-xl font-semibold text-theme-text">{value}</div>
+      <div className="text-base sm:text-xl font-semibold text-theme-text break-words">{value}</div>
     </div>
   );
 };

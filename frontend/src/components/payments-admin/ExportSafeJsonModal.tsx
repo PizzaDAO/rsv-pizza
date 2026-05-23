@@ -68,7 +68,7 @@ export const ExportSafeJsonModal: React.FC<ExportSafeJsonModalProps> = ({
     >
       <form
         onSubmit={handleSubmit}
-        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-md max-h-[90vh] overflow-y-auto"
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 px-5 py-4 border-b border-theme-stroke">
