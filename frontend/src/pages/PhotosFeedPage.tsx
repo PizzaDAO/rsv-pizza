@@ -7,7 +7,7 @@ import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, FeedPhoto } from '../lib/api';
 import { countryNameToAlpha2 } from '../utils/countryFlag';
 
-const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@3.3.0/flags';
+const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
 
 function CircleFlag({ country, size = 14 }: { country: string | null; size?: number }) {
   const code = countryNameToAlpha2(country);
