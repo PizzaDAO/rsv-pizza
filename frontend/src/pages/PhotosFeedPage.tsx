@@ -127,9 +127,6 @@ export function PhotosFeedPage() {
             <button onClick={() => { hasMoreRef.current = true; setHasMore(true); loadPage(false); }} className="mt-2 underline text-theme-text">Try again</button>
           </div>
         )}
-        {!hasMore && photos.length > 0 && !error && (
-          <p className="text-center text-theme-text-muted py-6 text-sm">You've reached the end.</p>
-        )}
       </div>
 
       {selectedIdx !== null && photos[selectedIdx] && (
