@@ -221,12 +221,27 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       <td className="px-3 py-3 text-sm text-theme-text">
-        <div className="font-medium">
+        <div className="font-medium inline-flex items-center gap-1.5">
           {formatPayoutAmount(
             Number(payout.finalAmountUsd),
             Number(payout.originalAmount),
             payout.originalCurrency,
           )}
+          {/* speck-89172: amber AlertTriangle when the payout's final amount
+              exceeds the party's effective reimbursement cap. Additive to
+              the parmigiana-89172 "Already paid" caption — this flags the
+              individual row, that flags the cumulative paid total. */}
+          {showAdminColumns &&
+            admin.party?.effectiveReimbursementCapUsd != null &&
+            Number(payout.finalAmountUsd) > admin.party.effectiveReimbursementCapUsd && (
+              <span
+                className="inline-flex items-center text-amber-500 shrink-0"
+                title={`Submitted amount $${Number(payout.finalAmountUsd).toFixed(2)} exceeds the party's $${admin.party.effectiveReimbursementCapUsd.toFixed(2)} cap.`}
+                aria-label="Amount exceeds party cap"
+              >
+                <AlertTriangle size={14} />
+              </span>
+            )}
         </div>
       </td>
 

@@ -664,15 +664,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       );
     }
 
-    // acciuga-62583: hard per-submission ceiling of $625 (no override).
-    // Enforced BEFORE the party-cap check so the host gets the clearer
-    // "split your submission" guidance even on uncapped events.
-    assertWithinPerSubmissionCap(finalUsd);
-
-    // tiramisu-49102: hard cap — block creates that would push the cumulative
-    // paid+pending+approved total past the party's effective cap. Parties
-    // without an effective cap stay uncapped.
-    await assertWithinPartyCap(partyId, finalUsd);
+    // speck-89172: host POST is no longer cap-enforced. Hosts can submit any
+    // positive amount; admin moderates over-cap rows from /payments (which
+    // surfaces an amber flag on rows that exceed the party's effective cap).
+    // The acciuga-62583 / tiramisu-49102 helpers remain in this file because
+    // admin PATCH (aglio-62584) still uses the per-submission ceiling.
 
     // arugula-38633 v3 follow-up: zero-receipts path — default the FX fields
     // to USD passthrough using finalUsd. (extractedUsdSum stays 0; we surface
@@ -1018,13 +1014,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       if (!Number.isFinite(n) || n <= 0) {
         throw new AppError('finalAmountUsd must be a positive number', 400, 'INVALID_AMOUNT');
       }
-      // acciuga-62583: hard per-submission $625 ceiling — enforced before the
-      // party-cap check so the message is clearer on uncapped events.
-      assertWithinPerSubmissionCap(n);
-      // tiramisu-49102: re-check per-party cap when the host edits the
-      // amount. Exclude THIS row from the existing-total so the edit doesn't
-      // count against itself.
-      await assertWithinPartyCap(partyId, n, payoutId);
+      // speck-89172: host PATCH is no longer cap-enforced. The amber flag on
+      // /payments rows surfaces over-cap edits for admin moderation; admin
+      // PATCH (aglio-62584) retains the per-submission ceiling via the
+      // override checkbox.
       data.finalAmountUsd = new Decimal(n);
     }
 
@@ -1235,18 +1228,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       : (recomputedAmount != null ? Number(recomputedAmount.toString()) : oldAmount);
     const amountChanged = newAmount !== oldAmount;
 
-    // acciuga-62583: hard per-submission $625 ceiling on the recomputed amount
-    // (explicit-amount edits are checked above next to the validation).
-    if (amountChanged && !explicitAmount) {
-      assertWithinPerSubmissionCap(newAmount);
-    }
-
-    // tiramisu-49102: re-check per-party cap when a receipt-edit causes the
-    // amount to be recomputed (explicit-amount edits are checked above).
-    // Exclude THIS row from the existing-total so it doesn't count against itself.
-    if (amountChanged && !explicitAmount) {
-      await assertWithinPartyCap(partyId, newAmount, payoutId);
-    }
+    // speck-89172: cap enforcement on receipt-edit recompute removed — the
+    // amber flag on /payments rows surfaces over-cap edits for admin
+    // moderation. Admin PATCH (aglio-62584) retains the per-submission
+    // ceiling via its override checkbox.
 
     // Single transaction: delete removed docs, insert new docs, update payout,
     // write the audit row(s).

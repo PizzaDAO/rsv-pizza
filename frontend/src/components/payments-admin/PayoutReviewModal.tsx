@@ -475,8 +475,22 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 })()
               ) : (
                 <div>
-                  <div className="text-2xl font-semibold text-theme-text">
+                  <div className="text-2xl font-semibold text-theme-text inline-flex items-center gap-2">
                     {formatUsd(Number(payout.finalAmountUsd))}
+                    {/* speck-89172: amber AlertTriangle when the payout's
+                        final amount exceeds the party's effective cap. Hosts
+                        can now submit any amount; admin moderates over-cap
+                        rows from /payments. */}
+                    {payout.party?.effectiveReimbursementCapUsd != null &&
+                      Number(payout.finalAmountUsd) > payout.party.effectiveReimbursementCapUsd && (
+                        <span
+                          className="inline-flex items-center text-amber-500 shrink-0"
+                          title={`Submitted amount $${Number(payout.finalAmountUsd).toFixed(2)} exceeds the party's $${Number(payout.party.effectiveReimbursementCapUsd).toFixed(2)} cap.`}
+                          aria-label="Amount exceeds party cap"
+                        >
+                          <AlertTriangle size={18} />
+                        </span>
+                      )}
                   </div>
                   {payout.originalCurrency && payout.originalCurrency.toUpperCase() !== 'USD' && (
                     <div className="text-xs text-theme-text-muted mt-0.5">

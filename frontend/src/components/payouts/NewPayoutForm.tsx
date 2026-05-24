@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, StickyNote, BadgeDollarSign, Users } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users, AlertTriangle } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
@@ -12,11 +12,13 @@ import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
 
 /**
- * acciuga-62583: hard per-submission ceiling of $625. Matches backend
- * `PER_SUBMISSION_CAP_EXCEEDED` (400) — UI disables submit + shows inline
- * error so the host can split the request before posting. No override path.
+ * speck-89172: the $625 per-payment hard ceiling is still informative — USDC
+ * execute still caps at $625 per tx, so a single oversize submission may
+ * require admin to split into multiple sends. Host submission is no longer
+ * blocked; instead we render an amber warning so the host knows what to
+ * expect on the admin side.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_PAYMENT_HARD_CEILING_USD = 625;
 
 interface NewPayoutFormProps {
   partyId: string;
@@ -145,15 +147,18 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const attendanceValid = !askForAttendance
     || (estimatedAttendance != null && estimatedAttendance > 0);
 
-  // acciuga-62583: hard $625 per-submission cap. Hosts split larger expenses
-  // into multiple submissions. Matches backend `PER_SUBMISSION_CAP_EXCEEDED`.
-  const exceedsPerSubmissionCap = finalAmount > PER_SUBMISSION_MAX_USD;
+  // speck-89172: hosts can now submit any positive amount. The party-cap and
+  // $625 hard-ceiling checks are surfaced as non-blocking amber warnings
+  // instead. Admin moderates over-cap rows from /payments.
+  const effectiveCapUsd = party?.effectiveReimbursementCapUsd ?? null;
+  const exceedsPartyCap =
+    effectiveCapUsd != null && effectiveCapUsd > 0 && finalAmount > effectiveCapUsd;
+  const exceedsHardCeiling = finalAmount > PER_PAYMENT_HARD_CEILING_USD;
 
   // arugula-38633 v3 follow-up: payment details + receipts are no longer
   // required for submission. The submit button stays active whenever the
   // host has entered a positive amount and nothing async is in flight.
   const canSubmit = finalAmount > 0
-    && finalAmount <= PER_SUBMISSION_MAX_USD
     && attendanceValid
     && !isProcessing
     && !submitting;
@@ -363,12 +368,30 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       )}
 
-      {/* acciuga-62583: per-submission $625 ceiling. Same visual treatment as
-          submitError so the host sees the gate before clicking Submit. */}
-      {exceedsPerSubmissionCap && (
-        <div className="card p-4 border-red-500/40 bg-red-500/10 text-sm text-red-300">
-          Payment requests are limited to ${PER_SUBMISSION_MAX_USD} per submission.
-          Reduce the amount or split into multiple submissions.
+      {/* speck-89172: party-cap amber warning. Non-blocking — submit stays
+          enabled, admin reviews from /payments. Only renders when the party
+          has an effective cap AND the typed amount exceeds it. */}
+      {exceedsPartyCap && (
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-100">
+              Heads up: ${finalAmount.toFixed(2)} exceeds your ${effectiveCapUsd!.toFixed(2)} reimbursement cap. Admin will review.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* speck-89172: $625 hard-ceiling amber warning. USDC execute caps at
+          $625 per tx, so admin may need to split this into multiple sends. */}
+      {exceedsHardCeiling && (
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-100">
+              Heads up: ${finalAmount.toFixed(2)} exceeds the ${PER_PAYMENT_HARD_CEILING_USD} per-payment maximum. Admin may need to split into multiple sends.
+            </div>
+          </div>
         </div>
       )}
 
