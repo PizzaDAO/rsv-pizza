@@ -273,11 +273,11 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
     }
 
     // Validate MIME type (images + videos)
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/avif'];
     const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     const allowedMimeTypes = [...allowedImageTypes, ...allowedVideoTypes];
     if (!allowedMimeTypes.includes(mimeType)) {
-      throw new AppError('Invalid file type. Allowed: jpeg, png, webp, gif, mp4, webm, mov', 400, 'INVALID_FILE_TYPE');
+      throw new AppError('Invalid file type. Allowed: jpeg, png, webp, gif, heic, heif, avif, mp4, webm, mov', 400, 'INVALID_FILE_TYPE');
     }
 
     const isVideo = allowedVideoTypes.includes(mimeType);

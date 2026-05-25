@@ -400,7 +400,7 @@ export async function uploadEventPhoto(
 } | null> {
   try {
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       console.error('Invalid file type:', file.type);
       return null;
@@ -483,7 +483,7 @@ export async function uploadVenuePhoto(
 } | null> {
   try {
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       console.error('Invalid file type:', file.type);
       return null;
