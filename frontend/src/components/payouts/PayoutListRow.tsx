@@ -8,6 +8,9 @@ interface PayoutListRowProps {
   payout: Payout;
   partyId: string;
   onOpen: () => void;
+  // Renamed conceptually to "withdrawn" in gelato-72831, but the prop name
+  // stays the same to keep the diff small — it's just a notification that
+  // the row was removed (whether the prior status was pending or approved).
   onCancelled: (payoutId: string) => void;
 }
 
@@ -54,9 +57,9 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
   onCancelled,
 }) => {
   const { user } = useAuth();
-  const [cancelling, setCancelling] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
-  // gouda-83912: only the submitter (or any admin) may cancel a payout from
+  // gouda-83912: only the submitter (or any admin) may withdraw a payout from
   // the host-side list. Other cohosts can still see and open the row, but
   // the inline X button is hidden so they don't get a 403 on click.
   const [isAdmin, setIsAdmin] = useState(false);
@@ -70,21 +73,32 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
   const canModify =
     isAdmin || (user?.id != null && user.id === payout.hostUserId);
 
+  // gelato-72831: hosts can withdraw both pending and approved payouts.
+  // Approved means an admin OK'd it but no payment has been issued yet, so
+  // hard-deleting is still safe (the deletion_log trigger keeps an audit
+  // record). `paid`, `rejected`, `failed` remain terminal.
+  const canWithdraw = payout.status === 'pending' || payout.status === 'approved';
+
   // First pizza photo, or first receipt as a fallback thumbnail
   const thumb = payout.documents.find(d => d.kind === 'pizza')
     ?? payout.documents.find(d => d.kind === 'receipt');
 
-  const handleCancel = async (e: React.MouseEvent) => {
+  const handleWithdraw = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Cancel this payment request? This cannot be undone.')) return;
-    setCancelling(true);
+    // Hard-delete is not reversible, so we keep a confirm step. For approved
+    // rows the copy makes clear that resubmitting is the next step.
+    const message = payout.status === 'approved'
+      ? 'Withdraw this request? You can submit a new one afterward.'
+      : 'Withdraw this payment request? This cannot be undone.';
+    if (!confirm(message)) return;
+    setWithdrawing(true);
     try {
       const ok = await cancelPayout(partyId, payout.id);
       if (ok) {
         onCancelled(payout.id);
       }
     } finally {
-      setCancelling(false);
+      setWithdrawing(false);
     }
   };
 
@@ -152,15 +166,17 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
         {STATUS_LABEL[payout.status]}
       </span>
 
-      {/* Cancel button (only while pending, and only for the submitter/admin) */}
-      {payout.status === 'pending' && canModify && (
+      {/* Withdraw button (pending or approved; only for the submitter/admin).
+          gelato-72831: extended from pending-only to pending+approved. */}
+      {canWithdraw && canModify && (
         <button
-          onClick={handleCancel}
-          disabled={cancelling}
+          onClick={handleWithdraw}
+          disabled={withdrawing}
           className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-          title="Cancel"
+          title="Withdraw"
+          aria-label="Withdraw payment request"
         >
-          {cancelling ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
+          {withdrawing ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
         </button>
       )}
 

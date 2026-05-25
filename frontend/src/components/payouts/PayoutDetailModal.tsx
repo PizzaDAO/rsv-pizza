@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign } from 'lucide-react';
+import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2 } from 'lucide-react';
 import { Payout, PayoutStatus } from '../../types';
-import { getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
+import { cancelPayout, getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { methodIcon, methodLabel } from './PayoutListRow';
 import { IconInput } from '../IconInput';
@@ -18,6 +18,12 @@ interface PayoutDetailModalProps {
    * (PayoutsTab) refresh its list so totals / OCR sums stay in sync.
    */
   onUpdated?: () => void;
+  /**
+   * gelato-72831: optional callback fired after a successful withdraw so the
+   * parent list can drop the row. If provided, the modal will close itself
+   * after invoking it.
+   */
+  onWithdrawn?: (payoutId: string) => void;
 }
 
 const STATUS_STYLES: Record<PayoutStatus, string> = {
@@ -46,6 +52,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   payoutId,
   onClose,
   onUpdated,
+  onWithdrawn,
 }) => {
   const { user } = useAuth();
   const [payout, setPayout] = useState<Payout | null>(null);
@@ -68,6 +75,10 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // ---- withdraw state (gelato-72831) ----
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   // New uploads since edit-mode was opened (existing docs aren't re-uploaded).
   const [newReceipts, setNewReceipts] = useState<ReceiptItem[]>([]);
@@ -238,6 +249,38 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     }
   };
 
+  // gelato-72831: withdraw both pending and approved payouts. Hard-deletes
+  // the row server-side (deletion_log trigger keeps audit trail). For approved
+  // rows the confirm copy makes clear that resubmitting is the next step.
+  const handleWithdraw = async () => {
+    if (!payout || withdrawing) return;
+    const message = payout.status === 'approved'
+      ? 'Withdraw this request? You can submit a new one afterward.'
+      : 'Withdraw this payment request? This cannot be undone.';
+    if (!confirm(message)) return;
+    setWithdrawing(true);
+    setWithdrawError(null);
+    try {
+      const ok = await cancelPayout(partyId, payout.id);
+      if (ok) {
+        onWithdrawn?.(payout.id);
+        onClose();
+      }
+    } catch (err: any) {
+      setWithdrawError(err?.message || 'Failed to withdraw payment');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  // Status-gated withdraw availability. canModify already enforces
+  // submitter-or-admin ownership.
+  const canWithdraw = Boolean(
+    payout &&
+    (payout.status === 'pending' || payout.status === 'approved') &&
+    canModify
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -269,6 +312,22 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 Edit
               </button>
             )}
+            {/* gelato-72831: Withdraw is available for pending AND approved
+                rows. Approved means an admin OK'd it but no money has moved;
+                hard-deleting still leaves a deletion_log audit trail. */}
+            {payout && !editing && canWithdraw && (
+              <button
+                type="button"
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md text-theme-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                title="Withdraw"
+                aria-label="Withdraw payment request"
+              >
+                {withdrawing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Withdraw
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-1.5 rounded-md text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
@@ -289,6 +348,12 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
           {error && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300 inline-flex items-center gap-2">
               <AlertCircle size={16} /> {error}
+            </div>
+          )}
+
+          {withdrawError && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300 inline-flex items-center gap-2">
+              <AlertCircle size={16} /> {withdrawError}
             </div>
           )}
 
