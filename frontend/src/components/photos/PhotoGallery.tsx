@@ -15,6 +15,13 @@ interface PhotoGalleryProps {
   guestId?: string;
   photoModeration?: boolean;
   /**
+   * Whether the current viewer can upload. Defaults to true to keep existing
+   * call sites working. When false, the Upload buttons (header + empty state)
+   * and the programmatic triggerUploadRef are hidden so non-confirmed visitors
+   * don't see a broken click → upload-fail flow. parmigiano-71294.
+   */
+  canUpload?: boolean;
+  /**
    * Optional ref the gallery populates on mount with a function that opens
    * the upload picker. Callers (e.g. EventPage) can call this to programmatically
    * trigger an upload flow without restructuring the gallery internals.
@@ -32,6 +39,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   uploaderEmail,
   guestId,
   photoModeration = false,
+  canUpload = true,
   triggerUploadRef,
 }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -50,15 +58,17 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
   // Expose an imperative trigger so callers can programmatically open the upload picker.
   // Populated/cleared in an effect to avoid mutating refs during render.
+  // parmigiano-71294: skip the trigger entirely when canUpload is false so
+  // non-confirmed visitors can't open the picker programmatically.
   useEffect(() => {
-    if (!triggerUploadRef) return;
+    if (!triggerUploadRef || !canUpload) return;
     triggerUploadRef.current = () => setShowUpload(true);
     return () => {
       if (triggerUploadRef.current) {
         triggerUploadRef.current = null;
       }
     };
-  }, [triggerUploadRef]);
+  }, [triggerUploadRef, canUpload]);
 
   // Split photos into images and videos for tab filtering
   const imagePhotos = useMemo(() => photos.filter(p => !p.mimeType?.startsWith('video/')), [photos]);
@@ -341,14 +351,16 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
             )}
           </div>}
 
-          {/* Upload Button */}
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Upload size={16} />
-            <span className="hidden sm:inline">Upload</span>
-          </button>
+          {/* Upload Button — hidden when viewer can't upload (parmigiano-71294) */}
+          {canUpload && (
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              <Upload size={16} />
+              <span className="hidden sm:inline">Upload</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -475,7 +487,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               ? 'No videos yet'
               : 'No photos yet'}
           </p>
-          {filter === 'all' && (
+          {filter === 'all' && canUpload && (
             <button
               onClick={() => setShowUpload(true)}
               className="inline-flex items-center gap-2 bg-[#ff393a] hover:bg-[#ff5a5b] text-white font-medium px-4 py-2 rounded-lg transition-colors"

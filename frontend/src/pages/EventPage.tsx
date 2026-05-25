@@ -1535,8 +1535,13 @@ export function EventPage() {
                   />
                 )}
 
-                {/* Photo Gallery Section - only for confirmed guests */}
-                {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
+                {/* Photo Gallery Section
+                    parmigiano-71294: Drop the CONFIRMED gate so non-RSVP'd visitors see
+                    the same photos that already appear on the /photos public feed.
+                    Private galleries (photosPublic=false) remain gated to confirmed
+                    guests + hosts. Upload UI is hidden for non-confirmed visitors via
+                    the canUpload prop to avoid a broken click → fail flow. */}
+                {photoStats?.photosEnabled && (event.photosPublic || existingGuestData?.status === 'CONFIRMED' || isHostUser) && (
                   <div ref={photoGalleryRef} className="border-t border-theme-stroke pt-6 mt-6">
                     {showPhotos ? (
                       <PhotoGallery
@@ -1546,6 +1551,7 @@ export function EventPage() {
                         uploaderName={existingGuestData?.name || user?.name || undefined}
                         uploaderEmail={existingGuestData?.email || user?.email}
                         guestId={existingGuestData?.id}
+                        canUpload={existingGuestData?.status === 'CONFIRMED'}
                         triggerUploadRef={photoGalleryTriggerRef}
                       />
                     ) : (

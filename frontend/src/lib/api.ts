@@ -593,6 +593,8 @@ export interface PublicEvent {
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
   photoModeration?: boolean;
+  photosEnabled?: boolean;
+  photosPublic?: boolean;
   nftEnabled?: boolean;
   nftChain?: string | null;
   hiddenGppPhotos?: string[];
