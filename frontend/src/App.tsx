@@ -31,6 +31,7 @@ import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 import { EventsMapPage } from './pages/EventsMapPage';
 import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
 import { PartnersPage } from './pages/PartnersPage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { PhotosFeedPage } from './pages/PhotosFeedPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
@@ -64,6 +65,9 @@ function App() {
             <Route path="/map/swc" element={<Suspense fallback={null}><EventsMapSwcPage /></Suspense>} />
             {/* /partners must come before /:slug */}
             <Route path="/partners" element={<PartnersPage />} />
+            {/* stromboli-71593: /leaderboard + /gpp/leaderboard must come before /:slug */}
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/gpp/leaderboard" element={<LeaderboardPage />} />
             {/* /payments must come before /:slug */}
             <Route path="/payments" element={<PaymentsAdminPage />} />
             {/* margherita-43821: /photos public global feed; must come before /:slug */}
