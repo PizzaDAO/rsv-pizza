@@ -7,6 +7,7 @@ import { methodIcon, methodLabel } from './PayoutListRow';
 import { IconInput } from '../IconInput';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
+import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
 
 interface PayoutDetailModalProps {
   partyId: string;
@@ -76,6 +77,17 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   const [editNotes, setEditNotes] = useState('');
   const [editOverrideAmount, setEditOverrideAmount] = useState<string>('');
 
+  // focaccia-89172: per-existing-document FX overrides keyed by document id.
+  // The on-disk `ocrAmount`/`ocrCurrency` columns aren't currently mutable via
+  // the host PATCH, so we apply the corrected USD via `editOverrideAmount`
+  // when the host saves — the per-doc values stay informational.
+  interface DocFxOverride {
+    usdAmount: number;
+    originalAmount: number;
+    originalCurrency: string;
+  }
+  const [docFxOverrides, setDocFxOverrides] = useState<Record<string, DocFxOverride>>({});
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -95,6 +107,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     setNewReceipts([]);
     setNewPizzaPhotos([]);
     setRemovedDocIds(new Set());
+    setDocFxOverrides({});
     setEditNotes(payout.hostNotes ?? '');
     setEditOverrideAmount(
       payout.finalAmountUsd != null ? String(payout.finalAmountUsd) : ''
@@ -107,6 +120,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     setNewReceipts([]);
     setNewPizzaPhotos([]);
     setRemovedDocIds(new Set());
+    setDocFxOverrides({});
   };
 
   // Surviving existing documents (not marked for removal) — drives the
@@ -475,30 +489,79 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 <div>
                   <p className="text-xs text-theme-text-muted mb-2">Existing receipts</p>
                   <ul className="space-y-2">
-                    {survivingReceipts.map(d => (
-                      <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
-                        <a href={d.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
-                          <img src={d.url} alt="" className="w-14 h-14 rounded object-cover" />
-                        </a>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-theme-text truncate">{d.fileName}</p>
-                          {d.ocrAmount != null && (
-                            <p className="text-xs text-theme-text-muted">
-                              ${d.ocrAmount.toFixed(2)} USD
-                              {d.ocrCurrency && d.ocrCurrency !== 'USD' && ` (from ${d.ocrCurrency})`}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
-                          className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                          aria-label="Remove receipt"
-                        >
-                          <X size={16} />
-                        </button>
-                      </li>
-                    ))}
+                    {survivingReceipts.map(d => {
+                      // focaccia-89172: apply local FX override (if any) on top
+                      // of the stored OCR values so the host sees the corrected
+                      // USD inline. The corrected total flows into the amount
+                      // override field on save (see onConverted below).
+                      const ov = docFxOverrides[d.id];
+                      const displayedUsd = ov ? ov.usdAmount : d.ocrAmount;
+                      const displayedOriginal = ov ? ov.originalAmount : d.ocrAmount;
+                      const displayedCurrency = ov ? ov.originalCurrency : (d.ocrCurrency || 'USD');
+                      return (
+                        <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
+                          <a href={d.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                            <img src={d.url} alt="" className="w-14 h-14 rounded object-cover" />
+                          </a>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-theme-text truncate">{d.fileName}</p>
+                            {displayedUsd != null && (
+                              <div className="text-xs text-theme-text-muted mt-0.5 inline-flex items-center gap-2 flex-wrap">
+                                <span>${displayedUsd.toFixed(2)} USD</span>
+                                {displayedCurrency !== 'USD' && (
+                                  <span>(from {(displayedOriginal ?? 0).toLocaleString()})</span>
+                                )}
+                                {/* On approved payouts the amount is locked,
+                                    so the dropdown wouldn't change anything.
+                                    Hide it there. */}
+                                {!isApproved && d.ocrAmount != null && (
+                                  <CurrencyOverrideSelect
+                                    partyId={partyId}
+                                    originalAmount={displayedOriginal ?? d.ocrAmount}
+                                    currentCurrency={displayedCurrency}
+                                    onConverted={result => {
+                                      // 1) Remember the override locally so
+                                      //    the row re-renders with new values.
+                                      setDocFxOverrides(prev => {
+                                        const nextOverrides = {
+                                          ...prev,
+                                          [d.id]: {
+                                            usdAmount: result.usdAmount,
+                                            originalAmount: result.originalAmount,
+                                            originalCurrency: result.originalCurrency,
+                                          },
+                                        };
+                                        // 2) Recompute the total across surviving
+                                        //    receipts with overrides applied and
+                                        //    push that into the amount-override
+                                        //    field so save persists the new sum.
+                                        const newTotal = survivingReceipts.reduce((sum, sr) => {
+                                          const o = nextOverrides[sr.id];
+                                          const usd = o ? o.usdAmount : (sr.ocrAmount ?? 0);
+                                          return sum + usd;
+                                        }, 0);
+                                        if (newTotal > 0) {
+                                          setEditOverrideAmount(newTotal.toFixed(2));
+                                        }
+                                        return nextOverrides;
+                                      });
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
+                            className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            aria-label="Remove receipt"
+                          >
+                            <X size={16} />
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}

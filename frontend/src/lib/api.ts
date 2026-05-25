@@ -4419,6 +4419,28 @@ export async function previewReceiptOCR(
   );
 }
 
+// focaccia-89172: re-run the FX cascade for a host-supplied currency override.
+// OCR sometimes misreads `₹` as `$` (etc.) — the host picks the correct code
+// from a dropdown and we replace the row's USD amount + exchange rate in-place.
+export interface ConvertFxResult {
+  usdAmount: number;
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  source: string;
+  conversionNote?: string;
+}
+
+export async function convertFx(
+  partyId: string,
+  body: { originalAmount: number; originalCurrency: string }
+): Promise<ConvertFxResult> {
+  return apiRequest<ConvertFxResult>(
+    `/api/parties/${partyId}/payouts/convert-fx`,
+    { method: 'POST', body, requireAuth: true }
+  );
+}
+
 // ============================================================
 // Outreach (marinara-67583) — admin-only outreach tracker
 // ============================================================
