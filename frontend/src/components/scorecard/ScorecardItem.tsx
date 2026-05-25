@@ -145,7 +145,7 @@ export function ScorecardItem({
 
       {/* URL Input (for post item) - appears below the row */}
       {showInput && !completed && (
-        <div className="ml-11 p-3 bg-[#1a1a2e] border border-white/10 rounded-lg">
+        <div className="ml-11 p-3 bg-white/10 border border-white/10 rounded-lg backdrop-blur-sm">
           <p className="text-xs text-white/60 mb-2">Paste the link to your post:</p>
           <div className="flex gap-2">
             <IconInput
