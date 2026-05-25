@@ -6,6 +6,7 @@ import { Layout } from '../components/Layout';
 import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, FeedPhoto } from '../lib/api';
 import { countryNameToAlpha2 } from '../utils/countryFlag';
+import { gppCityBySlug } from '../utils/gppCity';
 
 const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
 
@@ -149,6 +150,12 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   const aspectRatio = photo.width && photo.height
     ? `${photo.width} / ${photo.height}`
     : undefined;
+
+  // Prefer GPP city manifest entry; fall back to address-derived city/country.
+  const gpp = gppCityBySlug(photo.party.slug);
+  const displayCity = gpp?.name ?? photo.party.city ?? photo.party.name;
+  const displayCountry = gpp?.country ?? photo.party.country;
+
   return (
     <button onClick={onOpen} className="mb-3 block w-full break-inside-avoid rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity">
       <div className="relative w-full" style={{ aspectRatio }}>
@@ -165,12 +172,12 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
           <img src={src} alt={photo.caption || ''} loading="lazy" className="w-full h-full object-cover block" />
         )}
       </div>
-      {(photo.party.city || photo.party.name) && (
+      {(displayCity || photo.party.name) && (
         <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1.5">
-          {countryNameToAlpha2(photo.party.country)
-            ? <CircleFlag country={photo.party.country} size={14} />
+          {countryNameToAlpha2(displayCountry)
+            ? <CircleFlag country={displayCountry} size={14} />
             : <MapPin size={11} />}
-          <span className="truncate">{photo.party.city || photo.party.name}</span>
+          <span className="truncate">{displayCity}</span>
         </div>
       )}
     </button>
@@ -188,6 +195,12 @@ function FeedLightbox({
   hasNext: boolean;
 }) {
   const isVideo = photo.mimeType?.startsWith('video/');
+
+  // Prefer GPP city manifest entry; fall back to address-derived city/country.
+  const gpp = gppCityBySlug(photo.party.slug);
+  const displayCity = gpp?.name ?? photo.party.city;
+  const displayCountry = gpp?.country ?? photo.party.country;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <button
@@ -217,13 +230,13 @@ function FeedLightbox({
         <div className="p-4 border-t border-theme-stroke">
           {photo.caption && <p className="text-theme-text mb-2">{photo.caption}</p>}
           <p className="text-theme-text-muted text-sm flex items-center gap-2">
-            {countryNameToAlpha2(photo.party.country)
-              ? <CircleFlag country={photo.party.country} size={18} />
+            {countryNameToAlpha2(displayCountry)
+              ? <CircleFlag country={displayCountry} size={18} />
               : <MapPin size={12} />}
             <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">
               {photo.party.name}
             </Link>
-            {photo.party.city && <span>· {photo.party.city}{photo.party.country ? `, ${photo.party.country}` : ''}</span>}
+            {displayCity && <span>· {displayCity}{displayCountry ? `, ${displayCountry}` : ''}</span>}
           </p>
         </div>
       </div>
