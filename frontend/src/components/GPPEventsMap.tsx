@@ -5,6 +5,10 @@ import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
 // Lucide "send" icon SVG, inlined for use inside the InfoWindow HTML string.
 const SEND_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`;
 
+// Telegram brand mark — paper plane on the official Telegram blue (#229ED9),
+// inlined for use inside the InfoWindow HTML string.
+const TELEGRAM_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#229ED9" aria-label="Telegram"><path d="M12 0a12 12 0 100 24 12 12 0 000-24zm5.56 8.16-1.86 8.78c-.14.63-.5.78-1.02.49l-2.82-2.08-1.36 1.31c-.15.15-.28.28-.57.28l.2-2.87 5.24-4.73c.23-.2-.05-.32-.35-.12L8.55 13.3l-2.78-.87c-.6-.19-.62-.6.13-.89l10.85-4.18c.5-.18.94.12.81.8z"/></svg>`;
+
 interface GPPEventsMapProps {
   events: GPPEventMapItem[];
   cityChats?: Map<string, string>;
@@ -200,14 +204,26 @@ export default function GPPEventsMap({
           ? `<p style="color:#888;font-size:11px;margin:2px 0">${event.address}</p>`
           : '';
 
-        const linkLabel = canModerate ? 'View Event &rarr;' : 'RSVP &rarr;';
-        const linkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">${linkLabel}</a>`;
+        // focaccia-58293: party name itself is the link; no separate
+        // "RSVP →" / "View Event →" button.
+        const safeName = event.name
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const nameLinkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="display:block;margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a;text-decoration:none;line-height:1.25">${safeName}</a>`;
+
+        // focaccia-58293: flyer thumbnail at the top of the popup. Backend
+        // always returns eventImageUrl (defaults to the GPP OG image).
+        const flyerHtml = event.eventImageUrl
+          ? `<img src="${event.eventImageUrl}" alt="" loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block;margin:0 0 8px;background:#f3f4f6" onerror="this.style.display='none'" />`
+          : '';
 
         const cityKey = event.name.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
         const telegramUrlRaw = event.telegramGroup || cityChats.get(cityKey) || null;
         const telegramUrl = telegramUrlRaw ? telegramUrlRaw.replace(/"/g, '&quot;') : null;
+        // focaccia-58293: Telegram link uses the brand logo instead of "Telegram →" text.
         const telegramHtml = telegramUrl
-          ? `<a href="${telegramUrl}" target="_blank" rel="noopener noreferrer" style="color:#29B6F6;font-size:12px;text-decoration:none;font-weight:500">Telegram &rarr;</a>`
+          ? `<a href="${telegramUrl}" target="_blank" rel="noopener noreferrer" title="Join the Telegram chat" style="display:inline-flex;align-items:center;text-decoration:none;line-height:0">${TELEGRAM_LOGO_SVG}</a>`
           : '';
 
         const sanitizeHandle = (raw: string | null | undefined): string | null => {
@@ -272,16 +288,18 @@ export default function GPPEventsMap({
           ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${actionsHtml}</div>`
           : '';
 
+        const telegramRowHtml = telegramHtml
+          ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${telegramHtml}</div>`
+          : '';
+
         return `
           <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
-            <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${event.name}</h3>
+            ${flyerHtml}
+            ${nameLinkHtml}
             ${dateHtml}
             ${venueHtml}
             ${addressHtml}
-            <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              ${linkHtml}
-              ${telegramHtml}
-            </div>
+            ${telegramRowHtml}
             ${actionsRowHtml}
           </div>
         `;

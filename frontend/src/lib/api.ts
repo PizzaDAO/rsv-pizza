@@ -3580,6 +3580,7 @@ export interface GPPEventMapItem {
   telegramGroup: string | null;
   hostTelegram?: string | null;
   coHostTelegrams?: string[];
+  eventImageUrl?: string | null;
 }
 
 interface GPPEventApiResponse {
@@ -3600,6 +3601,7 @@ interface GPPEventApiResponse {
   telegramGroup: string | null;
   hostTelegram?: string | null;
   coHostTelegrams?: string[];
+  eventImageUrl?: string | null;
 }
 
 interface GPPEventsApiPayload {
@@ -3641,6 +3643,7 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     telegramGroup: e.telegramGroup ?? null,
     hostTelegram: e.hostTelegram ?? null,
     coHostTelegrams: e.coHostTelegrams ?? [],
+    eventImageUrl: e.eventImageUrl ?? null,
   }));
   if (curated) {
     events = events.filter((e) => e.underbossStatus === 'approved');
