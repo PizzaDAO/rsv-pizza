@@ -414,6 +414,80 @@ router.post(
   }
 );
 
+// ---------- POST /:partyId/payouts/convert-fx ----------
+
+/**
+ * focaccia-89172: host-side currency override. OCR sometimes misreads a
+ * currency symbol (e.g. `₹` as `$`) and the resulting USD conversion is
+ * wildly off. This endpoint wraps `convertToUSD` so the host can pick the
+ * correct currency from a dropdown on each receipt row; the row's locked
+ * FX fields are then replaced in-place client-side.
+ *
+ * Pure FX lookup — no OCR. Same auth + rate-limit shape as ocr-preview.
+ */
+router.post(
+  '/:partyId/payouts/convert-fx',
+  ocrPreviewLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const { originalAmount, originalCurrency } = req.body || {};
+
+      const amt = Number(originalAmount);
+      if (!Number.isFinite(amt) || amt <= 0) {
+        throw new AppError(
+          'originalAmount must be a positive number',
+          400,
+          'INVALID_AMOUNT'
+        );
+      }
+      if (typeof originalCurrency !== 'string' || originalCurrency.trim().length === 0) {
+        throw new AppError(
+          'originalCurrency is required',
+          400,
+          'INVALID_CURRENCY'
+        );
+      }
+
+      const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (!canEdit) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+
+      // bresaola-49185: same approval gate as ocr-preview — no FX lookups
+      // (which can touch external APIs) on unapproved parties.
+      await assertPartyApproved(partyId);
+
+      const fx = await convertToUSD(amt, originalCurrency.trim());
+
+      // convertToUSD never throws — it returns source='unknown' with rate=1
+      // when no provider can serve the currency. Reject that case so the
+      // host gets explicit feedback (and so the dropdown reverts client-side).
+      if (fx.source === 'unknown') {
+        throw new AppError(
+          `Could not look up exchange rate for currency "${originalCurrency.trim().toUpperCase()}".`,
+          400,
+          'UNKNOWN_CURRENCY'
+        );
+      }
+
+      res.json({
+        usdAmount: fx.usdAmount,
+        originalAmount: fx.originalAmount,
+        originalCurrency: fx.originalCurrency,
+        exchangeRate: fx.exchangeRate,
+        source: fx.source,
+        conversionNote:
+          fx.originalCurrency !== 'USD'
+            ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate.toFixed(6)} USD)`
+            : undefined,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ---------- POST /:partyId/payouts ----------
 
 interface IncomingDocument {

@@ -3,6 +3,7 @@ import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2 }
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
 import { OcrPreviewResult } from '../../types';
+import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
 
 export interface ReceiptItem {
   /** Stable client-side id for React keys. */
@@ -167,18 +168,40 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                     </span>
                   )}
                   {item.status === 'done' && item.ocr && (
-                    <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1">
                         {item.ocr.confidence >= 0.8
                           ? <CheckCircle2 size={12} className="text-emerald-400" />
                           : <AlertCircle size={12} className="text-amber-400" />}
                         ${item.ocr.amount.toFixed(2)} USD
                       </span>
-                      {item.ocr.conversionNote && (
-                        <span className="text-theme-text-muted">
-                          (from {item.ocr.originalAmount.toLocaleString()} {item.ocr.originalCurrency})
-                        </span>
-                      )}
+                      <span className="text-theme-text-muted">
+                        (from {item.ocr.originalAmount.toLocaleString()})
+                      </span>
+                      {/* focaccia-89172: native currency override dropdown.
+                          OCR misreads `₹` as `$` etc.; host picks the correct
+                          ISO code and we re-convert in-place. */}
+                      <CurrencyOverrideSelect
+                        partyId={partyId}
+                        originalAmount={item.ocr.originalAmount}
+                        currentCurrency={item.ocr.originalCurrency}
+                        onConverted={result => {
+                          const next = updateItem(items, item.id, {
+                            ocr: {
+                              ...item.ocr!,
+                              amount: result.usdAmount,
+                              originalAmount: result.originalAmount,
+                              originalCurrency: result.originalCurrency,
+                              exchangeRate: result.exchangeRate,
+                              conversionNote: result.conversionNote,
+                              fxSource:
+                                (result.source as OcrPreviewResult['fxSource']) ||
+                                item.ocr!.fxSource,
+                            },
+                          });
+                          onChange(next);
+                        }}
+                      />
                       <span className={item.ocr.confidence >= 0.8 ? 'text-emerald-300' : 'text-amber-300'}>
                         {Math.round(item.ocr.confidence * 100)}% confidence
                       </span>
