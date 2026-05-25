@@ -5,7 +5,7 @@
  * LocationAutocomplete when an event is created/edited). Includes a few
  * common aliases the wild data has produced ("USA", "UK", etc.).
  */
-const NAME_TO_CODE: Record<string, string> = {
+export const NAME_TO_CODE: Record<string, string> = {
   'Afghanistan': 'AF',
   'Åland Islands': 'AX',
   'Aland Islands': 'AX',
@@ -378,4 +378,51 @@ export function countryNameToAlpha2(name: string | null | undefined): string | n
   const code = NAME_TO_CODE[name.trim()];
   if (!code || code.length !== 2) return null;
   return code.toLowerCase(); // lowercase is what circle-flags filenames use
+}
+
+// sicilian-58129: reverse lookup — every long-name variant we know for a given
+// alpha-2 code. Used by /photos filter to expand "ES" -> ["Spain","España"]
+// before sending the raw country list to the backend.
+let _codeToNames: Map<string, string[]> | null = null;
+function buildCodeToNames(): Map<string, string[]> {
+  if (_codeToNames) return _codeToNames;
+  const m = new Map<string, string[]>();
+  for (const [name, code] of Object.entries(NAME_TO_CODE)) {
+    if (!code || code.length !== 2) continue;
+    const key = code.toUpperCase();
+    const arr = m.get(key) ?? [];
+    arr.push(name);
+    m.set(key, arr);
+  }
+  _codeToNames = m;
+  return m;
+}
+
+export function alpha2ToCountryNames(alpha2: string): string[] {
+  if (!alpha2) return [];
+  return buildCodeToNames().get(alpha2.toUpperCase()) ?? [];
+}
+
+// Preferred canonical display name per alpha-2. Picks the English name where
+// available, otherwise the first variant we know.
+const PREFERRED_NAME_BY_CODE: Record<string, string> = {
+  ES: 'Spain', CN: 'China', MX: 'Mexico', US: 'United States', GB: 'United Kingdom',
+  DE: 'Germany', FR: 'France', IT: 'Italy', JP: 'Japan', KR: 'South Korea',
+  BR: 'Brazil', AT: 'Austria', BE: 'Belgium', NL: 'Netherlands', PT: 'Portugal',
+  CH: 'Switzerland', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland',
+  PL: 'Poland', CZ: 'Czechia', GR: 'Greece', TR: 'Turkey', RU: 'Russia',
+  IN: 'India', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', ZA: 'South Africa',
+  AR: 'Argentina', CL: 'Chile', CO: 'Colombia', PE: 'Peru', VE: 'Venezuela',
+  EG: 'Egypt', NG: 'Nigeria', KE: 'Kenya', GH: 'Ghana', MA: 'Morocco',
+  TH: 'Thailand', VN: 'Vietnam', PH: 'Philippines', ID: 'Indonesia', MY: 'Malaysia',
+  SG: 'Singapore', TW: 'Taiwan', HK: 'Hong Kong', AE: 'United Arab Emirates',
+  IL: 'Israel', SA: 'Saudi Arabia', IR: 'Iran', PK: 'Pakistan', BD: 'Bangladesh',
+};
+
+export function alpha2ToCanonicalName(alpha2: string): string {
+  if (!alpha2) return '';
+  const code = alpha2.toUpperCase();
+  if (PREFERRED_NAME_BY_CODE[code]) return PREFERRED_NAME_BY_CODE[code];
+  const names = buildCodeToNames().get(code);
+  return names && names.length > 0 ? names[0] : code;
 }

@@ -1,22 +1,28 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { cdnUrl } from '../lib/supabase';
-import { getPhotosFeed, FeedPhoto } from '../lib/api';
-import { countryNameToAlpha2 } from '../utils/countryFlag';
+import {
+  getPhotosFeed,
+  getPhotosFeedFacets,
+  getMyPartnerTags,
+  FeedPhoto,
+} from '../lib/api';
+import { countryNameToAlpha2, alpha2ToCountryNames, alpha2ToCanonicalName } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
+import { GPP_REGIONS, GPPRegion } from '../types';
 
 const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
 
-function CircleFlag({ country, size = 14 }: { country: string | null; size?: number }) {
-  const code = countryNameToAlpha2(country);
-  if (!code) return null;
+function CircleFlag({ country, code, size = 14 }: { country?: string | null; code?: string | null; size?: number }) {
+  const c = code ?? countryNameToAlpha2(country ?? null);
+  if (!c) return null;
   return (
     <img
-      src={`${FLAG_BASE}/${code}.svg`}
-      alt={country || ''}
+      src={`${FLAG_BASE}/${c}.svg`}
+      alt={country || c}
       width={size}
       height={size}
       loading="lazy"
@@ -26,9 +32,29 @@ function CircleFlag({ country, size = 14 }: { country: string | null; size?: num
   );
 }
 
+// --- URL <-> state helpers (sicilian-58129) ----------------------------------
+
+function parseCsvParam(v: string | null): string[] {
+  if (!v) return [];
+  return Array.from(new Set(v.split(',').map((s) => s.trim()).filter(Boolean)));
+}
+
+// -----------------------------------------------------------------------------
+
 export function PhotosFeedPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Filter state — initialized from URL once on mount.
+  const [activeCountries, setActiveCountries] = useState<string[]>(() => parseCsvParam(searchParams.get('countries')));
+  const [activeRegions, setActiveRegions] = useState<string[]>(() => parseCsvParam(searchParams.get('regions')));
+  const [activePartnerTag, setActivePartnerTag] = useState<string | null>(() => searchParams.get('partnerTag') || null);
+
+  // Facets + partner tags
+  const [facetCountries, setFacetCountries] = useState<Array<{ name: string; count: number }>>([]);
+  const [myPartnerTags, setMyPartnerTags] = useState<string[]>([]);
+
+  // Feed
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
-  const [, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -40,21 +66,67 @@ export function PhotosFeedPage() {
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
 
+  // Refs that reflect the latest filter values — used inside loadPage so that
+  // the same memoized callback always reads the current filters without
+  // becoming stale.
+  const countriesRef = useRef(activeCountries);
+  const regionsRef = useRef(activeRegions);
+  const partnerTagRef = useRef(activePartnerTag);
+  countriesRef.current = activeCountries;
+  regionsRef.current = activeRegions;
+  partnerTagRef.current = activePartnerTag;
+
+  // Sync filter state -> URL so refresh / sharing work.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (activeCountries.length > 0) next.set('countries', activeCountries.join(','));
+    if (activeRegions.length > 0) next.set('regions', activeRegions.join(','));
+    if (activePartnerTag) next.set('partnerTag', activePartnerTag);
+    // Replace (don't push) to keep history clean.
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCountries, activeRegions, activePartnerTag]);
+
+  // Build the raw-country list to send to the backend by expanding each
+  // selected alpha-2 to all known locale variants intersected with what
+  // actually exists in the facet data (so we don't push 30 unused names).
+  const buildCountriesForBackend = useCallback((codes: string[]): string[] => {
+    if (codes.length === 0) return [];
+    const facetSet = new Set(facetCountries.map((c) => c.name));
+    const out = new Set<string>();
+    for (const code of codes) {
+      const variants = alpha2ToCountryNames(code);
+      for (const v of variants) {
+        if (facetSet.has(v)) out.add(v);
+      }
+      // Fallback: if no facet variants matched (e.g. facets not loaded yet),
+      // still send all known variants so the backend can match.
+      if (out.size === 0) {
+        for (const v of variants) out.add(v);
+      }
+    }
+    return Array.from(out);
+  }, [facetCountries]);
+
   const loadPage = useCallback(async (isInitial: boolean) => {
     if (loadingRef.current || !hasMoreRef.current) return;
     loadingRef.current = true;
     if (isInitial) setLoading(true); else setLoadingMore(true);
     setError(null);
     try {
-      const res = await getPhotosFeed(cursorRef.current);
+      const filters = {
+        countries: buildCountriesForBackend(countriesRef.current),
+        regions: regionsRef.current,
+        partnerTag: partnerTagRef.current,
+      };
+      const res = await getPhotosFeed(cursorRef.current, 24, filters);
       if (!res) {
         setError('Could not load photos right now.');
         hasMoreRef.current = false;
         setHasMore(false);
       } else {
-        setPhotos(prev => isInitial ? res.photos : [...prev, ...res.photos]);
+        setPhotos((prev) => (isInitial ? res.photos : [...prev, ...res.photos]));
         cursorRef.current = res.nextCursor;
-        setCursor(res.nextCursor);
         hasMoreRef.current = !!res.nextCursor;
         setHasMore(!!res.nextCursor);
       }
@@ -64,32 +136,97 @@ export function PhotosFeedPage() {
       loadingRef.current = false;
       if (isInitial) setLoading(false); else setLoadingMore(false);
     }
-  }, []);
+  }, [buildCountriesForBackend]);
 
-  useEffect(() => { loadPage(true); }, [loadPage]);
+  // Reset + reload whenever a filter changes.
+  const filterKey = useMemo(
+    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}`,
+    [activeCountries, activeRegions, activePartnerTag]
+  );
 
   useEffect(() => {
+    cursorRef.current = null;
+    hasMoreRef.current = true;
+    setPhotos([]);
+    setHasMore(true);
+    loadPage(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
+
+  // Fetch facets once on mount.
+  useEffect(() => {
+    let cancelled = false;
+    getPhotosFeedFacets().then((res) => {
+      if (cancelled || !res) return;
+      setFacetCountries(res.countries);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch partner tags once on mount (gracefully handles anon).
+  useEffect(() => {
+    let cancelled = false;
+    getMyPartnerTags().then((res) => {
+      if (cancelled || !res) return;
+      setMyPartnerTags(res.tags || []);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Infinite scroll sentinel.
+  useEffect(() => {
     if (!sentinelRef.current) return;
-    const obs = new IntersectionObserver(entries => {
+    const obs = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) loadPage(false);
     }, { rootMargin: '600px 0px' });
     obs.observe(sentinelRef.current);
     return () => obs.disconnect();
   }, [loadPage]);
 
+  // Lightbox keyboard nav.
   useEffect(() => {
     if (selectedIdx === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSelectedIdx(null);
       else if (e.key === 'ArrowLeft') {
-        setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i));
+        setSelectedIdx((i) => (i !== null && i > 0 ? i - 1 : i));
       } else if (e.key === 'ArrowRight') {
-        setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i));
+        setSelectedIdx((i) => (i !== null && i < photos.length - 1 ? i + 1 : i));
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedIdx, photos.length]);
+
+  // Country facet — collapse locale variants into one entry per alpha-2.
+  const countryOptions = useMemo(() => {
+    const byCode = new Map<string, { code: string; name: string; count: number; rawNames: Set<string> }>();
+    for (const c of facetCountries) {
+      const alpha2 = countryNameToAlpha2(c.name);
+      const code = alpha2 ? alpha2.toUpperCase() : `__unmapped__${c.name}`;
+      const existing = byCode.get(code);
+      if (existing) {
+        existing.count += c.count;
+        existing.rawNames.add(c.name);
+      } else {
+        byCode.set(code, {
+          code,
+          name: alpha2 ? alpha2ToCanonicalName(code) : c.name,
+          count: c.count,
+          rawNames: new Set([c.name]),
+        });
+      }
+    }
+    return Array.from(byCode.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [facetCountries]);
+
+  const clearAllFilters = () => {
+    setActiveCountries([]);
+    setActiveRegions([]);
+    setActivePartnerTag(null);
+  };
+
+  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag;
 
   return (
     <Layout>
@@ -101,15 +238,44 @@ export function PhotosFeedPage() {
       </Helmet>
 
       <div className="max-w-[1400px] mx-auto px-4 py-8">
-        <header className="mb-6">
+        <header className="mb-4">
           <h1 className="text-3xl font-bold text-theme-text">Photos</h1>
           <p className="text-theme-text-secondary mt-1">Highlights from pizza parties around the world.</p>
         </header>
 
+        {/* Sticky filter bar */}
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 bg-theme-bg/95 backdrop-blur-sm border-b border-theme-stroke flex flex-wrap items-center gap-2">
+          <CountryFilterButton
+            options={countryOptions}
+            selected={activeCountries}
+            onChange={setActiveCountries}
+          />
+          <RegionFilterButton
+            selected={activeRegions}
+            onChange={setActiveRegions}
+          />
+          {myPartnerTags.length > 0 && (
+            <PartnerFilterButton
+              tags={myPartnerTags}
+              selected={activePartnerTag}
+              onChange={setActivePartnerTag}
+            />
+          )}
+          {anyFiltersActive && (
+            <button
+              onClick={clearAllFilters}
+              className="ml-auto text-sm text-theme-text-muted hover:text-theme-text inline-flex items-center gap-1"
+            >
+              <X size={14} />
+              Clear filters
+            </button>
+          )}
+        </div>
+
         {loading && photos.length === 0 ? (
           <SkeletonGrid />
         ) : photos.length === 0 ? (
-          <EmptyState />
+          <EmptyState anyFiltersActive={anyFiltersActive} onClear={clearAllFilters} />
         ) : (
           <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
             {photos.map((p, idx) => <FeedTile key={p.id} photo={p} onOpen={() => setSelectedIdx(idx)} />)}
@@ -135,14 +301,258 @@ export function PhotosFeedPage() {
           photo={photos[selectedIdx]}
           hasPrev={selectedIdx > 0}
           hasNext={selectedIdx < photos.length - 1}
-          onPrev={() => setSelectedIdx(i => (i !== null && i > 0 ? i - 1 : i))}
-          onNext={() => setSelectedIdx(i => (i !== null && i < photos.length - 1 ? i + 1 : i))}
+          onPrev={() => setSelectedIdx((i) => (i !== null && i > 0 ? i - 1 : i))}
+          onNext={() => setSelectedIdx((i) => (i !== null && i < photos.length - 1 ? i + 1 : i))}
           onClose={() => setSelectedIdx(null)}
         />
       )}
     </Layout>
   );
 }
+
+// --- Filter bar buttons ------------------------------------------------------
+
+function FilterDropdownShell({
+  label,
+  count,
+  open,
+  onToggle,
+  children,
+  panelClassName = '',
+}: {
+  label: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  panelClassName?: string;
+}) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+          count > 0
+            ? 'bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20'
+            : 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:bg-theme-surface-hover hover:text-theme-text'
+        }`}
+      >
+        <span>{label}</span>
+        {count > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-red-500 text-white">
+            {count}
+          </span>
+        )}
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={onToggle} />
+          <div className={`absolute top-full left-0 mt-2 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-2 min-w-[260px] max-h-[60vh] overflow-y-auto ${panelClassName}`}>
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CountryFilterButton({
+  options, selected, onChange,
+}: {
+  options: Array<{ code: string; name: string; count: number; rawNames: Set<string> }>;
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.name.toLowerCase().includes(q) || o.code.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const toggle = (code: string) => {
+    if (selected.includes(code)) onChange(selected.filter((c) => c !== code));
+    else onChange([...selected, code]);
+  };
+
+  return (
+    <FilterDropdownShell
+      label="Country"
+      count={selected.length}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+      panelClassName="w-[300px]"
+    >
+      <div className="px-3 pb-2 sticky top-0 bg-theme-card border-b border-theme-stroke">
+        <div className="relative">
+          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-theme-text-muted" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search countries..."
+            className="w-full pl-7 pr-2 py-1.5 text-sm bg-theme-surface border border-theme-stroke rounded-lg text-theme-text placeholder-theme-text-muted focus:outline-none focus:border-red-500/40"
+          />
+        </div>
+      </div>
+      {selected.length > 0 && (
+        <button
+          onClick={() => onChange([])}
+          className="w-full text-left px-4 py-2 text-xs text-theme-text-faint hover:bg-theme-surface transition-colors"
+        >
+          Clear ({selected.length})
+        </button>
+      )}
+      {filtered.length === 0 ? (
+        <div className="px-4 py-3 text-sm text-theme-text-muted">No matches</div>
+      ) : (
+        filtered.map((opt) => {
+          const isSel = selected.includes(opt.code);
+          return (
+            <button
+              key={opt.code}
+              onClick={() => toggle(opt.code)}
+              className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2 ${
+                isSel
+                  ? 'text-red-500 font-medium'
+                  : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+              }`}>
+                {isSel && <Check size={12} className="text-theme-text" />}
+              </div>
+              {opt.code.startsWith('__unmapped__')
+                ? <MapPin size={14} className="text-theme-text-muted" />
+                : <CircleFlag code={opt.code.toLowerCase()} size={16} />}
+              <span className="flex-1 truncate">{opt.name}</span>
+              <span className="text-xs text-theme-text-muted">{opt.count}</span>
+            </button>
+          );
+        })
+      )}
+    </FilterDropdownShell>
+  );
+}
+
+function RegionFilterButton({
+  selected, onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const allIds = GPP_REGIONS.map((r) => r.id);
+
+  const toggle = (id: GPPRegion) => {
+    if (selected.includes(id)) onChange(selected.filter((r) => r !== id));
+    else onChange([...selected, id]);
+  };
+
+  const allSelected = selected.length === allIds.length;
+
+  return (
+    <FilterDropdownShell
+      label="Region"
+      count={selected.length}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      <button
+        onClick={() => onChange(allSelected ? [] : allIds)}
+        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+          allSelected
+            ? 'text-red-500 font-medium'
+            : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+        }`}
+      >
+        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+          allSelected ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+        }`}>
+          {allSelected && <Check size={12} className="text-theme-text" />}
+        </div>
+        {allSelected ? 'Clear all' : 'Select all'}
+      </button>
+      <div className="border-b border-theme-stroke my-1" />
+      {GPP_REGIONS.map((r) => {
+        const isSel = selected.includes(r.id);
+        return (
+          <button
+            key={r.id}
+            onClick={() => toggle(r.id)}
+            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+              isSel
+                ? 'text-red-500 font-medium'
+                : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+              isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+            }`}>
+              {isSel && <Check size={12} className="text-theme-text" />}
+            </div>
+            {r.label}
+          </button>
+        );
+      })}
+    </FilterDropdownShell>
+  );
+}
+
+function PartnerFilterButton({
+  tags, selected, onChange,
+}: {
+  tags: string[];
+  selected: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const count = selected ? 1 : 0;
+  return (
+    <FilterDropdownShell
+      label="Partner"
+      count={count}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      {selected && (
+        <button
+          onClick={() => onChange(null)}
+          className="w-full text-left px-4 py-2 text-xs text-theme-text-faint hover:bg-theme-surface transition-colors"
+        >
+          Clear
+        </button>
+      )}
+      {tags.map((tag) => {
+        const isSel = selected === tag;
+        return (
+          <button
+            key={tag}
+            onClick={() => onChange(isSel ? null : tag)}
+            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+              isSel
+                ? 'text-red-500 font-medium'
+                : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+              isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+            }`}>
+              {isSel && <Check size={12} className="text-theme-text" />}
+            </div>
+            <span className="flex-1 truncate">{tag}</span>
+          </button>
+        );
+      })}
+    </FilterDropdownShell>
+  );
+}
+
+// --- Tiles + lightbox (unchanged from pre-sicilian-58129) --------------------
 
 function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   const isVideo = photo.mimeType?.startsWith('video/');
@@ -254,11 +664,17 @@ function SkeletonGrid() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ anyFiltersActive, onClear }: { anyFiltersActive: boolean; onClear: () => void }) {
   return (
     <div className="text-center py-20">
-      <p className="text-theme-text text-lg">No starred photos yet.</p>
-      <p className="text-theme-text-muted mt-2">Check back after the next pizza party.</p>
+      <p className="text-theme-text text-lg">
+        {anyFiltersActive ? 'No photos match these filters.' : 'No starred photos yet.'}
+      </p>
+      <p className="text-theme-text-muted mt-2">
+        {anyFiltersActive
+          ? <button onClick={onClear} className="underline hover:text-theme-text">Clear filters</button>
+          : 'Check back after the next pizza party.'}
+      </p>
     </div>
   );
 }
