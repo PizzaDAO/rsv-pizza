@@ -228,6 +228,11 @@ export function EventPage() {
           const stats = await getPhotoStats(foundEvent.id);
           if (stats) {
             setPhotoStats(stats);
+            // Auto-expand the gallery if there are existing photos — visitors expect
+            // photos inline, not behind a "View N photos" button (parmigiano-71294).
+            if (stats.totalPhotos && stats.totalPhotos > 0) {
+              setShowPhotos(true);
+            }
           }
         } else {
           setError('Event not found. The link may be invalid or expired.');
