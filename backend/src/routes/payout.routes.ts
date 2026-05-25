@@ -24,6 +24,7 @@ import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { looksLikeEnsName, resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
+import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
 const router = Router();
 
@@ -283,6 +284,83 @@ async function assertMercuryAllowed(
       `Mercury virtual cards are unavailable in ${party?.country ?? 'this country'} due to compliance restrictions. Please pick another payout method.`,
       400,
       'MERCURY_COUNTRY_BLOCKED',
+    );
+  }
+}
+
+/**
+ * acciuga-62583: hard per-submission ceiling of $625. Independent of the
+ * per-party cap (tiramisu-49102): even on uncapped parties, no single payout
+ * row can exceed $625. Same numeric value as `HARD_PER_TX_CEILING_USD` in
+ * usdc-base.service.ts (the USDC-execute ceiling) but enforced here at
+ * SUBMISSION time across all methods — no override path. Hosts split larger
+ * expenses across multiple submissions.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
+function assertWithinPerSubmissionCap(amountUsd: number) {
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
+  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+    throw new AppError(
+      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      400,
+      'PER_SUBMISSION_CAP_EXCEEDED',
+    );
+  }
+}
+
+/**
+ * tiramisu-49102: hard per-party cap enforcement.
+ *
+ * Sums every existing payout for the party that is `pending | approved | paid`
+ * and rejects with 409 PARTY_CAP_EXCEEDED if `usedUsd + proposedUsd` would
+ * exceed the party's `effectiveReimbursementCapUsd` (validated cap OR max
+ * numeric event tag). Parties without an effective cap stay uncapped.
+ *
+ * Skips a row when `ignorePayoutId` is supplied — used by PATCH edits so the
+ * row being edited doesn't count against itself.
+ */
+async function assertWithinPartyCap(
+  partyId: string,
+  proposedUsd: number,
+  ignorePayoutId?: string,
+): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  if (!party) {
+    // Defensive — callers above already verified the party exists.
+    throw new AppError('Party not found', 404, 'NOT_FOUND');
+  }
+
+  const effectiveCap = computeEffectiveCapUsd({
+    reimbursementCapUsd: party.reimbursementCapUsd,
+    eventTags: party.eventTags,
+  });
+  if (effectiveCap == null) return;
+
+  const where: any = {
+    partyId,
+    status: { in: ['paid', 'pending', 'approved'] },
+  };
+  if (ignorePayoutId) {
+    where.id = { not: ignorePayoutId };
+  }
+  const existingTotal = await prisma.payout.aggregate({
+    where,
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd = existingTotal._sum.finalAmountUsd
+    ? Number(existingTotal._sum.finalAmountUsd.toString())
+    : 0;
+  const remainingUsd = Math.max(0, effectiveCap - usedUsd);
+
+  if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
+    throw new AppError(
+      `This payment would exceed the party's $${effectiveCap.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
+      409,
+      'PARTY_CAP_EXCEEDED',
     );
   }
 }
@@ -586,6 +664,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       );
     }
 
+    // speck-89172: host POST is no longer cap-enforced. Hosts can submit any
+    // positive amount; admin moderates over-cap rows from /payments (which
+    // surfaces an amber flag on rows that exceed the party's effective cap).
+    // The acciuga-62583 / tiramisu-49102 helpers remain in this file because
+    // admin PATCH (aglio-62584) still uses the per-submission ceiling.
+
     // arugula-38633 v3 follow-up: zero-receipts path — default the FX fields
     // to USD passthrough using finalUsd. (extractedUsdSum stays 0; we surface
     // finalUsd as both originalAmount and extractedAmountUsd so the row reads
@@ -837,13 +921,43 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (!existing) {
       throw new AppError('Payment not found', 404, 'NOT_FOUND');
     }
-    if (existing.status !== 'pending') {
+
+    // provolone-39042: split doc-only edits from amount/method/wallet edits so
+    // hosts can attach receipts to already-approved payouts (Adama incident:
+    // host couldn't add a receipt to their $200 approved wire). The admin
+    // PATCH route stays unrestricted — this is host-side only.
+    const hasAmountOrMethodChanges =
+      payoutMethod !== undefined ||
+      payoutWalletAddress !== undefined ||
+      payoutBankDetails !== undefined ||
+      finalAmountUsd !== undefined ||
+      mercuryCardLast4 !== undefined ||
+      hostNotes !== undefined;
+
+    // Paid/failed/rejected payouts are frozen entirely on the host side.
+    if (
+      existing.status === 'paid' ||
+      existing.status === 'rejected' ||
+      existing.status === 'failed'
+    ) {
       throw new AppError(
-        'Payments can only be edited while pending; this one is ' + existing.status,
+        `Payments cannot be edited once ${existing.status}.`,
         400,
         'NOT_EDITABLE'
       );
     }
+
+    // Approved payouts: doc-only edits allowed, but amount/method/wallet/notes
+    // are frozen so the admin-approved amount can't be silently changed.
+    if (existing.status === 'approved' && hasAmountOrMethodChanges) {
+      throw new AppError(
+        'Approved payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.',
+        400,
+        'APPROVED_NOT_EDITABLE'
+      );
+    }
+
+    // Pending payouts fall through unchanged — anything goes.
 
     // gouda-83912: only the cohost who submitted the payout (or any admin)
     // may edit it. Other cohosts on the same party can see the row but
@@ -900,6 +1014,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       if (!Number.isFinite(n) || n <= 0) {
         throw new AppError('finalAmountUsd must be a positive number', 400, 'INVALID_AMOUNT');
       }
+      // speck-89172: host PATCH is no longer cap-enforced. The amber flag on
+      // /payments rows surfaces over-cap edits for admin moderation; admin
+      // PATCH (aglio-62584) retains the per-submission ceiling via the
+      // override checkbox.
       data.finalAmountUsd = new Decimal(n);
     }
 
@@ -1069,7 +1187,13 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       id => existing.documents.find(d => d.id === id)?.kind === 'receipt'
     );
 
-    if (receiptsChanged) {
+    // provolone-39042: only pending payouts auto-recompute finalAmountUsd from
+    // the OCR sum when receipts change. Approved payouts keep their
+    // admin-approved amount even if new receipts are attached — the OCR sum
+    // becomes informational only.
+    const allowRecompute = existing.status === 'pending';
+
+    if (receiptsChanged && allowRecompute) {
       const removedSet = new Set(removeIds);
       const survivingReceipts = existing.documents.filter(
         d => d.kind === 'receipt' && !removedSet.has(d.id)
@@ -1103,6 +1227,11 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ? Number((data.finalAmountUsd as Decimal).toString())
       : (recomputedAmount != null ? Number(recomputedAmount.toString()) : oldAmount);
     const amountChanged = newAmount !== oldAmount;
+
+    // speck-89172: cap enforcement on receipt-edit recompute removed — the
+    // amber flag on /payments rows surfaces over-cap edits for admin
+    // moderation. Admin PATCH (aglio-62584) retains the per-submission
+    // ceiling via its override checkbox.
 
     // Single transaction: delete removed docs, insert new docs, update payout,
     // write the audit row(s).

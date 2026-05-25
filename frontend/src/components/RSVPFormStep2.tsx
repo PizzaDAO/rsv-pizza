@@ -1,6 +1,6 @@
 import React from 'react';
 import { ThumbsUp, ThumbsDown, Loader2, ChevronLeft, X, Star, MapPin, Plus } from 'lucide-react';
-import { DIETARY_OPTIONS, DRINKS } from '../constants/options';
+import { DIETARY_OPTIONS, DRINKS, TOPPINGS as ALL_TOPPINGS } from '../constants/options';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { calculateDistanceMiles, formatDistanceMiles } from '../lib/ordering';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +56,104 @@ export function RSVPFormStep2({
           ))}
         </div>
       </div>
+
+      {/* Topping Preferences (gorgonzola-41822: opt-in by host) */}
+      {form.showToppingsOnRsvp && form.availableToppings.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-theme-text mb-3">
+            {t('step2.toppings', { defaultValue: 'Topping Preferences' })}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ALL_TOPPINGS
+              .filter(topping => form.availableToppings.includes(topping.id))
+              .map(topping => {
+                const isLiked = form.likedToppings.includes(topping.id);
+                const isDisliked = form.dislikedToppings.includes(topping.id);
+                const isExcluded = form.excludedToppings.has(topping.id);
+                return (
+                  <div
+                    key={topping.id}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                      isExcluded
+                        ? 'opacity-40 cursor-not-allowed bg-theme-surface border-theme-stroke'
+                        : isLiked
+                          ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                          : isDisliked
+                            ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                            : 'bg-theme-surface border-theme-stroke'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => !isExcluded && form.handleToppingLike(topping.id)}
+                      disabled={isExcluded}
+                      className={`flex items-center gap-1.5 flex-1 py-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
+                    >
+                      <ThumbsUp
+                        size={12}
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                      />
+                      <span className={`text-xs ${isExcluded ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{topping.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => !isExcluded && form.handleToppingDislike(topping.id)}
+                      disabled={isExcluded}
+                      className={`p-0.5 transition-opacity ${isExcluded ? 'cursor-not-allowed' : 'hover:opacity-70'}`}
+                    >
+                      <ThumbsDown
+                        size={12}
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            {/* Custom toppings (host-added, stored as custom:Name) */}
+            {form.availableToppings
+              .filter(id => id.startsWith('custom:'))
+              .map(id => {
+                const name = id.slice('custom:'.length);
+                const isLiked = form.likedToppings.includes(id);
+                const isDisliked = form.dislikedToppings.includes(id);
+                return (
+                  <div
+                    key={id}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                      isLiked
+                        ? 'bg-[#39d98a]/20 border-[#39d98a]/30'
+                        : isDisliked
+                          ? 'bg-[#ff393a]/20 border-[#ff393a]/30'
+                          : 'bg-theme-surface border-theme-stroke'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => form.handleToppingLike(id)}
+                      className="flex items-center gap-1.5 flex-1 py-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsUp
+                        size={12}
+                        className={`transition-all ${isLiked ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                      />
+                      <span className="text-theme-text text-xs">{name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => form.handleToppingDislike(id)}
+                      className="p-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <ThumbsDown
+                        size={12}
+                        className={`transition-all ${isDisliked ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Drinks */}
       {!form.isGppEvent && form.availableBeverages.length > 0 && (

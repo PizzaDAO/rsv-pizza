@@ -799,7 +799,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       includeAllStatuses = true;
     }
 
-    const where: any = { eventType: 'gpp' };
+    let where: any = { eventType: 'gpp' };
     if (req.query.curated === '1') {
       where.underbossStatus = { in: ['approved', 'listed'] };
     } else if (includeAllStatuses) {
@@ -823,6 +823,26 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       where.region = region as string;
     }
 
+    // tropea-58294: swcOnly filter must run in SQL, not as a JS post-filter on
+    // the already-truncated take(N) result. Previously, take(500) capped the
+    // findMany BEFORE the JS .filter() ran, so SWC+approved events older than
+    // the 500th-newest GPP event were silently dropped (54 of 74 returned).
+    // We pre-fetch the distinct list of swc-* tags from event_tags and add
+    // hasSome + underbossStatus='approved' to the prisma where clause so the
+    // take/count happen against the filtered set.
+    if (req.query.swcOnly === 'true') {
+      const swcTagRows = await prisma.$queryRaw<Array<{ tag: string }>>`
+        SELECT DISTINCT t AS tag FROM parties, unnest(event_tags) t
+        WHERE t LIKE '%swc%' AND t <> 'swc'
+      `;
+      const swcTags = swcTagRows.map(r => r.tag);
+      where = {
+        eventType: 'gpp',
+        underbossStatus: 'approved',
+        eventTags: { hasSome: swcTags },
+      };
+    }
+
     const parsedLimit = Math.min(parseInt(limit as string, 10) || 500, 2000);
     const parsedOffset = parseInt(offset as string, 10) || 0;
 
@@ -837,26 +857,13 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       prisma.party.count({ where }),
     ]);
 
-    // cacciatore-72814: optional post-filter for SWC-flagged events.
-    // Keeps an event when its `eventTags` array contains at least one tag
-    // including the substring "swc" (e.g. "swc-2026", "swc-bali") but NOT
-    // the bare string "swc". Done in JS so we don't have to teach Prisma
-    // about array-substring matching.
-    let resultEvents = events;
-    if (req.query.swcOnly === 'true') {
-      resultEvents = events.filter((e: any) =>
-        e.underbossStatus === 'approved' &&
-        Array.isArray(e.eventTags) && e.eventTags.some((t: string) => typeof t === 'string' && t.includes('swc') && t !== 'swc')
-      );
-    }
-
     res.set(
       'Cache-Control',
       callerIsModerator ? 'private, no-store' : 'public, max-age=300'
     );
     res.json({
-      events: resultEvents.map((e) => formatGppEvent(e, callerIsModerator)),
-      total: req.query.swcOnly === 'true' ? resultEvents.length : total,
+      events: events.map((e) => formatGppEvent(e, callerIsModerator)),
+      total,
       limit: parsedLimit,
       offset: parsedOffset,
     });
@@ -864,6 +871,45 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     next(error);
   }
 });
+
+// vesuvio-91824: cap /gpp/pizzerias map at top-3 per event, ranked by
+// `(rating ?? 3.5) - 0.3 * distanceMiles` to event venue. Mirrors the
+// vesuvio-58492 RSVP modal ranking server-side so the world map isn't
+// over-represented by events that pre-selected many pizzerias.
+const TOP_PIZZERIA_LIMIT = 3;
+const DISTANCE_WEIGHT_PER_MILE = 0.3;
+const KM_TO_MILES = 0.621371;
+
+function rankPizzeriasForEvent(
+  list: any[],
+  venue: { lat: number | null; lng: number | null },
+): any[] {
+  const venueHasCoords =
+    typeof venue.lat === 'number' &&
+    typeof venue.lng === 'number' &&
+    !(venue.lat === 0 && venue.lng === 0);
+
+  return list
+    .map((p, idx) => {
+      const rating = typeof p.rating === 'number' ? p.rating : 3.5;
+      const loc = p.location;
+      const pizzeriaHasCoords =
+        loc &&
+        typeof loc.lat === 'number' &&
+        typeof loc.lng === 'number' &&
+        !(loc.lat === 0 && loc.lng === 0);
+
+      const distanceMiles =
+        venueHasCoords && pizzeriaHasCoords
+          ? haversineKm({ lat: venue.lat as number, lng: venue.lng as number }, loc) * KM_TO_MILES
+          : 0;
+
+      return { p, idx, score: rating - distanceMiles * DISTANCE_WEIGHT_PER_MILE };
+    })
+    .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
+    .slice(0, TOP_PIZZERIA_LIMIT)
+    .map((x) => x.p);
+}
 
 // GET /api/gpp/pizzerias - All GPP pizzerias (flattened across events)
 router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction) => {
@@ -885,6 +931,8 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
         customUrl: true,
         inviteCode: true,
         address: true,
+        latitude: true,
+        longitude: true,
         selectedPizzerias: true,
       },
     });
@@ -898,7 +946,12 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventCity = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || 'Unknown';
       const eventSlug = party.customUrl || party.inviteCode;
 
-      for (const p of raw as any[]) {
+      const ranked = rankPizzeriasForEvent(raw as any[], {
+        lat: party.latitude,
+        lng: party.longitude,
+      });
+
+      for (const p of ranked) {
         // Strip heavy fields, keep photoUrl if previously cached
         const { photos, orderingOptions, ...light } = p;
         pizzerias.push({ ...light, eventId: party.id, eventCity, eventSlug });

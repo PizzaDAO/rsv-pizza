@@ -32,6 +32,7 @@ import { EventsMapPage } from './pages/EventsMapPage';
 import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
 import { PartnersPage } from './pages/PartnersPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
+import { PhotosFeedPage } from './pages/PhotosFeedPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -69,6 +70,8 @@ function App() {
             <Route path="/gpp/leaderboard" element={<LeaderboardPage />} />
             {/* /payments must come before /:slug */}
             <Route path="/payments" element={<PaymentsAdminPage />} />
+            {/* margherita-43821: /photos public global feed; must come before /:slug */}
+            <Route path="/photos" element={<PhotosFeedPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/report/:slug" element={<PublicReportPage />} />

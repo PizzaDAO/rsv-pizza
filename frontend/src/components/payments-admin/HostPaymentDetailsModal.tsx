@@ -74,7 +74,7 @@ export const HostPaymentDetailsModal: React.FC<HostPaymentDetailsModalProps> = (
       onClick={onClose}
     >
       <div
-        className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto bg-theme-surface border border-theme-stroke rounded-2xl shadow-2xl"
+        className="card p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-theme-surface border border-theme-stroke rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 mb-4">

@@ -234,7 +234,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     >
       <form
         onSubmit={handleSubmit}
-        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

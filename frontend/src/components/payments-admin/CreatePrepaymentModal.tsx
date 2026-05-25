@@ -6,6 +6,23 @@ import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 import { createPayout } from '../../lib/api';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 
+/**
+ * parmigiana-58291: strip the "Global Pizza Party " prefix from event names
+ * everywhere this modal shows the party name (title + default note +
+ * placeholder). Same convention as PayoutRow and PrepayQueueTable — inlined
+ * here to match those callsites.
+ */
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
+/**
+ * acciuga-62583: hard per-submission ceiling of $625. Matches backend
+ * `PER_SUBMISSION_CAP_EXCEEDED` (400). No override path — admin must split
+ * larger prepayments across multiple submissions.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
 interface CreatePrepaymentModalProps {
   row: PrepayQueueRow;
   onClose: () => void;
@@ -35,7 +52,23 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
 }) => {
   const { party, candidates } = row;
   const cap = party.effectiveReimbursementCapUsd ?? 0;
-  const defaultAmount = Math.max(1, Math.round(0.5 * cap));
+  // tiramisu-49102: cap-remaining = cap minus what's already been paid for
+  // this party. `partyPaidUsd` is what BISMARCK-92103 attached to PrepayQueueRow
+  // from the prepay-queue endpoint; the synthetic row built by the Pay-again
+  // path uses the same field. null = no cap configured (uncapped event).
+  const paidSoFar = row.partyPaidUsd ?? 0;
+  const remainingUsd: number | null = cap > 0 ? Math.max(0, cap - paidSoFar) : null;
+  // bianco-89172: keep the cents — `Math.round(0.5 * 625)` gave 313, off by
+  // 50¢ from the actual half. payouts.final_amount_usd is numeric(12,2) so
+  // decimals round-trip through the backend without loss.
+  // tiramisu-49102: clamp the default to whatever's actually left under the
+  // cap (so a paid-down event doesn't pre-fill an over-cap default).
+  // acciuga-62583: also clamp to the hard $625 per-submission ceiling so the
+  // pre-filled default never trips the backend limit.
+  const rawDefault = cap > 0 ? cap / 2 : 1;
+  const clampedDefault =
+    remainingUsd != null ? Math.min(rawDefault, remainingUsd) : rawDefault;
+  const defaultAmount = Math.min(clampedDefault, PER_SUBMISSION_MAX_USD).toFixed(2);
 
   const mercuryBlocked = isMercuryBlocked(party.country);
 
@@ -49,7 +82,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   }, [candidates, mercuryBlocked]);
 
   const [selectedUserId, setSelectedUserId] = useState<string>(initialCandidateId);
-  const [amountStr, setAmountStr] = useState(String(defaultAmount));
+  const [amountStr, setAmountStr] = useState(defaultAmount);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,11 +103,23 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
+  // tiramisu-49102: client-side cap-remaining clamp. Disables submit when the
+  // typed amount exceeds the remaining cap; backend also enforces with 409
+  // PARTY_CAP_EXCEEDED if this slips through (e.g. concurrent admin sends).
+  const exceedsRemaining =
+    remainingUsd != null && Number.isFinite(amountNum) && amountNum > remainingUsd + 1e-9;
+
+  // acciuga-62583: hard per-submission $625 ceiling, no override. Backend
+  // also enforces with 400 PER_SUBMISSION_CAP_EXCEEDED.
+  const exceedsPerSubmission = Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+
   const canSubmit =
     !!selectedCandidate &&
     !(selectedCandidate.method === 'mercury_card' && mercuryBlocked) &&
     Number.isFinite(amountNum) &&
     amountNum > 0 &&
+    !exceedsRemaining &&
+    !exceedsPerSubmission &&
     !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -96,7 +141,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             ? { email: selectedCandidate.bankEmail }
             : undefined,
         finalAmountUsd: amountNum,
-        adminNotes: notes.trim() || `Prepayment for ${party.name}`,
+        adminNotes: notes.trim() || `Prepayment for ${stripGppPrefix(party.name)}`,
         hostNotes: 'Prepayment created by admin',
         recipientHostUserId: selectedCandidate.userId,
       });
@@ -120,14 +165,14 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
     >
       <form
         onSubmit={handleSubmit}
-        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-lg max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-lg max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-theme-stroke">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold text-theme-text truncate">
-              Prepay {party.name}
+              Prepay {stripGppPrefix(party.name)}
             </h2>
             {cap > 0 && (
               <p className="text-xs text-theme-text-muted mt-0.5">
@@ -184,6 +229,17 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                           <Star size={12} className="text-amber-500 shrink-0" />
                         )}
                         <span className="truncate">{label}</span>
+                        {/* paesana-89172: amber warning when this candidate
+                            is the primary host of an event where the primary
+                            host isn't in co_hosts (= invisible on the public
+                            event page). Doesn't block selection. */}
+                        {c.isPrimaryHost && party.primaryHostInCohosts === false && (
+                          <AlertTriangle
+                            size={12}
+                            className="text-amber-500 shrink-0"
+                            aria-label="Primary host is not visible on the event page"
+                          />
+                        )}
                       </div>
                       <div className="text-xs text-theme-text-muted truncate">
                         {c.email}
@@ -194,6 +250,17 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                           {PAYOUT_METHOD_LABELS[c.method]}
                         </span>
                       </div>
+                      {/* paesana-89172: explainer text under the chosen
+                          recipient when they're the invisible primary host. */}
+                      {c.isPrimaryHost && party.primaryHostInCohosts === false && (
+                        <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-500">
+                          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                          <span>
+                            This host isn't shown on the event page — confirm
+                            they're the active organizer before paying.
+                          </span>
+                        </div>
+                      )}
                       {disabled && (
                         <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-500">
                           <AlertTriangle size={12} className="mt-0.5 shrink-0" />
@@ -225,6 +292,33 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             <p className="text-xs text-theme-text-muted mt-1">
               Default is 50% of the event's reimbursement cap. Edit if needed.
             </p>
+            {/* tiramisu-49102: cap-remaining hint. Shown when an effective cap
+                exists. paidSoFar > 0 means there's already a payout against
+                this party (the Pay-again path) so the admin sees exactly how
+                much headroom is left. */}
+            {remainingUsd != null && (
+              <p
+                className={`text-xs mt-1 ${
+                  exceedsRemaining ? 'text-red-500' : 'text-theme-text-muted'
+                }`}
+              >
+                Remaining: ${remainingUsd.toFixed(2)}
+                {paidSoFar > 0 && (
+                  <> &middot; Already paid: ${paidSoFar.toFixed(2)} of ${cap.toFixed(2)} cap</>
+                )}
+              </p>
+            )}
+            {exceedsRemaining && remainingUsd != null && (
+              <p className="text-xs text-red-500 mt-1">
+                Exceeds cap: ${remainingUsd.toFixed(2)} remaining
+              </p>
+            )}
+            {/* acciuga-62583: per-submission $625 ceiling */}
+            {exceedsPerSubmission && (
+              <p className="text-xs text-red-500 mt-1">
+                Single payments capped at ${PER_SUBMISSION_MAX_USD}
+              </p>
+            )}
           </div>
 
           {/* Internal note (optional) */}
@@ -232,7 +326,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
             icon={Pencil}
             multiline
             rows={3}
-            placeholder={`Internal note (optional, defaults to "Prepayment for ${party.name}")`}
+            placeholder={`Internal note (optional, defaults to "Prepayment for ${stripGppPrefix(party.name)}")`}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             maxLength={500}

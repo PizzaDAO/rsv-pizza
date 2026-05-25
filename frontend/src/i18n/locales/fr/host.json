@@ -337,7 +337,7 @@
     "revokeLink": "Révoquer le lien",
     "toDo": "À faire",
     "asked": "Demandé",
-    "yes": "Oui",
+    "yes": "Confirmé",
     "billed": "Facturé",
     "paid": "Payé",
     "stuck": "Bloqué",
@@ -793,6 +793,25 @@
         "firstPoap": "Premier mint POAP",
         "goalReached": "Objectif atteint"
       }
+    },
+    "share": {
+      "buttonLabel": "Partager les progrès",
+      "modalTitle": "Partagez vos progrès",
+      "download": "Télécharger",
+      "copy": "Copier",
+      "copySuccess": "Copié dans le presse-papiers",
+      "copyFailed": "Échec de la copie",
+      "generating": "Génération…",
+      "generateFailed": "Impossible de générer l'image",
+      "close": "Fermer"
+    },
+    "ticker": {
+      "empty": "Aucune confirmation pour l'instant",
+      "justNow": "à l'instant",
+      "minutesAgo": "il y a {{count}} min",
+      "hoursAgo": "il y a {{count}} h",
+      "daysAgo": "il y a {{count}} j",
+      "recentRsvps": "Confirmations récentes"
     }
   }
 }

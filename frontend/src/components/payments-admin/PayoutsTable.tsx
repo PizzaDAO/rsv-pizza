@@ -20,6 +20,11 @@ interface PayoutsTableProps {
    * User.id. Surfaced when the admin clicks the host name in a row.
    */
   onHostClick?: (userId: string) => void;
+  /**
+   * montasio-49102: parent re-fetches the payouts list after an inline cap
+   * edit so the row reflects the new value.
+   */
+  onCapUpdated?: (partyId: string) => void;
   busyRowId?: string | null;
   loading?: boolean;
   loadingMore?: boolean;
@@ -128,6 +133,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onMarkPaid,
   onExecute,
   onHostClick,
+  onCapUpdated,
   busyRowId,
   loading,
   loadingMore,
@@ -138,8 +144,10 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
 
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
+      {/* regina-89172: horizontal scroll wrapper with min-w on the table so
+          columns stay legible at mobile widths instead of squishing. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
               <th className="px-3 py-3 w-10">
@@ -187,6 +195,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                 onSelectToggle={() => onToggleSelect(p.id)}
                 onClick={() => onRowClick(p)}
                 onHostClick={onHostClick}
+                onCapUpdated={onCapUpdated}
                 actions={
                   <ActionsCell
                     payout={p}

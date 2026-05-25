@@ -4,10 +4,8 @@ import { useGuestsRealtime } from '../../hooks/useGuestsRealtime';
 import * as db from '../../lib/supabase';
 import { dbGuestToGuest } from '../../contexts/PizzaContext';
 import { StatusHeader } from './StatusHeader';
-import { CheckInPanel } from './CheckInPanel';
 import { AnnouncePanel } from './AnnouncePanel';
 import { AnnouncementHistory } from './AnnouncementHistory';
-import { LogisticsCard } from './LogisticsCard';
 import { PizzaStatusCard } from './PizzaStatusCard';
 import { MusicNowPlayingCard } from './MusicNowPlayingCard';
 import { ChecklistTodayCard } from './ChecklistTodayCard';
@@ -17,6 +15,8 @@ import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';
 import { PizzaBoxStackCard } from './PizzaBoxStackCard';
 import { BroadcastJoinCard } from './BroadcastJoinCard';
 import { StandWithCryptoCard } from './StandWithCryptoCard';
+import { StreamOnScreenCard } from './StreamOnScreenCard';
+import { CollapsibleCard } from './CollapsibleCard';
 
 interface DayOfDashboardProps {
   party: Party;
@@ -63,50 +63,130 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
 
   const briefingFirst = isGpp && briefingWindowActive;
 
-  return (
-    <div
-      className={
-        isMobile
-          ? 'space-y-4 pb-8'
-          : 'grid grid-cols-1 xl:grid-cols-3 gap-4'
-      }
-    >
-      {briefingFirst && (
-        <div className={isMobile ? '' : 'xl:col-span-3'}>
-          <BriefingCard party={party} highlighted />
-        </div>
-      )}
-
-      <div className={isMobile ? '' : 'xl:col-span-2 space-y-4'}>
-        <StatusHeader party={party} guests={guests} />
-        <CheckInPanel party={party} guests={guests} onGuestUpdated={refreshGuests} />
-        <AnnouncePanel
-          partyId={party.id}
-          onSent={() => setAnnHistoryKey((k) => k + 1)}
-        />
-        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
-        <PhotoQuickCaptureCard party={party} />
-      </div>
-
-      <div className={isMobile ? '' : 'space-y-4'}>
-        {isGpp && !briefingFirst && <BriefingCard party={party} />}
-        {isGpp && <SignedPizzaBoxCard party={party} />}
-        {isGpp && <PizzaBoxStackCard party={party} />}
-        {isGpp && <BroadcastJoinCard partyId={party.id} layout={layout} />}
-        {isGpp && <StandWithCryptoCard party={party} />}
-        <LogisticsCard party={party} />
-        <PizzaStatusCard party={party} />
+  // genoa-44102: Two-column layout on desktop — important day-of actions on
+  // the left, supporting/reference info on the right. Mobile stays single-
+  // column stacked with the same left-then-right priority order.
+  //
+  // prosciutto-78201: MusicNowPlayingCard moved from the right column into
+  // the left column directly under PizzaStatusCard; new StreamOnScreenCard
+  // takes the top spot in the right column.
+  const leftColumn = (
+    <>
+      <CollapsibleCard id="pizza" partyId={party.id} title="Order the pizza">
+        <PizzaStatusCard party={party} guests={guests} />
+      </CollapsibleCard>
+      <CollapsibleCard id="music" partyId={party.id} title="Music">
         <MusicNowPlayingCard
           partyId={party.id}
           inviteCode={party.inviteCode}
           hideOpenTabLink={isMobile}
         />
-        <ChecklistTodayCard
+      </CollapsibleCard>
+      {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
+      <CollapsibleCard id="swc" partyId={party.id} title="Stand With Crypto">
+        <StandWithCryptoCard party={party} />
+      </CollapsibleCard>
+      <CollapsibleCard id="announce" partyId={party.id} title="Announce">
+        <AnnouncePanel
           partyId={party.id}
-          inviteCode={party.inviteCode}
-          hideOpenTabLink={isMobile}
+          onSent={() => setAnnHistoryKey((k) => k + 1)}
         />
+      </CollapsibleCard>
+      <CollapsibleCard
+        id="announcement-history"
+        partyId={party.id}
+        title="Sent today"
+      >
+        <AnnouncementHistory partyId={party.id} refreshKey={annHistoryKey} />
+      </CollapsibleCard>
+    </>
+  );
+
+  const rightColumn = (
+    <>
+      <CollapsibleCard
+        id="stream-on-screen"
+        partyId={party.id}
+        title="Put the stream on screen"
+      >
+        <StreamOnScreenCard />
+      </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="broadcast"
+          partyId={party.id}
+          title="Join the global PizzaDAO broadcast"
+        >
+          <BroadcastJoinCard partyId={party.id} layout={layout} />
+        </CollapsibleCard>
+      )}
+      {isGpp && !briefingFirst && (
+        <CollapsibleCard
+          id="briefing"
+          partyId={party.id}
+          title="PizzaDAO mic-announcement"
+        >
+          <BriefingCard party={party} />
+        </CollapsibleCard>
+      )}
+      <CollapsibleCard
+        id="photo-quick-capture"
+        partyId={party.id}
+        title="Quick photo or video"
+      >
+        <PhotoQuickCaptureCard party={party} />
+      </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="signed-box"
+          partyId={party.id}
+          title="Sign a pizza box together"
+        >
+          <SignedPizzaBoxCard party={party} />
+        </CollapsibleCard>
+      )}
+      {isGpp && (
+        <CollapsibleCard
+          id="box-tower"
+          partyId={party.id}
+          title="Stack the pizza boxes"
+        >
+          <PizzaBoxStackCard party={party} />
+        </CollapsibleCard>
+      )}
+    </>
+  );
+
+  return (
+    <div
+      className={
+        isMobile
+          ? 'space-y-4 pb-8'
+          : 'grid grid-cols-1 lg:grid-cols-2 gap-4'
+      }
+    >
+      {briefingFirst && (
+        <div className={isMobile ? '' : 'lg:col-span-2'}>
+          <BriefingCard party={party} highlighted />
+        </div>
+      )}
+
+      {/* StatusHeader pulse first — countdown + checked-in is the live signal. */}
+      <div className={isMobile ? '' : 'lg:col-span-2'}>
+        <StatusHeader party={party} guests={guests} />
       </div>
+
+      {isMobile ? (
+        <>
+          {leftColumn}
+          {rightColumn}
+        </>
+      ) : (
+        <>
+          <div className="space-y-4">{leftColumn}</div>
+          <div className="space-y-4">{rightColumn}</div>
+        </>
+      )}
     </div>
   );
 };

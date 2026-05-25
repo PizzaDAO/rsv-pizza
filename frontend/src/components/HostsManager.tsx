@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { User, UserPlus, X, Globe, Instagram, GripVertical, ChevronDown, ChevronUp, Send, ArrowRightLeft } from 'lucide-react';
 import { CoHost } from '../types';
 import { Checkbox } from './Checkbox';
 import HostFormModal from './HostFormModal';
@@ -8,7 +8,9 @@ import { fetchXAvatarToSupabase, isAutoFilledXAvatar } from '../utils/avatarUtil
 import { uuid, normalizeUrl, stripToHandle } from '../lib/utils';
 import { ALL_HOST_TABS } from '../lib/tabPermissions';
 import { usePizza } from '../contexts/PizzaContext';
-import { apiRequest } from '../lib/api';
+import { apiRequest, fetchPartyOwner } from '../lib/api';
+import { useIsAdminOrUnderboss } from '../hooks/useIsAdminOrUnderboss';
+import TransferOwnershipModal from './admin/TransferOwnershipModal';
 
 interface HostsManagerProps {
   partyId: string;
@@ -45,6 +47,18 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   // (see arugula-38633 incident in MEMORY).
   const [fullCoHosts, setFullCoHosts] = useState<CoHost[] | null>(null);
 
+  // paesana-89172: primary host (parties.userId) info fetched from the same
+  // endpoint. Used to render a synthetic "Owner" row when the owner's email
+  // isn't in co_hosts yet — and to canonicalize them into co_hosts on first
+  // save (toggle/edit/remove of any sibling). 37+ existing parties had their
+  // owner invisible from this UI before the paesana-89172 backfill landed.
+  const [primaryHost, setPrimaryHost] = useState<{
+    userId: string | null;
+    name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null>(null);
+
   // Co-hosts state — includes ALL co-hosts (manual + protected).
   // Prefer the unsanitized fetch when available; fall back to props otherwise.
   const [coHosts, setCoHosts] = useState<CoHost[]>(initialCoHosts);
@@ -54,6 +68,61 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   const visibleCoHosts = React.useMemo(
     () => coHosts.filter(h => !isProtected(h)),
     [coHosts]
+  );
+
+  // paesana-89172: case-insensitive lookup of the primary host inside the
+  // current cohosts array.
+  const ownerEmail = primaryHost?.email?.toLowerCase() ?? null;
+  const ownerCoHost = React.useMemo<CoHost | null>(() => {
+    if (!ownerEmail) return null;
+    return visibleCoHosts.find(h => (h.email ?? '').toLowerCase() === ownerEmail) ?? null;
+  }, [visibleCoHosts, ownerEmail]);
+
+  // paesana-89172: when the primary host is NOT yet in co_hosts (legacy
+  // parties pre-backfill or any new path that forgets to auto-add), build a
+  // synthetic row so they still render. Any change to the synthetic row
+  // canonicalizes them into co_hosts via `canonicalizeOwnerIntoCoHosts`.
+  const syntheticOwnerRow = React.useMemo<CoHost | null>(() => {
+    if (!primaryHost || ownerCoHost) return null;
+    return {
+      id: `__owner_synthetic_${primaryHost.userId ?? primaryHost.email}`,
+      name: primaryHost.name ?? primaryHost.email,
+      email: primaryHost.email,
+      avatar_url: primaryHost.avatar_url ?? undefined,
+      showOnEvent: true,
+      canEdit: true,
+    };
+  }, [primaryHost, ownerCoHost]);
+
+  // The row id of "the owner" — synthetic or real — used to flag the Owner
+  // badge + hide the X (remove) button on that row.
+  const ownerRowId = syntheticOwnerRow?.id ?? ownerCoHost?.id ?? null;
+
+  // Cohosts list as actually rendered: prepend the synthetic owner when one
+  // exists; otherwise leave the list alone. The owner appears once either way.
+  const renderedCoHosts = React.useMemo<CoHost[]>(() => {
+    if (syntheticOwnerRow) return [syntheticOwnerRow, ...visibleCoHosts];
+    return visibleCoHosts;
+  }, [syntheticOwnerRow, visibleCoHosts]);
+
+  /**
+   * paesana-89172: if the owner row is synthetic (not yet in coHosts), inject
+   * them into the array so the rest of the toggle/edit handlers can operate
+   * on a real entry. Returns the updated array + the id the rest of the
+   * handler should target (synthetic id is replaced with a real uuid).
+   */
+  const canonicalizeOwnerIntoCoHosts = React.useCallback(
+    (current: CoHost[], targetId: string): { next: CoHost[]; resolvedId: string } => {
+      if (!syntheticOwnerRow || targetId !== syntheticOwnerRow.id) {
+        return { next: current, resolvedId: targetId };
+      }
+      const realEntry: CoHost = {
+        ...syntheticOwnerRow,
+        id: uuid(),
+      };
+      return { next: [...current, realEntry], resolvedId: realEntry.id };
+    },
+    [syntheticOwnerRow]
   );
 
   // Sync from props when enriched data arrives asynchronously — but only if
@@ -68,24 +137,72 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
   // Fetch the unsanitized cohosts (with email) on mount / partyId change.
   // Silent fallback on error — render falls back to sanitized props.
+  // paesana-89172: also captures the primary host so we can render the
+  // synthetic "Owner" row when their email isn't in co_hosts.
   useEffect(() => {
     if (!partyId) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiRequest<{ coHosts: CoHost[] }>(
-          `/api/parties/${partyId}/cohosts/full`
-        );
+        const data = await apiRequest<{
+          coHosts: CoHost[];
+          primaryHost?: {
+            userId: string | null;
+            name: string | null;
+            email: string;
+            avatar_url: string | null;
+          } | null;
+        }>(`/api/parties/${partyId}/cohosts/full`);
         if (cancelled) return;
         const next = Array.isArray(data.coHosts) ? data.coHosts : [];
         setFullCoHosts(next);
         setCoHosts(next);
+        setPrimaryHost(data.primaryHost ?? null);
       } catch {
         // Silent fallback — keep sanitized props as source of truth.
       }
     })();
     return () => { cancelled = true; };
   }, [partyId]);
+
+  // fontina-91827: admin-only "Transfer ownership" affordance under the
+  // primary host row. The hook resolves to null while loading, then true/false.
+  // The owner-info lookup is deferred until the admin actually opens the modal
+  // so we don't hit the backend on every host page render.
+  const isAdminCaller = useIsAdminOrUnderboss();
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [primaryOwner, setPrimaryOwner] = useState<{ email: string; name: string | null } | null>(null);
+  const [primaryOwnerError, setPrimaryOwnerError] = useState<string | null>(null);
+  const [loadingPrimaryOwner, setLoadingPrimaryOwner] = useState(false);
+
+  const openTransferModal = async () => {
+    setPrimaryOwnerError(null);
+    if (primaryOwner) {
+      setShowTransferModal(true);
+      return;
+    }
+    // paesana-89172 already fetches the primary host into `primaryHost`; if
+    // that's populated we don't need a second network call.
+    if (primaryHost?.email) {
+      setPrimaryOwner({ email: primaryHost.email, name: primaryHost.name });
+      setShowTransferModal(true);
+      return;
+    }
+    setLoadingPrimaryOwner(true);
+    try {
+      const data = await fetchPartyOwner(partyId);
+      if (!data.ownerEmail) {
+        setPrimaryOwnerError('This event has no primary owner on record.');
+        return;
+      }
+      setPrimaryOwner({ email: data.ownerEmail, name: data.ownerName });
+      setShowTransferModal(true);
+    } catch (e) {
+      setPrimaryOwnerError(e instanceof Error ? e.message : 'Failed to load owner');
+    } finally {
+      setLoadingPrimaryOwner(false);
+    }
+  };
 
   const [newCoHostName, setNewCoHostName] = useState('');
   const [newCoHostEmail, setNewCoHostEmail] = useState('');
@@ -176,8 +293,10 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   const toggleTabPermission = async (coHostId: string, tabId: string) => {
-    const newCoHosts = coHosts.map(h => {
-      if (h.id !== coHostId) return h;
+    // paesana-89172: canonicalize synthetic owner before mutating permissions.
+    const { next: canon, resolvedId } = canonicalizeOwnerIntoCoHosts(coHosts, coHostId);
+    const newCoHosts = canon.map(h => {
+      if (h.id !== resolvedId) return h;
       // If allowedTabs is undefined (all access), start with full list then remove the toggled tab
       const current = Array.isArray(h.allowedTabs) ? h.allowedTabs : permissionTabs.map(t => t.id);
       const updated = current.includes(tabId)
@@ -192,11 +311,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   const toggleAllTabs = async (coHostId: string) => {
-    const coHost = coHosts.find(h => h.id === coHostId);
+    // Use the rendered list (incl. synthetic owner) for the lookup, then
+    // canonicalize before applying — same pattern as toggleCoHostCanEdit.
+    const coHost = renderedCoHosts.find(h => h.id === coHostId);
     if (!coHost) return;
     const hasAll = !Array.isArray(coHost.allowedTabs);
-    const newCoHosts = coHosts.map(h => {
-      if (h.id !== coHostId) return h;
+    const { next: canon, resolvedId } = canonicalizeOwnerIntoCoHosts(coHosts, coHostId);
+    const newCoHosts = canon.map(h => {
+      if (h.id !== resolvedId) return h;
       // If currently all tabs (undefined), restrict to empty; if restricted, give all (undefined)
       return { ...h, allowedTabs: hasAll ? [] : undefined };
     });
@@ -327,8 +449,15 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
         avatarUrl = await proxyAvatarToStorage(editHostAvatarUrl.trim());
       }
 
-      const newCoHosts = coHosts.map(h =>
-        h.id === editingHostId
+      // paesana-89172: if the editing target is the synthetic owner row,
+      // canonicalize into coHosts first so the field updates land on a real
+      // entry that will persist through subsequent renders.
+      const { next: canon, resolvedId } = canonicalizeOwnerIntoCoHosts(
+        coHosts,
+        editingHostId ?? '',
+      );
+      const newCoHosts = canon.map(h =>
+        h.id === resolvedId
           ? {
             ...h,
             name: editHostName.trim(),
@@ -358,8 +487,11 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   const toggleCoHostShowOnEvent = async (id: string) => {
-    const newCoHosts = coHosts.map(h =>
-      h.id === id ? { ...h, showOnEvent: !h.showOnEvent } : h
+    // paesana-89172: canonicalize synthetic owner row → real cohost entry
+    // before applying the toggle, so the change actually persists.
+    const { next: canon, resolvedId } = canonicalizeOwnerIntoCoHosts(coHosts, id);
+    const newCoHosts = canon.map(h =>
+      h.id === resolvedId ? { ...h, showOnEvent: !h.showOnEvent } : h
     );
     setCoHosts(newCoHosts);
     // Auto-save
@@ -367,12 +499,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
   };
 
   const toggleCoHostCanEdit = async (id: string) => {
-    const newCoHosts = coHosts.map(h => {
-      if (h.id !== id) return h;
+    // paesana-89172: canonicalize synthetic owner row → real cohost entry.
+    const { next: canon, resolvedId } = canonicalizeOwnerIntoCoHosts(coHosts, id);
+    const newCoHosts = canon.map(h => {
+      if (h.id !== resolvedId) return h;
       const newCanEdit = !h.canEdit;
       // Clear allowedTabs and collapse permissions when turning off Editor
       if (!newCanEdit) {
-        setExpandedPermissionsId(prev => prev === id ? null : prev);
+        setExpandedPermissionsId(prev => prev === resolvedId ? null : prev);
         return { ...h, canEdit: false, allowedTabs: undefined };
       }
       return { ...h, canEdit: true };
@@ -420,41 +554,81 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
 
       {/* Hosts List (Main Host + Co-Hosts) */}
       <div className="space-y-2 mb-3">
-        {/* Main Host (display only - name comes from user account) */}
-        {hostName && (
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-[#ff393a]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-white font-medium truncate">{hostName}</p>
-                  <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
+        {/* paesana-89172: the standalone "Primary" display row used to
+            render here. The owner is now the first entry in
+            `renderedCoHosts` below (with an "Owner" badge + editable
+            toggles + non-removable), so rendering them here would
+            duplicate them. Only render this legacy display row when we
+            haven't yet loaded the primaryHost data (network fallback)
+            AND the owner isn't already in the cohosts array. */}
+        {hostName && !primaryHost && !ownerCoHost && (
+          <div className="p-3 bg-white/5 rounded-xl border border-[#ff393a]/30 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 rounded-full bg-[#ff393a]/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-[#ff393a]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-white font-medium truncate">{hostName}</p>
+                    <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full">Primary</span>
+                  </div>
                 </div>
               </div>
             </div>
+            {/* fontina-91827: admin-only Transfer ownership affordance even in
+                the legacy/network-fallback render path. */}
+            {isAdminCaller && (
+              <div className="mt-2 pl-[52px] flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={openTransferModal}
+                  disabled={loadingPrimaryOwner}
+                  className="text-xs text-white/50 hover:text-[#ff393a] transition-colors flex items-center gap-1 disabled:opacity-50"
+                  title="Admin only — reassign event ownership to another registered user"
+                >
+                  <ArrowRightLeft size={12} />
+                  {loadingPrimaryOwner ? 'Loading…' : 'Transfer ownership →'}
+                </button>
+                {primaryOwnerError && (
+                  <span className="text-xs text-[#ff393a]">{primaryOwnerError}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Co-Hosts (visible only — protected/auto-added entries are hidden from host UI) */}
-        {visibleCoHosts.map((coHost) => {
+        {/* Co-Hosts (visible only — protected/auto-added entries are hidden from host UI)
+            paesana-89172: `renderedCoHosts` prepends a synthetic "Owner" row when
+            the primary host isn't yet in co_hosts; on first toggle/edit the
+            synthetic row is canonicalized into a real co_host entry. */}
+        {renderedCoHosts.map((coHost) => {
           const fullIndex = coHosts.findIndex(h => h.id === coHost.id);
+          const isOwnerRow = ownerRowId !== null && coHost.id === ownerRowId;
+          // Owner row can't be dragged or removed (they can't be kicked off
+          // their own event). Synthetic owner has no real index — render
+          // without dnd handlers.
+          const draggable = !isOwnerRow;
           return (
           <div
             key={coHost.id}
-            draggable
-            onDragStart={() => handleDragStart(coHost.id)}
-            onDragOver={(e) => handleDragOver(e, coHost.id)}
-            onDragEnd={handleDragEnd}
-            className={`p-3 bg-white/5 rounded-xl border border-white/10 transition-all cursor-move ${draggedIndex === fullIndex ? 'opacity-50' : 'opacity-100'
+            draggable={draggable}
+            onDragStart={draggable ? () => handleDragStart(coHost.id) : undefined}
+            onDragOver={draggable ? (e) => handleDragOver(e, coHost.id) : undefined}
+            onDragEnd={draggable ? handleDragEnd : undefined}
+            className={`p-3 bg-white/5 rounded-xl border ${isOwnerRow ? 'border-[#ff393a]/30' : 'border-white/10'} transition-all ${draggable ? 'cursor-move' : ''} ${draggedIndex === fullIndex ? 'opacity-50' : 'opacity-100'
               }`}
           >
             {/* Top row: identity + remove button */}
             <div className="flex items-center gap-3">
-              <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0">
-                <GripVertical size={18} />
-              </div>
+              {isOwnerRow ? (
+                // Owner row: no drag handle (can't be reordered before owner).
+                <div className="w-[18px] shrink-0" />
+              ) : (
+                <div className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60 shrink-0">
+                  <GripVertical size={18} />
+                </div>
+              )}
               {coHost.avatar_url ? (
                 <img src={coHost.avatar_url} alt={coHost.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
               ) : (
@@ -465,6 +639,14 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-white font-medium truncate">{coHost.name}</p>
+                  {/* paesana-89172: "Owner" badge for the primary host row
+                      (synthetic OR real). Mirrors the existing "Primary"
+                      pill style used on the main host row. */}
+                  {isOwnerRow && (
+                    <span className="text-xs bg-[#ff393a]/20 text-[#ff393a] px-2 py-0.5 rounded-full shrink-0">
+                      Owner
+                    </span>
+                  )}
                 </div>
                 {coHost.email && (
                   <p className="text-white/50 text-xs truncate">{coHost.email}</p>
@@ -501,13 +683,17 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => removeCoHost(coHost.id)}
-                className="text-[#ff393a] hover:text-[#ff5a5b] shrink-0"
-              >
-                <X size={18} />
-              </button>
+              {/* paesana-89172: Owner row is non-removable — the primary host
+                  can't be kicked from their own event. */}
+              {!isOwnerRow && (
+                <button
+                  type="button"
+                  onClick={() => removeCoHost(coHost.id)}
+                  className="text-[#ff393a] hover:text-[#ff5a5b] shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              )}
             </div>
             {/* Bottom row: controls */}
             <div className="flex items-center gap-3 mt-2 pl-9">
@@ -532,7 +718,25 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               >
                 Edit
               </button>
+              {/* fontina-91827: admin-only Transfer-ownership affordance,
+                  rendered next to Edit on the Owner row. Hidden for
+                  non-admin callers and non-owner rows. */}
+              {isOwnerRow && isAdminCaller && (
+                <button
+                  type="button"
+                  onClick={openTransferModal}
+                  disabled={loadingPrimaryOwner}
+                  className="text-white/50 hover:text-[#ff393a] text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                  title="Admin only — reassign event ownership to another registered user"
+                >
+                  <ArrowRightLeft size={12} />
+                  {loadingPrimaryOwner ? 'Loading…' : 'Transfer ownership →'}
+                </button>
+              )}
             </div>
+            {isOwnerRow && primaryOwnerError && (
+              <div className="mt-1 pl-9 text-xs text-[#ff393a]">{primaryOwnerError}</div>
+            )}
 
             {/* Tab permissions expander (only when canEdit is true) */}
             {coHost.canEdit && (
@@ -606,12 +810,12 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
         avatarFilePreview={editAvatarFilePreview}
         showOnEvent={
           editingHostId
-            ? (coHosts.find(h => h.id === editingHostId)?.showOnEvent !== false)
+            ? (renderedCoHosts.find(h => h.id === editingHostId)?.showOnEvent !== false)
             : true
         }
         canEdit={
           editingHostId
-            ? (coHosts.find(h => h.id === editingHostId)?.canEdit === true)
+            ? (renderedCoHosts.find(h => h.id === editingHostId)?.canEdit === true)
             : false
         }
         xAvatarFetching={editXAvatarFetching}
@@ -715,6 +919,27 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
         onSubmit={addCoHost}
         submitting={savingHost}
       />
+
+      {/* fontina-91827: admin-only ownership transfer modal */}
+      {primaryOwner && (
+        <TransferOwnershipModal
+          isOpen={showTransferModal}
+          partyId={partyId}
+          currentOwnerName={primaryOwner.name}
+          currentOwnerEmail={primaryOwner.email}
+          candidateCoHosts={coHosts
+            .filter(h => !!h.email)
+            .map(h => ({ name: h.name, email: h.email as string }))}
+          onClose={() => setShowTransferModal(false)}
+          onTransferred={() => {
+            // Hard reload — ownership change fundamentally rewires the host
+            // session (the calling admin may have just lost edit power on
+            // this party; the new owner needs the full host UI). Letting
+            // the existing party context settle without a reload is risky.
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 };

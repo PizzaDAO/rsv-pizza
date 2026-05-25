@@ -228,7 +228,7 @@ router.post('/:partyId/photos/batch-review', requireAuth, async (req: AuthReques
 });
 
 // POST /api/parties/:partyId/photos - Upload a new photo (requires guest identity or auth)
-router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
     const {
@@ -322,8 +322,13 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
-    // All photos/videos require approval
-    const initialStatus = 'pending';
+    // margherita-43821: host uploads (owner / co-host w/ canEdit / super-admin /
+    // GPP editor) are auto-approved + auto-starred so they appear in /photos
+    // immediately. Guest uploads still go through pending moderation.
+    const isHostUpload = await canUserEditParty(partyId, req.userId, req.userEmail);
+    const initialStatus = isHostUpload ? 'approved' : 'pending';
+    const initialStarred = isHostUpload ? true : false;
+    const now = new Date();
 
     const photo = await prisma.photo.create({
       data: {
@@ -343,6 +348,10 @@ router.post('/:partyId/photos', async (req: AuthRequest, res: Response, next: Ne
         photoYear: photoYear ? parseInt(photoYear, 10) : null,
         duration: isVideo && duration ? duration : null,
         status: initialStatus,
+        starred: initialStarred,
+        starredAt: initialStarred ? now : null,
+        reviewedAt: isHostUpload ? now : null,
+        reviewedBy: isHostUpload ? (req.userId || null) : null,
       },
       include: {
         guest: { select: { id: true, name: true } },

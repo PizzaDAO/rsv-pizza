@@ -36,6 +36,10 @@ export interface Guest {
   status?: GuestStatus;
   waitlistPosition?: number | null;
   promotedAt?: string | null;
+  // tartufo-49271: surfaces guests.submitted_via so the live RSVP ticker can
+  // filter to direct-RSVP signals (link/rsvp/api) and skip bulk-invited rows.
+  // Optional + default-accept-undefined so older rows still flow through.
+  submittedVia?: string;
 }
 
 export interface PizzaStyle {
@@ -260,6 +264,7 @@ export interface Party {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   maxGuests: number | null;
   expectedGuests?: number | null;
   hideGuests: boolean;
@@ -1584,6 +1589,13 @@ export interface ExternalPaymentInput {
   mercuryCardLast4?: string;  // for mercury_card
   externalProofUrl?: string;
   adminNotes: string;         // REQUIRED — must explain why this is being recorded
+  /**
+   * aglio-62584: admin override for the acciuga-62583 per-submission $625
+   * cap. Set to `true` when backfilling a pre-cap historical out-of-band
+   * payment that legitimately exceeded $625. Without this, finalAmountUsd
+   * > $625 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
+   */
+  allowOverSubmissionCap?: boolean;
 }
 
 // Admin-list payout: includes embedded party + host info
@@ -1593,6 +1605,11 @@ export interface AdminPayout extends Payout {
     name: string;
     inviteCode: string;
     customUrl: string | null;
+    /**
+     * bruschetta-58291: surface country on the /payments admin queue.
+     * Free-form string from `parties.country` (e.g. 'USA', 'Spain').
+     */
+    country: string | null;
     /** Host's planning number (arugula-38633 v2 follow-up). */
     expectedGuests: number | null;
     /**
@@ -1607,6 +1624,33 @@ export interface AdminPayout extends Payout {
      * `event_tags` → null. See backend/src/helpers/reimbursementCap.ts.
      */
     effectiveReimbursementCapUsd: number | null;
+    /**
+     * parmigiana-89172: per-party sum of `status === 'paid'` payouts (all
+     * methods — USDC, wire, Mercury). Surfaced inline on PayoutRow to
+     * warn admins before they accidentally double-pay. Optional so older
+     * cached payloads don't break TS during a rolling deploy.
+     */
+    paidTotalUsd?: number;
+    /**
+     * parmigiana-89172: count of paid payouts that contribute to
+     * `paidTotalUsd`. Shown in parens, e.g. "Already paid: $470.00 (2)".
+     */
+    paidTotalCount?: number;
+    /**
+     * paesana-89172: owner User id (parties.userId). Paired with
+     * `primaryHostInCohosts` so the frontend can flag rows where the payout
+     * recipient is the primary host but they aren't visible on the event UI
+     * (= missing from co_hosts). Optional for backward-compat with cached
+     * payloads during rolling deploys.
+     */
+    userId?: string | null;
+    /**
+     * paesana-89172: true when the primary host's email appears in co_hosts.
+     * False means the primary host is invisible on the event page — admins
+     * should double-check before paying out to them. Optional for
+     * backward-compat.
+     */
+    primaryHostInCohosts?: boolean;
   };
   host: {
     id: string;
@@ -1619,11 +1663,28 @@ export interface AdminPayoutDetail extends AdminPayout {
   audits: PayoutAuditEntry[];
 }
 
+/**
+ * bianco-89172: cumulative paid-USDC summary for a single recipient wallet.
+ * Backs the per-address $626 cap warning in PayoutReviewModal + BulkSendModal.
+ * `wouldExceed` is null when no proposed `amount` was supplied to the
+ * `/wallet-paid-total` endpoint; true / false when one was.
+ */
+export interface WalletPaidTotal {
+  address: string;
+  paidUsd: number;
+  paidCount: number;
+  capUsd: number;
+  wouldExceed: boolean | null;
+}
+
 export interface AdminPayoutFilters {
   status?: PayoutStatus | 'all';
   payoutMethod?: PayoutMethod | 'all';
   partyId?: string;
-  hostEmail?: string;
+  /** salame-83472: unified search — host email|name OR party name (case-insensitive contains). */
+  search?: string;
+  /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
+  country?: string;
   currency?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -1675,10 +1736,35 @@ export interface PrepayQueueRow {
     country: string | null;
     effectiveReimbursementCapUsd: number | null;
     eventTags: string[];
+    /**
+     * paesana-89172: owner User id (parties.userId). Paired with
+     * `primaryHostInCohosts` so the prepay-queue table can flag rows where
+     * the candidate is the primary host but they aren't visible on the
+     * event UI. Optional for backward-compat with cached payloads.
+     */
+    userId?: string | null;
+    /**
+     * paesana-89172: true when the primary host's email appears in
+     * co_hosts. False = invisible owner — flag amber on the candidate
+     * chip. Optional for backward-compat.
+     */
+    primaryHostInCohosts?: boolean;
   };
   candidates: PrepayCandidate[];
   /** True when the admin must disambiguate between ≥2 candidates. */
   hasMultipleCandidates: boolean;
+  /**
+   * parmigiana-89172: per-party sum of `status === 'paid'` payouts (all
+   * methods). Surfaced as an inline "Already paid: $X (N)" line under the
+   * city name so admins don't accidentally double-pay. Always present from
+   * the backend — defaults to 0 for parties with no prior paid payouts.
+   */
+  partyPaidUsd: number;
+  /**
+   * parmigiana-89172: count of paid payouts that contribute to
+   * `partyPaidUsd`. Shown in parens, e.g. "Already paid: $600.00 (2)".
+   */
+  partyPaidCount: number;
 }
 
 export interface OcrPreviewResult {

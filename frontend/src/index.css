@@ -742,6 +742,31 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   animation: pulse-once 600ms ease-out;
 }
 
+/* tartufo-49271: live RSVP ticker — newly-arrived rows slide in from the
+   top. `animation-delay: index * 60ms` is applied inline to stagger bursts.
+   Hovering/focusing the parent list pauses the animation via [data-paused]. */
+@keyframes ticker-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-ticker-in {
+  animation: ticker-slide-in 320ms ease-out both;
+}
+[data-paused="true"] .animate-ticker-in {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker-in {
+    animation: none;
+  }
+}
+
 /* Pizzeria name label next to red pins on the Participating Pizzerias map.
    Google Maps applies this class to the label container that sits centered on
    the marker anchor — we offset it downward so it sits below the pin with a

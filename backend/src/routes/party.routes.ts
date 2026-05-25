@@ -14,6 +14,7 @@ import {
   resolveCapActorKind,
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
+import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -247,7 +248,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationRecipientUrl, donationEthAddress
+      donationRecipientUrl, donationEthAddress, showToppingsOnRsvp
     } = req.body;
 
     // Generate default party name if not provided
@@ -274,11 +275,30 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       select: { name: true },
     });
 
-    // Build coHosts array with host email if provided
-    const hostCoHosts = req.userEmail
-      ? [{ id: crypto.randomUUID(), name: user?.name || '', email: req.userEmail, showOnEvent: false }]
-      : [];
-    const finalCoHosts = coHosts || hostCoHosts;
+    // paesana-89172: ALWAYS ensure the primary host (req.userEmail) appears in
+    // the co_hosts array — otherwise the Hosts UI hides them and the prepay
+    // queue treats them as an invisible recipient. Merge the client-supplied
+    // coHosts with a synthesized entry for the creator (case-insensitive email
+    // match) when missing. showOnEvent + canEdit default true so the owner is
+    // visible on the event page and can manage it.
+    const baseCoHosts: any[] = Array.isArray(coHosts) ? [...coHosts] : [];
+    if (req.userEmail) {
+      const creatorEmail = req.userEmail.toLowerCase();
+      const alreadyPresent = baseCoHosts.some(
+        (h: any) => h && typeof h === 'object' && typeof h.email === 'string'
+          && h.email.toLowerCase() === creatorEmail
+      );
+      if (!alreadyPresent) {
+        baseCoHosts.push({
+          id: crypto.randomUUID(),
+          name: user?.name || req.userEmail,
+          email: req.userEmail,
+          showOnEvent: true,
+          canEdit: true,
+        });
+      }
+    }
+    const finalCoHosts = baseCoHosts;
 
     const party = await prisma.party.create({
       data: {
@@ -314,6 +334,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         donationRecipient: donationRecipient || null,
         donationRecipientUrl: donationRecipientUrl || null,
         donationEthAddress: donationEthAddress || null,
+        showToppingsOnRsvp: showToppingsOnRsvp || false,
       },
       include: {
         user: { select: { name: true } },
@@ -446,7 +467,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     const { id } = req.params;
     const {
       name, date, endTime, duration, pizzaStyle, address, latitude, longitude, country, city, placeId, venueName, maxGuests,
-      availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
+      availableBeverages, availableToppings, availableDietaryOptions, showToppingsOnRsvp, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts, selectedPizzerias,
       expectedGuests,
       eventTags,
@@ -673,6 +694,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
         ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
+        ...(showToppingsOnRsvp !== undefined && { showToppingsOnRsvp }),
         ...(password !== undefined && { password: password || null }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
@@ -979,7 +1001,21 @@ router.get('/:partyId/cohosts/full', async (req: AuthRequest, res: Response, nex
 
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { coHosts: true },
+      // paesana-89172: also return the primary host (parties.userId) so the
+      // HostsManager can render an "Owner" row even when the owner's email
+      // isn't in co_hosts yet. Without this, owners created via the v1 API
+      // or older code paths vanish from the Hosts UI.
+      select: {
+        coHosts: true,
+        userId: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+            profilePictureUrl: true,
+          },
+        },
+      },
     });
 
     if (!party) {
@@ -991,7 +1027,17 @@ router.get('/:partyId/cohosts/full', async (req: AuthRequest, res: Response, nex
       return res.status(403).json({ error: 'not authorized' });
     }
 
-    return res.json({ coHosts: party.coHosts ?? [] });
+    return res.json({
+      coHosts: party.coHosts ?? [],
+      primaryHost: party.user
+        ? {
+            userId: party.userId,
+            name: party.user.name,
+            email: party.user.email,
+            avatar_url: party.user.profilePictureUrl,
+          }
+        : null,
+    });
   } catch (error) {
     next(error);
   }
@@ -1853,9 +1899,9 @@ router.post('/:partyId/guests/walk-in', async (req: AuthRequest, res: Response, 
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -1919,9 +1965,9 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     // Validate body
@@ -2021,12 +2067,10 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
           ? `${baseUrl}/${party.customUrl}`
           : `${baseUrl}/${party.inviteCode}`;
 
-        // Build HTML once (per-recipient personalization only swaps the greeting)
-        const escapedBody = body
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\n/g, '<br />');
+        // Build HTML once (per-recipient personalization only swaps the greeting).
+        // Body supports `[label](url)` markdown links (http/https/mailto only);
+        // invalid schemes (e.g. javascript:) render as literal text.
+        const escapedBody = renderAnnouncementBodyHtml(body);
 
         for (const recipient of recipients) {
           if (!recipient.email) continue;
@@ -2104,9 +2148,9 @@ router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, ne
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'day-of');
+    const canAccessDayOf = await canUserAccessTab(partyId, req.userEmail, req.userId, 'party-guide');
     if (!canAccessDayOf) {
-      throw new AppError('You do not have access to the day-of tab', 403, 'TAB_ACCESS_DENIED');
+      throw new AppError('You do not have access to the party-guide tab', 403, 'TAB_ACCESS_DENIED');
     }
 
     const rows = await prisma.announcement.findMany({
@@ -2127,8 +2171,10 @@ router.get('/:partyId/announcements', async (req: AuthRequest, res: Response, ne
 // the URLs never ship in the JS bundle for non-eligible viewers.
 //
 // Env vars (set on backend Vercel project):
-//   BROADCAST_ZOOM_URL       - global GPP Zoom meeting link (set when known)
-//   BROADCAST_STREAMYARD_URL - global GPP StreamYard studio link (set when known)
+//   BROADCAST_ZOOM_URL         - global GPP Zoom meeting link (set when known)
+//   BROADCAST_ZOOM_MEETING_ID  - display-formatted meeting ID (e.g. "860 6254 2262")
+//   BROADCAST_ZOOM_PASSCODE    - meeting passcode (e.g. "552142")
+//   BROADCAST_STREAMYARD_URL   - global GPP StreamYard studio link (set when known)
 // While unset, returns null URLs and the card shows "Coming soon".
 router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -2144,11 +2190,19 @@ router.get('/:partyId/broadcast-urls', async (req: AuthRequest, res: Response, n
     if (!canAccess) throw new AppError('Forbidden', 403, 'FORBIDDEN');
 
     if (party.eventType !== 'gpp' || party.underbossStatus !== 'approved') {
-      return res.json({ zoomUrl: null, streamyardUrl: null, eligible: false });
+      return res.json({
+        zoomUrl: null,
+        zoomMeetingId: null,
+        zoomPasscode: null,
+        streamyardUrl: null,
+        eligible: false,
+      });
     }
 
     return res.json({
       zoomUrl: process.env.BROADCAST_ZOOM_URL || null,
+      zoomMeetingId: process.env.BROADCAST_ZOOM_MEETING_ID || null,
+      zoomPasscode: process.env.BROADCAST_ZOOM_PASSCODE || null,
       streamyardUrl: process.env.BROADCAST_STREAMYARD_URL || null,
       eligible: true,
     });

@@ -19,6 +19,7 @@ import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
+import photoFeedRoutes from './routes/photo-feed.routes.js';
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import donationRoutes from './routes/donation.routes.js';
@@ -51,6 +52,7 @@ import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import adminPayoutRoutes, { payoutWalletRouter } from './routes/admin-payout.routes.js';
+import adminPartyRoutes from './routes/admin-party.routes.js';
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
@@ -136,6 +138,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
+app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-management routes (transfer ownership) — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
@@ -146,6 +149,7 @@ app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
+app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests

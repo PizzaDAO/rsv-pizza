@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -31,10 +31,14 @@ import { formatTimezoneDisplay } from '../utils/dateUtils';
 import { useConfetti } from '../hooks/useConfetti';
 import { AddToCalendarPopup } from '../components/AddToCalendarPopup';
 import { ParticipatingPizzerias } from '../components/ParticipatingPizzerias';
+import { rankPizzerias } from '../lib/pizzeriaRank';
 import { LastYearPhotos } from '../components/LastYearPhotos';
 import VenueMap from '../components/VenueMap';
 import { CheckInButton } from '../components/CheckInButton';
+import { CheckInScanner } from '../components/CheckInScanner';
 import { GuestScorecard } from '../components/scorecard';
+import { uploadPhoto } from '../lib/api';
+import { uploadEventPhoto } from '../lib/supabase';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -100,6 +104,14 @@ export function EventPage() {
   const { fire: fireConfetti, ConfettiOverlay } = useConfetti();
   const [showCalendarPopup, setShowCalendarPopup] = useState(false);
   const calendarAnchorRef = useRef<HTMLDivElement>(null);
+
+  // Scorecard action wiring (basil-72184).
+  const photoGalleryRef = useRef<HTMLDivElement>(null);
+  const photoGalleryTriggerRef = useRef<(() => void) | null>(null);
+  const selfieInputRef = useRef<HTMLInputElement>(null);
+  const [vouchScannerOpen, setVouchScannerOpen] = useState(false);
+  const [scorecardRefresh, setScorecardRefresh] = useState(0);
+  const [selfieUploading, setSelfieUploading] = useState(false);
 
   // Sticky RSVP button on mobile: show when inline button is scrolled above the viewport.
   // Uses a scroll listener instead of IntersectionObserver because IO won't fire when an
@@ -319,6 +331,18 @@ export function EventPage() {
     }
   };
 
+  // Cap "On the Menu" to top-3 pizzerias by the shared ranking helper
+  // (stracchino-22301). Must be declared above the early returns below.
+  const topPizzerias = useMemo(
+    () => rankPizzerias(
+      event?.selectedPizzerias ?? [],
+      event?.latitude != null && event?.longitude != null
+        ? { lat: event.latitude, lng: event.longitude }
+        : null,
+    ),
+    [event?.selectedPizzerias, event?.latitude, event?.longitude],
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -536,14 +560,80 @@ export function EventPage() {
     );
   };
 
+  // Scorecard action handlers (basil-72184). Backend auto-completes the
+  // photo/vouch/pizza_selfie scorecard items as side effects, so these only
+  // trigger the user-visible action and bump `scorecardRefresh` so the
+  // scorecard refetches afterward.
+  const handleScorecardUploadPhoto = () => {
+    // Scroll to the gallery so the upload modal appears in context.
+    photoGalleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Open the picker if the gallery has registered a trigger.
+    if (photoGalleryTriggerRef.current) {
+      photoGalleryTriggerRef.current();
+    } else {
+      // Gallery not mounted yet (button is collapsed). Expand it; the trigger
+      // will register on the next render and we don't auto-open in that case.
+      setShowPhotos(true);
+    }
+  };
+
+  const handleScorecardScanGuest = () => {
+    setVouchScannerOpen(true);
+  };
+
+  const handleScorecardTakeSelfie = () => {
+    selfieInputRef.current?.click();
+  };
+
+  const handleSelfieFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input so picking the same file twice still triggers onChange.
+    e.target.value = '';
+    if (!file || !event) return;
+
+    setSelfieUploading(true);
+    try {
+      const uploadResult = await uploadEventPhoto(file, event.id);
+      if (!uploadResult) {
+        console.error('Selfie storage upload failed');
+        return;
+      }
+      const result = await uploadPhoto(event.id, {
+        url: uploadResult.url,
+        fileName: uploadResult.fileName,
+        fileSize: uploadResult.fileSize,
+        mimeType: uploadResult.mimeType,
+        width: uploadResult.width,
+        height: uploadResult.height,
+        uploaderName: existingGuestData?.name || user?.name || undefined,
+        uploaderEmail: existingGuestData?.email || user?.email,
+        guestId: existingGuestData?.id,
+        tags: ['pizza-selfie'],
+      });
+      if (!result) {
+        console.error('Selfie record creation failed');
+        return;
+      }
+      // Both `photo` (any upload) and `pizza_selfie` (pizza-selfie tag) get
+      // auto-completed by the backend; refetch to reflect the new state.
+      setScorecardRefresh((n) => n + 1);
+    } catch (err) {
+      console.error('Selfie upload error:', err);
+    } finally {
+      setSelfieUploading(false);
+    }
+  };
+
   // Interactive Google Maps JS SDK venue thumbnail (see VenueMap component).
-  // Prefer canonical place_id (ChIJ…) + address — opens the real place card.
+  // Per Google's Maps Universal URL spec, `/maps/search/?api=1` with both
+  // `query` and `query_place_id` opens the canonical place card. `/maps/place/?api=1`
+  // is not a valid action and Google falls back to a generic IP-located map view.
   // Skip query_place_id for Google's address-shell IDs (prefixes Ei…/Ek…), which
   // are autocomplete fallbacks that don't resolve to a Maps place page. Fall
   // back to address alone, then to lat/lng if no address.
   const hasCanonicalPlaceId = event.placeId?.startsWith('ChIJ') ?? false;
   const googleMapsUrl = hasCanonicalPlaceId && event.address
-    ? `https://www.google.com/maps/place/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}&query_place_id=${event.placeId}`
     : event.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
       : event.latitude && event.longitude
@@ -1183,7 +1273,13 @@ export function EventPage() {
 
                 {/* Guest Scorecard - shown after check-in on event day */}
                 {isEventDay && existingGuestData?.checkedInAt && (
-                  <GuestScorecard inviteCode={event.customUrl || event.inviteCode} />
+                  <GuestScorecard
+                    inviteCode={event.customUrl || event.inviteCode}
+                    onUploadPhoto={handleScorecardUploadPhoto}
+                    onScanGuest={handleScorecardScanGuest}
+                    onTakeSelfie={handleScorecardTakeSelfie}
+                    refreshSignal={scorecardRefresh}
+                  />
                 )}
 
                 {/* Guest Count - Mobile */}
@@ -1402,9 +1498,9 @@ export function EventPage() {
                 <MusicWidget isHost={false} partyId={event.id} className="border-t border-theme-stroke pt-6 mt-6" />
 
                 {/* Participating Pizzerias Section */}
-                {event.selectedPizzerias && event.selectedPizzerias.length > 0 && (
+                {topPizzerias.length > 0 && (
                   <ParticipatingPizzerias
-                    pizzerias={event.selectedPizzerias}
+                    pizzerias={topPizzerias}
                     venueAddress={event.address}
                     eventSlug={slug}
                   />
@@ -1421,7 +1517,7 @@ export function EventPage() {
 
                 {/* Photo Gallery Section - only for confirmed guests */}
                 {photoStats?.photosEnabled && existingGuestData?.status === 'CONFIRMED' && (
-                  <div className="border-t border-theme-stroke pt-6 mt-6">
+                  <div ref={photoGalleryRef} className="border-t border-theme-stroke pt-6 mt-6">
                     {showPhotos ? (
                       <PhotoGallery
                         partyId={event.id}
@@ -1430,6 +1526,7 @@ export function EventPage() {
                         uploaderName={existingGuestData?.name || user?.name || undefined}
                         uploaderEmail={existingGuestData?.email || user?.email}
                         guestId={existingGuestData?.id}
+                        triggerUploadRef={photoGalleryTriggerRef}
                       />
                     ) : (
                       <button
@@ -1515,6 +1612,31 @@ export function EventPage() {
           )}
         </div>
       )}
+
+      {/* Vouch / check-in QR scanner (scorecard "Scan" action — basil-72184).
+          CheckInScanner self-portals via createPortal. */}
+      {vouchScannerOpen && (
+        <CheckInScanner
+          inviteCode={event.customUrl || event.inviteCode}
+          currentGuestId={existingGuestData?.id}
+          onVouchSuccess={() => {
+            setVouchScannerOpen(false);
+            setScorecardRefresh((n) => n + 1);
+          }}
+          onClose={() => setVouchScannerOpen(false)}
+        />
+      )}
+
+      {/* Hidden file input for scorecard "Selfie" action — opens front camera on mobile. */}
+      <input
+        ref={selfieInputRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        style={{ display: 'none' }}
+        onChange={handleSelfieFile}
+        disabled={selfieUploading}
+      />
 
       <CornerLinks />
 

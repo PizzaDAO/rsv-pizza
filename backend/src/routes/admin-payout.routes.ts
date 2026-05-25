@@ -29,6 +29,8 @@ import {
   getUsdcDailyCapStatus,
   getPayoutWalletAddress,
   getPayoutWalletBalanceUsd,
+  getPerAddressPaidTotals,
+  PER_ADDRESS_HARD_CAP_USD,
 } from '../services/usdc-base.service.js';
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
@@ -36,11 +38,33 @@ import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveWalletInput } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { notifyHostOfPaymentExecution } from '../services/payoutTelegramNotify.js';
+import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 
 const router = Router();
 
 const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
+
+/**
+ * acciuga-62583: hard per-submission ceiling of $625 — same value as
+ * `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the USDC-execute ceiling)
+ * but enforced here at SUBMISSION time across all admin create/edit paths
+ * (external POST + PATCH). No override path. Inlined here per task spec —
+ * mirror of the helper in payout.routes.ts so we don't extract a shared module
+ * just for two callsites.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
+function assertWithinPerSubmissionCap(amountUsd: number) {
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
+  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+    throw new AppError(
+      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      400,
+      'PER_SUBMISSION_CAP_EXCEEDED',
+    );
+  }
+}
 
 /**
  * Shared Prisma `select` for the embedded `party` on payout responses.
@@ -56,6 +80,9 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   name: true,
   inviteCode: true,
   customUrl: true,
+  // bruschetta-58291: surface the party's country on the /payments admin
+  // queue rows + power the Country filter dropdown in PayoutsFilterBar.
+  country: true,
   expectedGuests: true,
   // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
   // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
@@ -63,6 +90,12 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // `computeEffectiveCapUsd` helper (validated cap OR max numeric tag).
   reimbursementCapUsd: true,
   eventTags: true,
+  // paesana-89172: needed to derive `primaryHostInCohosts` — admin warning
+  // when a payout's recipient is the primary host but they're not in the
+  // co_hosts JSONB (= invisible on the event UI).
+  userId: true,
+  coHosts: true,
+  user: { select: { email: true } },
   _count: {
     select: {
       guests: {
@@ -169,6 +202,90 @@ function escapeCSV(value: string): string {
   return value;
 }
 
+/**
+ * parmigiana-89172: aggregate `status === 'paid'` payout totals per party in a
+ * single groupBy query. Used to surface an "Already paid" warning inline on
+ * both the prepay queue rows AND the admin payouts table rows, so admins don't
+ * accidentally double-pay (Osogbo, Seropédica, Dar es Salaam all got two USDC
+ * sends within hours of each other before this landed).
+ *
+ * Returns a Map keyed by partyId so callers can do O(1) lookups. Parties with
+ * no paid payouts are simply absent from the map — callers should default to
+ * `{ paidUsd: 0, paidCount: 0 }` for those.
+ */
+async function fetchPaidTotalsByParty(
+  partyIds: string[],
+): Promise<Map<string, { paidUsd: number; paidCount: number }>> {
+  if (partyIds.length === 0) return new Map();
+  const rows = await prisma.payout.groupBy({
+    by: ['partyId'],
+    where: { partyId: { in: partyIds }, status: 'paid' },
+    _sum: { finalAmountUsd: true },
+    _count: { id: true },
+  });
+  const m = new Map<string, { paidUsd: number; paidCount: number }>();
+  for (const r of rows) {
+    m.set(r.partyId, {
+      paidUsd: r._sum.finalAmountUsd ? Number(r._sum.finalAmountUsd.toString()) : 0,
+      paidCount: r._count.id,
+    });
+  }
+  return m;
+}
+
+/**
+ * tiramisu-49102: hard per-party cap enforcement. Sums every payout for the
+ * party that is `pending | approved | paid` and throws 409 PARTY_CAP_EXCEEDED
+ * if `usedUsd + proposedUsd` exceeds the party's `effectiveReimbursementCapUsd`
+ * (validated cap OR max numeric event tag). Parties without an effective cap
+ * stay uncapped.
+ *
+ * `ignorePayoutId` excludes a row from the existing-total — used by PATCH so a
+ * row being edited doesn't count against itself.
+ */
+async function assertWithinPartyCap(
+  partyId: string,
+  proposedUsd: number,
+  ignorePayoutId?: string,
+): Promise<void> {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  if (!party) {
+    throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+  }
+  const effectiveCap = computeEffectiveCapUsd({
+    reimbursementCapUsd: party.reimbursementCapUsd,
+    eventTags: party.eventTags,
+  });
+  if (effectiveCap == null) return;
+
+  const where: any = {
+    partyId,
+    status: { in: ['paid', 'pending', 'approved'] },
+  };
+  if (ignorePayoutId) {
+    where.id = { not: ignorePayoutId };
+  }
+  const existingTotal = await prisma.payout.aggregate({
+    where,
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd = existingTotal._sum.finalAmountUsd
+    ? Number(existingTotal._sum.finalAmountUsd.toString())
+    : 0;
+  const remainingUsd = Math.max(0, effectiveCap - usedUsd);
+
+  if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
+    throw new AppError(
+      `This payment would exceed the party's $${effectiveCap.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
+      409,
+      'PARTY_CAP_EXCEEDED',
+    );
+  }
+}
+
 /** Build a Prisma `where` clause from query-string filters. */
 function buildPayoutWhere(query: Request['query']): any {
   const where: any = {};
@@ -188,11 +305,19 @@ function buildPayoutWhere(query: Request['query']): any {
     where.partyId = partyId.trim();
   }
 
-  const hostEmail = query.hostEmail;
-  if (typeof hostEmail === 'string' && hostEmail.trim().length > 0) {
-    where.host = {
-      email: { contains: hostEmail.trim().toLowerCase(), mode: 'insensitive' as const },
-    };
+  // salame-83472: unified search — matches host.email, host.name, OR party.name
+  // (case-insensitive contains). Replaces the previous `hostEmail`-only filter.
+  // The implicit AND with the existing top-level `where.party` (underbossStatus
+  // 'approved' from tartufo-58291 + optional country from bruschetta-58291) is
+  // preserved by Prisma because top-level OR is AND'd with other top-level keys.
+  const search = query.search;
+  if (typeof search === 'string' && search.trim().length > 0) {
+    const needle = search.trim();
+    where.OR = [
+      { host: { email: { contains: needle, mode: 'insensitive' as const } } },
+      { host: { name: { contains: needle, mode: 'insensitive' as const } } },
+      { party: { name: { contains: needle, mode: 'insensitive' as const } } },
+    ];
   }
 
   const currency = query.currency;
@@ -212,13 +337,46 @@ function buildPayoutWhere(query: Request['query']): any {
     }
   }
 
+  // bruschetta-58291: optional country filter — pulled out before assembling
+  // `where.party` below so it merges cleanly with the tartufo-58291
+  // `underbossStatus: 'approved'` filter (must NOT overwrite that gate).
+  const country = query.country;
+  const countryClause =
+    typeof country === 'string' && country !== 'all' && country.trim().length > 0
+      ? { country: country.trim() }
+      : {};
+
   // tartufo-58291: hide payouts from unapproved parties from the admin queue
   // + CSV export. Existing rows from before the bresaola-49185 backend gate
   // shouldn't surface in routine review. Stats/totals reuse this same `where`
-  // so they stay consistent.
-  where.party = { underbossStatus: 'approved' };
+  // so they stay consistent. bruschetta-58291: merged with optional country
+  // filter so both apply.
+  where.party = {
+    underbossStatus: 'approved',
+    ...countryClause,
+  };
 
   return where;
+}
+
+/**
+ * paesana-89172: returns true when the party's primary host (party.user.email)
+ * is present in the co_hosts JSONB array (case-insensitive email match), OR
+ * the party doesn't have a User joined (rare). Returns false ONLY when we know
+ * the primary host's email AND it's missing from co_hosts — that's the
+ * suspicious-payment signal: the recipient is the event owner but they're
+ * invisible in the Hosts UI / public page.
+ */
+function isPrimaryHostInCohosts(party: any): boolean {
+  if (!party || typeof party !== 'object') return true;
+  const ownerEmail = party.user?.email ? String(party.user.email).toLowerCase() : null;
+  if (!ownerEmail) return true; // can't determine — don't flag
+  const list = Array.isArray(party.coHosts) ? party.coHosts : [];
+  return list.some((ch: any) =>
+    ch && typeof ch === 'object'
+    && typeof ch.email === 'string'
+    && ch.email.toLowerCase() === ownerEmail
+  );
 }
 
 /** Shape a Prisma payout row for the API response. */
@@ -273,6 +431,10 @@ function serializePayout(row: any): any {
           name: row.party.name,
           inviteCode: row.party.inviteCode,
           customUrl: row.party.customUrl,
+          // bruschetta-58291: surface the party's country on the wire so the
+          // /payments queue can render it as a subtitle and populate the
+          // Country filter dropdown.
+          country: row.party.country ?? null,
           // arugula-38633 v2 follow-up: admin dashboard shows planning vs
           // actuals. `expectedGuests` is the host's planning number;
           // `rsvpCount` is the filtered _count of confirmed direct RSVPs
@@ -285,6 +447,13 @@ function serializePayout(row: any): any {
             reimbursementCapUsd: row.party.reimbursementCapUsd,
             eventTags: row.party.eventTags,
           }),
+          // paesana-89172: surface the owner's id + a flag for whether they
+          // appear in the co_hosts array. Frontend pairs this with
+          // `payout.hostUserId` to flag suspicious admin-created prepayments
+          // whose recipient is the primary host but isn't visible on the
+          // event UI.
+          userId: row.party.userId ?? null,
+          primaryHostInCohosts: isPrimaryHostInCohosts(row.party),
         }
       : undefined,
     host: row.host
@@ -681,6 +850,11 @@ router.get(
           country: string | null;
           effectiveReimbursementCapUsd: number | null;
           eventTags: string[];
+          // paesana-89172: primary host (parties.userId) + whether they
+          // appear in co_hosts. Frontend flags amber when a candidate's
+          // userId matches but the primary host isn't visible.
+          userId: string | null;
+          primaryHostInCohosts: boolean;
         };
         candidates: CandidateInternal[];
       };
@@ -734,6 +908,11 @@ router.get(
             country: p.country,
             effectiveReimbursementCapUsd: cap,
             eventTags: p.eventTags,
+            // paesana-89172: shape this party for the warning helper. The
+            // prepay-queue select already pulls `userId`, `coHosts`, and
+            // `user.email` — reuse them via `isPrimaryHostInCohosts`.
+            userId: p.userId ?? null,
+            primaryHostInCohosts: isPrimaryHostInCohosts(p),
           },
           candidates,
         });
@@ -845,7 +1024,22 @@ router.get(
           hasMultipleCandidates: r.candidates.length > 1,
         }));
 
-      res.json({ rows: finalRows });
+      // parmigiana-89172: attach per-party "already paid" totals so the
+      // admin sees inline warning before clicking Create Prepayment again.
+      // Single aggregate query keyed by partyId; default 0/0 for parties
+      // with no prior paid payouts.
+      const finalPartyIds = finalRows.map(r => r.party.id);
+      const paidTotals = await fetchPaidTotalsByParty(finalPartyIds);
+      const rowsWithPaidTotals = finalRows.map(r => {
+        const totals = paidTotals.get(r.party.id);
+        return {
+          ...r,
+          partyPaidUsd: totals?.paidUsd ?? 0,
+          partyPaidCount: totals?.paidCount ?? 0,
+        };
+      });
+
+      res.json({ rows: rowsWithPaidTotals });
     } catch (error) {
       next(error);
     }
@@ -920,6 +1114,26 @@ router.post(
       if (!host) {
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
+
+      // acciuga-62583: hard per-submission $625 ceiling — enforced BEFORE the
+      // party-cap check so the error message is clearer even on uncapped
+      // events. Out-of-band records still get split by default.
+      // aglio-62584: admin override available here too — when the admin is
+      // recording an out-of-band payment that intentionally exceeds the cap
+      // (e.g. backfilling a pre-cap historical wire) they can pass
+      // `allowOverSubmissionCap: true`.
+      if (
+        finalAmountUsd > PER_SUBMISSION_MAX_USD &&
+        body.allowOverSubmissionCap === true
+      ) {
+        // admin acknowledged — proceed
+      } else {
+        assertWithinPerSubmissionCap(finalAmountUsd);
+      }
+
+      // tiramisu-49102: hard cap — block external records that would push the
+      // cumulative paid+pending+approved past the party's effective cap.
+      await assertWithinPartyCap(partyId, finalAmountUsd);
 
       const paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
       if (Number.isNaN(paidAt.getTime())) {
@@ -1064,6 +1278,10 @@ router.get(
 
       // Totals — computed over the filtered set (NOT just the current page),
       // so the dashboard pills reflect the user's current filters.
+      // parmigiana-58291: also pull party { id, name, country } so we can build
+      // the per-party totals rollup without a second query. Reuses the same
+      // `where` clause, so the existing tartufo/bruschetta filters (status,
+      // method, country, dateRange) and the approval gate all still apply.
       const allFiltered = await prisma.payout.findMany({
         where,
         select: {
@@ -1072,6 +1290,13 @@ router.get(
           finalAmountUsd: true,
           createdAt: true,
           paidAt: true,
+          party: {
+            select: {
+              id: true,
+              name: true,
+              country: true,
+            },
+          },
         },
       });
 
@@ -1082,6 +1307,14 @@ router.get(
       let totalUsdThisMonth = 0;
       let sumUsd = 0;
       let awaitingReview = 0;
+
+      // parmigiana-58291: per-party rollup over `status === 'paid'` rows.
+      // Keyed by party.id; we accumulate sum + count and resolve to a sorted
+      // array (descending by totalPaidUsd) for the response.
+      const partyTotals = new Map<
+        string,
+        { partyId: string; partyName: string; country: string | null; totalPaidUsd: number; payoutCount: number }
+      >();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1102,13 +1335,62 @@ router.get(
           if (r.paidAt && r.paidAt >= startOfMonth) {
             totalUsdThisMonth += usd;
           }
+          // parmigiana-58291: accumulate per-party totals. Only `paid` rows
+          // count — pending/approved/rejected don't represent USD that left
+          // the wallet. Guard against the (theoretically impossible) missing
+          // party relation so a single bad row can't 500 the dashboard.
+          if (r.party) {
+            const existing = partyTotals.get(r.party.id);
+            if (existing) {
+              existing.totalPaidUsd += usd;
+              existing.payoutCount += 1;
+            } else {
+              partyTotals.set(r.party.id, {
+                partyId: r.party.id,
+                partyName: r.party.name,
+                country: r.party.country,
+                totalPaidUsd: usd,
+                payoutCount: 1,
+              });
+            }
+          }
         }
       }
 
       const avgUsd = allFiltered.length > 0 ? sumUsd / allFiltered.length : 0;
 
+      // taleggio-49183: the parmigiana-58291 top-level `byParty` aggregate
+      // was removed — the per-row "Already paid: $X (N)" rendering on each
+      // PayoutRow (populated below from `pagePaidTotals`) already shows the
+      // same information under each event name, so the top-level list was
+      // duplicative. The `partyTotals` Map above is left intact in case
+      // future serialization consumers depend on it.
+
+      // parmigiana-89172: attach a per-party "already paid" rollup to each
+      // row's nested `party` object so the PayoutsTable can render an
+      // inline "Already paid: $X (N)" warning under the event name. Per
+      // PARTY, not per payout — collect the unique partyIds in the page
+      // and run one aggregate query.
+      const pagePartyIds = Array.from(
+        new Set(
+          page
+            .map(p => (p as any).party?.id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      );
+      const pagePaidTotals = await fetchPaidTotalsByParty(pagePartyIds);
+      const serializedPayouts = page.map(p => {
+        const serialized = serializePayout(p);
+        if (serialized.party?.id) {
+          const totals = pagePaidTotals.get(serialized.party.id);
+          serialized.party.paidTotalUsd = totals?.paidUsd ?? 0;
+          serialized.party.paidTotalCount = totals?.paidCount ?? 0;
+        }
+        return serialized;
+      });
+
       res.json({
-        payouts: page.map(serializePayout),
+        payouts: serializedPayouts,
         nextCursor,
         totals: {
           byStatus,
@@ -1152,7 +1434,18 @@ router.get(
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
 
-      res.json({ payout: serializePayout(row) });
+      const serialized = serializePayout(row);
+      // tiramisu-49102: attach per-party "already paid" totals to the detail
+      // response too so the Pay-again button on PayoutReviewModal can populate
+      // the synthetic PrepayQueueRow with `partyPaidUsd` for the CreatePrepayment
+      // modal's remaining-cap clamp. Cheap one-row aggregate.
+      if (serialized.party?.id) {
+        const totals = await fetchPaidTotalsByParty([serialized.party.id]);
+        const t = totals.get(serialized.party.id);
+        serialized.party.paidTotalUsd = t?.paidUsd ?? 0;
+        serialized.party.paidTotalCount = t?.paidCount ?? 0;
+      }
+      res.json({ payout: serialized });
     } catch (error) {
       next(error);
     }
@@ -1214,6 +1507,24 @@ router.patch(
         if (oldAmount !== newAmount) {
           amountChanged = true;
           data.finalAmountUsd = parsed;
+          // aglio-62584: admin override for the acciuga-62583 per-submission
+          // cap. When the admin is intentionally setting an over-cap amount
+          // (e.g. editing a grandfathered $750 row, or splitting on their own),
+          // they can pass `allowOverSubmissionCap: true` to bypass. The modal
+          // surfaces an amber warning + ack Checkbox before forwarding the
+          // flag. Host-side PATCH (payout.routes.ts) still has no override.
+          if (
+            parsed > PER_SUBMISSION_MAX_USD &&
+            req.body?.allowOverSubmissionCap === true
+          ) {
+            // admin acknowledged — proceed
+          } else {
+            assertWithinPerSubmissionCap(parsed);
+          }
+          // tiramisu-49102: re-check per-party cap when admin edits amount.
+          // Exclude THIS row from the existing-total so the edit doesn't
+          // count against itself.
+          await assertWithinPartyCap(existing.partyId, parsed, existing.id);
         }
       }
 
@@ -1322,7 +1633,13 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          partyId: true,
+          finalAmountUsd: true,
+        },
       });
 
       if (!existing) {
@@ -1337,6 +1654,18 @@ router.post(
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      // bocconcini-49102: re-run the per-submission + per-party cap checks at
+      // approve time so rows created/edited BEFORE the cap rules landed (or
+      // rows whose party's cap was tightened after creation) can't be pushed
+      // through to `approved` (and from there to `paid`). Helpers are
+      // idempotent — better to over-check than to under-check.
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      await assertWithinPartyCap(
+        existing.partyId,
+        Number(existing.finalAmountUsd),
+        existing.id,
+      );
 
       const { note, autoExecute } = req.body || {};
 
@@ -1523,7 +1852,13 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          partyId: true,
+          finalAmountUsd: true,
+        },
       });
 
       if (!existing) {
@@ -1534,6 +1869,16 @@ router.post(
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      // bocconcini-49102: re-run the per-submission + per-party cap checks at
+      // mark-paid time too. mark-paid is the manual override that records an
+      // out-of-band payment for an existing row — same gates apply.
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      await assertWithinPartyCap(
+        existing.partyId,
+        Number(existing.finalAmountUsd),
+        existing.id,
+      );
 
       const {
         wireReference,
@@ -1618,6 +1963,67 @@ router.get(
   },
 );
 
+// ============================================
+// bianco-89172: GET /api/admin/payouts/wallet-paid-total
+//
+// Returns cumulative paid USDC for a single recipient wallet, optionally with
+// a `wouldExceed` flag for a proposed additional amount. Backs the warning
+// panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
+// already received $Y; sending $Z more would push past the $626 per-address
+// cap" before they fire off a duplicate payment.
+//
+// Query params:
+//   address (required): 0x...40 hex chars (case-insensitive)
+//   amount  (optional): proposed additional USD. When set, response includes
+//                       wouldExceed = (paidUsd + amount > capUsd). When
+//                       omitted, wouldExceed = null.
+//
+// Admin-only (isPaymentAdmin via requireAnyAdminOrPaymentAdmin).
+// ============================================
+router.get(
+  '/wallet-paid-total',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const addressRaw = typeof req.query.address === 'string' ? req.query.address.trim() : '';
+      if (!addressRaw || !/^0x[0-9a-fA-F]{40}$/.test(addressRaw)) {
+        throw new AppError(
+          'address query param must be a valid 0x-prefixed 40-char hex wallet',
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+
+      let amount: number | null = null;
+      if (req.query.amount != null && req.query.amount !== '') {
+        const parsed = Number(req.query.amount);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new AppError(
+            'amount query param must be a non-negative number',
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        amount = parsed;
+      }
+
+      const { paidUsd, paidCount } = await getPerAddressPaidTotals(addressRaw);
+      const wouldExceed = amount == null ? null : paidUsd + amount > PER_ADDRESS_HARD_CAP_USD;
+
+      res.json({
+        address: addressRaw,
+        paidUsd,
+        paidCount,
+        capUsd: PER_ADDRESS_HARD_CAP_USD,
+        wouldExceed,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 /**
  * Shared executor used by both the explicit POST /:id/execute route and the
  * `autoExecute: true` branch of POST /:id/approve. Branches on payoutMethod
@@ -1641,8 +2047,14 @@ async function executePayout(params: {
     actorKind: AdminActorKind;
   };
   body: any;
+  /**
+   * bianco-89172: when true, skip the per-address $626 cumulative cap
+   * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
+   * the warning's acknowledgement checkbox has been ticked.
+   */
+  allowOverPerAddressCap?: boolean;
 }) {
-  const { payoutId, actor, body } = params;
+  const { payoutId, actor, body, allowOverPerAddressCap } = params;
 
   const existing = await prisma.payout.findUnique({
     where: { id: payoutId },
@@ -1653,6 +2065,7 @@ async function executePayout(params: {
       payoutMethod: true,
       finalAmountUsd: true,
       payoutWalletAddress: true,
+      partyId: true,
     },
   });
   if (!existing) {
@@ -1667,6 +2080,17 @@ async function executePayout(params: {
   }
 
   const finalAmountUsd = Number(existing.finalAmountUsd);
+
+  // bocconcini-49102: re-run the per-submission + per-party cap checks at
+  // execute time so rows approved before the cap rules landed (or rows whose
+  // party cap was tightened after approval) can't be pushed through to
+  // `paid`. Covers BOTH the direct POST /:id/execute route and the
+  // `autoExecute: true` branch of POST /:id/approve, plus per-row checks in
+  // POST /bulk-execute (which serially calls this helper). `assertWithinPartyCap`
+  // re-queries on every call, so successive bulk rows see the freshly-paid
+  // earlier rows in their `usedUsd` totals.
+  assertWithinPerSubmissionCap(finalAmountUsd);
+  await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
 
   // arugula-38633 v3 follow-up: payout_method can be null when the host
   // submitted before setting their payment details. Block execute with a
@@ -1691,7 +2115,9 @@ async function executePayout(params: {
     }
 
     try {
-      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd);
+      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd, {
+        allowOverPerAddressCap: !!allowOverPerAddressCap,
+      });
 
       const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.update({
@@ -1732,6 +2158,11 @@ async function executePayout(params: {
       void notifyHostOfPaymentExecution(existing.id, 'paid', {
         txHash: result.txHash,
       });
+      // cipolla-49102: fire-and-forget email to the host's User.email.
+      // Runs alongside Telegram (which is USDC-only) — same contract.
+      void emailHostOfPaymentExecution(existing.id, 'paid', {
+        txHash: result.txHash,
+      });
       return updated;
     } catch (err: any) {
       // Flip to failed + record the error so the admin UI shows what happened.
@@ -1757,6 +2188,10 @@ async function executePayout(params: {
       // boscaiola-49102: fire-and-forget Telegram DM on failure too.
       // Same fire-and-forget contract — never blocks or throws.
       void notifyHostOfPaymentExecution(existing.id, 'failed', {
+        error: errMsg,
+      });
+      // cipolla-49102: fire-and-forget email on failure too.
+      void emailHostOfPaymentExecution(existing.id, 'failed', {
         error: errMsg,
       });
       throw new AppError(`USDC payout failed: ${errMsg}`, 502, 'USDC_SEND_FAILED');
@@ -1801,6 +2236,9 @@ async function executePayout(params: {
       });
       return row;
     });
+    // cipolla-49102: fire-and-forget email to the host's User.email.
+    // No txHash for wire — helper omits the link.
+    void emailHostOfPaymentExecution(existing.id, 'paid');
     return updated;
   }
 
@@ -1851,6 +2289,9 @@ async function executePayout(params: {
       });
       return row;
     });
+    // cipolla-49102: fire-and-forget email to the host's User.email.
+    // No txHash for mercury_card — helper omits the link.
+    void emailHostOfPaymentExecution(existing.id, 'paid');
     return updated;
   }
 
@@ -1898,6 +2339,10 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
+        // bianco-89172: admin can acknowledge the per-address $626 cap
+        // warning via the PayoutReviewModal checkbox; the frontend forwards
+        // the flag here.
+        allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
       });
 
       res.json({ payout: serializePayout(updated) });
@@ -2046,6 +2491,11 @@ router.post(
         );
       }
 
+      // bianco-89172: a single batch-level acknowledgement covers every row.
+      // BulkSendModal disables Send when any selected wallet would exceed the
+      // per-address cap unless the admin ticks "Allow over-cap sends".
+      const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
+
       // SEQUENTIAL execution — nonce safety. Do NOT switch to Promise.all.
       const results: BulkSendResult[] = [];
       for (const row of eligible) {
@@ -2055,6 +2505,7 @@ router.post(
             payoutId: row.id,
             actor: { email: actor.email, actorKind: actor.actorKind },
             body: {},
+            allowOverPerAddressCap,
           });
           // Record a batch-context audit alongside the mark_paid audit that
           // executePayout already wrote.

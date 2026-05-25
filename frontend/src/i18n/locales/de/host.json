@@ -337,7 +337,7 @@
     "revokeLink": "Link widerrufen",
     "toDo": "Zu erledigen",
     "asked": "Angefragt",
-    "yes": "Ja",
+    "yes": "Bestätigt",
     "billed": "In Rechnung gestellt",
     "paid": "Bezahlt",
     "stuck": "Blockiert",
@@ -793,6 +793,25 @@
         "firstPoap": "Erstes POAP-Mint",
         "goalReached": "Ziel erreicht"
       }
+    },
+    "share": {
+      "buttonLabel": "Fortschritt teilen",
+      "modalTitle": "Teile deinen Fortschritt",
+      "download": "Herunterladen",
+      "copy": "Kopieren",
+      "copySuccess": "In die Zwischenablage kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+      "generating": "Wird erstellt…",
+      "generateFailed": "Bild konnte nicht erstellt werden",
+      "close": "Schließen"
+    },
+    "ticker": {
+      "empty": "Noch keine Zusagen",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {{count}} Min.",
+      "hoursAgo": "vor {{count}} Std.",
+      "daysAgo": "vor {{count}} T.",
+      "recentRsvps": "Aktuelle Zusagen"
     }
   }
 }

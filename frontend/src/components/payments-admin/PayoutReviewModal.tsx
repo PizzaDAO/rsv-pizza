@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
-import type { AdminPayoutDetail, PayoutAuditEntry } from '../../types';
+import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
   PayoutMethodIcon,
@@ -11,6 +12,25 @@ import {
   formatOriginalCurrency,
 } from '../payments-shared';
 
+/**
+ * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
+ * the city stays visible in the review-modal header. Same convention as
+ * PayoutRow and PrepayQueueTable — inlined here to match those callsites.
+ */
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
+/**
+ * aglio-62584: client-side mirror of backend `PER_SUBMISSION_MAX_USD` (see
+ * admin-payout.routes.ts). Inlined here so the modal can render an amber
+ * warning + ack Checkbox BEFORE submitting an over-cap edit. The server is
+ * still the source of truth — if this constant drifts, the backend will
+ * 400 with PER_SUBMISSION_CAP_EXCEEDED and the inline error panel
+ * surfaces the message.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
+
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
   /** When set, indicates the actor would be paying themselves — disables mutate buttons. */
@@ -18,7 +38,20 @@ interface PayoutReviewModalProps {
   onClose: () => void;
   onApprove: (note?: string) => Promise<void> | void;
   onReject: (reason: string) => Promise<void> | void;
-  onSaveAmount: (newAmount: number, note?: string) => Promise<void> | void;
+  /**
+   * aglio-62584: `allowOverSubmissionCap` is forwarded when the admin has
+   * acknowledged the amber $625 cap warning by ticking the override
+   * Checkbox below the amount input. Parent should forward to
+   * `updateAdminPayout`'s `allowOverSubmissionCap` field.
+   *
+   * Returns a string error message (NOT throws) when the save fails — the
+   * modal renders it inline below the Save button so the failure isn't
+   * silent. Returning `void` (or resolving to `undefined`) means success.
+   */
+  onSaveAmount: (
+    newAmount: number,
+    opts?: { note?: string; allowOverSubmissionCap?: boolean },
+  ) => Promise<string | void> | string | void;
   onSaveAdminNotes: (notes: string) => Promise<void> | void;
   onMarkPaid: (refs: {
     wireReference?: string;
@@ -30,20 +63,38 @@ interface PayoutReviewModalProps {
   /**
    * Execute payout (PR 5). For USDC → no body, server sends via Privy.
    * For wire / mercury_card → admin-supplied refs.
+   *
+   * `allowOverPerAddressCap` (bianco-89172): forwarded when the admin has
+   * acknowledged the per-address $626 cap warning by ticking the override
+   * checkbox in the execute form.
    */
   onExecute: (body: {
     wireReference?: string;
     mercuryCardLast4?: string;
     mercuryCardId?: string;
     note?: string;
+    allowOverPerAddressCap?: boolean;
   }) => Promise<void> | void;
   /**
    * Optional fetcher for the USDC daily-cap-remaining hint. Only called when
    * the admin opens the USDC execute confirmation. Returns null if unavailable.
    */
   fetchUsdcCapRemaining?: () => Promise<{ usedUsd: number; capUsd: number; remainingUsd: number } | null>;
+  /**
+   * bianco-89172: optional fetcher for the per-address paid total + would-exceed
+   * check. Called when a USDC execute form opens so we can render the cap
+   * warning panel before the admin clicks Send. Returns null if unavailable.
+   */
+  fetchWalletPaidTotal?: (address: string, amount: number) => Promise<WalletPaidTotal | null>;
   /** Re-open (clear rejected/failed) — uses mark-paid plumbing or a future endpoint. */
   onReopen?: () => Promise<void> | void;
+  /**
+   * tiramisu-49102: "Pay again to this wallet" — only surfaced when this
+   * payout is already `paid`. Parent opens CreatePrepaymentModal pre-filled
+   * with the same party + host + method/destination so the admin can issue a
+   * follow-up payment without leaving the modal.
+   */
+  onPayAgain?: (payout: AdminPayoutDetail) => void;
   busy?: boolean;
 }
 
@@ -58,13 +109,22 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onMarkPaid,
   onExecute,
   fetchUsdcCapRemaining,
+  fetchWalletPaidTotal,
   onReopen,
+  onPayAgain,
   busy = false,
 }) => {
   const [editingAmount, setEditingAmount] = useState(false);
   const [draftAmount, setDraftAmount] = useState(String(payout.finalAmountUsd));
   const [adminNotes, setAdminNotes] = useState(payout.adminNotes ?? '');
   const [adminNotesDirty, setAdminNotesDirty] = useState(false);
+
+  // aglio-62584: per-submission $625 cap override + inline error surface.
+  // `ackOverSubmissionCap` is required before Save enables when the draft
+  // amount exceeds the cap; `saveAmountError` renders inline below the
+  // Save button when the backend (or any other failure path) rejects.
+  const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
+  const [saveAmountError, setSaveAmountError] = useState<string | null>(null);
 
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -86,6 +146,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     { usedUsd: number; capUsd: number; remainingUsd: number } | null
   >(null);
   const [usdcCapLoading, setUsdcCapLoading] = useState(false);
+
+  // bianco-89172: per-address $626 cap warning state. `walletPaidTotal` is
+  // null until the USDC execute form opens; `overrideCap` is the admin's
+  // acknowledgement of the warning (required to enable Execute when
+  // `wouldExceed === true`).
+  const [walletPaidTotal, setWalletPaidTotal] = useState<WalletPaidTotal | null>(null);
+  const [walletPaidLoading, setWalletPaidLoading] = useState(false);
+  const [overrideCap, setOverrideCap] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -127,6 +195,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     setExecCardLast4('');
     setExecCardId('');
     setExecNote('');
+    // bianco-89172: clear the per-address cap state on every open so the
+    // ack checkbox doesn't carry over from a previous Execute attempt.
+    setWalletPaidTotal(null);
+    setOverrideCap(false);
     if (payout.payoutMethod === 'usdc_base' && fetchUsdcCapRemaining) {
       setUsdcCapLoading(true);
       try {
@@ -138,6 +210,26 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         setUsdcCapLoading(false);
       }
     }
+    // bianco-89172: fetch the per-address paid-total for the recipient wallet
+    // so we can warn the admin if this payout would push past the $626 cap.
+    if (
+      payout.payoutMethod === 'usdc_base' &&
+      payout.payoutWalletAddress &&
+      fetchWalletPaidTotal
+    ) {
+      setWalletPaidLoading(true);
+      try {
+        const total = await fetchWalletPaidTotal(
+          payout.payoutWalletAddress,
+          Number(payout.finalAmountUsd),
+        );
+        setWalletPaidTotal(total);
+      } catch {
+        setWalletPaidTotal(null);
+      } finally {
+        setWalletPaidLoading(false);
+      }
+    }
   }
 
   return (
@@ -146,7 +238,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -168,7 +260,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 rel="noopener noreferrer"
                 className="hover:underline"
               >
-                {payout.party.name}
+                {stripGppPrefix(payout.party.name)}
               </a>
             </div>
             {/* arugula-38633 v2 follow-up: planning vs actuals, prominent.
@@ -251,6 +343,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     onClick={() => {
                       setDraftAmount(String(payout.finalAmountUsd));
                       setEditingAmount(true);
+                      // aglio-62584: clear any stale cap-ack / error state
+                      // from a prior open so the warning behaviour is fresh.
+                      setAckOverSubmissionCap(false);
+                      setSaveAmountError(null);
                     }}
                     disabled={selfPayoutBlocked || busy}
                     className="inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-theme-text disabled:opacity-50"
@@ -261,41 +357,140 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
               </div>
               {editingAmount ? (
-                <div className="flex items-center gap-2">
-                  <IconInput
-                    icon={DollarSign}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Final USD amount"
-                    value={draftAmount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftAmount(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const n = Number(draftAmount);
-                      if (!Number.isFinite(n) || n < 0) return;
-                      await onSaveAmount(n);
-                      setEditingAmount(false);
-                    }}
-                    disabled={busy}
-                    className="px-3 py-2 rounded-lg bg-[#E52828] text-white text-sm disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingAmount(false)}
-                    className="px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:bg-theme-surface-hover"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                (() => {
+                  // aglio-62584: per-submission cap warning + ack. Recompute
+                  // on every render so the warning toggles as the admin types.
+                  const draftNum = Number(draftAmount);
+                  const draftIsValid = Number.isFinite(draftNum) && draftNum >= 0;
+                  const exceedsCap = draftIsValid && draftNum > PER_SUBMISSION_MAX_USD;
+                  const saveDisabled =
+                    busy || !draftIsValid || (exceedsCap && !ackOverSubmissionCap);
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <IconInput
+                          icon={DollarSign}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Final USD amount"
+                          value={draftAmount}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setDraftAmount(e.target.value);
+                            // Clear stale error once the admin starts typing again.
+                            if (saveAmountError) setSaveAmountError(null);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!draftIsValid) return;
+                            if (exceedsCap && !ackOverSubmissionCap) return;
+                            setSaveAmountError(null);
+                            try {
+                              const result = await onSaveAmount(draftNum, {
+                                allowOverSubmissionCap: exceedsCap
+                                  ? ackOverSubmissionCap
+                                  : undefined,
+                              });
+                              // aglio-62584: parent may return a string instead
+                              // of throwing — surface it inline.
+                              if (typeof result === 'string' && result.length > 0) {
+                                setSaveAmountError(result);
+                                return;
+                              }
+                              setEditingAmount(false);
+                              setAckOverSubmissionCap(false);
+                            } catch (err: any) {
+                              setSaveAmountError(
+                                (err && (err.message || String(err))) ||
+                                  'Save failed — please try again.',
+                              );
+                            }
+                          }}
+                          disabled={saveDisabled}
+                          className="px-3 py-2 rounded-lg bg-[#E52828] text-white text-sm disabled:opacity-50"
+                        >
+                          {busy ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAmount(false);
+                            setAckOverSubmissionCap(false);
+                            setSaveAmountError(null);
+                          }}
+                          className="px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:bg-theme-surface-hover"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {/* aglio-62584: amber warning + ack Checkbox when the
+                          typed value exceeds the per-submission cap. The
+                          backend will reject the save unless the modal
+                          forwards `allowOverSubmissionCap: true`. */}
+                      {exceedsCap && (
+                        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                          <div className="flex items-start gap-2.5">
+                            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                            <div className="flex-1 text-sm">
+                              <div className="font-medium text-amber-200 mb-1">
+                                Per-submission cap warning
+                              </div>
+                              <div className="text-theme-text-secondary text-xs">
+                                Payments are normally capped at{' '}
+                                <b>${PER_SUBMISSION_MAX_USD}</b> per submission.
+                                Saving <b>${draftNum.toFixed(2)}</b> requires an
+                                explicit override (used for grandfathered or
+                                pre-cap rows).
+                              </div>
+                              <div className="mt-3">
+                                <Checkbox
+                                  checked={ackOverSubmissionCap}
+                                  onChange={() => setAckOverSubmissionCap((v) => !v)}
+                                  label={`I acknowledge — this exceeds the $${PER_SUBMISSION_MAX_USD} per-submission cap`}
+                                  labelClassName="text-sm text-amber-100"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* aglio-62584: inline error surface so save failures
+                          aren't silent. Covers backend rejections (bad
+                          wallet, party cap exceeded, etc.) and network
+                          errors. */}
+                      {saveAmountError && (
+                        <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10">
+                          <div className="flex items-start gap-2.5">
+                            <AlertTriangle className="text-red-300 mt-0.5 flex-shrink-0" size={16} />
+                            <div className="flex-1 text-sm text-red-100">
+                              {saveAmountError}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <div>
-                  <div className="text-2xl font-semibold text-theme-text">
+                  <div className="text-2xl font-semibold text-theme-text inline-flex items-center gap-2">
                     {formatUsd(Number(payout.finalAmountUsd))}
+                    {/* speck-89172: amber AlertTriangle when the payout's
+                        final amount exceeds the party's effective cap. Hosts
+                        can now submit any amount; admin moderates over-cap
+                        rows from /payments. */}
+                    {payout.party?.effectiveReimbursementCapUsd != null &&
+                      Number(payout.finalAmountUsd) > payout.party.effectiveReimbursementCapUsd && (
+                        <span
+                          className="inline-flex items-center text-amber-500 shrink-0"
+                          title={`Submitted amount $${Number(payout.finalAmountUsd).toFixed(2)} exceeds the party's $${Number(payout.party.effectiveReimbursementCapUsd).toFixed(2)} cap.`}
+                          aria-label="Amount exceeds party cap"
+                        >
+                          <AlertTriangle size={18} />
+                        </span>
+                      )}
                   </div>
                   {payout.originalCurrency && payout.originalCurrency.toUpperCase() !== 'USD' && (
                     <div className="text-xs text-theme-text-muted mt-0.5">
@@ -564,6 +759,51 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="text-emerald-800/70">Daily cap status unavailable.</span>
                       )}
                     </div>
+                    {/* bianco-89172: per-address $626 cap warning. Only shown
+                        when the proposed send would push the recipient's
+                        cumulative paid total past the cap. The admin must
+                        explicitly tick the override checkbox; until they do,
+                        the Send button below is disabled. */}
+                    {walletPaidLoading && (
+                      <div className="text-xs text-emerald-800/80 inline-flex items-center gap-1">
+                        <Loader2 size={10} className="animate-spin" /> Checking per-address total…
+                      </div>
+                    )}
+                    {!walletPaidLoading && walletPaidTotal?.wouldExceed && payout.payoutWalletAddress && (
+                      <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                          <div className="flex-1 text-sm">
+                            <div className="font-medium text-amber-200 mb-1">
+                              Per-address cap warning
+                            </div>
+                            <div className="text-theme-text-secondary text-xs">
+                              Wallet{' '}
+                              <code className="font-mono text-[11px]">
+                                {payout.payoutWalletAddress.slice(0, 6)}…{payout.payoutWalletAddress.slice(-4)}
+                              </code>{' '}
+                              has already received{' '}
+                              <b>${walletPaidTotal.paidUsd.toFixed(2)}</b>{' '}
+                              across {walletPaidTotal.paidCount} payout
+                              {walletPaidTotal.paidCount === 1 ? '' : 's'}. Sending{' '}
+                              <b>${Number(payout.finalAmountUsd).toFixed(2)}</b> would push the total to{' '}
+                              <b>
+                                ${(walletPaidTotal.paidUsd + Number(payout.finalAmountUsd)).toFixed(2)}
+                              </b>
+                              , exceeding the ${walletPaidTotal.capUsd} per-address cap.
+                            </div>
+                            <div className="mt-3">
+                              <Checkbox
+                                checked={overrideCap}
+                                onChange={() => setOverrideCap((v) => !v)}
+                                label="I acknowledge — proceed anyway"
+                                labelClassName="text-sm text-amber-100"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -623,6 +863,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       if (payout.payoutMethod === 'wire' && !execWireValid) return;
                       if (payout.payoutMethod === 'mercury_card' && !execMercuryValid) return;
                       if (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress) return;
+                      // bianco-89172: block submit if the per-address cap would
+                      // exceed and the admin hasn't ticked the override.
+                      if (
+                        payout.payoutMethod === 'usdc_base' &&
+                        walletPaidTotal?.wouldExceed &&
+                        !overrideCap
+                      ) {
+                        return;
+                      }
                       await onExecute({
                         wireReference: payout.payoutMethod === 'wire' ? execWireRef.trim() : undefined,
                         mercuryCardLast4:
@@ -632,6 +881,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             ? execCardId.trim()
                             : undefined,
                         note: execNote.trim() || undefined,
+                        // bianco-89172: forward the admin's acknowledgement so
+                        // the server bypasses its own per-address cap check.
+                        allowOverPerAddressCap:
+                          payout.payoutMethod === 'usdc_base' && walletPaidTotal?.wouldExceed
+                            ? overrideCap
+                            : undefined,
                       });
                       setShowExecuteForm(false);
                     }}
@@ -640,7 +895,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       payout.payoutMethod == null ||
                       (payout.payoutMethod === 'wire' && !execWireValid) ||
                       (payout.payoutMethod === 'mercury_card' && !execMercuryValid) ||
-                      (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress)
+                      (payout.payoutMethod === 'usdc_base' && !payout.payoutWalletAddress) ||
+                      // bianco-89172: disabled until ack when the cap would exceed.
+                      (payout.payoutMethod === 'usdc_base' &&
+                        !!walletPaidTotal?.wouldExceed &&
+                        !overrideCap)
                     }
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
@@ -792,6 +1051,38 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               Re-open
             </button>
           )}
+          {/* tiramisu-49102: Pay-again button. Surfaced only when status is
+              paid AND we have enough to pre-fill the CreatePrepaymentModal —
+              i.e. a method is set, and (for USDC) a wallet, or (for wire) a
+              bank email. Mercury-card replays only need the host + party.
+              Parent handler builds a synthetic PrepayQueueRow and opens the
+              modal. */}
+          {isPaid && onPayAgain && payout.host?.id && payout.host?.email && payout.payoutMethod && (() => {
+            const m = payout.payoutMethod;
+            const eligible =
+              (m === 'usdc_base' && !!payout.payoutWalletAddress) ||
+              (m === 'wire' &&
+                payout.payoutBankDetails &&
+                typeof (payout.payoutBankDetails as any).email === 'string' &&
+                ((payout.payoutBankDetails as any).email as string).trim().length > 0) ||
+              m === 'mercury_card';
+            if (!eligible) return null;
+            const label =
+              m === 'usdc_base'
+                ? 'Pay again to this wallet'
+                : 'Send another payment';
+            return (
+              <button
+                type="button"
+                onClick={() => onPayAgain(payout)}
+                disabled={busy || selfPayoutBlocked}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                <Repeat2 size={14} />
+                {label}
+              </button>
+            );
+          })()}
           <button
             type="button"
             onClick={onClose}

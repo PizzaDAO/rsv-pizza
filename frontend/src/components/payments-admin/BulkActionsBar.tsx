@@ -39,9 +39,9 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
 }) => {
   if (selectedCount === 0) return null;
   return (
-    <div className="sticky top-[7rem] z-10 bg-theme-text/95 text-white rounded-xl px-4 py-3 mb-3 shadow-lg flex items-center gap-3 flex-wrap">
+    <div className="sticky top-[4rem] sm:top-[7rem] z-10 bg-theme-text/95 text-white rounded-xl px-3 py-2 sm:px-4 sm:py-3 mb-3 shadow-lg flex items-center gap-2 sm:gap-3 flex-wrap">
       <span className="text-sm font-medium">{selectedCount} selected</span>
-      <div className="ml-auto flex items-center gap-2 flex-wrap">
+      <div className="sm:ml-auto flex items-center gap-2 flex-wrap">
         <button
           type="button"
           onClick={onApprove}

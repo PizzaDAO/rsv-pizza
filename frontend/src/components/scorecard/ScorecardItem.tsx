@@ -20,6 +20,9 @@ interface ScorecardItemProps {
   completed: boolean;
   loading?: boolean;
   onComplete: (itemKey: ScorecardItemKey, proofUrl?: string, proofType?: string) => void;
+  onUploadPhoto?: () => void;
+  onScanGuest?: () => void;
+  onTakeSelfie?: () => void;
 }
 
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
@@ -33,15 +36,21 @@ const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = 
   signup_pizzadao: { label: 'Sign up on pizzadao.org', emoji: '🌐' },
 };
 
-export function ScorecardItem({ itemKey, completed, loading, onComplete }: ScorecardItemProps) {
+export function ScorecardItem({
+  itemKey,
+  completed,
+  loading,
+  onComplete,
+  onUploadPhoto,
+  onScanGuest,
+  onTakeSelfie,
+}: ScorecardItemProps) {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const config = ITEM_CONFIG[itemKey];
 
   // Items that need URL proof
   const needsUrlProof = itemKey === 'post';
-  // Auto-complete items (no user action needed from this UI)
-  const isAutoItem = itemKey === 'photo' || itemKey === 'vouch' || itemKey === 'pizza_selfie';
   // Self-report items
   const isSelfReport = itemKey === 'sign_pizza_box' || itemKey === 'join_telegram' || itemKey === 'follow_pizzadao' || itemKey === 'signup_pizzadao';
 
@@ -53,6 +62,15 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
       const tweetText = encodeURIComponent("Having a great time at the pizza party! @pizza_dao #PizzaDAO");
       window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
       setShowInput(true);
+    } else if (itemKey === 'photo') {
+      // Backend auto-completes via photo upload side effect.
+      onUploadPhoto?.();
+    } else if (itemKey === 'vouch') {
+      // Backend auto-completes via vouch endpoint side effect.
+      onScanGuest?.();
+    } else if (itemKey === 'pizza_selfie') {
+      // Backend auto-completes when photo tagged "pizza-selfie".
+      onTakeSelfie?.();
     } else if (isSelfReport) {
       onComplete(itemKey, undefined, 'self_report');
     }
@@ -67,6 +85,9 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
 
   const getActionLabel = (): string => {
     if (itemKey === 'post') return 'Share';
+    if (itemKey === 'photo') return 'Upload';
+    if (itemKey === 'vouch') return 'Scan';
+    if (itemKey === 'pizza_selfie') return 'Selfie';
     if (itemKey === 'sign_pizza_box') return 'I signed it!';
     if (itemKey === 'join_telegram') return 'I joined!';
     if (itemKey === 'follow_pizzadao') return 'I followed!';
@@ -96,8 +117,6 @@ export function ScorecardItem({ itemKey, completed, loading, onComplete }: Score
           <Loader2 className="w-4 h-4 animate-spin text-white/50" />
         ) : completed ? (
           <span className="text-xs text-green-400 font-medium">Done</span>
-        ) : isAutoItem ? (
-          <span className="text-xs text-white/40">Auto</span>
         ) : (
           <button
             onClick={handleAction}

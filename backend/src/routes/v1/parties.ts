@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../../config/database.js';
 import { requireApiKey, ApiKeyRequest, SCOPES } from '../../middleware/apiKey.js';
 import { AppError } from '../../middleware/error.js';
@@ -141,6 +142,23 @@ router.post('/', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest,
       }
     }
 
+    // paesana-89172: auto-add the API key's owner User as the primary host
+    // in co_hosts. Without this, parties created via the public API would
+    // never show their owner in the Hosts UI / prepay queue.
+    const owner = await prisma.user.findUnique({
+      where: { id: req.apiKey!.userId },
+      select: { name: true, email: true },
+    });
+    const ownerCoHosts: any[] = owner?.email
+      ? [{
+          id: crypto.randomUUID(),
+          name: owner.name || owner.email,
+          email: owner.email,
+          showOnEvent: true,
+          canEdit: true,
+        }]
+      : [];
+
     const party = await prisma.party.create({
       data: {
         name: name.trim(),
@@ -160,7 +178,7 @@ router.post('/', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest,
         eventImageUrl: eventImageUrl || null,
         description: description || null,
         customUrl: customUrl || null,
-        coHosts: [],
+        coHosts: ownerCoHosts,
         userId: req.apiKey!.userId,
       },
     });

@@ -337,7 +337,7 @@
     "revokeLink": "リンクを無効化",
     "toDo": "未対応",
     "asked": "依頼済み",
-    "yes": "はい",
+    "yes": "確認済み",
     "billed": "請求済み",
     "paid": "支払済み",
     "stuck": "停滞中",
@@ -793,6 +793,25 @@
         "firstPoap": "最初のPOAPミント",
         "goalReached": "目標達成"
       }
+    },
+    "share": {
+      "buttonLabel": "進捗をシェア",
+      "modalTitle": "あなたの進捗をシェア",
+      "download": "ダウンロード",
+      "copy": "コピー",
+      "copySuccess": "クリップボードにコピーしました",
+      "copyFailed": "コピーに失敗しました",
+      "generating": "生成中…",
+      "generateFailed": "画像を生成できませんでした",
+      "close": "閉じる"
+    },
+    "ticker": {
+      "empty": "まだRSVPはありません",
+      "justNow": "たった今",
+      "minutesAgo": "{{count}}分前",
+      "hoursAgo": "{{count}}時間前",
+      "daysAgo": "{{count}}日前",
+      "recentRsvps": "最近のRSVP"
     }
   }
 }

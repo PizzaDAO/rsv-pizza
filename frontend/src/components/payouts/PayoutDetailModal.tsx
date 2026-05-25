@@ -131,6 +131,14 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     payout && (isAdmin || (user?.id != null && user.id === payout.hostUserId))
   );
 
+  // provolone-39042: hosts can edit pending or approved payouts. On approved
+  // rows the editable surface is narrowed to receipts/photos only — amount,
+  // method, notes are locked (the backend enforces APPROVED_NOT_EDITABLE).
+  // paid/rejected/failed remain fully frozen on the host side.
+  const isEditableStatus =
+    payout?.status === 'pending' || payout?.status === 'approved';
+  const isApproved = payout?.status === 'approved';
+
   const handleSave = async () => {
     if (!payout || saving) return;
     setSaving(true);
@@ -139,22 +147,31 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
       // Build the patch payload. Only include fields that actually changed.
       const patch: Parameters<typeof updatePayout>[2] = {};
 
+      // provolone-39042: on approved payouts the notes + amount inputs are
+      // hidden; never include them in the patch (backend would reject with
+      // APPROVED_NOT_EDITABLE).
+      const approvedLocked = payout.status === 'approved';
+
       // Notes (treat empty string as a clear).
-      const trimmedNotes = editNotes.trim();
-      const originalNotes = (payout.hostNotes ?? '').trim();
-      if (trimmedNotes !== originalNotes) {
-        patch.hostNotes = trimmedNotes.length > 0 ? trimmedNotes : null;
+      if (!approvedLocked) {
+        const trimmedNotes = editNotes.trim();
+        const originalNotes = (payout.hostNotes ?? '').trim();
+        if (trimmedNotes !== originalNotes) {
+          patch.hostNotes = trimmedNotes.length > 0 ? trimmedNotes : null;
+        }
       }
 
       // Amount override.
-      const amountStr = editOverrideAmount.trim();
-      if (amountStr !== '') {
-        const parsed = Number(amountStr);
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error('Amount must be a positive number');
-        }
-        if (parsed !== payout.finalAmountUsd) {
-          patch.finalAmountUsd = parsed;
+      if (!approvedLocked) {
+        const amountStr = editOverrideAmount.trim();
+        if (amountStr !== '') {
+          const parsed = Number(amountStr);
+          if (!Number.isFinite(parsed) || parsed <= 0) {
+            throw new Error('Amount must be a positive number');
+          }
+          if (parsed !== payout.finalAmountUsd) {
+            patch.finalAmountUsd = parsed;
+          }
         }
       }
 
@@ -228,7 +245,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {payout && !editing && payout.status === 'pending' && canModify && (
+            {payout && !editing && isEditableStatus && canModify && (
               <button
                 type="button"
                 onClick={enterEdit}
@@ -286,9 +303,11 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 </span>
               </div>
 
-              {/* gouda-83912: ownership notice for non-owners on pending payouts.
-                  Explains why Edit/Cancel buttons aren't shown. */}
-              {payout.status === 'pending' && !canModify && (
+              {/* gouda-83912: ownership notice for non-owners on editable payouts.
+                  Explains why Edit/Cancel buttons aren't shown. provolone-39042
+                  extends this to approved rows (which are also host-editable
+                  for receipts now). */}
+              {isEditableStatus && !canModify && (
                 <p className="text-xs text-theme-text-muted">
                   Only {payout.hostName ?? payout.hostEmail ?? 'the submitter'} can modify this.
                 </p>
@@ -446,8 +465,9 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
           {payout && editing && (
             <>
               <p className="text-xs text-theme-text-muted">
-                You can edit this payment until an admin reviews it. Removed
-                photos are deleted on save.
+                {isApproved
+                  ? 'This payment is approved. You can still add or remove receipts and pizza photos for record-keeping. Amount and method are locked after approval — contact an admin to change.'
+                  : 'You can edit this payment until an admin reviews it. Removed photos are deleted on save.'}
               </p>
 
               {/* Existing receipts — host can click X to mark for removal */}
@@ -529,37 +549,41 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 />
               </div>
 
-              {/* Notes */}
-              <div>
-                <p className="text-xs text-theme-text-muted mb-2">Notes</p>
-                <IconInput
-                  icon={StickyNote}
-                  multiline
-                  rows={3}
-                  placeholder="What was this for? Pizza + venue, etc."
-                  value={editNotes}
-                  onChange={e => setEditNotes(e.target.value)}
-                  maxLength={500}
-                />
-                <p className="text-xs text-theme-text-muted mt-1">{editNotes.length}/500</p>
-              </div>
+              {/* Notes — locked on approved payouts (provolone-39042). */}
+              {!isApproved && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Notes</p>
+                  <IconInput
+                    icon={StickyNote}
+                    multiline
+                    rows={3}
+                    placeholder="What was this for? Pizza + venue, etc."
+                    value={editNotes}
+                    onChange={e => setEditNotes(e.target.value)}
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-theme-text-muted mt-1">{editNotes.length}/500</p>
+                </div>
+              )}
 
-              {/* Amount override */}
-              <div>
-                <p className="text-xs text-theme-text-muted mb-2">Amount (USD)</p>
-                <IconInput
-                  icon={DollarSign}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Override amount (USD) — leave blank to recompute from receipts"
-                  value={editOverrideAmount}
-                  onChange={e => setEditOverrideAmount(e.target.value)}
-                />
-                <p className="text-xs text-theme-text-muted mt-1">
-                  If you change receipts, we'll re-add the totals automatically unless you set a value here.
-                </p>
-              </div>
+              {/* Amount override — locked on approved payouts (provolone-39042). */}
+              {!isApproved && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Amount (USD)</p>
+                  <IconInput
+                    icon={DollarSign}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Override amount (USD) — leave blank to recompute from receipts"
+                    value={editOverrideAmount}
+                    onChange={e => setEditOverrideAmount(e.target.value)}
+                  />
+                  <p className="text-xs text-theme-text-muted mt-1">
+                    If you change receipts, we'll re-add the totals automatically unless you set a value here.
+                  </p>
+                </div>
+              )}
 
               {saveError && (
                 <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 inline-flex items-center gap-2">

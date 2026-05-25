@@ -1,43 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
-import { searchPizzerias, geocodeAddress, calculateDistanceMiles } from '../lib/ordering';
+import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 import { findActiveRegion } from '../lib/optinAbRegions';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
-
-// ---- Ranking helpers (vesuvio-58492) ----
-
-// Cap the RSVP "Favorite Pizzerias" list to the top N entries ranked by a
-// weighted score combining rating and distance from the venue. Istanbul GPP
-// had ~15+ host-selected pizzerias which overwhelmed the form.
-const TOP_PIZZERIA_LIMIT = 3;
-const DISTANCE_WEIGHT_PER_MILE = 0.3;
-
-function rankPizzerias(
-  list: Pizzeria[],
-  venue: { lat: number; lng: number } | null,
-): Pizzeria[] {
-  return [...list]
-    .map(p => {
-      const rating = p.rating ?? 3.5;
-      const hasDistance =
-        !!venue &&
-        !!p.location &&
-        p.location.lat !== 0 &&
-        p.location.lng !== 0;
-      const distance = hasDistance
-        ? calculateDistanceMiles(venue.lat, venue.lng, p.location.lat, p.location.lng)
-        : 0;
-      return { p, score: rating - distance * DISTANCE_WEIGHT_PER_MILE };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_PIZZERIA_LIMIT)
-    .map(x => x.p);
-}
+import { rankPizzerias } from '../lib/pizzeriaRank';
 
 // ---- Types ----
 
@@ -59,6 +30,7 @@ export interface RSVPEventData {
   availableBeverages: string[];
   availableToppings: string[];
   availableDietaryOptions: string[];
+  showToppingsOnRsvp?: boolean;
   selectedPizzerias?: Pizzeria[];
   turtleRolesEnabled?: boolean;
 }
@@ -101,6 +73,7 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     availableBeverages: event.availableBeverages || [],
     availableToppings: event.availableToppings || [],
     availableDietaryOptions: event.availableDietaryOptions || [],
+    showToppingsOnRsvp: event.showToppingsOnRsvp ?? false,
     selectedPizzerias: event.selectedPizzerias,
     turtleRolesEnabled: event.turtleRolesEnabled,
   };
@@ -125,6 +98,7 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     availableBeverages: party.available_beverages || [],
     availableToppings: party.available_toppings || [],
     availableDietaryOptions: party.available_dietary_options || [],
+    showToppingsOnRsvp: party.show_toppings_on_rsvp ?? false,
     selectedPizzerias: party.selected_pizzerias as Pizzeria[] | undefined,
     turtleRolesEnabled: party.turtle_roles_enabled,
   };
@@ -711,6 +685,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     availableBeverages: eventData.availableBeverages,
     availableToppings: eventData.availableToppings,
     availableDietaryOptions: eventData.availableDietaryOptions,
+    showToppingsOnRsvp: eventData.showToppingsOnRsvp ?? false,
 
     // Reset
     resetForm,

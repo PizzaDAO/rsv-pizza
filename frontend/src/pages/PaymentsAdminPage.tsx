@@ -13,6 +13,7 @@ import {
   markAdminPayoutPaid,
   executeAdminPayout,
   getUsdcDailyCapRemaining,
+  fetchWalletPaidTotal,
   exportAdminPayoutsCsv,
   fetchPrepayQueue,
 } from '../lib/api';
@@ -22,6 +23,7 @@ import type {
   AdminPayoutFilters,
   AdminPayoutTotals,
   PrepayQueueRow,
+  PrepayCandidate,
 } from '../types';
 import { formatUsd } from '../components/payments-shared';
 import {
@@ -50,6 +52,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   status: 'all',
   payoutMethod: 'all',
   currency: 'all',
+  // bruschetta-58291: country filter default — 'all' means no filter.
+  country: 'all',
 };
 
 // lardo-58294: substring filter shared between the search input and the
@@ -223,6 +227,17 @@ export function PaymentsAdminPage() {
     return Array.from(set).sort();
   }, [payouts]);
 
+  // bruschetta-58291: derive the country dropdown set from the currently-loaded
+  // payouts (mirrors `availableCurrencies` above). Backend exposes country via
+  // PAYOUT_PARTY_SELECT; null countries are skipped.
+  const availableCountries = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of payouts) {
+      if (p.party.country) set.add(p.party.country);
+    }
+    return Array.from(set).sort();
+  }, [payouts]);
+
   // siciliana-69183: derive the AdminPayout objects matching `selectedIds` for
   // the Safe-export modal. The modal itself filters non-USDC / missing-wallet
   // rows; we just hand it the full selection.
@@ -313,6 +328,61 @@ export function PaymentsAdminPage() {
         'success',
       );
     }
+  }
+
+  /**
+   * tiramisu-49102: "Pay again to this wallet" from PayoutReviewModal.
+   * Closes the review modal and opens CreatePrepaymentModal pre-filled with
+   * the same party + host + payout-method/destination as the existing payout.
+   * The synthetic PrepayQueueRow mirrors the shape the prepay-queue endpoint
+   * normally emits — a single PrepayCandidate derived from the paid payout's
+   * host + method + walletAddress/bankEmail. CreatePrepaymentModal handles the
+   * cap-remaining clamp + the existing 50%-of-cap default.
+   */
+  function handlePayAgain(payout: AdminPayoutDetail) {
+    if (!payout.host?.id || !payout.payoutMethod || !payout.host.email) return;
+
+    const bankEmail =
+      payout.payoutMethod === 'wire' &&
+      payout.payoutBankDetails &&
+      typeof (payout.payoutBankDetails as any).email === 'string'
+        ? ((payout.payoutBankDetails as any).email as string).trim() || null
+        : null;
+
+    const candidate: PrepayCandidate = {
+      userId: payout.host.id,
+      name: payout.host.name ?? null,
+      email: payout.host.email,
+      method: payout.payoutMethod,
+      walletAddress:
+        payout.payoutMethod === 'usdc_base' ? payout.payoutWalletAddress ?? null : null,
+      bankEmail,
+      // We don't carry primary/cohost role here — the modal only uses it for
+      // a star icon. Default to false; the admin already knows who they're
+      // paying because the modal came from a specific payout row.
+      isPrimaryHost: false,
+    };
+
+    const syntheticRow: PrepayQueueRow = {
+      party: {
+        id: payout.party.id,
+        name: payout.party.name,
+        customUrl: payout.party.customUrl,
+        country: payout.party.country,
+        effectiveReimbursementCapUsd: payout.party.effectiveReimbursementCapUsd,
+        // We don't carry eventTags on AdminPayout.party; the modal only reads
+        // it for the cap-fallback display, and `effectiveReimbursementCapUsd`
+        // is already resolved upstream.
+        eventTags: [],
+      },
+      candidates: [candidate],
+      hasMultipleCandidates: false,
+      partyPaidUsd: payout.party.paidTotalUsd ?? 0,
+      partyPaidCount: payout.party.paidTotalCount ?? 0,
+    };
+
+    setDetail(null);
+    setPrepayModalRow(syntheticRow);
   }
 
   async function openDetail(p: AdminPayout) {
@@ -526,6 +596,12 @@ export function PaymentsAdminPage() {
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
 
+        {/* taleggio-49183: the parmigiana-58291 "Totals by party" rollup table
+            was removed here. Each PayoutRow already renders "Already paid:
+            $X (N)" inline under the event name (powered by the same
+            partyTotals aggregation on the backend), so the top table was
+            duplicative. */}
+
         {/* bismarck-92103: Prepay queue — only renders when there's at least
             one matching party (host flagged prepay + saved payment method,
             no in-flight payouts).
@@ -540,8 +616,8 @@ export function PaymentsAdminPage() {
                 ? `Prepay queue (${sortedPrepayQueue.length} of ${prepayQueue.length} events)`
                 : `Prepay queue (${prepayQueue.length} event${prepayQueue.length === 1 ? '' : 's'})`}
             </h2>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="max-w-md flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+              <div className="sm:max-w-md sm:flex-1">
                 <IconInput
                   icon={Search}
                   type="text"
@@ -550,7 +626,7 @@ export function PaymentsAdminPage() {
                   placeholder="Search city, country, or host…"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs uppercase tracking-wide text-theme-text-muted">
                   Sort:
                 </span>
@@ -576,6 +652,7 @@ export function PaymentsAdminPage() {
                 rows={sortedPrepayQueue}
                 onCreatePrepayment={(row) => setPrepayModalRow(row)}
                 onHostClick={(userId) => setHostDetailUserId(userId)}
+                onPartyUpdated={() => loadPrepayQueue()}
               />
             )}
           </section>
@@ -586,6 +663,7 @@ export function PaymentsAdminPage() {
           onChange={setFilters}
           onReset={() => setFilters(DEFAULT_FILTERS)}
           availableCurrencies={availableCurrencies}
+          availableCountries={availableCountries}
         />
 
         <BulkActionsBar
@@ -618,6 +696,7 @@ export function PaymentsAdminPage() {
           onMarkPaid={handleRowMarkPaid}
           onExecute={openDetail}
           onHostClick={(userId) => setHostDetailUserId(userId)}
+          onCapUpdated={() => refresh()}
           busyRowId={rowBusyId}
           loading={loading}
           loadingMore={loadingMore}
@@ -671,15 +750,26 @@ export function PaymentsAdminPage() {
                 setModalBusy(false);
               }
             }}
-            onSaveAmount={async (newAmount, note) => {
+            onSaveAmount={async (newAmount, opts) => {
               setModalBusy(true);
               try {
-                await updateAdminPayout(detail.id, { finalAmountUsd: newAmount, note });
+                await updateAdminPayout(detail.id, {
+                  finalAmountUsd: newAmount,
+                  note: opts?.note,
+                  // aglio-62584: forward the admin's per-submission cap
+                  // acknowledgement so the backend bypasses the 400.
+                  allowOverSubmissionCap: opts?.allowOverSubmissionCap,
+                });
                 const fresh = await getAdminPayout(detail.id);
                 setDetail(fresh);
                 await refresh();
+                return;
               } catch (err: any) {
-                setErrorMsg(err.message || 'Save failed');
+                // aglio-62584: return the message instead of swallowing it
+                // into the page-level error so PayoutReviewModal can render
+                // it inline (was previously silent — clicking Save on a
+                // grandfathered $750 row just did nothing visible).
+                return err?.message || 'Save failed';
               } finally {
                 setModalBusy(false);
               }
@@ -737,6 +827,14 @@ export function PaymentsAdminPage() {
                 return null;
               }
             }}
+            fetchWalletPaidTotal={async (address, amount) => {
+              try {
+                return await fetchWalletPaidTotal(address, amount);
+              } catch {
+                return null;
+              }
+            }}
+            onPayAgain={handlePayAgain}
           />
         )}
         {showExternalModal && (

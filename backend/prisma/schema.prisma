@@ -61,6 +61,7 @@ model Party {
   availableBeverages      String[]  @map("available_beverages")
   availableToppings       String[]  @map("available_toppings")
   availableDietaryOptions String[]  @map("available_dietary_options")
+  showToppingsOnRsvp      Boolean   @default(false) @map("show_toppings_on_rsvp")
   address                 String?
   placeId                 String?   @map("place_id")
   latitude                Float?
@@ -724,6 +725,8 @@ model Photo {
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@index([partyId, status])
+  // margherita-43821: composite index supporting GET /api/photos/feed
+  @@index([starred, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("photos")
 }
 

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -70,6 +70,8 @@ export async function apiRequest<T>(
 // null URLs means env vars aren't set yet (card shows "Coming soon").
 export interface BroadcastUrlsResponse {
   zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
   streamyardUrl: string | null;
   eligible: boolean;
 }
@@ -174,6 +176,7 @@ export interface UpdatePartyData {
   availableBeverages?: string[];
   availableToppings?: string[];
   availableDietaryOptions?: string[];
+  showToppingsOnRsvp?: boolean;
   selectedPizzerias?: any[];
   password?: string | null;
   eventImageUrl?: string | null;
@@ -295,6 +298,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       availableBeverages: data.availableBeverages,
       availableToppings: data.availableToppings,
       availableDietaryOptions: data.availableDietaryOptions,
+      showToppingsOnRsvp: data.showToppingsOnRsvp,
       selectedPizzerias: data.selectedPizzerias,
       password: data.password,
       eventImageUrl: data.eventImageUrl,
@@ -556,6 +560,7 @@ export interface PublicEvent {
   availableBeverages: string[];
   availableToppings: string[];
   availableDietaryOptions: string[];
+  showToppingsOnRsvp?: boolean;
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -2623,6 +2628,37 @@ export async function removeAdmin(id: string): Promise<void> {
   await apiRequest(`/api/admin/${id}`, { method: 'DELETE' });
 }
 
+// fontina-91827: admin-only lookup for a party's current owner email + name.
+// Used by TransferOwnershipModal so the admin UI can render "Currently owned
+// by X (email)" without depending on the host-gated cohosts/full endpoint.
+export async function fetchPartyOwner(partyId: string): Promise<{
+  partyId: string;
+  ownerId: string | null;
+  ownerEmail: string | null;
+  ownerName: string | null;
+}> {
+  return apiRequest(`/api/admin/parties/${partyId}/owner`);
+}
+
+// fontina-91827: admin-only event ownership transfer. Atomically updates
+// parties.user_id, removes the old owner from co_hosts, deletes their
+// party_payment_opt_ins row, and canonicalizes the new owner with
+// canEdit:true + showOnEvent:true in the cohost array.
+export async function transferEventOwnership(
+  partyId: string,
+  body: {
+    newOwnerEmail: string;
+    removeOldFromCoHosts?: boolean;
+    deleteOldOptIn?: boolean;
+    note?: string;
+  },
+): Promise<{ ok: true; partyId: string; newOwnerId: string; newOwnerEmail: string }> {
+  return apiRequest(`/api/admin/parties/${partyId}/transfer-ownership`, {
+    method: 'POST',
+    body,
+  });
+}
+
 // Underboss Admin API (management)
 
 export async function fetchUnderbossList(): Promise<UnderbossAdmin[]> {
@@ -3935,7 +3971,10 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.status && filters.status !== 'all') params.set('status', filters.status);
   if (filters.payoutMethod && filters.payoutMethod !== 'all') params.set('payoutMethod', filters.payoutMethod);
   if (filters.partyId) params.set('partyId', filters.partyId);
-  if (filters.hostEmail) params.set('hostEmail', filters.hostEmail);
+  // salame-83472: unified search — host email|name OR party name.
+  if (filters.search) params.set('search', filters.search);
+  // bruschetta-58291: country filter — exact-match `parties.country`.
+  if (filters.country && filters.country !== 'all') params.set('country', filters.country);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
   if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
@@ -3963,6 +4002,12 @@ export async function updateAdminPayout(
     payoutWalletAddress?: string | null;
     payoutBankDetails?: BankDetails | null;
     note?: string;
+    /**
+     * aglio-62584: admin override for the acciuga-62583 per-submission
+     * $625 cap. Forwarded only when the admin has ticked the ack Checkbox
+     * in PayoutReviewModal's amount-edit form (or recordExternalPayment).
+     */
+    allowOverSubmissionCap?: boolean;
   },
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}`, {
@@ -4012,6 +4057,11 @@ export async function markAdminPayoutPaid(
  *   - usdc_base    → no body required; server sends via Privy server-wallet
  *   - wire         → { wireReference: string } REQUIRED
  *   - mercury_card → { mercuryCardLast4: 'NNNN', mercuryCardId?: string, note?: string } REQUIRED
+ *
+ * `allowOverPerAddressCap` (bianco-89172): forwarded to the server to bypass
+ * the per-address $626 cumulative cap when the admin has acknowledged the
+ * warning in PayoutReviewModal.
+ *
  * Returns the updated payout. Throws on any server-side validation/execution failure.
  */
 export async function executeAdminPayout(
@@ -4021,6 +4071,7 @@ export async function executeAdminPayout(
     mercuryCardLast4?: string;
     mercuryCardId?: string;
     note?: string;
+    allowOverPerAddressCap?: boolean;
   } = {},
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {
@@ -4050,12 +4101,38 @@ export interface BulkSendResult {
   error?: string;
 }
 
-export async function bulkExecutePayouts(ids: string[]): Promise<BulkSendResult[]> {
+export async function bulkExecutePayouts(
+  ids: string[],
+  opts?: { allowOverPerAddressCap?: boolean },
+): Promise<BulkSendResult[]> {
+  const body: { ids: string[]; allowOverPerAddressCap?: boolean } = { ids };
+  if (opts?.allowOverPerAddressCap) body.allowOverPerAddressCap = true;
   const res = await apiRequest<{ results: BulkSendResult[] }>(`/api/admin/payouts/bulk-execute`, {
     method: 'POST',
-    body: { ids },
+    body,
   });
   return res.results;
+}
+
+/**
+ * bianco-89172: fetch the cumulative paid-USDC total for a single recipient
+ * wallet, optionally with a "wouldExceed" check for a proposed additional
+ * amount. Backs the per-address $626 cap warning in PayoutReviewModal +
+ * BulkSendModal. Returns `wouldExceed: null` when `amount` is omitted.
+ *
+ * Admin-only — throws via `apiRequest` if the caller is not a payment admin.
+ */
+export async function fetchWalletPaidTotal(
+  address: string,
+  amount?: number,
+): Promise<WalletPaidTotal> {
+  const params = new URLSearchParams({ address });
+  if (amount != null && Number.isFinite(amount)) {
+    params.set('amount', String(amount));
+  }
+  return apiRequest<WalletPaidTotal>(
+    `/api/admin/payouts/wallet-paid-total?${params.toString()}`,
+  );
 }
 
 /**
@@ -4650,6 +4727,46 @@ export async function resolveEnsName(name: string): Promise<string | null> {
     const data = await res.json();
     return typeof data?.address === 'string' ? data.address : null;
   } catch {
+    return null;
+  }
+}
+
+// ============================================
+// margherita-43821: public photos feed
+// ============================================
+
+export interface FeedPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  mimeType: string;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+  party: { slug: string; name: string; city: string | null; country: string | null };
+}
+
+export interface PhotosFeedResponse {
+  photos: FeedPhoto[];
+  nextCursor: string | null;
+}
+
+export async function getPhotosFeed(
+  cursor: string | null,
+  limit: number = 24
+): Promise<PhotosFeedResponse | null> {
+  try {
+    const params = new URLSearchParams();
+    if (cursor) params.append('cursor', cursor);
+    params.append('limit', String(limit));
+    return await apiRequest<PhotosFeedResponse>(
+      `/api/photos/feed?${params.toString()}`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch (e) {
+    console.error('Error fetching photos feed:', e);
     return null;
   }
 }
