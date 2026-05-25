@@ -128,7 +128,7 @@ export function CheckInButton({
         <button
           onClick={handleOpenScanner}
           className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm
-            bg-green-600 hover:bg-green-700 text-white transition-colors"
+            bg-green-600 hover:bg-green-700 text-[#ffffff] transition-colors"
         >
           Checked In
         </button>

@@ -23,6 +23,10 @@ interface ScorecardItemProps {
   onUploadPhoto?: () => void;
   onScanGuest?: () => void;
   onTakeSelfie?: () => void;
+  /** Public URL of the event, included as a second line in the share tweet. */
+  eventUrl?: string;
+  /** Sponsor Twitter handles (no `@` prefix, deduped, excluding `pizza_dao`). */
+  partnerHandles?: string[];
 }
 
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
@@ -44,6 +48,8 @@ export function ScorecardItem({
   onUploadPhoto,
   onScanGuest,
   onTakeSelfie,
+  eventUrl,
+  partnerHandles,
 }: ScorecardItemProps) {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -58,8 +64,18 @@ export function ScorecardItem({
     if (completed) return;
 
     if (needsUrlProof) {
-      // Open Twitter intent first, then show input for URL
-      const tweetText = encodeURIComponent("Having a great time at the pizza party! @pizza_dao #PizzaDAO");
+      // Open Twitter intent first, then show input for URL.
+      // Build tweet body: tag @pizza_dao + all sponsor handles, then event URL on a second line.
+      // Falls back to the original hardcoded text if either input is missing.
+      let tweetBody: string;
+      if (partnerHandles && eventUrl) {
+        const handles = partnerHandles.map(h => `@${h}`).join(' ');
+        const firstLine = `Having a great time at the pizza party! @pizza_dao${handles ? ' ' + handles : ''} #PizzaDAO`;
+        tweetBody = [firstLine, eventUrl].filter(Boolean).join('\n');
+      } else {
+        tweetBody = "Having a great time at the pizza party! @pizza_dao #PizzaDAO";
+      }
+      const tweetText = encodeURIComponent(tweetBody);
       window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
       setShowInput(true);
     } else if (itemKey === 'photo') {
@@ -120,7 +136,7 @@ export function ScorecardItem({
         ) : (
           <button
             onClick={handleAction}
-            className="text-xs font-medium px-3 py-1.5 rounded-full bg-[#ff393a] hover:bg-[#ff5a5b] text-white transition-colors"
+            className="text-xs font-medium px-3 py-1.5 rounded-full bg-[#ff393a] hover:bg-[#ff5a5b] text-[#ffffff] transition-colors"
           >
             {getActionLabel()}
           </button>
@@ -142,7 +158,7 @@ export function ScorecardItem({
             <button
               onClick={handleSubmitUrl}
               disabled={!inputValue.trim()}
-              className="px-3 py-1.5 rounded bg-[#ff393a] hover:bg-[#ff5a5b] text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded bg-[#ff393a] hover:bg-[#ff5a5b] text-[#ffffff] text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Submit
             </button>
