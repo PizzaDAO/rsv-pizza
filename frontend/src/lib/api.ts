@@ -4780,20 +4780,64 @@ export interface PhotosFeedResponse {
   nextCursor: string | null;
 }
 
+export interface PhotosFeedFilters {
+  countries?: string[];      // raw country names (locale variants) sent to backend
+  regions?: string[];        // GPP region ids
+  partnerTag?: string | null;
+}
+
 export async function getPhotosFeed(
   cursor: string | null,
-  limit: number = 24
+  limit: number = 24,
+  filters?: PhotosFeedFilters
 ): Promise<PhotosFeedResponse | null> {
   try {
     const params = new URLSearchParams();
     if (cursor) params.append('cursor', cursor);
     params.append('limit', String(limit));
+    if (filters?.countries && filters.countries.length > 0) {
+      params.append('countries', filters.countries.join(','));
+    }
+    if (filters?.regions && filters.regions.length > 0) {
+      params.append('regions', filters.regions.join(','));
+    }
+    if (filters?.partnerTag) {
+      params.append('partnerTag', filters.partnerTag);
+    }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,
       { method: 'GET', requireAuth: false }
     );
   } catch (e) {
     console.error('Error fetching photos feed:', e);
+    return null;
+  }
+}
+
+export interface PhotosFeedFacets {
+  countries: Array<{ name: string; count: number }>;
+}
+
+export async function getPhotosFeedFacets(): Promise<PhotosFeedFacets | null> {
+  try {
+    return await apiRequest<PhotosFeedFacets>(
+      `/api/photos/feed/facets`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch (e) {
+    console.error('Error fetching photos feed facets:', e);
+    return null;
+  }
+}
+
+export async function getMyPartnerTags(): Promise<{ tags: string[] } | null> {
+  try {
+    return await apiRequest<{ tags: string[] }>(
+      `/api/photos/feed/my-partner-tags`,
+      { method: 'GET', requireAuth: false }
+    );
+  } catch (e) {
+    console.error('Error fetching my partner tags:', e);
     return null;
   }
 }
