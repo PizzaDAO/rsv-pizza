@@ -1,6 +1,6 @@
 import { render } from '@react-email/render';
 import { Resend } from 'resend';
-import { createElement } from 'react';
+import * as React from 'react';
 import EventReminder, {
   renderPlainText,
   type EventReminderProps,
@@ -92,7 +92,7 @@ export async function buildReminderPayload(
     hours,
     publicOrigin: opts?.publicOrigin,
   };
-  const html = await render(createElement(EventReminder, props));
+  const html = await render(<EventReminder {...props} />);
   const text = renderPlainText(props);
   const timeOnly = shortLocalTime(ctx.partyDate, ctx.partyTimezone);
   return {
