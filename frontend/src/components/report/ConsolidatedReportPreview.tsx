@@ -32,14 +32,14 @@ function LocationChip({ party, overlay = false }: { party?: { slug: string; name
   const flag = countryNameToAlpha2(loc.country) ? <CircleFlag country={loc.country} size={14} /> : null;
   if (overlay) {
     return (
-      <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-gradient-to-t from-black/70 to-transparent flex items-center gap-1.5 text-[11px] text-white pointer-events-none">
+      <div className="absolute bottom-1 left-1 inline-flex items-center gap-1 max-w-[calc(100%-0.5rem)] px-1.5 py-0.5 rounded-md bg-gray-200/95 text-gray-900 text-[11px] font-medium pointer-events-none">
         {flag}
         <span className="truncate">{loc.label}</span>
       </div>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-theme-text-muted">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-200 text-gray-900 text-xs font-medium">
       {flag}
       <span className="truncate">{loc.label}</span>
     </span>
