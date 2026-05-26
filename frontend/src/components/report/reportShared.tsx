@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Building2 } from 'lucide-react';
+import { Building2, Globe } from 'lucide-react';
 import { NotableAttendee } from '../../types';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
 
@@ -133,9 +133,22 @@ export function ReportOrgCard({ group }: { group: { domain: string | null; atten
       ) : (
         <>
           <Building2 size={14} className="text-theme-text-muted" />
-          {attendees.map((a) => (
-            <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
-          ))}
+          {attendees.map((a) =>
+            a.link ? (
+              <a
+                key={a.id}
+                href={a.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+              >
+                {a.name}
+                <Globe size={12} className="text-theme-text-muted flex-shrink-0" />
+              </a>
+            ) : (
+              <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
+            )
+          )}
         </>
       )}
     </div>

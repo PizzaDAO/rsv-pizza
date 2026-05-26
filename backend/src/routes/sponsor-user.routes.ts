@@ -1130,7 +1130,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         dateRange: null,
         stats: {
           totalRsvps: 0, approvedGuests: 0, mailingListSignups: 0, walletAddresses: 0,
-          roleBreakdown: {}, poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
+          poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
         },
         impressions: { totalViews: 0, uniqueVisitors: 0 },
         clickStats: { totalClicks: 0, uniqueClickers: 0, byLink: [] },
@@ -1186,31 +1186,6 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     const combinedSocialPosts: any[] = [];
     const combinedNotable: any[] = [];
     const combinedPhotos: any[] = [];
-
-    // roleBreakdown computed via $queryRaw to avoid loading every guest's roles into Node.
-    const roleBreakdown: Record<string, number> = {};
-    if (eventIds.length > 0) {
-      const roleRows = await prisma.$queryRaw<{ role: string; count: bigint }[]>`
-        SELECT role, COUNT(*)::bigint AS count
-        FROM (
-          SELECT COALESCE(NULLIF(r, ''), 'Other') AS role
-          FROM (
-            SELECT unnest(
-              CASE WHEN array_length(roles, 1) IS NULL OR array_length(roles, 1) = 0
-                   THEN ARRAY[COALESCE(role, 'Other')]
-                   ELSE roles END
-            ) AS r
-            FROM guests
-            WHERE party_id::text IN (${Prisma.join(eventIds)})
-              AND status != 'INVITED'
-          ) u
-        ) sub
-        GROUP BY role
-      `;
-      for (const r of roleRows) {
-        roleBreakdown[r.role] = (roleBreakdown[r.role] || 0) + Number(r.count);
-      }
-    }
 
     // Page-view (impression) aggregation — total + TRUE cross-event distinct visitors.
     const viewStats = eventIds.length > 0
@@ -1353,10 +1328,17 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       poapMints += party.poapMints || 0;
       poapMoments += party.poapMoments || 0;
 
+      const partyContext = {
+        slug: party.customUrl || party.inviteCode,
+        name: party.name,
+        city: party.city,
+        country: party.country,
+      };
+
       socialPostCount += party.socialPosts.length;
       for (const sp of party.socialPosts) {
         socialPostViews += sp.views || 0;
-        combinedSocialPosts.push({ ...sp, eventName: party.name });
+        combinedSocialPosts.push({ ...sp, eventName: party.name, party: partyContext });
       }
 
       // Notable attendees — mask email to @domain (mirrors published public report).
@@ -1372,7 +1354,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       }
 
       for (const ph of party.photos) {
-        combinedPhotos.push(ph);
+        combinedPhotos.push({ ...ph, party: partyContext });
       }
 
       const reportSlug = party.reportPublicSlug || party.customUrl || party.inviteCode;
@@ -1414,7 +1396,6 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         approvedGuests,
         mailingListSignups,
         walletAddresses,
-        roleBreakdown,
         poapMints,
         poapMoments,
         socialPostViews,

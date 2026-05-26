@@ -16,24 +16,7 @@ import {
 import { countryNameToAlpha2, alpha2ToCountryNames, alpha2ToCanonicalName } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
 import { GPP_REGIONS, GPPRegion } from '../types';
-
-const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
-
-function CircleFlag({ country, code, size = 14 }: { country?: string | null; code?: string | null; size?: number }) {
-  const c = code ?? countryNameToAlpha2(country ?? null);
-  if (!c) return null;
-  return (
-    <img
-      src={`${FLAG_BASE}/${c}.svg`}
-      alt={country || c}
-      width={size}
-      height={size}
-      loading="lazy"
-      className="rounded-full inline-block shrink-0"
-      style={{ width: size, height: size }}
-    />
-  );
-}
+import { CircleFlag } from '../components/CircleFlag';
 
 // --- URL <-> state helpers (sicilian-58129) ----------------------------------
 
