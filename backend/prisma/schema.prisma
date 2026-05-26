@@ -770,6 +770,10 @@ model PartyKit {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  // salumi-89172: shipping-coordinator reimbursement payouts that are tied
+  // to this kit. Mirrors Payout.partyKit (relation name "PayoutsForKit").
+  reimbursementPayouts Payout[] @relation("PayoutsForKit")
+
   @@map("party_kits")
 }
 
@@ -1570,6 +1574,17 @@ model Payout {
   party               Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
   hostUserId          String    @map("host_user_id")
   host                User      @relation(fields: [hostUserId], references: [id], onDelete: Restrict)
+
+  // salumi-89172: distinguishes event-reimbursement payouts ('event') from
+  // shipping-coordinator receipt payouts ('shipping'). DB CHECK constraint
+  // restricts the value set; default 'event' preserves existing behavior.
+  purpose             String    @default("event")
+  // salumi-89172: optional kit the shipping receipt is tied to. NULL for
+  // event payouts and for shipping receipts that aren't tied to a kit (none
+  // in v1 — selection is required on the form). FK ON DELETE SET NULL so
+  // archiving a kit doesn't cascade-destroy historical reimbursements.
+  partyKitId          String?   @map("party_kit_id") @db.Uuid
+  partyKit            PartyKit? @relation("PayoutsForKit", fields: [partyKitId], references: [id], onDelete: SetNull)
 
   originalAmount      Decimal   @map("original_amount") @db.Decimal(12, 2)
   originalCurrency    String    @map("original_currency")

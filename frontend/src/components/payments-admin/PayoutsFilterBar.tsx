@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import type { AdminPayoutFilters, PayoutMethod, PayoutStatus } from '../../types';
+import type { AdminPayoutFilters, PayoutMethod, PayoutPurpose, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 
 interface PayoutsFilterBarProps {
@@ -33,6 +33,13 @@ const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [
   { value: 'wire', label: PAYOUT_METHOD_LABELS.wire },
 ];
 
+// salumi-89172: Purpose filter — event reimbursements vs shipping receipts.
+const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = [
+  { value: 'all', label: 'All purposes' },
+  { value: 'event', label: 'Event' },
+  { value: 'shipping', label: 'Shipping' },
+];
+
 /**
  * regina-89172: count active (non-default) filter fields. Status tab strip is
  * NOT counted here — it's always visible above the collapsible section, so
@@ -46,6 +53,7 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
   if (filters.currency && filters.currency !== 'all') n += 1;
   if (filters.country && filters.country !== 'all') n += 1;
+  if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
   if (filters.dateTo) n += 1;
   return n;
@@ -122,7 +130,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         id="payouts-filter-controls"
         className={`${expanded ? 'block' : 'hidden'} sm:block`}
       >
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-start">
           {/* salame-83472: unified search — host email|name OR party name. */}
           <div className="md:col-span-2">
             <IconInput
@@ -187,6 +195,21 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               <option value="all">All countries</option>
               {availableCountries.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* salumi-89172: Purpose dropdown — Event reimbursements vs
+              Shipping coordinator receipts. Default 'all' shows both. */}
+          <div>
+            <select
+              value={filters.purpose ?? 'all'}
+              onChange={(e) => update({ purpose: e.target.value as PayoutPurpose | 'all' })}
+              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+              aria-label="Filter by purpose"
+            >
+              {PURPOSE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>

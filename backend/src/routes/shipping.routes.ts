@@ -986,6 +986,114 @@ router.delete('/admin/coordinators/:id', requireAuth, requireShippingAuth, async
   }
 });
 
+// ============================================
+// GET /api/shipping/my-payouts - salumi-89172
+//
+// Returns the current shipping coordinator's (or admin's) shipping-purpose
+// payouts. Reuses the existing payouts pipeline (OCR, FX, methods,
+// notifications) — the row shape mirrors `serializePayout` from
+// payout.routes.ts so the host PayoutListRow component renders without
+// modification.
+// ============================================
+router.get('/my-payouts', requireAuth, requireShippingAuth, async (req: ShippingRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+
+    const rows = await prisma.payout.findMany({
+      where: {
+        hostUserId: req.userId,
+        purpose: 'shipping',
+      },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+        party: { select: { id: true, name: true, customUrl: true, inviteCode: true } },
+        partyKit: {
+          select: { id: true, requestedTier: true, allocatedTier: true, recipientName: true, city: true, country: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    function serialize(p: any) {
+      return {
+        id: p.id,
+        partyId: p.partyId,
+        hostUserId: p.hostUserId,
+        purpose: p.purpose ?? 'event',
+        partyKitId: p.partyKitId ?? null,
+        hostName: p.host?.name ?? null,
+        hostEmail: p.host?.email ?? null,
+        originalAmount: Number(p.originalAmount),
+        originalCurrency: p.originalCurrency,
+        exchangeRate: Number(p.exchangeRate),
+        extractedAmountUsd: Number(p.extractedAmountUsd),
+        finalAmountUsd: Number(p.finalAmountUsd),
+        status: p.status,
+        payoutMethod: p.payoutMethod,
+        payoutWalletAddress: p.payoutWalletAddress ?? null,
+        payoutBankDetails: p.payoutBankDetails ?? null,
+        mercuryCardId: p.mercuryCardId ?? null,
+        mercuryCardLast4: p.mercuryCardLast4 ?? null,
+        hostNotes: p.hostNotes ?? null,
+        adminNotes: p.adminNotes ?? null,
+        rejectionReason: p.rejectionReason ?? null,
+        reviewedBy: p.reviewedBy ?? null,
+        reviewedAt: p.reviewedAt ? p.reviewedAt.toISOString() : null,
+        paidAt: p.paidAt ? p.paidAt.toISOString() : null,
+        transactionHash: p.transactionHash ?? null,
+        wireReference: p.wireReference ?? null,
+        externalProofUrl: p.externalProofUrl ?? null,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+        documents: (p.documents || []).map((d: any) => ({
+          id: d.id,
+          kind: d.kind,
+          url: d.url,
+          fileName: d.fileName,
+          fileSize: d.fileSize,
+          mimeType: d.mimeType,
+          ocrAmount: d.ocrAmount != null ? Number(d.ocrAmount) : null,
+          ocrCurrency: d.ocrCurrency ?? null,
+          ocrConfidence: d.ocrConfidence != null ? Number(d.ocrConfidence) : null,
+          ocrError: d.ocrError ?? null,
+          sortOrder: d.sortOrder,
+          uploadedByUserId: d.uploadedByUserId ?? null,
+          uploadedByName: d.uploadedBy?.name ?? null,
+          uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
+        })),
+        party: p.party
+          ? {
+              id: p.party.id,
+              name: p.party.name,
+              customUrl: p.party.customUrl,
+              inviteCode: p.party.inviteCode,
+            }
+          : null,
+        partyKit: p.partyKit
+          ? {
+              id: p.partyKit.id,
+              requestedTier: p.partyKit.requestedTier,
+              allocatedTier: p.partyKit.allocatedTier,
+              recipientName: p.partyKit.recipientName,
+              city: p.partyKit.city,
+              country: p.partyKit.country,
+            }
+          : null,
+      };
+    }
+
+    res.json({ payouts: rows.map(serialize) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Helper: escape CSV field
 function escapeCSV(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {

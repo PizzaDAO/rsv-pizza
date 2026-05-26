@@ -54,6 +54,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   currency: 'all',
   // bruschetta-58291: country filter default — 'all' means no filter.
   country: 'all',
+  // salumi-89172: purpose filter default — 'all' shows both event and
+  // shipping payouts so the existing admin queue is unchanged out of box.
+  purpose: 'all',
 };
 
 // lardo-58294: substring filter shared between the search input and the

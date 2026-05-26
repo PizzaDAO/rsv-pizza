@@ -2957,6 +2957,16 @@ export async function exportShippingKitsCsv(filters?: ShippingKitFilters): Promi
   return response.blob();
 }
 
+// salumi-89172: shipping coordinator's own shipping-purpose payouts (uploaded
+// receipts for postage / packing / supplies they paid out of pocket).
+export async function fetchMyShippingPayouts(): Promise<import('../types').ShippingPayout[]> {
+  const res = await apiRequest<{ payouts: import('../types').ShippingPayout[] }>(
+    '/api/shipping/my-payouts',
+    { requireAuth: true },
+  );
+  return res.payouts;
+}
+
 // Coordinator management (admin only)
 export async function fetchShippingCoordinators(): Promise<{ coordinators: ShippingCoordinator[] }> {
   return apiRequest<{ coordinators: ShippingCoordinator[] }>('/api/shipping/admin/coordinators');
@@ -3981,6 +3991,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   // bruschetta-58291: country filter — exact-match `parties.country`.
   if (filters.country && filters.country !== 'all') params.set('country', filters.country);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
+  // salumi-89172: purpose filter — 'event' | 'shipping' | 'all'. Omitted = show both.
+  if (filters.purpose && filters.purpose !== 'all') params.set('purpose', filters.purpose);
   if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
   if (filters.cursor) params.set('cursor', filters.cursor);
@@ -4338,6 +4350,16 @@ export interface CreatePayoutData {
   recipientHostUserId?: string;
   /** Optional admin-supplied note stored on the new payout. */
   adminNotes?: string;
+  /**
+   * salumi-89172: 'event' (default) or 'shipping'. Shipping coordinators
+   * submit `purpose='shipping'` with `partyKitId` set.
+   */
+  purpose?: 'event' | 'shipping';
+  /**
+   * salumi-89172: UUID of the `party_kits` row the receipt is tied to.
+   * Required when `purpose==='shipping'`; rejected for event payouts.
+   */
+  partyKitId?: string;
 }
 
 export async function createPayout(
