@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { cdnUrl } from '../lib/supabase';
 import {
   getPhotosFeed,
@@ -229,6 +230,7 @@ export function PhotosFeedPage() {
   const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag;
 
   return (
+    <ThemeProvider theme="gpp">
     <Layout>
       <Helmet>
         <title>Photos from Pizza Parties Around the World | RSV.Pizza</title>
@@ -244,7 +246,10 @@ export function PhotosFeedPage() {
         </header>
 
         {/* Sticky filter bar */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 bg-theme-bg/95 backdrop-blur-sm border-b border-theme-stroke flex flex-wrap items-center gap-2">
+        <div
+          className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 border-b border-theme-stroke flex flex-wrap items-center gap-2"
+          style={{ background: 'rgba(255,255,255,0.95)' }}
+        >
           <CountryFilterButton
             options={countryOptions}
             selected={activeCountries}
@@ -290,7 +295,7 @@ export function PhotosFeedPage() {
         )}
         {error && (
           <div className="text-center py-6">
-            <p className="text-amber-400">{error}</p>
+            <p className="text-amber-600">{error}</p>
             <button onClick={() => { hasMoreRef.current = true; setHasMore(true); loadPage(false); }} className="mt-2 underline text-theme-text">Try again</button>
           </div>
         )}
@@ -307,6 +312,7 @@ export function PhotosFeedPage() {
         />
       )}
     </Layout>
+    </ThemeProvider>
   );
 }
 
@@ -333,9 +339,10 @@ function FilterDropdownShell({
         onClick={onToggle}
         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors ${
           count > 0
-            ? 'bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20'
-            : 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:bg-theme-surface-hover hover:text-theme-text'
+            ? 'bg-red-500/10 border-red-500/40 text-red-600 hover:bg-red-500/20'
+            : 'border-black/10 text-gray-900 hover:bg-white'
         }`}
+        style={count > 0 ? undefined : { background: 'rgba(255,255,255,0.85)' }}
       >
         <span>{label}</span>
         {count > 0 && (
@@ -348,7 +355,10 @@ function FilterDropdownShell({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={onToggle} />
-          <div className={`absolute top-full left-0 mt-2 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-2 min-w-[260px] max-h-[60vh] overflow-y-auto ${panelClassName}`}>
+          <div
+            className={`absolute top-full left-0 mt-2 z-50 rounded-xl py-2 min-w-[260px] max-h-[60vh] overflow-y-auto border ${panelClassName}`}
+            style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+          >
             {children}
           </div>
         </>
@@ -386,28 +396,28 @@ function CountryFilterButton({
       onToggle={() => setOpen((o) => !o)}
       panelClassName="w-[300px]"
     >
-      <div className="px-3 pb-2 sticky top-0 bg-theme-card border-b border-theme-stroke">
+      <div className="px-3 pb-2 sticky top-0 border-b border-black/10" style={{ background: '#ffffff' }}>
         <div className="relative">
-          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-theme-text-muted" />
+          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search countries..."
-            className="w-full pl-7 pr-2 py-1.5 text-sm bg-theme-surface border border-theme-stroke rounded-lg text-theme-text placeholder-theme-text-muted focus:outline-none focus:border-red-500/40"
+            className="w-full pl-7 pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
           />
         </div>
       </div>
       {selected.length > 0 && (
         <button
           onClick={() => onChange([])}
-          className="w-full text-left px-4 py-2 text-xs text-theme-text-faint hover:bg-theme-surface transition-colors"
+          className="w-full text-left px-4 py-2 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
         >
           Clear ({selected.length})
         </button>
       )}
       {filtered.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-theme-text-muted">No matches</div>
+        <div className="px-4 py-3 text-sm text-gray-600">No matches</div>
       ) : (
         filtered.map((opt) => {
           const isSel = selected.includes(opt.code);
@@ -417,20 +427,20 @@ function CountryFilterButton({
               onClick={() => toggle(opt.code)}
               className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2 ${
                 isSel
-                  ? 'text-red-500 font-medium'
-                  : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+                  ? 'text-red-600 font-medium'
+                  : 'text-gray-900 hover:bg-gray-100'
               }`}
             >
               <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+                isSel ? 'bg-red-500 border-red-500' : 'border-black/20'
               }`}>
-                {isSel && <Check size={12} className="text-theme-text" />}
+                {isSel && <Check size={12} className="text-white" />}
               </div>
               {opt.code.startsWith('__unmapped__')
-                ? <MapPin size={14} className="text-theme-text-muted" />
+                ? <MapPin size={14} className="text-gray-500" />
                 : <CircleFlag code={opt.code.toLowerCase()} size={16} />}
               <span className="flex-1 truncate">{opt.name}</span>
-              <span className="text-xs text-theme-text-muted">{opt.count}</span>
+              <span className="text-xs text-gray-600">{opt.count}</span>
             </button>
           );
         })
@@ -466,18 +476,18 @@ function RegionFilterButton({
         onClick={() => onChange(allSelected ? [] : allIds)}
         className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
           allSelected
-            ? 'text-red-500 font-medium'
-            : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+            ? 'text-red-600 font-medium'
+            : 'text-gray-900 hover:bg-gray-100'
         }`}
       >
         <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-          allSelected ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+          allSelected ? 'bg-red-500 border-red-500' : 'border-black/20'
         }`}>
-          {allSelected && <Check size={12} className="text-theme-text" />}
+          {allSelected && <Check size={12} className="text-white" />}
         </div>
         {allSelected ? 'Clear all' : 'Select all'}
       </button>
-      <div className="border-b border-theme-stroke my-1" />
+      <div className="border-b border-black/10 my-1" />
       {GPP_REGIONS.map((r) => {
         const isSel = selected.includes(r.id);
         return (
@@ -486,14 +496,14 @@ function RegionFilterButton({
             onClick={() => toggle(r.id)}
             className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
               isSel
-                ? 'text-red-500 font-medium'
-                : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+                ? 'text-red-600 font-medium'
+                : 'text-gray-900 hover:bg-gray-100'
             }`}
           >
             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-              isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+              isSel ? 'bg-red-500 border-red-500' : 'border-black/20'
             }`}>
-              {isSel && <Check size={12} className="text-theme-text" />}
+              {isSel && <Check size={12} className="text-white" />}
             </div>
             {r.label}
           </button>
@@ -522,7 +532,7 @@ function PartnerFilterButton({
       {selected && (
         <button
           onClick={() => onChange(null)}
-          className="w-full text-left px-4 py-2 text-xs text-theme-text-faint hover:bg-theme-surface transition-colors"
+          className="w-full text-left px-4 py-2 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
         >
           Clear
         </button>
@@ -535,14 +545,14 @@ function PartnerFilterButton({
             onClick={() => onChange(isSel ? null : tag)}
             className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
               isSel
-                ? 'text-red-500 font-medium'
-                : 'text-theme-text-secondary hover:bg-theme-surface hover:text-theme-text'
+                ? 'text-red-600 font-medium'
+                : 'text-gray-900 hover:bg-gray-100'
             }`}
           >
             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-              isSel ? 'bg-red-500 border-red-500' : 'border-theme-stroke-hover'
+              isSel ? 'bg-red-500 border-red-500' : 'border-black/20'
             }`}>
-              {isSel && <Check size={12} className="text-theme-text" />}
+              {isSel && <Check size={12} className="text-white" />}
             </div>
             <span className="flex-1 truncate">{tag}</span>
           </button>
