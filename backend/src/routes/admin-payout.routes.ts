@@ -42,7 +42,7 @@ import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 
 const router = Router();
 
-const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed'] as const;
+const ALLOWED_PAYOUT_STATUSES = ['pending', 'pre_approved', 'approved', 'rejected', 'paid', 'failed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
@@ -399,6 +399,8 @@ function serializePayout(row: any): any {
     hostNotes: row.hostNotes,
     adminNotes: row.adminNotes,
     rejectionReason: row.rejectionReason,
+    firstApprovedBy: row.firstApprovedBy ?? null,
+    firstApprovedAt: row.firstApprovedAt ? row.firstApprovedAt.toISOString() : null,
     reviewedBy: row.reviewedBy,
     reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
@@ -1307,6 +1309,7 @@ router.get(
       let totalUsdThisMonth = 0;
       let sumUsd = 0;
       let awaitingReview = 0;
+      let preApprovedCount = 0;
 
       // parmigiana-58291: per-party rollup over `status === 'paid'` rows.
       // Keyed by party.id; we accumulate sum + count and resolve to a sorted
@@ -1327,9 +1330,10 @@ router.get(
         byMethod[methodKey] = (byMethod[methodKey] || 0) + 1;
         const usd = Number(r.finalAmountUsd);
         sumUsd += usd;
-        if (r.status === 'pending') {
+        if (r.status === 'pending' || r.status === 'pre_approved') {
           totalUsdPending += usd;
           awaitingReview += 1;
+          if (r.status === 'pre_approved') preApprovedCount += 1;
         } else if (r.status === 'paid') {
           totalUsdPaid += usd;
           if (r.paidAt && r.paidAt >= startOfMonth) {
@@ -1400,6 +1404,7 @@ router.get(
           totalUsdThisMonth,
           avgUsd,
           awaitingReview,
+          preApprovedCount,
         },
       });
     } catch (error) {
@@ -1624,6 +1629,9 @@ router.patch(
 // ============================================
 // POST /api/admin/payouts/:id/approve
 // ============================================
+// Two-person approval: pending → pre_approved → approved.
+// First approve sets firstApprovedBy; second approve (by a different admin)
+// sets reviewedBy and flips to approved (executable).
 router.post(
   '/:id/approve',
   requireAuth,
@@ -1639,21 +1647,34 @@ router.post(
           hostUserId: true,
           partyId: true,
           finalAmountUsd: true,
+          firstApprovedBy: true,
         },
       });
 
       if (!existing) {
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
-      if (existing.status !== 'pending') {
+      if (existing.status !== 'pending' && existing.status !== 'pre_approved') {
         throw new AppError(
-          `Can only approve a pending payout (current status: ${existing.status})`,
+          `Can only approve a pending or pre-approved payout (current status: ${existing.status})`,
           400,
           'INVALID_STATE',
         );
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      if (
+        existing.status === 'pre_approved' &&
+        existing.firstApprovedBy &&
+        existing.firstApprovedBy.toLowerCase() === actor.email.toLowerCase()
+      ) {
+        throw new AppError(
+          'You already pre-approved this payout. A different admin must give final approval.',
+          400,
+          'SAME_APPROVER_FORBIDDEN',
+        );
+      }
 
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // approve time so rows created/edited BEFORE the cap rules landed (or
@@ -1668,15 +1689,23 @@ router.post(
       );
 
       const { note, autoExecute } = req.body || {};
+      const isFirstApproval = existing.status === 'pending';
+      const nextStatus = isFirstApproval ? 'pre_approved' : 'approved';
+      const auditAction = isFirstApproval ? 'first_approve' : 'second_approve';
 
       const updated = await prisma.$transaction(async (tx) => {
+        const data: any = { status: nextStatus };
+        if (isFirstApproval) {
+          data.firstApprovedBy = actor.email;
+          data.firstApprovedAt = new Date();
+        } else {
+          data.reviewedBy = actor.email;
+          data.reviewedAt = new Date();
+        }
+
         const row = await tx.payout.update({
           where: { id: existing.id },
-          data: {
-            status: 'approved',
-            reviewedBy: actor.email,
-            reviewedAt: new Date(),
-          },
+          data,
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
             host: { select: { id: true, name: true, email: true } },
@@ -1691,9 +1720,9 @@ router.post(
         await tx.payoutAudit.create({
           data: {
             payoutId: existing.id,
-            action: 'approve',
-            oldStatus: 'pending',
-            newStatus: 'approved',
+            action: auditAction,
+            oldStatus: existing.status,
+            newStatus: nextStatus,
             actorEmail: actor.email,
             actorKind: actor.actorKind,
             note: typeof note === 'string' ? note : null,
@@ -1704,14 +1733,14 @@ router.post(
       });
 
       // autoExecute (PR 5): synchronously execute after approval — only for
-      // usdc_base, since wire + mercury_card require body refs (wireReference,
-      // mercuryCardLast4) which the approve call doesn't carry. For those two,
-      // we log + no-op (the admin will hit execute separately with refs).
+      // usdc_base and only on the second (final) approval step, since wire +
+      // mercury_card require body refs and first-approval doesn't produce an
+      // executable state.
       let autoExecuted = false;
       let autoExecuteSkippedReason: string | null = null;
       let result = updated;
 
-      if (autoExecute) {
+      if (autoExecute && !isFirstApproval) {
         if (updated.payoutMethod === 'usdc_base') {
           try {
             result = await executePayout({
@@ -1721,14 +1750,10 @@ router.post(
             });
             autoExecuted = true;
           } catch (err: any) {
-            // Execution failed but approval already happened — surface the
-            // error to the client. executePayout already wrote audit + flipped
-            // status to failed for usdc_base.
             console.error(
               `[admin-payout] autoExecute after approve failed for ${existing.id}: ` +
                 (err?.message || err),
             );
-            // Re-fetch so client sees the failed state.
             const refreshed = await prisma.payout.findUnique({
               where: { id: existing.id },
               include: {
@@ -1753,6 +1778,8 @@ router.post(
               `method=${updated.payoutMethod}: ${autoExecuteSkippedReason}`,
           );
         }
+      } else if (autoExecute && isFirstApproval) {
+        autoExecuteSkippedReason = 'autoExecute deferred — payout needs a second approval first';
       }
 
       res.json({

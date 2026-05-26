@@ -1480,7 +1480,7 @@ export interface UnifiedPartner {
 // ============================================
 // Host Payouts (arugula-38633)
 // ============================================
-export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed';
+export type PayoutStatus = 'pending' | 'pre_approved' | 'approved' | 'rejected' | 'paid' | 'failed';
 export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
 
 export interface PayoutDocument {
@@ -1560,6 +1560,8 @@ export interface Payout {
   hostNotes: string | null;
   adminNotes: string | null;
   rejectionReason: string | null;
+  firstApprovedBy: string | null;
+  firstApprovedAt: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
   paidAt: string | null;
@@ -1700,6 +1702,7 @@ export interface AdminPayoutTotals {
   totalUsdThisMonth: number;
   avgUsd: number;
   awaitingReview: number;
+  preApprovedCount: number;
 }
 
 export interface AdminPayoutsResponse {

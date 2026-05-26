@@ -20,6 +20,7 @@ interface PayoutsFilterBarProps {
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
+  { value: 'pre_approved', label: 'Pre-Approved' },
   { value: 'approved', label: 'Approved' },
   { value: 'paid', label: 'Paid' },
   { value: 'rejected', label: 'Rejected' },

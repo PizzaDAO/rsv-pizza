@@ -25,6 +25,8 @@ interface PayoutsTableProps {
    * edit so the row reflects the new value.
    */
   onCapUpdated?: (partyId: string) => void;
+  /** Current admin email — used to block self-second-approve on pre_approved rows. */
+  adminEmail?: string;
   busyRowId?: string | null;
   loading?: boolean;
   loadingMore?: boolean;
@@ -36,6 +38,7 @@ interface PayoutsTableProps {
 function ActionsCell({
   payout,
   busy,
+  adminEmail,
   onApprove,
   onReject,
   onEdit,
@@ -44,6 +47,7 @@ function ActionsCell({
 }: {
   payout: AdminPayout;
   busy: boolean;
+  adminEmail?: string;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onEdit: (payout: AdminPayout) => void;
@@ -51,6 +55,12 @@ function ActionsCell({
   onExecute: (payout: AdminPayout) => void;
 }) {
   const status: PayoutStatus = payout.status;
+  const isSameApprover =
+    status === 'pre_approved' &&
+    payout.firstApprovedBy != null &&
+    adminEmail != null &&
+    payout.firstApprovedBy.toLowerCase() === adminEmail.toLowerCase();
+
   return (
     <div className="inline-flex items-center gap-1">
       <button
@@ -63,14 +73,20 @@ function ActionsCell({
         <Eye size={15} />
       </button>
 
-      {status === 'pending' && (
+      {(status === 'pending' || status === 'pre_approved') && (
         <>
           <button
             type="button"
             onClick={() => onApprove(payout.id)}
-            disabled={busy}
+            disabled={busy || isSameApprover}
             className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
-            title="Approve"
+            title={
+              isSameApprover
+                ? 'You pre-approved this — another admin must approve'
+                : status === 'pending'
+                  ? 'Pre-approve'
+                  : 'Final approve'
+            }
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
           </button>
@@ -83,15 +99,17 @@ function ActionsCell({
           >
             <X size={15} />
           </button>
-          <button
-            type="button"
-            onClick={() => onEdit(payout)}
-            className="p-1.5 rounded-md hover:bg-theme-surface-hover text-theme-text-secondary"
-            title="Edit amount"
-            disabled={busy}
-          >
-            <Pencil size={15} />
-          </button>
+          {status === 'pending' && (
+            <button
+              type="button"
+              onClick={() => onEdit(payout)}
+              className="p-1.5 rounded-md hover:bg-theme-surface-hover text-theme-text-secondary"
+              title="Edit amount"
+              disabled={busy}
+            >
+              <Pencil size={15} />
+            </button>
+          )}
         </>
       )}
 
@@ -134,6 +152,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onExecute,
   onHostClick,
   onCapUpdated,
+  adminEmail,
   busyRowId,
   loading,
   loadingMore,
@@ -200,6 +219,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                   <ActionsCell
                     payout={p}
                     busy={busyRowId === p.id}
+                    adminEmail={adminEmail}
                     onApprove={onApprove}
                     onReject={onReject}
                     onEdit={onEdit}

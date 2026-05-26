@@ -18,6 +18,12 @@ const STATUS_STYLES: Record<PayoutStatus, { bg: string; text: string; border: st
     border: 'border-amber-300',
     label: 'Pending',
   },
+  pre_approved: {
+    bg: 'bg-purple-100',
+    text: 'text-purple-800',
+    border: 'border-purple-300',
+    label: 'Pre-Approved',
+  },
   approved: {
     bg: 'bg-blue-100',
     text: 'text-blue-800',

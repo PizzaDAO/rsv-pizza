@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Calendar, TrendingUp, Inbox } from 'lucide-react';
+import { DollarSign, Calendar, TrendingUp, Inbox, ShieldCheck } from 'lucide-react';
 import type { AdminPayoutTotals } from '../../types';
 import { formatUsd } from '../payments-shared';
 
@@ -34,8 +34,8 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, tone = 'default
 export const PaymentsStatsCards: React.FC<PaymentsStatsCardsProps> = ({ totals, loading }) => {
   if (loading || !totals) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className="rounded-xl border border-theme-stroke bg-theme-surface p-4 animate-pulse h-20" />
         ))}
       </div>
@@ -43,12 +43,18 @@ export const PaymentsStatsCards: React.FC<PaymentsStatsCardsProps> = ({ totals, 
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
       <StatCard
         icon={<DollarSign size={14} />}
         label="Pending"
         value={formatUsd(totals.totalUsdPending)}
         tone="amber"
+      />
+      <StatCard
+        icon={<ShieldCheck size={14} />}
+        label="Pre-Approved"
+        value={String(totals.preApprovedCount)}
+        tone="default"
       />
       <StatCard
         icon={<Calendar size={14} />}

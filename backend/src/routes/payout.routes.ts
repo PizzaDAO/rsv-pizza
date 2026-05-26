@@ -60,7 +60,7 @@ type PayoutMethod = (typeof PAYOUT_METHODS)[number];
 // host's only out when the admin approved a non-compliant amount (e.g.
 // post-bocconcini-49102 cap recheck would now reject the row at execute time).
 // `paid`, `rejected`, and `failed` remain terminal from the host side.
-const WITHDRAWABLE_STATUSES = ['pending', 'approved'] as const;
+const WITHDRAWABLE_STATUSES = ['pending', 'pre_approved', 'approved'] as const;
 
 // ---------- helpers ----------
 
@@ -91,6 +91,8 @@ function serializePayout(p: any) {
     hostNotes: p.hostNotes ?? null,
     adminNotes: p.adminNotes ?? null,
     rejectionReason: p.rejectionReason ?? null,
+    firstApprovedBy: p.firstApprovedBy ?? null,
+    firstApprovedAt: p.firstApprovedAt ? p.firstApprovedAt.toISOString() : null,
     reviewedBy: p.reviewedBy ?? null,
     reviewedAt: p.reviewedAt ? p.reviewedAt.toISOString() : null,
     paidAt: p.paidAt ? p.paidAt.toISOString() : null,
@@ -351,7 +353,7 @@ async function assertWithinPartyCap(
 
   const where: any = {
     partyId,
-    status: { in: ['paid', 'pending', 'approved'] },
+    status: { in: ['paid', 'pending', 'pre_approved', 'approved'] },
   };
   if (ignorePayoutId) {
     where.id = { not: ignorePayoutId };
@@ -1032,7 +1034,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 
     // Approved payouts: doc-only edits allowed, but amount/method/wallet/notes
     // are frozen so the admin-approved amount can't be silently changed.
-    if (existing.status === 'approved' && hasAmountOrMethodChanges) {
+    if ((existing.status === 'approved' || existing.status === 'pre_approved') && hasAmountOrMethodChanges) {
       throw new AppError(
         'Approved payments cannot have amount, method, wallet, or notes changed. Ask an admin to revert to pending first.',
         400,

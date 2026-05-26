@@ -697,6 +697,7 @@ export function PaymentsAdminPage() {
           onExecute={openDetail}
           onHostClick={(userId) => setHostDetailUserId(userId)}
           onCapUpdated={() => refresh()}
+          adminEmail={role.kind === 'allowed' ? role.email : undefined}
           busyRowId={rowBusyId}
           loading={loading}
           loadingMore={loadingMore}
@@ -722,6 +723,7 @@ export function PaymentsAdminPage() {
               !!detail.host.email &&
               detail.host.email.toLowerCase() === role.email.toLowerCase()
             }
+            adminEmail={role.kind === 'allowed' ? role.email : undefined}
             busy={modalBusy}
             onClose={closeDetail}
             onApprove={async (note) => {

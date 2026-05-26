@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2 } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, ShieldCheck } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -95,6 +95,8 @@ interface PayoutReviewModalProps {
    * follow-up payment without leaving the modal.
    */
   onPayAgain?: (payout: AdminPayoutDetail) => void;
+  /** Current admin email — used to block self-second-approve on pre_approved rows. */
+  adminEmail?: string;
   busy?: boolean;
 }
 
@@ -112,6 +114,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   fetchWalletPaidTotal,
   onReopen,
   onPayAgain,
+  adminEmail,
   busy = false,
 }) => {
   const [editingAmount, setEditingAmount] = useState(false);
@@ -176,6 +179,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
   const isPending = payout.status === 'pending';
+  const isPreApproved = payout.status === 'pre_approved';
   const isFailed = payout.status === 'failed';
   // passata-49102: failed payouts are now re-executable, so treat them like
   // 'approved' for the Execute affordance (button + form).
@@ -184,6 +188,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // 'failed' is no longer "closed" — it has the Execute (Retry) button instead
   // of Re-open. Only 'rejected' remains terminal-until-reopened.
   const isClosed = payout.status === 'rejected';
+
+  const isSameApprover =
+    isPreApproved &&
+    payout.firstApprovedBy != null &&
+    adminEmail != null &&
+    payout.firstApprovedBy.toLowerCase() === adminEmail.toLowerCase();
 
   // For Mercury, last4 must be exactly 4 digits before the button enables.
   const execMercuryValid = /^\d{4}$/.test(execCardLast4.trim());
@@ -996,16 +1006,23 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
         {/* Footer actions */}
         <div className="border-t border-theme-stroke px-5 py-3 flex items-center gap-2 flex-wrap bg-theme-surface">
-          {isPending && (
+          {isPreApproved && payout.firstApprovedBy && (
+            <div className="flex items-center gap-1.5 text-xs text-purple-500 mr-auto">
+              <ShieldCheck size={14} />
+              <span>Pre-approved by {payout.firstApprovedBy}</span>
+            </div>
+          )}
+          {(isPending || isPreApproved) && (
             <>
               <button
                 type="button"
                 onClick={() => onApprove()}
-                disabled={busy || selfPayoutBlocked}
+                disabled={busy || selfPayoutBlocked || isSameApprover}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
+                title={isSameApprover ? 'You pre-approved this — another admin must approve' : undefined}
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                Approve
+                {isPending ? 'Pre-Approve' : 'Final Approve'}
               </button>
               <button
                 type="button"
@@ -1016,6 +1033,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <X size={14} />
                 Reject
               </button>
+              {isSameApprover && (
+                <span className="text-xs text-amber-500">
+                  You already pre-approved this payout.
+                </span>
+              )}
             </>
           )}
           {isApproved && (

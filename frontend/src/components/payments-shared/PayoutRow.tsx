@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, StickyNote } from 'lucide-react';
 import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
@@ -250,7 +250,23 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       <td className="px-3 py-3">
-        <PayoutStatusPill status={payout.status} />
+        <div className="flex items-center gap-1.5">
+          <PayoutStatusPill status={payout.status} />
+          <StickyNote
+            size={13}
+            className={`shrink-0 transition-colors ${
+              payout.adminNotes
+                ? 'text-amber-400'
+                : 'text-theme-text-faint'
+            }`}
+            title={payout.adminNotes ?? 'No admin notes'}
+          />
+        </div>
+        {showAdminColumns && payout.status === 'pre_approved' && payout.firstApprovedBy && (
+          <div className="text-[11px] text-purple-400 mt-0.5">
+            by {payout.firstApprovedBy}
+          </div>
+        )}
       </td>
 
       {actions && (

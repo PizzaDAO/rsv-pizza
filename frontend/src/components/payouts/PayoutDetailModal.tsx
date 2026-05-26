@@ -28,6 +28,7 @@ interface PayoutDetailModalProps {
 
 const STATUS_STYLES: Record<PayoutStatus, string> = {
   pending: 'bg-amber-500/20 text-amber-300',
+  pre_approved: 'bg-purple-500/20 text-purple-300',
   approved: 'bg-sky-500/20 text-sky-300',
   rejected: 'bg-red-500/20 text-red-300',
   paid: 'bg-emerald-500/20 text-emerald-300',
@@ -36,6 +37,7 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
   pending: 'Pending review',
+  pre_approved: 'Pre-Approved',
   approved: 'Approved — payment pending',
   rejected: 'Rejected',
   paid: 'Paid',

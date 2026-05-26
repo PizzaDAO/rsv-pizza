@@ -1591,6 +1591,8 @@ model Payout {
   adminNotes          String?   @map("admin_notes")
   rejectionReason     String?   @map("rejection_reason")
 
+  firstApprovedBy     String?   @map("first_approved_by")
+  firstApprovedAt     DateTime? @map("first_approved_at") @db.Timestamptz
   reviewedBy          String?   @map("reviewed_by")
   reviewedAt          DateTime? @map("reviewed_at") @db.Timestamptz
   paidAt              DateTime? @map("paid_at") @db.Timestamptz
