@@ -42,7 +42,11 @@ import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 
 const router = Router();
 
-const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed'] as const;
+// ravioli-82931: 'withdrawn' added — host-soft-deleted rows show in the admin
+// queue for transparency. They are excluded from per-party cap math
+// (`assertWithinPartyCap` only sums paid|pending|approved) and from
+// `partyTotals` (which only sums paid).
+const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed', 'withdrawn'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**

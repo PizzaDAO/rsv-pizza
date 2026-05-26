@@ -1539,7 +1539,29 @@ export interface UnifiedPartner {
 // ============================================
 // Host Payouts (arugula-38633)
 // ============================================
-export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed';
+// ravioli-82931: 'withdrawn' is the soft-delete state hosts move pending|approved
+// rows into via DELETE /:partyId/payouts/:payoutId. Receipts on the row are
+// retained for the host's receipts-library tab.
+export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn';
+
+/**
+ * ravioli-82931: one entry in the host's receipts library — a `kind='receipt'`
+ * `payout_documents` row joined to its parent payout's status. Surfaced via
+ * `GET /api/parties/:partyId/payouts/receipts-library`.
+ */
+export interface ReceiptLibraryEntry {
+  id: string;
+  payoutId: string;
+  payoutStatus: PayoutStatus;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  createdAt: string;
+}
 export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
 
 export interface PayoutDocument {

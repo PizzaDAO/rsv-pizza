@@ -1,0 +1,145 @@
+import React, { useEffect, useState } from 'react';
+import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink } from 'lucide-react';
+import { fetchReceiptsLibrary } from '../../lib/api';
+import type { ReceiptLibraryEntry } from '../../types';
+import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
+
+interface ReceiptsLibraryProps {
+  partyId: string;
+}
+
+/**
+ * ravioli-82931: "Your receipts" section on the host PayoutsTab. Lists every
+ * receipt the host has uploaded for THIS party across all of their payouts,
+ * including ones on rows they later withdrew. Withdrawal soft-deletes the
+ * payout (status='withdrawn') instead of hard-deleting it so the receipts
+ * remain reachable here.
+ *
+ * Read-only: host can view full image in a new tab but can't delete entries.
+ * Receipt rows are tied to past submissions; deletion would require editing
+ * the source row, which has its own pending-only edit flow.
+ */
+export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => {
+  const [receipts, setReceipts] = useState<ReceiptLibraryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchReceiptsLibrary(partyId)
+      .then((rows) => {
+        if (!cancelled) setReceipts(rows);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err?.message || 'Failed to load receipts');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId]);
+
+  const reload = () => {
+    setLoading(true);
+    setError(null);
+    fetchReceiptsLibrary(partyId)
+      .then(setReceipts)
+      .catch((err: any) => setError(err?.message || 'Failed to load receipts'))
+      .finally(() => setLoading(false));
+  };
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-lg font-semibold text-theme-text">Your receipts</h2>
+          <p className="text-xs text-white/40 mt-1">
+            Every receipt you've uploaded for this event, including withdrawn requests.
+          </p>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-[#ff393a]" />
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <AlertCircle className="w-8 h-8 text-[#ff393a]" />
+          <p className="text-sm text-theme-text-secondary">{error}</p>
+          <button
+            onClick={reload}
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+          >
+            <RefreshCw size={14} />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && receipts.length === 0 && (
+        <p className="text-sm text-theme-text-secondary py-6 text-center">
+          Receipts you upload will appear here.
+        </p>
+      )}
+
+      {!loading && !error && receipts.length > 0 && (
+        <ul className="divide-y divide-theme-stroke">
+          {receipts.map((r) => {
+            const isImage = (r.mimeType || '').startsWith('image/');
+            const formattedDate = new Date(r.createdAt).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            });
+            return (
+              <li key={r.id} className="flex items-center gap-3 py-3">
+                {isImage ? (
+                  <img
+                    src={r.url}
+                    alt={r.fileName}
+                    className="w-12 h-12 object-cover rounded border border-theme-stroke flex-shrink-0"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded border border-theme-stroke bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
+                    <FileText size={20} className="text-theme-text-secondary" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-theme-text truncate">
+                      {r.fileName}
+                    </span>
+                    <PayoutStatusPill status={r.payoutStatus} />
+                  </div>
+                  <div className="text-xs text-white/40 mt-0.5">
+                    Uploaded {formattedDate}
+                    {r.ocrAmount != null && r.ocrCurrency && (
+                      <> — {r.ocrAmount.toFixed(2)} {r.ocrCurrency}</>
+                    )}
+                  </div>
+                </div>
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#ff393a] hover:underline inline-flex items-center gap-1 flex-shrink-0"
+                >
+                  View full
+                  <ExternalLink size={12} />
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};

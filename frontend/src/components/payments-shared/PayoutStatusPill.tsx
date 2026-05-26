@@ -42,6 +42,15 @@ const STATUS_STYLES: Record<PayoutStatus, { bg: string; text: string; border: st
     border: 'border-rose-300',
     label: 'Failed',
   },
+  // ravioli-82931: muted neutral gray for soft-withdrawn rows. Host cancelled
+  // the request; row is preserved so its receipts remain in the host's
+  // receipts library. Same disabled/inactive aesthetic.
+  withdrawn: {
+    bg: 'bg-gray-100',
+    text: 'text-gray-600',
+    border: 'border-gray-300',
+    label: 'Withdrawn',
+  },
 };
 
 export const PayoutStatusPill: React.FC<PayoutStatusPillProps> = ({ status, size = 'sm' }) => {

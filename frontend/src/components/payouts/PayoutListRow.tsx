@@ -26,6 +26,10 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   rejected: 'bg-red-500/20 text-red-300',
   paid: 'bg-emerald-500/20 text-emerald-300',
   failed: 'bg-red-600/30 text-red-200',
+  // ravioli-82931: muted neutral for soft-withdrawn rows. The active-list GET
+  // already filters these out, so this style only kicks in for stale-state
+  // edge cases (e.g. realtime race after withdraw).
+  withdrawn: 'bg-gray-500/20 text-gray-300',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -34,6 +38,7 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   rejected: 'Rejected',
   paid: 'Paid',
   failed: 'Failed',
+  withdrawn: 'Withdrawn',
 };
 
 // arugula-38633 v3 follow-up: helper to display a method (or "Not set" placeholder).

@@ -32,6 +32,8 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   rejected: 'bg-red-500/20 text-red-300',
   paid: 'bg-emerald-500/20 text-emerald-300',
   failed: 'bg-red-600/30 text-red-200',
+  // ravioli-82931: muted neutral for soft-withdrawn rows (matches PayoutStatusPill aesthetic).
+  withdrawn: 'bg-gray-500/20 text-gray-300',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -40,6 +42,7 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   rejected: 'Rejected',
   paid: 'Paid',
   failed: 'Failed',
+  withdrawn: 'Withdrawn',
 };
 
 /**

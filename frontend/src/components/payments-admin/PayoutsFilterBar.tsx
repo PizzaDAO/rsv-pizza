@@ -31,6 +31,8 @@ const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
   { value: 'paid', label: 'Paid' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'failed', label: 'Failed' },
+  // ravioli-82931: surface soft-withdrawn rows in admin for transparency.
+  { value: 'withdrawn', label: 'Withdrawn' },
 ];
 
 const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [
