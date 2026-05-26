@@ -1792,6 +1792,8 @@ export interface AdminPayoutFilters {
   search?: string;
   /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
   country?: string;
+  /** mascarpone-49102: event-tag filter — single tag "has" match on `parties.event_tags`. `'all'` / undefined = no filter. */
+  tag?: string;
   currency?: string;
   /**
    * salumi-89172: Purpose filter — 'event' (host reimbursements) or

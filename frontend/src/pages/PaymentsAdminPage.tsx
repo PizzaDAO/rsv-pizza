@@ -54,6 +54,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   currency: 'all',
   // bruschetta-58291: country filter default — 'all' means no filter.
   country: 'all',
+  // mascarpone-49102: tag filter default — 'all' means no filter.
+  tag: 'all',
   // salumi-89172: purpose filter default — 'all' shows both event and
   // shipping payouts so the existing admin queue is unchanged out of box.
   purpose: 'all',
@@ -237,6 +239,21 @@ export function PaymentsAdminPage() {
     const set = new Set<string>();
     for (const p of payouts) {
       if (p.party.country) set.add(p.party.country);
+    }
+    return Array.from(set).sort();
+  }, [payouts]);
+
+  // mascarpone-49102: derive the tag dropdown set from `party.eventTags`
+  // (added to PAYOUT_PARTY_SELECT in tagliatelle-49102). Flattens the arrays
+  // and dedupes; sorted ascending. Mirrors the country / currency pattern.
+  const availableTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of payouts) {
+      if (Array.isArray(p.party.eventTags)) {
+        for (const t of p.party.eventTags) {
+          if (t && typeof t === 'string') set.add(t);
+        }
+      }
     }
     return Array.from(set).sort();
   }, [payouts]);
@@ -667,6 +684,7 @@ export function PaymentsAdminPage() {
           onReset={() => setFilters(DEFAULT_FILTERS)}
           availableCurrencies={availableCurrencies}
           availableCountries={availableCountries}
+          availableTags={availableTags}
         />
 
         <BulkActionsBar
