@@ -658,7 +658,9 @@ function FeedTile({
           {countryNameToAlpha2(displayCountry)
             ? <CircleFlag country={displayCountry} size={14} />
             : <MapPin size={11} />}
-          <span className="truncate">{displayCity}</span>
+          <span className="truncate">
+            {displayCity && displayCountry ? `${displayCity}, ${displayCountry}` : (displayCity || displayCountry || photo.party.name)}
+          </span>
         </div>
       )}
     </button>
