@@ -3996,6 +3996,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.search) params.set('search', filters.search);
   // bruschetta-58291: country filter — exact-match `parties.country`.
   if (filters.country && filters.country !== 'all') params.set('country', filters.country);
+  // mascarpone-49102: tag filter — single event_tag "has" match.
+  if (filters.tag && filters.tag !== 'all') params.set('tag', filters.tag);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
   // salumi-89172: purpose filter — 'event' | 'shipping' | 'all'. Omitted = show both.
   if (filters.purpose && filters.purpose !== 'all') params.set('purpose', filters.purpose);

@@ -354,14 +354,26 @@ function buildPayoutWhere(query: Request['query']): any {
       ? { country: country.trim() }
       : {};
 
+  // mascarpone-49102: optional tag filter — single tag, "contains" semantic
+  // on the party.event_tags String[] column. Prisma's `{ has: string }`
+  // operator emits `event_tags @> ARRAY[$1]`. Folds into `where.party` below
+  // alongside the approval gate + country clause; do NOT overwrite either.
+  const tag = query.tag;
+  const tagClause =
+    typeof tag === 'string' && tag !== 'all' && tag.trim().length > 0
+      ? { eventTags: { has: tag.trim() } }
+      : {};
+
   // tartufo-58291: hide payouts from unapproved parties from the admin queue
   // + CSV export. Existing rows from before the bresaola-49185 backend gate
   // shouldn't surface in routine review. Stats/totals reuse this same `where`
   // so they stay consistent. bruschetta-58291: merged with optional country
-  // filter so both apply.
+  // filter so both apply. mascarpone-49102: merged with optional tag filter
+  // (single event_tag "has" match) so the queue can be sliced by tag.
   where.party = {
     underbossStatus: 'approved',
     ...countryClause,
+    ...tagClause,
   };
 
   return where;

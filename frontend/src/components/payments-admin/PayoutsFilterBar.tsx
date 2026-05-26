@@ -15,6 +15,13 @@ interface PayoutsFilterBarProps {
    * derived in `PaymentsAdminPage` from the loaded set. Sorted ascending.
    */
   availableCountries: string[];
+  /**
+   * mascarpone-49102: distinct event-tag values across the currently-loaded
+   * payouts (flattened from each `party.eventTags` array). Mirrors the
+   * `availableCountries` pattern — derived in `PaymentsAdminPage`. Sorted
+   * ascending.
+   */
+  availableTags: string[];
 }
 
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
@@ -53,6 +60,7 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
   if (filters.currency && filters.currency !== 'all') n += 1;
   if (filters.country && filters.country !== 'all') n += 1;
+  if (filters.tag && filters.tag !== 'all') n += 1;
   if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
   if (filters.dateTo) n += 1;
@@ -77,6 +85,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   onReset,
   availableCurrencies,
   availableCountries,
+  availableTags,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const activeCount = countActiveFilters(filters);
@@ -130,7 +139,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         id="payouts-filter-controls"
         className={`${expanded ? 'block' : 'hidden'} sm:block`}
       >
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-8 gap-2 items-start">
           {/* salame-83472: unified search — host email|name OR party name. */}
           <div className="md:col-span-2">
             <IconInput
@@ -195,6 +204,24 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               <option value="all">All countries</option>
               {availableCountries.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* mascarpone-49102: Tag dropdown — populated from event_tags
+              flattened across the loaded payout set (parallels
+              availableCurrencies/availableCountries). Backend filters
+              `party.eventTags` via Prisma `{ has: tag }`. */}
+          <div>
+            <select
+              value={filters.tag ?? 'all'}
+              onChange={(e) => update({ tag: e.target.value })}
+              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+              aria-label="Filter by tag"
+            >
+              <option value="all">All tags</option>
+              {availableTags.map((t) => (
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </div>
