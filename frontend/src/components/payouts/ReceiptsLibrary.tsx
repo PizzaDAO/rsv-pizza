@@ -9,15 +9,17 @@ interface ReceiptsLibraryProps {
 }
 
 /**
- * ravioli-82931: "Your receipts" section on the host PayoutsTab. Lists every
- * receipt the host has uploaded for THIS party across all of their payouts,
- * including ones on rows they later withdrew. Withdrawal soft-deletes the
- * payout (status='withdrawn') instead of hard-deleting it so the receipts
- * remain reachable here.
+ * ravioli-82931 + agnolotti-58291: "Receipts" section on the host PayoutsTab.
  *
- * Read-only: host can view full image in a new tab but can't delete entries.
- * Receipt rows are tied to past submissions; deletion would require editing
- * the source row, which has its own pending-only edit flow.
+ * After agnolotti-58291 this is a PARTY-scoped library — every receipt
+ * uploaded against the party is listed, regardless of which cohost submitted
+ * it (visibility now matches event-edit access, not the original uploader).
+ * Receipts also survive both soft-withdraw (ravioli-82931) and hard-delete
+ * of the parent payout (FK SET NULL), so historical evidence stays reachable.
+ *
+ * Read-only: hosts can view the full image in a new tab but can't delete
+ * entries here. Receipt removal still goes through the source payout's
+ * pending-only edit flow.
  */
 export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => {
   const [receipts, setReceipts] = useState<ReceiptLibraryEntry[]>([]);
@@ -56,9 +58,9 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
     <div className="card p-6">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-lg font-semibold text-theme-text">Your receipts</h2>
+          <h2 className="text-lg font-semibold text-theme-text">Receipts</h2>
           <p className="text-xs text-white/40 mt-1">
-            Every receipt you've uploaded for this event, including withdrawn requests.
+            Every receipt uploaded for this event by any host, including withdrawn requests.
           </p>
         </div>
       </div>
@@ -85,7 +87,7 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
 
       {!loading && !error && receipts.length === 0 && (
         <p className="text-sm text-theme-text-secondary py-6 text-center">
-          Receipts you upload will appear here.
+          Receipts uploaded by any host appear here.
         </p>
       )}
 
@@ -98,6 +100,10 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
               month: 'short',
               day: 'numeric',
             });
+            // agnolotti-58291: prefer the uploader's display name, fall back
+            // to the cached email when the User row has been deleted. Empty
+            // when both are missing (historical pre-pancetta receipts).
+            const uploader = r.uploadedByName || r.uploadedByEmail || null;
             return (
               <li key={r.id} className="flex items-center gap-3 py-3">
                 {isImage ? (
@@ -117,10 +123,11 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                     <span className="text-sm font-medium text-theme-text truncate">
                       {r.fileName}
                     </span>
-                    <PayoutStatusPill status={r.payoutStatus} />
+                    {r.payoutStatus && <PayoutStatusPill status={r.payoutStatus} />}
                   </div>
                   <div className="text-xs text-white/40 mt-0.5">
                     Uploaded {formattedDate}
+                    {uploader && <> by {uploader}</>}
                     {r.ocrAmount != null && r.ocrCurrency && (
                       <> — {r.ocrAmount.toFixed(2)} {r.ocrCurrency}</>
                     )}

@@ -254,6 +254,10 @@ model Party {
   slugAliases           SlugAlias[]
   scorecardItems        GuestScorecardItem[]
   payouts               Payout[]
+  // agnolotti-58291: receipts are now party-level (PayoutDocument.partyId);
+  // payout association is optional. Inverse relation lives here so cascading
+  // a party delete also removes its receipts.
+  payoutDocuments       PayoutDocument[]
   paymentOptIns         PartyPaymentOptIn[]
   outreachAttempts      OutreachAttempt[]
   announcements         Announcement[]
@@ -1688,8 +1692,14 @@ model PartyPaymentOptIn {
 
 model PayoutDocument {
   id            String   @id @default(uuid()) @db.Uuid
-  payoutId      String   @map("payout_id") @db.Uuid
-  payout        Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  // agnolotti-58291: receipts are now PARTY-level. `partyId` is the canonical
+  // owner (NOT NULL, CASCADE on party delete). `payoutId` is optional and is
+  // the submission this receipt was uploaded with; it goes NULL via SET NULL
+  // cascade if the payout row is later hard-deleted, so receipts survive.
+  partyId       String   @map("party_id") @db.Uuid
+  party         Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  payoutId      String?  @map("payout_id") @db.Uuid
+  payout        Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   kind          String   // 'pizza' | 'receipt'
   url           String
   fileName      String   @map("file_name")
@@ -1709,6 +1719,7 @@ model PayoutDocument {
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  @@index([partyId])
   @@index([payoutId])
   @@index([uploadedByUserId])
   @@map("payout_documents")

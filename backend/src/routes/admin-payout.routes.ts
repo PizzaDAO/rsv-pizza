@@ -2597,6 +2597,161 @@ router.post(
   },
 );
 
+// ============================================
+// PATCH /api/admin/payouts/documents/:docId — agnolotti-58291
+//
+// Admin per-receipt OCR correction. Updates ONLY the `payout_documents` row's
+// `ocrAmount` and `ocrCurrency` fields. Does NOT recompute the parent payout's
+// `finalAmountUsd` — admins use the existing edit-amount affordance on the
+// payout itself for that. Useful for forensics and for correcting OCR drift
+// when the model misread a receipt amount or currency.
+//
+// Auth: requireAnyAdminOrPaymentAdmin (admin / super_admin / payment_admin).
+// Body: { ocrAmount?: number | null, ocrCurrency?: string | null }
+//   - null clears the field; undefined leaves it untouched.
+//   - ocrAmount must be finite (or null).
+//   - ocrCurrency must be a non-empty string ≤8 chars (or null).
+//
+// Audit: writes a payout_audit row with action='edit_amount' when the document
+// still has a parent payout. Skips audit when payoutId is null (orphaned
+// receipt — parent payout was deleted; nothing to audit against).
+// ============================================
+router.patch(
+  '/documents/:docId',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { docId } = req.params;
+      const body = req.body || {};
+
+      const doc = await prisma.payoutDocument.findUnique({
+        where: { id: docId },
+        select: {
+          id: true,
+          kind: true,
+          payoutId: true,
+          ocrAmount: true,
+          ocrCurrency: true,
+        },
+      });
+      if (!doc) {
+        throw new AppError('Document not found', 404, 'NOT_FOUND');
+      }
+
+      const data: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
+
+      if (body.ocrAmount !== undefined) {
+        if (body.ocrAmount === null) {
+          data.ocrAmount = null;
+        } else {
+          const n = Number(body.ocrAmount);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new AppError(
+              'ocrAmount must be a non-negative finite number or null',
+              400,
+              'VALIDATION_ERROR',
+            );
+          }
+          data.ocrAmount = n;
+        }
+      }
+
+      if (body.ocrCurrency !== undefined) {
+        if (body.ocrCurrency === null) {
+          data.ocrCurrency = null;
+        } else {
+          const c = String(body.ocrCurrency).trim();
+          if (c.length === 0 || c.length > 8) {
+            throw new AppError(
+              'ocrCurrency must be a non-empty string of 1-8 characters or null',
+              400,
+              'VALIDATION_ERROR',
+            );
+          }
+          data.ocrCurrency = c;
+        }
+      }
+
+      if (Object.keys(data).length === 0) {
+        throw new AppError('No editable fields supplied', 400, 'VALIDATION_ERROR');
+      }
+
+      // Run the update + audit atomically. Audit only fires when there's a
+      // parent payout — orphaned receipts (payoutId IS NULL) have nothing to
+      // audit against, since payout_audit.payout_id is NOT NULL with CASCADE.
+      const oldAmount = doc.ocrAmount == null ? null : Number(doc.ocrAmount.toString());
+      const oldCurrency = doc.ocrCurrency;
+      const actor = await loadActor(req);
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payoutDocument.update({
+          where: { id: docId },
+          data: {
+            ocrAmount: data.ocrAmount === undefined
+              ? undefined
+              : data.ocrAmount === null
+                ? null
+                : (data.ocrAmount as any),
+            ocrCurrency: data.ocrCurrency === undefined
+              ? undefined
+              : data.ocrCurrency,
+          },
+        });
+
+        if (doc.payoutId) {
+          // Use action='edit_amount' (existing enum value) and stash the
+          // before/after in `note` JSON so forensics tools can pick this up
+          // alongside the regular amount edits.
+          const newAmount = data.ocrAmount === undefined
+            ? oldAmount
+            : data.ocrAmount;
+          const newCurrency = data.ocrCurrency === undefined
+            ? oldCurrency
+            : data.ocrCurrency;
+          await tx.payoutAudit.create({
+            data: {
+              payoutId: doc.payoutId,
+              action: 'edit_amount',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: JSON.stringify({
+                scope: 'receipt',
+                documentId: docId,
+                oldAmount,
+                newAmount,
+                oldCurrency,
+                newCurrency,
+              }),
+            },
+          });
+        }
+
+        return row;
+      });
+
+      res.json({
+        document: {
+          id: updated.id,
+          kind: updated.kind,
+          url: updated.url,
+          fileName: updated.fileName,
+          fileSize: updated.fileSize,
+          mimeType: updated.mimeType,
+          ocrAmount: updated.ocrAmount == null ? null : Number(updated.ocrAmount),
+          ocrCurrency: updated.ocrCurrency,
+          ocrConfidence: updated.ocrConfidence == null ? null : Number(updated.ocrConfidence),
+          ocrError: updated.ocrError,
+          sortOrder: updated.sortOrder,
+          uploadedByUserId: updated.uploadedByUserId ?? null,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 // Re-export the helper so other backend code (e.g. PR 5 execute route) can
 // reuse the composed guard without re-deriving it.
 export { requireAnyAdminOrPaymentAdmin, isFullAdmin };
