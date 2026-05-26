@@ -1364,6 +1364,11 @@ export interface SponsorDashboardEvent {
   name: string;
   slug: string;
   reportPublicSlug: string | null;
+  // pecorino-64118: always-resolvable report slug (works for draft/unpublished
+  // reports too — the partner login bypasses the publish/password gate). Optional
+  // for backward-compat with cached payloads before the backend ships.
+  reportSlug?: string;
+  reportPublished?: boolean;
   date: string | null;
   createdAt: string;
   timezone: string | null;
@@ -1461,6 +1466,57 @@ export interface SponsorDashboardData {
   isAdmin: boolean;
   tag: string | null;
   events: SponsorDashboardEvent[];
+}
+
+// pecorino-64118: consolidated cross-event partner report (GET /api/sponsor/report).
+// Full rollup of every report the partner can access into one private view.
+export interface ConsolidatedReportEvent {
+  id: string;
+  name: string;
+  date: string | null;
+  slug: string;
+  reportSlug: string;
+  rsvpCount: number;
+  approvedCount: number;
+  impressions: { totalViews: number; uniqueVisitors: number };
+  clicks: number;
+}
+
+export interface ConsolidatedReport {
+  partnerName: string | null;
+  tag: string | null;
+  eventCount: number;
+  dateRange: { start: string; end: string } | null;
+  stats: {
+    totalRsvps: number;
+    approvedGuests: number;
+    mailingListSignups: number;
+    walletAddresses: number;
+    roleBreakdown: Record<string, number>;
+    poapMints: number;
+    poapMoments: number;
+    socialPostViews: number;
+    socialPostCount: number;
+  };
+  impressions: { totalViews: number; uniqueVisitors: number };
+  clickStats: {
+    totalClicks: number;
+    uniqueClickers: number;
+    byLink: {
+      url: string;
+      linkType: string;
+      linkLabel: string | null;
+      clicks: number;
+      uniqueClickers: number;
+    }[];
+  };
+  // Notable attendees with email masked to @domain, annotated with event name.
+  notableAttendees: (NotableAttendee & { eventName?: string })[];
+  // Social posts annotated with their event name.
+  socialPosts: (SocialPost & { eventName?: string })[];
+  featuredPhotos: Photo[];
+  walletAddressList: string[];
+  events: ConsolidatedReportEvent[];
 }
 
 // Unified partner (merges event-level Sponsor with underboss SponsorUser)

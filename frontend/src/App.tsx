@@ -25,6 +25,7 @@ import { AdminPage } from './pages/AdminPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
+import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
@@ -96,6 +97,7 @@ function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
+            <Route path="/partner/report" element={<ConsolidatedReportPage />} />
             <Route path="/partner-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />

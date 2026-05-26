@@ -212,6 +212,9 @@
     "viewEventPage": "イベントページを表示",
     "joinTelegram": "都市のTelegramグループに参加",
     "viewEventReport": "イベントレポートを表示",
+    "viewReportDraft": "下書きレポートを表示（未公開）",
+    "draft": "下書き",
+    "consolidatedReport": "統合レポート",
     "reportNotPublished": "レポートはまだ公開されていません",
     "copyOneSheetLink": "ワンシートリンクをコピー",
     "copied": "コピーしました！",
@@ -233,6 +236,25 @@
       "europe": "Europe",
       "uk": "UK",
       "brazil": "Brazil"
+    }
+  },
+  "consolidated": {
+    "pageTitle": "統合レポート",
+    "title": "{{name}} — すべてのイベント",
+    "titleGeneric": "統合レポート — すべてのイベント",
+    "eventCount": "{{count}}件のイベント",
+    "eventCount_other": "{{count}}件のイベント",
+    "perEventBreakdown": "イベント別内訳",
+    "backToDashboard": "ダッシュボードに戻る",
+    "notAvailableTitle": "レポートはまだ利用できません",
+    "notAvailableDesc": "統合レポートはまだ利用できません。しばらくしてからもう一度ご確認ください。",
+    "table": {
+      "event": "イベント",
+      "date": "日付",
+      "rsvps": "RSVP",
+      "attendees": "参加者",
+      "impressions": "インプレッション",
+      "clicks": "クリック"
     }
   },
   "cities": {

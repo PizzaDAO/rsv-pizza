@@ -212,6 +212,9 @@
     "viewEventPage": "이벤트 페이지 보기",
     "joinTelegram": "도시 텔레그램 그룹 참여",
     "viewEventReport": "이벤트 리포트 보기",
+    "viewReportDraft": "초안 리포트 보기 (아직 게시되지 않음)",
+    "draft": "초안",
+    "consolidatedReport": "통합 리포트",
     "reportNotPublished": "리포트가 아직 게시되지 않았습니다",
     "copyOneSheetLink": "원시트 링크 복사",
     "copied": "복사됨!",
@@ -233,6 +236,25 @@
       "europe": "유럽",
       "uk": "영국",
       "brazil": "브라질"
+    }
+  },
+  "consolidated": {
+    "pageTitle": "통합 리포트",
+    "title": "{{name}} — 모든 이벤트",
+    "titleGeneric": "통합 리포트 — 모든 이벤트",
+    "eventCount": "이벤트 {{count}}개",
+    "eventCount_other": "이벤트 {{count}}개",
+    "perEventBreakdown": "이벤트별 분석",
+    "backToDashboard": "대시보드로 돌아가기",
+    "notAvailableTitle": "리포트를 아직 사용할 수 없습니다",
+    "notAvailableDesc": "통합 리포트를 아직 사용할 수 없습니다. 잠시 후 다시 확인해 주세요.",
+    "table": {
+      "event": "이벤트",
+      "date": "날짜",
+      "rsvps": "RSVP",
+      "attendees": "참석자",
+      "impressions": "노출수",
+      "clicks": "클릭수"
     }
   },
   "cities": {

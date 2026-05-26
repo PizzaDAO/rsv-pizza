@@ -212,6 +212,9 @@
     "viewEventPage": "Eventseite ansehen",
     "joinTelegram": "Stadt-Telegram-Gruppe beitreten",
     "viewEventReport": "Event-Bericht ansehen",
+    "viewReportDraft": "Berichtsentwurf ansehen (noch nicht veröffentlicht)",
+    "draft": "Entwurf",
+    "consolidatedReport": "Gesamtbericht",
     "reportNotPublished": "Bericht noch nicht veröffentlicht",
     "copyOneSheetLink": "One-Sheet-Link kopieren",
     "copied": "Kopiert!",
@@ -233,6 +236,25 @@
       "europe": "Europe",
       "uk": "UK",
       "brazil": "Brazil"
+    }
+  },
+  "consolidated": {
+    "pageTitle": "Gesamtbericht",
+    "title": "{{name}} — Alle Events",
+    "titleGeneric": "Gesamtbericht — Alle Events",
+    "eventCount": "{{count}} Event",
+    "eventCount_other": "{{count}} Events",
+    "perEventBreakdown": "Aufschlüsselung pro Event",
+    "backToDashboard": "Zurück zum Dashboard",
+    "notAvailableTitle": "Bericht noch nicht verfügbar",
+    "notAvailableDesc": "Der Gesamtbericht ist noch nicht verfügbar. Bitte schauen Sie bald wieder vorbei.",
+    "table": {
+      "event": "Event",
+      "date": "Datum",
+      "rsvps": "RSVPs",
+      "attendees": "Teilnehmer",
+      "impressions": "Impressionen",
+      "clicks": "Klicks"
     }
   },
   "cities": {
