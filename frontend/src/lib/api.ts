@@ -221,6 +221,7 @@ export interface UpdatePartyData {
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
+  surveyEnabled?: boolean;
   reimbursementCapUsd?: number | null;
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
@@ -343,6 +344,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
+      surveyEnabled: data.surveyEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
       // Day-of logistics (pepperoni-58341)
       wifiInfo: data.wifiInfo,
@@ -4868,4 +4870,69 @@ export async function getMyPartnerTags(): Promise<{ tags: string[] } | null> {
     console.error('Error fetching my partner tags:', e);
     return null;
   }
+}
+
+// ===========================================================================
+// romana-61204: Post-event guest survey
+// ===========================================================================
+
+import type { SurveyQuestion, SurveyAnswers } from './surveyQuestions';
+
+export interface SurveyFetchResponse {
+  eventName: string;
+  eventSlug: string;
+  firstName: string;
+  surveyEnabled: boolean;
+  questionSet: SurveyQuestion[];
+  questionSetVersion: number;
+  alreadySubmitted: boolean;
+  answers: SurveyAnswers | null;
+}
+
+// Public (token-based) — fetch the survey for a guest's /survey/:token link.
+export async function fetchSurvey(token: string): Promise<SurveyFetchResponse> {
+  return apiRequest<SurveyFetchResponse>(`/api/survey/${token}`, {
+    method: 'GET',
+    requireAuth: false,
+  });
+}
+
+// Public (token-based) — submit (or resubmit) survey answers.
+export async function submitSurvey(
+  token: string,
+  answers: SurveyAnswers
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/survey/${token}`, {
+    method: 'POST',
+    body: { answers },
+    requireAuth: false,
+  });
+}
+
+// Host — send the survey email to all CONFIRMED guests with an email.
+export async function sendSurvey(
+  partyId: string
+): Promise<{ sent: number; failed: number; skipped: number }> {
+  return apiRequest<{ sent: number; failed: number; skipped: number }>(
+    `/api/parties/${partyId}/survey/send`,
+    { method: 'POST', requireAuth: true }
+  );
+}
+
+export interface SurveyResults {
+  responseCount: number;
+  questionSet: SurveyQuestion[];
+  questionSetVersion: number;
+  ratings: Record<string, { sum: number; count: number; average: number | null }>;
+  yesno: Record<string, { yes: number; no: number }>;
+  multiple: Record<string, Record<string, number>>;
+  comments: Record<string, string[]>;
+}
+
+// Host — fetch aggregated survey results.
+export async function getSurveyResults(partyId: string): Promise<SurveyResults> {
+  return apiRequest<SurveyResults>(`/api/parties/${partyId}/survey/results`, {
+    method: 'GET',
+    requireAuth: true,
+  });
 }

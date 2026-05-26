@@ -215,6 +215,12 @@ model Party {
   // Turtle role selection on RSVP form
   turtleRolesEnabled Boolean @default(false) @map("turtle_roles_enabled")
 
+  // romana-61204: post-event guest survey. survey_enabled lets a host turn the
+  // survey off; survey_sent_at is set when the survey email batch goes out
+  // (auto morning-after via cron, or manually by the host).
+  surveyEnabled Boolean   @default(true) @map("survey_enabled")
+  surveySentAt  DateTime? @map("survey_sent_at") @db.Timestamptz
+
   // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
   // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
   reimbursementCapUsd        Decimal?  @map("reimbursement_cap_usd") @db.Decimal(10, 2)
@@ -255,8 +261,28 @@ model Party {
   attestations          GuestAttestation[]
   reimbursementCapAppeals ReimbursementCapAppeal[]
   reimbursementCapAudits  ReimbursementCapAudit[]
+  surveyResponses         SurveyResponse[]
 
   @@map("parties")
+}
+
+// romana-61204: one post-event survey response per guest. Resubmit = upsert
+// keyed on guestId (unique). EXPLICIT @@map so Prisma uses the actual table
+// name instead of inferring it.
+model SurveyResponse {
+  id                 String   @id @default(uuid()) @db.Uuid
+  partyId            String   @map("party_id") @db.Uuid
+  party              Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  guestId            String   @unique @map("guest_id") @db.Uuid
+  guest              Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  email              String
+  questionSetVersion Int      @map("question_set_version")
+  answers            Json
+  submittedAt        DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  updatedAt          DateTime? @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("survey_responses")
 }
 
 // quattro-12847: Full history of host reimbursement-cap appeals.
@@ -397,6 +423,9 @@ model Guest {
   checkedInBy       String?   @map("checked_in_by")
   discountClaimedAt DateTime? @map("discount_claimed_at") @db.Timestamptz
 
+  // romana-61204: post-event survey token (unique tokenized /survey/:token link)
+  surveyToken String? @unique @map("survey_token") @db.Uuid
+
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
@@ -412,6 +441,9 @@ model Guest {
   // provolone-39042: peer/host/self attestations for check-in attribution
   attestationsReceived GuestAttestation[] @relation("AttestationsOfGuest")
   attestationsGiven    GuestAttestation[] @relation("AttestationsByGuest")
+
+  // romana-61204: post-event survey response (0 or 1 per guest)
+  surveyResponse SurveyResponse?
 
   @@index([email])
   @@map("guests")

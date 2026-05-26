@@ -20,6 +20,7 @@ import {
   FileImage,
   Printer,
   LayoutGrid,
+  MessageSquare,
 } from 'lucide-react';
 import { CoHost } from '../types';
 
@@ -39,6 +40,7 @@ export type TabId =
   | 'raffle'
   | 'budget'
   | 'checklist'
+  | 'survey'
   | 'gpp'
   | 'promo'
   | 'flyer'
@@ -73,6 +75,7 @@ export const ALL_HOST_TABS: HostTab[] = [
   { id: 'raffle', label: 'Raffle', icon: Ticket },
   { id: 'budget', label: 'Budget', icon: Calculator },
   { id: 'checklist', label: 'Checklist', icon: ListChecks },
+  { id: 'survey', label: 'Survey', icon: MessageSquare },
   { id: 'gpp', label: 'Party Kit', icon: Package },
   { id: 'promo', label: 'Promo', icon: Megaphone },
   { id: 'flyer', label: 'Flyer', icon: FileImage },

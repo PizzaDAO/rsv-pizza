@@ -64,6 +64,7 @@ import scorecardRoutes from './routes/scorecard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
+import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -169,6 +170,7 @@ app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', leaderboardRoutes); // quattro-71244: gamified dashboard leaderboard (host only, before partyRoutes)
 app.use('/api/parties', quizHostRouter); // Quiz CRUD routes (host only, before partyRoutes)
+app.use('/api/parties', surveyHostRouter); // romana-61204: survey send/results (host only, path-scoped, before partyRoutes)
 app.use('/api/parties', partyRoutes); // Party routes have global auth (must be last /api/parties router)
 app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/preferences', preferencesRoutes); // Public preferences (used during RSVP)
@@ -185,6 +187,8 @@ app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP event
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api/checkin', checkinRoutes);
+app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
+app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug

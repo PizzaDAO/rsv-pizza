@@ -484,6 +484,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       hiddenGppPhotos, extraGppPhotos,
       lumaUrl, meetupUrl, eventbriteUrl, externalLinks,
       quizEnabled,
+      // romana-61204: host toggle to enable/disable the post-event survey.
+      surveyEnabled,
       telegramGroup,
       hostTelegramLinkToken,
       // NOTE: hostTelegramChatId is intentionally NOT destructured here —
@@ -733,6 +735,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(eventbriteUrl !== undefined && { eventbriteUrl: eventbriteUrl || null }),
         ...(externalLinks !== undefined && { externalLinks }),
         ...(quizEnabled !== undefined && { quizEnabled }),
+        ...(surveyEnabled !== undefined && { surveyEnabled }),
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
         ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),

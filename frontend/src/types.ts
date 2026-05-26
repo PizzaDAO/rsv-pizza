@@ -337,6 +337,8 @@ export interface Party {
   hostTelegramLinkToken?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
+  // romana-61204: post-event survey toggle
+  surveyEnabled?: boolean;
   // Reimbursement cap (arugula-38633 v2) — populated by underboss validation.
   // Banner on payout form only renders when reimbursementCapUsd != null.
   reimbursementCapUsd?: number | null;
