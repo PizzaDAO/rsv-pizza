@@ -2,12 +2,13 @@
  * Host-facing payout routes (arugula-38633, PR 3/5).
  *
  * Mounted at `/api/parties`. Endpoints:
- *   POST   /:partyId/payouts                Create a new payout request (with parallel OCR)
- *   GET    /:partyId/payouts                List payouts for a party (host view)
- *   GET    /:partyId/payouts/:payoutId      Detail (host or any admin)
- *   PATCH  /:partyId/payouts/:payoutId      Update (host, while status='pending' only)
- *   DELETE /:partyId/payouts/:payoutId      Withdraw (host, while status IN 'pending'|'approved')
- *   POST   /:partyId/payouts/ocr-preview    OCR a single uploaded image without saving
+ *   POST   /:partyId/payouts                          Create a new payout request (with parallel OCR)
+ *   GET    /:partyId/payouts                          List active payouts for a party (excludes withdrawn)
+ *   GET    /:partyId/payouts/receipts-library         Submitter's receipts across all statuses incl. withdrawn (ravioli-82931)
+ *   GET    /:partyId/payouts/:payoutId                Detail (host or any admin)
+ *   PATCH  /:partyId/payouts/:payoutId                Update (host, while status='pending' only)
+ *   DELETE /:partyId/payouts/:payoutId                Soft-withdraw — sets status='withdrawn' (ravioli-82931)
+ *   POST   /:partyId/payouts/ocr-preview              OCR a single uploaded image without saving
  *
  * Admin execution + approval/rejection endpoints land in PR 4 / PR 5.
  */
@@ -1007,8 +1008,11 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // ravioli-82931: hide withdrawn rows from the active host payouts list.
+    // They remain reachable via the receipts-library endpoint below so hosts
+    // can still see receipts they uploaded on rows they later withdrew.
     const payouts = await prisma.payout.findMany({
-      where: { partyId },
+      where: { partyId, status: { not: 'withdrawn' } },
       include: {
         host: { select: { id: true, name: true, email: true } },
         documents: {
@@ -1020,6 +1024,65 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
     });
 
     res.json({ payouts: payouts.map(serializePayout) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- GET /:partyId/payouts/receipts-library ----------
+
+/**
+ * ravioli-82931: the host's submitted receipts (kind='receipt' documents)
+ * across ALL their payouts on this party, including withdrawn. Lets hosts see
+ * what they've previously submitted even after they withdrew the request.
+ *
+ * Mounted BEFORE `/:partyId/payouts/:payoutId` so the literal path wins over
+ * the dynamic param. Auth mirrors `gouda-83912`: requires `canUserEditParty`
+ * AND the caller must be the submitter (`hostUserId === req.userId`) OR an
+ * admin. Other cohosts on the same party can't see each other's receipts.
+ */
+router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const isAdminCaller = await isAnyAdmin(req.userEmail);
+
+    // Pull all receipt documents for payouts on this party where the caller
+    // is the submitter (or admin — admins can see across all submitters).
+    const payoutWhere: any = { partyId };
+    if (!isAdminCaller) {
+      payoutWhere.hostUserId = req.userId;
+    }
+
+    const docs = await prisma.payoutDocument.findMany({
+      where: {
+        kind: 'receipt',
+        payout: payoutWhere,
+      },
+      include: {
+        payout: { select: { id: true, status: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      receipts: docs.map((d) => ({
+        id: d.id,
+        payoutId: d.payoutId,
+        payoutStatus: d.payout?.status ?? null,
+        url: d.url,
+        fileName: d.fileName,
+        fileSize: d.fileSize,
+        mimeType: d.mimeType,
+        ocrAmount: d.ocrAmount != null ? numberFromDecimal(d.ocrAmount) : null,
+        ocrCurrency: d.ocrCurrency ?? null,
+        ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
+        createdAt: d.createdAt.toISOString(),
+      })),
+    });
   } catch (error) {
     next(error);
   }
@@ -1510,6 +1573,17 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 
 // ---------- DELETE /:partyId/payouts/:payoutId ----------
 
+/**
+ * ravioli-82931: soft-withdraw. Replaced the hard-delete from gelato-72831
+ * with `status = 'withdrawn'` so the linked payout_documents (receipts) are
+ * preserved. Withdrawn rows are hidden from the host's active list (see GET
+ * above) and from `assertWithinPartyCap`'s per-party sum (it only counts
+ * `paid|pending|approved`), but remain reachable for the host's receipts
+ * library and visible in the admin queue for transparency.
+ *
+ * The HTTP verb stays DELETE for backward-compat with the cancelPayout API
+ * client; the response shape is unchanged.
+ */
 router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, payoutId } = req.params;
@@ -1534,7 +1608,7 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
     }
 
     // gouda-83912: only the cohost who submitted the payout (or any admin)
-    // may delete it. Other cohosts on the same party can see the row but
+    // may withdraw it. Other cohosts on the same party can see the row but
     // cannot mutate it.
     const isAdminCaller = await isAnyAdmin(req.userEmail);
     if (!isAdminCaller && existing.hostUserId !== req.userId) {
@@ -1545,7 +1619,26 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
       );
     }
 
-    await prisma.payout.delete({ where: { id: payoutId } });
+    // ravioli-82931: soft-delete via status flip + 'cancel' audit row. Using
+    // 'cancel' (already in the action enum) instead of adding a new
+    // 'withdraw' constraint value to keep this PR DB-migration-scope small.
+    await prisma.$transaction(async (tx) => {
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: { status: 'withdrawn' },
+      });
+      await tx.payoutAudit.create({
+        data: {
+          payoutId,
+          action: 'cancel',
+          oldStatus: existing.status,
+          newStatus: 'withdrawn',
+          actorEmail: (req.userEmail || '').toLowerCase(),
+          actorKind: 'host',
+          note: 'Host withdrew payment request (receipts preserved).',
+        },
+      });
+    });
 
     res.json({ success: true });
   } catch (error) {
