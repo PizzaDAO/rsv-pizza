@@ -718,6 +718,10 @@ model Photo {
   // Video metadata
   duration Float? // Video duration in seconds (null for images)
 
+  // salame-58195: thumbs-up voting (denormalized counter, maintained by toggle endpoint)
+  voteCount Int         @default(0) @map("vote_count")
+  votes     PhotoVote[]
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -728,6 +732,23 @@ model Photo {
   // margherita-43821: composite index supporting GET /api/photos/feed
   @@index([starred, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("photos")
+}
+
+// salame-58195: thumbs-up votes on photos. One vote per (photo, user); toggle
+// to unvote. The User FK is one-way (no back-relation on User to avoid Prisma
+// churn) and references the "User" table (PascalCase singular — no @@map on
+// the User model).
+model PhotoVote {
+  id        String   @id @default(uuid()) @db.Uuid
+  photoId   String   @map("photo_id") @db.Uuid
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([photoId, userId])
+  @@index([photoId])
+  @@index([userId])
+  @@map("photo_votes")
 }
 
 // ============================================

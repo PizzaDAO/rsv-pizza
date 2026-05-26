@@ -248,6 +248,16 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     }
   };
 
+  // salame-58195: propagate thumbs-up vote changes back into the local list
+  // (and the open modal if it's the same photo) so counts/state stay in sync.
+  const handleVoteChange = useCallback(
+    (photoId: string, next: { voteCount: number; votedByMe: boolean }) => {
+      setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, ...next } : p)));
+      setSelectedPhoto((cur) => (cur && cur.id === photoId ? { ...cur, ...next } : cur));
+    },
+    []
+  );
+
   const handleApproveAll = async () => {
     if (!stats || stats.pendingPhotos === 0) return;
     setBatchLoading(true);
@@ -510,6 +520,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 onDelete={handleDelete}
                 onApprove={isHost && photo.status === 'pending' ? handleApprove : undefined}
                 onReject={isHost && photo.status === 'pending' ? handleReject : undefined}
+                onVoteChange={handleVoteChange}
               />
             ))}
           </div>
@@ -552,6 +563,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           onUpdateYear={handleUpdateYear}
           onApprove={isHost ? handleApprove : undefined}
           onReject={isHost ? handleReject : undefined}
+          onVoteChange={handleVoteChange}
         />
       )}
     </div>

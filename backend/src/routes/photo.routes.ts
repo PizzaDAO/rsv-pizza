@@ -78,13 +78,28 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       skip: parseInt(offset as string, 10),
       include: {
         guest: { select: { id: true, name: true } },
+        // salame-58195: include current user's vote (if any) so the client can
+        // render votedByMe without an extra round-trip.
+        votes: req.userId
+          ? { where: { userId: req.userId }, select: { id: true } }
+          : false,
       },
     });
 
     const total = await prisma.photo.count({ where });
 
+    // salame-58195: shape response with votedByMe (boolean). voteCount is
+    // already a column on Photo so it comes through automatically.
+    const photosWithVote = photos.map((p) => {
+      const { votes, ...rest } = p as typeof p & { votes?: { id: string }[] };
+      return {
+        ...rest,
+        votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+      };
+    });
+
     res.json({
-      photos,
+      photos: photosWithVote,
       total,
       limit: parseInt(limit as string, 10),
       offset: parseInt(offset as string, 10),
@@ -377,7 +392,7 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
 });
 
 // GET /api/parties/:partyId/photos/:photoId - Get single photo details
-router.get('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
 
@@ -407,6 +422,10 @@ router.get('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, 
       where: { id: photoId, partyId },
       include: {
         guest: { select: { id: true, name: true } },
+        // salame-58195
+        votes: req.userId
+          ? { where: { userId: req.userId }, select: { id: true } }
+          : false,
       },
     });
 
@@ -414,7 +433,13 @@ router.get('/:partyId/photos/:photoId', async (req: AuthRequest, res: Response, 
       throw new AppError('Photo not found', 404, 'NOT_FOUND');
     }
 
-    res.json({ photo });
+    const { votes, ...rest } = photo as typeof photo & { votes?: { id: string }[] };
+    const photoWithVote = {
+      ...rest,
+      votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+    };
+
+    res.json({ photo: photoWithVote });
   } catch (error) {
     next(error);
   }
@@ -522,6 +547,65 @@ router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest,
     });
 
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// salame-58195: POST /api/parties/:partyId/photos/:photoId/vote
+// Toggle the current user's thumbs-up on a photo. Requires auth.
+// Returns { voted: boolean, voteCount: number }.
+router.post('/:partyId/photos/:photoId/vote', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, photoId } = req.params;
+    const userId = req.userId;
+    if (!userId) {
+      throw new AppError('Auth required', 401, 'UNAUTHORIZED');
+    }
+
+    // Verify the photo exists and belongs to this party.
+    const photo = await prisma.photo.findFirst({
+      where: { id: photoId, partyId },
+      select: { id: true },
+    });
+    if (!photo) {
+      throw new AppError('Photo not found', 404, 'NOT_FOUND');
+    }
+
+    const existing = await prisma.photoVote.findUnique({
+      where: { photoId_userId: { photoId, userId } },
+      select: { id: true },
+    });
+
+    if (existing) {
+      // Toggle off
+      const [, updated] = await prisma.$transaction([
+        prisma.photoVote.delete({
+          where: { photoId_userId: { photoId, userId } },
+        }),
+        prisma.photo.update({
+          where: { id: photoId },
+          data: { voteCount: { decrement: 1 } },
+          select: { voteCount: true },
+        }),
+      ]);
+      // Guard against negative drift (shouldn't happen, but safe).
+      const voteCount = Math.max(0, updated.voteCount);
+      return res.json({ voted: false, voteCount });
+    }
+
+    // Toggle on
+    const [, updated] = await prisma.$transaction([
+      prisma.photoVote.create({
+        data: { photoId, userId },
+      }),
+      prisma.photo.update({
+        where: { id: photoId },
+        data: { voteCount: { increment: 1 } },
+        select: { voteCount: true },
+      }),
+    ]);
+    return res.json({ voted: true, voteCount: updated.voteCount });
   } catch (error) {
     next(error);
   }
