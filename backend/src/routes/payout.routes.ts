@@ -95,7 +95,6 @@ function serializePayout(p: any) {
     mercuryCardId: p.mercuryCardId ?? null,
     mercuryCardLast4: p.mercuryCardLast4 ?? null,
     hostNotes: p.hostNotes ?? null,
-    adminNotes: p.adminNotes ?? null,
     rejectionReason: p.rejectionReason ?? null,
     reviewedBy: p.reviewedBy ?? null,
     reviewedAt: p.reviewedAt ? p.reviewedAt.toISOString() : null,
