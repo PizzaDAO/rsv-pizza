@@ -495,6 +495,9 @@ export interface Photo {
   reviewedAt: string | null;
   reviewedBy: string | null;
   duration: number | null; // Video duration in seconds (null for images)
+  // salame-58195: thumbs-up voting
+  voteCount: number;
+  votedByMe: boolean;
   createdAt: string;
   updatedAt: string;
   guest?: {

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock, MessageSquare, ThumbsUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Photo } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { togglePhotoVote } from '../../lib/api';
 
 interface PhotoModalProps {
   photo: Photo;
@@ -18,6 +20,8 @@ interface PhotoModalProps {
   onUpdateYear?: (photoId: string, year: number | null) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
+  // salame-58195: thumbs-up vote toggled — parent updates local list.
+  onVoteChange?: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
 }
 
 export const PhotoModal: React.FC<PhotoModalProps> = ({
@@ -34,7 +38,21 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   onUpdateYear,
   onApprove,
   onReject,
+  onVoteChange,
 }) => {
+  // salame-58195: thumbs-up voting
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
+  const handleVote = async () => {
+    if (!user || voting) return;
+    setVoting(true);
+    const res = await togglePhotoVote(photo.partyId, photo.id);
+    setVoting(false);
+    if (res && onVoteChange) {
+      onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
+    }
+  };
+
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionValue, setCaptionValue] = useState(photo.caption || '');
   const [editingTags, setEditingTags] = useState(false);
@@ -477,6 +495,23 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
 
           {/* Actions */}
           <div className="space-y-2 border-t border-theme-stroke pt-4">
+            {/* salame-58195: thumbs-up vote (approved photos only) */}
+            {photo.status === 'approved' && (
+              <button
+                onClick={handleVote}
+                disabled={!user || voting}
+                title={user ? (photo.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
+                className={`w-full flex items-center justify-center gap-2 font-medium py-2.5 rounded-lg transition-colors ${
+                  photo.votedByMe
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-theme-surface-hover text-theme-text hover:bg-white/15'
+                } ${!user || voting ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                <ThumbsUp size={18} fill={photo.votedByMe ? 'currentColor' : 'none'} />
+                {photo.voteCount > 0 ? `${photo.voteCount}` : ''} {photo.votedByMe ? 'Voted' : 'Thumbs up'}
+              </button>
+            )}
+
             <button
               onClick={handleDownload}
               className="w-full flex items-center justify-center gap-2 bg-theme-surface-hover hover:bg-theme-surface-hover text-theme-text font-medium py-2.5 rounded-lg transition-colors"

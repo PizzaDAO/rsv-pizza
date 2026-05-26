@@ -926,6 +926,26 @@ export async function batchReviewPhotos(
   }
 }
 
+// salame-58195: toggle the current user's thumbs-up vote on a photo.
+// Logged-in users only. Returns { voted, voteCount } on success, null on error.
+export async function togglePhotoVote(
+  partyId: string,
+  photoId: string,
+): Promise<{ voted: boolean; voteCount: number } | null> {
+  try {
+    return await apiRequest<{ voted: boolean; voteCount: number }>(
+      `/api/parties/${partyId}/photos/${photoId}/vote`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling photo vote:', error);
+    return null;
+  }
+}
+
 // Get available photo tags for a party (defaults + confirmed sponsor names)
 export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] } | null> {
   try {
@@ -4772,7 +4792,10 @@ export interface FeedPhoto {
   width: number | null;
   height: number | null;
   createdAt: string;
-  party: { slug: string; name: string; city: string | null; country: string | null };
+  // salame-58195: thumbs-up voting state
+  voteCount: number;
+  votedByMe: boolean;
+  party: { id: string; slug: string; name: string; city: string | null; country: string | null };
 }
 
 export interface PhotosFeedResponse {

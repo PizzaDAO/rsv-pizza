@@ -1,6 +1,8 @@
-import React from 'react';
-import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play, ThumbsUp } from 'lucide-react';
 import { Photo } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { togglePhotoVote } from '../../lib/api';
 
 interface PhotoCardProps {
   photo: Photo;
@@ -10,6 +12,8 @@ interface PhotoCardProps {
   onDelete?: (photoId: string) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
+  // salame-58195: thumbs-up vote toggled — parent updates local list.
+  onVoteChange?: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
 }
 
 /** Format duration in seconds to "M:SS" display */
@@ -27,11 +31,31 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onDelete,
   onApprove,
   onReject,
+  onVoteChange,
 }) => {
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
   const isVideo = photo.mimeType?.startsWith('video/');
+
+  // salame-58195: thumbs-up voting
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
+  const handleVote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      // Anon: fall through to opening the modal (login prompt deferred).
+      onClick?.();
+      return;
+    }
+    if (voting) return;
+    setVoting(true);
+    const res = await togglePhotoVote(photo.partyId, photo.id);
+    setVoting(false);
+    if (res && onVoteChange) {
+      onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -204,6 +228,24 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             </span>
           )}
         </div>
+      )}
+
+      {/* salame-58195: thumbs-up vote (approved photos only) */}
+      {!isPending && !isRejected && (
+        <button
+          type="button"
+          onClick={handleVote}
+          aria-label={photo.votedByMe ? 'Remove vote' : 'Thumbs up'}
+          title={user ? (photo.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
+          className={`absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+            photo.votedByMe
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : 'bg-black/60 text-white hover:bg-black/80'
+          } ${voting ? 'opacity-70' : ''}`}
+        >
+          <ThumbsUp size={12} fill={photo.votedByMe ? 'currentColor' : 'none'} />
+          {photo.voteCount > 0 && <span>{photo.voteCount}</span>}
+        </button>
       )}
     </div>
   );
