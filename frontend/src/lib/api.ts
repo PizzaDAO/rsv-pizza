@@ -4062,6 +4062,46 @@ export async function updateAdminPayout(
   return res.payout;
 }
 
+/**
+ * agnolotti-58291: per-receipt admin OCR correction. Updates ONLY the
+ * `ocrAmount` and `ocrCurrency` on a single `payout_documents` row — does NOT
+ * touch the parent payout's `finalAmountUsd`. Use the normal
+ * `updateAdminPayout` edit-amount path when an admin wants to recompute the
+ * payout total.
+ *
+ * Sending `null` clears the field; sending `undefined` (i.e. omitting it from
+ * the object) leaves it untouched.
+ *
+ * Returns the updated document row shape — same fields as
+ * `AdminPayoutDetail.documents[]` minus the uploader join.
+ */
+export async function updatePayoutDocument(
+  docId: string,
+  patch: {
+    ocrAmount?: number | null;
+    ocrCurrency?: string | null;
+  },
+): Promise<{
+  id: string;
+  kind: 'pizza' | 'receipt';
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  ocrError: string | null;
+  sortOrder: number;
+  uploadedByUserId: string | null;
+}> {
+  const res = await apiRequest<{ document: any }>(
+    `/api/admin/payouts/documents/${docId}`,
+    { method: 'PATCH', body: patch },
+  );
+  return res.document;
+}
+
 export async function approveAdminPayout(
   id: string,
   opts?: { note?: string; autoExecute?: boolean },

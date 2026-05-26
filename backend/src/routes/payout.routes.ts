@@ -897,10 +897,16 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     }
 
     // pancetta-37195: stamp each new document with the uploader.
+    // agnolotti-58291: also stamp `partyId` so the document is party-scoped
+    // independent of the payoutId association (which is now SET NULL on
+    // payout delete). The nested `documents: { create: ... }` below uses the
+    // implicit `payoutId` from the parent create; partyId must be set
+    // explicitly since it's a sibling FK, not a back-relation.
     const uploaderUserId = req.userId ?? null;
     const uploaderEmail = req.userEmail ?? null;
     const docsToCreateStamped = docsToCreate.map(d => ({
       ...d,
+      partyId,
       uploadedByUserId: uploaderUserId,
       uploadedByEmail: uploaderEmail,
     }));
@@ -1031,14 +1037,21 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
 // ---------- GET /:partyId/payouts/receipts-library ----------
 
 /**
- * ravioli-82931: the host's submitted receipts (kind='receipt' documents)
- * across ALL their payouts on this party, including withdrawn. Lets hosts see
- * what they've previously submitted even after they withdrew the request.
+ * ravioli-82931 + agnolotti-58291: party-scoped receipts library.
+ *
+ * Every `kind='receipt'` `payout_documents` row belonging to this party is
+ * returned, regardless of which cohost uploaded it or which payout it was
+ * attached to (or whether the parent payout was later withdrawn / hard-
+ * deleted — receipts now survive payout deletion via `partyId` FK +
+ * `payoutId` SET NULL).
+ *
+ * Auth: `canUserEditParty` only. Any cohost with edit access on the party
+ * sees ALL the party's receipts. The "submitter-only" filter from
+ * `gouda-83912` was removed by agnolotti-58291 so the receipts library is
+ * a shared per-event resource.
  *
  * Mounted BEFORE `/:partyId/payouts/:payoutId` so the literal path wins over
- * the dynamic param. Auth mirrors `gouda-83912`: requires `canUserEditParty`
- * AND the caller must be the submitter (`hostUserId === req.userId`) OR an
- * admin. Other cohosts on the same party can't see each other's receipts.
+ * the dynamic param.
  */
 router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -1047,22 +1060,17 @@ router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: R
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
-    const isAdminCaller = await isAnyAdmin(req.userEmail);
 
-    // Pull all receipt documents for payouts on this party where the caller
-    // is the submitter (or admin — admins can see across all submitters).
-    const payoutWhere: any = { partyId };
-    if (!isAdminCaller) {
-      payoutWhere.hostUserId = req.userId;
-    }
-
+    // agnolotti-58291: query payout_documents by partyId directly (no join
+    // through payouts.partyId). payoutId is nullable now — receipts attached
+    // to a since-deleted payout still surface here with `payoutId === null`.
     const docs = await prisma.payoutDocument.findMany({
-      where: {
-        kind: 'receipt',
-        payout: payoutWhere,
-      },
+      where: { partyId, kind: 'receipt' },
       include: {
-        payout: { select: { id: true, status: true } },
+        payout: { select: { id: true, status: true, hostUserId: true } },
+        // agnolotti-58291: surface uploader name/email so the UI can render
+        // "uploaded by X" — useful now that cohosts see each other's receipts.
+        uploadedBy: { select: { id: true, name: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -1079,6 +1087,11 @@ router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: R
         ocrAmount: d.ocrAmount != null ? numberFromDecimal(d.ocrAmount) : null,
         ocrCurrency: d.ocrCurrency ?? null,
         ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
+        // agnolotti-58291: uploader attribution. Falls back to cached email
+        // if the User row is later deleted.
+        uploadedByUserId: d.uploadedByUserId ?? null,
+        uploadedByName: d.uploadedBy?.name ?? null,
+        uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
         createdAt: d.createdAt.toISOString(),
       })),
     });
@@ -1486,6 +1499,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         await tx.payoutDocument.createMany({
           data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
             ...d,
+            // agnolotti-58291: stamp partyId on every new doc — the FK is now
+            // NOT NULL party-side, optional payout-side.
+            partyId,
             payoutId: existing.id,
             uploadedByUserId: uploaderUserId,
             uploadedByEmail: uploaderEmail,

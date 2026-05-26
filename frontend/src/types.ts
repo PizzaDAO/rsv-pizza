@@ -1545,14 +1545,20 @@ export interface UnifiedPartner {
 export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn';
 
 /**
- * ravioli-82931: one entry in the host's receipts library — a `kind='receipt'`
- * `payout_documents` row joined to its parent payout's status. Surfaced via
- * `GET /api/parties/:partyId/payouts/receipts-library`.
+ * ravioli-82931 + agnolotti-58291: one entry in the party-scoped receipts
+ * library. After agnolotti, receipts are party-level — every cohost with
+ * edit access on the party sees ALL the party's receipts (not just their own).
+ * The parent payout association (`payoutId` / `payoutStatus`) is optional
+ * because receipts now survive payout hard-delete (FK SET NULL).
+ *
+ * Surfaced via `GET /api/parties/:partyId/payouts/receipts-library`.
  */
 export interface ReceiptLibraryEntry {
   id: string;
-  payoutId: string;
-  payoutStatus: PayoutStatus;
+  /** agnolotti-58291: null when the parent payout has been hard-deleted. */
+  payoutId: string | null;
+  /** agnolotti-58291: null when the parent payout has been hard-deleted. */
+  payoutStatus: PayoutStatus | null;
   url: string;
   fileName: string;
   fileSize: number;
@@ -1560,6 +1566,15 @@ export interface ReceiptLibraryEntry {
   ocrAmount: number | null;
   ocrCurrency: string | null;
   ocrConfidence: number | null;
+  /**
+   * agnolotti-58291: uploader attribution so the UI can show "uploaded by X"
+   * — useful now that cohosts see each other's receipts. `uploadedByName`
+   * comes from the live User join; `uploadedByEmail` falls back to the
+   * cached email if the User row was later deleted.
+   */
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
   createdAt: string;
 }
 export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
