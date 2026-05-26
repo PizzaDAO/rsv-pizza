@@ -7,3 +7,5 @@ export { KitContentsModal } from './KitContentsModal';
 export { CsvImportModal } from './CsvImportModal';
 export { CoordinatorManager } from './CoordinatorManager';
 export { CoordinatorModal } from './CoordinatorModal';
+export { ShippingPaymentsSection } from './ShippingPaymentsSection';
+export { NewShippingReceiptModal } from './NewShippingReceiptModal';

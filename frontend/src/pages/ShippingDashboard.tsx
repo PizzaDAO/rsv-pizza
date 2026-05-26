@@ -5,7 +5,7 @@ import { Loader2, Shield, AlertCircle, Truck, ChevronDown, LogIn, Check, Printer
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager, KitContentsModal } from '../components/shipping';
+import { KitStats, KitFilters, KitTable, KitDetailModal, CsvImportModal, CoordinatorManager, KitContentsModal, ShippingPaymentsSection } from '../components/shipping';
 import { PrintMaterials } from '../components/print';
 import {
   fetchShippingMe,
@@ -457,6 +457,12 @@ export function ShippingDashboard() {
 
           {activeTab === 'kits' && (
             <>
+              {/* salumi-89172: My Payments section — coordinator uploads
+                  reimbursement receipts for shipping costs they paid out of
+                  pocket (postage, packing, supplies). Reuses the host
+                  payouts pipeline via `purpose='shipping'`. */}
+              <ShippingPaymentsSection kits={kits} />
+
               {/* Stats */}
               {stats && (
                 <section className="mb-6">

@@ -300,6 +300,14 @@ function buildPayoutWhere(query: Request['query']): any {
     where.payoutMethod = method;
   }
 
+  // salumi-89172: Purpose filter — 'event' | 'shipping' | 'all' (default).
+  // When unset, both purposes are returned (existing behavior — pre-feature
+  // all rows were implicitly 'event').
+  const purpose = query.purpose;
+  if (typeof purpose === 'string' && purpose !== 'all' && (purpose === 'event' || purpose === 'shipping')) {
+    where.purpose = purpose;
+  }
+
   const partyId = query.partyId;
   if (typeof partyId === 'string' && partyId.trim().length > 0) {
     where.partyId = partyId.trim();
@@ -385,6 +393,10 @@ function serializePayout(row: any): any {
     id: row.id,
     partyId: row.partyId,
     hostUserId: row.hostUserId,
+    // salumi-89172: shipping coordinator payouts can be filtered out of the
+    // normal queue + show a "Shipping" pill in the admin UI.
+    purpose: row.purpose ?? 'event',
+    partyKitId: row.partyKitId ?? null,
     originalAmount: Number(row.originalAmount),
     originalCurrency: row.originalCurrency,
     exchangeRate: Number(row.exchangeRate),

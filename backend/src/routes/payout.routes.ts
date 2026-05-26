@@ -73,6 +73,11 @@ function serializePayout(p: any) {
     id: p.id,
     partyId: p.partyId,
     hostUserId: p.hostUserId,
+    // salumi-89172: surface the payout purpose + the optional kit it's tied
+    // to so the host-side list can distinguish event reimbursements from
+    // shipping-coordinator receipts.
+    purpose: p.purpose ?? 'event',
+    partyKitId: p.partyKitId ?? null,
     // pancetta-37195: surface the submitter so cohosts can tell who created
     // the payout. host is included via the prisma findUnique/findMany below.
     hostName: p.host?.name ?? null,
@@ -526,7 +531,47 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       // default `req.userId` for `hostUserId`. Preserves pancetta-37195
       // attribution — "Submitted by X" reads correctly.
       recipientHostUserId,
+      // salumi-89172: optional payout purpose + tied kit. Shipping
+      // coordinators submit `purpose='shipping'` with `partyKitId` set to
+      // the kit the receipt belongs to. Event-reimbursement flows leave
+      // both unset; the column defaults to 'event'.
+      purpose: bodyPurpose,
+      partyKitId: bodyPartyKitId,
     } = req.body || {};
+
+    // salumi-89172: validate purpose. Default 'event' preserves all existing
+    // flows. 'shipping' is only allowed when `partyKitId` is also supplied
+    // AND the kit actually belongs to this party (checked below after the
+    // party-edit gate).
+    const purpose: 'event' | 'shipping' =
+      bodyPurpose === 'shipping' ? 'shipping' : 'event';
+    const partyKitIdInput =
+      typeof bodyPartyKitId === 'string' && bodyPartyKitId.trim().length > 0
+        ? bodyPartyKitId.trim()
+        : null;
+    if (purpose === 'shipping' && !partyKitIdInput) {
+      throw new AppError(
+        'partyKitId is required for shipping receipts',
+        400,
+        'PARTY_KIT_ID_REQUIRED',
+      );
+    }
+    if (purpose !== 'shipping' && partyKitIdInput) {
+      // Refuse to silently drop a kit id on a non-shipping payout — it almost
+      // certainly indicates a frontend bug rather than intent.
+      throw new AppError(
+        'partyKitId may only be set when purpose="shipping"',
+        400,
+        'INVALID_PARTY_KIT_ID',
+      );
+    }
+
+    // salumi-89172: shipping receipts are submitted by shipping coordinators
+    // who don't necessarily have edit access on the party — they manage
+    // logistics, not the event itself. When `purpose='shipping'`, swap the
+    // canUserEditParty gate for a shipping-coordinator / admin check that
+    // mirrors the auth used by `/api/shipping/*`.
+    const isShippingPurpose = purpose === 'shipping';
 
     // bismarck-92103: admins creating prepayments on behalf of a cohost don't
     // need party edit access — they're operating from the /payments admin
@@ -536,7 +581,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     const recipientOverrideRequested =
       typeof recipientHostUserId === 'string' && recipientHostUserId.trim().length > 0;
     const skipPartyEditCheck =
-      recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
+      (recipientOverrideRequested && (await isAnyAdmin(req.userEmail))) ||
+      isShippingPurpose;
     if (!skipPartyEditCheck) {
       const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
       if (!canEdit) {
@@ -548,6 +594,46 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           );
         }
         throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+    }
+
+    // salumi-89172: for shipping receipts, require the caller to be an admin
+    // OR an active shipping coordinator. Also enforce that the kit belongs
+    // to the party in the URL — submitters can't cross parties.
+    if (isShippingPurpose) {
+      const email = req.userEmail?.toLowerCase() || '';
+      const callerIsAdmin = await isAnyAdmin(req.userEmail);
+      let allowed = callerIsAdmin;
+      if (!allowed && email) {
+        const coord = await prisma.shippingCoordinator.findFirst({
+          where: { email, isActive: true },
+          select: { id: true },
+        });
+        allowed = !!coord;
+      }
+      if (!allowed) {
+        throw new AppError(
+          'Shipping receipts require admin or shipping-coordinator access.',
+          403,
+          'FORBIDDEN_SHIPPING_PAYOUT',
+        );
+      }
+      // Verify the kit exists AND belongs to this party. Cross-party submits
+      // would otherwise let a coordinator file a receipt under a kit they
+      // don't actually handle.
+      const kit = await prisma.partyKit.findUnique({
+        where: { id: partyKitIdInput! },
+        select: { id: true, partyId: true },
+      });
+      if (!kit) {
+        throw new AppError('Kit not found', 404, 'KIT_NOT_FOUND');
+      }
+      if (kit.partyId !== partyId) {
+        throw new AppError(
+          'Kit does not belong to this party',
+          400,
+          'KIT_PARTY_MISMATCH',
+        );
       }
     }
 
@@ -827,6 +913,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         // cohost, `effectiveHostUserId` is the cohost; otherwise it's the
         // authenticated submitter (req.userId).
         hostUserId: effectiveHostUserId,
+        // salumi-89172: persist purpose + tied kit. Defaults to 'event' /
+        // null when the body didn't supply them, matching pre-feature
+        // behavior.
+        purpose,
+        partyKitId: partyKitIdInput,
         originalAmount: new Decimal(effectiveOriginalAmount),
         originalCurrency: effectiveOriginalCurrency,
         exchangeRate: new Decimal(effectiveExchangeRate),

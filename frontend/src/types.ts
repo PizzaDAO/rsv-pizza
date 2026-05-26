@@ -1536,10 +1536,29 @@ export interface PayoutAuditEntry {
 }
 
 
+/**
+ * salumi-89172: distinguishes event-reimbursement payouts ('event') from
+ * shipping-coordinator receipt payouts ('shipping'). Existing event payouts
+ * default to 'event' on the wire when the column was unset.
+ */
+export type PayoutPurpose = 'event' | 'shipping';
+
 export interface Payout {
   id: string;
   partyId: string;
   hostUserId: string;
+  /**
+   * salumi-89172: 'event' (host reimbursement, the original flow) or
+   * 'shipping' (shipping-coordinator receipt). Defaults to 'event' on
+   * historical rows when the column was unset.
+   */
+  purpose: PayoutPurpose;
+  /**
+   * salumi-89172: optional UUID of the `party_kits` row the receipt is tied
+   * to. NULL for all event-purpose payouts and (later) any general-supplies
+   * shipping receipts. Required for shipping receipts in v1.
+   */
+  partyKitId: string | null;
   // pancetta-37195: submitter name/email so cohosts see "Submitted by X".
   hostName?: string | null;
   hostEmail?: string | null;
@@ -1596,6 +1615,30 @@ export interface ExternalPaymentInput {
    * > $625 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
    */
   allowOverSubmissionCap?: boolean;
+}
+
+/**
+ * salumi-89172: payouts returned by `GET /api/shipping/my-payouts`. Mirrors
+ * the host-side `Payout` shape with embedded `party` + `partyKit` so the
+ * /shipping dashboard can render "Receipt tied to <event> — <kit
+ * recipient>". Re-uses the same documents array so PayoutListRow renders
+ * without changes.
+ */
+export interface ShippingPayout extends Payout {
+  party: {
+    id: string;
+    name: string;
+    customUrl: string | null;
+    inviteCode: string;
+  } | null;
+  partyKit: {
+    id: string;
+    requestedTier: string;
+    allocatedTier: string | null;
+    recipientName: string;
+    city: string;
+    country: string;
+  } | null;
 }
 
 // Admin-list payout: includes embedded party + host info
@@ -1694,6 +1737,12 @@ export interface AdminPayoutFilters {
   /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
   country?: string;
   currency?: string;
+  /**
+   * salumi-89172: Purpose filter — 'event' (host reimbursements) or
+   * 'shipping' (shipping-coordinator receipts) or 'all' / undefined to show
+   * both.
+   */
+  purpose?: PayoutPurpose | 'all';
   dateFrom?: string;
   dateTo?: string;
   cursor?: string;
