@@ -17,7 +17,12 @@ const HOURS = (Number(process.env.HOURS) || 4) as ReminderHours;
 const PUBLIC_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN;
 
 if (!process.env.RESEND_API_KEY) { console.error('RESEND_API_KEY missing'); process.exit(1); }
-if (!process.env.UNSUBSCRIBE_SECRET) { console.error('UNSUBSCRIBE_SECRET missing'); process.exit(1); }
+if (!process.env.UNSUBSCRIBE_SECRET) {
+  // Preview-only: prod secret may not be set yet. The unsub link in the
+  // preview email won't validate against prod — that's expected.
+  process.env.UNSUBSCRIBE_SECRET = 'preview-only-dummy-secret';
+  console.warn('UNSUBSCRIBE_SECRET not set — using preview-only dummy (unsub link will be invalid)');
+}
 if (!([1, 2, 3, 4] as number[]).includes(HOURS)) { console.error(`HOURS must be 1|2|3|4 (got ${HOURS})`); process.exit(1); }
 
 async function main() {
