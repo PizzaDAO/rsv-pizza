@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2 } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
+import { updatePartyApi } from '../../lib/api';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
@@ -95,6 +96,20 @@ interface PayoutReviewModalProps {
    * follow-up payment without leaving the modal.
    */
   onPayAgain?: (payout: AdminPayoutDetail) => void;
+  /**
+   * tagliatelle-49102: the actor's admin role. Used to gate the in-modal
+   * event_tags editor — only `admin` / `super_admin` see the add input and
+   * the per-chip remove (×) buttons. `payment_admin` sees the chips
+   * read-only (since they can't PATCH the party). Optional for backward-
+   * compat with any caller that hasn't been threaded yet.
+   */
+  adminRole?: 'admin' | 'super_admin' | 'payment_admin' | null;
+  /**
+   * tagliatelle-49102: called after the modal successfully PATCHes the
+   * party's `event_tags`. Parent should refresh its payouts list so the
+   * underlying row picks up the new tag set (effective cap, etc.).
+   */
+  onTagsChanged?: (next: string[]) => void;
   busy?: boolean;
 }
 
@@ -112,8 +127,68 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   fetchWalletPaidTotal,
   onReopen,
   onPayAgain,
+  adminRole,
+  onTagsChanged,
   busy = false,
 }) => {
+  // tagliatelle-49102: in-modal event_tags editor. Full admins (admin /
+  // super_admin) can add + remove tags via PATCH /api/parties/:id;
+  // payment_admin sees the chips read-only. Hooks must be declared above
+  // any early return — see feedback_hooks_above_early_returns.
+  const canEditTags = adminRole === 'admin' || adminRole === 'super_admin';
+  const [tags, setTags] = useState<string[]>(payout.party.eventTags ?? []);
+  const [newTag, setNewTag] = useState('');
+  const [tagSaving, setTagSaving] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
+
+  // Re-sync the local tag state whenever the parent swaps in a fresh
+  // `payout` (e.g. after refresh() reloads the detail). Without this the
+  // chip list goes stale after an external mutation.
+  useEffect(() => {
+    setTags(payout.party.eventTags ?? []);
+  }, [payout.id, payout.party.eventTags]);
+
+  async function saveTags(nextTags: string[]) {
+    setTagSaving(true);
+    setTagError(null);
+    try {
+      // updatePartyApi handles the PATCH; backend enforces the 'go' tag
+      // gating (payment_admin+) but full admins (the only ones who can
+      // reach this code path) can freely set any tag.
+      await updatePartyApi(payout.partyId, { eventTags: nextTags });
+      setTags(nextTags);
+      onTagsChanged?.(nextTags);
+      return true;
+    } catch (err: any) {
+      setTagError(err?.message || 'Failed to update tags');
+      return false;
+    } finally {
+      setTagSaving(false);
+    }
+  }
+
+  async function handleAddTag(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 32) {
+      setTagError('Tag must be 32 characters or less');
+      return;
+    }
+    if (tags.includes(trimmed)) {
+      setTagError(`Tag "${trimmed}" is already set`);
+      return;
+    }
+    const nextTags = Array.from(new Set([...tags, trimmed]));
+    const ok = await saveTags(nextTags);
+    if (ok) setNewTag('');
+  }
+
+  async function handleRemoveTag(tag: string) {
+    const nextTags = tags.filter((t) => t !== tag);
+    await saveTags(nextTags);
+  }
+
   const [editingAmount, setEditingAmount] = useState(false);
   const [draftAmount, setDraftAmount] = useState(String(payout.finalAmountUsd));
   const [adminNotes, setAdminNotes] = useState(payout.adminNotes ?? '');
@@ -501,6 +576,70 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* tagliatelle-49102: party event_tags editor. Full admins
+                (admin / super_admin) can add + remove tags; payment_admin
+                sees the chips read-only. Hidden entirely when there are no
+                tags AND the actor can't edit — avoids visual clutter for
+                payment_admin on an empty event. */}
+            {(canEditTags || tags.length > 0) && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
+                <h3 className="font-semibold text-theme-text mb-2 text-sm inline-flex items-center gap-1.5">
+                  <Tag size={14} />
+                  Tags
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {tags.length === 0 && (
+                    <span className="text-xs text-theme-text-muted">No tags</span>
+                  )}
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-full bg-theme-surface-hover px-2.5 py-1 text-xs text-theme-text-secondary"
+                    >
+                      {tag}
+                      {canEditTags && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          disabled={tagSaving}
+                          aria-label={`Remove tag ${tag}`}
+                          className="inline-flex items-center justify-center rounded-full hover:bg-theme-stroke text-theme-text-muted hover:text-theme-text disabled:opacity-50"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                {canEditTags && (
+                  <form onSubmit={handleAddTag} className="mt-2 flex gap-2">
+                    <div className="flex-1">
+                      <IconInput
+                        icon={Tag}
+                        placeholder="Add a tag (e.g. prepay, k500, swc)"
+                        value={newTag}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          setNewTag(e.target.value);
+                          if (tagError) setTagError(null);
+                        }}
+                        maxLength={32}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={tagSaving || !newTag.trim()}
+                      className="px-3 py-2 rounded-lg bg-[#E52828] text-white text-sm disabled:opacity-50 inline-flex items-center gap-1"
+                    >
+                      {tagSaving ? <Loader2 size={14} className="animate-spin" /> : 'Add'}
+                    </button>
+                  </form>
+                )}
+                {tagError && (
+                  <div className="mt-2 text-xs text-red-300">{tagError}</div>
+                )}
+              </div>
+            )}
 
             {/* Per-receipt OCR */}
             {receipts.length > 0 && (

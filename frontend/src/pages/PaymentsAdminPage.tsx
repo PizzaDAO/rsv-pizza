@@ -835,6 +835,23 @@ export function PaymentsAdminPage() {
               }
             }}
             onPayAgain={handlePayAgain}
+            // tagliatelle-49102: surface the actor's role so the modal can
+            // gate the in-modal event_tags editor. `payment_admin` sees the
+            // chips read-only; `admin` / `super_admin` get add + remove.
+            adminRole={role.kind === 'allowed' ? role.role : null}
+            // tagliatelle-49102: after a tag mutation, refresh the payouts
+            // list so the row picks up the new tag set (effective cap, etc.).
+            // Re-fetch the modal detail too so its local `payout.party.eventTags`
+            // stays in sync with anything the backend derives.
+            onTagsChanged={async () => {
+              try {
+                const fresh = await getAdminPayout(detail.id);
+                setDetail(fresh);
+              } catch {
+                /* ignore — modal already updated its local state */
+              }
+              await refresh();
+            }}
           />
         )}
         {showExternalModal && (
