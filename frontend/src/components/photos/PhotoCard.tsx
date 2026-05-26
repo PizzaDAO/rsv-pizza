@@ -230,21 +230,17 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
       )}
 
-      {/* salame-58195: thumbs-up vote (approved photos only) */}
+      {/* salame-58195: thumbs-up vote (approved photos only) — napoletana-58197: icon-only, white, drop-shadow */}
       {!isPending && !isRejected && (
         <button
           type="button"
           onClick={handleVote}
-          aria-label={photo.votedByMe ? 'Remove vote' : 'Thumbs up'}
-          title={user ? (photo.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
-          className={`absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-            photo.votedByMe
-              ? 'bg-red-500 text-white hover:bg-red-600'
-              : 'bg-black/60 text-white hover:bg-black/80'
-          } ${voting ? 'opacity-70' : ''}`}
+          aria-label={photo.votedByMe ? 'Remove vote' : 'Vote'}
+          title={user ? (photo.votedByMe ? 'Remove vote' : 'Vote') : 'Log in to vote'}
+          className={`absolute bottom-2 left-2 z-10 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ThumbsUp size={12} fill={photo.votedByMe ? 'currentColor' : 'none'} />
-          {photo.voteCount > 0 && <span>{photo.voteCount}</span>}
+          <ThumbsUp size={22} fill={photo.votedByMe ? 'currentColor' : 'none'} strokeWidth={2.25} />
         </button>
       )}
     </div>
