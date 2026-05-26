@@ -447,6 +447,10 @@ function serializePayout(row: any): any {
             reimbursementCapUsd: row.party.reimbursementCapUsd,
             eventTags: row.party.eventTags,
           }),
+          // tagliatelle-49102: raw event_tags array surfaced so the
+          // /payments PayoutReviewModal can render the tag chips + let
+          // full admins add/remove tags via PATCH /api/parties/:id.
+          eventTags: Array.isArray(row.party.eventTags) ? row.party.eventTags : [],
           // paesana-89172: surface the owner's id + a flag for whether they
           // appear in the co_hosts array. Frontend pairs this with
           // `payout.hostUserId` to flag suspicious admin-created prepayments

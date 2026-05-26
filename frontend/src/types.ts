@@ -1625,6 +1625,14 @@ export interface AdminPayout extends Payout {
      */
     effectiveReimbursementCapUsd: number | null;
     /**
+     * tagliatelle-49102: party-level `event_tags` surfaced so the
+     * PayoutReviewModal can render the tag chips + let full admins
+     * (role IN ('admin','super_admin')) add/remove tags via the existing
+     * PATCH /api/parties/:id endpoint. Optional for backward-compat with
+     * cached payloads during a rolling deploy.
+     */
+    eventTags?: string[];
+    /**
      * parmigiana-89172: per-party sum of `status === 'paid'` payouts (all
      * methods — USDC, wire, Mercury). Surfaced inline on PayoutRow to
      * warn admins before they accidentally double-pay. Optional so older
