@@ -27,6 +27,8 @@ interface ScorecardItemProps {
   eventUrl?: string;
   /** Sponsor Twitter handles (no `@` prefix, deduped, excluding `pizza_dao`). */
   partnerHandles?: string[];
+  /** Per-event Telegram URL (normalized). Falls back to https://t.me/pizzadao when absent. */
+  telegramUrl?: string | null;
 }
 
 const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = {
@@ -50,6 +52,7 @@ export function ScorecardItem({
   onTakeSelfie,
   eventUrl,
   partnerHandles,
+  telegramUrl,
 }: ScorecardItemProps) {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -87,6 +90,18 @@ export function ScorecardItem({
     } else if (itemKey === 'pizza_selfie') {
       // Backend auto-completes when photo tagged "pizza-selfie".
       onTakeSelfie?.();
+    } else if (itemKey === 'join_telegram') {
+      const url = telegramUrl || 'https://t.me/pizzadao';
+      window.open(url, '_blank', 'noopener,noreferrer');
+      onComplete(itemKey, url, 'self_report');
+    } else if (itemKey === 'follow_pizzadao') {
+      const url = 'https://twitter.com/pizza_dao';
+      window.open(url, '_blank', 'noopener,noreferrer');
+      onComplete(itemKey, url, 'self_report');
+    } else if (itemKey === 'signup_pizzadao') {
+      const url = 'https://pizzadao.org';
+      window.open(url, '_blank', 'noopener,noreferrer');
+      onComplete(itemKey, url, 'self_report');
     } else if (isSelfReport) {
       onComplete(itemKey, undefined, 'self_report');
     }
@@ -105,9 +120,9 @@ export function ScorecardItem({
     if (itemKey === 'vouch') return 'Scan';
     if (itemKey === 'pizza_selfie') return 'Selfie';
     if (itemKey === 'sign_pizza_box') return 'I signed it!';
-    if (itemKey === 'join_telegram') return 'I joined!';
-    if (itemKey === 'follow_pizzadao') return 'I followed!';
-    if (itemKey === 'signup_pizzadao') return 'I signed up!';
+    if (itemKey === 'join_telegram') return 'Join';
+    if (itemKey === 'follow_pizzadao') return 'Follow';
+    if (itemKey === 'signup_pizzadao') return 'Sign up';
     return '';
   };
 

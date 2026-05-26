@@ -1304,6 +1304,7 @@ export function EventPage() {
                     refreshSignal={scorecardRefresh}
                     eventUrl={eventUrl}
                     partnerHandles={partnerHandles}
+                    telegramUrl={telegramLink}
                   />
                 )}
 

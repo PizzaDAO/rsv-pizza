@@ -14,6 +14,8 @@ interface GuestScorecardProps {
   eventUrl?: string;
   /** Sponsor Twitter handles (no `@`, deduped, excluding `pizza_dao`). */
   partnerHandles?: string[];
+  /** Per-event Telegram URL (normalized). Falls back to https://t.me/pizzadao when absent. */
+  telegramUrl?: string | null;
 }
 
 const ITEM_ORDER: ScorecardItemKey[] = [
@@ -35,6 +37,7 @@ export function GuestScorecard({
   refreshSignal,
   eventUrl,
   partnerHandles,
+  telegramUrl,
 }: GuestScorecardProps) {
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
@@ -154,6 +157,7 @@ export function GuestScorecard({
                 onTakeSelfie={onTakeSelfie}
                 eventUrl={eventUrl}
                 partnerHandles={partnerHandles}
+                telegramUrl={telegramUrl}
               />
             </div>
           );
