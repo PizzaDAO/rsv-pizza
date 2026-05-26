@@ -36,10 +36,10 @@
       "Bash(supabase secrets set:*)",
       "Bash(npx supabase secrets set:*)",
       "Bash(npx supabase login)",
-      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase secrets set:*)",
-      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase functions deploy:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=REDACTED_DEAD_PAT npx supabase secrets set:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=REDACTED_DEAD_PAT npx supabase functions deploy:*)",
       "Bash(npx gh-pages -d dist)",
-      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bdc15f6e8088c78afde9c1693f6e03dc01615b01 npx supabase:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=REDACTED_DEAD_PAT npx supabase:*)",
       "WebFetch(domain:supabase.com)",
       "Bash(node migrate-address.js:*)",
       "Bash(cat:*)",
@@ -98,9 +98,9 @@
       "mcp__vercel__get_project",
       "mcp__vercel__deploy_to_vercel",
       "Bash(vercel deploy:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx prisma migrate deploy:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" ./node_modules/.bin/prisma migrate deploy:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:qcuS43imDHqlu4QM@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx --package=prisma@5.22.0 prisma migrate deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:REDACTED_DEAD_DB_PW@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx prisma migrate deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:REDACTED_DEAD_DB_PW@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" ./node_modules/.bin/prisma migrate deploy:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.znpiwdvvsqaxuskpfleo:REDACTED_DEAD_DB_PW@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&statement_cache_size=0\" npx --package=prisma@5.22.0 prisma migrate deploy:*)",
       "mcp__supabase__get_project_url",
       "mcp__supabase__get_publishable_keys",
       "Bash(vercel logs:*)",
@@ -114,7 +114,9 @@
       "Bash(BASE=\"https://backend-pizza-dao.vercel.app\")",
       "Bash(find:*)",
       "Bash(code:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "WebFetch(domain:api.rsv.pizza)",
+      "WebFetch(domain:rsvpizza-git-bismarck-58392-overflow-pizza-dao.vercel.app)"
     ]
   }
 }

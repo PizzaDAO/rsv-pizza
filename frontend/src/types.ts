@@ -1485,6 +1485,40 @@ export interface ConsolidatedReportEvent {
   clicks: number;
 }
 
+// pecorino-64118: per-item event context attached to consolidated photos/posts so
+// the report can render a flag + city/country chip. Optional so the frontend
+// degrades gracefully before the backend redeploy lands.
+export interface ConsolidatedReportPartyContext {
+  slug: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+}
+
+// Combined starred photo for the consolidated media grid — the subset of Photo
+// fields the grid + lightbox actually use, plus optional party context.
+export interface ConsolidatedReportPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  mimeType: string | null;
+  duration: number | null;
+  party?: ConsolidatedReportPartyContext;
+}
+
+// Combined social post annotated with its event name + optional party context.
+export interface ConsolidatedReportSocialPost {
+  id: string;
+  platform: string;
+  url: string;
+  authorHandle: string | null;
+  title: string | null;
+  views: number | null;
+  eventName?: string;
+  party?: ConsolidatedReportPartyContext;
+}
+
 export interface ConsolidatedReport {
   partnerName: string | null;
   tag: string | null;
@@ -1495,7 +1529,6 @@ export interface ConsolidatedReport {
     approvedGuests: number;
     mailingListSignups: number;
     walletAddresses: number;
-    roleBreakdown: Record<string, number>;
     poapMints: number;
     poapMoments: number;
     socialPostViews: number;
@@ -1515,9 +1548,9 @@ export interface ConsolidatedReport {
   };
   // Notable attendees with email masked to @domain, annotated with event name.
   notableAttendees: (NotableAttendee & { eventName?: string })[];
-  // Social posts annotated with their event name.
-  socialPosts: (SocialPost & { eventName?: string })[];
-  featuredPhotos: Photo[];
+  // Social posts annotated with their event name + optional party context.
+  socialPosts: ConsolidatedReportSocialPost[];
+  featuredPhotos: ConsolidatedReportPhoto[];
   walletAddressList: string[];
   events: ConsolidatedReportEvent[];
 }

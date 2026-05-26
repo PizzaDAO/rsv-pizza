@@ -16,24 +16,7 @@ import {
 import { countryNameToAlpha2, alpha2ToCountryNames, alpha2ToCanonicalName } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
 import { GPP_REGIONS, GPPRegion } from '../types';
-
-const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
-
-function CircleFlag({ country, code, size = 14 }: { country?: string | null; code?: string | null; size?: number }) {
-  const c = code ?? countryNameToAlpha2(country ?? null);
-  if (!c) return null;
-  return (
-    <img
-      src={`${FLAG_BASE}/${c}.svg`}
-      alt={country || c}
-      width={size}
-      height={size}
-      loading="lazy"
-      className="rounded-full inline-block shrink-0"
-      style={{ width: size, height: size }}
-    />
-  );
-}
+import { CircleFlag } from '../components/CircleFlag';
 
 // --- URL <-> state helpers (sicilian-58129) ----------------------------------
 
@@ -647,7 +630,7 @@ function FeedTile({
           className={`absolute bottom-2 right-2 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ThumbsUp size={22} fill={photo.votedByMe ? 'currentColor' : 'none'} strokeWidth={2.25} />
+          <ThumbsUp size={22} fill="currentColor" strokeWidth={2.25} />
         </span>
       </div>
       {(displayCity || photo.party.name) && (
