@@ -1193,14 +1193,17 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       const roleRows = await prisma.$queryRaw<{ role: string; count: bigint }[]>`
         SELECT role, COUNT(*)::bigint AS count
         FROM (
-          SELECT COALESCE(NULLIF(unnest(
-            CASE WHEN array_length(roles, 1) IS NULL OR array_length(roles, 1) = 0
-                 THEN ARRAY[COALESCE(role, 'Other')]
-                 ELSE roles END
-          ), ''), 'Other') AS role
-          FROM guests
-          WHERE party_id::text IN (${Prisma.join(eventIds)})
-            AND status != 'INVITED'
+          SELECT COALESCE(NULLIF(r, ''), 'Other') AS role
+          FROM (
+            SELECT unnest(
+              CASE WHEN array_length(roles, 1) IS NULL OR array_length(roles, 1) = 0
+                   THEN ARRAY[COALESCE(role, 'Other')]
+                   ELSE roles END
+            ) AS r
+            FROM guests
+            WHERE party_id::text IN (${Prisma.join(eventIds)})
+              AND status != 'INVITED'
+          ) u
         ) sub
         GROUP BY role
       `;
