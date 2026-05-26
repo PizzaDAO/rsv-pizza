@@ -781,8 +781,6 @@ export interface DbParty {
   underboss_status?: string | null;
   // Turtle role selection toggle
   turtle_roles_enabled?: boolean;
-  // margherita-58471: per-event T-4h reminder opt-out (defaults true)
-  reminders_enabled?: boolean;
   // Reimbursement cap (arugula-38633 v2)
   reimbursement_cap_usd?: number | null;
   reimbursement_cap_appeal_note?: string | null;
@@ -858,7 +856,6 @@ export const SAFE_PARTY_COLUMNS = `
   telegram_group,
   host_telegram_chat_id, host_telegram_link_token,
   turtle_roles_enabled,
-  reminders_enabled,
   underboss_status,
   flyer_config,
   poster_image_url, poster_generated_at,
@@ -1935,7 +1932,6 @@ export async function updateParty(
     telegram_group?: string | null;
     host_telegram_link_token?: string | null;
     turtle_roles_enabled?: boolean;
-    reminders_enabled?: boolean;
     reimbursement_cap_usd?: number | null;
     // quattro-71244: gamified-dashboard goal targets.
     host_goals?: HostGoals | null;
@@ -2018,7 +2014,6 @@ export async function updateParty(
         telegramGroup: updates.telegram_group,
         hostTelegramLinkToken: updates.host_telegram_link_token,
         turtleRolesEnabled: updates.turtle_roles_enabled,
-        remindersEnabled: updates.reminders_enabled,
         reimbursementCapUsd: updates.reimbursement_cap_usd,
         // Day-of logistics (pepperoni-58341)
         wifiInfo: updates.wifi_info,

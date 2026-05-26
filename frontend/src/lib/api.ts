@@ -221,8 +221,6 @@ export interface UpdatePartyData {
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
-  // margherita-58471: T-4h reminder opt-out at the party level.
-  remindersEnabled?: boolean;
   reimbursementCapUsd?: number | null;
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
@@ -345,7 +343,6 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
-      remindersEnabled: data.remindersEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
       // Day-of logistics (pepperoni-58341)
       wifiInfo: data.wifiInfo,

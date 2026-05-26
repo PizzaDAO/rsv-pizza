@@ -337,8 +337,6 @@ export interface Party {
   hostTelegramLinkToken?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
-  // margherita-58471: T-4h reminder opt-out at the party level. Defaults true.
-  remindersEnabled?: boolean;
   // Reimbursement cap (arugula-38633 v2) — populated by underboss validation.
   // Banner on payout form only renders when reimbursementCapUsd != null.
   reimbursementCapUsd?: number | null;
