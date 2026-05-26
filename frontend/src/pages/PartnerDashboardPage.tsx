@@ -534,16 +534,27 @@ export function PartnerDashboardPage() {
         <div className="rounded-2xl p-6 sm:p-8" style={{ background: 'rgba(240, 240, 240, 0.95)' }}>
         {/* Header */}
         <div className="mb-8">
-          <div className="mb-2">
-            <h1 className="text-2xl font-bold text-theme-text">
-              {dashboardData?.isAdmin ? t('title') : `${sponsor?.name || t('title')}`}
-            </h1>
-            <p className="text-sm text-theme-text-muted">
-              {events.length !== allEvents.length
-                ? t('dashboard.showingCountOfTotal', { count: events.length, total: allEvents.length })
-                : t('dashboard.showingCount', { count: events.length })}
-              {dashboardData?.tag ? t('dashboard.taggedSuffix', { tag: dashboardData.tag }) : ''}
-            </p>
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-theme-text">
+                {dashboardData?.isAdmin ? t('title') : `${sponsor?.name || t('title')}`}
+              </h1>
+              <p className="text-sm text-theme-text-muted">
+                {events.length !== allEvents.length
+                  ? t('dashboard.showingCountOfTotal', { count: events.length, total: allEvents.length })
+                  : t('dashboard.showingCount', { count: events.length })}
+                {dashboardData?.tag ? t('dashboard.taggedSuffix', { tag: dashboardData.tag }) : ''}
+              </p>
+            </div>
+            {/* pecorino-64118: consolidated cross-event report (carries ?tag= when filtered) */}
+            <a
+              href={dashboardData?.tag ? `/partner/report?tag=${encodeURIComponent(dashboardData.tag)}` : '/partner/report'}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#E52828] rounded-lg hover:bg-[#CC2020] transition-colors"
+              title={t('dashboard.consolidatedReport')}
+            >
+              <BarChart3 size={14} />
+              {t('dashboard.consolidatedReport')}
+            </a>
           </div>
 
           {/* Admin tag filter */}
@@ -1108,26 +1119,30 @@ function EventCard({ event, onToggleChecklist, cityChats, isAdmin = false }: Eve
                 </a>
               ) : null;
             })()}
-            {event.reportPublicSlug ? (
-              <a
-                href={`/report/${event.reportPublicSlug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
-                title={t('dashboard.viewEventReport')}
-              >
-                <BarChart3 size={12} />
-                {t('dashboard.report')}
-              </a>
-            ) : (
-              <span
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-faint border border-theme-surface rounded-md cursor-default"
-                title={t('dashboard.reportNotPublished')}
-              >
-                <BarChart3 size={12} />
-                {t('dashboard.report')}
-              </span>
-            )}
+            {(() => {
+              // pecorino-64118: always link to the report (drafts included). The
+              // partner login bypasses the publish/password gate server-side.
+              // `reportSlug` may be absent before the backend ships — fall back to
+              // `reportPublicSlug` so it degrades gracefully.
+              const slug = event.reportSlug || event.reportPublicSlug;
+              if (!slug) return null;
+              const isDraft = event.reportPublished === false;
+              return (
+                <a
+                  href={`/report/${slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-theme-text-muted hover:text-theme-text-secondary border border-theme-stroke hover:border-theme-stroke-hover rounded-md transition-colors"
+                  title={isDraft ? t('dashboard.viewReportDraft') : t('dashboard.viewEventReport')}
+                >
+                  <BarChart3 size={12} />
+                  {t('dashboard.report')}
+                  {isDraft && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title={t('dashboard.draft')} />
+                  )}
+                </a>
+              );
+            })()}
             <button
               onClick={() => {
                 navigator.clipboard.writeText(`https://rsv.pizza/onesheet/${event.slug}`);

@@ -30,10 +30,16 @@ async function canUserViewReport(partyId: string, userId?: string, userEmail?: s
       const sponsorTags = sponsorUsers.map(s => s.tag);
       const party = await prisma.party.findUnique({
         where: { id: partyId },
-        select: { eventTags: true },
+        select: { eventTags: true, eventType: true },
       });
-      if (party && party.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t))) {
-        return true;
+      if (party) {
+        // pecorino-64118: pizzadao partners can view any GPP event report
+        // (GPP events carry eventType='gpp', not a literal `pizzadao` tag).
+        const isPizzaDao = sponsorTags.includes('pizzadao');
+        const tagged = Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t));
+        if (tagged || (isPizzaDao && party.eventType === 'gpp')) {
+          return true;
+        }
       }
     }
   }
@@ -359,7 +365,12 @@ async function isSponsorForReport(slug: string, userEmail?: string): Promise<boo
   if (sponsorUsers.length === 0) return false;
   const sponsorTags = sponsorUsers.map(s => s.tag);
   const party = await findPartyBySlug(slug);
-  return !!(party?.eventTags && Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t)));
+  if (!party) return false;
+  // pecorino-64118: GPP events are NOT literally tagged `pizzadao` — they carry
+  // eventType='gpp'. A pizzadao partner should be able to view any GPP report.
+  const isPizzaDao = sponsorTags.includes('pizzadao');
+  const tagged = Array.isArray(party.eventTags) && (party.eventTags as string[]).some(t => sponsorTags.includes(t));
+  return tagged || (isPizzaDao && party.eventType === 'gpp');
 }
 
 // GET /api/reports/:publicSlug/check - Check if report requires password (public, optionalAuth)

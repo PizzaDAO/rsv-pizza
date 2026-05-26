@@ -212,6 +212,9 @@
     "viewEventPage": "查看活动页面",
     "joinTelegram": "加入城市Telegram群组",
     "viewEventReport": "查看活动报告",
+    "viewReportDraft": "查看报告草稿（尚未发布）",
+    "draft": "草稿",
+    "consolidatedReport": "汇总报告",
     "reportNotPublished": "报告尚未发布",
     "copyOneSheetLink": "复制单页链接",
     "copied": "已复制！",
@@ -233,6 +236,25 @@
       "europe": "Europe",
       "uk": "UK",
       "brazil": "Brazil"
+    }
+  },
+  "consolidated": {
+    "pageTitle": "汇总报告",
+    "title": "{{name}} — 所有活动",
+    "titleGeneric": "汇总报告 — 所有活动",
+    "eventCount": "{{count}} 个活动",
+    "eventCount_other": "{{count}} 个活动",
+    "perEventBreakdown": "各活动明细",
+    "backToDashboard": "返回仪表板",
+    "notAvailableTitle": "报告尚不可用",
+    "notAvailableDesc": "汇总报告尚不可用，请稍后再查看。",
+    "table": {
+      "event": "活动",
+      "date": "日期",
+      "rsvps": "RSVP",
+      "attendees": "参加者",
+      "impressions": "曝光量",
+      "clicks": "点击量"
     }
   },
   "cities": {

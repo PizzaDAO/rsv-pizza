@@ -212,6 +212,9 @@
     "viewEventPage": "View event page",
     "joinTelegram": "Join city Telegram group",
     "viewEventReport": "View event report",
+    "viewReportDraft": "View draft report (not yet published)",
+    "draft": "Draft",
+    "consolidatedReport": "Consolidated report",
     "reportNotPublished": "Report not published yet",
     "copyOneSheetLink": "Copy One Sheet link",
     "copied": "Copied!",
@@ -233,6 +236,25 @@
       "europe": "Europe",
       "uk": "UK",
       "brazil": "Brazil"
+    }
+  },
+  "consolidated": {
+    "pageTitle": "Consolidated Report",
+    "title": "{{name}} — All Events",
+    "titleGeneric": "Consolidated Report — All Events",
+    "eventCount": "{{count}} event",
+    "eventCount_other": "{{count}} events",
+    "perEventBreakdown": "Per-Event Breakdown",
+    "backToDashboard": "Back to dashboard",
+    "notAvailableTitle": "Report not available yet",
+    "notAvailableDesc": "The consolidated report is not available yet. Please check back soon.",
+    "table": {
+      "event": "Event",
+      "date": "Date",
+      "rsvps": "RSVPs",
+      "attendees": "Attendees",
+      "impressions": "Impressions",
+      "clicks": "Clicks"
     }
   },
   "cities": {

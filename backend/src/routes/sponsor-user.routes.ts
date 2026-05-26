@@ -803,6 +803,11 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         name: event.name,
         slug: event.customUrl || event.inviteCode,
         reportPublicSlug: event.reportPublished ? (event.reportPublicSlug || event.customUrl || event.inviteCode) : null,
+        // pecorino-64118: always-resolvable report slug (even for unpublished/draft
+        // reports) so partners can open every event's report from the dashboard.
+        // The partner login bypasses the publish + password gates server-side.
+        reportSlug: event.reportPublicSlug || event.customUrl || event.inviteCode,
+        reportPublished: event.reportPublished,
         date: event.date,
         createdAt: event.createdAt,
         timezone: event.timezone,
@@ -1081,6 +1086,344 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
       bucket: 'hour' as const,
       since: sinceDate.toISOString(),
       points,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/sponsor/report - Consolidated cross-event report (private, full rollup)
+// pecorino-64118: rolls up ALL report data across every event the partner can
+// access into one view. Private (partner login only) — no public slug/password.
+// Same tag-resolution rules as GET /events (pizzadao -> eventType='gpp', admin-all).
+sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    const queryTag = req.query.tag as string | undefined;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
+
+    // Build where clause — identical to GET /events
+    const where: any = {};
+    if (tag && tag !== 'pizzadao') {
+      where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      where.eventType = 'gpp';
+    } else if (req.isAdminViewing) {
+      where.eventType = 'gpp';
+      where.NOT = { eventTags: { equals: [] } };
+    }
+
+    // Non-admin partners only see approved events.
+    if (!req.isAdminViewing) {
+      where.underbossStatus = 'approved';
+    }
+    // Exclude cancelled events (consistent with GET /events).
+    where.cancelledAt = null;
+
+    // Non-admin with no resolvable tag (shouldn't happen): early-return empty.
+    if (!tag && !req.isAdminViewing) {
+      return res.json({
+        partnerName: req.sponsorUser?.name || null,
+        tag: null,
+        eventCount: 0,
+        dateRange: null,
+        stats: {
+          totalRsvps: 0, approvedGuests: 0, mailingListSignups: 0, walletAddresses: 0,
+          roleBreakdown: {}, poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
+        },
+        impressions: { totalViews: 0, uniqueVisitors: 0 },
+        clickStats: { totalClicks: 0, uniqueClickers: 0, byLink: [] },
+        notableAttendees: [],
+        socialPosts: [],
+        featuredPhotos: [],
+        walletAddressList: [],
+        events: [],
+      });
+    }
+
+    // Load all matching parties with report-relevant includes (mirrors report.routes.ts GET).
+    const parties = await prisma.party.findMany({
+      where,
+      include: {
+        socialPosts: { orderBy: { sortOrder: 'asc' } },
+        notableAttendees: {
+          orderBy: { sortOrder: 'asc' },
+          include: { guest: { select: { email: true } } },
+        },
+        photos: {
+          where: { starred: true },
+          orderBy: { starredAt: 'desc' },
+          take: 10,
+        },
+        user: { select: { name: true, profilePictureUrl: true } },
+        guests: {
+          select: {
+            id: true,
+            mailingListOptIn: true,
+            ethereumAddress: true,
+            approved: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const eventIds = parties.map(p => p.id);
+
+    // Aggregate per-event stats + the rollup.
+    let totalRsvps = 0;
+    let approvedGuests = 0;
+    let mailingListSignups = 0;
+    let walletAddresses = 0;
+    let poapMints = 0;
+    let poapMoments = 0;
+    let socialPostViews = 0;
+    let socialPostCount = 0;
+
+    const walletSet = new Set<string>();
+    const combinedSocialPosts: any[] = [];
+    const combinedNotable: any[] = [];
+    const combinedPhotos: any[] = [];
+
+    // roleBreakdown computed via $queryRaw to avoid loading every guest's roles into Node.
+    const roleBreakdown: Record<string, number> = {};
+    if (eventIds.length > 0) {
+      const roleRows = await prisma.$queryRaw<{ role: string; count: bigint }[]>`
+        SELECT role, COUNT(*)::bigint AS count
+        FROM (
+          SELECT COALESCE(NULLIF(unnest(
+            CASE WHEN array_length(roles, 1) IS NULL OR array_length(roles, 1) = 0
+                 THEN ARRAY[COALESCE(role, 'Other')]
+                 ELSE roles END
+          ), ''), 'Other') AS role
+          FROM guests
+          WHERE party_id::text IN (${Prisma.join(eventIds)})
+            AND status != 'INVITED'
+        ) sub
+        GROUP BY role
+      `;
+      for (const r of roleRows) {
+        roleBreakdown[r.role] = (roleBreakdown[r.role] || 0) + Number(r.count);
+      }
+    }
+
+    // Page-view (impression) aggregation — total + TRUE cross-event distinct visitors.
+    const viewStats = eventIds.length > 0
+      ? await prisma.pageView.groupBy({
+          by: ['partyId'],
+          where: { partyId: { in: eventIds } },
+          _count: true,
+        })
+      : [];
+    const viewCountMap = new Map(viewStats.map(r => [r.partyId, r._count]));
+    let totalViews = 0;
+    for (const v of viewStats) totalViews += v._count;
+
+    let uniqueVisitors = 0;
+    if (eventIds.length > 0) {
+      const uniqRows = await prisma.$queryRaw<{ unique_count: bigint }[]>`
+        SELECT COUNT(DISTINCT visitor_hash) AS unique_count
+        FROM page_views
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+          AND visitor_hash IS NOT NULL
+      `;
+      uniqueVisitors = Number(uniqRows[0]?.unique_count || 0);
+    }
+
+    // Per-event unique visitors (for the per-event table rows).
+    const perEventUniqueViewMap = new Map<string, number>();
+    if (eventIds.length > 0) {
+      const perEventUniq = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
+        SELECT party_id::text, COUNT(DISTINCT visitor_hash) AS unique_count
+        FROM page_views
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+        GROUP BY party_id
+      `;
+      for (const r of perEventUniq) perEventUniqueViewMap.set(r.party_id, Number(r.unique_count));
+    }
+
+    // Determine partner names to filter link clicks by (same logic as GET /events).
+    let partnerNames: string[] = [];
+    if (!req.isAdminViewing && req.sponsorUser) {
+      const partnerRecord = await prisma.sponsorUser.findUnique({
+        where: { id: req.sponsorUser.id },
+        select: { coHostName: true, name: true, email: true },
+      });
+      const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
+      if (displayName) partnerNames = [displayName];
+    } else if (req.isAdminViewing) {
+      const tagPartners = await prisma.sponsorUser.findMany({
+        where: { ...(tag ? { tag } : {}), isActive: true },
+        select: { coHostName: true, name: true, email: true },
+      });
+      partnerNames = tagPartners
+        .map(p => p.coHostName || p.name || p.email)
+        .filter(Boolean) as string[];
+    }
+
+    let labelFilter = Prisma.empty;
+    if (partnerNames.length === 1) {
+      labelFilter = Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`;
+    } else if (partnerNames.length > 1) {
+      const conditions = partnerNames.map(n =>
+        Prisma.sql`link_label = ${n} OR link_label LIKE ${n + '_%'}`
+      );
+      labelFilter = Prisma.sql`AND (${Prisma.join(conditions, ' OR ')})`;
+    }
+
+    // Link-click aggregation: per-link rollup + per-event totals.
+    const clicksByLink = eventIds.length > 0
+      ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
+        SELECT
+          party_id::text,
+          url,
+          link_type,
+          MAX(link_label) as link_label,
+          COUNT(*) as total_clicks,
+          COUNT(DISTINCT visitor_hash) as unique_clicks
+        FROM link_clicks
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+        AND link_type IN ('sponsor', 'host_social')
+        ${labelFilter}
+        GROUP BY party_id, url, link_type
+        ORDER BY total_clicks DESC
+      `
+      : [];
+
+    const perEventClickCount = new Map<string, number>();
+    const byLinkAgg = new Map<string, { url: string; linkType: string; linkLabel: string | null; clicks: number; uniqueClickers: number }>();
+    let totalClicks = 0;
+    for (const row of clicksByLink) {
+      perEventClickCount.set(row.party_id, (perEventClickCount.get(row.party_id) || 0) + Number(row.total_clicks));
+      totalClicks += Number(row.total_clicks);
+      // Aggregate per-link across events by url+type.
+      const key = `${row.link_type}::${row.url}`;
+      const existing = byLinkAgg.get(key);
+      if (existing) {
+        existing.clicks += Number(row.total_clicks);
+        existing.uniqueClickers += Number(row.unique_clicks);
+      } else {
+        byLinkAgg.set(key, {
+          url: row.url,
+          linkType: row.link_type,
+          linkLabel: row.link_label,
+          clicks: Number(row.total_clicks),
+          uniqueClickers: Number(row.unique_clicks),
+        });
+      }
+    }
+    const byLink = Array.from(byLinkAgg.values()).sort((a, b) => b.clicks - a.clicks);
+
+    // TRUE cross-event distinct clickers (don't sum per-event uniques).
+    let uniqueClickers = 0;
+    if (eventIds.length > 0) {
+      const labelFilterClause = labelFilter === Prisma.empty ? Prisma.empty : labelFilter;
+      const uniqClickRows = await prisma.$queryRaw<{ unique_count: bigint }[]>`
+        SELECT COUNT(DISTINCT visitor_hash) AS unique_count
+        FROM link_clicks
+        WHERE party_id::text IN (${Prisma.join(eventIds)})
+          AND link_type IN ('sponsor', 'host_social')
+          AND visitor_hash IS NOT NULL
+          ${labelFilterClause}
+      `;
+      uniqueClickers = Number(uniqClickRows[0]?.unique_count || 0);
+    }
+
+    // Per-event rows + scalar rollups from the loaded parties.
+    const events = parties.map(party => {
+      const submitted = party.guests.filter(g => g.status !== 'INVITED');
+      const rsvpCount = submitted.length;
+      const approvedCount = submitted.filter(g => g.approved !== false).length;
+      totalRsvps += rsvpCount;
+      approvedGuests += approvedCount;
+      mailingListSignups += submitted.filter(g => g.mailingListOptIn).length;
+
+      for (const g of submitted) {
+        if (g.ethereumAddress) {
+          walletAddresses += 1;
+          walletSet.add(g.ethereumAddress);
+        }
+      }
+
+      poapMints += party.poapMints || 0;
+      poapMoments += party.poapMoments || 0;
+
+      socialPostCount += party.socialPosts.length;
+      for (const sp of party.socialPosts) {
+        socialPostViews += sp.views || 0;
+        combinedSocialPosts.push({ ...sp, eventName: party.name });
+      }
+
+      // Notable attendees — mask email to @domain (mirrors published public report).
+      for (const a of party.notableAttendees) {
+        const { guest, ...attendee } = a as any;
+        const fullEmail = guest?.email as string | undefined;
+        const domain = fullEmail?.split('@')[1] || null;
+        combinedNotable.push({
+          ...attendee,
+          email: domain ? `@${domain}` : null,
+          eventName: party.name,
+        });
+      }
+
+      for (const ph of party.photos) {
+        combinedPhotos.push(ph);
+      }
+
+      const reportSlug = party.reportPublicSlug || party.customUrl || party.inviteCode;
+      return {
+        id: party.id,
+        name: party.name,
+        date: party.date,
+        slug: party.customUrl || party.inviteCode,
+        reportSlug,
+        rsvpCount,
+        approvedCount,
+        impressions: {
+          totalViews: viewCountMap.get(party.id) || 0,
+          uniqueVisitors: perEventUniqueViewMap.get(party.id) || 0,
+        },
+        clicks: perEventClickCount.get(party.id) || 0,
+      };
+    });
+
+    // Cap combined starred photos at 60 total.
+    const featuredPhotos = combinedPhotos.slice(0, 60);
+
+    // Deduped wallet address list.
+    const walletAddressList = Array.from(walletSet);
+
+    // Date range.
+    const dates = parties.map(p => p.date).filter((d): d is Date => !!d).map(d => new Date(d).getTime());
+    const dateRange = dates.length > 0
+      ? { start: new Date(Math.min(...dates)).toISOString(), end: new Date(Math.max(...dates)).toISOString() }
+      : null;
+
+    res.json({
+      partnerName: req.sponsorUser?.name || (req.isAdminViewing ? (tag || 'All Partners') : null),
+      tag: tag || null,
+      eventCount: parties.length,
+      dateRange,
+      stats: {
+        totalRsvps,
+        approvedGuests,
+        mailingListSignups,
+        walletAddresses,
+        roleBreakdown,
+        poapMints,
+        poapMoments,
+        socialPostViews,
+        socialPostCount,
+      },
+      impressions: { totalViews, uniqueVisitors },
+      clickStats: { totalClicks, uniqueClickers, byLink },
+      notableAttendees: combinedNotable,
+      socialPosts: combinedSocialPosts,
+      featuredPhotos,
+      walletAddressList,
+      events,
     });
   } catch (error) {
     next(error);
