@@ -639,18 +639,15 @@ function FeedTile({
         ) : (
           <img src={src} alt={photo.caption || ''} loading="lazy" className="w-full h-full object-cover block" />
         )}
-        {/* salame-58195: thumbs-up overlay */}
+        {/* salame-58195: thumbs-up overlay (napoletana-58197: icon-only, white, drop-shadow) */}
         <span
           onClick={handleVote}
-          aria-label={photo.votedByMe ? 'Remove vote' : 'Thumbs up'}
-          className={`absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-            photo.votedByMe
-              ? 'bg-red-500 text-white hover:bg-red-600'
-              : 'bg-black/60 text-white hover:bg-black/80'
-          } ${voting ? 'opacity-70' : ''}`}
+          role="button"
+          aria-label={photo.votedByMe ? 'Remove vote' : 'Vote'}
+          className={`absolute bottom-2 right-2 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ThumbsUp size={12} fill={photo.votedByMe ? 'currentColor' : 'none'} />
-          {photo.voteCount > 0 && <span>{photo.voteCount}</span>}
+          <ThumbsUp size={22} fill={photo.votedByMe ? 'currentColor' : 'none'} strokeWidth={2.25} />
         </span>
       </div>
       {(displayCity || photo.party.name) && (
