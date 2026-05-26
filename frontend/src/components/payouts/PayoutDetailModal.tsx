@@ -429,12 +429,6 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   <p className="text-sm text-theme-text whitespace-pre-wrap">{payout.hostNotes}</p>
                 </div>
               )}
-              {payout.adminNotes && (
-                <div>
-                  <p className="text-xs text-theme-text-muted mb-1">Reviewer notes</p>
-                  <p className="text-sm text-theme-text whitespace-pre-wrap">{payout.adminNotes}</p>
-                </div>
-              )}
               {payout.rejectionReason && (
                 <div>
                   <p className="text-xs text-red-300 mb-1">Rejection reason</p>
