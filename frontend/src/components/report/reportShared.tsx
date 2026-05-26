@@ -57,13 +57,27 @@ export function KPICard({ label, value, icon: Icon, color, url, onAction, action
   return content;
 }
 
-// Group attendees by org domain
+// Derive a registrable domain from a URL (the attendee's `link`).
+function domainFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./i, '').toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Group attendees by org domain. The org domain is the corporate email domain
+// if present, otherwise the domain derived from the attendee's link. Attendees
+// with neither (personal-registrar email only, or no email and no link) are
+// grouped as "independent".
 export function groupAttendeesByOrg(attendees: NotableAttendee[]) {
   const map = new Map<string, NotableAttendee[]>();
   const independent: NotableAttendee[] = [];
 
   for (const a of attendees) {
-    const domain = a.email ? extractEmailDomain(a.email, true) : null;
+    const domain = (a.email ? extractEmailDomain(a.email, true) : null) || domainFromUrl(a.link);
     if (domain) {
       const list = map.get(domain) || [];
       list.push(a);
@@ -122,7 +136,8 @@ export function ReportOrgCard({ group }: { group: { domain: string | null; atten
             href={`https://${domain}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+            title={domain}
+            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors truncate max-w-[180px]"
           >
             {domain}
           </a>
