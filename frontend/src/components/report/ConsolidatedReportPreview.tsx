@@ -237,17 +237,39 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
         />
       )}
 
-      {/* Industry RSVPs — combined org domains from approved guests' emails (pecorino-64118) */}
-      {report.industryOrgs && report.industryOrgs.length > 0 && (
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
-          <div className="flex flex-wrap gap-2">
-            {report.industryOrgs.map((org) => (
-              <OrgDomainChip key={org.domain} domain={org.domain} count={org.count} />
-            ))}
+      {/* Industry RSVPs — grouped by city / event (pecorino-64118).
+          Each city sub-group shows a flag + "City, Country" header and that event's
+          org-domain chips. Groups ordered by descending org count. */}
+      {(() => {
+        const cityGroups = report.events
+          .filter((ev) => ev.industryOrgs && ev.industryOrgs.length > 0)
+          .sort((a, b) => (b.industryOrgs?.length || 0) - (a.industryOrgs?.length || 0));
+        if (cityGroups.length === 0) return null;
+        return (
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
+            <div className="space-y-5">
+              {cityGroups.map((ev) => {
+                const loc = resolvePartyLocation({ slug: ev.slug, name: ev.name, city: ev.city ?? null, country: ev.country ?? null });
+                const flag = loc && countryNameToAlpha2(loc.country) ? <CircleFlag country={loc.country} size={16} /> : null;
+                return (
+                  <div key={ev.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {flag}
+                      <span className="text-sm font-medium text-theme-text-secondary">{loc?.label || ev.name}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ev.industryOrgs!.map((org) => (
+                        <OrgDomainChip key={org.domain} domain={org.domain} count={org.count} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Social Posts (combined) — compact platform-icon cards */}
       {report.socialPosts.length > 0 && (

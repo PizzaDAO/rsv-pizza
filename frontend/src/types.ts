@@ -1485,6 +1485,11 @@ export interface ConsolidatedReportEvent {
   approvedCount: number;
   impressions: { totalViews: number; uniqueVisitors: number };
   clicks: number;
+  // pecorino-64118: per-event org domains from approved guests' emails, plus city/
+  // country so the consolidated report can group Industry RSVPs by city.
+  industryOrgs?: { domain: string; count: number }[];
+  city?: string | null;
+  country?: string | null;
 }
 
 // pecorino-64118: per-item event context attached to consolidated photos/posts so

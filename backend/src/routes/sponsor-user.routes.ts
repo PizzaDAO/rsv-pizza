@@ -1393,12 +1393,20 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         combinedPhotos.push({ ...ph, party: partyContext });
       }
 
+      // pecorino-64118: per-event Industry RSVPs — org domains from THIS event's
+      // approved guests, so the consolidated report can group industry orgs by city.
+      const eventIndustryOrgs = buildIndustryOrgs(
+        submitted.filter(g => g.approved !== false).map(g => g.email)
+      );
+
       const reportSlug = party.reportPublicSlug || party.customUrl || party.inviteCode;
       return {
         id: party.id,
         name: party.name,
         date: party.date,
         slug: party.customUrl || party.inviteCode,
+        city: party.city,
+        country: party.country,
         reportSlug,
         rsvpCount,
         approvedCount,
@@ -1407,6 +1415,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
           uniqueVisitors: perEventUniqueViewMap.get(party.id) || 0,
         },
         clicks: perEventClickCount.get(party.id) || 0,
+        industryOrgs: eventIndustryOrgs,
       };
     });
 
