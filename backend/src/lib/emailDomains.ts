@@ -12,17 +12,45 @@ export const PERSONAL_EMAIL_PROVIDERS: Set<string> = new Set([
   'hey.com', 'pm.me', 'inbox.com', 'mail.ru', 'qq.com', '163.com',
   'comcast.net', 'verizon.net', 'att.net', 'sbcglobal.net', 'cox.net',
   'charter.net', 'earthlink.net', 'optonline.net', 'frontier.com',
+  // pecorino-64118 cleanup: personal providers / relays / international
+  // variants seen in real avax data but missing from the original list.
+  'duck.com', 'mozmail.com', 'passinbox.com', '126.com', '139.com',
+  '189.cn', 'sina.com', 'sina.cn', 'foxmail.com', 'web.de', 't-online.de',
+  'orange.fr', 'free.fr', 'laposte.net', 'libero.it', 'naver.com',
+  'daum.net', 'hanmail.net', 'seznam.cz', 'wp.pl', 'o2.pl', 'bluewin.ch',
+  'rediffmail.com', 'live.fr', 'live.it', 'live.de', 'live.ca',
+  'live.com.mx', 'live.com.ar', 'live.com.pt', 'live.co.uk',
+  'outlook.es', 'outlook.fr', 'outlook.de', 'outlook.com.br',
 ]);
 
+// Internal / host domains that should never surface as "industry orgs"
+// (e.g. the PizzaDAO host's own domain). Excluded the same as personal
+// providers. pecorino-64118 cleanup.
+export const INTERNAL_DOMAINS: Set<string> = new Set([
+  'rarepizzas.com',
+]);
+
+// Brand stems for major personal email providers. If a domain CONTAINS any
+// of these as a substring, treat it as personal — this cleanly catches typos
+// (gmail.con, 35gmail.com) and international variants (hotmail.it, yahoo.fr,
+// outlook.de) that won't be in the exact set. These brand names don't appear
+// in real company domains. pecorino-64118 cleanup.
+export const PERSONAL_BRAND_STEMS: string[] = [
+  'gmail', 'googlemail', 'hotmail', 'outlook', 'yahoo', 'ymail', 'protonmail',
+];
+
 // Returns the lowercased email domain if it is NOT a personal provider,
-// otherwise null. Also returns null for missing / malformed emails.
+// internal/host domain, or personal-brand variant; otherwise null. Also
+// returns null for missing / malformed emails.
 export function orgDomainFromEmail(email: string | null | undefined): string | null {
   if (!email) return null;
   const parts = email.split('@');
   if (parts.length !== 2) return null;
   const domain = parts[1].trim().toLowerCase();
   if (!domain) return null;
+  if (INTERNAL_DOMAINS.has(domain)) return null;
   if (PERSONAL_EMAIL_PROVIDERS.has(domain)) return null;
+  if (PERSONAL_BRAND_STEMS.some((stem) => domain.includes(stem))) return null;
   return domain;
 }
 
