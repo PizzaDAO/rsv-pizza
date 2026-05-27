@@ -240,7 +240,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           className={`absolute bottom-2 left-2 z-10 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ThumbsUp size={22} fill="currentColor" strokeWidth={2.25} />
+          <ThumbsUp size={22} fill="none" stroke="white" strokeWidth={2.25} />
         </button>
       )}
     </div>

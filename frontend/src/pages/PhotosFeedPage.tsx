@@ -630,7 +630,7 @@ function FeedTile({
           className={`absolute bottom-2 right-2 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ThumbsUp size={22} fill="currentColor" strokeWidth={2.25} />
+          <ThumbsUp size={22} fill="none" stroke="white" strokeWidth={2.25} />
         </span>
       </div>
       {(displayCity || photo.party.name) && (
