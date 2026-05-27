@@ -737,6 +737,12 @@ model Photo {
   voteCount Int         @default(0) @map("vote_count")
   votes     PhotoVote[]
 
+  // napoletana-58211: reverse relation for payout_documents.photo_id. A photo
+  // can have at most one linked pizza payout-doc, but Prisma models this as a
+  // collection because the FK on the other side isn't unique. Empty for all
+  // photos that weren't created via the payout-pizza flow.
+  payoutDocuments PayoutDocument[]
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -1731,9 +1737,18 @@ model PayoutDocument {
   voteCount Int                  @default(0) @map("vote_count")
   votes     PayoutDocumentVote[]
 
+  // napoletana-58211: when kind='pizza', this links to the canonical row in
+  // the `photos` table. Receipts (kind='receipt') keep photoId NULL. ON
+  // DELETE SET NULL so deleting the photo row doesn't cascade and lose the
+  // payout record — we want the payout to survive a moderator removing the
+  // photo from the feed.
+  photoId String? @map("photo_id") @db.Uuid
+  photo   Photo?  @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
   @@index([partyId])
   @@index([payoutId])
   @@index([uploadedByUserId])
+  @@index([photoId])
   @@map("payout_documents")
 }
 

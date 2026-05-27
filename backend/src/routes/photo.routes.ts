@@ -149,6 +149,11 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
         where: {
           partyId,
           kind: 'pizza',
+          // napoletana-58211: exclude docs already mirrored into the
+          // `photos` table — they're returned on the photo side of this
+          // UNION. New uploads create both rows atomically; backfill links
+          // existing rows.
+          photoId: null,
           OR: [
             { payoutId: null },
             { payout: { isNot: { status: 'rejected' } } },
@@ -176,6 +181,11 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
         where: {
           partyId,
           kind: 'pizza',
+          // napoletana-58211: exclude docs already mirrored into the
+          // `photos` table — they're returned on the photo side of this
+          // UNION. New uploads create both rows atomically; backfill links
+          // existing rows.
+          photoId: null,
           OR: [
             { payoutId: null },
             { payout: { isNot: { status: 'rejected' } } },

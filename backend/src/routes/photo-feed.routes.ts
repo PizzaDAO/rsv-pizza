@@ -156,6 +156,12 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     // -- payout pizza photos source ---------------------------------------
     const payoutDocWhere: any = {
       kind: 'pizza',
+      // napoletana-58211: rows already mirrored into the `photos` table are
+      // represented on the photo side of the union — exclude them here to
+      // avoid double-display. New uploads always create both rows
+      // atomically (see POST /:partyId/payouts), and the backfill script
+      // links existing pizza docs to a canonical photos row.
+      photoId: null,
       // exclude docs whose payout was rejected. payout_id is nullable on the
       // schema but in practice always set for pizza docs (verified during
       // implementation). The nested `payout: { isNot: { status: 'rejected' } }`
