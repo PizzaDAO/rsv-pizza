@@ -5,6 +5,7 @@ import { IconInput } from '../IconInput';
 import { Photo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { togglePhotoVote } from '../../lib/api';
+import { MediaThumb } from './MediaThumb';
 
 interface PhotoModalProps {
   photo: Photo;
@@ -202,21 +203,14 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
       >
         {/* Photo/Video */}
         <div className="flex-1 flex items-center justify-center min-h-0">
-          {isVideo ? (
-            <video
-              key={photo.id}
-              src={photo.url}
-              controls
-              autoPlay
-              className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
-            />
-          ) : (
-            <img
-              src={photo.url}
-              alt={photo.caption || 'Event photo'}
-              className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
-            />
-          )}
+          <MediaThumb
+            key={photo.id}
+            src={photo.url}
+            mimeType={photo.mimeType}
+            alt={photo.caption || 'Event photo'}
+            mode="full"
+            className="max-w-full max-h-[70vh] md:max-h-[85vh] object-contain rounded-lg"
+          />
         </div>
 
         {/* Info Panel */}

@@ -11,6 +11,7 @@ import { ReportPreview } from './ReportPreview';
 import { IconInput } from '../IconInput';
 import { PageViewStats } from './PageViewStats';
 import { LinkClickStats } from './LinkClickStats';
+import { MediaThumb } from '../photos/MediaThumb';
 import {
   getReport,
   updateReport,
@@ -555,12 +556,15 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
           <p className="text-theme-text-muted text-xs mb-3">{t('report.starredPhotosHint')}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {report.featuredPhotos.map((photo) => (
-              <img
-                key={photo.id}
-                src={photo.thumbnailUrl || photo.url}
-                alt={photo.caption || 'Event photo'}
-                className="w-full aspect-square object-cover rounded-lg"
-              />
+              <div key={photo.id} className="w-full aspect-square">
+                <MediaThumb
+                  src={photo.thumbnailUrl || photo.url}
+                  mimeType={photo.mimeType}
+                  alt={photo.caption || 'Event photo'}
+                  mode="thumb"
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
             ))}
           </div>
         </div>

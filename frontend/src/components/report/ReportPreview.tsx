@@ -5,6 +5,7 @@ import { EventReport, PageViewStats, Photo } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
 import { KPICard, OrgDomainChip } from './reportShared';
+import { MediaThumb } from '../photos/MediaThumb';
 
 interface ReportPreviewProps {
   report: EventReport;
@@ -165,9 +166,11 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
                   onClick={() => setLightboxIndex(i)}
                   className="w-full aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  <img
+                  <MediaThumb
                     src={photo.thumbnailUrl || photo.url}
+                    mimeType={photo.mimeType}
                     alt={photo.caption || 'Event photo'}
+                    mode="thumb"
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -310,13 +313,16 @@ function PhotoLightbox({
         </button>
       )}
 
-      {/* Image */}
-      <img
-        src={photo.url}
-        alt={photo.caption || 'Event photo'}
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-        onClick={(e) => e.stopPropagation()}
-      />
+      {/* Image or Video */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <MediaThumb
+          src={photo.url}
+          mimeType={photo.mimeType}
+          alt={photo.caption || 'Event photo'}
+          mode="full"
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+        />
+      </div>
 
       {/* Caption */}
       {photo.caption && (
