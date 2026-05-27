@@ -1145,24 +1145,27 @@ describe('scoreEvent — integration fixtures', () => {
       makeFunnelEvent({ visitorHash: 'v4', step: 'rsvp_opened', createdAt: new Date(base) }),
     ];
     const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel);
-    // Should fire: cap_fill, low_domain_entropy, wallet_too_low, host_self,
-    // pizzeria_blank, wallet_source_null, one_word_name, firstname_digits,
-    // low_hour_entropy, rapid_intersubmission, low_funnel_coverage,
-    // mailing_list_opt_in_extreme (all default=false), lsh_field_sig_cluster
-    // (identical sigs).
-    // (sig_collapse no longer in scoreEvent list — replaced by lsh_field_sig_cluster.)
-    // parmesan-67529: high_per_visitor_rsvp_saturation no longer fires here
+    // Should fire (post-rebalance 2026-05-26): cap_fill, low_domain_entropy,
+    // wallet_too_low, host_self, pizzeria_blank, wallet_source_null,
+    // firstname_digits, low_hour_entropy, rapid_intersubmission,
+    // low_funnel_coverage, mailing_list_opt_in_extreme.
+    // (sig_collapse / lsh_field_sig_cluster / one_word_name / wallet_reuse /
+    // cross_event_wallet are no longer in scoreEvent.)
+    // parmesan-67529: high_per_visitor_rsvp_saturation does not fire here
     // because all 5 funnel visitors line up at the same `base` timestamp →
     // each matches the same large set of RSVPs → max == secondMax (ratio 1.0,
-    // below 1.5 threshold). The remaining 13 heuristics still saturate the
+    // below 1.5 threshold). The remaining heuristics still saturate the
     // score above 70. This is the desired post-refinement behavior: kiosk-shape
     // flat distributions don't trip saturation.
     expect(row.score).toBeGreaterThanOrEqual(70);
     expect(row.tier).toBe('high');
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).toContain('cap_fill_no_waitlist');
-    expect(firedIds).not.toContain('sig_collapse'); // removed from scoreEvent
-    expect(firedIds).toContain('lsh_field_sig_cluster'); // replaces sig_collapse
+    expect(firedIds).not.toContain('sig_collapse'); // never in scoreEvent
+    expect(firedIds).not.toContain('lsh_field_sig_cluster'); // removed 2026-05-26
+    expect(firedIds).not.toContain('one_word_name'); // removed 2026-05-26
+    expect(firedIds).not.toContain('wallet_reuse'); // removed 2026-05-26
+    expect(firedIds).not.toContain('cross_event_wallet'); // removed 2026-05-26
     expect(firedIds).toContain('mailing_list_opt_in_extreme');
     expect(firedIds).toContain('host_self_rsvp_mismatch');
     expect(firedIds).toContain('low_funnel_coverage');
