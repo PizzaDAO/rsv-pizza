@@ -16,7 +16,13 @@ import { GPP_REGIONS } from '../types';
 import type { UnderbossDashboardData, UnderbossStats, UnderbossEvent } from '../types';
 
 function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
-  const totalEvents = events.length;
+  // pizzetta-58924: per-event counters use approved + not-cancelled lens;
+  // per-guest sums stay across all events.
+  const approvedEvents = events.filter(
+    e => e.underbossStatus === 'approved' && !e.cancelledAt
+  );
+
+  const totalEvents = approvedEvents.length;
   let totalRsvps = 0;
   let totalInvited = 0;
   let totalApproved = 0;
@@ -27,6 +33,9 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
     totalRsvps += e.guestCount;
     totalInvited += e.invitedCount || 0;
     totalApproved += e.approvedCount;
+  }
+
+  for (const e of approvedEvents) {
     if (e.progress.hasVenue) eventsWithVenue++;
     if (e.progress.hasBudget) eventsWithBudget++;
   }
