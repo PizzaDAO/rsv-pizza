@@ -5,7 +5,7 @@ import {
   FileText, Download, X, ChevronLeft, ChevronRight, ExternalLink, Play,
 } from 'lucide-react';
 import { ConsolidatedReport, ConsolidatedReportPhoto, ConsolidatedReportSocialPost } from '../../types';
-import { KPICard, groupAttendeesByOrg, ReportOrgCard } from './reportShared';
+import { KPICard, OrgDomainChip } from './reportShared';
 import { CircleFlag } from '../CircleFlag';
 import { PlatformIcon, detectPlatform } from './platformIcon';
 import { countryNameToAlpha2 } from '../../utils/countryFlag';
@@ -229,13 +229,13 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
         />
       )}
 
-      {/* Industry RSVPs (combined notable attendees) */}
-      {report.notableAttendees.length > 0 && (
+      {/* Industry RSVPs — combined org domains from approved guests' emails (pecorino-64118) */}
+      {report.industryOrgs && report.industryOrgs.length > 0 && (
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
           <div className="flex flex-wrap gap-2">
-            {groupAttendeesByOrg(report.notableAttendees).map((group) => (
-              <ReportOrgCard key={group.domain || '_independent'} group={group} />
+            {report.industryOrgs.map((org) => (
+              <OrgDomainChip key={org.domain} domain={org.domain} count={org.count} />
             ))}
           </div>
         </div>

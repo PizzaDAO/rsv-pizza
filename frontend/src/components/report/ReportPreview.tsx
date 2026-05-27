@@ -4,7 +4,7 @@ import { Calendar, MapPin, Users, Mail, Wallet, Award, Video, Eye, ExternalLink,
 import { EventReport, PageViewStats, Photo } from '../../types';
 import { ReportRoleChart } from './ReportRoleChart';
 import { SocialPostsList } from './SocialPostsList';
-import { KPICard, groupAttendeesByOrg, ReportOrgCard } from './reportShared';
+import { KPICard, OrgDomainChip } from './reportShared';
 
 interface ReportPreviewProps {
   report: EventReport;
@@ -220,13 +220,13 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
         </div>
       )}
 
-      {/* Industry RSVPs */}
-      {report.notableAttendees.length > 0 && (
+      {/* Industry RSVPs — org domains derived from approved guests' emails (pecorino-64118) */}
+      {report.industryOrgs && report.industryOrgs.length > 0 && (
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
           <div className="flex flex-wrap gap-2">
-            {groupAttendeesByOrg(report.notableAttendees).map((group) => (
-              <ReportOrgCard key={group.domain || '_independent'} group={group} />
+            {report.industryOrgs.map((org) => (
+              <OrgDomainChip key={org.domain} domain={org.domain} count={org.count} />
             ))}
           </div>
         </div>
