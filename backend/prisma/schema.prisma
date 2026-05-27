@@ -215,6 +215,11 @@ model Party {
   // Turtle role selection on RSVP form
   turtleRolesEnabled Boolean @default(false) @map("turtle_roles_enabled")
 
+  // margherita-58471: T-4h reminder email opt-out at the party level.
+  // Host toggles in EventDetailsTab; defaults to true for all new + existing
+  // events. Cron worker skips parties where this is false.
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+
   // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
   // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
   reimbursementCapUsd        Decimal?  @map("reimbursement_cap_usd") @db.Decimal(10, 2)
@@ -400,6 +405,12 @@ model Guest {
   checkedInAt       DateTime? @map("checked_in_at") @db.Timestamptz
   checkedInBy       String?   @map("checked_in_by")
   discountClaimedAt DateTime? @map("discount_claimed_at") @db.Timestamptz
+
+  // margherita-58471: T-4h reminder email tracking.
+  // reminderSentAt is the audit trail — single-reminder design, no separate log table.
+  // remindersUnsubscribed is the per-guest opt-out flag, set via one-click List-Unsubscribe.
+  remindersUnsubscribed Boolean   @default(false) @map("reminders_unsubscribed")
+  reminderSentAt        DateTime? @map("reminder_sent_at") @db.Timestamptz
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
