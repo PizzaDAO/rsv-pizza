@@ -68,14 +68,19 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
 
 // Helper: compute stats from events
 function computeStats(events: any[], underbossEmails: string[] = []) {
-  const totalEvents = events.length;
+  // pizzetta-58924: per-event counters use approved + not-cancelled lens;
+  // per-guest sums stay across all events.
+  const approvedEvents = events.filter(
+    (e: any) => e.underbossStatus === 'approved' && !e.cancelledAt
+  );
+
+  const totalEvents = approvedEvents.length;
   let totalRsvps = 0;
   let totalApproved = 0;
+  let totalInvited = 0;
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
   let eventsWithKit = 0;
-
-  let totalInvited = 0;
 
   for (const event of events) {
     const invited = event.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
@@ -85,7 +90,9 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
     totalInvited += invited;
     totalRsvps += guestCount;
     totalApproved += approvedCount;
+  }
 
+  for (const event of approvedEvents) {
     const progress = computeProgress(event, underbossEmails);
     if (progress.hasVenue) eventsWithVenue++;
     if (progress.hasBudget) eventsWithBudget++;
