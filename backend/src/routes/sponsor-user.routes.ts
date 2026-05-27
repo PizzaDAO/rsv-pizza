@@ -5,6 +5,7 @@ import { requireAuth, AuthRequest, isAdmin, isUnderboss } from '../middleware/au
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
+import { buildIndustryOrgs } from '../lib/emailDomains.js';
 
 // Admin management routes (mounted at /api/sponsor-users)
 
@@ -1135,6 +1136,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         impressions: { totalViews: 0, uniqueVisitors: 0 },
         clickStats: { totalClicks: 0, uniqueClickers: 0, byLink: [] },
         notableAttendees: [],
+        industryOrgs: [],
         socialPosts: [],
         featuredPhotos: [],
         walletAddressList: [],
@@ -1160,6 +1162,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         guests: {
           select: {
             id: true,
+            email: true,
             mailingListOptIn: true,
             ethereumAddress: true,
             approved: true,
@@ -1171,6 +1174,11 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     });
 
     const eventIds = parties.map(p => p.id);
+
+    // pecorino-64118: collect approved guest emails across ALL loaded events for
+    // one combined Industry RSVPs rollup (org domains only, personal providers
+    // excluded). Raw emails are never returned — only { domain, count }.
+    const industryOrgEmails: (string | null | undefined)[] = [];
 
     // Aggregate per-event stats + the rollup.
     let totalRsvps = 0;
@@ -1318,6 +1326,11 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       approvedGuests += approvedCount;
       mailingListSignups += submitted.filter(g => g.mailingListOptIn).length;
 
+      // pecorino-64118: gather approved guest emails for the combined Industry RSVPs.
+      for (const g of submitted) {
+        if (g.approved !== false) industryOrgEmails.push(g.email);
+      }
+
       for (const g of submitted) {
         if (g.ethereumAddress) {
           walletAddresses += 1;
@@ -1386,6 +1399,9 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       ? { start: new Date(Math.min(...dates)).toISOString(), end: new Date(Math.max(...dates)).toISOString() }
       : null;
 
+    // pecorino-64118: combined Industry RSVPs across all events.
+    const industryOrgs = buildIndustryOrgs(industryOrgEmails);
+
     res.json({
       partnerName: req.sponsorUser?.name || (req.isAdminViewing ? (tag || 'All Partners') : null),
       tag: tag || null,
@@ -1404,6 +1420,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       impressions: { totalViews, uniqueVisitors },
       clickStats: { totalClicks, uniqueClickers, byLink },
       notableAttendees: combinedNotable,
+      industryOrgs,
       socialPosts: combinedSocialPosts,
       featuredPhotos,
       walletAddressList,

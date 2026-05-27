@@ -726,6 +726,8 @@ export interface EventReport {
   // Related data
   socialPosts: SocialPost[];
   notableAttendees: NotableAttendee[];
+  // pecorino-64118: org domains derived from approved guests' emails (server-side).
+  industryOrgs?: { domain: string; count: number }[];
   featuredPhotos: Photo[];
 
   // Wallet addresses for CSV export
@@ -1548,6 +1550,8 @@ export interface ConsolidatedReport {
   };
   // Notable attendees with email masked to @domain, annotated with event name.
   notableAttendees: (NotableAttendee & { eventName?: string })[];
+  // pecorino-64118: combined org domains from approved guests' emails (server-side).
+  industryOrgs?: { domain: string; count: number }[];
   // Social posts annotated with their event name + optional party context.
   socialPosts: ConsolidatedReportSocialPost[];
   featuredPhotos: ConsolidatedReportPhoto[];

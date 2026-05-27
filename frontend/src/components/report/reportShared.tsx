@@ -124,6 +124,28 @@ export function ReportOrgFavicon({ domain, size = 20 }: { domain: string; size?:
   );
 }
 
+// pecorino-64118: chip for an org domain (TLD) derived from approved guests'
+// emails, with a count when more than one guest shares the domain.
+export function OrgDomainChip({ domain, count }: { domain: string; count: number }) {
+  return (
+    <div className="inline-flex items-center gap-2 bg-theme-surface rounded-lg px-3 py-2 border border-theme-stroke">
+      <ReportOrgFavicon domain={domain} size={16} />
+      <a
+        href={`https://${domain}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={domain}
+        className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors truncate max-w-[180px]"
+      >
+        {domain}
+      </a>
+      {count > 1 && (
+        <span className="text-xs text-theme-text-muted">({count})</span>
+      )}
+    </div>
+  );
+}
+
 export function ReportOrgCard({ group }: { group: { domain: string | null; attendees: NotableAttendee[] } }) {
   const { domain, attendees } = group;
 
