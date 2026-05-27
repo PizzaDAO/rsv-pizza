@@ -245,6 +245,7 @@
     "eventCount": "{{count}}件のイベント",
     "eventCount_other": "{{count}}件のイベント",
     "perEventBreakdown": "イベント別内訳",
+    "viewAllPhotos": "View all photos →",
     "backToDashboard": "ダッシュボードに戻る",
     "notAvailableTitle": "レポートはまだ利用できません",
     "notAvailableDesc": "統合レポートはまだ利用できません。しばらくしてからもう一度ご確認ください。",

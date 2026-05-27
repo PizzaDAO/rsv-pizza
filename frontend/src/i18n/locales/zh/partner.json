@@ -245,6 +245,7 @@
     "eventCount": "{{count}} 个活动",
     "eventCount_other": "{{count}} 个活动",
     "perEventBreakdown": "各活动明细",
+    "viewAllPhotos": "View all photos →",
     "backToDashboard": "返回仪表板",
     "notAvailableTitle": "报告尚不可用",
     "notAvailableDesc": "汇总报告尚不可用，请稍后再查看。",

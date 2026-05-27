@@ -216,6 +216,17 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
               );
             })}
           </div>
+          {report.tag && (
+            <div className="mt-4">
+              <a
+                href={`/photos?partnerTag=${encodeURIComponent(report.tag)}`}
+                className="inline-flex items-center gap-1 text-sm text-theme-text hover:text-theme-text-secondary transition-colors"
+              >
+                {tp('consolidated.viewAllPhotos')}
+                <ExternalLink size={14} className="text-theme-text-muted flex-shrink-0" />
+              </a>
+            </div>
+          )}
         </div>
       )}
 

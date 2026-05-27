@@ -1154,8 +1154,8 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
           include: { guest: { select: { email: true } } },
         },
         photos: {
-          where: { starred: true },
-          orderBy: { starredAt: 'desc' },
+          where: { status: 'approved' },
+          orderBy: [{ starred: 'desc' }, { createdAt: 'desc' }],
           take: 10,
         },
         user: { select: { name: true, profilePictureUrl: true } },
@@ -1387,8 +1387,9 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       };
     });
 
-    // Cap combined starred photos at 60 total.
-    const featuredPhotos = combinedPhotos.slice(0, 60);
+    // pecorino-64118: report shows a representative SAMPLE (starred/best first,
+    // then recent); the "View all photos" link covers the rest via /photos.
+    const featuredPhotos = combinedPhotos.slice(0, 24);
 
     // Deduped wallet address list.
     const walletAddressList = Array.from(walletSet);

@@ -68,7 +68,6 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       : null;
 
     const where: any = {
-      starred: true,
       status: 'approved',
       party: {
         is: buildPartyFilter({ regions, countries, partnerTag }),
@@ -154,14 +153,13 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
 });
 
 // sicilian-58129: facets endpoint — returns distinct country values among
-// feed-eligible photos (starred + approved + party-eligible) with photo counts.
+// feed-eligible photos (approved + party-eligible) with photo counts.
 // Used by the /photos filter bar to populate the country dropdown.
 router.get('/feed/facets', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const grouped = await prisma.photo.groupBy({
       by: ['partyId'],
       where: {
-        starred: true,
         status: 'approved',
         party: {
           is: {

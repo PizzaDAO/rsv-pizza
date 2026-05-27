@@ -245,6 +245,7 @@
     "eventCount": "{{count}} Event",
     "eventCount_other": "{{count}} Events",
     "perEventBreakdown": "Aufschlüsselung pro Event",
+    "viewAllPhotos": "View all photos →",
     "backToDashboard": "Zurück zum Dashboard",
     "notAvailableTitle": "Bericht noch nicht verfügbar",
     "notAvailableDesc": "Der Gesamtbericht ist noch nicht verfügbar. Bitte schauen Sie bald wieder vorbei.",
