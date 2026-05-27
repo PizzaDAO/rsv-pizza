@@ -21,6 +21,8 @@ export const PERSONAL_EMAIL_PROVIDERS: Set<string> = new Set([
   'rediffmail.com', 'live.fr', 'live.it', 'live.de', 'live.ca',
   'live.com.mx', 'live.com.ar', 'live.com.pt', 'live.co.uk',
   'outlook.es', 'outlook.fr', 'outlook.de', 'outlook.com.br',
+  // pecorino-64118 follow-up: additional personal providers / Apple Hide-My-Email relay.
+  'rocketmail.com', 'privaterelay.appleid.com',
 ]);
 
 // Internal / host domains that should never surface as "industry orgs"
@@ -39,6 +41,12 @@ export const PERSONAL_BRAND_STEMS: string[] = [
   'gmail', 'googlemail', 'hotmail', 'outlook', 'yahoo', 'ymail', 'protonmail',
 ];
 
+// RFC 2606 / 6761 reserved TLDs + RFC 2606 example second-level domains. These
+// are placeholder / test addresses (e.g. example.invalid) that should never be
+// counted as a real industry org. pecorino-64118 follow-up.
+const RESERVED_TLD_SUFFIXES: string[] = ['.invalid', '.test', '.localhost', '.example'];
+const RESERVED_EXAMPLE_DOMAINS: Set<string> = new Set(['example.com', 'example.org', 'example.net']);
+
 // Returns the lowercased email domain if it is NOT a personal provider,
 // internal/host domain, or personal-brand variant; otherwise null. Also
 // returns null for missing / malformed emails.
@@ -48,6 +56,9 @@ export function orgDomainFromEmail(email: string | null | undefined): string | n
   if (parts.length !== 2) return null;
   const domain = parts[1].trim().toLowerCase();
   if (!domain) return null;
+  // Reserved / placeholder domains (RFC 2606/6761): example.invalid, foo.test, etc.
+  if (RESERVED_TLD_SUFFIXES.some((suffix) => domain.endsWith(suffix))) return null;
+  if (RESERVED_EXAMPLE_DOMAINS.has(domain)) return null;
   if (INTERNAL_DOMAINS.has(domain)) return null;
   if (PERSONAL_EMAIL_PROVIDERS.has(domain)) return null;
   if (PERSONAL_BRAND_STEMS.some((stem) => domain.includes(stem))) return null;

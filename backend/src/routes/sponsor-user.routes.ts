@@ -1097,12 +1097,22 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
 // pecorino-64118: rolls up ALL report data across every event the partner can
 // access into one view. Private (partner login only) — no public slug/password.
 // Same tag-resolution rules as GET /events (pizzadao -> eventType='gpp', admin-all).
+// pecorino-64118: maps a partner tag to ITS OWN newsletter opt-in column on the
+// Guest model. The consolidated report's "newsletter signups" tile counts only
+// these (never PizzaDAO's mailingListOptIn) and is hidden for any other tag.
+const NEWSLETTER_OPTIN_FIELD: Record<string, 'swcOptIn' | 'swcCaOptIn' | 'swcAuOptIn' | 'swcEuOptIn' | 'swcUkOptIn' | 'swcBrOptIn' | 'ethconfOptIn'> = {
+  swc: 'swcOptIn', swcca: 'swcCaOptIn', swcau: 'swcAuOptIn', swceu: 'swcEuOptIn', swcuk: 'swcUkOptIn', swcbr: 'swcBrOptIn', ethconf: 'ethconfOptIn',
+};
+
 sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
     const queryTag = req.query.tag as string | undefined;
     const tag = req.isAdminViewing
       ? (queryTag?.trim().toLowerCase() || undefined)
       : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
+
+    // pecorino-64118: newsletter signups count THIS tag's own opt-in column, if any.
+    const optinField = tag ? NEWSLETTER_OPTIN_FIELD[tag] : undefined;
 
     // Build where clause — identical to GET /events
     const where: any = {};
@@ -1130,7 +1140,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         eventCount: 0,
         dateRange: null,
         stats: {
-          totalRsvps: 0, approvedGuests: 0, mailingListSignups: 0, walletAddresses: 0,
+          totalRsvps: 0, approvedGuests: 0, mailingListSignups: null, walletAddresses: 0,
           poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
         },
         impressions: { totalViews: 0, uniqueVisitors: 0 },
@@ -1164,6 +1174,14 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
             id: true,
             email: true,
             mailingListOptIn: true,
+            // pecorino-64118: per-tag newsletter opt-ins (counted instead of PizzaDAO's).
+            swcOptIn: true,
+            swcCaOptIn: true,
+            swcAuOptIn: true,
+            swcEuOptIn: true,
+            swcUkOptIn: true,
+            swcBrOptIn: true,
+            ethconfOptIn: true,
             ethereumAddress: true,
             approved: true,
             status: true,
@@ -1324,7 +1342,12 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       const approvedCount = submitted.filter(g => g.approved !== false).length;
       totalRsvps += rsvpCount;
       approvedGuests += approvedCount;
-      mailingListSignups += submitted.filter(g => g.mailingListOptIn).length;
+      // pecorino-64118: newsletter signups count THIS tag's own opt-in column on
+      // approved guests only. For tags without a newsletter, this stays null and
+      // the frontend hides the tile.
+      if (optinField) {
+        mailingListSignups += submitted.filter(g => g.approved !== false && g[optinField] === true).length;
+      }
 
       // pecorino-64118: gather approved guest emails for the combined Industry RSVPs.
       for (const g of submitted) {
@@ -1411,7 +1434,8 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       stats: {
         totalRsvps,
         approvedGuests,
-        mailingListSignups,
+        // pecorino-64118: null = no per-tag newsletter → frontend hides the tile.
+        mailingListSignups: optinField ? mailingListSignups : null,
         walletAddresses,
         poapMints,
         poapMoments,

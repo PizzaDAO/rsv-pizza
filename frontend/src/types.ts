@@ -1529,7 +1529,8 @@ export interface ConsolidatedReport {
   stats: {
     totalRsvps: number;
     approvedGuests: number;
-    mailingListSignups: number;
+    // pecorino-64118: null when the partner tag has no own newsletter (tile hidden).
+    mailingListSignups: number | null;
     walletAddresses: number;
     poapMints: number;
     poapMoments: number;
