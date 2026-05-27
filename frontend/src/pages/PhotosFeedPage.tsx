@@ -401,13 +401,14 @@ function CountryFilterButton({
     >
       <div className="px-3 pb-2 sticky top-0 border-b border-black/10" style={{ background: '#ffffff' }}>
         <div className="relative">
-          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={16} className="absolute top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" style={{ left: '12px' }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search countries..."
-            className="w-full pl-9 pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
+            className="w-full pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
+            style={{ paddingLeft: '36px' }}
           />
         </div>
       </div>
