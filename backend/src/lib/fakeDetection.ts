@@ -99,27 +99,41 @@ export interface FakeDetectionRow {
 // ============================================
 // Weights (tunable without code surgery)
 // ============================================
-
+//
+// Rebalance 2026-05-26 (fakedetection-rebalance): empirical signal-quality
+// analysis vs. 9 confirmed-fraud + 194 confirmed-legit events (ground truth =
+// Resend bounce/suppression rate). Three high-signal heuristics up-weighted
+// (wallet_too_low 8→12, pizzeria_fields_blank 5→10, low_funnel_coverage
+// 10→15) and four noisy heuristics removed from `scoreEvent` and dropped
+// from WEIGHTS (one_word_name, cross_event_wallet, wallet_reuse,
+// lsh_field_sig_cluster). The `checkXxx` functions are preserved for
+// possible later re-enablement and for test coverage.
+//
+// Calibration sanity check:
+//   Before: 23 weights, total = 245 (max score still capped at 100).
+//   After:  19 weights, total = 219 (max score still capped at 100).
+// The 100-point cap is unchanged, so tier cutoffs (10/30/60) keep their
+// existing meaning.
+//
+// `high_per_visitor_rsvp_saturation` and `repeat_session_rsvp_count` are
+// intentionally left at 20 in this round; their signal will be re-evaluated
+// once more cookie-session data accumulates (~3 weeks).
 export const WEIGHTS = {
   cap_fill_no_waitlist: 15,
   low_domain_entropy: 10,
-  wallet_too_low: 8,
+  wallet_too_low: 12,
   wallet_too_high_reuse: 8,
-  wallet_reuse: 10,
   host_self_rsvp_mismatch: 20,
-  pizzeria_fields_blank: 5,
+  pizzeria_fields_blank: 10,
   wallet_source_all_null: 5,
-  one_word_name: 5,
   firstname_digits_email: 5,
   day_gap_pattern: 7,
   low_hour_entropy: 7,
   rapid_intersubmission: 8,
-  cross_event_wallet: 15,
-  low_funnel_coverage: 10,
+  low_funnel_coverage: 15,
   high_per_visitor_rsvp_saturation: 20,
   mailing_list_opt_in_extreme: 7,
   name_token_zscore: 8,
-  lsh_field_sig_cluster: 10,
   email_digit_benford: 5,
   co_host_twitter_handles_missing: 12,
   repeat_session_rsvp_count: 20,
@@ -397,24 +411,38 @@ export function checkWalletTooHighReuse(guests: FakeDetectionGuest[]): FlagResul
   );
 }
 
-/** 5. wallet_reuse — same wallet address used multiple times on the same event. */
+/**
+ * 5. wallet_reuse — same wallet address used multiple times on the same event.
+ *
+ * @deprecated Disabled from scoreEvent 2026-05-26 — empirical analysis showed
+ * a -13% lift (fires only on legit events; kiosk RSVPs share wallets, so this
+ * heuristic mis-flags normal community check-in patterns). Function preserved
+ * in case threshold tuning makes it viable later. See git log for the analysis.
+ */
 export function checkWalletReuse(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'wallet_reuse';
+  const WALLET_REUSE_WEIGHT = 10; // legacy weight — no longer in WEIGHTS const
   const n = guests.length;
-  if (n < 10) return flag(id, false, `n=${n} below 10`);
+  if (n < 10) {
+    return { id, name: id, fired: false, weight: WALLET_REUSE_WEIGHT, detail: `n=${n} below 10` };
+  }
   const ethSubs = guests
     .map(g => (g.ethereumAddress ?? '').toLowerCase())
     .filter(a => a.length > 0);
-  if (ethSubs.length === 0) return flag(id, false, 'no wallets');
+  if (ethSubs.length === 0) {
+    return { id, name: id, fired: false, weight: WALLET_REUSE_WEIGHT, detail: 'no wallets' };
+  }
   const uniqueEth = new Set(ethSubs).size;
   const reuse = (ethSubs.length - uniqueEth) / Math.max(ethSubs.length, 1);
   const fired = reuse >= 0.1;
-  return flag(
+  return {
     id,
+    name: id,
     fired,
-    `${ethSubs.length} wallets, ${uniqueEth} unique, reuse=${(reuse * 100).toFixed(1)}%`,
-    { ethSubs: ethSubs.length, uniqueEth, reuse },
-  );
+    weight: WALLET_REUSE_WEIGHT,
+    detail: `${ethSubs.length} wallets, ${uniqueEth} unique, reuse=${(reuse * 100).toFixed(1)}%`,
+    evidence: { ethSubs: ethSubs.length, uniqueEth, reuse },
+  };
 }
 
 /** 6. host_self_rsvp_mismatch — host RSVPed within 60s of event create under a different name. */
@@ -484,11 +512,22 @@ export function checkWalletSourceAllNull(guests: FakeDetectionGuest[]): FlagResu
   return flag(id, allNull, allNull ? 'every walletSource is null' : 'some walletSource set', { n });
 }
 
-/** 9. one_word_name — too many single-word guest names. */
+/**
+ * 9. one_word_name — too many single-word guest names.
+ *
+ * @deprecated Disabled from scoreEvent 2026-05-26 — empirical analysis showed
+ * a -21% lift; the heuristic fires on 88% of legit events (single-word names
+ * are normal across many cultures, especially in international markets where
+ * users only enter a first name). Function preserved in case threshold tuning
+ * makes it viable later. See git log for the analysis that drove this decision.
+ */
 export function checkOneWordName(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'one_word_name';
+  const ONE_WORD_NAME_WEIGHT = 5; // legacy weight — no longer in WEIGHTS const
   const n = guests.length;
-  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  if (n < 20) {
+    return { id, name: id, fired: false, weight: ONE_WORD_NAME_WEIGHT, detail: `n=${n} below 20` };
+  }
   let oneWord = 0;
   for (const g of guests) {
     const name = (g.name ?? '').trim();
@@ -498,7 +537,14 @@ export function checkOneWordName(guests: FakeDetectionGuest[]): FlagResult {
   }
   const ratio = oneWord / n;
   const fired = ratio > 0.2;
-  return flag(id, fired, `${oneWord}/${n} (${(ratio * 100).toFixed(1)}%) one-word names`, { oneWord, n, ratio });
+  return {
+    id,
+    name: id,
+    fired,
+    weight: ONE_WORD_NAME_WEIGHT,
+    detail: `${oneWord}/${n} (${(ratio * 100).toFixed(1)}%) one-word names`,
+    evidence: { oneWord, n, ratio },
+  };
 }
 
 /** 10. firstname_digits_email — emails follow firstname+digits pattern and domains are low-entropy. */
@@ -625,12 +671,21 @@ export function checkRapidIntersubmission(guests: FakeDetectionGuest[]): FlagRes
   return flag(id, fired, `medianDeltaSec=${median.toFixed(1)}`, { medianDeltaSec: median, n: deltas.length });
 }
 
-/** 14. cross_event_wallet — any guest wallet appears on the sybil-wallet set. */
+/**
+ * 14. cross_event_wallet — any guest wallet appears on the sybil-wallet set.
+ *
+ * @deprecated Disabled from scoreEvent 2026-05-26 — empirical analysis showed
+ * a -6% lift (fires only on legit events; real crypto enthusiasts legitimately
+ * attend multiple events with the same wallet, so the "sybil" definition needs
+ * tightening before this is viable). Function preserved in case threshold
+ * tuning makes it viable later. See git log for the analysis.
+ */
 export function checkCrossEventWallet(
   guests: FakeDetectionGuest[],
   sybilWallets: Set<string>,
 ): FlagResult {
   const id = 'cross_event_wallet';
+  const CROSS_EVENT_WALLET_WEIGHT = 15; // legacy weight — no longer in WEIGHTS const
   const matched: string[] = [];
   for (const g of guests) {
     const addr = (g.ethereumAddress ?? '').toLowerCase();
@@ -639,12 +694,14 @@ export function checkCrossEventWallet(
     }
   }
   const fired = matched.length > 0;
-  return flag(
+  return {
     id,
+    name: id,
     fired,
-    fired ? `${matched.length} sybil wallet(s) on this event` : 'no sybil wallets',
-    fired ? { wallets: matched.slice(0, 5) } : undefined,
-  );
+    weight: CROSS_EVENT_WALLET_WEIGHT,
+    detail: fired ? `${matched.length} sybil wallet(s) on this event` : 'no sybil wallets',
+    evidence: fired ? { wallets: matched.slice(0, 5) } : undefined,
+  };
 }
 
 /**
@@ -798,11 +855,20 @@ export function checkNameTokenZscore(guests: FakeDetectionGuest[]): FlagResult {
  * many other guests are within Hamming distance ≤ 2. The largest such cluster
  * indicates how many guests share an "almost identical" field profile.
  * Fire if largest cluster > 40% of guests.
+ *
+ * @deprecated Disabled from scoreEvent 2026-05-26 — empirical analysis showed
+ * only +2% lift with a 65% false-positive rate (fires roughly equally on
+ * fraud and legit events; many legit events have clusters of guests who
+ * accepted the default field values). Function preserved in case threshold
+ * tuning makes it viable later. See git log for the analysis.
  */
 export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResult {
   const id = 'lsh_field_sig_cluster';
+  const LSH_FIELD_SIG_CLUSTER_WEIGHT = 10; // legacy weight — no longer in WEIGHTS const
   const n = guests.length;
-  if (n < 30) return flag(id, false, `n=${n} below 30`);
+  if (n < 30) {
+    return { id, name: id, fired: false, weight: LSH_FIELD_SIG_CLUSTER_WEIGHT, detail: `n=${n} below 30` };
+  }
   const sigs: number[] = new Array(n);
   for (let i = 0; i < n; i++) {
     const g = guests[i];
@@ -826,12 +892,14 @@ export function checkLshFieldSigCluster(guests: FakeDetectionGuest[]): FlagResul
   }
   const share = maxCluster / n;
   const fired = share > 0.4;
-  return flag(
+  return {
     id,
+    name: id,
     fired,
-    `largestCluster=${maxCluster}/${n} (${(share * 100).toFixed(1)}%) within Hamming ≤ 2`,
-    { maxCluster, n, share },
-  );
+    weight: LSH_FIELD_SIG_CLUSTER_WEIGHT,
+    detail: `largestCluster=${maxCluster}/${n} (${(share * 100).toFixed(1)}%) within Hamming ≤ 2`,
+    evidence: { maxCluster, n, share },
+  };
 }
 
 /**
@@ -1033,26 +1101,29 @@ export function scoreEvent(
 ): FakeDetectionRow {
   const guests = filterDirectRsvps(allGuests);
 
+  // Rebalance 2026-05-26: checkOneWordName, checkCrossEventWallet,
+  // checkWalletReuse, and checkLshFieldSigCluster were removed from this list
+  // based on empirical signal-quality analysis (see WEIGHTS comment). The
+  // functions remain exported for tests and possible re-enablement.
+  // `sybilWallets` is still in the signature for API stability — callers will
+  // pass it in until cross_event_wallet is either re-enabled or removed.
+  void sybilWallets;
   const flags: FlagResult[] = [
     checkCapFillNoWaitlist(guests, maxGuests),
     checkLowDomainEntropy(guests),
     checkWalletTooLow(guests),
     checkWalletTooHighReuse(guests),
-    checkWalletReuse(guests),
     checkHostSelfRsvpMismatch(guests, party),
     checkPizzeriaFieldsBlank(guests),
     checkWalletSourceAllNull(guests),
-    checkOneWordName(guests),
     checkFirstnameDigitsEmail(guests),
     checkDayGapPattern(guests, party, linkClicks),
     checkLowHourEntropy(guests, party),
     checkRapidIntersubmission(guests),
-    checkCrossEventWallet(guests, sybilWallets),
     checkLowFunnelCoverage(guests, funnelEvents),
     checkHighPerVisitorRsvpSaturation(guests, funnelEvents),
     checkMailingListOptInExtreme(guests),
     checkNameTokenZscore(guests),
-    checkLshFieldSigCluster(guests),
     checkEmailDigitBenford(guests),
     checkCoHostTwitterHandlesMissing(party),
     checkRepeatSessionRsvpCount(guests),
