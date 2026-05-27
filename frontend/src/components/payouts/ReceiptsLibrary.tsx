@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink } from 'lucide-react';
 import { fetchReceiptsLibrary } from '../../lib/api';
 import type { ReceiptLibraryEntry } from '../../types';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
+import { ReceiptLightbox } from '../payments-shared';
 
 interface ReceiptsLibraryProps {
   partyId: string;
@@ -25,6 +26,26 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
   const [receipts, setReceipts] = useState<ReceiptLibraryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // bresaola-89172: lightbox state — store the initial index so clicking a
+  // specific row opens that image first and the carousel can step through
+  // every receipt in the library.
+  const [lightboxState, setLightboxState] = useState<{ open: boolean; initialIndex: number }>({
+    open: false,
+    initialIndex: 0,
+  });
+
+  // Build the carousel list once per receipts array. Includes every entry —
+  // non-image rows still get a fallback render inside the lightbox via the
+  // HEIC pathway, and unknown formats degrade gracefully.
+  const lightboxImages = useMemo(
+    () =>
+      receipts.map((r) => ({
+        url: r.url,
+        fileName: r.fileName,
+        mimeType: r.mimeType,
+      })),
+    [receipts],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +114,7 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
 
       {!loading && !error && receipts.length > 0 && (
         <ul className="divide-y divide-theme-stroke">
-          {receipts.map((r) => {
+          {receipts.map((r, idx) => {
             const isImage = (r.mimeType || '').startsWith('image/');
             const formattedDate = new Date(r.createdAt).toLocaleDateString(undefined, {
               year: 'numeric',
@@ -106,18 +127,30 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
             const uploader = r.uploadedByName || r.uploadedByEmail || null;
             return (
               <li key={r.id} className="flex items-center gap-3 py-3">
-                {isImage ? (
-                  <img
-                    src={r.url}
-                    alt={r.fileName}
-                    className="w-12 h-12 object-cover rounded border border-theme-stroke flex-shrink-0"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded border border-theme-stroke bg-theme-surface-hover flex items-center justify-center flex-shrink-0">
-                    <FileText size={20} className="text-theme-text-secondary" />
-                  </div>
-                )}
+                {/* bresaola-89172: thumbnail wrapped in a button so clicking
+                    opens the shared lightbox carousel scrolled to this row.
+                    Non-image rows (PDFs etc.) still open in a new tab via
+                    the lightbox's HEIC-style fallback. */}
+                <button
+                  type="button"
+                  onClick={() => setLightboxState({ open: true, initialIndex: idx })}
+                  className="flex-shrink-0 rounded border border-theme-stroke overflow-hidden hover:opacity-80 transition-opacity"
+                  aria-label={`Open ${r.fileName}`}
+                  title={r.fileName}
+                >
+                  {isImage ? (
+                    <img
+                      src={r.url}
+                      alt={r.fileName}
+                      className="w-12 h-12 object-cover block"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-theme-surface-hover flex items-center justify-center">
+                      <FileText size={20} className="text-theme-text-secondary" />
+                    </div>
+                  )}
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-theme-text truncate">
@@ -147,6 +180,13 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
           })}
         </ul>
       )}
+
+      <ReceiptLightbox
+        isOpen={lightboxState.open}
+        images={lightboxImages}
+        initialIndex={lightboxState.initialIndex}
+        onClose={() => setLightboxState({ open: false, initialIndex: 0 })}
+      />
     </div>
   );
 };

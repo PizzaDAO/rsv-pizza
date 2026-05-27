@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -11,6 +11,7 @@ import {
   PAYOUT_METHOD_LABELS,
   formatUsd,
   formatOriginalCurrency,
+  ReceiptLightbox,
 } from '../payments-shared';
 
 /**
@@ -337,33 +338,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     }
   }
 
-  // taralli-58291: keyboard navigation for the lightbox + Escape passthrough
-  // to the parent close. When the lightbox is open, Escape closes it (and
-  // ArrowLeft / ArrowRight cycle); when closed, Escape closes the modal.
-  // Only one window listener is attached to keep the order deterministic.
+  // bresaola-89172: keyboard nav for the lightbox now lives inside the
+  // ReceiptLightbox component itself (Esc to close, arrows to cycle). The
+  // parent modal still listens for Esc here to close the review modal —
+  // when the lightbox is open it stops Esc propagation, so only one of
+  // these handlers fires per keypress.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (lightboxIndex != null) {
-        if (e.key === 'Escape') {
-          setLightboxIndex(null);
-        } else if (e.key === 'ArrowLeft') {
-          if (allPhotos.length === 0) return;
-          setLightboxIndex((i) =>
-            i == null ? null : (i - 1 + allPhotos.length) % allPhotos.length,
-          );
-        } else if (e.key === 'ArrowRight') {
-          if (allPhotos.length === 0) return;
-          setLightboxIndex((i) =>
-            i == null ? null : (i + 1) % allPhotos.length,
-          );
-        }
-      } else if (e.key === 'Escape') {
+      if (lightboxIndex == null && e.key === 'Escape') {
         onClose();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, lightboxIndex, allPhotos.length]);
+  }, [onClose, lightboxIndex]);
 
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
@@ -1431,83 +1419,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         </div>
       </div>
 
-      {/* Lightbox — taralli-58291: ArrowLeft / ArrowRight cycle through
-          receipts + pizza photos, Escape closes. Keyboard handlers live in
-          the useEffect at the top of the component so they remain bound
-          regardless of focus. */}
-      {lightboxIndex != null && allPhotos[lightboxIndex] && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            setLightboxIndex(null);
-          }}
-        >
-          <img
-            src={allPhotos[lightboxIndex].url}
-            alt={allPhotos[lightboxIndex].fileName}
-            className="max-w-[90vw] max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          {allPhotos.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((i) =>
-                    i == null
-                      ? null
-                      : (i - 1 + allPhotos.length) % allPhotos.length,
-                  );
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60"
-                aria-label="Previous photo"
-              >
-                <ChevronLeft size={32} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((i) =>
-                    i == null ? null : (i + 1) % allPhotos.length,
-                  );
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60"
-                aria-label="Next photo"
-              >
-                <ChevronRight size={32} />
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setLightboxIndex(null);
-            }}
-            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60"
-            aria-label="Close lightbox"
-          >
-            <X size={20} />
-          </button>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/90 text-xs sm:text-sm flex items-center gap-2 bg-black/40 rounded-full px-3 py-1.5 max-w-[90vw]">
-            <span
-              className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                allPhotos[lightboxIndex].kind === 'receipt'
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-emerald-500 text-white'
-              }`}
-            >
-              {allPhotos[lightboxIndex].kind}
-            </span>
-            <span className="truncate">
-              {lightboxIndex + 1} / {allPhotos.length} · {allPhotos[lightboxIndex].fileName}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* bresaola-89172: shared ReceiptLightbox renders into document.body
+          via createPortal, so it isn't clipped by the modal's overflow. It
+          owns its own Esc + arrow-key handlers and the HEIC fallback. */}
+      <ReceiptLightbox
+        isOpen={lightboxIndex != null}
+        images={allPhotos.map((d) => ({
+          url: d.url,
+          fileName: d.fileName,
+          mimeType: d.mimeType,
+        }))}
+        initialIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   );
 };
