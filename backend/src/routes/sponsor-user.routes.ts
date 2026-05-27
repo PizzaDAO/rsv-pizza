@@ -1135,7 +1135,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     // Non-admin with no resolvable tag (shouldn't happen): early-return empty.
     if (!tag && !req.isAdminViewing) {
       return res.json({
-        partnerName: req.sponsorUser?.name || null,
+        partnerName: null,
         tag: null,
         eventCount: 0,
         dateRange: null,
@@ -1435,8 +1435,24 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     // pecorino-64118: combined Industry RSVPs across all events.
     const industryOrgs = buildIndustryOrgs(industryOrgEmails);
 
+    // pecorino-64118 follow-up: header shows the ORG name for the filtered tag
+    // (sponsor_users.coHostName), not the logged-in user's personal name.
+    let partnerName: string | null = null;
+    if (tag) {
+      const tagSponsors = await prisma.sponsorUser.findMany({
+        where: { tag, isActive: true },
+        select: { coHostName: true },
+      });
+      const orgName = tagSponsors
+        .map(s => s.coHostName?.trim())
+        .find((v): v is string => !!v);
+      partnerName = orgName || (tag === 'pizzadao' ? 'PizzaDAO' : tag);
+    } else if (req.isAdminViewing) {
+      partnerName = 'All Partners';
+    }
+
     res.json({
-      partnerName: req.sponsorUser?.name || (req.isAdminViewing ? (tag || 'All Partners') : null),
+      partnerName,
       tag: tag || null,
       eventCount: parties.length,
       dateRange,
