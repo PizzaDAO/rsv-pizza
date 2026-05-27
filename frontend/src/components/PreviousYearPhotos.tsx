@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventPhoto } from '../lib/supabase';
+import { uploadPhoto } from '../lib/api';
 
 const GPP_PHOTOS_URL = 'https://app.gpp.day/api/photos.json';
 const GPP_BASE_URL = 'https://app.gpp.day';
@@ -222,13 +223,14 @@ export function PreviousYearPhotos() {
     [party, extraPhotos, hiddenSrcs, loadParty]
   );
 
-  // Upload handler
+  // Upload handler — uploads go to the photos table (consolidated), not extra_gpp_photos
   const handleUploadFiles = useCallback(
     async (files: FileList | File[]) => {
       if (!party) return;
 
       setUploading(true);
-      const newUrls: string[] = [];
+
+      const eventYear = party.date ? new Date(party.date).getUTCFullYear() : undefined;
 
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) continue;
@@ -236,30 +238,22 @@ export function PreviousYearPhotos() {
 
         const result = await uploadEventPhoto(file, party.id);
         if (result) {
-          newUrls.push(result.url);
-        }
-      }
-
-      if (newUrls.length > 0) {
-        const updatedExtras = [...extraPhotos, ...newUrls];
-        setExtraPhotos(updatedExtras);
-
-        const success = await updateParty(party.id, {
-          extra_gpp_photos: updatedExtras,
-        });
-
-        if (!success) {
-          setExtraPhotos(extraPhotos);
-          if (party.inviteCode) {
-            loadParty(party.inviteCode);
-          }
+          await uploadPhoto(party.id, {
+            url: result.url,
+            fileName: result.fileName,
+            fileSize: result.fileSize,
+            mimeType: result.mimeType,
+            width: result.width,
+            height: result.height,
+            photoYear: eventYear,
+          });
         }
       }
 
       setUploading(false);
       setShowUploadArea(false);
     },
-    [party, extraPhotos, loadParty]
+    [party]
   );
 
   // Lightbox navigation
@@ -596,8 +590,8 @@ function UploadModal({
         </div>
 
         <p className="text-theme-text-muted text-xs mb-4">
-          Upload your own photos from previous years. These will appear alongside the
-          app.gpp.day photos on your public event page.
+          Upload your own photos from previous years. They're added to your event photo
+          gallery and, if photo moderation is on, appear once you approve them.
         </p>
 
         <div
