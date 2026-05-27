@@ -11,6 +11,14 @@ const mockPrisma = vi.hoisted(() => ({
     create: vi.fn(), update: vi.fn(), updateMany: vi.fn(),
     groupBy: vi.fn(), delete: vi.fn(),
   },
+  // napoletana-58210: the GET /:partyId/photos handler now unions payout
+  // pizza photos when no source-incompatible filter is set. Default mocks
+  // return empty arrays so the existing test assertions about photo.findMany
+  // continue to hold.
+  payoutDocument: {
+    findMany: vi.fn(() => Promise.resolve([])),
+    count: vi.fn(() => Promise.resolve(0)),
+  },
   guest: { findFirst: vi.fn() },
 }));
 

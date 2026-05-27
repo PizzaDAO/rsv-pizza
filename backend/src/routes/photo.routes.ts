@@ -8,6 +8,15 @@ import { autoCompleteScorecardItem } from './scorecard.routes.js';
 const router = Router();
 
 // GET /api/parties/:partyId/photos - List all photos for a party (public if photosPublic is true)
+//
+// napoletana-58210: the response is a UNION of two sources — the curated
+// `photos` table (existing behaviour) and uncurated payout pizza photos
+// (`payout_documents` where kind='pizza' and the parent payout is not
+// 'rejected'). Each item carries a `source` discriminator + `payoutId` so the
+// frontend can dispatch vote calls to the right endpoint. Source-incompatible
+// filters (starred, tag, uploadedBy, non-default status) collapse the
+// response to the photos table for v1 — payout docs have no analog for
+// any of those concepts.
 router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
@@ -71,38 +80,211 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       where.status = 'approved';
     }
 
-    const photos = await prisma.photo.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(parseInt(limit as string, 10), 100),
-      skip: parseInt(offset as string, 10),
-      include: {
-        guest: { select: { id: true, name: true } },
-        // salame-58195: include current user's vote (if any) so the client can
-        // render votedByMe without an extra round-trip.
-        votes: req.userId
-          ? { where: { userId: req.userId }, select: { id: true } }
-          : false,
-      },
+    // napoletana-58210: payout pizza photos are included ONLY when the request
+    // has no filters that would otherwise exclude them (starred/tag/uploadedBy
+    // don't exist on payout docs; non-default status filters target moderation
+    // states that don't apply either). Default unfiltered = both sources.
+    const includePayoutDocs =
+      !starred &&
+      !tag &&
+      !uploadedBy &&
+      (!statusFilter || statusFilter === 'approved');
+
+    const photoLimit = Math.min(parseInt(limit as string, 10), 100);
+    const photoOffset = parseInt(offset as string, 10);
+
+    const photoSelect = {
+      guest: { select: { id: true, name: true } },
+      // salame-58195: include current user's vote (if any) so the client can
+      // render votedByMe without an extra round-trip.
+      votes: req.userId
+        ? { where: { userId: req.userId }, select: { id: true } }
+        : false,
+    } as const;
+
+    if (!includePayoutDocs) {
+      // Original behaviour — single-source response.
+      const photos = await prisma.photo.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: photoLimit,
+        skip: photoOffset,
+        include: photoSelect,
+      });
+
+      const total = await prisma.photo.count({ where });
+
+      const photosWithVote = photos.map((p) => {
+        const { votes, ...rest } = p as typeof p & { votes?: { id: string }[] };
+        return {
+          ...rest,
+          source: 'photo' as const,
+          payoutId: null,
+          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+        };
+      });
+
+      return res.json({
+        photos: photosWithVote,
+        total,
+        limit: photoLimit,
+        offset: photoOffset,
+      });
+    }
+
+    // UNION mode: pull both sources, merge, sort, then paginate.
+    // We fetch up to (limit + offset) from each source (capped) so the merged
+    // window can serve the requested page deterministically; counts come from
+    // separate count queries.
+    const fetchCap = Math.min(photoLimit + photoOffset, 200);
+
+    const [photos, payoutDocs, photoTotal, payoutTotal] = await Promise.all([
+      prisma.photo.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: fetchCap,
+        include: photoSelect,
+      }),
+      prisma.payoutDocument.findMany({
+        where: {
+          partyId,
+          kind: 'pizza',
+          OR: [
+            { payoutId: null },
+            { payout: { isNot: { status: 'rejected' } } },
+          ],
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: fetchCap,
+        select: {
+          id: true,
+          partyId: true,
+          url: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          payoutId: true,
+          createdAt: true,
+          voteCount: true,
+          votes: req.userId
+            ? { where: { userId: req.userId }, select: { id: true } }
+            : false,
+        },
+      }),
+      prisma.photo.count({ where }),
+      prisma.payoutDocument.count({
+        where: {
+          partyId,
+          kind: 'pizza',
+          OR: [
+            { payoutId: null },
+            { payout: { isNot: { status: 'rejected' } } },
+          ],
+        },
+      }),
+    ]);
+
+    // Shape both into a common payload. Photo-sourced rows preserve the
+    // existing shape (so the frontend Photo type still applies); payout-sourced
+    // rows fill in null/defaults for the photo-only fields.
+    type Merged = {
+      id: string;
+      partyId: string;
+      url: string;
+      thumbnailUrl: string | null;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      width: number | null;
+      height: number | null;
+      uploadedBy: string | null;
+      uploaderName: string | null;
+      uploaderEmail: string | null;
+      caption: string | null;
+      tags: string[];
+      photoYear: number | null;
+      starred: boolean;
+      starredAt: Date | null;
+      status: string;
+      reviewedAt: Date | null;
+      reviewedBy: string | null;
+      duration: number | null;
+      voteCount: number;
+      votedByMe: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      guest: { id: string; name: string | null } | null;
+      source: 'photo' | 'payout';
+      payoutId: string | null;
+    };
+
+    const merged: Merged[] = [
+      ...photos.map((p): Merged => {
+        const { votes, guest, ...rest } = p as typeof p & {
+          votes?: { id: string }[];
+          guest?: { id: string; name: string | null } | null;
+        };
+        return {
+          ...rest,
+          guest: guest ?? null,
+          source: 'photo',
+          payoutId: null,
+          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+        };
+      }),
+      ...payoutDocs.map((pd): Merged => {
+        const votes = (pd as typeof pd & { votes?: { id: string }[] }).votes;
+        return {
+          id: pd.id,
+          partyId: pd.partyId,
+          url: pd.url,
+          thumbnailUrl: null,
+          fileName: pd.fileName,
+          fileSize: pd.fileSize,
+          mimeType: pd.mimeType,
+          width: null,
+          height: null,
+          uploadedBy: null,
+          uploaderName: null,
+          uploaderEmail: null,
+          caption: null,
+          tags: [],
+          photoYear: null,
+          // Payout pizza photos are auto-approved + auto-starred so they look
+          // like the host curated them.
+          starred: true,
+          starredAt: pd.createdAt,
+          status: 'approved',
+          reviewedAt: null,
+          reviewedBy: null,
+          duration: null,
+          voteCount: pd.voteCount,
+          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+          createdAt: pd.createdAt,
+          // PayoutDocument has no updatedAt — fall back to createdAt for shape parity.
+          updatedAt: pd.createdAt,
+          guest: null,
+          source: 'payout',
+          payoutId: pd.payoutId,
+        };
+      }),
+    ];
+
+    merged.sort((a, b) => {
+      const tDiff = b.createdAt.getTime() - a.createdAt.getTime();
+      if (tDiff !== 0) return tDiff;
+      return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
     });
 
-    const total = await prisma.photo.count({ where });
-
-    // salame-58195: shape response with votedByMe (boolean). voteCount is
-    // already a column on Photo so it comes through automatically.
-    const photosWithVote = photos.map((p) => {
-      const { votes, ...rest } = p as typeof p & { votes?: { id: string }[] };
-      return {
-        ...rest,
-        votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
-      };
-    });
+    const pageStart = photoOffset;
+    const pageEnd = pageStart + photoLimit;
+    const page = merged.slice(pageStart, pageEnd);
 
     res.json({
-      photos: photosWithVote,
-      total,
-      limit: parseInt(limit as string, 10),
-      offset: parseInt(offset as string, 10),
+      photos: page,
+      total: photoTotal + payoutTotal,
+      limit: photoLimit,
+      offset: photoOffset,
     });
   } catch (error) {
     next(error);

@@ -506,6 +506,14 @@ export interface Photo {
     id: string;
     name: string;
   } | null;
+  // napoletana-58210: per-party photo lists now union the photos table with
+  // payout-document pizza photos. `source` discriminates; `payoutId` is
+  // present on payout-sourced rows so the vote toggle can route to the
+  // correct endpoint. Photos table rows default to source='photo' /
+  // payoutId=null. Star / delete / tag-edit affordances should be hidden on
+  // payout-sourced rows in the v1 gallery.
+  source?: 'photo' | 'payout';
+  payoutId?: string | null;
 }
 
 export interface PhotoStats {
