@@ -757,6 +757,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
+      // napoletana-58211: filled in below for kind='pizza' docs after we
+      // insert the canonical photos row. Receipts keep this null.
+      photoId: string | null;
     }> = [];
 
     let idx = 0;
@@ -788,6 +791,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: idx,
+          photoId: null,
         });
       } else {
         const err = result && !result.ok ? result.error : 'Unexpected OCR result';
@@ -804,6 +808,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrLineItems: null,
           ocrError: err,
           sortOrder: idx,
+          photoId: null,
         });
       }
       idx++;
@@ -824,6 +829,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrLineItems: null,
         ocrError: null,
         sortOrder: i,
+        // napoletana-58211: filled in inside the transaction below — we
+        // create the canonical photos row first, then attach its id here.
+        photoId: null,
       });
     });
 
@@ -911,57 +919,97 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // explicitly since it's a sibling FK, not a back-relation.
     const uploaderUserId = req.userId ?? null;
     const uploaderEmail = req.userEmail ?? null;
-    const docsToCreateStamped = docsToCreate.map(d => ({
-      ...d,
-      partyId,
-      uploadedByUserId: uploaderUserId,
-      uploadedByEmail: uploaderEmail,
-    }));
 
-    // Create the payout + its documents atomically.
-    const payout = await prisma.payout.create({
-      data: {
-        partyId,
-        // bismarck-92103: when admins create prepayments on behalf of a
-        // cohost, `effectiveHostUserId` is the cohost; otherwise it's the
-        // authenticated submitter (req.userId).
-        hostUserId: effectiveHostUserId,
-        // salumi-89172: persist purpose + tied kit. Defaults to 'event' /
-        // null when the body didn't supply them, matching pre-feature
-        // behavior.
-        purpose,
-        partyKitId: partyKitIdInput,
-        originalAmount: new Decimal(effectiveOriginalAmount),
-        originalCurrency: effectiveOriginalCurrency,
-        exchangeRate: new Decimal(effectiveExchangeRate),
-        extractedAmountUsd: new Decimal(effectiveExtractedUsd),
-        finalAmountUsd: new Decimal(finalUsd),
-        status: 'pending',
-        // arugula-38633 v3 follow-up: payoutMethod is optional. Persist null
-        // when the host hasn't set their payment details yet.
-        payoutMethod: hasMethod ? payoutMethod : null,
-        payoutWalletAddress: resolvedWallet,
-        ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
-          ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
-          : {}),
-        mercuryCardLast4: hasMethod && payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
-          ? mercuryCardLast4.slice(-4)
-          : null,
-        hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
-          ? hostNotes.trim()
-          : null,
-        // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
-        // when an admin creates a prepayment on behalf of a cohost.
-        adminNotes: initialAdminNotes,
-        documents: { create: docsToCreateStamped },
-      },
-      include: {
-        host: { select: { id: true, name: true, email: true } },
-        documents: {
-          orderBy: { sortOrder: 'asc' },
-          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+    // napoletana-58211: the `photos` table is the canonical store for ALL
+    // party photos. For each kind='pizza' payout doc, insert the photos row
+    // FIRST (auto-approved + auto-starred so it surfaces immediately on the
+    // event gallery + /photos feed), then create the payout_documents row
+    // with `photoId` pointing at it. Receipts (kind='receipt') stay
+    // payout-only — photoId remains null. Wrapped in a transaction so a
+    // photos-insert failure aborts the whole submission and we never leave
+    // an orphan payout_documents row.
+    const payout = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const docsToCreateStamped = await Promise.all(
+        docsToCreate.map(async (d) => {
+          let photoId: string | null = d.photoId;
+          if (d.kind === 'pizza') {
+            const photo = await tx.photo.create({
+              data: {
+                partyId,
+                url: d.url,
+                fileName: d.fileName,
+                fileSize: d.fileSize,
+                mimeType: d.mimeType,
+                // uploadedBy is a Guest FK; payout submitters are Users.
+                // Leave null and rely on uploaderEmail for attribution.
+                uploadedBy: null,
+                uploaderName: null,
+                uploaderEmail: uploaderEmail,
+                status: 'approved',
+                starred: true,
+                starredAt: now,
+                reviewedAt: now,
+                reviewedBy: uploaderUserId,
+              },
+              select: { id: true },
+            });
+            photoId = photo.id;
+          }
+          return {
+            ...d,
+            partyId,
+            uploadedByUserId: uploaderUserId,
+            uploadedByEmail: uploaderEmail,
+            photoId,
+          };
+        }),
+      );
+
+      return tx.payout.create({
+        data: {
+          partyId,
+          // bismarck-92103: when admins create prepayments on behalf of a
+          // cohost, `effectiveHostUserId` is the cohost; otherwise it's the
+          // authenticated submitter (req.userId).
+          hostUserId: effectiveHostUserId,
+          // salumi-89172: persist purpose + tied kit. Defaults to 'event' /
+          // null when the body didn't supply them, matching pre-feature
+          // behavior.
+          purpose,
+          partyKitId: partyKitIdInput,
+          originalAmount: new Decimal(effectiveOriginalAmount),
+          originalCurrency: effectiveOriginalCurrency,
+          exchangeRate: new Decimal(effectiveExchangeRate),
+          extractedAmountUsd: new Decimal(effectiveExtractedUsd),
+          finalAmountUsd: new Decimal(finalUsd),
+          status: 'pending',
+          // arugula-38633 v3 follow-up: payoutMethod is optional. Persist null
+          // when the host hasn't set their payment details yet.
+          payoutMethod: hasMethod ? payoutMethod : null,
+          payoutWalletAddress: resolvedWallet,
+          ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
+            ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
+            : {}),
+          mercuryCardLast4: hasMethod && payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
+            ? mercuryCardLast4.slice(-4)
+            : null,
+          hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
+            ? hostNotes.trim()
+            : null,
+          // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
+          // when an admin creates a prepayment on behalf of a cohost.
+          adminNotes: initialAdminNotes,
+          documents: { create: docsToCreateStamped },
         },
-      },
+        include: {
+          host: { select: { id: true, name: true, email: true } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
+        },
+      });
     });
 
     // One-shot: persist the host's attendance estimate to the party, but only
@@ -1360,6 +1408,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
+      // napoletana-58211: kept here for shape parity with newPizzaDocs so the
+      // combined createMany call below has a uniform input type. Receipts
+      // always carry null.
+      photoId: string | null;
     }> = [];
     let newOcrSum = 0;
     interface FxHeadline {
@@ -1398,6 +1450,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: i,
+          photoId: null,
         });
       } else {
         const err = result && !result.ok ? result.error : 'Unexpected OCR result';
@@ -1414,6 +1467,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrLineItems: null,
           ocrError: err,
           sortOrder: i,
+          photoId: null,
         });
       }
     });
@@ -1431,6 +1485,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrLineItems: null,
       ocrError: null,
       sortOrder: i,
+      // napoletana-58211: filled in inside the transaction below — we
+      // insert the canonical photos row first, then attach its id.
+      photoId: null as string | null,
     }));
 
     const documentsChanged = newReceiptDocs.length > 0 || newPizzaDocs.length > 0 || removeIds.length > 0;
@@ -1509,6 +1566,35 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         // not the original payout submitter.
         const uploaderUserId = req.userId ?? null;
         const uploaderEmail = req.userEmail ?? null;
+
+        // napoletana-58211: insert photos rows for each new pizza doc FIRST
+        // (auto-approved + auto-starred) and stamp photoId so the
+        // payout_documents row links to the canonical photos record. If any
+        // photos.create fails, the surrounding transaction aborts and the
+        // patch is rolled back. Receipts skip this step (photoId stays null).
+        const now = new Date();
+        for (const d of newPizzaDocs) {
+          const photo = await tx.photo.create({
+            data: {
+              partyId,
+              url: d.url,
+              fileName: d.fileName,
+              fileSize: d.fileSize,
+              mimeType: d.mimeType,
+              uploadedBy: null,
+              uploaderName: null,
+              uploaderEmail: uploaderEmail,
+              status: 'approved',
+              starred: true,
+              starredAt: now,
+              reviewedAt: now,
+              reviewedBy: uploaderUserId,
+            },
+            select: { id: true },
+          });
+          d.photoId = photo.id;
+        }
+
         await tx.payoutDocument.createMany({
           data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
             ...d,
