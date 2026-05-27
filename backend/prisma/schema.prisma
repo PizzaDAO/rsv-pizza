@@ -1709,6 +1709,12 @@ model PayoutDocument {
   ocrCurrency   String?  @map("ocr_currency")
   ocrConfidence Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
   ocrRaw        Json?    @map("ocr_raw")
+  // formaggi-89172: structured per-line items extracted from the receipt OCR.
+  // Schema is OcrLineItem[] (see backend/src/services/ocr.service.ts) — each
+  // entry has name, qty, unitPrice, subtotal, category. Stored as JSONB with a
+  // GIN index (`idx_payout_documents_ocr_line_items`) to support future
+  // analytics queries (e.g. average pizza prices by country/city).
+  ocrLineItems  Json?    @map("ocr_line_items")
   ocrError      String?  @map("ocr_error")
   // pancetta-37195: per-receipt uploader attribution. Both nullable so
   // historical rows are valid. uploadedByEmail caches the email at upload

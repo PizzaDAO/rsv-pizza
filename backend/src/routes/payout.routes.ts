@@ -752,6 +752,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
       ocrRaw: any;
+      // formaggi-89172: per-line structured items extracted from the receipt.
+      // null for pizza-photo rows + receipts whose OCR errored.
+      ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
     }> = [];
@@ -781,6 +784,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrCurrency: fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          // formaggi-89172: structured per-line items for pizza-price analytics.
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: idx,
         });
@@ -796,6 +801,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrCurrency: null,
           ocrConfidence: null,
           ocrRaw: null,
+          ocrLineItems: null,
           ocrError: err,
           sortOrder: idx,
         });
@@ -815,6 +821,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrCurrency: null,
         ocrConfidence: null,
         ocrRaw: null,
+        ocrLineItems: null,
         ocrError: null,
         sortOrder: i,
       });
@@ -1349,6 +1356,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
       ocrRaw: any;
+      // formaggi-89172: per-line structured items extracted from the receipt.
+      ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
     }> = [];
@@ -1385,6 +1394,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrCurrency: fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          // formaggi-89172: structured per-line items for pizza-price analytics.
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: i,
         });
@@ -1400,6 +1411,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrCurrency: null,
           ocrConfidence: null,
           ocrRaw: null,
+          ocrLineItems: null,
           ocrError: err,
           sortOrder: i,
         });
@@ -1416,6 +1428,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrCurrency: null,
       ocrConfidence: null,
       ocrRaw: null,
+      ocrLineItems: null,
       ocrError: null,
       sortOrder: i,
     }));
@@ -1506,6 +1519,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
             uploadedByUserId: uploaderUserId,
             uploadedByEmail: uploaderEmail,
             ocrRaw: d.ocrRaw === null ? Prisma.JsonNull : (d.ocrRaw as Prisma.InputJsonValue),
+            // formaggi-89172: same JsonNull handling as ocrRaw — Prisma needs
+            // an explicit JsonNull marker (not JS null) to insert a SQL NULL
+            // into a JSONB column via createMany.
+            ocrLineItems: d.ocrLineItems == null ? Prisma.JsonNull : (d.ocrLineItems as Prisma.InputJsonValue),
           })),
         });
       }
