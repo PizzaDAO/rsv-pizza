@@ -81,7 +81,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
     { key: 'socialPostViews', label: t('report.socialPostViews'), value: report.stats.socialPostViews || null, icon: Eye, color: 'text-blue-400' },
     { key: 'socialPosts', label: t('report.socialPosts'), value: report.stats.socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: t('report.totalRsvps'), value: report.stats.totalRsvps || null, icon: Users, color: 'text-green-400' },
-    { key: 'attendees', label: t('report.attendees'), value: report.stats.approvedGuests || null, icon: Users, color: 'text-emerald-400' },
     { key: 'newsletterSignups', label: t('report.newsletterSignups'), value: report.stats.mailingListSignups || null, icon: Mail, color: 'text-orange-400' },
     { key: 'walletAddresses', label: t('report.walletAddresses'), value: report.stats.walletAddresses || null, icon: Wallet, color: 'text-cyan-400', onAction: downloadWallets, actionIcon: Download },
     { key: 'poapMints', label: t('report.poapMints'), value: report.stats.poapMints || null, icon: Award, color: 'text-yellow-400' },
@@ -144,7 +143,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
                   <th className="py-2 pr-4 font-medium">{tp('consolidated.table.event')}</th>
                   <th className="py-2 pr-4 font-medium">{tp('consolidated.table.date')}</th>
                   <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.rsvps')}</th>
-                  <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.attendees')}</th>
                   <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.impressions')}</th>
                   <th className="py-2 font-medium text-right">{tp('consolidated.table.clicks')}</th>
                 </tr>
@@ -165,7 +163,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
                     </td>
                     <td className="py-2 pr-4 text-theme-text-secondary whitespace-nowrap">{formatDate(ev.date)}</td>
                     <td className="py-2 pr-4 text-right text-theme-text">{ev.rsvpCount.toLocaleString()}</td>
-                    <td className="py-2 pr-4 text-right text-theme-text">{ev.approvedCount.toLocaleString()}</td>
                     <td className="py-2 pr-4 text-right text-theme-text">{ev.impressions.totalViews.toLocaleString()}</td>
                     <td className="py-2 text-right text-theme-text">{ev.clicks.toLocaleString()}</td>
                   </tr>
