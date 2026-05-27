@@ -407,7 +407,7 @@ function CountryFilterButton({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search countries..."
-            className="w-full pl-7 pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
+            className="w-full pl-9 pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
           />
         </div>
       </div>
