@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play, ThumbsUp } from 'lucide-react';
 import { Photo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { togglePhotoVote } from '../../lib/api';
+import { togglePhotoVote, togglePayoutPhotoVote } from '../../lib/api';
 
 interface PhotoCardProps {
   photo: Photo;
@@ -37,6 +37,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
   const isVideo = photo.mimeType?.startsWith('video/');
+  // napoletana-58210: payout-sourced rows are uncurated — hide star / delete /
+  // tag-edit affordances. The source field is optional for back-compat.
+  const isPayoutSource = photo.source === 'payout';
 
   // salame-58195: thumbs-up voting
   const { user } = useAuth();
@@ -50,7 +53,10 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
     }
     if (voting) return;
     setVoting(true);
-    const res = await togglePhotoVote(photo.partyId, photo.id);
+    // napoletana-58210: route to the source-specific vote endpoint.
+    const res = isPayoutSource && photo.payoutId
+      ? await togglePayoutPhotoVote(photo.payoutId, photo.id)
+      : await togglePhotoVote(photo.partyId, photo.id);
     setVoting(false);
     if (res && onVoteChange) {
       onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
@@ -132,8 +138,10 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
       )}
 
-      {/* Star Badge (if starred and not pending/rejected) */}
-      {photo.starred && !isPending && !isRejected && (
+      {/* Star Badge (if starred and not pending/rejected) — napoletana-58210:
+          hidden for payout-sourced rows because we set starred=true
+          synthetically and don't want to imply host curation. */}
+      {photo.starred && !isPending && !isRejected && !isPayoutSource && (
         <div className="absolute top-2 left-2">
           <Star className="w-5 h-5 text-yellow-400 fill-yellow-400 drop-shadow-lg" />
         </div>
@@ -165,8 +173,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
       )}
 
-      {/* Host Controls (for approved photos) */}
-      {isHost && !isPending && (
+      {/* Host Controls (for approved photos) — napoletana-58210: hidden for
+          payout-sourced photos because star/delete don't apply to payout docs. */}
+      {isHost && !isPending && !isPayoutSource && (
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => {

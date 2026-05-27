@@ -35,6 +35,7 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
+import payoutDocumentVoteRoutes from './routes/payout-document-vote.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import leaderboardRoutes from './routes/leaderboard.routes.js';
@@ -151,6 +152,7 @@ app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-bas
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);
 app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
+app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests

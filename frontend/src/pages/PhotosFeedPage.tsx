@@ -11,6 +11,7 @@ import {
   getPhotosFeedFacets,
   getMyPartnerTags,
   togglePhotoVote,
+  togglePayoutPhotoVote,
   FeedPhoto,
 } from '../lib/api';
 import { countryNameToAlpha2, alpha2ToCountryNames, alpha2ToCanonicalName } from '../utils/countryFlag';
@@ -601,7 +602,10 @@ function FeedTile({
     }
     if (voting) return;
     setVoting(true);
-    const res = await togglePhotoVote(photo.party.id, photo.id);
+    // napoletana-58210: route to the source-specific vote endpoint.
+    const res = photo.source === 'payout' && photo.payoutId
+      ? await togglePayoutPhotoVote(photo.payoutId, photo.id)
+      : await togglePhotoVote(photo.party.id, photo.id);
     setVoting(false);
     if (res) {
       onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
@@ -673,7 +677,10 @@ function FeedLightbox({
     e.stopPropagation();
     if (!user || voting) return;
     setVoting(true);
-    const res = await togglePhotoVote(photo.party.id, photo.id);
+    // napoletana-58210: route to the source-specific vote endpoint.
+    const res = photo.source === 'payout' && photo.payoutId
+      ? await togglePayoutPhotoVote(photo.payoutId, photo.id)
+      : await togglePhotoVote(photo.party.id, photo.id);
     setVoting(false);
     if (res) {
       onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });

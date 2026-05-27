@@ -949,6 +949,29 @@ export async function togglePhotoVote(
   }
 }
 
+// napoletana-58210: toggle the current user's thumbs-up vote on a
+// payout-sourced photo. The /photos feed + event-page galleries union the
+// `photos` table with payout-document pizza photos; voting on the payout
+// side uses a separate table so we need a separate endpoint. Callers should
+// dispatch on `photo.source` and pass `photo.payoutId`.
+export async function togglePayoutPhotoVote(
+  payoutId: string,
+  docId: string,
+): Promise<{ voted: boolean; voteCount: number } | null> {
+  try {
+    return await apiRequest<{ voted: boolean; voteCount: number }>(
+      `/api/payouts/${payoutId}/documents/${docId}/vote`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling payout photo vote:', error);
+    return null;
+  }
+}
+
 // Get available photo tags for a party (defaults + confirmed sponsor names)
 export async function getPhotoTags(partyId: string): Promise<{ tags: string[]; defaultTags: string[]; sponsorTags: string[] } | null> {
   try {
@@ -4881,6 +4904,13 @@ export interface FeedPhoto {
   // salame-58195: thumbs-up voting state
   voteCount: number;
   votedByMe: boolean;
+  // napoletana-58210: the feed now unions the photos table with payout
+  // pizza photos. `source` discriminates; `payoutId` is non-null when the
+  // item came from the payouts side so the client can build the correct
+  // vote-toggle URL. Older backends won't return these fields — keep the
+  // type tolerant by defaulting to 'photo' / null at the call site.
+  source?: 'photo' | 'payout';
+  payoutId?: string | null;
   party: { id: string; slug: string; name: string; city: string | null; country: string | null };
 }
 

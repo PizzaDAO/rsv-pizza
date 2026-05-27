@@ -4,7 +4,7 @@ import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, T
 import { IconInput } from '../IconInput';
 import { Photo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { togglePhotoVote } from '../../lib/api';
+import { togglePhotoVote, togglePayoutPhotoVote } from '../../lib/api';
 import { MediaThumb } from './MediaThumb';
 
 interface PhotoModalProps {
@@ -41,13 +41,20 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
   onReject,
   onVoteChange,
 }) => {
+  // napoletana-58210: payout-sourced rows hide star/delete/tag-edit
+  // affordances and route vote toggles to a different endpoint.
+  const isPayoutSource = photo.source === 'payout';
+
   // salame-58195: thumbs-up voting
   const { user } = useAuth();
   const [voting, setVoting] = useState(false);
   const handleVote = async () => {
     if (!user || voting) return;
     setVoting(true);
-    const res = await togglePhotoVote(photo.partyId, photo.id);
+    // napoletana-58210: route to the source-specific vote endpoint.
+    const res = isPayoutSource && photo.payoutId
+      ? await togglePayoutPhotoVote(photo.payoutId, photo.id)
+      : await togglePhotoVote(photo.partyId, photo.id);
     setVoting(false);
     if (res && onVoteChange) {
       onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
@@ -313,7 +320,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
               <div>
                 {photo.caption ? (
                   <p className="text-theme-text">{photo.caption}</p>
-                ) : isHost ? (
+                ) : isHost && !isPayoutSource ? (
                   <button
                     onClick={() => setEditingCaption(true)}
                     className="text-theme-text-muted hover:text-theme-text-secondary text-sm"
@@ -321,7 +328,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                     Add a caption...
                   </button>
                 ) : null}
-                {isHost && photo.caption && (
+                {isHost && !isPayoutSource && photo.caption && (
                   <button
                     onClick={() => setEditingCaption(true)}
                     className="text-theme-text-muted hover:text-theme-text-secondary text-xs mt-1"
@@ -395,7 +402,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                       </span>
                     ))}
                   </div>
-                  {isHost && onUpdateTags && availableTags.length > 0 && (
+                  {isHost && !isPayoutSource && onUpdateTags && availableTags.length > 0 && (
                     <button
                       onClick={() => setEditingTags(true)}
                       className="text-theme-text-muted hover:text-theme-text-secondary text-xs mt-1"
@@ -404,7 +411,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                     </button>
                   )}
                 </>
-              ) : isHost && onUpdateTags && availableTags.length > 0 ? (
+              ) : isHost && !isPayoutSource && onUpdateTags && availableTags.length > 0 ? (
                 <button
                   onClick={() => setEditingTags(true)}
                   className="text-theme-text-muted hover:text-theme-text-secondary text-sm flex items-center gap-1"
@@ -453,7 +460,7 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
                 </button>
               </div>
             </div>
-          ) : isHost && onUpdateYear ? (
+          ) : isHost && !isPayoutSource && onUpdateYear ? (
             <div className="mb-4">
               {photo.photoYear ? (
                 <div>
@@ -514,7 +521,9 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
               Download
             </button>
 
-            {isHost && (
+            {/* napoletana-58210: host star/delete affordances don't apply to
+                payout-sourced rows — hide them to avoid 404s + confusion. */}
+            {isHost && !isPayoutSource && (
               <>
                 <button
                   onClick={() => onStar?.(photo.id, !photo.starred)}

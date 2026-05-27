@@ -33,17 +33,17 @@ model User {
   payoutWalletAddress   String? @map("payout_wallet_address")
   payoutBankDetails     Json?   @map("payout_bank_details")
 
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  parties      Party[]
-  orders       Order[]
-  magicLinks   MagicLink[]
-  apiKeys      ApiKey[]
-  aiPhoneCalls AIPhoneCall[]
-  payouts      Payout[]
-  paymentOptIns PartyPaymentOptIn[] @relation("PartyPaymentOptIns")
-  uploadedPayoutDocuments PayoutDocument[] @relation("PayoutDocumentUploadedBy")
+  parties                          Party[]
+  orders                           Order[]
+  magicLinks                       MagicLink[]
+  apiKeys                          ApiKey[]
+  aiPhoneCalls                     AIPhoneCall[]
+  payouts                          Payout[]
+  paymentOptIns                    PartyPaymentOptIn[]      @relation("PartyPaymentOptIns")
+  uploadedPayoutDocuments          PayoutDocument[]         @relation("PayoutDocumentUploadedBy")
   reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
   reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
 }
@@ -156,21 +156,21 @@ model Party {
   flyerArtistUrl  String? @map("flyer_artist_url") // Flyer artist link
 
   // KPI tracking
-  xPostUrl         String? @map("x_post_url") // Main X/Twitter post
-  xPostViews       Int?    @map("x_post_views") // X post view count
-  farcasterPostUrl String? @map("farcaster_post_url") // Main Farcaster post
-  farcasterViews   Int?    @map("farcaster_views") // Farcaster view count
-  lumaUrl          String? @map("luma_url") // Luma event URL
-  lumaViews        Int?    @map("luma_views") // Luma page views
-  meetupUrl        String? @map("meetup_url") // Meetup event URL
-  eventbriteUrl    String? @map("eventbrite_url") // Eventbrite event URL
-  externalLinks    Json?   @default("[]") @map("external_links") // Custom external links [{label, url}]
-  telegramGroup    String? @map("telegram_group") @db.VarChar // City Telegram group link
+  xPostUrl              String? @map("x_post_url") // Main X/Twitter post
+  xPostViews            Int?    @map("x_post_views") // X post view count
+  farcasterPostUrl      String? @map("farcaster_post_url") // Main Farcaster post
+  farcasterViews        Int?    @map("farcaster_views") // Farcaster view count
+  lumaUrl               String? @map("luma_url") // Luma event URL
+  lumaViews             Int?    @map("luma_views") // Luma page views
+  meetupUrl             String? @map("meetup_url") // Meetup event URL
+  eventbriteUrl         String? @map("eventbrite_url") // Eventbrite event URL
+  externalLinks         Json?   @default("[]") @map("external_links") // Custom external links [{label, url}]
+  telegramGroup         String? @map("telegram_group") @db.VarChar // City Telegram group link
   hostTelegramChatId    BigInt? @map("host_telegram_chat_id") // Host's private Telegram chat_id (set via /start <token> webhook)
   hostTelegramLinkToken String? @unique @map("host_telegram_link_token") @db.VarChar // nanoid(10) token for host /start deeplink
-  poapEventId      String? @map("poap_event_id") // POAP event ID
-  poapMints        Int?    @map("poap_mints") // POAP mint count
-  poapMoments      Int?    @map("poap_moments") // POAP moments count
+  poapEventId           String? @map("poap_event_id") // POAP event ID
+  poapMints             Int?    @map("poap_mints") // POAP mint count
+  poapMoments           Int?    @map("poap_moments") // POAP moments count
 
   // Report settings
   reportPublished   Boolean @default(false) @map("report_published")
@@ -194,11 +194,11 @@ model Party {
   city    String?
 
   // Underboss dashboard fields
-  hostStatus      String? @map("host_status")
-  underbossStatus String  @default("pending") @map("underboss_status")
+  hostStatus      String?            @map("host_status")
+  underbossStatus String             @default("pending") @map("underboss_status")
   statusAudit     PartyStatusAudit[]
-  hostTags        Json    @default("[]") @map("host_tags")
-  underbossNotes  String? @map("underboss_notes")
+  hostTags        Json               @default("[]") @map("host_tags")
+  underbossNotes  String?            @map("underboss_notes")
 
   // GPP (Global Pizza Party/Previous year) photo management
   hiddenGppPhotos Json @default("[]") @map("hidden_gpp_photos") // Array of hidden app.gpp.day photo src paths
@@ -229,39 +229,39 @@ model Party {
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  guests                Guest[]
-  orders                Order[]
-  photos                Photo[]
-  partyKit              PartyKit?
-  donations             Donation[]
-  raffles               Raffle[]
-  displays              Display[]
-  staff                 Staff[]
-  performers            Performer[]
-  venues                Venue[]
-  sponsors              Sponsor[]
-  budgetItems           BudgetItem[]
-  checklistItems        ChecklistItem[]
-  socialPosts           SocialPost[]
-  notableAttendees      NotableAttendee[]
-  aiPhoneCalls          AIPhoneCall[]
-  pageViews             PageView[]
-  linkClicks            LinkClick[]
-  rsvpFunnelEvents      RsvpFunnelEvent[]
-  sponsorChecklistItems SponsorChecklistItem[]
-  partnerEventNotes     PartnerEventNote[]
-  quizQuestions         QuizQuestion[]
-  slugAliases           SlugAlias[]
-  scorecardItems        GuestScorecardItem[]
-  payouts               Payout[]
+  guests                  Guest[]
+  orders                  Order[]
+  photos                  Photo[]
+  partyKit                PartyKit?
+  donations               Donation[]
+  raffles                 Raffle[]
+  displays                Display[]
+  staff                   Staff[]
+  performers              Performer[]
+  venues                  Venue[]
+  sponsors                Sponsor[]
+  budgetItems             BudgetItem[]
+  checklistItems          ChecklistItem[]
+  socialPosts             SocialPost[]
+  notableAttendees        NotableAttendee[]
+  aiPhoneCalls            AIPhoneCall[]
+  pageViews               PageView[]
+  linkClicks              LinkClick[]
+  rsvpFunnelEvents        RsvpFunnelEvent[]
+  sponsorChecklistItems   SponsorChecklistItem[]
+  partnerEventNotes       PartnerEventNote[]
+  quizQuestions           QuizQuestion[]
+  slugAliases             SlugAlias[]
+  scorecardItems          GuestScorecardItem[]
+  payouts                 Payout[]
   // agnolotti-58291: receipts are now party-level (PayoutDocument.partyId);
   // payout association is optional. Inverse relation lives here so cascading
   // a party delete also removes its receipts.
-  payoutDocuments       PayoutDocument[]
-  paymentOptIns         PartyPaymentOptIn[]
-  outreachAttempts      OutreachAttempt[]
-  announcements         Announcement[]
-  attestations          GuestAttestation[]
+  payoutDocuments         PayoutDocument[]
+  paymentOptIns           PartyPaymentOptIn[]
+  outreachAttempts        OutreachAttempt[]
+  announcements           Announcement[]
+  attestations            GuestAttestation[]
   reimbursementCapAppeals ReimbursementCapAppeal[]
   reimbursementCapAudits  ReimbursementCapAudit[]
 
@@ -274,17 +274,17 @@ model Party {
 // keys off this table so underbosses can mark appeals as reviewed and view
 // the full history of past appeals + resolutions.
 model ReimbursementCapAppeal {
-  id               String   @id @default(uuid()) @db.Uuid
-  partyId          String   @map("party_id") @db.Uuid
-  party            Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  hostUserId       String   @map("host_user_id")
-  host             User     @relation("ReimbursementCapAppealsByHost", fields: [hostUserId], references: [id])
+  id               String    @id @default(uuid()) @db.Uuid
+  partyId          String    @map("party_id") @db.Uuid
+  party            Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  hostUserId       String    @map("host_user_id")
+  host             User      @relation("ReimbursementCapAppealsByHost", fields: [hostUserId], references: [id])
   note             String
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz
-  reviewedByUserId String?  @map("reviewed_by_user_id")
-  reviewedBy       User?    @relation("ReimbursementCapAppealsReviewedBy", fields: [reviewedByUserId], references: [id])
-  reviewedNote     String?  @map("reviewed_note")
+  reviewedByUserId String?   @map("reviewed_by_user_id")
+  reviewedBy       User?     @relation("ReimbursementCapAppealsReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewedNote     String?   @map("reviewed_note")
 
   @@index([partyId])
   @@map("reimbursement_cap_appeals")
@@ -332,15 +332,15 @@ model PartyStatusAudit {
 // actor's email and role (admin/super_admin/payment_admin/underboss/host/system).
 // No historical backfill: rows that pre-date this audit have no actor info.
 model ReimbursementCapAudit {
-  id          String   @id @default(uuid()) @db.Uuid
-  partyId     String   @map("party_id") @db.Uuid
-  party       Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  oldCapUsd   Decimal? @map("old_cap_usd") @db.Decimal(10, 2)
-  newCapUsd   Decimal? @map("new_cap_usd") @db.Decimal(10, 2)
-  actorEmail  String   @map("actor_email")
-  actorKind   String   @map("actor_kind")
-  setAt       DateTime @default(now()) @map("set_at") @db.Timestamptz
-  note        String?
+  id         String   @id @default(uuid()) @db.Uuid
+  partyId    String   @map("party_id") @db.Uuid
+  party      Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  oldCapUsd  Decimal? @map("old_cap_usd") @db.Decimal(10, 2)
+  newCapUsd  Decimal? @map("new_cap_usd") @db.Decimal(10, 2)
+  actorEmail String   @map("actor_email")
+  actorKind  String   @map("actor_kind")
+  setAt      DateTime @default(now()) @map("set_at") @db.Timestamptz
+  note       String?
 
   @@index([partyId])
   @@index([setAt(sort: Desc)])
@@ -442,15 +442,15 @@ model Guest {
 // P2002/23505 in the route handler instead. DO NOT add a competing
 // @@unique — the migration would try to drop the COALESCE index.
 model GuestAttestation {
-  id               String   @id @default(uuid()) @db.Uuid
-  guestId          String   @map("guest_id") @db.Uuid
-  partyId          String   @map("party_id") @db.Uuid
-  attesterKind     String   @map("attester_kind") // 'host_admin' | 'peer_guest' | 'self_host'
-  attesterUserId   String?  @map("attester_user_id")
-  attesterGuestId  String?  @map("attester_guest_id") @db.Uuid
-  attesterEmail    String?  @map("attester_email")
-  attesterName     String?  @map("attester_name")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  guestId         String   @map("guest_id") @db.Uuid
+  partyId         String   @map("party_id") @db.Uuid
+  attesterKind    String   @map("attester_kind") // 'host_admin' | 'peer_guest' | 'self_host'
+  attesterUserId  String?  @map("attester_user_id")
+  attesterGuestId String?  @map("attester_guest_id") @db.Uuid
+  attesterEmail   String?  @map("attester_email")
+  attesterName    String?  @map("attester_name")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   guest         Guest  @relation("AttestationsOfGuest", fields: [guestId], references: [id], onDelete: Cascade)
   party         Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -1294,7 +1294,7 @@ model LinkClick {
 model RsvpFunnelEvent {
   id          String   @id @default(uuid()) @db.Uuid
   partyId     String   @map("party_id") @db.Uuid
-  step        String   // 'rsvp_opened' | 'rsvp_step1_complete'
+  step        String // 'rsvp_opened' | 'rsvp_step1_complete'
   visitorHash String   @map("visitor_hash")
   ipAddress   String?  @map("ip_address")
   userAgent   String?  @map("user_agent")
@@ -1575,11 +1575,11 @@ model SlugAlias {
 
 // Guest scorecard items for gamified engagement tracking
 model GuestScorecardItem {
-  id          String    @id @default(uuid()) @db.Uuid
-  guestId     String    @map("guest_id") @db.Uuid
-  guest       Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  partyId     String    @map("party_id") @db.Uuid
-  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid()) @db.Uuid
+  guestId String @map("guest_id") @db.Uuid
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   itemKey     String    @map("item_key") @db.VarChar
   completed   Boolean   @default(false)
@@ -1588,8 +1588,8 @@ model GuestScorecardItem {
   proofType   String?   @map("proof_type") @db.VarChar
   metadata    Json      @default("{}")
 
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([guestId, partyId, itemKey])
   @@index([guestId, partyId])
@@ -1605,56 +1605,56 @@ model GuestScorecardItem {
 // at the DB layer enforce allowed values.
 
 model Payout {
-  id                  String    @id @default(uuid()) @db.Uuid
-  partyId             String    @map("party_id") @db.Uuid
-  party               Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  hostUserId          String    @map("host_user_id")
-  host                User      @relation(fields: [hostUserId], references: [id], onDelete: Restrict)
+  id         String @id @default(uuid()) @db.Uuid
+  partyId    String @map("party_id") @db.Uuid
+  party      Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  hostUserId String @map("host_user_id")
+  host       User   @relation(fields: [hostUserId], references: [id], onDelete: Restrict)
 
   // salumi-89172: distinguishes event-reimbursement payouts ('event') from
   // shipping-coordinator receipt payouts ('shipping'). DB CHECK constraint
   // restricts the value set; default 'event' preserves existing behavior.
-  purpose             String    @default("event")
+  purpose    String    @default("event")
   // salumi-89172: optional kit the shipping receipt is tied to. NULL for
   // event payouts and for shipping receipts that aren't tied to a kit (none
   // in v1 — selection is required on the form). FK ON DELETE SET NULL so
   // archiving a kit doesn't cascade-destroy historical reimbursements.
-  partyKitId          String?   @map("party_kit_id") @db.Uuid
-  partyKit            PartyKit? @relation("PayoutsForKit", fields: [partyKitId], references: [id], onDelete: SetNull)
+  partyKitId String?   @map("party_kit_id") @db.Uuid
+  partyKit   PartyKit? @relation("PayoutsForKit", fields: [partyKitId], references: [id], onDelete: SetNull)
 
-  originalAmount      Decimal   @map("original_amount") @db.Decimal(12, 2)
-  originalCurrency    String    @map("original_currency")
-  exchangeRate        Decimal   @map("exchange_rate") @db.Decimal(18, 6)
-  extractedAmountUsd  Decimal   @map("extracted_amount_usd") @db.Decimal(12, 2)
-  finalAmountUsd      Decimal   @map("final_amount_usd") @db.Decimal(12, 2)
+  originalAmount     Decimal @map("original_amount") @db.Decimal(12, 2)
+  originalCurrency   String  @map("original_currency")
+  exchangeRate       Decimal @map("exchange_rate") @db.Decimal(18, 6)
+  extractedAmountUsd Decimal @map("extracted_amount_usd") @db.Decimal(12, 2)
+  finalAmountUsd     Decimal @map("final_amount_usd") @db.Decimal(12, 2)
 
-  status              String    @default("pending")
+  status       String  @default("pending")
   // arugula-38633 v3 follow-up: optional — hosts can submit a payout with
   // just an amount; admin nags the host for payment details before execute.
-  payoutMethod        String?   @map("payout_method")
+  payoutMethod String? @map("payout_method")
 
-  payoutWalletAddress String?   @map("payout_wallet_address")
-  payoutBankDetails   Json?     @map("payout_bank_details")
-  mercuryCardId       String?   @map("mercury_card_id")
-  mercuryCardLast4    String?   @map("mercury_card_last4")
+  payoutWalletAddress String? @map("payout_wallet_address")
+  payoutBankDetails   Json?   @map("payout_bank_details")
+  mercuryCardId       String? @map("mercury_card_id")
+  mercuryCardLast4    String? @map("mercury_card_last4")
 
-  hostNotes           String?   @map("host_notes")
-  adminNotes          String?   @map("admin_notes")
-  rejectionReason     String?   @map("rejection_reason")
+  hostNotes       String? @map("host_notes")
+  adminNotes      String? @map("admin_notes")
+  rejectionReason String? @map("rejection_reason")
 
-  reviewedBy          String?   @map("reviewed_by")
-  reviewedAt          DateTime? @map("reviewed_at") @db.Timestamptz
-  paidAt              DateTime? @map("paid_at") @db.Timestamptz
+  reviewedBy String?   @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
+  paidAt     DateTime? @map("paid_at") @db.Timestamptz
 
-  transactionHash     String?   @map("transaction_hash")
-  wireReference       String?   @map("wire_reference")
-  externalProofUrl    String?   @map("external_proof_url")
+  transactionHash  String? @map("transaction_hash")
+  wireReference    String? @map("wire_reference")
+  externalProofUrl String? @map("external_proof_url")
 
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  documents           PayoutDocument[]
-  audits              PayoutAudit[]
+  documents PayoutDocument[]
+  audits    PayoutAudit[]
 
   @@index([partyId])
   @@index([hostUserId])
@@ -1679,11 +1679,11 @@ model Payout {
 // submitted a real payout for an event keeps appearing as a candidate
 // without re-clicking Submit.
 model PartyPaymentOptIn {
-  partyId    String   @map("party_id") @db.Uuid
-  party      Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  userId     String   @map("user_id")
-  user       User     @relation("PartyPaymentOptIns", fields: [userId], references: [id], onDelete: Cascade)
-  optedInAt  DateTime @default(now()) @map("opted_in_at") @db.Timestamptz
+  partyId   String   @map("party_id") @db.Uuid
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation("PartyPaymentOptIns", fields: [userId], references: [id], onDelete: Cascade)
+  optedInAt DateTime @default(now()) @map("opted_in_at") @db.Timestamptz
 
   @@id([partyId, userId])
   @@index([partyId])
@@ -1691,39 +1691,45 @@ model PartyPaymentOptIn {
 }
 
 model PayoutDocument {
-  id            String   @id @default(uuid()) @db.Uuid
+  id               String   @id @default(uuid()) @db.Uuid
   // agnolotti-58291: receipts are now PARTY-level. `partyId` is the canonical
   // owner (NOT NULL, CASCADE on party delete). `payoutId` is optional and is
   // the submission this receipt was uploaded with; it goes NULL via SET NULL
   // cascade if the payout row is later hard-deleted, so receipts survive.
-  partyId       String   @map("party_id") @db.Uuid
-  party         Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  payoutId      String?  @map("payout_id") @db.Uuid
-  payout        Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
-  kind          String   // 'pizza' | 'receipt'
-  url           String
-  fileName      String   @map("file_name")
-  fileSize      Int      @map("file_size")
-  mimeType      String   @map("mime_type")
-  ocrAmount     Decimal? @map("ocr_amount") @db.Decimal(12, 2)
-  ocrCurrency   String?  @map("ocr_currency")
-  ocrConfidence Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
-  ocrRaw        Json?    @map("ocr_raw")
+  partyId          String   @map("party_id") @db.Uuid
+  party            Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  payoutId         String?  @map("payout_id") @db.Uuid
+  payout           Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  kind             String // 'pizza' | 'receipt'
+  url              String
+  fileName         String   @map("file_name")
+  fileSize         Int      @map("file_size")
+  mimeType         String   @map("mime_type")
+  ocrAmount        Decimal? @map("ocr_amount") @db.Decimal(12, 2)
+  ocrCurrency      String?  @map("ocr_currency")
+  ocrConfidence    Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
+  ocrRaw           Json?    @map("ocr_raw")
   // formaggi-89172: structured per-line items extracted from the receipt OCR.
   // Schema is OcrLineItem[] (see backend/src/services/ocr.service.ts) — each
   // entry has name, qty, unitPrice, subtotal, category. Stored as JSONB with a
   // GIN index (`idx_payout_documents_ocr_line_items`) to support future
   // analytics queries (e.g. average pizza prices by country/city).
-  ocrLineItems  Json?    @map("ocr_line_items")
-  ocrError      String?  @map("ocr_error")
+  ocrLineItems     Json?    @map("ocr_line_items")
+  ocrError         String?  @map("ocr_error")
   // pancetta-37195: per-receipt uploader attribution. Both nullable so
   // historical rows are valid. uploadedByEmail caches the email at upload
   // time so display still works if the User is later deleted.
-  uploadedByUserId String? @map("uploaded_by_user_id")
-  uploadedByEmail  String? @map("uploaded_by_email")
-  uploadedBy       User?   @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  uploadedByUserId String?  @map("uploaded_by_user_id")
+  uploadedByEmail  String?  @map("uploaded_by_email")
+  uploadedBy       User?    @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in
+  // the /photos feed + event galleries. Denormalized counter maintained by
+  // the toggle endpoint (parallel to Photo.voteCount).
+  voteCount Int                  @default(0) @map("vote_count")
+  votes     PayoutDocumentVote[]
 
   @@index([partyId])
   @@index([payoutId])
@@ -1731,19 +1737,36 @@ model PayoutDocument {
   @@map("payout_documents")
 }
 
+// napoletana-58210: thumbs-up votes on payout-document photos. One vote per
+// (payout_document, user); toggle to unvote. Mirrors PhotoVote — User FK is
+// one-way (no back-relation on User) and references the "User" table
+// (PascalCase singular — no @@map on the User model).
+model PayoutDocumentVote {
+  id               String         @id @default(uuid()) @db.Uuid
+  payoutDocumentId String         @map("payout_document_id") @db.Uuid
+  payoutDocument   PayoutDocument @relation(fields: [payoutDocumentId], references: [id], onDelete: Cascade)
+  userId           String         @map("user_id")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([payoutDocumentId, userId], map: "payout_document_votes_unique")
+  @@index([payoutDocumentId], map: "payout_document_votes_doc_idx")
+  @@index([userId], map: "payout_document_votes_user_idx")
+  @@map("payout_document_votes")
+}
+
 model PayoutAudit {
-  id          String   @id @default(uuid()) @db.Uuid
-  payoutId    String   @map("payout_id") @db.Uuid
-  payout      Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
-  action      String
-  oldStatus   String?  @map("old_status")
-  newStatus   String?  @map("new_status")
-  oldAmount   Decimal? @map("old_amount") @db.Decimal(12, 2)
-  newAmount   Decimal? @map("new_amount") @db.Decimal(12, 2)
-  actorEmail  String   @map("actor_email")
-  actorKind   String   @map("actor_kind")
-  note        String?
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  payoutId   String   @map("payout_id") @db.Uuid
+  payout     Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  action     String
+  oldStatus  String?  @map("old_status")
+  newStatus  String?  @map("new_status")
+  oldAmount  Decimal? @map("old_amount") @db.Decimal(12, 2)
+  newAmount  Decimal? @map("new_amount") @db.Decimal(12, 2)
+  actorEmail String   @map("actor_email")
+  actorKind  String   @map("actor_kind")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([payoutId])
   @@index([createdAt(sort: Desc)])
@@ -1758,22 +1781,22 @@ model PayoutAudit {
 // contact list consumed by /underboss/outreach (marinara-67583).
 
 model OutreachCommunity {
-  id             String    @id @default(cuid())
-  city           String
-  country        String?
-  communityName  String    @map("community_name")
-  source         String    // 'luma' | 'meetup' | 'curated' | 'twitter'
-  contactHandle  String?   @map("contact_handle")
-  contactUrl     String    @map("contact_url")
-  contactEmail   String?   @map("contact_email")
-  followerCount  Int?      @map("follower_count")
-  activityScore  Decimal?  @map("activity_score") @db.Decimal(10, 4)
-  priority       String?   // 'high' | 'medium' | 'low'
-  notes          String?
+  id            String   @id @default(cuid())
+  city          String
+  country       String?
+  communityName String   @map("community_name")
+  source        String // 'luma' | 'meetup' | 'curated' | 'twitter'
+  contactHandle String?  @map("contact_handle")
+  contactUrl    String   @map("contact_url")
+  contactEmail  String?  @map("contact_email")
+  followerCount Int?     @map("follower_count")
+  activityScore Decimal? @map("activity_score") @db.Decimal(10, 4)
+  priority      String? // 'high' | 'medium' | 'low'
+  notes         String?
 
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  attempts       OutreachAttempt[]
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  attempts  OutreachAttempt[]
 
   @@unique([source, contactUrl])
   @@index([city])
@@ -1782,19 +1805,19 @@ model OutreachCommunity {
 }
 
 model OutreachAttempt {
-  id                String   @id @default(cuid())
-  communityId       String   @map("community_id")
-  community         OutreachCommunity @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  channel           String   // 'twitter_dm' | 'email' | 'telegram'
-  templateId        String   @map("template_id") // 'v1_twitter' | 'v1_email' | 'v1_telegram'
-  sentAt            DateTime @default(now()) @map("sent_at") @db.Timestamptz
-  sentBy            String   @map("sent_by") // admin email from req.userEmail
-  status            String   @default("sent") // 'sent' | 'replied' | 'declined' | 'converted' | 'bounced'
-  convertedPartyId  String?  @map("converted_party_id") @db.Uuid
-  convertedParty    Party?   @relation(fields: [convertedPartyId], references: [id], onDelete: SetNull)
-  notes             String?
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id               String            @id @default(cuid())
+  communityId      String            @map("community_id")
+  community        OutreachCommunity @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  channel          String // 'twitter_dm' | 'email' | 'telegram'
+  templateId       String            @map("template_id") // 'v1_twitter' | 'v1_email' | 'v1_telegram'
+  sentAt           DateTime          @default(now()) @map("sent_at") @db.Timestamptz
+  sentBy           String            @map("sent_by") // admin email from req.userEmail
+  status           String            @default("sent") // 'sent' | 'replied' | 'declined' | 'converted' | 'bounced'
+  convertedPartyId String?           @map("converted_party_id") @db.Uuid
+  convertedParty   Party?            @relation(fields: [convertedPartyId], references: [id], onDelete: SetNull)
+  notes            String?
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([communityId])
   @@index([status])
