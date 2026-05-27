@@ -82,6 +82,22 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
           hideOpenTabLink={isMobile}
         />
       </CollapsibleCard>
+      <CollapsibleCard
+        id="stream-on-screen"
+        partyId={party.id}
+        title="Put the stream on screen"
+      >
+        <StreamOnScreenCard />
+      </CollapsibleCard>
+      {isGpp && (
+        <CollapsibleCard
+          id="broadcast"
+          partyId={party.id}
+          title="Join the global PizzaDAO broadcast"
+        >
+          <BroadcastJoinCard partyId={party.id} layout={layout} />
+        </CollapsibleCard>
+      )}
       {/* StandWithCryptoCard self-gates on party.eventTags containing 'swc' */}
       <CollapsibleCard id="swc" partyId={party.id} title="Stand With Crypto">
         <StandWithCryptoCard party={party} />
@@ -104,22 +120,6 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
 
   const rightColumn = (
     <>
-      <CollapsibleCard
-        id="stream-on-screen"
-        partyId={party.id}
-        title="Put the stream on screen"
-      >
-        <StreamOnScreenCard />
-      </CollapsibleCard>
-      {isGpp && (
-        <CollapsibleCard
-          id="broadcast"
-          partyId={party.id}
-          title="Join the global PizzaDAO broadcast"
-        >
-          <BroadcastJoinCard partyId={party.id} layout={layout} />
-        </CollapsibleCard>
-      )}
       {isGpp && !briefingFirst && (
         <CollapsibleCard
           id="briefing"
