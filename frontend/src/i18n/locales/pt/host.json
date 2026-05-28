@@ -111,6 +111,7 @@
     "pageViewsTracked": "As visualizações são rastreadas quando visitantes carregam a página do seu evento",
     "stats": "Estatísticas",
     "socialPostViews": "Visualizações de Posts Sociais",
+    "socialPostViewsNote": "Only counts social posts that hosts submitted to this event's report — actual social impressions are likely much higher.",
     "socialPosts": "Posts Sociais",
     "totalRsvps": "Total de RSVPs",
     "attendees": "Participantes",

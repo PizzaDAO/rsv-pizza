@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Building2, Globe } from 'lucide-react';
+import { Building2, Globe, Info } from 'lucide-react';
 import { NotableAttendee } from '../../types';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
 
@@ -16,15 +16,23 @@ export interface KPICardProps {
   url?: string | null;
   onAction?: () => void;
   actionIcon?: React.ElementType;
+  note?: string;
 }
 
-export function KPICard({ label, value, icon: Icon, color, url, onAction, actionIcon: ActionIcon }: KPICardProps) {
+export function KPICard({ label, value, icon: Icon, color, url, onAction, actionIcon: ActionIcon, note }: KPICardProps) {
   const { t } = useTranslation('host');
   const content = (
     <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
       <div className="flex items-center gap-2 mb-2">
         <Icon size={16} className={color} />
-        <span className="text-xs text-theme-text-secondary flex-1">{label}</span>
+        <span className="text-xs text-theme-text-secondary flex-1 inline-flex items-center gap-1">
+          {label}
+          {note && (
+            <span title={note} aria-label={note} className="inline-flex items-center cursor-help">
+              <Info size={12} className="text-theme-text-muted flex-shrink-0" />
+            </span>
+          )}
+        </span>
         {onAction && ActionIcon && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction(); }}
