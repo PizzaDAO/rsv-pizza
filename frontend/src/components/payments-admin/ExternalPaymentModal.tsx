@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   DollarSign,
-  User as UserIcon,
+  Mail,
   Calendar,
   Link as LinkIcon,
   Pencil,
@@ -16,6 +16,7 @@ import {
   Search,
   Check,
   AlertTriangle,
+  Star,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -59,10 +60,15 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   onCreated,
 }) => {
   // Party picker state — `selectedParty` is the source of truth for partyId +
-  // the list of host candidates. `hostUserId` is the chosen userId within
-  // that list (defaults to the main host on selection).
+  // the list of host candidates. `recipientUserId` is the chosen userId within
+  // that list (defaults to the main host on selection when only one candidate).
+  // mortazza-92103: an admin can also pick "other" and type an arbitrary email,
+  // which the backend resolves to a User at submit time.
   const [selectedParty, setSelectedParty] = useState<ApprovedPartySearchResult | null>(null);
-  const [hostUserId, setHostUserId] = useState('');
+  // '' = no selection, 'other' = free-form email path, otherwise a userId from
+  // selectedParty.hostCandidates.
+  const [recipientUserId, setRecipientUserId] = useState<string>('');
+  const [recipientEmailInput, setRecipientEmailInput] = useState('');
 
   const [partyQuery, setPartyQuery] = useState('');
   const [partyResults, setPartyResults] = useState<ApprovedPartySearchResult[]>([]);
@@ -157,9 +163,22 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   // derived: the active partyId (only set once a party is picked).
   const partyId = selectedParty?.id ?? '';
 
+  // mortazza-92103: a candidate is "valid" for submission when the admin has
+  // either picked a known candidate (recipientUserId is a userId from the list)
+  // or picked "other" AND typed a non-empty email.
+  const recipientReady = useMemo(() => {
+    if (!recipientUserId) return false;
+    if (recipientUserId === 'other') {
+      // Cheap client-side shape check; backend does the real validation.
+      const e = recipientEmailInput.trim();
+      return e.length > 0 && /.+@.+\..+/.test(e);
+    }
+    return true;
+  }, [recipientUserId, recipientEmailInput]);
+
   const canSubmit = useMemo(() => {
     if (!partyId.trim()) return false;
-    if (!hostUserId.trim()) return false;
+    if (!recipientReady) return false;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return false;
     if (!adminNotes.trim()) return false;
     // vegetariana-92103: over-cap submissions require an explicit ack.
@@ -167,7 +186,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     return !submitting && !uploading;
   }, [
     partyId,
-    hostUserId,
+    recipientReady,
     amountNum,
     adminNotes,
     submitting,
@@ -178,8 +197,17 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   function handlePickParty(p: ApprovedPartySearchResult) {
     setSelectedParty(p);
-    // Pre-select the main host (always the first candidate, role==='host').
-    setHostUserId(p.hostUserId);
+    // mortazza-92103: only auto-select when there's a single non-staff
+    // candidate so admins MUST consciously pick when multiple cohosts exist.
+    // (Bug example: Snax recorded $1000 for Paris meant for Louis but
+    // host_user_id stamped as Snax — the auto-default-to-main-host was wrong
+    // when the actual recipient was a cohost.)
+    if (p.hostCandidates.length === 1) {
+      setRecipientUserId(p.hostCandidates[0].userId);
+    } else {
+      setRecipientUserId('');
+    }
+    setRecipientEmailInput('');
     setPartyQuery('');
     setPartyResults([]);
     setSearchError(null);
@@ -187,7 +215,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   function handleChangeParty() {
     setSelectedParty(null);
-    setHostUserId('');
+    setRecipientUserId('');
+    setRecipientEmailInput('');
     setPartyQuery('');
     setPartyResults([]);
   }
@@ -237,15 +266,23 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
         ? `Other method. ${adminNotes.trim()}`
         : adminNotes.trim();
 
+      // mortazza-92103: route the recipient through the override field so the
+      // backend stamps `host_user_id` correctly. When the admin picked "Other",
+      // forward `recipientEmail` and let the backend resolve it (rejects with
+      // 400 RECIPIENT_USER_NOT_FOUND if the email doesn't map to a User).
       const body: ExternalPaymentInput = {
         partyId: partyId.trim(),
-        hostUserId: hostUserId.trim(),
         finalAmountUsd: amountNum,
         payoutMethod: method,
         paidAt: paidAt ? new Date(paidAt).toISOString() : undefined,
         externalProofUrl,
         adminNotes: composedAdminNotes,
       };
+      if (recipientUserId === 'other') {
+        body.recipientEmail = recipientEmailInput.trim();
+      } else {
+        body.recipientHostUserId = recipientUserId;
+      }
       // vegetariana-92103: only forward the override when the admin actually
       // acked the over-cap warning. Backend rejects > $650 without it.
       if (exceedsCap && ackOverSubmissionCap) {
@@ -378,35 +415,103 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
             )}
           </div>
 
-          {/* Host picker — only shown once a party is selected */}
+          {/* Recipient picker — only shown once a party is selected.
+              mortazza-92103: radio list (ports the bismarck-92103 prepay UX)
+              so admins explicitly pick the actual recipient cohost instead of
+              defaulting to themselves. "Other (specify)" handles edge cases
+              where the recipient isn't in the party's candidate list yet. */}
           {selectedParty && (
             <div>
-              <div className="relative">
-                <UserIcon
-                  size={20}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-muted pointer-events-none"
-                />
-                <select
-                  value={hostUserId}
-                  onChange={(e) => setHostUserId(e.target.value)}
-                  required
-                  className="w-full !pl-14 appearance-none"
-                >
-                  {selectedParty.hostCandidates.map((c) => {
-                    const label = `[${c.role === 'host' ? 'Host' : 'Cohost'}] ` +
-                      `${c.name || 'Unnamed'}` +
-                      (c.email ? ` (${c.email})` : '');
-                    return (
-                      <option key={c.userId} value={c.userId}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
+              <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
+                Recipient
               </div>
-              <p className="text-xs text-theme-text-muted mt-1">
-                Main host plus cohosts whose email matches a User account. Cohosts without an
-                rsv.pizza account aren't selectable.
+              <div className="space-y-2">
+                {selectedParty.hostCandidates.map((c) => {
+                  const active = recipientUserId === c.userId;
+                  const label = c.name && c.name.trim() ? c.name : (c.email || 'Unnamed');
+                  return (
+                    <label
+                      key={c.userId}
+                      className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="recipient"
+                        value={c.userId}
+                        checked={active}
+                        onChange={() => setRecipientUserId(c.userId)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-theme-text">
+                          {c.role === 'host' && (
+                            <Star size={12} className="text-amber-500 shrink-0" />
+                          )}
+                          <span className="truncate">{label}</span>
+                          {c.role === 'host' && (
+                            <span className="text-[10px] uppercase tracking-wide text-amber-500/80 shrink-0">
+                              Primary host
+                            </span>
+                          )}
+                        </div>
+                        {c.email && (
+                          <div className="text-xs text-theme-text-muted truncate">
+                            {c.email}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+
+                {/* "Other (specify)" — free-form email fallback. Backend
+                    resolves the email to a User at submit time and rejects
+                    with RECIPIENT_USER_NOT_FOUND if no match. */}
+                <label
+                  className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    recipientUserId === 'other'
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="recipient"
+                    value="other"
+                    checked={recipientUserId === 'other'}
+                    onChange={() => setRecipientUserId('other')}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-theme-text">
+                      Other (specify by email)
+                    </div>
+                    <div className="text-xs text-theme-text-muted mt-0.5">
+                      Use when the recipient isn't in the candidate list. Email
+                      must already match an rsv.pizza User account.
+                    </div>
+                    {recipientUserId === 'other' && (
+                      <div className="mt-2">
+                        <IconInput
+                          icon={Mail}
+                          type="email"
+                          placeholder="recipient@example.com *"
+                          value={recipientEmailInput}
+                          onChange={(e) => setRecipientEmailInput(e.target.value)}
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+              <p className="text-xs text-theme-text-muted mt-2">
+                Main host plus cohosts whose email matches a User account. Pick
+                the actual recipient — the audit row will credit them, not you.
               </p>
             </div>
           )}
