@@ -23,6 +23,12 @@ interface BulkActionsBarProps {
    * is grayed out + tooltip explains why.
    */
   eligibleBulkSendCount?: number;
+  /**
+   * argentina-92103: viewer role drives which buttons render. Underbosses
+   * see Approve / Reject only — Bulk Send, Mark Paid, Export Safe JSON are
+   * funds-adjacent operations that stay admin-only.
+   */
+  viewerRole?: 'admin' | 'underboss';
   busy?: boolean;
 }
 
@@ -35,9 +41,13 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   onExportSafeJson,
   onBulkSend,
   eligibleBulkSendCount = 0,
+  viewerRole = 'admin',
   busy = false,
 }) => {
   if (selectedCount === 0) return null;
+  // argentina-92103: underbosses can't send funds — hide Mark Paid, Bulk
+  // Send, Export Safe JSON. Approve / Reject stay visible.
+  const showFundsActions = viewerRole === 'admin';
   return (
     <div className="sticky top-[4rem] sm:top-[7rem] z-10 bg-theme-text/95 text-white rounded-xl px-3 py-2 sm:px-4 sm:py-3 mb-3 shadow-lg flex items-center gap-2 sm:gap-3 flex-wrap">
       <span className="text-sm font-medium">{selectedCount} selected</span>
@@ -60,16 +70,18 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
           <X size={14} />
           Reject
         </button>
-        <button
-          type="button"
-          onClick={onMarkPaid}
-          disabled={busy}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
-        >
-          <DollarSign size={14} />
-          Mark paid
-        </button>
-        {onBulkSend && (
+        {showFundsActions && (
+          <button
+            type="button"
+            onClick={onMarkPaid}
+            disabled={busy}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+          >
+            <DollarSign size={14} />
+            Mark paid
+          </button>
+        )}
+        {showFundsActions && onBulkSend && (
           <button
             type="button"
             onClick={onBulkSend}
@@ -85,7 +97,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             Bulk Send{eligibleBulkSendCount > 0 ? ` (${eligibleBulkSendCount})` : ''}
           </button>
         )}
-        {onExportSafeJson && (
+        {showFundsActions && onExportSafeJson && (
           <button
             type="button"
             onClick={onExportSafeJson}

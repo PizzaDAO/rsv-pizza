@@ -23,6 +23,7 @@ import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
+import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
@@ -76,6 +77,10 @@ function App() {
             <Route path="/gpp/leaderboard" element={<LeaderboardPage />} />
             {/* /payments must come before /:slug */}
             <Route path="/payments" element={<PaymentsAdminPage />} />
+            {/* argentina-92103: regional LATAM portal for the LATAM
+                underboss. Wraps PaymentsAdminPage with regionFilter +
+                portalSlug. Must come before /:slug. */}
+            <Route path="/payments/latam" element={<LatamPaymentsPage />} />
             {/* margherita-43821: /photos public global feed; must come before /:slug */}
             <Route path="/photos" element={<PhotosFeedPage />} />
             <Route path="/account" element={<AccountPage />} />

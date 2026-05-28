@@ -4065,16 +4065,36 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
   if (filters.cursor) params.set('cursor', filters.cursor);
   if (filters.limit) params.set('limit', String(filters.limit));
+  // argentina-92103: regional scope for /payments/latam (and any future
+  // regional portal). CSV of `parties.region` values; backend filters the
+  // query, totals, and per-row aggregates by region when present.
+  if (filters.regions && filters.regions.length > 0) {
+    params.set('regions', filters.regions.join(','));
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
+}
+
+/**
+ * argentina-92103: small helper for endpoints that don't accept the full
+ * AdminPayoutFilters object — appends `?regions=` when supplied.
+ */
+function regionsQuery(regions?: string[]): string {
+  if (!regions || regions.length === 0) return '';
+  return `?regions=${encodeURIComponent(regions.join(','))}`;
 }
 
 export async function listAdminPayouts(filters?: AdminPayoutFilters): Promise<AdminPayoutsResponse> {
   return apiRequest<AdminPayoutsResponse>(`/api/admin/payouts${buildPayoutQuery(filters)}`);
 }
 
-export async function getAdminPayout(id: string): Promise<AdminPayoutDetail> {
-  const res = await apiRequest<{ payout: AdminPayoutDetail }>(`/api/admin/payouts/${id}`);
+export async function getAdminPayout(
+  id: string,
+  opts?: { regions?: string[] },
+): Promise<AdminPayoutDetail> {
+  const res = await apiRequest<{ payout: AdminPayoutDetail }>(
+    `/api/admin/payouts/${id}${regionsQuery(opts?.regions)}`,
+  );
   return res.payout;
 }
 
@@ -4144,19 +4164,26 @@ export async function updatePayoutDocument(
 
 export async function approveAdminPayout(
   id: string,
-  opts?: { note?: string; autoExecute?: boolean },
+  opts?: { note?: string; autoExecute?: boolean; regions?: string[] },
 ): Promise<{ payout: AdminPayout; autoExecuteDeferred: boolean }> {
-  return apiRequest(`/api/admin/payouts/${id}/approve`, {
+  return apiRequest(`/api/admin/payouts/${id}/approve${regionsQuery(opts?.regions)}`, {
     method: 'POST',
     body: { note: opts?.note, autoExecute: opts?.autoExecute },
   });
 }
 
-export async function rejectAdminPayout(id: string, rejectionReason: string): Promise<AdminPayout> {
-  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/reject`, {
-    method: 'POST',
-    body: { rejectionReason },
-  });
+export async function rejectAdminPayout(
+  id: string,
+  rejectionReason: string,
+  opts?: { regions?: string[] },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/reject${regionsQuery(opts?.regions)}`,
+    {
+      method: 'POST',
+      body: { rejectionReason },
+    },
+  );
   return res.payout;
 }
 
@@ -4169,11 +4196,41 @@ export async function rejectAdminPayout(id: string, rejectionReason: string): Pr
  * Backend validates the current status is 'approved' (400 NOT_APPROVED
  * otherwise) and writes a payout_audit row with action='unapprove'.
  */
-export async function unapproveAdminPayout(id: string, note?: string): Promise<AdminPayout> {
-  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/unapprove`, {
-    method: 'POST',
-    body: { note },
-  });
+export async function unapproveAdminPayout(
+  id: string,
+  noteOrOpts?: string | { note?: string; regions?: string[] },
+): Promise<AdminPayout> {
+  // Backward-compat: callers passing a bare `note` string still work.
+  const note = typeof noteOrOpts === 'string' ? noteOrOpts : noteOrOpts?.note;
+  const regions = typeof noteOrOpts === 'string' ? undefined : noteOrOpts?.regions;
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/unapprove${regionsQuery(regions)}`,
+    {
+      method: 'POST',
+      body: { note },
+    },
+  );
+  return res.payout;
+}
+
+/**
+ * argentina-92103: regional underbosses (and admins) signal "this payout is
+ * ready for the payments team to pay" without actually changing status or
+ * sending funds. Writes a payout_audit row + fires Telegram + email to the
+ * payments-team distribution. The flag is sticky (admins see a green Flag
+ * icon on the row until they execute or revert).
+ */
+export async function flagReadyForPayment(
+  id: string,
+  opts?: { regions?: string[]; note?: string },
+): Promise<AdminPayoutDetail> {
+  const res = await apiRequest<{ payout: AdminPayoutDetail }>(
+    `/api/admin/payouts/${id}/flag-ready${regionsQuery(opts?.regions)}`,
+    {
+      method: 'POST',
+      body: { note: opts?.note },
+    },
+  );
   return res.payout;
 }
 
@@ -4353,9 +4410,9 @@ export async function fetchUserPaymentDetails(userId: string): Promise<UserPayme
  * have a saved payment method, excluding parties that already have an
  * in-flight payout. Surfaced as the "Prepay queue" section on /payments.
  */
-export async function fetchPrepayQueue(): Promise<PrepayQueueRow[]> {
+export async function fetchPrepayQueue(opts?: { regions?: string[] }): Promise<PrepayQueueRow[]> {
   const res = await apiRequest<{ rows: PrepayQueueRow[] }>(
-    '/api/admin/payouts/prepay-queue',
+    `/api/admin/payouts/prepay-queue${regionsQuery(opts?.regions)}`,
   );
   return res.rows;
 }

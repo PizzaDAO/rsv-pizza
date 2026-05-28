@@ -1801,7 +1801,25 @@ export interface ShippingPayout extends Payout {
 }
 
 // Admin-list payout: includes embedded party + host info
-export interface AdminPayout extends Payout {
+/**
+ * argentina-92103: per-payout "flagged ready for payment" signal.
+ *
+ * Set when a regional underboss (or any admin) clicks the "Flag ready for
+ * payment" button on PayoutReviewModal. Records an audit row and notifies
+ * the payments team via Telegram + email. The flag is sticky until invalidated
+ * by a downstream mark_paid / reject / unapprove audit on the same row, so
+ * the green icon stays visible on admins' /payments queue until they act on it.
+ *
+ * Fields are optional for backward-compat with cached responses during a
+ * rolling deploy — clients should treat `undefined` as `false`.
+ */
+export interface FlaggedReadyFields {
+  flaggedReady?: boolean;
+  flaggedReadyAt?: string | null;
+  flaggedReadyBy?: string | null;
+}
+
+export interface AdminPayout extends Payout, FlaggedReadyFields {
   party: {
     id: string;
     name: string;
@@ -1924,6 +1942,13 @@ export interface AdminPayoutFilters {
   country?: string;
   /** mascarpone-49102: event-tag filter — single tag "has" match on `parties.event_tags`. `'all'` / undefined = no filter. */
   tag?: string;
+  /**
+   * argentina-92103: regional scope for regional /payments portals (e.g.
+   * `/payments/latam` -> `['central-america','south-america']`). When set,
+   * only payouts whose `party.region` is in the list are returned. Used to
+   * gate regional underbosses to their region scope.
+   */
+  regions?: string[];
   currency?: string;
   /**
    * salumi-89172: Purpose filter — 'event' (host reimbursements) or

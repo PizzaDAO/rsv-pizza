@@ -19,6 +19,12 @@ interface PrepayQueueTableProps {
    * vs cap" indicators).
    */
   onPartyUpdated?: (partyId: string) => void;
+  /**
+   * argentina-92103: viewer role. Underbosses see the queue read-only — the
+   * "Create prepayment" button is hidden because creating a prepayment is
+   * a funds-sending operation reserved for admins.
+   */
+  viewerRole?: 'admin' | 'underboss';
 }
 
 /**
@@ -117,7 +123,11 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
   onCreatePrepayment,
   onHostClick,
   onPartyUpdated,
+  viewerRole = 'admin',
 }) => {
+  // argentina-92103: hide the "Create prepayment" button for underbosses
+  // — creating a prepayment is funds-sending and stays admin-only.
+  const canCreatePrepayment = viewerRole === 'admin';
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* regina-89172: mobile card list (<640px). Each row becomes a stacked
@@ -179,13 +189,15 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                     onUpdated={() => onPartyUpdated?.(row.party.id)}
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onCreatePrepayment(row)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shrink-0"
-                >
-                  Create prepayment
-                </button>
+                {canCreatePrepayment && (
+                  <button
+                    type="button"
+                    onClick={() => onCreatePrepayment(row)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shrink-0"
+                  >
+                    Create prepayment
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -268,13 +280,15 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                     />
                   </td>
                   <td className="px-3 py-3 align-top text-right">
-                    <button
-                      type="button"
-                      onClick={() => onCreatePrepayment(row)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
-                    >
-                      Create prepayment
-                    </button>
+                    {canCreatePrepayment && (
+                      <button
+                        type="button"
+                        onClick={() => onCreatePrepayment(row)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
+                      >
+                        Create prepayment
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

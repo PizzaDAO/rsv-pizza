@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Flag } from 'lucide-react';
 import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
@@ -250,7 +250,27 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       <td className="px-3 py-3">
-        <PayoutStatusPill status={payout.status} />
+        <div className="inline-flex items-center gap-1.5">
+          <PayoutStatusPill status={payout.status} />
+          {/* argentina-92103: green Flag icon when a regional underboss (or
+              admin) has marked the row "ready for payment". Tooltip carries
+              the actor email + timestamp. Sticky until the row is paid /
+              rejected / reverted. */}
+          {showAdminColumns && admin.flaggedReady && (
+            <Flag
+              size={14}
+              className="text-emerald-500 shrink-0"
+              aria-label="Flagged ready for payment"
+              title={
+                `Flagged ready` +
+                (admin.flaggedReadyBy ? ` by ${admin.flaggedReadyBy}` : '') +
+                (admin.flaggedReadyAt
+                  ? ` on ${new Date(admin.flaggedReadyAt).toLocaleString()}`
+                  : '')
+              }
+            />
+          )}
+        </div>
       </td>
 
       {actions && (
