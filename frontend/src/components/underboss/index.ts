@@ -1,4 +1,5 @@
 export { RegionStats } from './RegionStats';
+export { RegionBreakdown } from './RegionBreakdown';
 export { EventTable } from './EventTable';
 export { EventRow } from './EventRow';
 export { ProgressIndicator } from './ProgressIndicator';

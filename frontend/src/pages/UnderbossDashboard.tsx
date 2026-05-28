@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, OutreachTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, OutreachTab } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -540,6 +540,12 @@ export function UnderbossDashboard() {
         <section className="mb-8">
           <RegionStats stats={displayData.stats} />
         </section>
+
+        {isAdmin && allData && (
+          <section className="mb-8">
+            <RegionBreakdown events={allData.events} />
+          </section>
+        )}
 
         {/* Events / Cities Tabs */}
         <section>
