@@ -1768,10 +1768,10 @@ export interface ExternalPaymentInput {
   externalProofUrl?: string;
   adminNotes: string;         // REQUIRED — must explain why this is being recorded
   /**
-   * aglio-62584: admin override for the acciuga-62583 per-submission $625
+   * aglio-62584: admin override for the acciuga-62583 per-submission $650
    * cap. Set to `true` when backfilling a pre-cap historical out-of-band
-   * payment that legitimately exceeded $625. Without this, finalAmountUsd
-   * > $625 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
+   * payment that legitimately exceeded $650. Without this, finalAmountUsd
+   * > $650 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
    */
   allowOverSubmissionCap?: boolean;
 }
@@ -1902,7 +1902,7 @@ export interface AdminPayoutDetail extends AdminPayout {
 
 /**
  * bianco-89172: cumulative paid-USDC summary for a single recipient wallet.
- * Backs the per-address $626 cap warning in PayoutReviewModal + BulkSendModal.
+ * Backs the per-address $651 cap warning in PayoutReviewModal + BulkSendModal.
  * `wouldExceed` is null when no proposed `amount` was supplied to the
  * `/wallet-paid-total` endpoint; true / false when one was.
  */

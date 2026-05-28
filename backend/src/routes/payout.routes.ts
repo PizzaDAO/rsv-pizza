@@ -303,14 +303,14 @@ async function assertMercuryAllowed(
 }
 
 /**
- * acciuga-62583: hard per-submission ceiling of $625. Independent of the
- * per-party cap (tiramisu-49102): even on uncapped parties, no single payout
- * row can exceed $625. Same numeric value as `HARD_PER_TX_CEILING_USD` in
- * usdc-base.service.ts (the USDC-execute ceiling) but enforced here at
- * SUBMISSION time across all methods — no override path. Hosts split larger
- * expenses across multiple submissions.
+ * acciuga-62583: hard per-submission ceiling of $650 (grana-92103, was $625).
+ * Independent of the per-party cap (tiramisu-49102): even on uncapped parties,
+ * no single payout row can exceed $650. Same numeric value as
+ * `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the USDC-execute ceiling)
+ * but enforced here at SUBMISSION time across all methods — no override path.
+ * Hosts split larger expenses across multiple submissions.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_SUBMISSION_MAX_USD = 650;
 
 function assertWithinPerSubmissionCap(amountUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;

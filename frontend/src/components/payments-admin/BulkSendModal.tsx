@@ -39,7 +39,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
 
   // bianco-89172: per-wallet prior-paid totals (lowercased addr → WalletPaidTotal).
   // Fetched once per modal-open, then locally combined with the in-batch
-  // amounts to determine which wallets would push past the $626 cap. The
+  // amounts to determine which wallets would push past the $651 cap. The
   // admin must tick `overrideCap` to enable Send when any wallet would exceed.
   const [walletTotals, setWalletTotals] = useState<Map<string, WalletPaidTotal>>(new Map());
   const [walletTotalsLoading, setWalletTotalsLoading] = useState(false);
@@ -105,7 +105,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
         } catch {
           return [
             addr,
-            { address: addr, paidUsd: 0, paidCount: 0, capUsd: 626, wouldExceed: null },
+            { address: addr, paidUsd: 0, paidCount: 0, capUsd: 651, wouldExceed: null },
           ] as const;
         }
       }),
@@ -129,7 +129,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   // on Send + the warning panel.
   const capAnalysis = useMemo(() => {
     if (walletTotals.size === 0 || eligible.length === 0) {
-      return { overCapRowIds: new Set<string>(), overCapWalletCount: 0, capUsd: 626 };
+      return { overCapRowIds: new Set<string>(), overCapWalletCount: 0, capUsd: 651 };
     }
     // First, sum up each wallet's in-batch total.
     const inBatchByWallet = new Map<string, number>();
@@ -138,7 +138,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
       if (!addr) continue;
       inBatchByWallet.set(addr, (inBatchByWallet.get(addr) || 0) + Number(p.finalAmountUsd || 0));
     }
-    let capUsd = 626;
+    let capUsd = 651;
     const overCapWallets = new Set<string>();
     for (const [addr, batchTotal] of inBatchByWallet.entries()) {
       const wt = walletTotals.get(addr);
@@ -267,7 +267,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
 
             {/* bianco-89172: per-address cap warning. Surfaces a count of
                 wallets in this selection whose prior-paid + in-batch total
-                would exceed the $626 cap, and requires an explicit override
+                would exceed the $651 cap, and requires an explicit override
                 checkbox to enable Send. The server-side pre-flight is the
                 ultimate gate; this is just defense-in-depth for admins. */}
             {walletTotalsLoading && eligible.length > 0 && (

@@ -30,10 +30,10 @@ import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 /**
  * vegetariana-92103: client-side mirror of backend `PER_SUBMISSION_MAX_USD`
  * (see backend/src/routes/admin-payout.routes.ts). Used to surface the amber
- * warning + ack Checkbox when an admin enters > $625. Server is the source
+ * warning + ack Checkbox when an admin enters > $650. Server is the source
  * of truth — this is purely UX so admins can opt into the override.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_SUBMISSION_MAX_USD = 650;
 
 interface ExternalPaymentModalProps {
   onClose: () => void;
@@ -92,7 +92,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // vegetariana-92103: ack for the per-submission cap override. Required
-  // before Record Payment enables when the typed amount > $625. Reset on
+  // before Record Payment enables when the typed amount > $650. Reset on
   // every modal close so re-opening starts clean.
   const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
 
@@ -247,7 +247,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
         adminNotes: composedAdminNotes,
       };
       // vegetariana-92103: only forward the override when the admin actually
-      // acked the over-cap warning. Backend rejects > $625 without it.
+      // acked the over-cap warning. Backend rejects > $650 without it.
       if (exceedsCap && ackOverSubmissionCap) {
         body.allowOverSubmissionCap = true;
       }

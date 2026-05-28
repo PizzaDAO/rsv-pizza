@@ -31,7 +31,7 @@ function stripGppPrefix(name: string): string {
  * 400 with PER_SUBMISSION_CAP_EXCEEDED and the inline error panel
  * surfaces the message.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_SUBMISSION_MAX_USD = 650;
 
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
@@ -53,7 +53,7 @@ interface PayoutReviewModalProps {
   onUnapprove?: () => Promise<string | void> | string | void;
   /**
    * aglio-62584: `allowOverSubmissionCap` is forwarded when the admin has
-   * acknowledged the amber $625 cap warning by ticking the override
+   * acknowledged the amber $650 cap warning by ticking the override
    * Checkbox below the amount input. Parent should forward to
    * `updateAdminPayout`'s `allowOverSubmissionCap` field.
    *
@@ -78,7 +78,7 @@ interface PayoutReviewModalProps {
    * For wire / mercury_card → admin-supplied refs.
    *
    * `allowOverPerAddressCap` (bianco-89172): forwarded when the admin has
-   * acknowledged the per-address $626 cap warning by ticking the override
+   * acknowledged the per-address $651 cap warning by ticking the override
    * checkbox in the execute form.
    */
   onExecute: (body: {
@@ -207,7 +207,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [adminNotes, setAdminNotes] = useState(payout.adminNotes ?? '');
   const [adminNotesDirty, setAdminNotesDirty] = useState(false);
 
-  // aglio-62584: per-submission $625 cap override + inline error surface.
+  // aglio-62584: per-submission $650 cap override + inline error surface.
   // `ackOverSubmissionCap` is required before Save enables when the draft
   // amount exceeds the cap; `saveAmountError` renders inline below the
   // Save button when the backend (or any other failure path) rejects.
@@ -239,7 +239,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   >(null);
   const [usdcCapLoading, setUsdcCapLoading] = useState(false);
 
-  // bianco-89172: per-address $626 cap warning state. `walletPaidTotal` is
+  // bianco-89172: per-address $651 cap warning state. `walletPaidTotal` is
   // null until the USDC execute form opens; `overrideCap` is the admin's
   // acknowledgement of the warning (required to enable Execute when
   // `wouldExceed === true`).
@@ -436,7 +436,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       }
     }
     // bianco-89172: fetch the per-address paid-total for the recipient wallet
-    // so we can warn the admin if this payout would push past the $626 cap.
+    // so we can warn the admin if this payout would push past the $651 cap.
     if (
       payout.payoutMethod === 'usdc_base' &&
       payout.payoutWalletAddress &&
@@ -1206,7 +1206,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="text-emerald-800/70">Daily cap status unavailable.</span>
                       )}
                     </div>
-                    {/* bianco-89172: per-address $626 cap warning. Only shown
+                    {/* bianco-89172: per-address $651 cap warning. Only shown
                         when the proposed send would push the recipient's
                         cumulative paid total past the cap. The admin must
                         explicitly tick the override checkbox; until they do,

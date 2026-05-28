@@ -17,11 +17,11 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
- * acciuga-62583: hard per-submission ceiling of $625. Matches backend
- * `PER_SUBMISSION_CAP_EXCEEDED` (400). No override path — admin must split
- * larger prepayments across multiple submissions.
+ * acciuga-62583: hard per-submission ceiling of $650 (grana-92103, was $625).
+ * Matches backend `PER_SUBMISSION_CAP_EXCEEDED` (400). No override path —
+ * admin must split larger prepayments across multiple submissions.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_SUBMISSION_MAX_USD = 650;
 
 interface CreatePrepaymentModalProps {
   row: PrepayQueueRow;
@@ -58,12 +58,12 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   // path uses the same field. null = no cap configured (uncapped event).
   const paidSoFar = row.partyPaidUsd ?? 0;
   const remainingUsd: number | null = cap > 0 ? Math.max(0, cap - paidSoFar) : null;
-  // bianco-89172: keep the cents — `Math.round(0.5 * 625)` gave 313, off by
+  // bianco-89172: keep the cents — `Math.round(0.5 * 650)` gave 325, off by
   // 50¢ from the actual half. payouts.final_amount_usd is numeric(12,2) so
   // decimals round-trip through the backend without loss.
   // tiramisu-49102: clamp the default to whatever's actually left under the
   // cap (so a paid-down event doesn't pre-fill an over-cap default).
-  // acciuga-62583: also clamp to the hard $625 per-submission ceiling so the
+  // acciuga-62583: also clamp to the hard $650 per-submission ceiling so the
   // pre-filled default never trips the backend limit.
   const rawDefault = cap > 0 ? cap / 2 : 1;
   const clampedDefault =
@@ -109,7 +109,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   const exceedsRemaining =
     remainingUsd != null && Number.isFinite(amountNum) && amountNum > remainingUsd + 1e-9;
 
-  // acciuga-62583: hard per-submission $625 ceiling, no override. Backend
+  // acciuga-62583: hard per-submission $650 ceiling, no override. Backend
   // also enforces with 400 PER_SUBMISSION_CAP_EXCEEDED.
   const exceedsPerSubmission = Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
 
@@ -313,7 +313,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                 Exceeds cap: ${remainingUsd.toFixed(2)} remaining
               </p>
             )}
-            {/* acciuga-62583: per-submission $625 ceiling */}
+            {/* acciuga-62583: per-submission $650 ceiling */}
             {exceedsPerSubmission && (
               <p className="text-xs text-red-500 mt-1">
                 Single payments capped at ${PER_SUBMISSION_MAX_USD}
