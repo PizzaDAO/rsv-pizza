@@ -45,7 +45,11 @@ export const PERSONAL_BRAND_STEMS: string[] = [
 // are placeholder / test addresses (e.g. example.invalid) that should never be
 // counted as a real industry org. pecorino-64118 follow-up.
 const RESERVED_TLD_SUFFIXES: string[] = ['.invalid', '.test', '.localhost', '.example'];
-const RESERVED_EXAMPLE_DOMAINS: Set<string> = new Set(['example.com', 'example.org', 'example.net']);
+const RESERVED_EXAMPLE_DOMAINS: Set<string> = new Set([
+  'example.com', 'example.org', 'example.net',
+  // pecorino-64118: common placeholder/test domains seen in fake/test RSVPs.
+  'test.com', 'test.org', 'test.net',
+]);
 
 // Returns the lowercased email domain if it is NOT a personal provider,
 // internal/host domain, or personal-brand variant; otherwise null. Also
