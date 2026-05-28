@@ -678,6 +678,28 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       Rate: {Number(payout.exchangeRate).toFixed(4)} · Extracted: {formatUsd(Number(payout.extractedAmountUsd))}
                     </div>
                   )}
+                  {/* lonza-92103: city-level cumulative paid total, mirrored
+                      from the PayoutRow / PrepayQueueTable "Already paid"
+                      caption (parmigiana-89172). Admins were having to close
+                      the modal to scan the row for this number — surface it
+                      here so it's visible alongside the amount. Amber when
+                      the total has already reached the party's effective
+                      cap, muted otherwise. */}
+                  {payout.party.paidTotalCount != null &&
+                    payout.party.paidTotalCount > 0 && (
+                      <div
+                        className={`text-xs mt-1 ${
+                          payout.party.effectiveReimbursementCapUsd != null &&
+                          (payout.party.paidTotalUsd ?? 0) >=
+                            payout.party.effectiveReimbursementCapUsd
+                            ? 'text-amber-300'
+                            : 'text-theme-text-muted'
+                        }`}
+                      >
+                        Already paid to this city: $
+                        {(payout.party.paidTotalUsd ?? 0).toFixed(2)} ({payout.party.paidTotalCount})
+                      </div>
+                    )}
                 </div>
               )}
             </div>
