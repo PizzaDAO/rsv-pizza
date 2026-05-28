@@ -318,7 +318,9 @@ export const PaymentDetailsCard: React.FC = () => {
   const submitDisabled = !partyId || optInPending || !methodValid;
 
   return (
-    <div className="card p-6">
+    // pizzaiolo-92103: `id` is the scroll target for the inline notice in
+    // NewPayoutForm when the host hasn't saved a valid payment method yet.
+    <div id="payment-details-card" className="card p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-theme-text">
