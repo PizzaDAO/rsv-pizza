@@ -15,8 +15,10 @@ import {
   HelpCircle,
   Search,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import {
   recordExternalPayment,
   searchApprovedParties,
@@ -24,6 +26,14 @@ import {
 } from '../../lib/api';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
+
+/**
+ * vegetariana-92103: client-side mirror of backend `PER_SUBMISSION_MAX_USD`
+ * (see backend/src/routes/admin-payout.routes.ts). Used to surface the amber
+ * warning + ack Checkbox when an admin enters > $625. Server is the source
+ * of truth — this is purely UX so admins can opt into the override.
+ */
+const PER_SUBMISSION_MAX_USD = 625;
 
 interface ExternalPaymentModalProps {
   onClose: () => void;
@@ -81,6 +91,11 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // vegetariana-92103: ack for the per-submission cap override. Required
+  // before Record Payment enables when the typed amount > $625. Reset on
+  // every modal close so re-opening starts clean.
+  const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
+
   // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -89,6 +104,14 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // vegetariana-92103: reset the over-cap ack whenever the modal unmounts so
+  // the next open doesn't carry a stale acknowledgement forward.
+  useEffect(() => {
+    return () => {
+      setAckOverSubmissionCap(false);
+    };
+  }, []);
 
   // Debounced party search — only runs when the picker is "open" (no party
   // selected yet) and the query has ≥2 chars.
@@ -126,6 +149,11 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
+  // vegetariana-92103: typed amount exceeds the per-submission cap. Recomputed
+  // every render so the amber warning toggles as the admin types.
+  const exceedsCap =
+    Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+
   // derived: the active partyId (only set once a party is picked).
   const partyId = selectedParty?.id ?? '';
 
@@ -134,8 +162,19 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     if (!hostUserId.trim()) return false;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return false;
     if (!adminNotes.trim()) return false;
+    // vegetariana-92103: over-cap submissions require an explicit ack.
+    if (exceedsCap && !ackOverSubmissionCap) return false;
     return !submitting && !uploading;
-  }, [partyId, hostUserId, amountNum, adminNotes, submitting, uploading]);
+  }, [
+    partyId,
+    hostUserId,
+    amountNum,
+    adminNotes,
+    submitting,
+    uploading,
+    exceedsCap,
+    ackOverSubmissionCap,
+  ]);
 
   function handlePickParty(p: ApprovedPartySearchResult) {
     setSelectedParty(p);
@@ -207,6 +246,11 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
         externalProofUrl,
         adminNotes: composedAdminNotes,
       };
+      // vegetariana-92103: only forward the override when the admin actually
+      // acked the over-cap warning. Backend rejects > $625 without it.
+      if (exceedsCap && ackOverSubmissionCap) {
+        body.allowOverSubmissionCap = true;
+      }
       if (method === 'wire' || method === 'other') {
         if (wireReference.trim()) body.wireReference = wireReference.trim();
       }
@@ -368,16 +412,50 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
           )}
 
           {/* Amount */}
-          <IconInput
-            icon={DollarSign}
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Amount USD *"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-            required
-          />
+          <div>
+            <IconInput
+              icon={DollarSign}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Amount USD *"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              required
+            />
+            {/* vegetariana-92103: amber warning + ack Checkbox when the typed
+                amount exceeds the per-submission cap. The backend will reject
+                the record unless `allowOverSubmissionCap: true` is forwarded.
+                External (off-platform) payments don't go through our hot
+                wallet so the admin override is fine when the funds already
+                moved via Venmo/wire/multisig. */}
+            {exceedsCap && (
+              <div className="card p-4 border-l-4 border-l-amber-500 bg-amber-500/10 mt-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={18} />
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium text-amber-200 mb-1">
+                      Over per-submission cap
+                    </div>
+                    <div className="text-theme-text-secondary">
+                      ${amountNum.toFixed(2)} exceeds the ${PER_SUBMISSION_MAX_USD} per-submission cap.
+                      Most rsv.pizza-managed sends still cap at ${PER_SUBMISSION_MAX_USD} per tx for safety,
+                      but external (off-platform) payments don't go through our hot wallet —
+                      admin override is fine here when you've already paid via Venmo/wire/your own multisig.
+                    </div>
+                    <div className="mt-3">
+                      <Checkbox
+                        checked={ackOverSubmissionCap}
+                        onChange={() => setAckOverSubmissionCap((v) => !v)}
+                        label="I acknowledge — record the over-cap external payment"
+                        labelClassName="text-sm text-amber-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Method radios — USDC / Mercury / Wire / Other, matching reorder pref */}
           <div>
