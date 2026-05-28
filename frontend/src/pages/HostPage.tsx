@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap } from 'lucide-react';
+import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap, MessageSquare } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
 import { useGuestsRealtime } from '../hooks/useGuestsRealtime';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,7 @@ import { DisplaysWidget } from '../components/displays';
 import { RaffleWidget } from '../components/raffle';
 import { BudgetTab } from '../components/budget';
 import { ChecklistTab } from '../components/checklist';
+import { SurveyTab } from '../components/SurveyTab';
 import { PartyKitWidget } from '../components/kit';
 import { PromoWidget } from '../components/promo';
 import { FlyerTab } from '../components/flyer';
@@ -46,9 +47,9 @@ import { DayOfTab } from '../components/day-of';
 // Super admin email that can edit any party
 const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
 
-type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
+type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
 
-const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
+const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
 
 function HostPageContent() {
   const { t } = useTranslation('host');
@@ -216,6 +217,8 @@ function HostPageContent() {
       { id: 'guests' as TabType, label: t('tabs.guests'), icon: Users },
       { id: 'pizza' as TabType, label: isGPP ? t('tabs.pizza') : t('tabs.pizzaAndDrinks'), icon: Pizza },
       { id: 'photos' as TabType, label: t('tabs.photos'), icon: Camera },
+      // romana-61204: post-event guest survey (send + results)
+      { id: 'survey' as TabType, label: 'Survey', icon: MessageSquare },
     ];
 
     // Build pinned tabs from party.pinnedApps
@@ -534,6 +537,10 @@ function HostPageContent() {
 
               {activeTab === 'checklist' && party && (
                 <ChecklistTab partyId={party.id} />
+              )}
+
+              {activeTab === 'survey' && party && (
+                <SurveyTab partyId={party.id} surveyEnabled={party.surveyEnabled ?? true} />
               )}
 
               {activeTab === 'promo' && (

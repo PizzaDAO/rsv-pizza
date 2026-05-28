@@ -34,6 +34,7 @@ import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
 import { PartnersPage } from './pages/PartnersPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { PhotosFeedPage } from './pages/PhotosFeedPage';
+import { SurveyPage } from './pages/SurveyPage';
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -108,6 +109,8 @@ function App() {
             <Route path="/onesheet/:slug" element={<OneSheetPage />} />
             <Route path="/raleigh" element={<Navigate to="/durham" replace />} />
             <Route path="/cmohhr0640003jp047krjarz0" element={<Navigate to="/nashville" replace />} />
+            {/* romana-61204: post-event survey — must come before /:slug catch-all */}
+            <Route path="/survey/:token" element={<SurveyPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>

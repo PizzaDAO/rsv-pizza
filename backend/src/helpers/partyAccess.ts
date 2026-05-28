@@ -31,6 +31,7 @@ export const VALID_TAB_IDS = [
   'raffle',
   'budget',
   'checklist',
+  'survey',
   'gpp',
   'promo',
   'flyer',
