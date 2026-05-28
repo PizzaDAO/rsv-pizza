@@ -4063,6 +4063,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.purpose && filters.purpose !== 'all') params.set('purpose', filters.purpose);
   if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
+  // arancino-92103: sort order. Omit when default to keep URLs clean.
+  if (filters.sort && filters.sort !== 'created_desc') params.set('sort', filters.sort);
   if (filters.cursor) params.set('cursor', filters.cursor);
   if (filters.limit) params.set('limit', String(filters.limit));
   // argentina-92103: regional scope for /payments/latam (and any future

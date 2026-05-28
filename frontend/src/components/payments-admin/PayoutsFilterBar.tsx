@@ -49,6 +49,20 @@ const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = 
   { value: 'shipping', label: 'Shipping' },
 ];
 
+// arancino-92103: sort order for the payouts list. `created_desc` is the
+// default (newest submitted first) and matches the prior implicit ordering.
+type SortValue = NonNullable<AdminPayoutFilters['sort']>;
+const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
+  { value: 'created_desc', label: 'Newest first' },
+  { value: 'created_asc', label: 'Oldest first' },
+  { value: 'amount_desc', label: 'Highest amount' },
+  { value: 'amount_asc', label: 'Lowest amount' },
+];
+const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
+  (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
+  {} as Record<SortValue, string>,
+);
+
 /**
  * regina-89172: count active (non-default) filter fields. Status tab strip is
  * NOT counted here — it's always visible above the collapsible section, so
@@ -66,6 +80,9 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
   if (filters.dateTo) n += 1;
+  // arancino-92103: count sort as an active filter when it differs from
+  // the default `created_desc` (newest first).
+  if (filters.sort && filters.sort !== 'created_desc') n += 1;
   return n;
 }
 
@@ -141,7 +158,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         id="payouts-filter-controls"
         className={`${expanded ? 'block' : 'hidden'} sm:block`}
       >
-        <div className="grid grid-cols-1 md:grid-cols-8 gap-2 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-9 gap-2 items-start">
           {/* salame-83472: unified search — host email|name OR party name. */}
           <div className="md:col-span-2">
             <IconInput
@@ -242,6 +259,22 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               ))}
             </select>
           </div>
+
+          {/* arancino-92103: Sort dropdown — controls the row order of the
+              payouts table. Default is `created_desc` (newest submitted
+              first), matching the prior implicit backend ordering. */}
+          <div>
+            <select
+              value={filters.sort ?? 'created_desc'}
+              onChange={(e) => update({ sort: e.target.value as SortValue })}
+              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+              aria-label="Sort payouts"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-end gap-2 mt-3">
@@ -262,6 +295,14 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
               aria-label="Date to"
             />
+            {/* arancino-92103: surface non-default sort as a small chip so
+                admins notice the list is reordered. The dropdown above is
+                the canonical control; this chip is a read-only summary. */}
+            {filters.sort && filters.sort !== 'created_desc' && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#E52828]/10 text-[#E52828] text-xs font-medium">
+                Sort: {SORT_LABEL[filters.sort]}
+              </span>
+            )}
           </div>
           <button
             type="button"

@@ -1460,6 +1460,24 @@ router.get(
         ? req.query.cursor
         : undefined;
 
+      // arancino-92103: optional `?sort=` for the admin payouts queue. Default
+      // (`created_desc`) preserves the prior implicit ordering — non-sorting
+      // callers see no behavior change. Cursor pagination is keyed on
+      // `createdAt`, so when the caller picks a non-default sort we fall back
+      // to offset-based pagination (parses `cursor` as the offset count)
+      // instead of encoding cursors per orderBy.
+      const sortMap: Record<string, Prisma.PayoutOrderByWithRelationInput> = {
+        created_desc: { createdAt: 'desc' },
+        created_asc: { createdAt: 'asc' },
+        amount_desc: { finalAmountUsd: 'desc' },
+        amount_asc: { finalAmountUsd: 'asc' },
+      };
+      const sortKey = typeof req.query.sort === 'string' && sortMap[req.query.sort]
+        ? (req.query.sort as keyof typeof sortMap)
+        : 'created_desc';
+      const orderBy = sortMap[sortKey];
+      const useOffsetPagination = sortKey !== 'created_desc';
+
       const findArgs: any = {
         where,
         include: {
@@ -1470,12 +1488,19 @@ router.get(
             include: { uploadedBy: { select: { id: true, name: true, email: true } } },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         take: limit + 1,
       };
       if (cursor) {
-        findArgs.cursor = { id: cursor };
-        findArgs.skip = 1;
+        if (useOffsetPagination) {
+          const parsedOffset = parseInt(cursor, 10);
+          if (Number.isFinite(parsedOffset) && parsedOffset > 0) {
+            findArgs.skip = parsedOffset;
+          }
+        } else {
+          findArgs.cursor = { id: cursor };
+          findArgs.skip = 1;
+        }
       }
 
       const rows = await prisma.payout.findMany(findArgs);
@@ -1483,7 +1508,14 @@ router.get(
       let nextCursor: string | null = null;
       const page = rows.slice(0, limit);
       if (rows.length > limit) {
-        nextCursor = page[page.length - 1]?.id ?? null;
+        if (useOffsetPagination) {
+          // arancino-92103: encode cursor as the next offset so subsequent
+          // "load more" calls keep the same sort.
+          const currentOffset = typeof findArgs.skip === 'number' ? findArgs.skip : 0;
+          nextCursor = String(currentOffset + limit);
+        } else {
+          nextCursor = page[page.length - 1]?.id ?? null;
+        }
       }
 
       // Totals — computed over the filtered set (NOT just the current page),
