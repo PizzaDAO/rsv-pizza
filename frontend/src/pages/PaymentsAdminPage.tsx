@@ -7,6 +7,7 @@ import {
   fetchAdminMe,
   fetchUnderbossMe,
   listAdminPayouts,
+  fetchPayoutsByParty,
   getAdminPayout,
   approveAdminPayout,
   rejectAdminPayout,
@@ -25,6 +26,7 @@ import type {
   AdminPayoutDetail,
   AdminPayoutFilters,
   AdminPayoutTotals,
+  PartyPayoutsRow,
   PrepayQueueRow,
   PrepayCandidate,
 } from '../types';
@@ -32,6 +34,7 @@ import { formatUsd } from '../components/payments-shared';
 import {
   PayoutsFilterBar,
   PayoutsTable,
+  PayoutsByPartyTable,
   PayoutReviewModal,
   PaymentsStatsCards,
   BulkActionsBar,
@@ -120,7 +123,40 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const [filters, setFilters] = useState<AdminPayoutFilters>(() =>
     regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS,
   );
+
+  // etruria-92103: primary view is `by-city` (one row per party with status
+  // aggregates, click to expand). `by-payment` keeps the existing per-row
+  // view available as a fallback. The choice persists in localStorage so an
+  // admin's preference sticks across reloads. Falls back to `by-city` on
+  // first visit OR if the stored value is corrupted.
+  type ViewMode = 'by-city' | 'by-payment';
+  const VIEW_MODE_LS_KEY = 'paymentsAdminViewMode';
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'by-city';
+    try {
+      const stored = window.localStorage.getItem(VIEW_MODE_LS_KEY);
+      if (stored === 'by-city' || stored === 'by-payment') return stored;
+    } catch {
+      /* localStorage disabled (Safari private etc.) — fall through */
+    }
+    return 'by-city';
+  });
+  // Persist on change. Guarded against localStorage failures so private-mode
+  // browsing doesn't crash the page.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_MODE_LS_KEY, viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
+
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
+  // etruria-92103: by-city grouped rows from /by-party. Empty when viewing
+  // the per-payment list. `byPartyRows` and `payouts` are populated by the
+  // same loader (`loadPage`) so the rest of the page can read from whichever
+  // is active.
+  const [byPartyRows, setByPartyRows] = useState<PartyPayoutsRow[]>([]);
   const [totals, setTotals] = useState<AdminPayoutTotals | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -263,10 +299,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         // argentina-92103: always re-inject the portal's region scope so a
         // user clearing filters can't accidentally fetch the global queue.
         const merged = regions ? { ...f, regions } : f;
-        const res = await listAdminPayouts(merged);
-        setPayouts((prev) => (append ? [...prev, ...res.payouts] : res.payouts));
-        setTotals(res.totals);
-        setNextCursor(res.nextCursor);
+        // etruria-92103: when by-city is active, ALSO fetch the grouped
+        // shape from /by-party so the new table can render. The per-payment
+        // list is still fetched so:
+        //   1. Stats cards / totals / bulk-selection still work identically.
+        //   2. Toggling back to by-payment is instant (no extra fetch).
+        // append (load-more) only applies to the per-payment list; by-city
+        // returns all matching parties in one go (v1).
+        const listRes = await listAdminPayouts(merged);
+        setPayouts((prev) => (append ? [...prev, ...listRes.payouts] : listRes.payouts));
+        setTotals(listRes.totals);
+        setNextCursor(listRes.nextCursor);
+        if (!append && viewMode === 'by-city') {
+          const grouped = await fetchPayoutsByParty(merged);
+          setByPartyRows(grouped.rows);
+        }
       } catch (err: any) {
         setErrorMsg(err.message || 'Failed to load payments');
       } finally {
@@ -274,7 +321,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         else setLoading(false);
       }
     },
-    [regions],
+    [regions, viewMode],
   );
 
   // Re-load when filters change (and we're allowed)
@@ -339,6 +386,19 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     () => payouts.filter((p) => selectedIds.has(p.id)),
     [payouts, selectedIds],
   );
+
+  // etruria-92103: in by-city view, surface how many distinct cities (parties)
+  // the current selection spans so the BulkActionsBar can render "N payments
+  // across M cities selected". Derived from `selectedPayouts` so it stays in
+  // sync with the same source of truth.
+  const selectedCityCount = useMemo(() => {
+    if (viewMode !== 'by-city') return 0;
+    const partyIds = new Set<string>();
+    for (const p of selectedPayouts) {
+      if (p.party?.id) partyIds.add(p.party.id);
+    }
+    return partyIds.size;
+  }, [selectedPayouts, viewMode]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -801,8 +861,49 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           availableTags={availableTags}
         />
 
+        {/* etruria-92103: by-city / by-payment view toggle. by-city is the
+            default; the choice persists in localStorage. Lives on its own
+            row above the bulk-actions bar so it doesn't fight the filter
+            bar's sticky position. */}
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <span className="text-xs uppercase tracking-wide text-theme-text-muted">View:</span>
+          <div
+            role="tablist"
+            aria-label="Payments view mode"
+            className="inline-flex rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'by-city'}
+              onClick={() => setViewMode('by-city')}
+              className={`px-3 py-1.5 text-sm font-medium ${
+                viewMode === 'by-city'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
+              }`}
+            >
+              By city
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'by-payment'}
+              onClick={() => setViewMode('by-payment')}
+              className={`px-3 py-1.5 text-sm font-medium ${
+                viewMode === 'by-payment'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
+              }`}
+            >
+              By payment
+            </button>
+          </div>
+        </div>
+
         <BulkActionsBar
           selectedCount={selectedIds.size}
+          selectedCityCount={selectedCityCount}
           onApprove={handleBulkApprove}
           onReject={handleBulkReject}
           onMarkPaid={handleBulkMarkPaid}
@@ -820,26 +921,51 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           </div>
         )}
 
-        <PayoutsTable
-          payouts={payouts}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelect}
-          onToggleSelectAll={toggleSelectAll}
-          onRowClick={openDetail}
-          onApprove={handleRowApprove}
-          onReject={handleRowReject}
-          onEdit={openDetail}
-          onMarkPaid={handleRowMarkPaid}
-          onExecute={openDetail}
-          onUnapprove={handleRowUnapprove}
-          onHostClick={(userId) => setHostDetailUserId(userId)}
-          onCapUpdated={() => refresh()}
-          busyRowId={rowBusyId}
-          loading={loading}
-          loadingMore={loadingMore}
-          onLoadMore={() => loadPage({ ...filters, cursor: nextCursor || undefined }, true)}
-          hasMore={!!nextCursor}
-        />
+        {/* etruria-92103: render the by-city table when toggled on; the
+            per-payment table is the fallback view + the "old" experience for
+            admins who prefer the flat list. Both share the same handlers /
+            selection state. Bulk-action selection still operates on per-
+            payment ids — selecting a whole party doesn't make sense as a
+            bulk-action concept, so selection lives inside the expansion. */}
+        {viewMode === 'by-city' ? (
+          <PayoutsByPartyTable
+            rows={byPartyRows}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onRowClick={openDetail}
+            onApprove={handleRowApprove}
+            onReject={handleRowReject}
+            onEdit={openDetail}
+            onMarkPaid={handleRowMarkPaid}
+            onExecute={openDetail}
+            onUnapprove={handleRowUnapprove}
+            onHostClick={(userId) => setHostDetailUserId(userId)}
+            onCapUpdated={() => refresh()}
+            busyRowId={rowBusyId}
+            loading={loading}
+          />
+        ) : (
+          <PayoutsTable
+            payouts={payouts}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+            onRowClick={openDetail}
+            onApprove={handleRowApprove}
+            onReject={handleRowReject}
+            onEdit={openDetail}
+            onMarkPaid={handleRowMarkPaid}
+            onExecute={openDetail}
+            onUnapprove={handleRowUnapprove}
+            onHostClick={(userId) => setHostDetailUserId(userId)}
+            onCapUpdated={() => refresh()}
+            busyRowId={rowBusyId}
+            loading={loading}
+            loadingMore={loadingMore}
+            onLoadMore={() => loadPage({ ...filters, cursor: nextCursor || undefined }, true)}
+            hasMore={!!nextCursor}
+          />
+        )}
 
         {detailLoading && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">

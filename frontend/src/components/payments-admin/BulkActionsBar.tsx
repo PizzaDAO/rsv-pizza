@@ -3,6 +3,13 @@ import { Check, X, DollarSign, Loader2, FileJson, Send } from 'lucide-react';
 
 interface BulkActionsBarProps {
   selectedCount: number;
+  /**
+   * etruria-92103: when the page is in by-city view, also pass the number of
+   * distinct cities (parties) the current selection spans so the label reads
+   * "N payments across M cities selected". Omitted (or 0) reverts to the
+   * existing "N selected" label.
+   */
+  selectedCityCount?: number;
   onApprove: () => void;
   onReject: () => void;
   onMarkPaid: () => void;
@@ -34,6 +41,7 @@ interface BulkActionsBarProps {
 
 export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   selectedCount,
+  selectedCityCount,
   onApprove,
   onReject,
   onMarkPaid,
@@ -48,9 +56,16 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   // argentina-92103: underbosses can't send funds — hide Mark Paid, Bulk
   // Send, Export Safe JSON. Approve / Reject stay visible.
   const showFundsActions = viewerRole === 'admin';
+  // etruria-92103: in by-city view, surface "N payments across M cities
+  // selected" so admins understand that their selection lives at the
+  // payment level (not the party level).
+  const label =
+    selectedCityCount && selectedCityCount > 0
+      ? `${selectedCount} payment${selectedCount === 1 ? '' : 's'} across ${selectedCityCount} cit${selectedCityCount === 1 ? 'y' : 'ies'} selected`
+      : `${selectedCount} selected`;
   return (
     <div className="bg-theme-text/95 text-white rounded-xl px-3 py-2 sm:px-4 sm:py-3 mb-3 shadow-lg flex items-center gap-2 sm:gap-3 flex-wrap">
-      <span className="text-sm font-medium">{selectedCount} selected</span>
+      <span className="text-sm font-medium">{label}</span>
       <div className="sm:ml-auto flex items-center gap-2 flex-wrap">
         <button
           type="button"
