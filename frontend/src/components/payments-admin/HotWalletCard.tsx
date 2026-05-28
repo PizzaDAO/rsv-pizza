@@ -39,7 +39,17 @@ function formatBalance(raw: string, decimals: number): string {
   });
 }
 
-export const HotWalletCard: React.FC = () => {
+interface HotWalletCardProps {
+  /**
+   * argentina-92103: regional-portal mode (e.g. /payments/latam). When true,
+   * the refresh button + low-gas warning + "Base only" caption are hidden
+   * so the underboss can see balances without touching them. Address + the
+   * two balance tiles still render.
+   */
+  readOnly?: boolean;
+}
+
+export const HotWalletCard: React.FC<HotWalletCardProps> = ({ readOnly = false }) => {
   const [info, setInfo] = useState<PayoutWalletInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -94,18 +104,21 @@ export const HotWalletCard: React.FC = () => {
             Self-custodied payout wallet — funds outgoing USDC payments.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="p-2 rounded-md text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover disabled:opacity-50"
-          title="Refresh balances"
-          aria-label="Refresh balances"
-        >
-          {loading
-            ? <Loader2 size={14} className="animate-spin" />
-            : <RefreshCcw size={14} />}
-        </button>
+        {/* argentina-92103: refresh button hidden in read-only (UB) mode. */}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="p-2 rounded-md text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover disabled:opacity-50"
+            title="Refresh balances"
+            aria-label="Refresh balances"
+          >
+            {loading
+              ? <Loader2 size={14} className="animate-spin" />
+              : <RefreshCcw size={14} />}
+          </button>
+        )}
       </div>
 
       {errorMsg ? (
@@ -160,7 +173,10 @@ export const HotWalletCard: React.FC = () => {
               >
                 {formatBalance(info.ethBalance, 6)}
               </div>
-              {lowGas && (
+              {/* argentina-92103: low-gas warning suppressed in read-only
+                  mode — the UB can't refill or send so the call-to-action
+                  isn't actionable for him. */}
+              {lowGas && !readOnly && (
                 <div className="text-[11px] text-amber-300/80 mt-1">
                   Below {LOW_GAS_THRESHOLD_ETH} ETH — top up to avoid stalled payouts.
                 </div>
@@ -179,9 +195,14 @@ export const HotWalletCard: React.FC = () => {
             </div>
           </div>
 
-          <div className="text-xs text-theme-text-muted mt-3">
-            Send only ETH (gas) and USDC on Base (chainId {info.chainId}) — other tokens/chains will be lost.
-          </div>
+          {/* argentina-92103: "send only ETH/USDC on Base" caption is hidden
+              in read-only mode — the UB isn't depositing, so the warning is
+              clutter. */}
+          {!readOnly && (
+            <div className="text-xs text-theme-text-muted mt-3">
+              Send only ETH (gas) and USDC on Base (chainId {info.chainId}) — other tokens/chains will be lost.
+            </div>
+          )}
         </>
       ) : null}
     </section>

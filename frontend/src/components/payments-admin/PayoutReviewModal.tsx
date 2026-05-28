@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2 } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -122,6 +122,22 @@ interface PayoutReviewModalProps {
    * underlying row picks up the new tag set (effective cap, etc.).
    */
   onTagsChanged?: (next: string[]) => void;
+  /**
+   * argentina-92103: viewer role. `'underboss'` hides Execute Payment +
+   * Mark paid (manual) and surfaces a green "Flag ready for payment"
+   * button instead. Defaults to `'admin'` so existing callers keep the
+   * full power-user UI.
+   */
+  viewerRole?: 'admin' | 'underboss';
+  /**
+   * argentina-92103: flag the payout as "ready for payment" — writes an
+   * audit row + notifies the payments team. Surfaced as a green Flag
+   * button in the footer for underbosses; admins also see it so they can
+   * pre-flag rows before exiting the modal. Returns an error message
+   * string on failure (same contract as `onUnapprove`) so the modal can
+   * render it inline.
+   */
+  onFlagReady?: () => Promise<string | void> | string | void;
   busy?: boolean;
 }
 
@@ -142,8 +158,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onPayAgain,
   adminRole,
   onTagsChanged,
+  viewerRole = 'admin',
+  onFlagReady,
   busy = false,
 }) => {
+  // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
+  // green Flag-ready button replaces them in the footer slot.
+  const isAdminViewer = viewerRole === 'admin';
+  // Flag-ready inline error (mirrors the unapproveError pattern).
+  const [flagReadyError, setFlagReadyError] = useState<string | null>(null);
   // tagliatelle-49102: in-modal event_tags editor. Full admins (admin /
   // super_admin) can add + remove tags via PATCH /api/parties/:id;
   // payment_admin sees the chips read-only. Hooks must be declared above
@@ -1492,24 +1515,31 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   Revert to Pending
                 </button>
               )}
-              <button
-                type="button"
-                onClick={openExecuteForm}
-                disabled={busy || selfPayoutBlocked || showExecuteForm}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
-              >
-                <Send size={14} />
-                {isFailed ? 'Retry Payment' : 'Execute Payment'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMarkPaidForm(true)}
-                disabled={busy || selfPayoutBlocked}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
-              >
-                <DollarSign size={14} />
-                Mark paid (manual)
-              </button>
+              {/* argentina-92103: Execute + Mark-paid are admin-only — they
+                  send funds. Underbosses can still flag-ready (rendered below
+                  in the shared block) but cannot run the funds operations. */}
+              {isAdminViewer && (
+                <>
+                  <button
+                    type="button"
+                    onClick={openExecuteForm}
+                    disabled={busy || selfPayoutBlocked || showExecuteForm}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    <Send size={14} />
+                    {isFailed ? 'Retry Payment' : 'Execute Payment'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMarkPaidForm(true)}
+                    disabled={busy || selfPayoutBlocked}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    <DollarSign size={14} />
+                    Mark paid (manual)
+                  </button>
+                </>
+              )}
             </>
           )}
           {isClosed && onReopen && (
@@ -1555,6 +1585,47 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </button>
             );
           })()}
+          {/* argentina-92103: Flag ready for payment. Visible for both UB
+              and admin (admins can pre-flag a row so the payments-team
+              channel surfaces it as a to-do). Hidden once the row is in
+              a terminal state (paid / rejected / withdrawn) — the
+              backend would 400 in that case anyway. Renders sticky-green
+              "Flagged" pill instead when already flagged so the actor
+              doesn't double-fire notifications. */}
+          {onFlagReady && !isPaid && !isClosed && payout.status !== 'withdrawn' && (
+            payout.flaggedReady ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-sm font-medium"
+                title={
+                  `Flagged ready` +
+                  (payout.flaggedReadyBy ? ` by ${payout.flaggedReadyBy}` : '') +
+                  (payout.flaggedReadyAt
+                    ? ` on ${new Date(payout.flaggedReadyAt).toLocaleString()}`
+                    : '')
+                }
+              >
+                <Flag size={14} />
+                Flagged ready
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  setFlagReadyError(null);
+                  const err = await onFlagReady();
+                  if (typeof err === 'string' && err) {
+                    setFlagReadyError(err);
+                  }
+                }}
+                disabled={busy || selfPayoutBlocked}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
+                title="Notify the payments team that this payout is ready to be paid"
+              >
+                <Flag size={14} />
+                Flag ready for payment
+              </button>
+            )
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -1569,6 +1640,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
               <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
               <span>{unapproveError}</span>
+            </div>
+          )}
+          {/* argentina-92103: inline error for Flag-ready. Same pattern
+              as unapproveError above. */}
+          {flagReadyError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{flagReadyError}</span>
             </div>
           )}
         </div>

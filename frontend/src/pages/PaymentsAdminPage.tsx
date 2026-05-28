@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 import {
   fetchAdminMe,
+  fetchUnderbossMe,
   listAdminPayouts,
   getAdminPayout,
   approveAdminPayout,
@@ -17,6 +18,7 @@ import {
   fetchWalletPaidTotal,
   exportAdminPayoutsCsv,
   fetchPrepayQueue,
+  flagReadyForPayment,
 } from '../lib/api';
 import type {
   AdminPayout,
@@ -44,10 +46,34 @@ import {
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
 
+/**
+ * argentina-92103: viewer-role state. The full /payments dashboard accepts
+ * admin / super_admin / payment_admin (`viewerKind: 'admin'`). A regional
+ * portal (`regionFilter` supplied) additionally accepts an underboss whose
+ * regions overlap the requested scope (`viewerKind: 'underboss'`).
+ */
 type RoleState =
   | { kind: 'loading' }
   | { kind: 'denied' }
-  | { kind: 'allowed'; role: 'admin' | 'super_admin' | 'payment_admin'; email: string };
+  | {
+      kind: 'allowed';
+      role: 'admin' | 'super_admin' | 'payment_admin' | 'underboss';
+      viewerKind: 'admin' | 'underboss';
+      email: string;
+    };
+
+/**
+ * argentina-92103: optional props that turn the dashboard into a regional
+ * portal. When set:
+ *  - All payouts queries forward `?regions=` so the queue is scoped server-side.
+ *  - Page title flips to `"{portalSlug.toUpperCase()} Payments"`.
+ *  - Viewer-role resolution accepts a matching-region underboss in addition
+ *    to admin-class. Funds-sending affordances stay admin-only.
+ */
+export interface PaymentsAdminPageProps {
+  regionFilter?: string[];
+  portalSlug?: string;
+}
 
 const DEFAULT_FILTERS: AdminPayoutFilters = {
   status: 'all',
@@ -80,9 +106,20 @@ function matchesPrepaySearch(row: PrepayQueueRow, q: string): boolean {
   return false;
 }
 
-export function PaymentsAdminPage() {
+export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPageProps = {}) {
+  // argentina-92103: stable region list to thread into API calls + filter
+  // defaults. `undefined` when running as the unscoped /payments dashboard.
+  const regions = useMemo(
+    () => (regionFilter && regionFilter.length > 0 ? [...regionFilter] : undefined),
+    [regionFilter],
+  );
+  const portalLabel = portalSlug ? portalSlug.toUpperCase() : null;
+  const isRegionalPortal = !!regions;
+
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
-  const [filters, setFilters] = useState<AdminPayoutFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<AdminPayoutFilters>(() =>
+    regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS,
+  );
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
   const [totals, setTotals] = useState<AdminPayoutTotals | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -158,16 +195,20 @@ export function PaymentsAdminPage() {
 
   const loadPrepayQueue = useCallback(async () => {
     try {
-      const rows = await fetchPrepayQueue();
+      const rows = await fetchPrepayQueue(regions ? { regions } : undefined);
       setPrepayQueue(rows);
     } catch {
       // Non-fatal — the rest of the dashboard works without it. Silently
       // collapse the section by leaving the array empty.
       setPrepayQueue([]);
     }
-  }, []);
+  }, [regions]);
 
   // Role gate
+  // argentina-92103: when running as a regional portal (regions set), we
+  // accept EITHER an admin-class user OR an underboss whose regions overlap
+  // the requested scope. The unscoped /payments dashboard keeps the
+  // pre-existing admin-class-only behavior.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -176,33 +217,65 @@ export function PaymentsAdminPage() {
         if (cancelled) return;
         const r = me.role;
         if (me.isAdmin && (r === 'admin' || r === 'super_admin' || r === 'payment_admin')) {
-          setRole({ kind: 'allowed', role: r, email: me.email || '' });
-        } else {
-          setRole({ kind: 'denied' });
+          setRole({
+            kind: 'allowed',
+            role: r,
+            viewerKind: 'admin',
+            email: me.email || '',
+          });
+          return;
         }
+        // Regional portal fallback — check for underboss with matching region.
+        if (regions) {
+          try {
+            const ub = await fetchUnderbossMe();
+            if (cancelled) return;
+            if (ub.isUnderboss && Array.isArray(ub.regions)) {
+              const overlap = ub.regions.some((reg) => regions.includes(reg));
+              if (overlap) {
+                setRole({
+                  kind: 'allowed',
+                  role: 'underboss',
+                  viewerKind: 'underboss',
+                  email: ub.email || '',
+                });
+                return;
+              }
+            }
+          } catch {
+            // fall through to denied
+          }
+        }
+        setRole({ kind: 'denied' });
       } catch {
         if (!cancelled) setRole({ kind: 'denied' });
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [regions]);
 
-  const loadPage = useCallback(async (f: AdminPayoutFilters, append = false) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await listAdminPayouts(f);
-      setPayouts((prev) => (append ? [...prev, ...res.payouts] : res.payouts));
-      setTotals(res.totals);
-      setNextCursor(res.nextCursor);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load payments');
-    } finally {
-      if (append) setLoadingMore(false);
-      else setLoading(false);
-    }
-  }, []);
+  const loadPage = useCallback(
+    async (f: AdminPayoutFilters, append = false) => {
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      setErrorMsg(null);
+      try {
+        // argentina-92103: always re-inject the portal's region scope so a
+        // user clearing filters can't accidentally fetch the global queue.
+        const merged = regions ? { ...f, regions } : f;
+        const res = await listAdminPayouts(merged);
+        setPayouts((prev) => (append ? [...prev, ...res.payouts] : res.payouts));
+        setTotals(res.totals);
+        setNextCursor(res.nextCursor);
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Failed to load payments');
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    },
+    [regions],
+  );
 
   // Re-load when filters change (and we're allowed)
   useEffect(() => {
@@ -410,7 +483,9 @@ export function PaymentsAdminPage() {
     setDetail(null);
     setDetailLoading(true);
     try {
-      const d = await getAdminPayout(p.id);
+      // argentina-92103: forward the portal's region scope so underbosses
+      // can't peek at out-of-region detail by direct id lookup.
+      const d = await getAdminPayout(p.id, regions ? { regions } : undefined);
       setDetail(d);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load payment');
@@ -426,7 +501,7 @@ export function PaymentsAdminPage() {
   async function handleRowApprove(id: string) {
     setRowBusyId(id);
     try {
-      await approveAdminPayout(id);
+      await approveAdminPayout(id, regions ? { regions } : undefined);
       // crudo-91827: refresh BOTH lists — an approved prepayment row stays in
       // the payouts table but may affect prepay-queue derivations.
       await Promise.all([refresh(), loadPrepayQueue()]);
@@ -443,7 +518,7 @@ export function PaymentsAdminPage() {
   async function handleRowUnapprove(id: string) {
     setRowBusyId(id);
     try {
-      await unapproveAdminPayout(id);
+      await unapproveAdminPayout(id, regions ? { regions } : undefined);
       await Promise.all([refresh(), loadPrepayQueue()]);
     } catch (err: any) {
       setErrorMsg(err.message || 'Revert failed');
@@ -467,7 +542,7 @@ export function PaymentsAdminPage() {
     setDetail(null);
     setDetailLoading(true);
     try {
-      const d = await getAdminPayout(p.id);
+      const d = await getAdminPayout(p.id, regions ? { regions } : undefined);
       setDetail(d);
     } finally {
       setDetailLoading(false);
@@ -480,7 +555,7 @@ export function PaymentsAdminPage() {
     setBulkBusy(true);
     try {
       for (const id of Array.from(selectedIds)) {
-        await approveAdminPayout(id).catch(() => null);
+        await approveAdminPayout(id, regions ? { regions } : undefined).catch(() => null);
       }
       clearSelection();
       // crudo-91827: refresh BOTH lists for the same reason as the row variant.
@@ -503,10 +578,11 @@ export function PaymentsAdminPage() {
   // re-appears in the queue), and closes the modal on success.
   async function confirmReject(reason: string) {
     if (!rejectTarget) return;
+    const rejectOpts = regions ? { regions } : undefined;
     if (rejectTarget.kind === 'single') {
       setRowBusyId(rejectTarget.id);
       try {
-        await rejectAdminPayout(rejectTarget.id, reason);
+        await rejectAdminPayout(rejectTarget.id, reason, rejectOpts);
         await Promise.all([refresh(), loadPrepayQueue()]);
         setRejectTarget(null);
       } catch (err: any) {
@@ -518,7 +594,7 @@ export function PaymentsAdminPage() {
       setBulkBusy(true);
       try {
         for (const id of rejectTarget.ids) {
-          await rejectAdminPayout(id, reason).catch(() => null);
+          await rejectAdminPayout(id, reason, rejectOpts).catch(() => null);
         }
         setSelectedIds(new Set());
         await Promise.all([refresh(), loadPrepayQueue()]);
@@ -576,7 +652,12 @@ export function PaymentsAdminPage() {
           <ShieldX size={48} className="text-red-400/60 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
           <p className="text-theme-text-muted text-center max-w-md">
-            The host payments dashboard is only available to admins and payment admins.
+            {/* argentina-92103: tailored message for regional portals so the
+                UB knows which account to sign in as. Falls back to the
+                global message for the unscoped /payments dashboard. */}
+            {portalSlug
+              ? `Sign in as the ${portalSlug.toLowerCase()} underboss or as an admin to view this portal.`
+              : 'The host payments dashboard is only available to admins and payment admins.'}
           </p>
         </div>
       </Layout>
@@ -585,10 +666,17 @@ export function PaymentsAdminPage() {
 
   const meUserId = ''; // not needed client-side — backend enforces self-payout block
 
+  // argentina-92103: regional portals show "{PORTAL} Payments" in the
+  // header + title (e.g. "LATAM Payments"). Underbosses also see a
+  // softer subhead — they can review + flag but not send funds.
+  const pageTitle = portalLabel ? `${portalLabel} Payments` : 'Host Payments';
+  const viewerKind = role.viewerKind;
+  const isUnderboss = viewerKind === 'underboss';
+
   return (
     <Layout>
       <Helmet>
-        <title>Host Payments | RSV.Pizza</title>
+        <title>{pageTitle} | RSV.Pizza</title>
       </Helmet>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
@@ -597,9 +685,11 @@ export function PaymentsAdminPage() {
             <DollarSign size={20} className="text-emerald-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-theme-text">Host Payments</h1>
+            <h1 className="text-2xl font-bold text-theme-text">{pageTitle}</h1>
             <p className="text-sm text-theme-text-muted">
-              Review, approve, and pay out host payments ({role.role.replace('_', ' ')})
+              {isUnderboss
+                ? 'Review, approve, and flag payments ready for the payments team to pay.'
+                : `Review, approve, and pay out host payments (${role.role.replace('_', ' ')})`}
             </p>
           </div>
           {totals && totals.totalUsdPending > 0 && (
@@ -607,14 +697,18 @@ export function PaymentsAdminPage() {
               {formatUsd(totals.totalUsdPending)} pending
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => setShowExternalModal(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
-          >
-            <Plus size={14} />
-            Record External Payment
-          </button>
+          {/* argentina-92103: Record External Payment is funds-adjacent
+              (it records a paid-status payout out-of-band). Stays admin-only. */}
+          {!isUnderboss && (
+            <button
+              type="button"
+              onClick={() => setShowExternalModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
+            >
+              <Plus size={14} />
+              Record External Payment
+            </button>
+          )}
           <button
             type="button"
             onClick={handleExportCsv}
@@ -627,8 +721,11 @@ export function PaymentsAdminPage() {
         </div>
 
         {/* coppa-91827: hot wallet address + ETH/USDC balances so admins know
-            where to deposit funds and can verify they landed. Self-fetches. */}
-        <HotWalletCard />
+            where to deposit funds and can verify they landed. Self-fetches.
+            argentina-92103: read-only for regional underbosses — they can
+            see balances but the refresh button + low-gas warning + "Base
+            only" caption are hidden. */}
+        <HotWalletCard readOnly={isUnderboss} />
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
 
@@ -689,6 +786,7 @@ export function PaymentsAdminPage() {
                 onCreatePrepayment={(row) => setPrepayModalRow(row)}
                 onHostClick={(userId) => setHostDetailUserId(userId)}
                 onPartyUpdated={() => loadPrepayQueue()}
+                viewerRole={viewerKind}
               />
             )}
           </section>
@@ -713,6 +811,7 @@ export function PaymentsAdminPage() {
           eligibleBulkSendCount={eligibleBulkSendCount}
           onClear={clearSelection}
           busy={bulkBusy}
+          viewerRole={viewerKind}
         />
 
         {errorMsg && (
@@ -765,8 +864,11 @@ export function PaymentsAdminPage() {
             onApprove={async (note) => {
               setModalBusy(true);
               try {
-                await approveAdminPayout(detail.id, { note });
-                const fresh = await getAdminPayout(detail.id);
+                await approveAdminPayout(detail.id, {
+                  note,
+                  ...(regions ? { regions } : {}),
+                });
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
               } catch (err: any) {
@@ -778,8 +880,8 @@ export function PaymentsAdminPage() {
             onReject={async (reason) => {
               setModalBusy(true);
               try {
-                await rejectAdminPayout(detail.id, reason);
-                const fresh = await getAdminPayout(detail.id);
+                await rejectAdminPayout(detail.id, reason, regions ? { regions } : undefined);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
               } catch (err: any) {
@@ -795,8 +897,8 @@ export function PaymentsAdminPage() {
             onUnapprove={async () => {
               setModalBusy(true);
               try {
-                await unapproveAdminPayout(detail.id);
-                const fresh = await getAdminPayout(detail.id);
+                await unapproveAdminPayout(detail.id, regions ? { regions } : undefined);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await Promise.all([refresh(), loadPrepayQueue()]);
                 return;
@@ -816,7 +918,7 @@ export function PaymentsAdminPage() {
                   // acknowledgement so the backend bypasses the 400.
                   allowOverSubmissionCap: opts?.allowOverSubmissionCap,
                 });
-                const fresh = await getAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
                 return;
@@ -834,7 +936,7 @@ export function PaymentsAdminPage() {
               setModalBusy(true);
               try {
                 await updateAdminPayout(detail.id, { adminNotes: notes });
-                const fresh = await getAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
               } catch (err: any) {
                 setErrorMsg(err.message || 'Save failed');
@@ -846,7 +948,7 @@ export function PaymentsAdminPage() {
               setModalBusy(true);
               try {
                 await markAdminPayoutPaid(detail.id, refs);
-                const fresh = await getAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
               } catch (err: any) {
@@ -859,7 +961,7 @@ export function PaymentsAdminPage() {
               setModalBusy(true);
               try {
                 await executeAdminPayout(detail.id, body);
-                const fresh = await getAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
               } catch (err: any) {
@@ -894,14 +996,38 @@ export function PaymentsAdminPage() {
             // tagliatelle-49102: surface the actor's role so the modal can
             // gate the in-modal event_tags editor. `payment_admin` sees the
             // chips read-only; `admin` / `super_admin` get add + remove.
-            adminRole={role.kind === 'allowed' ? role.role : null}
+            // argentina-92103: underbosses pass `null` here so the tag
+            // editor stays read-only for them too.
+            adminRole={
+              role.kind === 'allowed' && role.role !== 'underboss' ? role.role : null
+            }
+            // argentina-92103: viewer-role threading. The modal hides
+            // Execute / Mark-paid for underbosses and surfaces the green
+            // Flag-ready button.
+            viewerRole={viewerKind}
+            onFlagReady={async () => {
+              setModalBusy(true);
+              try {
+                const fresh = await flagReadyForPayment(
+                  detail.id,
+                  regions ? { regions } : undefined,
+                );
+                setDetail(fresh);
+                await refresh();
+                return;
+              } catch (err: any) {
+                return err?.message || 'Flag failed';
+              } finally {
+                setModalBusy(false);
+              }
+            }}
             // tagliatelle-49102: after a tag mutation, refresh the payouts
             // list so the row picks up the new tag set (effective cap, etc.).
             // Re-fetch the modal detail too so its local `payout.party.eventTags`
             // stays in sync with anything the backend derives.
             onTagsChanged={async () => {
               try {
-                const fresh = await getAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
               } catch {
                 /* ignore — modal already updated its local state */
