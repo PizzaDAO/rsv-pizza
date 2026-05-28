@@ -50,14 +50,14 @@ const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'fai
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
- * acciuga-62583: hard per-submission ceiling of $625 — same value as
- * `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the USDC-execute ceiling)
- * but enforced here at SUBMISSION time across all admin create/edit paths
- * (external POST + PATCH). No override path. Inlined here per task spec —
- * mirror of the helper in payout.routes.ts so we don't extract a shared module
- * just for two callsites.
+ * acciuga-62583: hard per-submission ceiling of $650 (grana-92103, was $625) —
+ * same value as `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the
+ * USDC-execute ceiling) but enforced here at SUBMISSION time across all admin
+ * create/edit paths (external POST + PATCH). No override path. Inlined here
+ * per task spec — mirror of the helper in payout.routes.ts so we don't extract
+ * a shared module just for two callsites.
  */
-const PER_SUBMISSION_MAX_USD = 625;
+const PER_SUBMISSION_MAX_USD = 650;
 
 function assertWithinPerSubmissionCap(amountUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
@@ -1147,7 +1147,7 @@ router.post(
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
 
-      // acciuga-62583: hard per-submission $625 ceiling — enforced BEFORE the
+      // acciuga-62583: hard per-submission $650 ceiling — enforced BEFORE the
       // party-cap check so the error message is clearer even on uncapped
       // events. Out-of-band records still get split by default.
       // aglio-62584: admin override available here too — when the admin is
@@ -2122,7 +2122,7 @@ router.get(
 // Returns cumulative paid USDC for a single recipient wallet, optionally with
 // a `wouldExceed` flag for a proposed additional amount. Backs the warning
 // panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
-// already received $Y; sending $Z more would push past the $626 per-address
+// already received $Y; sending $Z more would push past the $651 per-address
 // cap" before they fire off a duplicate payment.
 //
 // Query params:
@@ -2201,7 +2201,7 @@ async function executePayout(params: {
   };
   body: any;
   /**
-   * bianco-89172: when true, skip the per-address $626 cumulative cap
+   * bianco-89172: when true, skip the per-address $651 cumulative cap
    * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
    * the warning's acknowledgement checkbox has been ticked.
    */
@@ -2492,7 +2492,7 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
-        // bianco-89172: admin can acknowledge the per-address $626 cap
+        // bianco-89172: admin can acknowledge the per-address $651 cap
         // warning via the PayoutReviewModal checkbox; the frontend forwards
         // the flag here.
         allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),

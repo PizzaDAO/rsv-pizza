@@ -7,7 +7,7 @@ import { appealReimbursementCap } from '../../lib/api';
 // Mirrors HARD_PER_TX_CEILING_USD in backend/src/services/usdc-base.service.ts.
 // Hosts already at this cap can't be pushed higher via the appeal form; they
 // need to talk to an underboss directly.
-const MAX_PER_TX_CEILING_USD = 625;
+const MAX_PER_TX_CEILING_USD = 650;
 
 interface AppealCapModalProps {
   partyId: string;

@@ -35,20 +35,21 @@ import { prisma } from '../config/database.js';
 
 const USDC_BASE_ADDRESS: Hex = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
-const HARD_PER_TX_CEILING_USD = 625;
+const HARD_PER_TX_CEILING_USD = 650;
 const DEFAULT_PER_TX_CAP_USD = 200;
 const DEFAULT_DAILY_CAP_USD = 2000;
 const TX_RECEIPT_TIMEOUT_MS = 90_000;
 
 /**
  * bianco-89172: per-address cumulative cap. No single 0x address should ever
- * receive more than $626 USDC across all parties without explicit admin
- * acknowledgement. Matches HARD_PER_TX_CEILING_USD + $1 cushion (so a single
- * at-the-ceiling tx doesn't accidentally trip this) while still catching the
- * double-payment scenarios observed in Osogbo ($626) and Seropédica ($600).
+ * receive more than $651 USDC (grana-92103, was $626) across all parties
+ * without explicit admin acknowledgement. Matches HARD_PER_TX_CEILING_USD +
+ * $1 cushion (so a single at-the-ceiling tx doesn't accidentally trip this)
+ * while still catching the double-payment scenarios observed in Osogbo ($626)
+ * and Seropédica ($600).
  * Override via `sendUsdcPayment(addr, amt, { allowOverPerAddressCap: true })`.
  */
-export const PER_ADDRESS_HARD_CAP_USD = 626;
+export const PER_ADDRESS_HARD_CAP_USD = 651;
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -214,7 +215,7 @@ export async function getPerAddressPaidTotals(
  * Throws on any pre-flight failure or onchain revert. Caller must persist the
  * resulting `txHash` on the payout row.
  *
- * `opts.allowOverPerAddressCap` (bianco-89172): bypass the per-address $626
+ * `opts.allowOverPerAddressCap` (bianco-89172): bypass the per-address $651
  * cumulative-paid pre-flight. Required when the admin has acknowledged the
  * warning in PayoutReviewModal / BulkSendModal. Default false.
  */
