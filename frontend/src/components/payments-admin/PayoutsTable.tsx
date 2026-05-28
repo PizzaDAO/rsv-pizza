@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, Pencil, Eye, DollarSign, Send, Loader2 } from 'lucide-react';
+import { Check, X, Pencil, Eye, DollarSign, Send, Loader2, Undo2 } from 'lucide-react';
 import type { AdminPayout, PayoutStatus } from '../../types';
 import { PayoutRow } from '../payments-shared';
 
@@ -15,6 +15,11 @@ interface PayoutsTableProps {
   onMarkPaid: (payout: AdminPayout) => void;
   /** Opens the modal so the admin can execute via the method-specific confirmation form. */
   onExecute: (payout: AdminPayout) => void;
+  /**
+   * caprino-92103: revert an `approved` payout back to `pending`. Surfaced as
+   * a small Undo2 icon in the row's action group when status === 'approved'.
+   */
+  onUnapprove?: (id: string) => void;
   /**
    * siciliana-69183: open the read-only HostPaymentDetailsModal for the given
    * User.id. Surfaced when the admin clicks the host name in a row.
@@ -41,6 +46,7 @@ function ActionsCell({
   onEdit,
   onMarkPaid,
   onExecute,
+  onUnapprove,
 }: {
   payout: AdminPayout;
   busy: boolean;
@@ -49,6 +55,7 @@ function ActionsCell({
   onEdit: (payout: AdminPayout) => void;
   onMarkPaid: (payout: AdminPayout) => void;
   onExecute: (payout: AdminPayout) => void;
+  onUnapprove?: (id: string) => void;
 }) {
   const status: PayoutStatus = payout.status;
   return (
@@ -106,6 +113,20 @@ function ActionsCell({
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
+          {/* caprino-92103: revert approved -> pending. Only surfaced when
+              status is strictly 'approved' (not 'failed') and the parent
+              wired onUnapprove. Amber to signal "reverse course". */}
+          {status === 'approved' && onUnapprove && (
+            <button
+              type="button"
+              onClick={() => onUnapprove(payout.id)}
+              disabled={busy}
+              className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600 disabled:opacity-50"
+              title="Revert to Pending"
+            >
+              <Undo2 size={15} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onMarkPaid(payout)}
@@ -132,6 +153,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
   onEdit,
   onMarkPaid,
   onExecute,
+  onUnapprove,
   onHostClick,
   onCapUpdated,
   busyRowId,
@@ -205,6 +227,7 @@ export const PayoutsTable: React.FC<PayoutsTableProps> = ({
                     onEdit={onEdit}
                     onMarkPaid={onMarkPaid}
                     onExecute={onExecute}
+                    onUnapprove={onUnapprove}
                   />
                 }
               />

@@ -9,6 +9,7 @@ import {
   getAdminPayout,
   approveAdminPayout,
   rejectAdminPayout,
+  unapproveAdminPayout,
   updateAdminPayout,
   markAdminPayoutPaid,
   executeAdminPayout,
@@ -436,6 +437,21 @@ export function PaymentsAdminPage() {
     }
   }
 
+  // caprino-92103: revert an approved payout back to pending. Same refresh
+  // pattern as handleRowApprove — both queues can shift when a row flips
+  // approved <-> pending.
+  async function handleRowUnapprove(id: string) {
+    setRowBusyId(id);
+    try {
+      await unapproveAdminPayout(id);
+      await Promise.all([refresh(), loadPrepayQueue()]);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Revert failed');
+    } finally {
+      setRowBusyId(null);
+    }
+  }
+
   // crudo-91827: opens the in-app reject-reason modal. The actual reject work
   // is done by `confirmReject` once the admin types a reason and confirms.
   async function handleRowReject(id: string) {
@@ -716,6 +732,7 @@ export function PaymentsAdminPage() {
           onEdit={openDetail}
           onMarkPaid={handleRowMarkPaid}
           onExecute={openDetail}
+          onUnapprove={handleRowUnapprove}
           onHostClick={(userId) => setHostDetailUserId(userId)}
           onCapUpdated={() => refresh()}
           busyRowId={rowBusyId}
@@ -767,6 +784,24 @@ export function PaymentsAdminPage() {
                 await refresh();
               } catch (err: any) {
                 setErrorMsg(err.message || 'Reject failed');
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            // caprino-92103: stay-open after revert so the admin sees the
+            // new pending state in the modal (and can immediately re-approve
+            // if they want). Returns the error message string on failure so
+            // PayoutReviewModal can render it inline below the footer.
+            onUnapprove={async () => {
+              setModalBusy(true);
+              try {
+                await unapproveAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id);
+                setDetail(fresh);
+                await Promise.all([refresh(), loadPrepayQueue()]);
+                return;
+              } catch (err: any) {
+                return err?.message || 'Revert failed';
               } finally {
                 setModalBusy(false);
               }

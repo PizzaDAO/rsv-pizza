@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -40,6 +40,17 @@ interface PayoutReviewModalProps {
   onClose: () => void;
   onApprove: (note?: string) => Promise<void> | void;
   onReject: (reason: string) => Promise<void> | void;
+  /**
+   * caprino-92103: revert an `approved` payout back to `pending`. Surfaced
+   * as an amber "Revert to Pending" button in the modal footer when the
+   * current status is `approved`. Returns a string error message (NOT
+   * throws) when the call fails so the modal can surface it inline; resolves
+   * to `undefined` on success.
+   *
+   * No confirm modal — reversible actions don't get a confirm step per
+   * project convention.
+   */
+  onUnapprove?: () => Promise<string | void> | string | void;
   /**
    * aglio-62584: `allowOverSubmissionCap` is forwarded when the admin has
    * acknowledged the amber $625 cap warning by ticking the override
@@ -120,6 +131,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onClose,
   onApprove,
   onReject,
+  onUnapprove,
   onSaveAmount,
   onSaveAdminNotes,
   onMarkPaid,
@@ -204,6 +216,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  // caprino-92103: inline error for "Revert to Pending". Rendered below the
+  // footer button row. Mirrors the saveAmountError pattern from aglio-62584.
+  const [unapproveError, setUnapproveError] = useState<string | null>(null);
 
   const [showMarkPaidForm, setShowMarkPaidForm] = useState(false);
   const [wireRef, setWireRef] = useState('');
@@ -1368,6 +1384,31 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           )}
           {isApproved && (
             <>
+              {/* caprino-92103: revert approved -> pending. Only surfaced
+                  when status is strictly 'approved' (not 'failed') and the
+                  parent wired an onUnapprove handler. Placed first so it
+                  sits visually distinct from the primary actions (Execute,
+                  Mark Paid) that follow. Amber border to signal "reverse
+                  course". No confirm modal — reversible action per project
+                  convention (re-approve restores the prior state). */}
+              {payout.status === 'approved' && onUnapprove && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setUnapproveError(null);
+                    const err = await onUnapprove();
+                    if (typeof err === 'string' && err) {
+                      setUnapproveError(err);
+                    }
+                  }}
+                  disabled={busy || selfPayoutBlocked}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-500/50 text-amber-300 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50"
+                  title="Move this payout back to pending"
+                >
+                  <Undo2 size={14} />
+                  Revert to Pending
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openExecuteForm}
@@ -1438,6 +1479,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           >
             Close
           </button>
+          {/* caprino-92103: inline error for Revert. Takes full row width
+              below the buttons via w-full on the wrapping flex container's
+              flex-wrap. Surfaces backend NOT_APPROVED + any network failure. */}
+          {unapproveError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{unapproveError}</span>
+            </div>
+          )}
         </div>
       </div>
 

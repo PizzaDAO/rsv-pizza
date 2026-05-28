@@ -4148,6 +4148,23 @@ export async function rejectAdminPayout(id: string, rejectionReason: string): Pr
   return res.payout;
 }
 
+/**
+ * caprino-92103: revert an `approved` payout back to `pending`. Approval
+ * was a one-way door — the only "undo" was reject, which is a different
+ * terminal state. This lets admins flip approved -> pending so they can
+ * re-review or ask the host for more info before sending.
+ *
+ * Backend validates the current status is 'approved' (400 NOT_APPROVED
+ * otherwise) and writes a payout_audit row with action='unapprove'.
+ */
+export async function unapproveAdminPayout(id: string, note?: string): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/unapprove`, {
+    method: 'POST',
+    body: { note },
+  });
+  return res.payout;
+}
+
 export async function markAdminPayoutPaid(
   id: string,
   refs: {

@@ -1800,6 +1800,91 @@ router.post(
 );
 
 // ============================================
+// POST /api/admin/payouts/:id/unapprove
+//
+// caprino-92103: revert an `approved` payout back to `pending` so the admin
+// can re-review (or ask the host for more info before sending). Approval
+// was previously a one-way door — the only "undo" was reject, which is a
+// different terminal state.
+//
+// Atomic via prisma.$transaction:
+//   1. Lookup payout (404 if missing).
+//   2. Validate status === 'approved' (400 NOT_APPROVED otherwise).
+//   3. status -> 'pending'; clear reviewedAt + reviewedBy.
+//   4. Write payout_audit row with action='unapprove'.
+//
+// Preserves external_proof_url / transactionHash / paidAt from any prior
+// execute attempt — those are history.
+// ============================================
+router.post(
+  '/:id/unapprove',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const existing = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true, hostUserId: true },
+      });
+
+      if (!existing) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+      if (existing.status !== 'approved') {
+        throw new AppError(
+          `Cannot unapprove a payout in status '${existing.status}'`,
+          400,
+          'NOT_APPROVED',
+        );
+      }
+
+      assertNotSelfPayout(actor, existing.hostUserId);
+
+      const { note } = req.body || {};
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: {
+            status: 'pending',
+            reviewedAt: null,
+            reviewedBy: null,
+          },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'unapprove',
+            oldStatus: 'approved',
+            newStatus: 'pending',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: typeof note === 'string' ? note : null,
+          },
+        });
+
+        return row;
+      });
+
+      res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // POST /api/admin/payouts/:id/reject
 // ============================================
 router.post(
