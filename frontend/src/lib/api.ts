@@ -4925,6 +4925,10 @@ export interface PhotosFeedFilters {
   countries?: string[];      // raw country names (locale variants) sent to backend
   regions?: string[];        // GPP region ids
   partnerTag?: string | null;
+  // sicilian-58195: shuffle support. When sort='random', backend uses MD5(id
+  // || seed) as the order key so pagination + filters stay consistent.
+  sort?: 'newest' | 'random';
+  seed?: string | null;
 }
 
 export async function getPhotosFeed(
@@ -4944,6 +4948,10 @@ export async function getPhotosFeed(
     }
     if (filters?.partnerTag) {
       params.append('partnerTag', filters.partnerTag);
+    }
+    if (filters?.sort === 'random' && filters.seed) {
+      params.append('sort', 'random');
+      params.append('seed', filters.seed);
     }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,

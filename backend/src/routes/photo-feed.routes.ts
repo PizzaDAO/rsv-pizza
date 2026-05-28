@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction, Request } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 
@@ -8,6 +9,7 @@ const MAX_LIMIT = 50;
 const MAX_FILTER_ITEMS = 50;
 
 type FeedSource = 'photo' | 'payout';
+type FeedSort = 'newest' | 'random';
 
 // napoletana-58210: cursor format extended to include the source discriminator
 // so the (createdAt, id) tuple is unambiguous when merging two tables. Format:
@@ -41,6 +43,22 @@ function parseCursor(raw: unknown): { createdAt: Date; source: FeedSource | null
 
 function buildCursorString(createdAt: Date, source: FeedSource, id: string): string {
   return `${createdAt.toISOString()}_${source}_${id}`;
+}
+
+// sicilian-58195: random-sort cursor format = `<md5hash>_<id>`. The md5 hash is
+// 32 lowercase hex chars (no underscores) and the id is a UUID (no underscores
+// either), so `_` is an unambiguous separator. The hash is the keyset's primary
+// component; id is the tiebreak for the rare md5 collision case.
+function parseRandomCursor(raw: unknown): { hash: string; id: string } | null {
+  if (typeof raw !== 'string') return null;
+  const sepIdx = raw.indexOf('_');
+  if (sepIdx <= 0) return null;
+  const hash = raw.slice(0, sepIdx);
+  const id = raw.slice(sepIdx + 1);
+  // md5 hash must be exactly 32 hex chars; reject otherwise so a malformed/
+  // newest-mode cursor that's accidentally sent doesn't break the query.
+  if (!/^[0-9a-f]{32}$/.test(hash) || !id) return null;
+  return { hash, id };
 }
 
 // sicilian-58129: parse comma-separated query param, dedupe, trim, cap length.
@@ -111,7 +129,6 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       Math.max(parseInt((req.query.limit as string) || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT, 1),
       MAX_LIMIT
     );
-    const cursor = parseCursor(req.query.cursor);
 
     const regions = parseCsv(req.query.regions);
     const countries = parseCsv(req.query.countries);
@@ -119,6 +136,23 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     const partnerTag = typeof partnerTagRaw === 'string' && partnerTagRaw.trim()
       ? partnerTagRaw.trim()
       : null;
+
+    // sicilian-58195: random shuffle sort. When sort=random, the seed deter-
+    // mines the order so cursor pagination + filters stay consistent across
+    // requests. Order is MD5(id::text || seed::text) ASC (tiebreak: id ASC).
+    // We skip the payout-docs UNION in random mode — after napoletana-58211
+    // every kind='pizza' payout doc has photo_id set, so the payout side is
+    // effectively empty in practice. (Documented limitation.)
+    const sort: FeedSort = req.query.sort === 'random' ? 'random' : 'newest';
+    const seed = sort === 'random'
+      ? String(parseInt((req.query.seed as string) || '', 10) || 0)
+      : null;
+
+    if (sort === 'random' && seed !== null) {
+      return await handleRandomFeed(req, res, { limit, regions, countries, partnerTag, seed });
+    }
+
+    const cursor = parseCursor(req.query.cursor);
 
     const partyFilter = buildPartyFilter({ regions, countries, partnerTag });
 
@@ -346,6 +380,138 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     next(error);
   }
 });
+
+// sicilian-58195: random-shuffle handler. ORDER BY MD5(id::text || seed::text)
+// gives a deterministic shuffle for a given seed; keyset pagination over the
+// (md5_hash, id) tuple keeps subsequent pages aligned with page 1 even as the
+// underlying photo set grows. We fetch ids+hash in one raw query (Prisma's
+// typed builder can't ORDER BY arbitrary SQL expressions), then re-fetch the
+// rows via the normal Prisma select so the response shape matches newest mode.
+async function handleRandomFeed(
+  req: AuthRequest,
+  res: Response,
+  opts: {
+    limit: number;
+    regions: string[];
+    countries: string[];
+    partnerTag: string | null;
+    seed: string;
+  },
+): Promise<void> {
+  const { limit, regions, countries, partnerTag, seed } = opts;
+  const cursor = parseRandomCursor(req.query.cursor);
+  const fetchSize = limit + 1;
+
+  // Build optional WHERE fragments using Prisma.sql so values are parameter-
+  // bound (no SQL-injection surface).
+  const regionFilter = regions.length > 0
+    ? Prisma.sql`AND pa.region = ANY(${regions}::text[])`
+    : Prisma.empty;
+  const countryFilter = countries.length > 0
+    ? Prisma.sql`AND pa.country = ANY(${countries}::text[])`
+    : Prisma.empty;
+  const partnerTagFilter = partnerTag
+    ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+    : Prisma.empty;
+  const cursorFilter = cursor
+    ? Prisma.sql`AND (
+        MD5(p.id::text || ${seed}::text) > ${cursor.hash}
+        OR (MD5(p.id::text || ${seed}::text) = ${cursor.hash} AND p.id::text > ${cursor.id})
+      )`
+    : Prisma.empty;
+
+  const rows = await prisma.$queryRaw<{ id: string; sort_hash: string }[]>(Prisma.sql`
+    SELECT p.id::text AS id, MD5(p.id::text || ${seed}::text) AS sort_hash
+    FROM photos p
+    JOIN parties pa ON pa.id = p.party_id
+    WHERE p.starred = true
+      AND p.status = 'approved'
+      AND pa.underboss_status = 'approved'
+      AND pa.photos_public = true
+      AND pa.photos_enabled = true
+      ${regionFilter}
+      ${countryFilter}
+      ${partnerTagFilter}
+      ${cursorFilter}
+    ORDER BY MD5(p.id::text || ${seed}::text) ASC, p.id::text ASC
+    LIMIT ${fetchSize}
+  `);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const ids = pageRows.map((r) => r.id);
+
+  // Re-fetch the full photo rows (with party + vote relations) using the same
+  // select shape as newest mode so the response is identical apart from order.
+  const photos = ids.length > 0
+    ? await prisma.photo.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          url: true,
+          thumbnailUrl: true,
+          caption: true,
+          mimeType: true,
+          duration: true,
+          width: true,
+          height: true,
+          createdAt: true,
+          voteCount: true,
+          votes: req.userId
+            ? { where: { userId: req.userId }, select: { id: true } }
+            : false,
+          party: {
+            select: {
+              id: true,
+              name: true,
+              customUrl: true,
+              inviteCode: true,
+              city: true,
+              country: true,
+            },
+          },
+        },
+      })
+    : [];
+
+  // Map by id and re-emit in the random sort order from the raw query.
+  const byId = new Map(photos.map((p) => [p.id, p]));
+  const sorted = ids.map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+
+  const lastRow = pageRows.length > 0 ? pageRows[pageRows.length - 1] : null;
+  const nextCursor = hasMore && lastRow
+    ? `${lastRow.sort_hash}_${lastRow.id}`
+    : null;
+
+  res.json({
+    photos: sorted.map((p) => {
+      const votes = (p as typeof p & { votes?: { id: string }[] }).votes;
+      return {
+        id: p.id,
+        source: 'photo' as const,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        mimeType: p.mimeType,
+        duration: p.duration,
+        width: p.width,
+        height: p.height,
+        createdAt: p.createdAt,
+        voteCount: p.voteCount,
+        votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+        payoutId: null,
+        party: {
+          id: p.party.id,
+          slug: p.party.customUrl || p.party.inviteCode,
+          name: p.party.name,
+          city: p.party.city,
+          country: p.party.country,
+        },
+      };
+    }),
+    nextCursor,
+  });
+}
 
 // sicilian-58129: facets endpoint — returns distinct country values among
 // feed-eligible photos (approved + party-eligible) with photo counts.

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp, Shuffle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +36,16 @@ export function PhotosFeedPage() {
   const [activeRegions, setActiveRegions] = useState<string[]>(() => parseCsvParam(searchParams.get('regions')));
   const [activePartnerTag, setActivePartnerTag] = useState<string | null>(() => searchParams.get('partnerTag') || null);
 
+  // sicilian-58195: shuffle state. sortMode='random' + seed makes the order
+  // deterministic for that seed so the backend's keyset cursor can paginate
+  // through the shuffled feed. URL params survive refresh / sharing.
+  const [sortMode, setSortMode] = useState<'newest' | 'random'>(
+    () => (searchParams.get('sort') === 'random' && searchParams.get('seed') ? 'random' : 'newest')
+  );
+  const [seed, setSeed] = useState<string | null>(
+    () => (searchParams.get('sort') === 'random' ? searchParams.get('seed') : null)
+  );
+
   // Facets + partner tags
   const [facetCountries, setFacetCountries] = useState<Array<{ name: string; count: number }>>([]);
   const [myPartnerTags, setMyPartnerTags] = useState<string[]>([]);
@@ -59,9 +69,13 @@ export function PhotosFeedPage() {
   const countriesRef = useRef(activeCountries);
   const regionsRef = useRef(activeRegions);
   const partnerTagRef = useRef(activePartnerTag);
+  const sortModeRef = useRef(sortMode);
+  const seedRef = useRef(seed);
   countriesRef.current = activeCountries;
   regionsRef.current = activeRegions;
   partnerTagRef.current = activePartnerTag;
+  sortModeRef.current = sortMode;
+  seedRef.current = seed;
 
   // Sync filter state -> URL so refresh / sharing work.
   useEffect(() => {
@@ -69,10 +83,14 @@ export function PhotosFeedPage() {
     if (activeCountries.length > 0) next.set('countries', activeCountries.join(','));
     if (activeRegions.length > 0) next.set('regions', activeRegions.join(','));
     if (activePartnerTag) next.set('partnerTag', activePartnerTag);
+    if (sortMode === 'random' && seed) {
+      next.set('sort', 'random');
+      next.set('seed', seed);
+    }
     // Replace (don't push) to keep history clean.
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCountries, activeRegions, activePartnerTag]);
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed]);
 
   // Build the raw-country list to send to the backend by expanding each
   // selected alpha-2 to all known locale variants intersected with what
@@ -105,6 +123,8 @@ export function PhotosFeedPage() {
         countries: buildCountriesForBackend(countriesRef.current),
         regions: regionsRef.current,
         partnerTag: partnerTagRef.current,
+        sort: sortModeRef.current,
+        seed: seedRef.current,
       };
       const res = await getPhotosFeed(cursorRef.current, 24, filters);
       if (!res) {
@@ -125,10 +145,11 @@ export function PhotosFeedPage() {
     }
   }, [buildCountriesForBackend]);
 
-  // Reset + reload whenever a filter changes.
+  // Reset + reload whenever a filter changes. sicilian-58195: include sort
+  // + seed so picking Shuffle (or reshuffling with a new seed) re-pages.
   const filterKey = useMemo(
-    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}`,
-    [activeCountries, activeRegions, activePartnerTag]
+    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}|${sortMode}|${seed || ''}`,
+    [activeCountries, activeRegions, activePartnerTag, sortMode, seed]
   );
 
   useEffect(() => {
@@ -211,6 +232,23 @@ export function PhotosFeedPage() {
     setActiveCountries([]);
     setActiveRegions([]);
     setActivePartnerTag(null);
+    // sicilian-58195: clearing also returns to default newest-first order.
+    setSortMode('newest');
+    setSeed(null);
+  };
+
+  // sicilian-58195: shuffle handler. Generates a new seed and switches to
+  // random sort. Clicking while already shuffled reshuffles with a fresh seed.
+  const handleShuffle = () => {
+    const newSeed = String(Math.floor(Math.random() * 1e9));
+    setSortMode('random');
+    setSeed(newSeed);
+  };
+
+  // Revert just the shuffle (preserve other filters).
+  const clearShuffle = () => {
+    setSortMode('newest');
+    setSeed(null);
   };
 
   // salame-58195: propagate vote changes back into the photos array so the
@@ -223,7 +261,7 @@ export function PhotosFeedPage() {
     []
   );
 
-  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag;
+  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag || sortMode === 'random';
 
   return (
     <ThemeProvider theme="gpp">
@@ -262,6 +300,32 @@ export function PhotosFeedPage() {
               onChange={setActivePartnerTag}
             />
           )}
+          {/* sicilian-58195: shuffle toggle. Same pill shape as the filter
+              buttons; click reshuffles (new seed). The adjacent X clears
+              shuffle and returns to newest-first ordering. */}
+          <button
+            onClick={handleShuffle}
+            title={sortMode === 'random' ? 'Reshuffle' : 'Shuffle photos'}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+              sortMode === 'random'
+                ? 'bg-red-500/10 border-red-500/40 text-red-600 hover:bg-red-500/20'
+                : 'border-black/10 text-gray-900 hover:bg-white'
+            }`}
+            style={sortMode === 'random' ? undefined : { background: 'rgba(255,255,255,0.85)' }}
+          >
+            <Shuffle size={14} />
+            <span>{sortMode === 'random' ? 'Shuffled' : 'Shuffle'}</span>
+            {sortMode === 'random' && (
+              <span
+                role="button"
+                aria-label="Clear shuffle"
+                onClick={(e) => { e.stopPropagation(); clearShuffle(); }}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-red-500/20"
+              >
+                <X size={12} />
+              </span>
+            )}
+          </button>
           {anyFiltersActive && (
             <button
               onClick={clearAllFilters}
