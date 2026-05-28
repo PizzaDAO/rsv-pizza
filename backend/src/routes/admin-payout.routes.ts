@@ -2942,6 +2942,114 @@ router.get(
   },
 );
 
+// ============================================
+// POST /api/admin/payouts/backfill-line-items — provola-92103
+//
+// One-shot ops endpoint to re-OCR existing receipts that were uploaded before
+// formaggi-89172 added structured `ocr_line_items` extraction. OPENAI_API_KEY
+// only exists on the backend Vercel deploy (auto-classifier blocks pulling it
+// locally), so the backfill MUST run server-side.
+//
+// Auth: requireAnyAdminOrPaymentAdmin (admin / super_admin / payment_admin).
+// Body: { limit?: number }  // 1..50, default 25
+//
+// Behavior:
+//  - Selects up to `limit` receipts where `ocr_line_items IS NULL` and the
+//    URL is present, oldest first.
+//  - Calls `analyzeReceipt(url)` sequentially with a 500ms throttle between
+//    iterations (gentle on OpenAI rate limits).
+//  - On success, writes ONLY `ocr_line_items` — leaves `ocr_amount`,
+//    `ocr_currency`, `ocr_confidence`, `ocr_raw` untouched so admin-approved
+//    payout totals don't shift. `merchant` and `receiptDate` are returned by
+//    the OCR service but have no DB columns yet, so they're discarded here.
+//  - On failure, the error is logged + pushed onto `failed` and we continue.
+//
+// Returns:
+//   { processed, succeeded, failed: [{id, error}], remaining, done }
+//
+// Loop externally with backend/scripts/loop-backfill-line-items.cjs.
+// ============================================
+router.post(
+  '/backfill-line-items',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { analyzeReceipt } = await import('../services/ocr.service.js');
+
+      const body = (req.body || {}) as { limit?: unknown };
+      const rawLimit = body.limit === undefined ? 25 : Number(body.limit);
+      if (!Number.isFinite(rawLimit)) {
+        throw new AppError('limit must be a finite number', 400, 'VALIDATION_ERROR');
+      }
+      const limit = Math.max(1, Math.min(50, Math.floor(rawLimit)));
+
+      // Candidates: receipts with no line items yet and a non-empty URL.
+      // `url: { not: '' }` excludes blank rows; the `IS NOT NULL` semantic is
+      // implicit because `url` is a non-nullable column on PayoutDocument.
+      const candidates = await prisma.payoutDocument.findMany({
+        where: {
+          kind: 'receipt',
+          ocrLineItems: { equals: Prisma.DbNull },
+          url: { not: '' },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        select: { id: true, url: true },
+      });
+
+      const failed: Array<{ id: string; error: string }> = [];
+      let succeeded = 0;
+
+      for (let i = 0; i < candidates.length; i++) {
+        const doc = candidates[i];
+        try {
+          const result = await analyzeReceipt(doc.url);
+          // Additive write: ONLY ocr_line_items. Do not overwrite
+          // ocr_amount / ocr_currency / ocr_confidence / ocr_raw — admins may
+          // have already approved payouts based on those values.
+          await prisma.payoutDocument.update({
+            where: { id: doc.id },
+            data: {
+              ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+            },
+          });
+          succeeded += 1;
+        } catch (err: any) {
+          const message = err?.message ? String(err.message) : String(err);
+          console.error(
+            `[backfill-line-items] doc=${doc.id} url=${doc.url} failed: ${message}`,
+          );
+          failed.push({ id: doc.id, error: message });
+        }
+
+        // Throttle between iterations (skip the wait after the last one).
+        if (i < candidates.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+
+      const remaining = await prisma.payoutDocument.count({
+        where: {
+          kind: 'receipt',
+          ocrLineItems: { equals: Prisma.DbNull },
+          url: { not: '' },
+        },
+      });
+
+      res.json({
+        processed: candidates.length,
+        succeeded,
+        failed,
+        remaining,
+        done: remaining === 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // Re-export the helper so other backend code (e.g. PR 5 execute route) can
 // reuse the composed guard without re-deriving it.
 export { requireAnyAdminOrPaymentAdmin, isFullAdmin };
