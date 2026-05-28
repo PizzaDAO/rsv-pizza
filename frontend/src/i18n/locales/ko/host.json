@@ -111,6 +111,7 @@
     "pageViewsTracked": "방문자가 이벤트 페이지를 로드하면 조회수가 추적됩니다",
     "stats": "통계",
     "socialPostViews": "소셜 포스트 조회수",
+    "socialPostViewsNote": "Only counts social posts that hosts submitted to this event's report — actual social impressions are likely much higher.",
     "socialPosts": "소셜 포스트",
     "totalRsvps": "총 RSVP",
     "attendees": "참석자",

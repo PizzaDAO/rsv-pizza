@@ -32,12 +32,12 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
     URL.revokeObjectURL(url);
   } : undefined;
 
-  const statsDefs: { key: string; label: string; autoValue: number | null | undefined; icon: React.ElementType; color: string; url?: string; onAction?: () => void; actionIcon?: React.ElementType }[] = [
+  const statsDefs: { key: string; label: string; autoValue: number | null | undefined; icon: React.ElementType; color: string; url?: string; onAction?: () => void; actionIcon?: React.ElementType; note?: string }[] = [
     ...(pageViewStats ? [
       { key: 'pageViews', label: t('report.pageViews'), autoValue: pageViewStats.totalViews, icon: MousePointerClick, color: 'text-[#ff393a]' },
       { key: 'uniqueVisitors', label: t('report.uniqueVisitors'), autoValue: pageViewStats.uniqueViews, icon: Eye, color: 'text-[#ff393a]' },
     ] : []),
-    { key: 'socialPostViews', label: t('report.socialPostViews'), autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400' },
+    { key: 'socialPostViews', label: t('report.socialPostViews'), autoValue: socialPostViews || null, icon: Eye, color: 'text-blue-400', note: t('report.socialPostViewsNote') },
     { key: 'socialPosts', label: t('report.socialPosts'), autoValue: socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: t('report.totalRsvps'), autoValue: report.stats.totalRsvps, icon: Users, color: 'text-green-400' },
     { key: 'attendees', label: t('report.attendees'), autoValue: report.stats.approvedGuests, icon: Users, color: 'text-emerald-400' },
@@ -217,6 +217,7 @@ export function ReportPreview({ report, onClose, pageViewStats }: ReportPreviewP
                 url={stat.url}
                 onAction={stat.onAction}
                 actionIcon={stat.actionIcon}
+                note={stat.note}
               />
             ))}
           </div>

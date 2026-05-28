@@ -111,6 +111,7 @@
     "pageViewsTracked": "当访客加载您的活动页面时会记录浏览量",
     "stats": "统计",
     "socialPostViews": "社交帖子浏览",
+    "socialPostViewsNote": "Only counts social posts that hosts submitted to this event's report — actual social impressions are likely much higher.",
     "socialPosts": "社交帖子",
     "totalRsvps": "总 RSVP 数",
     "attendees": "参与者",

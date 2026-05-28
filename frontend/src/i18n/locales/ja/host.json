@@ -111,6 +111,7 @@
     "pageViewsTracked": "訪問者がイベントページを読み込んだ時に閲覧が記録されます",
     "stats": "統計",
     "socialPostViews": "ソーシャル投稿閲覧数",
+    "socialPostViewsNote": "Only counts social posts that hosts submitted to this event's report — actual social impressions are likely much higher.",
     "socialPosts": "ソーシャル投稿",
     "totalRsvps": "総RSVP数",
     "attendees": "参加者",

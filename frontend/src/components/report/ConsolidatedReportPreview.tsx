@@ -98,11 +98,11 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
     }
   } : undefined;
 
-  const statsDefs: { key: string; label: string; value: number | null | undefined; icon: React.ElementType; color: string; onAction?: () => void; actionIcon?: React.ElementType }[] = [
+  const statsDefs: { key: string; label: string; value: number | null | undefined; icon: React.ElementType; color: string; onAction?: () => void; actionIcon?: React.ElementType; note?: string }[] = [
     { key: 'pageViews', label: t('report.pageViews'), value: report.impressions.totalViews || null, icon: MousePointerClick, color: 'text-[#ff393a]' },
     { key: 'uniqueVisitors', label: t('report.uniqueVisitors'), value: report.impressions.uniqueVisitors || null, icon: Eye, color: 'text-[#ff393a]' },
     { key: 'linkClicks', label: t('report.linkClicks'), value: report.clickStats.totalClicks || null, icon: MousePointerClick, color: 'text-purple-400' },
-    { key: 'socialPostViews', label: t('report.socialPostViews'), value: report.stats.socialPostViews || null, icon: Eye, color: 'text-blue-400' },
+    { key: 'socialPostViews', label: t('report.socialPostViews'), value: report.stats.socialPostViews || null, icon: Eye, color: 'text-blue-400', note: t('report.socialPostViewsNote') },
     { key: 'socialPosts', label: t('report.socialPosts'), value: report.stats.socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: t('report.totalRsvps'), value: report.stats.totalRsvps || null, icon: Users, color: 'text-green-400' },
     { key: 'newsletterSignups', label: t('report.newsletterSignups'), value: report.stats.mailingListSignups || null, icon: Mail, color: 'text-orange-400', onAction: downloadNewsletterEmails, actionIcon: Download },
@@ -150,6 +150,7 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
                 color={stat.color}
                 onAction={stat.onAction}
                 actionIcon={stat.actionIcon}
+                note={stat.note}
               />
             ))}
           </div>
