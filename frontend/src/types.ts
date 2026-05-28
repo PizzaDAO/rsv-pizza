@@ -1760,7 +1760,25 @@ export interface Payout {
  */
 export interface ExternalPaymentInput {
   partyId: string;
-  hostUserId: string;
+  /**
+   * mortazza-92103: legacy field still supported by the backend for
+   * compatibility with the v1 dropdown UI. The radio-list modal now sends
+   * `recipientHostUserId` (or `recipientEmail`) instead so the admin recording
+   * the row is never silently stamped as the recipient.
+   */
+  hostUserId?: string;
+  /**
+   * mortazza-92103: admin override mirroring the bismarck-92103 prepay path.
+   * When set, the resulting payout row's `host_user_id` is the cohost picked
+   * in the modal — not the admin recording. Audit note records the override.
+   */
+  recipientHostUserId?: string;
+  /**
+   * mortazza-92103: "Other (specify)" free-form path. Backend looks up
+   * `User.email` case-insensitively and rejects with 400 RECIPIENT_USER_NOT_FOUND
+   * when no match — admin must create the User first or pick from the list.
+   */
+  recipientEmail?: string;
   finalAmountUsd: number;
   /** 'other' is accepted client-side and mapped to 'wire' server-side (DB CHECK only allows the 3). */
   payoutMethod: PayoutMethod | 'other';

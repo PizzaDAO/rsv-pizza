@@ -1263,6 +1263,11 @@ router.get(
 //   - The plan allows 'other' as a method intent but the DB CHECK only allows
 //     the 3 — we map 'other' → 'wire' and rely on admin_notes for the real
 //     method (e.g. "Other: Venmo").
+//   - mortazza-92103: supports `recipientHostUserId` (radio pick in the modal)
+//     and `recipientEmail` (free-form "Other (specify)" path) so the admin
+//     attributes the payment to the actual recipient cohost, not themselves.
+//     Mirrors the bismarck-92103 prepay admin override. When override is used,
+//     the audit row's `note` records "Recipient overridden to {email}".
 // ============================================
 router.post(
   '/external',
@@ -1274,7 +1279,16 @@ router.post(
       const body = req.body || {};
 
       const partyId = typeof body.partyId === 'string' ? body.partyId.trim() : '';
-      const hostUserId = typeof body.hostUserId === 'string' ? body.hostUserId.trim() : '';
+      // mortazza-92103: `recipientHostUserId` (mirrors bismarck-92103 / prepay
+      // override) and `recipientEmail` (free-form lookup for the "Other" path
+      // in the modal) are both honored ahead of `hostUserId`. Either resolves
+      // to the actual recipient User whose id ends up in `payouts.host_user_id`.
+      // Legacy `hostUserId` from the v1 modal still works as a fallback.
+      const rawHostUserId = typeof body.hostUserId === 'string' ? body.hostUserId.trim() : '';
+      const recipientHostUserId =
+        typeof body.recipientHostUserId === 'string' ? body.recipientHostUserId.trim() : '';
+      const recipientEmail =
+        typeof body.recipientEmail === 'string' ? body.recipientEmail.trim() : '';
       const finalAmountUsd = Number(body.finalAmountUsd);
       const rawMethod = typeof body.payoutMethod === 'string' ? body.payoutMethod : '';
       const adminNotes = typeof body.adminNotes === 'string' ? body.adminNotes.trim() : '';
@@ -1282,8 +1296,12 @@ router.post(
       if (!partyId) {
         throw new AppError('partyId is required', 400, 'VALIDATION_ERROR');
       }
-      if (!hostUserId) {
-        throw new AppError('hostUserId is required', 400, 'VALIDATION_ERROR');
+      if (!rawHostUserId && !recipientHostUserId && !recipientEmail) {
+        throw new AppError(
+          'hostUserId, recipientHostUserId, or recipientEmail is required',
+          400,
+          'VALIDATION_ERROR',
+        );
       }
       if (!Number.isFinite(finalAmountUsd) || finalAmountUsd <= 0) {
         throw new AppError('finalAmountUsd must be > 0', 400, 'VALIDATION_ERROR');
@@ -1306,6 +1324,53 @@ router.post(
           400,
           'VALIDATION_ERROR',
         );
+      }
+
+      // mortazza-92103: resolve the actual recipient. Precedence:
+      //   1. `recipientHostUserId` (radio pick from the modal's candidate list)
+      //   2. `recipientEmail` (free-form "Other (specify)" path — case-insensitive
+      //      lookup on User.email; rejects with RECIPIENT_USER_NOT_FOUND when no
+      //      match so the admin has to create the User first or pick a candidate)
+      //   3. legacy `hostUserId` (v1 modal compatibility)
+      // The endpoint is already gated by `requireAnyAdminOrPaymentAdmin`, so any
+      // caller reaching this point is admin-class (admin / super_admin /
+      // payment_admin). `assertNotSelfPayout` below still blocks payment_admin
+      // from stamping themselves as the recipient.
+      let hostUserId: string;
+      let recipientOverrideNote: string | null = null;
+      if (recipientHostUserId) {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: recipientHostUserId },
+          select: { id: true, email: true },
+        });
+        if (!targetUser) {
+          throw new AppError(
+            'recipientHostUserId does not match any User',
+            400,
+            'INVALID_RECIPIENT_HOST_USER_ID',
+          );
+        }
+        hostUserId = targetUser.id;
+        recipientOverrideNote = `Recipient overridden to ${targetUser.email}`;
+      } else if (recipientEmail) {
+        // mortazza-92103: "Other (specify)" free-form path. Case-insensitive
+        // email lookup. No match → 400 RECIPIENT_USER_NOT_FOUND so the admin
+        // is forced to create the User first or pick a known candidate.
+        const targetUser = await prisma.user.findFirst({
+          where: { email: { equals: recipientEmail, mode: 'insensitive' } },
+          select: { id: true, email: true },
+        });
+        if (!targetUser) {
+          throw new AppError(
+            `No User found for email ${recipientEmail} — create the user first or pick a candidate from the list.`,
+            400,
+            'RECIPIENT_USER_NOT_FOUND',
+          );
+        }
+        hostUserId = targetUser.id;
+        recipientOverrideNote = `Recipient overridden to ${targetUser.email} (specified by email)`;
+      } else {
+        hostUserId = rawHostUserId;
       }
 
       // Block payment_admin from paying themselves (full admins exempt).
@@ -1359,7 +1424,12 @@ router.post(
         ? body.externalProofUrl.trim()
         : null;
 
-      const composedNote = `External payment recorded. ${adminNotes}`;
+      // mortazza-92103: when the admin attributed the payment to a different
+      // recipient than themselves, prepend the override marker so the audit
+      // trail makes "Submitted by X but credited to Y" obvious at a glance.
+      const composedNote = recipientOverrideNote
+        ? `External payment recorded. ${recipientOverrideNote}. ${adminNotes}`
+        : `External payment recorded. ${adminNotes}`;
 
       const created = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.create({
