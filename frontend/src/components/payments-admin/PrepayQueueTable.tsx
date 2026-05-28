@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Star } from 'lucide-react';
+import { AlertTriangle, Star, DollarSign } from 'lucide-react';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 import { PayoutMethodIcon, PAYOUT_METHOD_LABELS, CapInlineEditor } from '../payments-shared';
 
@@ -25,6 +25,12 @@ interface PrepayQueueTableProps {
    * a funds-sending operation reserved for admins.
    */
   viewerRole?: 'admin' | 'underboss';
+  /**
+   * panettone-92103: open MarkPartyPaidModal for the given row. Admin paid
+   * the host out-of-band (Venmo / wire / etc.) and wants to close out every
+   * in-flight payout in one click. Hidden for underbosses — funds-sending.
+   */
+  onMarkPartyPaid?: (row: PrepayQueueRow) => void;
 }
 
 /**
@@ -124,10 +130,14 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
   onHostClick,
   onPartyUpdated,
   viewerRole = 'admin',
+  onMarkPartyPaid,
 }) => {
   // argentina-92103: hide the "Create prepayment" button for underbosses
   // — creating a prepayment is funds-sending and stays admin-only.
   const canCreatePrepayment = viewerRole === 'admin';
+  // panettone-92103: same gate for "Mark party paid" — it flips rows to
+  // paid which is a funds-acknowledgement action reserved for admins.
+  const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       {/* regina-89172: mobile card list (<640px). Each row becomes a stacked
@@ -189,15 +199,28 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                     onUpdated={() => onPartyUpdated?.(row.party.id)}
                   />
                 </div>
-                {canCreatePrepayment && (
-                  <button
-                    type="button"
-                    onClick={() => onCreatePrepayment(row)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shrink-0"
-                  >
-                    Create prepayment
-                  </button>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {canMarkPartyPaid && onMarkPartyPaid && (
+                    <button
+                      type="button"
+                      onClick={() => onMarkPartyPaid(row)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/50 text-red-300 hover:bg-red-500/10 text-xs font-medium"
+                      title="Mark every in-flight payout for this event as paid (out-of-band reconciliation)"
+                    >
+                      <DollarSign size={12} />
+                      Mark paid
+                    </button>
+                  )}
+                  {canCreatePrepayment && (
+                    <button
+                      type="button"
+                      onClick={() => onCreatePrepayment(row)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
+                    >
+                      Create prepayment
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           );
@@ -280,15 +303,28 @@ export const PrepayQueueTable: React.FC<PrepayQueueTableProps> = ({
                     />
                   </td>
                   <td className="px-3 py-3 align-top text-right">
-                    {canCreatePrepayment && (
-                      <button
-                        type="button"
-                        onClick={() => onCreatePrepayment(row)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
-                      >
-                        Create prepayment
-                      </button>
-                    )}
+                    <div className="inline-flex items-center gap-2 flex-wrap justify-end">
+                      {canMarkPartyPaid && onMarkPartyPaid && (
+                        <button
+                          type="button"
+                          onClick={() => onMarkPartyPaid(row)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/50 text-red-300 hover:bg-red-500/10 text-xs font-medium"
+                          title="Mark every in-flight payout for this event as paid (out-of-band reconciliation)"
+                        >
+                          <DollarSign size={12} />
+                          Mark paid
+                        </button>
+                      )}
+                      {canCreatePrepayment && (
+                        <button
+                          type="button"
+                          onClick={() => onCreatePrepayment(row)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
+                        >
+                          Create prepayment
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

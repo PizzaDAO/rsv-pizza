@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
@@ -138,6 +138,13 @@ interface PayoutReviewModalProps {
    * render it inline.
    */
   onFlagReady?: () => Promise<string | void> | string | void;
+  /**
+   * panettone-92103: open MarkPartyPaidModal for this payout's party so the
+   * admin can flip every in-flight (pending + approved) payout on the event
+   * to paid in one transaction. Hidden for underbosses (admin-only handler).
+   * Parent owns the modal state.
+   */
+  onMarkPartyPaid?: () => void;
   busy?: boolean;
 }
 
@@ -160,6 +167,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onTagsChanged,
   viewerRole = 'admin',
   onFlagReady,
+  onMarkPartyPaid,
   busy = false,
 }) => {
   // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
@@ -1625,6 +1633,23 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 Flag ready for payment
               </button>
             )
+          )}
+          {/* panettone-92103: party-level "Mark party paid" — flips every
+              in-flight payout on this payout's party to paid in one
+              transaction. Less-prominent (border + dim text) so it sits
+              behind the per-row primary actions; admin-only. The modal
+              fetches its own preview (count + total) on open. */}
+          {isAdminViewer && onMarkPartyPaid && (
+            <button
+              type="button"
+              onClick={onMarkPartyPaid}
+              disabled={busy || selfPayoutBlocked}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-sm font-medium disabled:opacity-50"
+              title={`Mark every in-flight payout on ${stripGppPrefix(payout.party.name)} paid (out-of-band reconciliation)`}
+            >
+              <Coins size={14} />
+              Mark all paid for {stripGppPrefix(payout.party.name)}
+            </button>
           )}
           <button
             type="button"

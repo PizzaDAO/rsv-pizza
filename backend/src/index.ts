@@ -52,7 +52,7 @@ import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
-import adminPayoutRoutes, { payoutWalletRouter } from './routes/admin-payout.routes.js';
+import adminPayoutRoutes, { payoutWalletRouter, partyMarkPaidRouter } from './routes/admin-payout.routes.js';
 import adminPartyRoutes from './routes/admin-party.routes.js';
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
@@ -141,6 +141,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
+app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
 app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-management routes (transfer ownership) — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management

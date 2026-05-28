@@ -43,6 +43,7 @@ import {
   BulkSendModal,
   RejectReasonModal,
   HotWalletCard,
+  MarkPartyPaidModal,
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
 
@@ -146,6 +147,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // bismarck-92103: prepay queue + the "Create prepayment" modal target row.
   const [prepayQueue, setPrepayQueue] = useState<PrepayQueueRow[]>([]);
   const [prepayModalRow, setPrepayModalRow] = useState<PrepayQueueRow | null>(null);
+
+  // panettone-92103: "Mark party paid" modal target. Holds the partyId +
+  // a hint name so the modal header can render the city while the preview
+  // request is in flight.
+  const [markPartyPaidTarget, setMarkPartyPaidTarget] = useState<
+    | { partyId: string; partyNameHint: string }
+    | null
+  >(null);
 
   // lardo-58294: local-only substring filter for the prepay queue. Cleared
   // on tab refresh — no persistence.
@@ -787,6 +796,12 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 onHostClick={(userId) => setHostDetailUserId(userId)}
                 onPartyUpdated={() => loadPrepayQueue()}
                 viewerRole={viewerKind}
+                onMarkPartyPaid={(row) =>
+                  setMarkPartyPaidTarget({
+                    partyId: row.party.id,
+                    partyNameHint: row.party.name,
+                  })
+                }
               />
             )}
           </section>
@@ -1021,6 +1036,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 setModalBusy(false);
               }
             }}
+            // panettone-92103: open MarkPartyPaidModal pre-targeted at this
+            // payout's party so the admin can flip every in-flight payout on
+            // the event in one click. Admin-only (PayoutReviewModal already
+            // gates this on viewerRole='admin').
+            onMarkPartyPaid={() =>
+              setMarkPartyPaidTarget({
+                partyId: detail.partyId,
+                partyNameHint: detail.party.name,
+              })
+            }
             // tagliatelle-49102: after a tag mutation, refresh the payouts
             // list so the row picks up the new tag set (effective cap, etc.).
             // Re-fetch the modal detail too so its local `payout.party.eventTags`
@@ -1048,6 +1073,39 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             row={prepayModalRow}
             onClose={() => setPrepayModalRow(null)}
             onCreated={handlePrepaymentCreated}
+          />
+        )}
+
+        {/* panettone-92103: party-level "Mark party paid" modal. Refreshes
+            BOTH the payouts list (so flipped rows show paid) and the prepay
+            queue (so the source party drops off). If the review modal was
+            open over this party, refresh its detail too so the admin sees
+            the rows reflect the new state. */}
+        {markPartyPaidTarget && (
+          <MarkPartyPaidModal
+            partyId={markPartyPaidTarget.partyId}
+            partyNameHint={markPartyPaidTarget.partyNameHint}
+            onClose={() => setMarkPartyPaidTarget(null)}
+            onSuccess={async ({ count, partyName }) => {
+              pushToast(
+                count > 0
+                  ? `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName}`
+                  : `No in-flight payouts for ${partyName} — nothing changed`,
+                'success',
+              );
+              await Promise.all([refresh(), loadPrepayQueue()]);
+              if (detail && detail.partyId === markPartyPaidTarget.partyId) {
+                try {
+                  const fresh = await getAdminPayout(
+                    detail.id,
+                    regions ? { regions } : undefined,
+                  );
+                  setDetail(fresh);
+                } catch {
+                  /* non-fatal */
+                }
+              }
+            }}
           />
         )}
 
