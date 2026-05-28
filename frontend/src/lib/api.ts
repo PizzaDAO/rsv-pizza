@@ -3352,6 +3352,18 @@ export async function fetchSponsorConsolidatedReport(tag?: string): Promise<Cons
   return apiRequest<ConsolidatedReport>(`/api/sponsor/report${params}`);
 }
 
+// pecorino-64118 follow-up: download list of guest emails opted into a partner's
+// newsletter (ethconf + SWC family). Errors with 400 NO_NEWSLETTER for tags
+// without a newsletter (e.g. pizzadao).
+export async function fetchPartnerNewsletterEmails(
+  tag?: string
+): Promise<{ emails: string[]; count: number; tag: string; optinField: string }> {
+  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+  return apiRequest<{ emails: string[]; count: number; tag: string; optinField: string }>(
+    `/api/sponsor/newsletter-emails${params}`
+  );
+}
+
 // Admin-only time-series for partner dashboard chart
 export type PartnerTimeSeriesRange = '6hr' | '24hr' | '3d' | '7d';
 

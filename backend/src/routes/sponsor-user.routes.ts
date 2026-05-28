@@ -1480,3 +1480,73 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     next(error);
   }
 });
+
+// GET /api/sponsor/newsletter-emails - CSV-source list of emails opted into THIS
+// partner's newsletter (ethconf + SWC family). Follow-up to pecorino-64118: lets
+// newsletter-eligible partners download their newsletter signups from the
+// consolidated report's "Newsletter signups" KPI tile.
+// Same tag-resolution + event-set rules as GET /report.
+sponsorDashboardRouter.get('/newsletter-emails', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    const queryTag = req.query.tag as string | undefined;
+    const tag = req.isAdminViewing
+      ? (queryTag?.trim().toLowerCase() || undefined)
+      : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
+
+    const optinField = tag ? NEWSLETTER_OPTIN_FIELD[tag] : undefined;
+    if (!optinField) {
+      throw new AppError('No newsletter for this partner tag.', 400, 'NO_NEWSLETTER');
+    }
+
+    // Build event-set where clause — mirrors GET /report.
+    const where: any = {};
+    if (tag && tag !== 'pizzadao') {
+      where.eventTags = { has: tag };
+    } else if (tag === 'pizzadao') {
+      where.eventType = 'gpp';
+    } else if (req.isAdminViewing) {
+      where.eventType = 'gpp';
+      where.NOT = { eventTags: { equals: [] } };
+    }
+
+    if (!req.isAdminViewing) {
+      where.underbossStatus = 'approved';
+    }
+    where.cancelledAt = null;
+
+    // Find party ids in the event-set first, then fetch matching guest emails.
+    const parties = await prisma.party.findMany({
+      where,
+      select: { id: true },
+    });
+    const partyIds = parties.map(p => p.id);
+
+    if (partyIds.length === 0) {
+      return res.json({ emails: [], count: 0, tag, optinField });
+    }
+
+    const guests = await prisma.guest.findMany({
+      where: {
+        partyId: { in: partyIds },
+        email: { not: null },
+        status: { not: 'INVITED' },
+        // Prisma { not: false } silently excludes NULL rows under 3VL; use explicit OR.
+        OR: [{ approved: true }, { approved: null }],
+        [optinField]: true,
+      },
+      select: { email: true },
+    });
+
+    // Dedupe (lowercased), drop empties, sort alphabetically.
+    const seen = new Set<string>();
+    for (const g of guests) {
+      const e = (g.email || '').trim().toLowerCase();
+      if (e) seen.add(e);
+    }
+    const emails = Array.from(seen).sort();
+
+    res.json({ emails, count: emails.length, tag, optinField });
+  } catch (error) {
+    next(error);
+  }
+});

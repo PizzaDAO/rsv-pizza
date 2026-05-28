@@ -5,6 +5,7 @@ import {
   FileText, Download, X, ChevronLeft, ChevronRight, ExternalLink, Play,
 } from 'lucide-react';
 import { ConsolidatedReport, ConsolidatedReportPhoto, ConsolidatedReportSocialPost } from '../../types';
+import { fetchPartnerNewsletterEmails } from '../../lib/api';
 import { KPICard, OrgDomainChip } from './reportShared';
 import { CircleFlag } from '../CircleFlag';
 import { PlatformIcon, detectPlatform } from './platformIcon';
@@ -74,6 +75,29 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
     URL.revokeObjectURL(url);
   } : undefined;
 
+  // pecorino-64118 follow-up: download CSV of guest emails opted into THIS
+  // partner's newsletter. Backend returns 400 for tags without a newsletter
+  // (e.g. pizzadao); the tile only renders for newsletter-eligible tags
+  // because `mailingListSignups` is null in that case (see backend /report).
+  const hasNewsletterSignups = report.stats.mailingListSignups != null && report.stats.mailingListSignups > 0;
+  const downloadNewsletterEmails = hasNewsletterSignups ? async () => {
+    try {
+      const result = await fetchPartnerNewsletterEmails(report.tag || undefined);
+      const csv = 'email\n' + result.emails.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const namePart = (report.partnerName || report.tag || 'partner').replace(/[^a-zA-Z0-9]/g, '_');
+      a.href = url;
+      a.download = `${namePart}_newsletter_emails.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      // Don't break the report render — newsletter CSV is a side action.
+      console.error('Failed to download newsletter emails CSV:', err);
+    }
+  } : undefined;
+
   const statsDefs: { key: string; label: string; value: number | null | undefined; icon: React.ElementType; color: string; onAction?: () => void; actionIcon?: React.ElementType }[] = [
     { key: 'pageViews', label: t('report.pageViews'), value: report.impressions.totalViews || null, icon: MousePointerClick, color: 'text-[#ff393a]' },
     { key: 'uniqueVisitors', label: t('report.uniqueVisitors'), value: report.impressions.uniqueVisitors || null, icon: Eye, color: 'text-[#ff393a]' },
@@ -81,7 +105,7 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
     { key: 'socialPostViews', label: t('report.socialPostViews'), value: report.stats.socialPostViews || null, icon: Eye, color: 'text-blue-400' },
     { key: 'socialPosts', label: t('report.socialPosts'), value: report.stats.socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: t('report.totalRsvps'), value: report.stats.totalRsvps || null, icon: Users, color: 'text-green-400' },
-    { key: 'newsletterSignups', label: t('report.newsletterSignups'), value: report.stats.mailingListSignups || null, icon: Mail, color: 'text-orange-400' },
+    { key: 'newsletterSignups', label: t('report.newsletterSignups'), value: report.stats.mailingListSignups || null, icon: Mail, color: 'text-orange-400', onAction: downloadNewsletterEmails, actionIcon: Download },
     { key: 'walletAddresses', label: t('report.walletAddresses'), value: report.stats.walletAddresses || null, icon: Wallet, color: 'text-cyan-400', onAction: downloadWallets, actionIcon: Download },
     { key: 'poapMints', label: t('report.poapMints'), value: report.stats.poapMints || null, icon: Award, color: 'text-yellow-400' },
     { key: 'poapMoments', label: t('report.poapMoments'), value: report.stats.poapMoments || null, icon: Video, color: 'text-yellow-400' },
