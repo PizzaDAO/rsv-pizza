@@ -546,6 +546,10 @@ export function PartnerDashboardPage() {
           const totalUniqueVisitors = events.reduce((sum, e) => sum + (e.impressions?.uniqueVisitors || 0), 0);
           const totalClicks = events.reduce((sum, e) => sum + (e.clickStats?.totalClicks || 0), 0);
           const totalUniqueClickers = events.reduce((sum, e) => sum + (e.clickStats?.uniqueClickers || 0), 0);
+          // pecorino-64118 follow-up: total approved guests who submitted a wallet
+          // address (sum of per-event walletCount returned by /api/sponsor/events).
+          const totalWallets = events.reduce((sum, e) => sum + (e.walletCount || 0), 0);
+          const avgWallets = events.length > 0 ? Math.round(totalWallets / events.length) : 0;
           // Aggregate clicks: per-partner with per-platform breakdown
           const clicksByPartnerPlatformAgg: Record<string, { total: number; uniqueTotal: number; platforms: Record<string, { clicks: number; uniqueClickers: number }> }> = {};
           for (const e of events) {
@@ -595,10 +599,11 @@ export function PartnerDashboardPage() {
           const valueRsvps = totalRsvps * VALUE_PER_RSVP;
           const valueTotal = valueImpressions + valueClicks + valueNewsletter + valueRsvps;
 
-          // Grid columns: expand when admin tiles are present
+          // Grid columns: expand when admin tiles are present.
+          // pecorino-64118 follow-up: +1 tile ("Wallets submitted") in every variant.
           const gridColsClass = isSwc
-            ? (isAdmin ? 'md:grid-cols-3 lg:grid-cols-5' : 'md:grid-cols-3 lg:grid-cols-5')
-            : (isAdmin ? 'md:grid-cols-3 lg:grid-cols-6' : 'lg:grid-cols-4');
+            ? (isAdmin ? 'md:grid-cols-3 lg:grid-cols-6' : 'md:grid-cols-3 lg:grid-cols-6')
+            : (isAdmin ? 'md:grid-cols-3 lg:grid-cols-7' : 'md:grid-cols-3 lg:grid-cols-5');
           return (
             <div className="mb-6 space-y-3">
               <div className={`grid grid-cols-2 gap-3 ${gridColsClass}`}>
@@ -659,6 +664,17 @@ export function PartnerDashboardPage() {
                           </div>
                         ))}
                     </div>
+                  )}
+                </div>
+                {/* pecorino-64118 follow-up: total approved guests with a wallet address. */}
+                <div className="bg-theme-card border border-theme-stroke rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 text-theme-text-muted"><Wallet size={16} /></div>
+                    <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('dashboard.walletsSubmitted')}</span>
+                  </div>
+                  <div className="text-2xl font-bold text-theme-text">{totalWallets.toLocaleString()}</div>
+                  {totalWallets > 0 && (
+                    <div className="text-xs text-theme-text-muted mt-1">{t('dashboard.perEvent', { avg: avgWallets })}</div>
                   )}
                 </div>
                 {isAdmin && newsletterTotals && (

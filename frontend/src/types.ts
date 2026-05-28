@@ -1415,6 +1415,9 @@ export interface SponsorDashboardEvent {
   rsvpCount: number;
   invitedCount: number;
   approvedCount: number;
+  // pecorino-64118 follow-up: count of approved guests with a wallet address.
+  // Optional for backward-compat with cached payloads before backend ships.
+  walletCount?: number;
   maxGuests: number | null;
   expectedGuests?: number | null;
   budget: {

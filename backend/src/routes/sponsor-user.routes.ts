@@ -566,6 +566,9 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
             approved: true,
             checkedInAt: true,
             status: true,
+            // pecorino-64118 follow-up: count of guests with a wallet address
+            // (count only; raw addresses are never returned on this endpoint).
+            ethereumAddress: true,
             // Newsletter opt-in fields (admin-only response)
             mailingListOptIn: true,
             swcOptIn: true,
@@ -722,6 +725,11 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
       const submittedGuests = event.guests.filter(g => g.status !== 'INVITED');
       const guestCount = submittedGuests.length;
       const approvedCount = submittedGuests.filter(g => g.approved !== false).length;
+      // pecorino-64118 follow-up: count approved guests who submitted a wallet
+      // address. Count only — raw addresses are not exposed via this endpoint.
+      const walletCount = submittedGuests.filter(
+        g => g.approved !== false && typeof g.ethereumAddress === 'string' && g.ethereumAddress.length > 0
+      ).length;
 
       // Admin-only: newsletter opt-in counts per event.
       // Field is intentionally `undefined` for non-admins so JSON.stringify drops it
@@ -830,6 +838,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
         rsvpCount: guestCount,
         invitedCount: event.guests.filter(g => g.status === 'INVITED').length,
         approvedCount,
+        walletCount,
         maxGuests: event.maxGuests,
         expectedGuests: event.expectedGuests || null,
         budget,
