@@ -139,11 +139,17 @@
     "totalRsvps": "Total RSVPs",
     "perEvent": "~{{avg}} per event",
     "approved": "Approved",
+    "approvedRsvps": "Approved RSVPs",
     "withVenue": "With Venue",
     "withBudget": "With Budget",
     "completionRates": "Completion Rates",
+    "kit": "Kit",
+    "team": "Team",
     "venue": "Venue",
-    "budget": "Budget"
+    "budget": "Budget",
+    "sponsors": "Partners",
+    "social": "Social",
+    "thrown": "Thrown"
   },
   "intake": {
     "linkNotFound": "Link Not Found",

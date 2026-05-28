@@ -1175,10 +1175,18 @@ export interface UnderbossStats {
   eventsWithVenue: number;
   eventsWithBudget: number;
   eventsWithKit: number;
+  eventsWithTeam: number;
+  eventsWithSponsors: number;
+  eventsWithSocial: number;
+  eventsWithThrown: number;
   completionRate: {
     venue: number;
     budget: number;
     partyKit: number;
+    team: number;
+    sponsors: number;
+    social: number;
+    thrown: number;
   };
   avgRsvpsPerEvent: number;
 }
