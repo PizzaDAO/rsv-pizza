@@ -1869,8 +1869,35 @@ export interface AdminPayout extends Payout {
   };
 }
 
+/**
+ * bottarga-92103: event-level photo surfaced to admins on the payout-detail
+ * response. Mirrors a row from the `photos` table — photos hosts/guests upload
+ * directly to the event's Photos tab, distinct from the pizza-kind documents
+ * attached inside the payments flow (`Payout.documents`). Admins see every
+ * photo regardless of moderation `status`; the modal surfaces a small "Hidden
+ * from public" pill when `status !== 'approved'`.
+ */
+export interface AdminPayoutEventPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  fileName: string;
+  mimeType: string;
+  caption: string | null;
+  status: string;
+  starred: boolean;
+  uploaderName: string | null;
+  createdAt: string;
+}
+
 export interface AdminPayoutDetail extends AdminPayout {
   audits: PayoutAuditEntry[];
+  /**
+   * bottarga-92103: event-level photos for the party. Optional for backward-
+   * compat with cached payloads during a rolling deploy — older clients will
+   * just hide the section.
+   */
+  eventPhotos?: AdminPayoutEventPhoto[];
 }
 
 /**
