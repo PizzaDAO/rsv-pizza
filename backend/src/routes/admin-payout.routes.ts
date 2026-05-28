@@ -1477,6 +1477,42 @@ router.get(
         serialized.party.paidTotalUsd = t?.paidUsd ?? 0;
         serialized.party.paidTotalCount = t?.paidCount ?? 0;
       }
+
+      // bottarga-92103: surface the party's event-level photos (uploaded via
+      // the host Photos tab — separate from the pizza-kind documents attached
+      // inside the payments flow) so admins reviewing a payout see the full
+      // visual context of the party without bouncing to /host/:slug. Admins
+      // see every photo regardless of moderation status; the frontend surfaces
+      // a "Hidden from public" pill when `status !== 'approved'`.
+      const eventPhotos = await prisma.photo.findMany({
+        where: { partyId: row.partyId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          url: true,
+          thumbnailUrl: true,
+          fileName: true,
+          mimeType: true,
+          caption: true,
+          status: true,
+          starred: true,
+          uploaderName: true,
+          createdAt: true,
+        },
+      });
+      (serialized as any).eventPhotos = eventPhotos.map((p) => ({
+        id: p.id,
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        fileName: p.fileName,
+        mimeType: p.mimeType,
+        caption: p.caption,
+        status: p.status,
+        starred: p.starred,
+        uploaderName: p.uploaderName,
+        createdAt: p.createdAt.toISOString(),
+      }));
+
       res.json({ payout: serialized });
     } catch (error) {
       next(error);

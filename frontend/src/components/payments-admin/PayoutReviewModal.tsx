@@ -294,7 +294,36 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     () => payout.documents.filter((d) => d.kind === 'pizza'),
     [payout.documents],
   );
-  const allPhotos = useMemo(() => [...pizzas, ...receipts], [pizzas, receipts]);
+  // bottarga-92103: event-level photos from the party's Photos tab. Separate
+  // from payment-app photos (`payout.documents`). Optional on the wire — older
+  // cached responses simply render an empty section.
+  const eventPhotos = useMemo(
+    () => payout.eventPhotos ?? [],
+    [payout.eventPhotos],
+  );
+  // Unified lightbox carousel: payment-app pizzas → payment-app receipts →
+  // event-level photos. Order matters so `lightboxIndex` from each thumbnail
+  // grid resolves to the right starting image.
+  const allPhotos = useMemo(
+    () => [
+      ...pizzas.map((d) => ({
+        url: d.url,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+      })),
+      ...receipts.map((d) => ({
+        url: d.url,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+      })),
+      ...eventPhotos.map((p) => ({
+        url: p.url,
+        fileName: p.fileName,
+        mimeType: p.mimeType,
+      })),
+    ],
+    [pizzas, receipts, eventPhotos],
+  );
 
   async function saveReceiptEdit(docId: string) {
     const draft = receiptDrafts[docId];
@@ -497,33 +526,87 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         )}
 
         <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
-          {/* Left: photo gallery */}
-          <section>
-            <h3 className="text-sm font-semibold text-theme-text mb-2">
-              Photos ({allPhotos.length})
-            </h3>
-            {allPhotos.length === 0 && (
-              <p className="text-sm text-theme-text-faint">No photos attached.</p>
-            )}
-            <div className="grid grid-cols-3 gap-2">
-              {allPhotos.map((doc, idx) => (
-                <button
-                  key={doc.id}
-                  type="button"
-                  onClick={() => setLightboxIndex(idx)}
-                  className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                  title={doc.fileName}
-                >
-                  <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
-                  <span
-                    className={`absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                      doc.kind === 'receipt' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                    }`}
+          {/* Left: photo galleries
+              bottarga-92103: split into two sections — payment-app docs (the
+              original "Photos" grid) and event-level photos uploaded via the
+              host Photos tab. The lightbox carousel is one merged array
+              (pizzas → receipts → eventPhotos) so arrow-key nav crosses both
+              sections seamlessly. */}
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-theme-text mb-2">
+                Payment-app photos ({pizzas.length + receipts.length})
+              </h3>
+              {pizzas.length + receipts.length === 0 && (
+                <p className="text-sm text-theme-text-faint">No payment-app photos attached.</p>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                {[...pizzas, ...receipts].map((doc, idx) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => setLightboxIndex(idx)}
+                    className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                    title={doc.fileName}
                   >
-                    {doc.kind}
-                  </span>
-                </button>
-              ))}
+                    <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                    <span
+                      className={`absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                        doc.kind === 'receipt' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                      }`}
+                    >
+                      {doc.kind}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-theme-text mb-2">
+                Event photos ({eventPhotos.length})
+              </h3>
+              {eventPhotos.length === 0 ? (
+                <p className="text-sm text-theme-text-faint">No event photos yet.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {eventPhotos.map((p, idx) => {
+                    // Carousel index: event photos sit after the payment-app
+                    // pizzas + receipts in the merged `allPhotos` array.
+                    const carouselIdx = pizzas.length + receipts.length + idx;
+                    const isHidden = p.status !== 'approved';
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setLightboxIndex(carouselIdx)}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                        title={p.caption || p.fileName}
+                      >
+                        <img
+                          src={p.thumbnailUrl || p.url}
+                          alt={p.fileName}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {isHidden && (
+                          <span
+                            className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-white"
+                            title={`Photo status: ${p.status} — not visible to the public`}
+                          >
+                            Hidden
+                          </span>
+                        )}
+                        {p.starred && (
+                          <span className="absolute top-1 right-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-400 text-black">
+                            ★
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </section>
 
@@ -1493,14 +1576,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
       {/* bresaola-89172: shared ReceiptLightbox renders into document.body
           via createPortal, so it isn't clipped by the modal's overflow. It
-          owns its own Esc + arrow-key handlers and the HEIC fallback. */}
+          owns its own Esc + arrow-key handlers and the HEIC fallback.
+          bottarga-92103: `allPhotos` is the unified carousel — pizzas →
+          receipts → event-level photos — so arrow-key nav crosses sections. */}
       <ReceiptLightbox
         isOpen={lightboxIndex != null}
-        images={allPhotos.map((d) => ({
-          url: d.url,
-          fileName: d.fileName,
-          mimeType: d.mimeType,
-        }))}
+        images={allPhotos}
         initialIndex={lightboxIndex ?? 0}
         onClose={() => setLightboxIndex(null)}
       />
