@@ -151,6 +151,11 @@
     "social": "Social",
     "thrown": "Thrown"
   },
+  "regionBreakdown": {
+    "title": "Region Breakdown",
+    "region": "Region",
+    "approved": "Approved"
+  },
   "intake": {
     "linkNotFound": "Link Not Found",
     "linkNotFoundDesc": "This partner intake link is invalid, has expired, or has been revoked. Please contact the event host for a new link.",
