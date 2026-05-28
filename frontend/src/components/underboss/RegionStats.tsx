@@ -76,7 +76,7 @@ export function RegionStats({ stats }: RegionStatsProps) {
         />
         <StatCard
           icon={Users}
-          label={t('regionStats.approved')}
+          label={t('regionStats.approvedRsvps')}
           value={stats.totalApproved}
           color="bg-green-500/20 text-green-400"
         />
@@ -101,8 +101,13 @@ export function RegionStats({ stats }: RegionStatsProps) {
           <span className="text-xs text-theme-text-muted uppercase tracking-wider">{t('regionStats.completionRates')}</span>
         </div>
         <div className="space-y-3">
+          <CompletionBar label={t('regionStats.kit')} percent={stats.completionRate.partyKit} />
+          <CompletionBar label={t('regionStats.team')} percent={stats.completionRate.team} />
           <CompletionBar label={t('regionStats.venue')} percent={stats.completionRate.venue} />
           <CompletionBar label={t('regionStats.budget')} percent={stats.completionRate.budget} />
+          <CompletionBar label={t('regionStats.sponsors')} percent={stats.completionRate.sponsors} />
+          <CompletionBar label={t('regionStats.social')} percent={stats.completionRate.social} />
+          <CompletionBar label={t('regionStats.thrown')} percent={stats.completionRate.thrown} />
         </div>
       </div>
     </div>

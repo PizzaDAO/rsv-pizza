@@ -16,8 +16,8 @@ import { GPP_REGIONS } from '../types';
 import type { UnderbossDashboardData, UnderbossStats, UnderbossEvent } from '../types';
 
 function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStats {
-  // pizzetta-58924: per-event counters use approved + not-cancelled lens;
-  // per-guest sums stay across all events.
+  // panzerotti-58291: per-guest sums + per-event counters share one loop
+  // because both apply the same approved+not-cancelled lens now.
   const approvedEvents = events.filter(
     e => e.underbossStatus === 'approved' && !e.cancelledAt
   );
@@ -28,16 +28,24 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
   let totalApproved = 0;
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
+  let eventsWithKit = 0;
+  let eventsWithTeam = 0;
+  let eventsWithSponsors = 0;
+  let eventsWithSocial = 0;
+  let eventsWithThrown = 0;
 
-  for (const e of events) {
+  for (const e of approvedEvents) {
     totalRsvps += e.guestCount;
     totalInvited += e.invitedCount || 0;
     totalApproved += e.approvedCount;
-  }
 
-  for (const e of approvedEvents) {
     if (e.progress.hasVenue) eventsWithVenue++;
     if (e.progress.hasBudget) eventsWithBudget++;
+    if (e.progress.hasPartyKit) eventsWithKit++;
+    if (e.progress.hasCoHosts) eventsWithTeam++;
+    if (e.progress.hasSponsors) eventsWithSponsors++;
+    if (e.progress.hasSocialPosts) eventsWithSocial++;
+    if (e.progress.hasThrown) eventsWithThrown++;
   }
 
   return {
@@ -47,9 +55,19 @@ function recomputeStats(events: UnderbossDashboardData['events']): UnderbossStat
     totalApproved,
     eventsWithVenue,
     eventsWithBudget,
+    eventsWithKit,
+    eventsWithTeam,
+    eventsWithSponsors,
+    eventsWithSocial,
+    eventsWithThrown,
     completionRate: {
       venue: totalEvents > 0 ? Math.round((eventsWithVenue / totalEvents) * 100) : 0,
       budget: totalEvents > 0 ? Math.round((eventsWithBudget / totalEvents) * 100) : 0,
+      partyKit: totalEvents > 0 ? Math.round((eventsWithKit / totalEvents) * 100) : 0,
+      team: totalEvents > 0 ? Math.round((eventsWithTeam / totalEvents) * 100) : 0,
+      sponsors: totalEvents > 0 ? Math.round((eventsWithSponsors / totalEvents) * 100) : 0,
+      social: totalEvents > 0 ? Math.round((eventsWithSocial / totalEvents) * 100) : 0,
+      thrown: totalEvents > 0 ? Math.round((eventsWithThrown / totalEvents) * 100) : 0,
     },
     avgRsvpsPerEvent: totalEvents > 0 ? Math.round(totalRsvps / totalEvents) : 0,
   };
@@ -534,7 +552,7 @@ export function UnderbossDashboard() {
                   : 'text-theme-text-muted hover:text-theme-text-secondary'
               }`}
             >
-              {t('underbossDashboard.tabs.events')} ({displayData.events.length})
+              {t('underbossDashboard.tabs.events')} ({filteredData.stats.totalEvents} of {filteredData.events.length})
               {openAppealCount > 0 && (
                 <span
                   className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] font-semibold ml-1.5"

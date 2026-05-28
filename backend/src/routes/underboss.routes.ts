@@ -68,8 +68,8 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
 
 // Helper: compute stats from events
 function computeStats(events: any[], underbossEmails: string[] = []) {
-  // pizzetta-58924: per-event counters use approved + not-cancelled lens;
-  // per-guest sums stay across all events.
+  // panzerotti-58291: per-guest sums + per-event counters share one loop
+  // because both apply the same approved+not-cancelled lens now.
   const approvedEvents = events.filter(
     (e: any) => e.underbossStatus === 'approved' && !e.cancelledAt
   );
@@ -81,8 +81,12 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
   let eventsWithVenue = 0;
   let eventsWithBudget = 0;
   let eventsWithKit = 0;
+  let eventsWithTeam = 0;
+  let eventsWithSponsors = 0;
+  let eventsWithSocial = 0;
+  let eventsWithThrown = 0;
 
-  for (const event of events) {
+  for (const event of approvedEvents) {
     const invited = event.guests?.filter((g: any) => g.status === 'INVITED').length || 0;
     const guestCount = (event._count?.guests || 0) - invited;
     const approvedCount = event.guests?.filter((g: any) => g.approved !== false && g.status !== 'INVITED').length || 0;
@@ -90,13 +94,15 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
     totalInvited += invited;
     totalRsvps += guestCount;
     totalApproved += approvedCount;
-  }
 
-  for (const event of approvedEvents) {
     const progress = computeProgress(event, underbossEmails);
     if (progress.hasVenue) eventsWithVenue++;
     if (progress.hasBudget) eventsWithBudget++;
     if (progress.hasPartyKit) eventsWithKit++;
+    if (progress.hasCoHosts) eventsWithTeam++;
+    if (progress.hasSponsors) eventsWithSponsors++;
+    if (progress.hasSocialPosts) eventsWithSocial++;
+    if (progress.hasThrown) eventsWithThrown++;
   }
 
   return {
@@ -107,10 +113,18 @@ function computeStats(events: any[], underbossEmails: string[] = []) {
     eventsWithVenue,
     eventsWithBudget,
     eventsWithKit,
+    eventsWithTeam,
+    eventsWithSponsors,
+    eventsWithSocial,
+    eventsWithThrown,
     completionRate: {
       venue: totalEvents > 0 ? Math.round((eventsWithVenue / totalEvents) * 100) : 0,
       budget: totalEvents > 0 ? Math.round((eventsWithBudget / totalEvents) * 100) : 0,
       partyKit: totalEvents > 0 ? Math.round((eventsWithKit / totalEvents) * 100) : 0,
+      team: totalEvents > 0 ? Math.round((eventsWithTeam / totalEvents) * 100) : 0,
+      sponsors: totalEvents > 0 ? Math.round((eventsWithSponsors / totalEvents) * 100) : 0,
+      social: totalEvents > 0 ? Math.round((eventsWithSocial / totalEvents) * 100) : 0,
+      thrown: totalEvents > 0 ? Math.round((eventsWithThrown / totalEvents) * 100) : 0,
     },
     avgRsvpsPerEvent: totalEvents > 0 ? Math.round(totalRsvps / totalEvents) : 0,
   };
