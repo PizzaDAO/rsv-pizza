@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
-import { updatePartyApi } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument } from '../../lib/api';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
@@ -11,6 +11,7 @@ import {
   PAYOUT_METHOD_LABELS,
   formatUsd,
   formatOriginalCurrency,
+  ReceiptLightbox,
 } from '../payments-shared';
 
 /**
@@ -230,23 +231,127 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [walletPaidLoading, setWalletPaidLoading] = useState(false);
   const [overrideCap, setOverrideCap] = useState(false);
 
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // taralli-58291: lightbox uses an index into `allPhotos` so ArrowLeft /
+  // ArrowRight can cycle through receipts + pizza photos. Hooks must be
+  // declared above any early return — see feedback_hooks_above_early_returns.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Close on Escape
+  // agnolotti-58291: per-receipt OCR amount + currency edit state. The modal
+  // ships an inline form per receipt row (gated to full admins + payment_admin)
+  // so admins can correct OCR misreads without recomputing the parent payout.
+  // `receiptOverrides` is a docId -> { ocrAmount, ocrCurrency } map applied on
+  // top of `payout.documents` for rendering, so the row reflects the saved
+  // value immediately without waiting for a parent refresh.
+  type ReceiptOverride = { ocrAmount: number | null; ocrCurrency: string | null };
+  const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
+  // Per-row save state.
+  const [receiptSavingId, setReceiptSavingId] = useState<string | null>(null);
+  const [receiptSaveErrors, setReceiptSaveErrors] = useState<Record<string, string>>({});
+  // Per-row drafts so admins can edit without re-typing on re-render. Drafts
+  // are seeded from the original OCR value on first edit and kept until the
+  // row is saved or the modal closes.
+  type ReceiptDraft = { amount: string; currency: string };
+  const [receiptDrafts, setReceiptDrafts] = useState<Record<string, ReceiptDraft>>({});
+
+  // Hooks must be declared above any early returns. There aren't any early
+  // returns in this component today, but keeping all hooks grouped here makes
+  // the rule-of-hooks invariant easier to verify.
+
+  const canEditReceipts =
+    adminRole === 'admin' || adminRole === 'super_admin' || adminRole === 'payment_admin';
+
+  // Memoize the merged photo list so the keyboard handler's effect doesn't
+  // re-bind on every render. taralli-58291 introduced the memoization for
+  // lightbox keyboard nav; agnolotti-58291 layers receiptOverrides on top so
+  // inline-edited rows render the saved OCR values immediately.
+  const receipts = useMemo(
+    () =>
+      payout.documents
+        .filter((d) => d.kind === 'receipt')
+        .map((d) => {
+          const ov = receiptOverrides[d.id];
+          return ov ? { ...d, ocrAmount: ov.ocrAmount, ocrCurrency: ov.ocrCurrency } : d;
+        }),
+    [payout.documents, receiptOverrides],
+  );
+  const pizzas = useMemo(
+    () => payout.documents.filter((d) => d.kind === 'pizza'),
+    [payout.documents],
+  );
+  const allPhotos = useMemo(() => [...pizzas, ...receipts], [pizzas, receipts]);
+
+  async function saveReceiptEdit(docId: string) {
+    const draft = receiptDrafts[docId];
+    if (!draft) return;
+    setReceiptSavingId(docId);
+    setReceiptSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      // Empty string -> null (clear the field). Otherwise parse as number /
+      // upper-case the currency.
+      const trimmedAmt = draft.amount.trim();
+      const trimmedCur = draft.currency.trim();
+      const patch: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
+      if (trimmedAmt === '') {
+        patch.ocrAmount = null;
+      } else {
+        const n = Number(trimmedAmt);
+        if (!Number.isFinite(n) || n < 0) {
+          throw new Error('Amount must be a non-negative number');
+        }
+        patch.ocrAmount = n;
+      }
+      if (trimmedCur === '') {
+        patch.ocrCurrency = null;
+      } else if (trimmedCur.length > 8) {
+        throw new Error('Currency must be 8 characters or fewer');
+      } else {
+        patch.ocrCurrency = trimmedCur.toUpperCase();
+      }
+      const updated = await updatePayoutDocument(docId, patch);
+      setReceiptOverrides((m) => ({
+        ...m,
+        [docId]: {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+        },
+      }));
+      // Sync the draft text to the canonical saved value so the inputs match
+      // the rendered row on the next render.
+      setReceiptDrafts((m) => ({
+        ...m,
+        [docId]: {
+          amount: updated.ocrAmount == null ? '' : String(updated.ocrAmount),
+          currency: updated.ocrCurrency ?? '',
+        },
+      }));
+    } catch (err: any) {
+      setReceiptSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to save',
+      }));
+    } finally {
+      setReceiptSavingId(null);
+    }
+  }
+
+  // bresaola-89172: keyboard nav for the lightbox now lives inside the
+  // ReceiptLightbox component itself (Esc to close, arrows to cycle). The
+  // parent modal still listens for Esc here to close the review modal —
+  // when the lightbox is open it stops Esc propagation, so only one of
+  // these handlers fires per keypress.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        if (lightboxUrl) setLightboxUrl(null);
-        else onClose();
+      if (lightboxIndex == null && e.key === 'Escape') {
+        onClose();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, lightboxUrl]);
-
-  const receipts = payout.documents.filter((d) => d.kind === 'receipt');
-  const pizzas = payout.documents.filter((d) => d.kind === 'pizza');
-  const allPhotos = [...pizzas, ...receipts];
+  }, [onClose, lightboxIndex]);
 
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
@@ -385,11 +490,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               <p className="text-sm text-theme-text-faint">No photos attached.</p>
             )}
             <div className="grid grid-cols-3 gap-2">
-              {allPhotos.map((doc) => (
+              {allPhotos.map((doc, idx) => (
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => setLightboxUrl(doc.url)}
+                  onClick={() => setLightboxIndex(idx)}
                   className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
                   title={doc.fileName}
                 >
@@ -649,30 +754,106 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   {receipts.map((r) => {
                     const conf = r.ocrConfidence ?? 0;
                     const lowConf = conf > 0 && conf < 0.8;
+                    // agnolotti-58291: capture the OCR'd values as placeholders
+                    // so admins can see what the model originally returned
+                    // when they're correcting the field. `original*` reflects
+                    // the saved-but-not-yet-overridden value.
+                    const originalAmt = payout.documents.find((d) => d.id === r.id)?.ocrAmount;
+                    const originalCur = payout.documents.find((d) => d.id === r.id)?.ocrCurrency;
+                    const draft = receiptDrafts[r.id];
+                    const draftAmt = draft?.amount ?? (r.ocrAmount == null ? '' : String(r.ocrAmount));
+                    const draftCur = draft?.currency ?? (r.ocrCurrency ?? '');
+                    const dirty =
+                      draftAmt !== (r.ocrAmount == null ? '' : String(r.ocrAmount)) ||
+                      draftCur !== (r.ocrCurrency ?? '');
+                    const saving = receiptSavingId === r.id;
+                    const saveError = receiptSaveErrors[r.id];
                     return (
-                      <li key={r.id} className="flex items-center gap-2 text-sm">
-                        <span
-                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            r.ocrError ? 'bg-red-500' :
-                            lowConf ? 'bg-amber-500' :
-                            conf >= 0.8 ? 'bg-emerald-500' :
-                            'bg-gray-400'
-                          }`}
-                        />
-                        <span className="text-theme-text-muted flex-1 truncate">{r.fileName}</span>
-                        {r.ocrError ? (
-                          <span className="text-xs text-red-600">{r.ocrError}</span>
-                        ) : r.ocrAmount != null && r.ocrCurrency ? (
-                          <>
-                            <span className="text-theme-text font-medium">
-                              {formatOriginalCurrency(Number(r.ocrAmount), r.ocrCurrency)}
-                            </span>
-                            <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
-                              {(conf * 100).toFixed(0)}%
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-theme-text-faint">no OCR</span>
+                      <li key={r.id} className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              r.ocrError ? 'bg-red-500' :
+                              lowConf ? 'bg-amber-500' :
+                              conf >= 0.8 ? 'bg-emerald-500' :
+                              'bg-gray-400'
+                            }`}
+                          />
+                          <span className="text-theme-text-muted flex-1 truncate">{r.fileName}</span>
+                          {canEditReceipts ? (
+                            <>
+                              {/*
+                                agnolotti-58291: tight inline data-grid edits.
+                                IconInput is designed for full-width form
+                                fields with placeholder-as-label semantics and
+                                hardcodes `w-full !pl-14`, which doesn't fit a
+                                per-row 2-input + Save layout. Treating this as
+                                a data-grid cell, not a form field, so raw
+                                inputs are intentional here.
+                              */}
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                inputMode="decimal"
+                                value={draftAmt}
+                                placeholder={originalAmt == null ? 'amount' : String(originalAmt)}
+                                onChange={(e) =>
+                                  setReceiptDrafts((m) => ({
+                                    ...m,
+                                    [r.id]: { amount: e.target.value, currency: draftCur },
+                                  }))
+                                }
+                                className="w-24 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                              />
+                              <input
+                                type="text"
+                                maxLength={8}
+                                value={draftCur}
+                                placeholder={originalCur || 'CUR'}
+                                onChange={(e) =>
+                                  setReceiptDrafts((m) => ({
+                                    ...m,
+                                    [r.id]: { amount: draftAmt, currency: e.target.value },
+                                  }))
+                                }
+                                className="w-16 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs uppercase"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => saveReceiptEdit(r.id)}
+                                disabled={!dirty || saving}
+                                className="px-2 py-1 rounded bg-[#E52828] text-white text-xs disabled:opacity-40 inline-flex items-center gap-1"
+                                title="Save OCR override for this receipt"
+                              >
+                                {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                              </button>
+                              {conf > 0 && (
+                                <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
+                                  {(conf * 100).toFixed(0)}%
+                                </span>
+                              )}
+                            </>
+                          ) : r.ocrError ? (
+                            <span className="text-xs text-red-600">{r.ocrError}</span>
+                          ) : r.ocrAmount != null && r.ocrCurrency ? (
+                            <>
+                              <span className="text-theme-text font-medium">
+                                {formatOriginalCurrency(Number(r.ocrAmount), r.ocrCurrency)}
+                              </span>
+                              <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
+                                {(conf * 100).toFixed(0)}%
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-theme-text-faint">no OCR</span>
+                          )}
+                        </div>
+                        {canEditReceipts && r.ocrError && (
+                          <div className="text-xs text-red-600 mt-0.5 ml-4">{r.ocrError}</div>
+                        )}
+                        {saveError && (
+                          <div className="text-xs text-red-600 mt-0.5 ml-4">{saveError}</div>
                         )}
                       </li>
                     );
@@ -680,6 +861,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 </ul>
                 <div className="text-xs text-theme-text-muted mt-2 border-t border-theme-stroke pt-2">
                   Sum of OCR amounts (in their own currencies, not normalized): {ocrSum.toFixed(2)}
+                  {canEditReceipts && (
+                    <span className="block mt-1 text-theme-text-faint">
+                      Editing a receipt's OCR amount or currency here updates the document only —
+                      use the Edit Amount affordance on the payment itself to change the final USD total.
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -1232,31 +1419,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         </div>
       </div>
 
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            setLightboxUrl(null);
-          }}
-        >
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-black/40"
-            aria-label="Close lightbox"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      )}
+      {/* bresaola-89172: shared ReceiptLightbox renders into document.body
+          via createPortal, so it isn't clipped by the modal's overflow. It
+          owns its own Esc + arrow-key handlers and the HEIC fallback. */}
+      <ReceiptLightbox
+        isOpen={lightboxIndex != null}
+        images={allPhotos.map((d) => ({
+          url: d.url,
+          fileName: d.fileName,
+          mimeType: d.mimeType,
+        }))}
+        initialIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   );
 };

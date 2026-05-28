@@ -221,6 +221,11 @@ model Party {
   surveyEnabled Boolean   @default(true) @map("survey_enabled")
   surveySentAt  DateTime? @map("survey_sent_at") @db.Timestamptz
 
+  // margherita-58471: T-4h reminder email opt-out at the party level.
+  // Host toggles in EventDetailsTab; defaults to true for all new + existing
+  // events. Cron worker skips parties where this is false.
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+
   // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
   // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
   reimbursementCapUsd        Decimal?  @map("reimbursement_cap_usd") @db.Decimal(10, 2)
@@ -255,6 +260,10 @@ model Party {
   slugAliases           SlugAlias[]
   scorecardItems        GuestScorecardItem[]
   payouts               Payout[]
+  // agnolotti-58291: receipts are now party-level (PayoutDocument.partyId);
+  // payout association is optional. Inverse relation lives here so cascading
+  // a party delete also removes its receipts.
+  payoutDocuments       PayoutDocument[]
   paymentOptIns         PartyPaymentOptIn[]
   outreachAttempts      OutreachAttempt[]
   announcements         Announcement[]
@@ -425,6 +434,12 @@ model Guest {
 
   // romana-61204: post-event survey token (unique tokenized /survey/:token link)
   surveyToken String? @unique @map("survey_token") @db.Uuid
+
+  // margherita-58471: T-4h reminder email tracking.
+  // reminderSentAt is the audit trail — single-reminder design, no separate log table.
+  // remindersUnsubscribed is the per-guest opt-out flag, set via one-click List-Unsubscribe.
+  remindersUnsubscribed Boolean   @default(false) @map("reminders_unsubscribed")
+  reminderSentAt        DateTime? @map("reminder_sent_at") @db.Timestamptz
 
   partyId String @map("party_id") @db.Uuid
   party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -750,6 +765,10 @@ model Photo {
   // Video metadata
   duration Float? // Video duration in seconds (null for images)
 
+  // salame-58195: thumbs-up voting (denormalized counter, maintained by toggle endpoint)
+  voteCount Int         @default(0) @map("vote_count")
+  votes     PhotoVote[]
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -760,6 +779,23 @@ model Photo {
   // margherita-43821: composite index supporting GET /api/photos/feed
   @@index([starred, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("photos")
+}
+
+// salame-58195: thumbs-up votes on photos. One vote per (photo, user); toggle
+// to unvote. The User FK is one-way (no back-relation on User to avoid Prisma
+// churn) and references the "User" table (PascalCase singular — no @@map on
+// the User model).
+model PhotoVote {
+  id        String   @id @default(uuid()) @db.Uuid
+  photoId   String   @map("photo_id") @db.Uuid
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([photoId, userId])
+  @@index([photoId])
+  @@index([userId])
+  @@map("photo_votes")
 }
 
 // ============================================
@@ -1688,8 +1724,14 @@ model PartyPaymentOptIn {
 
 model PayoutDocument {
   id            String   @id @default(uuid()) @db.Uuid
-  payoutId      String   @map("payout_id") @db.Uuid
-  payout        Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  // agnolotti-58291: receipts are now PARTY-level. `partyId` is the canonical
+  // owner (NOT NULL, CASCADE on party delete). `payoutId` is optional and is
+  // the submission this receipt was uploaded with; it goes NULL via SET NULL
+  // cascade if the payout row is later hard-deleted, so receipts survive.
+  partyId       String   @map("party_id") @db.Uuid
+  party         Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  payoutId      String?  @map("payout_id") @db.Uuid
+  payout        Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   kind          String   // 'pizza' | 'receipt'
   url           String
   fileName      String   @map("file_name")
@@ -1699,6 +1741,12 @@ model PayoutDocument {
   ocrCurrency   String?  @map("ocr_currency")
   ocrConfidence Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
   ocrRaw        Json?    @map("ocr_raw")
+  // formaggi-89172: structured per-line items extracted from the receipt OCR.
+  // Schema is OcrLineItem[] (see backend/src/services/ocr.service.ts) — each
+  // entry has name, qty, unitPrice, subtotal, category. Stored as JSONB with a
+  // GIN index (`idx_payout_documents_ocr_line_items`) to support future
+  // analytics queries (e.g. average pizza prices by country/city).
+  ocrLineItems  Json?    @map("ocr_line_items")
   ocrError      String?  @map("ocr_error")
   // pancetta-37195: per-receipt uploader attribution. Both nullable so
   // historical rows are valid. uploadedByEmail caches the email at upload
@@ -1709,6 +1757,7 @@ model PayoutDocument {
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  @@index([partyId])
   @@index([payoutId])
   @@index([uploadedByUserId])
   @@map("payout_documents")

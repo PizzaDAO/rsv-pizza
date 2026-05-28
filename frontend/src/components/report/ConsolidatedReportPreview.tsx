@@ -2,12 +2,49 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Calendar, Users, Mail, Wallet, Award, Video, Eye, MousePointerClick,
-  FileText, Download, X, ChevronLeft, ChevronRight, ExternalLink,
+  FileText, Download, X, ChevronLeft, ChevronRight, ExternalLink, Play,
 } from 'lucide-react';
-import { ConsolidatedReport, Photo } from '../../types';
-import { ReportRoleChart } from './ReportRoleChart';
-import { SocialPostsList } from './SocialPostsList';
-import { KPICard, groupAttendeesByOrg, ReportOrgCard } from './reportShared';
+import { ConsolidatedReport, ConsolidatedReportPhoto, ConsolidatedReportSocialPost } from '../../types';
+import { KPICard, OrgDomainChip } from './reportShared';
+import { CircleFlag } from '../CircleFlag';
+import { PlatformIcon, detectPlatform } from './platformIcon';
+import { countryNameToAlpha2 } from '../../utils/countryFlag';
+import { gppCityBySlug } from '../../utils/gppCity';
+
+const isVideoMime = (m: string | null | undefined) => !!m && m.startsWith('video/');
+
+// Resolve a flag + "City, Country" label from the per-item party context,
+// preferring the GPP city manifest (same treatment as /photos).
+function resolvePartyLocation(party?: { slug: string; name: string; city: string | null; country: string | null }) {
+  if (!party) return null;
+  const gpp = gppCityBySlug(party.slug);
+  const city = gpp?.name ?? party.city ?? party.name;
+  const country = gpp?.country ?? party.country;
+  if (!city && !country) return null;
+  const label = city && country ? `${city}, ${country}` : (city || country || '');
+  return { city, country, label };
+}
+
+// Small flag + city/country chip overlaid on media tiles / shown inline on posts.
+function LocationChip({ party, overlay = false }: { party?: { slug: string; name: string; city: string | null; country: string | null }; overlay?: boolean }) {
+  const loc = resolvePartyLocation(party);
+  if (!loc) return null;
+  const flag = countryNameToAlpha2(loc.country) ? <CircleFlag country={loc.country} size={14} /> : null;
+  if (overlay) {
+    return (
+      <div className="absolute bottom-1 left-1 inline-flex items-center gap-1 max-w-[calc(100%-0.5rem)] px-1.5 py-0.5 rounded-md bg-gray-200/95 text-gray-900 text-[11px] font-medium pointer-events-none">
+        {flag}
+        <span className="truncate">{loc.label}</span>
+      </div>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-200 text-gray-900 text-xs font-medium">
+      {flag}
+      <span className="truncate">{loc.label}</span>
+    </span>
+  );
+}
 
 interface ConsolidatedReportPreviewProps {
   report: ConsolidatedReport;
@@ -44,7 +81,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
     { key: 'socialPostViews', label: t('report.socialPostViews'), value: report.stats.socialPostViews || null, icon: Eye, color: 'text-blue-400' },
     { key: 'socialPosts', label: t('report.socialPosts'), value: report.stats.socialPostCount || null, icon: FileText, color: 'text-blue-400' },
     { key: 'totalRsvps', label: t('report.totalRsvps'), value: report.stats.totalRsvps || null, icon: Users, color: 'text-green-400' },
-    { key: 'attendees', label: t('report.attendees'), value: report.stats.approvedGuests || null, icon: Users, color: 'text-emerald-400' },
     { key: 'newsletterSignups', label: t('report.newsletterSignups'), value: report.stats.mailingListSignups || null, icon: Mail, color: 'text-orange-400' },
     { key: 'walletAddresses', label: t('report.walletAddresses'), value: report.stats.walletAddresses || null, icon: Wallet, color: 'text-cyan-400', onAction: downloadWallets, actionIcon: Download },
     { key: 'poapMints', label: t('report.poapMints'), value: report.stats.poapMints || null, icon: Award, color: 'text-yellow-400' },
@@ -107,7 +143,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
                   <th className="py-2 pr-4 font-medium">{tp('consolidated.table.event')}</th>
                   <th className="py-2 pr-4 font-medium">{tp('consolidated.table.date')}</th>
                   <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.rsvps')}</th>
-                  <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.attendees')}</th>
                   <th className="py-2 pr-4 font-medium text-right">{tp('consolidated.table.impressions')}</th>
                   <th className="py-2 font-medium text-right">{tp('consolidated.table.clicks')}</th>
                 </tr>
@@ -128,7 +163,6 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
                     </td>
                     <td className="py-2 pr-4 text-theme-text-secondary whitespace-nowrap">{formatDate(ev.date)}</td>
                     <td className="py-2 pr-4 text-right text-theme-text">{ev.rsvpCount.toLocaleString()}</td>
-                    <td className="py-2 pr-4 text-right text-theme-text">{ev.approvedCount.toLocaleString()}</td>
                     <td className="py-2 pr-4 text-right text-theme-text">{ev.impressions.totalViews.toLocaleString()}</td>
                     <td className="py-2 text-right text-theme-text">{ev.clicks.toLocaleString()}</td>
                   </tr>
@@ -144,20 +178,52 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-theme-text mb-4">{t('report.media')}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {report.featuredPhotos.map((photo, i) => (
-              <button
-                key={photo.id}
-                onClick={() => setLightboxIndex(i)}
-                className="w-full aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                <img
-                  src={photo.thumbnailUrl || photo.url}
-                  alt={photo.caption || 'Event photo'}
-                  className="w-full h-full object-cover"
-                />
-              </button>
-            ))}
+            {report.featuredPhotos.map((photo, i) => {
+              const video = isVideoMime(photo.mimeType);
+              return (
+                <button
+                  key={photo.id}
+                  onClick={() => setLightboxIndex(i)}
+                  className="relative w-full aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {video ? (
+                    <>
+                      <video
+                        src={photo.url}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <Play size={20} className="text-white fill-white" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={photo.caption || 'Event photo'}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <LocationChip party={photo.party} overlay />
+                </button>
+              );
+            })}
           </div>
+          {report.tag && (
+            <div className="mt-4">
+              <a
+                href={`/photos?partnerTag=${encodeURIComponent(report.tag)}`}
+                className="inline-flex items-center gap-1 text-sm text-theme-text hover:text-theme-text-secondary transition-colors"
+              >
+                {tp('consolidated.viewAllPhotos')}
+                <ExternalLink size={14} className="text-theme-text-muted flex-shrink-0" />
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -171,37 +237,98 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
         />
       )}
 
-      {/* Industry RSVPs (combined notable attendees) */}
-      {report.notableAttendees.length > 0 && (
+      {/* Industry RSVPs — grouped by city / event (pecorino-64118).
+          Each city sub-group shows a flag + "City, Country" header and that event's
+          org-domain chips. Groups ordered by descending org count. */}
+      {(() => {
+        const cityGroups = report.events
+          .filter((ev) => ev.industryOrgs && ev.industryOrgs.length > 0)
+          .sort((a, b) => (b.industryOrgs?.length || 0) - (a.industryOrgs?.length || 0));
+        if (cityGroups.length === 0) return null;
+        return (
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
+            <div className="space-y-5">
+              {cityGroups.map((ev) => {
+                const loc = resolvePartyLocation({ slug: ev.slug, name: ev.name, city: ev.city ?? null, country: ev.country ?? null });
+                const flag = loc && countryNameToAlpha2(loc.country) ? <CircleFlag country={loc.country} size={16} /> : null;
+                return (
+                  <div key={ev.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {flag}
+                      <span className="text-sm font-medium text-theme-text-secondary">{loc?.label || ev.name}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ev.industryOrgs!.map((org) => (
+                        <OrgDomainChip key={org.domain} domain={org.domain} count={org.count} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Social Posts (combined) — compact platform-icon cards */}
+      {report.socialPosts.length > 0 && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-theme-text mb-3">{t('report.industryRsvps')}</h2>
-          <div className="flex flex-wrap gap-2">
-            {groupAttendeesByOrg(report.notableAttendees).map((group) => (
-              <ReportOrgCard key={group.domain || '_independent'} group={group} />
+          <h2 className="text-lg font-semibold text-theme-text mb-4">{t('report.socialPosts')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {report.socialPosts.map((post) => (
+              <SocialPostCard key={post.id} post={post} />
             ))}
           </div>
         </div>
       )}
-
-      {/* Role Breakdown */}
-      {Object.keys(report.stats.roleBreakdown).length > 0 && (
-        <div className="card p-6">
-          <ReportRoleChart roleBreakdown={report.stats.roleBreakdown} totalRsvps={report.stats.totalRsvps} />
-        </div>
-      )}
-
-      {/* Social Posts (combined) */}
-      {report.socialPosts.length > 0 && (
-        <div className="card p-6">
-          <SocialPostsList
-            posts={report.socialPosts}
-            onAdd={async () => {}}
-            onDelete={async () => {}}
-            editable={false}
-          />
-        </div>
-      )}
     </div>
+  );
+}
+
+// Compact social-post card: platform icon, title/handle/url, views, location chip, link.
+function SocialPostCard({ post }: { post: ConsolidatedReportSocialPost }) {
+  const { t } = useTranslation('host');
+  // Map the stored platform value to the shared PlatformIcon's labels; fall back
+  // to URL detection so every post gets a recognizable real-logo icon.
+  const platformMap: Record<string, string> = {
+    twitter: 'X',
+    farcaster: 'Farcaster',
+    instagram: 'Instagram',
+    facebook: 'Facebook',
+    linkedin: 'LinkedIn',
+    youtube: 'YouTube',
+    tiktok: 'TikTok',
+  };
+  const platform = platformMap[(post.platform || '').toLowerCase()] || detectPlatform(post.url);
+  const label = post.title || post.authorHandle || post.url;
+
+  return (
+    <a
+      href={post.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="bg-theme-surface rounded-xl p-3 border border-theme-stroke flex items-start gap-3 hover:border-theme-text-muted transition-colors group"
+    >
+      <div className="text-theme-text-secondary mt-0.5 flex-shrink-0">
+        <PlatformIcon platform={platform} size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-theme-text truncate flex-1">{label}</span>
+          <ExternalLink size={12} className="text-theme-text-muted flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+        <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1">
+          {post.views != null && post.views > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-theme-text-muted">
+              <Eye size={12} />
+              {post.views.toLocaleString()} {t('report.socialPostViews')}
+            </span>
+          )}
+          <LocationChip party={post.party} />
+        </div>
+      </div>
+    </a>
   );
 }
 
@@ -211,7 +338,7 @@ function PhotoLightbox({
   onClose,
   onNavigate,
 }: {
-  photos: Photo[];
+  photos: ConsolidatedReportPhoto[];
   index: number;
   onClose: () => void;
   onNavigate: (index: number) => void;
@@ -219,6 +346,7 @@ function PhotoLightbox({
   const photo = photos[index];
   const hasPrev = index > 0;
   const hasNext = index < photos.length - 1;
+  const video = isVideoMime(photo.mimeType);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -258,12 +386,23 @@ function PhotoLightbox({
         </button>
       )}
 
-      <img
-        src={photo.url}
-        alt={photo.caption || 'Event photo'}
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-        onClick={(e) => e.stopPropagation()}
-      />
+      {video ? (
+        <video
+          src={photo.url}
+          controls
+          autoPlay
+          playsInline
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <img
+          src={photo.url}
+          alt={photo.caption || 'Event photo'}
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
 
       {photo.caption && (
         <div

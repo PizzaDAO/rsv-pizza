@@ -170,6 +170,9 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     underbossStatus: (dbParty.underboss_status as any) || null,
     turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
     surveyEnabled: dbParty.survey_enabled ?? true,
+    // margherita-58471: default to true if the column wasn't selected (e.g. on
+    // legacy code paths that don't include reminders_enabled in their SELECT).
+    remindersEnabled: dbParty.reminders_enabled !== false,
     reimbursementCapUsd: dbParty.reimbursement_cap_usd != null ? Number(dbParty.reimbursement_cap_usd) : null,
     // arugula-38633 v2 follow-up: numeric-tag fallback. Computed client-side
     // because the host party flows through Supabase (not /api/parties/:id).

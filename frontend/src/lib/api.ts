@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry } from '../types';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -222,6 +222,8 @@ export interface UpdatePartyData {
   hostTelegramLinkToken?: string | null;
   turtleRolesEnabled?: boolean;
   surveyEnabled?: boolean;
+  // margherita-58471: T-4h reminder opt-out at the party level.
+  remindersEnabled?: boolean;
   reimbursementCapUsd?: number | null;
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
@@ -345,6 +347,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       hostTelegramLinkToken: data.hostTelegramLinkToken,
       turtleRolesEnabled: data.turtleRolesEnabled,
       surveyEnabled: data.surveyEnabled,
+      remindersEnabled: data.remindersEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
       // Day-of logistics (pepperoni-58341)
       wifiInfo: data.wifiInfo,
@@ -924,6 +927,26 @@ export async function batchReviewPhotos(
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
+    return null;
+  }
+}
+
+// salame-58195: toggle the current user's thumbs-up vote on a photo.
+// Logged-in users only. Returns { voted, voteCount } on success, null on error.
+export async function togglePhotoVote(
+  partyId: string,
+  photoId: string,
+): Promise<{ voted: boolean; voteCount: number } | null> {
+  try {
+    return await apiRequest<{ voted: boolean; voteCount: number }>(
+      `/api/parties/${partyId}/photos/${photoId}/vote`,
+      {
+        method: 'POST',
+        requireAuth: true,
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling photo vote:', error);
     return null;
   }
 }
@@ -3998,6 +4021,8 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.search) params.set('search', filters.search);
   // bruschetta-58291: country filter — exact-match `parties.country`.
   if (filters.country && filters.country !== 'all') params.set('country', filters.country);
+  // mascarpone-49102: tag filter — single event_tag "has" match.
+  if (filters.tag && filters.tag !== 'all') params.set('tag', filters.tag);
   if (filters.currency && filters.currency !== 'all') params.set('currency', filters.currency);
   // salumi-89172: purpose filter — 'event' | 'shipping' | 'all'. Omitted = show both.
   if (filters.purpose && filters.purpose !== 'all') params.set('purpose', filters.purpose);
@@ -4040,6 +4065,46 @@ export async function updateAdminPayout(
     body: fields,
   });
   return res.payout;
+}
+
+/**
+ * agnolotti-58291: per-receipt admin OCR correction. Updates ONLY the
+ * `ocrAmount` and `ocrCurrency` on a single `payout_documents` row — does NOT
+ * touch the parent payout's `finalAmountUsd`. Use the normal
+ * `updateAdminPayout` edit-amount path when an admin wants to recompute the
+ * payout total.
+ *
+ * Sending `null` clears the field; sending `undefined` (i.e. omitting it from
+ * the object) leaves it untouched.
+ *
+ * Returns the updated document row shape — same fields as
+ * `AdminPayoutDetail.documents[]` minus the uploader join.
+ */
+export async function updatePayoutDocument(
+  docId: string,
+  patch: {
+    ocrAmount?: number | null;
+    ocrCurrency?: string | null;
+  },
+): Promise<{
+  id: string;
+  kind: 'pizza' | 'receipt';
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  ocrError: string | null;
+  sortOrder: number;
+  uploadedByUserId: string | null;
+}> {
+  const res = await apiRequest<{ document: any }>(
+    `/api/admin/payouts/documents/${docId}`,
+    { method: 'PATCH', body: patch },
+  );
+  return res.document;
 }
 
 export async function approveAdminPayout(
@@ -4387,6 +4452,19 @@ export async function listPayouts(partyId: string): Promise<Payout[]> {
     { requireAuth: true }
   );
   return res.payouts;
+}
+
+/**
+ * ravioli-82931: returns every receipt the caller has submitted for this
+ * party across ALL their payouts (any status, including withdrawn). Powers
+ * the "Your receipts" section on PayoutsTab.
+ */
+export async function fetchReceiptsLibrary(partyId: string): Promise<ReceiptLibraryEntry[]> {
+  const res = await apiRequest<{ receipts: ReceiptLibraryEntry[] }>(
+    `/api/parties/${partyId}/payouts/receipts-library`,
+    { requireAuth: true }
+  );
+  return res.receipts;
 }
 
 export async function getPayout(partyId: string, payoutId: string): Promise<Payout> {
@@ -4802,7 +4880,10 @@ export interface FeedPhoto {
   width: number | null;
   height: number | null;
   createdAt: string;
-  party: { slug: string; name: string; city: string | null; country: string | null };
+  // salame-58195: thumbs-up voting state
+  voteCount: number;
+  votedByMe: boolean;
+  party: { id: string; slug: string; name: string; city: string | null; country: string | null };
 }
 
 export interface PhotosFeedResponse {

@@ -4,6 +4,7 @@ import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { canUserEditParty, canUserAccessTab, isSuperAdmin } from '../helpers/partyAccess.js';
+import { buildIndustryOrgs } from '../lib/emailDomains.js';
 
 // Helper: extends canUserEditParty to also allow sponsors tagged on the event (read-only access)
 //
@@ -83,6 +84,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
             role: true,
             mailingListOptIn: true,
             approved: true,
+            status: true,
           },
         },
         photos: {
@@ -108,6 +110,15 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
     const approvedGuests = party.guests.filter(g => g.approved !== false).length;
     const mailingListSignups = party.guests.filter(g => g.mailingListOptIn).length;
     const walletAddresses = party.guests.filter(g => g.ethereumAddress).length;
+
+    // pecorino-64118: Industry RSVPs — org domains derived from ALL approved
+    // guests' emails (personal providers excluded). Only { domain, count } is
+    // returned; raw guest emails are never leaked to the report.
+    const industryOrgs = buildIndustryOrgs(
+      party.guests
+        .filter(g => g.approved !== false && g.status !== 'INVITED')
+        .map(g => g.email),
+    );
 
     // Calculate role breakdown — count ALL roles per guest (guests can have multiple)
     const roleBreakdown: Record<string, number> = {};
@@ -166,6 +177,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
           email: (a as any).guest?.email || null,
           guest: undefined,
         })),
+        industryOrgs,
         featuredPhotos: party.photos,
 
         // Wallet address list for CSV export
@@ -422,11 +434,13 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
         guests: {
           select: {
             id: true,
+            email: true,
             roles: true,
             role: true,
             mailingListOptIn: true,
             ethereumAddress: true,
             approved: true,
+            status: true,
           },
         },
         photos: {
@@ -456,6 +470,15 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
     const approvedGuests = party.guests.filter(g => g.approved !== false).length;
     const mailingListSignups = party.guests.filter(g => g.mailingListOptIn).length;
     const walletAddresses = party.guests.filter(g => g.ethereumAddress).length;
+
+    // pecorino-64118: Industry RSVPs — org domains from ALL approved guests'
+    // emails (personal providers excluded). Only { domain, count } is returned;
+    // raw guest emails are NOT included in the public response.
+    const industryOrgs = buildIndustryOrgs(
+      party.guests
+        .filter(g => g.approved !== false && g.status !== 'INVITED')
+        .map(g => g.email),
+    );
 
     // Calculate role breakdown — count ALL roles per guest (guests can have multiple)
     const roleBreakdown: Record<string, number> = {};
@@ -515,6 +538,7 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
             email: domain ? `@${domain}` : null,
           };
         }),
+        industryOrgs,
         featuredPhotos: party.photos,
 
         // Wallet address list for CSV export

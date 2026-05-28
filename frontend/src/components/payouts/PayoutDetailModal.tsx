@@ -8,6 +8,7 @@ import { IconInput } from '../IconInput';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
+import { ReceiptLightbox } from '../payments-shared';
 
 interface PayoutDetailModalProps {
   partyId: string;
@@ -32,6 +33,8 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   rejected: 'bg-red-500/20 text-red-300',
   paid: 'bg-emerald-500/20 text-emerald-300',
   failed: 'bg-red-600/30 text-red-200',
+  // ravioli-82931: muted neutral for soft-withdrawn rows (matches PayoutStatusPill aesthetic).
+  withdrawn: 'bg-gray-500/20 text-gray-300',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -40,6 +43,7 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   rejected: 'Rejected',
   paid: 'Paid',
   failed: 'Failed',
+  withdrawn: 'Withdrawn',
 };
 
 /**
@@ -79,6 +83,13 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   // ---- withdraw state (gelato-72831) ----
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
+  // bresaola-89172: lightbox state for receipt + pizza-photo thumbnails.
+  // The carousel combines both kinds so arrow-key nav walks the whole set.
+  const [lightboxState, setLightboxState] = useState<{ open: boolean; initialIndex: number }>({
+    open: false,
+    initialIndex: 0,
+  });
 
   // New uploads since edit-mode was opened (existing docs aren't re-uploaded).
   const [newReceipts, setNewReceipts] = useState<ReceiptItem[]>([]);
@@ -144,6 +155,29 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     () => (payout?.documents ?? []).filter(d => d.kind === 'pizza' && !removedDocIds.has(d.id)),
     [payout, removedDocIds]
   );
+
+  // bresaola-89172: unified lightbox list across receipts + pizza photos so
+  // arrow-key nav walks the whole set. Receipts listed first (matches the
+  // top-down DOM order in read-only mode).
+  const viewReceipts = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'receipt'),
+    [payout]
+  );
+  const viewPizzaPhotos = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'pizza'),
+    [payout]
+  );
+  const lightboxImages = useMemo(
+    () =>
+      [...viewReceipts, ...viewPizzaPhotos].map(d => ({
+        url: d.url,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+      })),
+    [viewReceipts, viewPizzaPhotos]
+  );
+  const receiptsLightboxOffset = 0;
+  const pizzasLightboxOffset = viewReceipts.length;
 
   const isProcessingUploads =
     newReceipts.some(r => r.status === 'uploading' || r.status === 'ocring') ||
@@ -429,12 +463,6 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   <p className="text-sm text-theme-text whitespace-pre-wrap">{payout.hostNotes}</p>
                 </div>
               )}
-              {payout.adminNotes && (
-                <div>
-                  <p className="text-xs text-theme-text-muted mb-1">Reviewer notes</p>
-                  <p className="text-sm text-theme-text whitespace-pre-wrap">{payout.adminNotes}</p>
-                </div>
-              )}
               {payout.rejectionReason && (
                 <div>
                   <p className="text-xs text-red-300 mb-1">Rejection reason</p>
@@ -443,15 +471,23 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
               )}
 
               {/* Receipts (with OCR breakdown) */}
-              {payout.documents.some(d => d.kind === 'receipt') && (
+              {viewReceipts.length > 0 && (
                 <div>
                   <p className="text-xs text-theme-text-muted mb-2">Receipts</p>
                   <ul className="space-y-2">
-                    {payout.documents.filter(d => d.kind === 'receipt').map(d => (
+                    {viewReceipts.map((d, idx) => (
                       <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
-                        <a href={d.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
-                          <img src={d.url} alt="" className="w-14 h-14 rounded object-cover" />
-                        </a>
+                        {/* bresaola-89172: thumbnail opens the shared lightbox
+                            instead of popping the raw URL in a new tab. */}
+                        <button
+                          type="button"
+                          onClick={() => setLightboxState({ open: true, initialIndex: receiptsLightboxOffset + idx })}
+                          className="flex-shrink-0 rounded overflow-hidden hover:opacity-80 transition-opacity"
+                          aria-label={`Open ${d.fileName}`}
+                          title={d.fileName}
+                        >
+                          <img src={d.url} alt={d.fileName} className="w-14 h-14 object-cover block" />
+                        </button>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-theme-text truncate">{d.fileName}</p>
                           {d.ocrAmount != null ? (
@@ -472,7 +508,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                             </p>
                           )}
                         </div>
-                        <a href={d.url} target="_blank" rel="noreferrer" className="p-1 text-theme-text-muted hover:text-theme-text">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="p-1 text-theme-text-muted hover:text-theme-text" title="Open raw file">
                           <ExternalLink size={14} />
                         </a>
                       </li>
@@ -482,20 +518,23 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
               )}
 
               {/* Pizza photos */}
-              {payout.documents.some(d => d.kind === 'pizza') && (
+              {viewPizzaPhotos.length > 0 && (
                 <div>
                   <p className="text-xs text-theme-text-muted mb-2">Pizza / event photos</p>
                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                    {payout.documents.filter(d => d.kind === 'pizza').map(d => (
+                    {viewPizzaPhotos.map((d, idx) => (
                       <div key={d.id} className="space-y-1">
-                        <a
-                          href={d.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block aspect-square rounded-lg overflow-hidden bg-theme-surface"
+                        {/* bresaola-89172: same lightbox treatment — combined
+                            carousel walks receipts then pizza photos. */}
+                        <button
+                          type="button"
+                          onClick={() => setLightboxState({ open: true, initialIndex: pizzasLightboxOffset + idx })}
+                          className="block w-full aspect-square rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity"
+                          aria-label={`Open ${d.fileName}`}
+                          title={d.fileName}
                         >
-                          <img src={d.url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
-                        </a>
+                          <img src={d.url} alt={d.fileName} className="w-full h-full object-cover" />
+                        </button>
                         {/* pancetta-37195: per-photo uploader attribution.
                             Hidden for historical rows (null uploadedByUserId). */}
                         {d.uploadedByUserId && (
@@ -746,6 +785,13 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      <ReceiptLightbox
+        isOpen={lightboxState.open}
+        images={lightboxImages}
+        initialIndex={lightboxState.initialIndex}
+        onClose={() => setLightboxState({ open: false, initialIndex: 0 })}
+      />
     </div>
   );
 };

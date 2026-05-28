@@ -65,6 +65,7 @@ import citiesRoutes from './routes/cities.routes.js';
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
+import reminderRoutes from './routes/reminder.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -186,6 +187,7 @@ app.use('/api/gpp', gppRoutes);
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
+app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)

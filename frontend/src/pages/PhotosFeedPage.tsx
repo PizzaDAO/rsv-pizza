@@ -1,37 +1,22 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { cdnUrl } from '../lib/supabase';
 import {
   getPhotosFeed,
   getPhotosFeedFacets,
   getMyPartnerTags,
+  togglePhotoVote,
   FeedPhoto,
 } from '../lib/api';
 import { countryNameToAlpha2, alpha2ToCountryNames, alpha2ToCanonicalName } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
 import { GPP_REGIONS, GPPRegion } from '../types';
-
-const FLAG_BASE = 'https://cdn.jsdelivr.net/npm/circle-flags@2.8.3/flags';
-
-function CircleFlag({ country, code, size = 14 }: { country?: string | null; code?: string | null; size?: number }) {
-  const c = code ?? countryNameToAlpha2(country ?? null);
-  if (!c) return null;
-  return (
-    <img
-      src={`${FLAG_BASE}/${c}.svg`}
-      alt={country || c}
-      width={size}
-      height={size}
-      loading="lazy"
-      className="rounded-full inline-block shrink-0"
-      style={{ width: size, height: size }}
-    />
-  );
-}
+import { CircleFlag } from '../components/CircleFlag';
 
 // --- URL <-> state helpers (sicilian-58129) ----------------------------------
 
@@ -227,6 +212,16 @@ export function PhotosFeedPage() {
     setActivePartnerTag(null);
   };
 
+  // salame-58195: propagate vote changes back into the photos array so the
+  // count + filled icon update immediately on click (and stay in sync across
+  // tile <-> lightbox).
+  const handleVoteChange = useCallback(
+    (photoId: string, next: { voteCount: number; votedByMe: boolean }) => {
+      setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, ...next } : p)));
+    },
+    []
+  );
+
   const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag;
 
   return (
@@ -283,7 +278,14 @@ export function PhotosFeedPage() {
           <EmptyState anyFiltersActive={anyFiltersActive} onClear={clearAllFilters} />
         ) : (
           <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
-            {photos.map((p, idx) => <FeedTile key={p.id} photo={p} onOpen={() => setSelectedIdx(idx)} />)}
+            {photos.map((p, idx) => (
+              <FeedTile
+                key={p.id}
+                photo={p}
+                onOpen={() => setSelectedIdx(idx)}
+                onVoteChange={handleVoteChange}
+              />
+            ))}
           </div>
         )}
 
@@ -309,6 +311,7 @@ export function PhotosFeedPage() {
           onPrev={() => setSelectedIdx((i) => (i !== null && i > 0 ? i - 1 : i))}
           onNext={() => setSelectedIdx((i) => (i !== null && i < photos.length - 1 ? i + 1 : i))}
           onClose={() => setSelectedIdx(null)}
+          onVoteChange={handleVoteChange}
         />
       )}
     </Layout>
@@ -398,13 +401,14 @@ function CountryFilterButton({
     >
       <div className="px-3 pb-2 sticky top-0 border-b border-black/10" style={{ background: '#ffffff' }}>
         <div className="relative">
-          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={16} className="absolute top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" style={{ left: '12px' }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search countries..."
-            className="w-full pl-7 pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
+            className="w-full pr-2 py-1.5 text-sm bg-white border border-black/10 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500/40"
+            style={{ paddingLeft: '36px' }}
           />
         </div>
       </div>
@@ -564,7 +568,15 @@ function PartnerFilterButton({
 
 // --- Tiles + lightbox (unchanged from pre-sicilian-58129) --------------------
 
-function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
+function FeedTile({
+  photo,
+  onOpen,
+  onVoteChange,
+}: {
+  photo: FeedPhoto;
+  onOpen: () => void;
+  onVoteChange: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
+}) {
   const isVideo = photo.mimeType?.startsWith('video/');
   const src = cdnUrl(photo.url);
   const aspectRatio = photo.width && photo.height
@@ -575,6 +587,26 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
   const gpp = gppCityBySlug(photo.party.slug);
   const displayCity = gpp?.name ?? photo.party.city ?? photo.party.name;
   const displayCountry = gpp?.country ?? photo.party.country;
+
+  // salame-58195
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
+  const handleVote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!user) {
+      // Anon: defer login prompt — fall through to lightbox.
+      onOpen();
+      return;
+    }
+    if (voting) return;
+    setVoting(true);
+    const res = await togglePhotoVote(photo.party.id, photo.id);
+    setVoting(false);
+    if (res) {
+      onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
+    }
+  };
 
   return (
     <button onClick={onOpen} className="mb-3 block w-full break-inside-avoid rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity">
@@ -591,13 +623,25 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
         ) : (
           <img src={src} alt={photo.caption || ''} loading="lazy" className="w-full h-full object-cover block" />
         )}
+        {/* salame-58195: thumbs-up overlay (napoletana-58197: icon-only, white, drop-shadow) */}
+        <span
+          onClick={handleVote}
+          role="button"
+          aria-label={photo.votedByMe ? 'Remove vote' : 'Vote'}
+          className={`absolute bottom-2 right-2 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
+        >
+          <ThumbsUp size={22} fill={photo.votedByMe ? 'white' : 'none'} stroke="white" strokeWidth={2.25} />
+        </span>
       </div>
       {(displayCity || photo.party.name) && (
         <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1.5">
           {countryNameToAlpha2(displayCountry)
             ? <CircleFlag country={displayCountry} size={14} />
             : <MapPin size={11} />}
-          <span className="truncate">{displayCity}</span>
+          <span className="truncate">
+            {displayCity && displayCountry ? `${displayCity}, ${displayCountry}` : (displayCity || displayCountry || photo.party.name)}
+          </span>
         </div>
       )}
     </button>
@@ -605,7 +649,7 @@ function FeedTile({ photo, onOpen }: { photo: FeedPhoto; onOpen: () => void }) {
 }
 
 function FeedLightbox({
-  photo, onClose, onPrev, onNext, hasPrev, hasNext,
+  photo, onClose, onPrev, onNext, hasPrev, hasNext, onVoteChange,
 }: {
   photo: FeedPhoto;
   onClose: () => void;
@@ -613,6 +657,7 @@ function FeedLightbox({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
+  onVoteChange: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
 }) {
   const isVideo = photo.mimeType?.startsWith('video/');
 
@@ -620,6 +665,20 @@ function FeedLightbox({
   const gpp = gppCityBySlug(photo.party.slug);
   const displayCity = gpp?.name ?? photo.party.city;
   const displayCountry = gpp?.country ?? photo.party.country;
+
+  // salame-58195
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
+  const handleVote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || voting) return;
+    setVoting(true);
+    const res = await togglePhotoVote(photo.party.id, photo.id);
+    setVoting(false);
+    if (res) {
+      onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -649,15 +708,32 @@ function FeedLightbox({
         </div>
         <div className="p-4 border-t border-theme-stroke">
           {photo.caption && <p className="text-theme-text mb-2">{photo.caption}</p>}
-          <p className="text-theme-text-muted text-sm flex items-center gap-2">
-            {countryNameToAlpha2(displayCountry)
-              ? <CircleFlag country={displayCountry} size={18} />
-              : <MapPin size={12} />}
-            <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">
-              {photo.party.name}
-            </Link>
-            {displayCity && <span>· {displayCity}{displayCountry ? `, ${displayCountry}` : ''}</span>}
-          </p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-theme-text-muted text-sm flex items-center gap-2">
+              {countryNameToAlpha2(displayCountry)
+                ? <CircleFlag country={displayCountry} size={18} />
+                : <MapPin size={12} />}
+              <Link to={`/${photo.party.slug}`} className="hover:underline text-theme-text">
+                {photo.party.name}
+              </Link>
+              {displayCity && <span>· {displayCity}{displayCountry ? `, ${displayCountry}` : ''}</span>}
+            </p>
+            {/* salame-58195: vote button (logged-in users only; anon sees count) */}
+            <button
+              onClick={handleVote}
+              disabled={!user || voting}
+              aria-label={photo.votedByMe ? 'Remove vote' : 'Thumbs up'}
+              title={user ? (photo.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                photo.votedByMe
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-white/10 text-theme-text hover:bg-white/20'
+              } ${!user || voting ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              <ThumbsUp size={18} fill={photo.votedByMe ? 'currentColor' : 'none'} />
+              <span>{photo.voteCount}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

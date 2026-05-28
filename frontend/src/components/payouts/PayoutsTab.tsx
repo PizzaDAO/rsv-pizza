@@ -12,6 +12,7 @@ import { ExpectedGuestsCard } from './ExpectedGuestsCard';
 import { PrepayCheckbox } from './PrepayCheckbox';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { AppealCapModal } from './AppealCapModal';
+import { ReceiptsLibrary } from './ReceiptsLibrary';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -254,6 +255,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             totalPaidUsd={totalPaidUsd}
             reimbursementCapUsd={effectiveReimbursementCapUsd ?? null}
           />
+
+          {/*
+            ravioli-82931: surfaces every receipt the host has uploaded for
+            THIS party across all of their payouts (any status, including
+            withdrawn). Lets hosts see what they've previously submitted even
+            after withdrawing a request — receipts are no longer hard-deleted
+            with the parent payout. Read-only.
+          */}
+          <ReceiptsLibrary partyId={partyId} />
         </>
       )}
 

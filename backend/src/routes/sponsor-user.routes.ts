@@ -5,6 +5,7 @@ import { requireAuth, AuthRequest, isAdmin, isUnderboss } from '../middleware/au
 import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js';
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
+import { buildIndustryOrgs } from '../lib/emailDomains.js';
 
 // Admin management routes (mounted at /api/sponsor-users)
 
@@ -1096,12 +1097,22 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
 // pecorino-64118: rolls up ALL report data across every event the partner can
 // access into one view. Private (partner login only) — no public slug/password.
 // Same tag-resolution rules as GET /events (pizzadao -> eventType='gpp', admin-all).
+// pecorino-64118: maps a partner tag to ITS OWN newsletter opt-in column on the
+// Guest model. The consolidated report's "newsletter signups" tile counts only
+// these (never PizzaDAO's mailingListOptIn) and is hidden for any other tag.
+const NEWSLETTER_OPTIN_FIELD: Record<string, 'swcOptIn' | 'swcCaOptIn' | 'swcAuOptIn' | 'swcEuOptIn' | 'swcUkOptIn' | 'swcBrOptIn' | 'ethconfOptIn'> = {
+  swc: 'swcOptIn', swcca: 'swcCaOptIn', swcau: 'swcAuOptIn', swceu: 'swcEuOptIn', swcuk: 'swcUkOptIn', swcbr: 'swcBrOptIn', ethconf: 'ethconfOptIn',
+};
+
 sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
     const queryTag = req.query.tag as string | undefined;
     const tag = req.isAdminViewing
       ? (queryTag?.trim().toLowerCase() || undefined)
       : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
+
+    // pecorino-64118: newsletter signups count THIS tag's own opt-in column, if any.
+    const optinField = tag ? NEWSLETTER_OPTIN_FIELD[tag] : undefined;
 
     // Build where clause — identical to GET /events
     const where: any = {};
@@ -1124,17 +1135,18 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     // Non-admin with no resolvable tag (shouldn't happen): early-return empty.
     if (!tag && !req.isAdminViewing) {
       return res.json({
-        partnerName: req.sponsorUser?.name || null,
+        partnerName: null,
         tag: null,
         eventCount: 0,
         dateRange: null,
         stats: {
-          totalRsvps: 0, approvedGuests: 0, mailingListSignups: 0, walletAddresses: 0,
-          roleBreakdown: {}, poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
+          totalRsvps: 0, approvedGuests: 0, mailingListSignups: null, walletAddresses: 0,
+          poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
         },
         impressions: { totalViews: 0, uniqueVisitors: 0 },
         clickStats: { totalClicks: 0, uniqueClickers: 0, byLink: [] },
         notableAttendees: [],
+        industryOrgs: [],
         socialPosts: [],
         featuredPhotos: [],
         walletAddressList: [],
@@ -1152,15 +1164,24 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
           include: { guest: { select: { email: true } } },
         },
         photos: {
-          where: { starred: true },
-          orderBy: { starredAt: 'desc' },
+          where: { status: 'approved' },
+          orderBy: [{ starred: 'desc' }, { createdAt: 'desc' }],
           take: 10,
         },
         user: { select: { name: true, profilePictureUrl: true } },
         guests: {
           select: {
             id: true,
+            email: true,
             mailingListOptIn: true,
+            // pecorino-64118: per-tag newsletter opt-ins (counted instead of PizzaDAO's).
+            swcOptIn: true,
+            swcCaOptIn: true,
+            swcAuOptIn: true,
+            swcEuOptIn: true,
+            swcUkOptIn: true,
+            swcBrOptIn: true,
+            ethconfOptIn: true,
             ethereumAddress: true,
             approved: true,
             status: true,
@@ -1171,6 +1192,11 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     });
 
     const eventIds = parties.map(p => p.id);
+
+    // pecorino-64118: collect approved guest emails across ALL loaded events for
+    // one combined Industry RSVPs rollup (org domains only, personal providers
+    // excluded). Raw emails are never returned — only { domain, count }.
+    const industryOrgEmails: (string | null | undefined)[] = [];
 
     // Aggregate per-event stats + the rollup.
     let totalRsvps = 0;
@@ -1186,28 +1212,6 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     const combinedSocialPosts: any[] = [];
     const combinedNotable: any[] = [];
     const combinedPhotos: any[] = [];
-
-    // roleBreakdown computed via $queryRaw to avoid loading every guest's roles into Node.
-    const roleBreakdown: Record<string, number> = {};
-    if (eventIds.length > 0) {
-      const roleRows = await prisma.$queryRaw<{ role: string; count: bigint }[]>`
-        SELECT role, COUNT(*)::bigint AS count
-        FROM (
-          SELECT COALESCE(NULLIF(unnest(
-            CASE WHEN array_length(roles, 1) IS NULL OR array_length(roles, 1) = 0
-                 THEN ARRAY[COALESCE(role, 'Other')]
-                 ELSE roles END
-          ), ''), 'Other') AS role
-          FROM guests
-          WHERE party_id::text IN (${Prisma.join(eventIds)})
-            AND status != 'INVITED'
-        ) sub
-        GROUP BY role
-      `;
-      for (const r of roleRows) {
-        roleBreakdown[r.role] = (roleBreakdown[r.role] || 0) + Number(r.count);
-      }
-    }
 
     // Page-view (impression) aggregation — total + TRUE cross-event distinct visitors.
     const viewStats = eventIds.length > 0
@@ -1338,7 +1342,17 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       const approvedCount = submitted.filter(g => g.approved !== false).length;
       totalRsvps += rsvpCount;
       approvedGuests += approvedCount;
-      mailingListSignups += submitted.filter(g => g.mailingListOptIn).length;
+      // pecorino-64118: newsletter signups count THIS tag's own opt-in column on
+      // approved guests only. For tags without a newsletter, this stays null and
+      // the frontend hides the tile.
+      if (optinField) {
+        mailingListSignups += submitted.filter(g => g.approved !== false && g[optinField] === true).length;
+      }
+
+      // pecorino-64118: gather approved guest emails for the combined Industry RSVPs.
+      for (const g of submitted) {
+        if (g.approved !== false) industryOrgEmails.push(g.email);
+      }
 
       for (const g of submitted) {
         if (g.ethereumAddress) {
@@ -1350,10 +1364,17 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       poapMints += party.poapMints || 0;
       poapMoments += party.poapMoments || 0;
 
+      const partyContext = {
+        slug: party.customUrl || party.inviteCode,
+        name: party.name,
+        city: party.city,
+        country: party.country,
+      };
+
       socialPostCount += party.socialPosts.length;
       for (const sp of party.socialPosts) {
         socialPostViews += sp.views || 0;
-        combinedSocialPosts.push({ ...sp, eventName: party.name });
+        combinedSocialPosts.push({ ...sp, eventName: party.name, party: partyContext });
       }
 
       // Notable attendees — mask email to @domain (mirrors published public report).
@@ -1369,8 +1390,14 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       }
 
       for (const ph of party.photos) {
-        combinedPhotos.push(ph);
+        combinedPhotos.push({ ...ph, party: partyContext });
       }
+
+      // pecorino-64118: per-event Industry RSVPs — org domains from THIS event's
+      // approved guests, so the consolidated report can group industry orgs by city.
+      const eventIndustryOrgs = buildIndustryOrgs(
+        submitted.filter(g => g.approved !== false).map(g => g.email)
+      );
 
       const reportSlug = party.reportPublicSlug || party.customUrl || party.inviteCode;
       return {
@@ -1378,6 +1405,8 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
         name: party.name,
         date: party.date,
         slug: party.customUrl || party.inviteCode,
+        city: party.city,
+        country: party.country,
         reportSlug,
         rsvpCount,
         approvedCount,
@@ -1386,11 +1415,13 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
           uniqueVisitors: perEventUniqueViewMap.get(party.id) || 0,
         },
         clicks: perEventClickCount.get(party.id) || 0,
+        industryOrgs: eventIndustryOrgs,
       };
     });
 
-    // Cap combined starred photos at 60 total.
-    const featuredPhotos = combinedPhotos.slice(0, 60);
+    // pecorino-64118: report shows a representative SAMPLE (starred/best first,
+    // then recent); the "View all photos" link covers the rest via /photos.
+    const featuredPhotos = combinedPhotos.slice(0, 24);
 
     // Deduped wallet address list.
     const walletAddressList = Array.from(walletSet);
@@ -1401,17 +1432,36 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       ? { start: new Date(Math.min(...dates)).toISOString(), end: new Date(Math.max(...dates)).toISOString() }
       : null;
 
+    // pecorino-64118: combined Industry RSVPs across all events.
+    const industryOrgs = buildIndustryOrgs(industryOrgEmails);
+
+    // pecorino-64118 follow-up: header shows the ORG name for the filtered tag
+    // (sponsor_users.coHostName), not the logged-in user's personal name.
+    let partnerName: string | null = null;
+    if (tag) {
+      const tagSponsors = await prisma.sponsorUser.findMany({
+        where: { tag, isActive: true },
+        select: { coHostName: true },
+      });
+      const orgName = tagSponsors
+        .map(s => s.coHostName?.trim())
+        .find((v): v is string => !!v);
+      partnerName = orgName || (tag === 'pizzadao' ? 'PizzaDAO' : tag);
+    } else if (req.isAdminViewing) {
+      partnerName = 'All Partners';
+    }
+
     res.json({
-      partnerName: req.sponsorUser?.name || (req.isAdminViewing ? (tag || 'All Partners') : null),
+      partnerName,
       tag: tag || null,
       eventCount: parties.length,
       dateRange,
       stats: {
         totalRsvps,
         approvedGuests,
-        mailingListSignups,
+        // pecorino-64118: null = no per-tag newsletter → frontend hides the tile.
+        mailingListSignups: optinField ? mailingListSignups : null,
         walletAddresses,
-        roleBreakdown,
         poapMints,
         poapMoments,
         socialPostViews,
@@ -1420,6 +1470,7 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       impressions: { totalViews, uniqueVisitors },
       clickStats: { totalClicks, uniqueClickers, byLink },
       notableAttendees: combinedNotable,
+      industryOrgs,
       socialPosts: combinedSocialPosts,
       featuredPhotos,
       walletAddressList,

@@ -1,6 +1,8 @@
-import React from 'react';
-import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play, ThumbsUp } from 'lucide-react';
 import { Photo } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { togglePhotoVote } from '../../lib/api';
 
 interface PhotoCardProps {
   photo: Photo;
@@ -10,6 +12,8 @@ interface PhotoCardProps {
   onDelete?: (photoId: string) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
+  // salame-58195: thumbs-up vote toggled — parent updates local list.
+  onVoteChange?: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
 }
 
 /** Format duration in seconds to "M:SS" display */
@@ -27,11 +31,31 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onDelete,
   onApprove,
   onReject,
+  onVoteChange,
 }) => {
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
   const isVideo = photo.mimeType?.startsWith('video/');
+
+  // salame-58195: thumbs-up voting
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
+  const handleVote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      // Anon: fall through to opening the modal (login prompt deferred).
+      onClick?.();
+      return;
+    }
+    if (voting) return;
+    setVoting(true);
+    const res = await togglePhotoVote(photo.partyId, photo.id);
+    setVoting(false);
+    if (res && onVoteChange) {
+      onVoteChange(photo.id, { voteCount: res.voteCount, votedByMe: res.voted });
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -204,6 +228,20 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             </span>
           )}
         </div>
+      )}
+
+      {/* salame-58195: thumbs-up vote (approved photos only) — napoletana-58197: icon-only, white, drop-shadow */}
+      {!isPending && !isRejected && (
+        <button
+          type="button"
+          onClick={handleVote}
+          aria-label={photo.votedByMe ? 'Remove vote' : 'Vote'}
+          title={user ? (photo.votedByMe ? 'Remove vote' : 'Vote') : 'Log in to vote'}
+          className={`absolute bottom-2 left-2 z-10 cursor-pointer text-white hover:scale-110 transition-transform ${voting ? 'opacity-70' : ''}`}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
+        >
+          <ThumbsUp size={22} fill={photo.votedByMe ? 'white' : 'none'} stroke="white" strokeWidth={2.25} />
+        </button>
       )}
     </div>
   );

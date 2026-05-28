@@ -493,6 +493,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       // sends /start <token> to the bot). Allowing PATCH writes would let a host
       // spoof another user's chat_id.
       turtleRolesEnabled,
+      // margherita-58471: per-event T-4h reminder opt-out
+      remindersEnabled,
       // Day-of logistics (pepperoni-58341)
       wifiInfo,
       parkingNotes,
@@ -739,6 +741,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(telegramGroup !== undefined && { telegramGroup: telegramGroup || null }),
         ...(hostTelegramLinkToken !== undefined && { hostTelegramLinkToken: hostTelegramLinkToken || null }),
         ...(turtleRolesEnabled !== undefined && { turtleRolesEnabled }),
+        ...(remindersEnabled !== undefined && { remindersEnabled }),
         ...(wifiInfo !== undefined && { wifiInfo: wifiInfo || null }),
         ...(parkingNotes !== undefined && { parkingNotes: parkingNotes || null }),
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),

@@ -339,6 +339,8 @@ export interface Party {
   turtleRolesEnabled?: boolean;
   // romana-61204: post-event survey toggle
   surveyEnabled?: boolean;
+  // margherita-58471: T-4h reminder opt-out at the party level. Defaults true.
+  remindersEnabled?: boolean;
   // Reimbursement cap (arugula-38633 v2) — populated by underboss validation.
   // Banner on payout form only renders when reimbursementCapUsd != null.
   reimbursementCapUsd?: number | null;
@@ -497,6 +499,9 @@ export interface Photo {
   reviewedAt: string | null;
   reviewedBy: string | null;
   duration: number | null; // Video duration in seconds (null for images)
+  // salame-58195: thumbs-up voting
+  voteCount: number;
+  votedByMe: boolean;
   createdAt: string;
   updatedAt: string;
   guest?: {
@@ -725,6 +730,8 @@ export interface EventReport {
   // Related data
   socialPosts: SocialPost[];
   notableAttendees: NotableAttendee[];
+  // pecorino-64118: org domains derived from approved guests' emails (server-side).
+  industryOrgs?: { domain: string; count: number }[];
   featuredPhotos: Photo[];
 
   // Wallet addresses for CSV export
@@ -1482,6 +1489,45 @@ export interface ConsolidatedReportEvent {
   approvedCount: number;
   impressions: { totalViews: number; uniqueVisitors: number };
   clicks: number;
+  // pecorino-64118: per-event org domains from approved guests' emails, plus city/
+  // country so the consolidated report can group Industry RSVPs by city.
+  industryOrgs?: { domain: string; count: number }[];
+  city?: string | null;
+  country?: string | null;
+}
+
+// pecorino-64118: per-item event context attached to consolidated photos/posts so
+// the report can render a flag + city/country chip. Optional so the frontend
+// degrades gracefully before the backend redeploy lands.
+export interface ConsolidatedReportPartyContext {
+  slug: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+}
+
+// Combined starred photo for the consolidated media grid — the subset of Photo
+// fields the grid + lightbox actually use, plus optional party context.
+export interface ConsolidatedReportPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  mimeType: string | null;
+  duration: number | null;
+  party?: ConsolidatedReportPartyContext;
+}
+
+// Combined social post annotated with its event name + optional party context.
+export interface ConsolidatedReportSocialPost {
+  id: string;
+  platform: string;
+  url: string;
+  authorHandle: string | null;
+  title: string | null;
+  views: number | null;
+  eventName?: string;
+  party?: ConsolidatedReportPartyContext;
 }
 
 export interface ConsolidatedReport {
@@ -1492,9 +1538,9 @@ export interface ConsolidatedReport {
   stats: {
     totalRsvps: number;
     approvedGuests: number;
-    mailingListSignups: number;
+    // pecorino-64118: null when the partner tag has no own newsletter (tile hidden).
+    mailingListSignups: number | null;
     walletAddresses: number;
-    roleBreakdown: Record<string, number>;
     poapMints: number;
     poapMoments: number;
     socialPostViews: number;
@@ -1514,9 +1560,11 @@ export interface ConsolidatedReport {
   };
   // Notable attendees with email masked to @domain, annotated with event name.
   notableAttendees: (NotableAttendee & { eventName?: string })[];
-  // Social posts annotated with their event name.
-  socialPosts: (SocialPost & { eventName?: string })[];
-  featuredPhotos: Photo[];
+  // pecorino-64118: combined org domains from approved guests' emails (server-side).
+  industryOrgs?: { domain: string; count: number }[];
+  // Social posts annotated with their event name + optional party context.
+  socialPosts: ConsolidatedReportSocialPost[];
+  featuredPhotos: ConsolidatedReportPhoto[];
   walletAddressList: string[];
   events: ConsolidatedReportEvent[];
 }
@@ -1538,7 +1586,44 @@ export interface UnifiedPartner {
 // ============================================
 // Host Payouts (arugula-38633)
 // ============================================
-export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed';
+// ravioli-82931: 'withdrawn' is the soft-delete state hosts move pending|approved
+// rows into via DELETE /:partyId/payouts/:payoutId. Receipts on the row are
+// retained for the host's receipts-library tab.
+export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn';
+
+/**
+ * ravioli-82931 + agnolotti-58291: one entry in the party-scoped receipts
+ * library. After agnolotti, receipts are party-level — every cohost with
+ * edit access on the party sees ALL the party's receipts (not just their own).
+ * The parent payout association (`payoutId` / `payoutStatus`) is optional
+ * because receipts now survive payout hard-delete (FK SET NULL).
+ *
+ * Surfaced via `GET /api/parties/:partyId/payouts/receipts-library`.
+ */
+export interface ReceiptLibraryEntry {
+  id: string;
+  /** agnolotti-58291: null when the parent payout has been hard-deleted. */
+  payoutId: string | null;
+  /** agnolotti-58291: null when the parent payout has been hard-deleted. */
+  payoutStatus: PayoutStatus | null;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ocrAmount: number | null;
+  ocrCurrency: string | null;
+  ocrConfidence: number | null;
+  /**
+   * agnolotti-58291: uploader attribution so the UI can show "uploaded by X"
+   * — useful now that cohosts see each other's receipts. `uploadedByName`
+   * comes from the live User join; `uploadedByEmail` falls back to the
+   * cached email if the User row was later deleted.
+   */
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
+  createdAt: string;
+}
 export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
 
 export interface PayoutDocument {
@@ -1794,6 +1879,8 @@ export interface AdminPayoutFilters {
   search?: string;
   /** bruschetta-58291: country filter — exact-match `parties.country`. `'all'` / undefined = no filter. */
   country?: string;
+  /** mascarpone-49102: event-tag filter — single tag "has" match on `parties.event_tags`. `'all'` / undefined = no filter. */
+  tag?: string;
   currency?: string;
   /**
    * salumi-89172: Purpose filter — 'event' (host reimbursements) or

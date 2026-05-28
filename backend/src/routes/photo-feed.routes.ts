@@ -52,7 +52,7 @@ function buildPartyFilter(opts: { regions: string[]; countries: string[]; partne
   return partyFilter;
 }
 
-router.get('/feed', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const limit = Math.min(
       Math.max(parseInt((req.query.limit as string) || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT, 1),
@@ -68,7 +68,6 @@ router.get('/feed', async (req: Request, res: Response, next: NextFunction) => {
       : null;
 
     const where: any = {
-      starred: true,
       status: 'approved',
       party: {
         is: buildPartyFilter({ regions, countries, partnerTag }),
@@ -96,6 +95,11 @@ router.get('/feed', async (req: Request, res: Response, next: NextFunction) => {
         width: true,
         height: true,
         createdAt: true,
+        // salame-58195
+        voteCount: true,
+        votes: req.userId
+          ? { where: { userId: req.userId }, select: { id: true } }
+          : false,
         party: {
           select: {
             id: true,
@@ -116,23 +120,31 @@ router.get('/feed', async (req: Request, res: Response, next: NextFunction) => {
       : null;
 
     res.json({
-      photos: page.map((p) => ({
-        id: p.id,
-        url: p.url,
-        thumbnailUrl: p.thumbnailUrl,
-        caption: p.caption,
-        mimeType: p.mimeType,
-        duration: p.duration,
-        width: p.width,
-        height: p.height,
-        createdAt: p.createdAt,
-        party: {
-          slug: p.party.customUrl || p.party.inviteCode,
-          name: p.party.name,
-          city: p.party.city,
-          country: p.party.country,
-        },
-      })),
+      photos: page.map((p) => {
+        const votes = (p as typeof p & { votes?: { id: string }[] }).votes;
+        return {
+          id: p.id,
+          url: p.url,
+          thumbnailUrl: p.thumbnailUrl,
+          caption: p.caption,
+          mimeType: p.mimeType,
+          duration: p.duration,
+          width: p.width,
+          height: p.height,
+          createdAt: p.createdAt,
+          // salame-58195
+          voteCount: p.voteCount,
+          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
+          party: {
+            // Include id so the client can hit the per-party vote endpoint.
+            id: p.party.id,
+            slug: p.party.customUrl || p.party.inviteCode,
+            name: p.party.name,
+            city: p.party.city,
+            country: p.party.country,
+          },
+        };
+      }),
       nextCursor,
     });
   } catch (error) {
@@ -141,14 +153,13 @@ router.get('/feed', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // sicilian-58129: facets endpoint — returns distinct country values among
-// feed-eligible photos (starred + approved + party-eligible) with photo counts.
+// feed-eligible photos (approved + party-eligible) with photo counts.
 // Used by the /photos filter bar to populate the country dropdown.
 router.get('/feed/facets', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const grouped = await prisma.photo.groupBy({
       by: ['partyId'],
       where: {
-        starred: true,
         status: 'approved',
         party: {
           is: {

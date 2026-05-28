@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Building2 } from 'lucide-react';
+import { Building2, Globe } from 'lucide-react';
 import { NotableAttendee } from '../../types';
 import { extractEmailDomain, getDomainFaviconUrl } from '../../utils/emailUtils';
 
@@ -57,13 +57,27 @@ export function KPICard({ label, value, icon: Icon, color, url, onAction, action
   return content;
 }
 
-// Group attendees by org domain
+// Derive a registrable domain from a URL (the attendee's `link`).
+function domainFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./i, '').toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Group attendees by org domain. The org domain is the corporate email domain
+// if present, otherwise the domain derived from the attendee's link. Attendees
+// with neither (personal-registrar email only, or no email and no link) are
+// grouped as "independent".
 export function groupAttendeesByOrg(attendees: NotableAttendee[]) {
   const map = new Map<string, NotableAttendee[]>();
   const independent: NotableAttendee[] = [];
 
   for (const a of attendees) {
-    const domain = a.email ? extractEmailDomain(a.email, true) : null;
+    const domain = (a.email ? extractEmailDomain(a.email, true) : null) || domainFromUrl(a.link);
     if (domain) {
       const list = map.get(domain) || [];
       list.push(a);
@@ -110,6 +124,28 @@ export function ReportOrgFavicon({ domain, size = 20 }: { domain: string; size?:
   );
 }
 
+// pecorino-64118: chip for an org domain (TLD) derived from approved guests'
+// emails, with a count when more than one guest shares the domain.
+export function OrgDomainChip({ domain, count }: { domain: string; count: number }) {
+  return (
+    <div className="inline-flex items-center gap-2 bg-theme-surface rounded-lg px-3 py-2 border border-theme-stroke">
+      <ReportOrgFavicon domain={domain} size={16} />
+      <a
+        href={`https://${domain}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={domain}
+        className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors truncate max-w-[180px]"
+      >
+        {domain}
+      </a>
+      {count > 1 && (
+        <span className="text-xs text-theme-text-muted">({count})</span>
+      )}
+    </div>
+  );
+}
+
 export function ReportOrgCard({ group }: { group: { domain: string | null; attendees: NotableAttendee[] } }) {
   const { domain, attendees } = group;
 
@@ -122,7 +158,8 @@ export function ReportOrgCard({ group }: { group: { domain: string | null; atten
             href={`https://${domain}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+            title={domain}
+            className="text-sm text-theme-text-secondary hover:text-theme-text transition-colors truncate max-w-[180px]"
           >
             {domain}
           </a>
@@ -133,9 +170,22 @@ export function ReportOrgCard({ group }: { group: { domain: string | null; atten
       ) : (
         <>
           <Building2 size={14} className="text-theme-text-muted" />
-          {attendees.map((a) => (
-            <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
-          ))}
+          {attendees.map((a) =>
+            a.link ? (
+              <a
+                key={a.id}
+                href={a.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+              >
+                {a.name}
+                <Globe size={12} className="text-theme-text-muted flex-shrink-0" />
+              </a>
+            ) : (
+              <span key={a.id} className="text-sm text-theme-text-secondary">{a.name}</span>
+            )
+          )}
         </>
       )}
     </div>

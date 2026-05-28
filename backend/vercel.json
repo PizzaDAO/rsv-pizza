@@ -23,6 +23,7 @@
     {
       "path": "/api/cron/send-surveys",
       "schedule": "0 * * * *"
-    }
+    },
+    { "path": "/api/cron/event-reminders", "schedule": "*/15 * * * *" }
   ]
 }

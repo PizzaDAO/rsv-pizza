@@ -2,12 +2,13 @@
  * Host-facing payout routes (arugula-38633, PR 3/5).
  *
  * Mounted at `/api/parties`. Endpoints:
- *   POST   /:partyId/payouts                Create a new payout request (with parallel OCR)
- *   GET    /:partyId/payouts                List payouts for a party (host view)
- *   GET    /:partyId/payouts/:payoutId      Detail (host or any admin)
- *   PATCH  /:partyId/payouts/:payoutId      Update (host, while status='pending' only)
- *   DELETE /:partyId/payouts/:payoutId      Withdraw (host, while status IN 'pending'|'approved')
- *   POST   /:partyId/payouts/ocr-preview    OCR a single uploaded image without saving
+ *   POST   /:partyId/payouts                          Create a new payout request (with parallel OCR)
+ *   GET    /:partyId/payouts                          List active payouts for a party (excludes withdrawn)
+ *   GET    /:partyId/payouts/receipts-library         Submitter's receipts across all statuses incl. withdrawn (ravioli-82931)
+ *   GET    /:partyId/payouts/:payoutId                Detail (host or any admin)
+ *   PATCH  /:partyId/payouts/:payoutId                Update (host, while status='pending' only)
+ *   DELETE /:partyId/payouts/:payoutId                Soft-withdraw — sets status='withdrawn' (ravioli-82931)
+ *   POST   /:partyId/payouts/ocr-preview              OCR a single uploaded image without saving
  *
  * Admin execution + approval/rejection endpoints land in PR 4 / PR 5.
  */
@@ -94,7 +95,6 @@ function serializePayout(p: any) {
     mercuryCardId: p.mercuryCardId ?? null,
     mercuryCardLast4: p.mercuryCardLast4 ?? null,
     hostNotes: p.hostNotes ?? null,
-    adminNotes: p.adminNotes ?? null,
     rejectionReason: p.rejectionReason ?? null,
     reviewedBy: p.reviewedBy ?? null,
     reviewedAt: p.reviewedAt ? p.reviewedAt.toISOString() : null,
@@ -752,6 +752,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
       ocrRaw: any;
+      // formaggi-89172: per-line structured items extracted from the receipt.
+      // null for pizza-photo rows + receipts whose OCR errored.
+      ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
     }> = [];
@@ -781,6 +784,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrCurrency: fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          // formaggi-89172: structured per-line items for pizza-price analytics.
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: idx,
         });
@@ -796,6 +801,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrCurrency: null,
           ocrConfidence: null,
           ocrRaw: null,
+          ocrLineItems: null,
           ocrError: err,
           sortOrder: idx,
         });
@@ -815,6 +821,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrCurrency: null,
         ocrConfidence: null,
         ocrRaw: null,
+        ocrLineItems: null,
         ocrError: null,
         sortOrder: i,
       });
@@ -897,10 +904,16 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     }
 
     // pancetta-37195: stamp each new document with the uploader.
+    // agnolotti-58291: also stamp `partyId` so the document is party-scoped
+    // independent of the payoutId association (which is now SET NULL on
+    // payout delete). The nested `documents: { create: ... }` below uses the
+    // implicit `payoutId` from the parent create; partyId must be set
+    // explicitly since it's a sibling FK, not a back-relation.
     const uploaderUserId = req.userId ?? null;
     const uploaderEmail = req.userEmail ?? null;
     const docsToCreateStamped = docsToCreate.map(d => ({
       ...d,
+      partyId,
       uploadedByUserId: uploaderUserId,
       uploadedByEmail: uploaderEmail,
     }));
@@ -1007,8 +1020,11 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // ravioli-82931: hide withdrawn rows from the active host payouts list.
+    // They remain reachable via the receipts-library endpoint below so hosts
+    // can still see receipts they uploaded on rows they later withdrew.
     const payouts = await prisma.payout.findMany({
-      where: { partyId },
+      where: { partyId, status: { not: 'withdrawn' } },
       include: {
         host: { select: { id: true, name: true, email: true } },
         documents: {
@@ -1020,6 +1036,72 @@ router.get('/:partyId/payouts', async (req: AuthRequest, res: Response, next: Ne
     });
 
     res.json({ payouts: payouts.map(serializePayout) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- GET /:partyId/payouts/receipts-library ----------
+
+/**
+ * ravioli-82931 + agnolotti-58291: party-scoped receipts library.
+ *
+ * Every `kind='receipt'` `payout_documents` row belonging to this party is
+ * returned, regardless of which cohost uploaded it or which payout it was
+ * attached to (or whether the parent payout was later withdrawn / hard-
+ * deleted — receipts now survive payout deletion via `partyId` FK +
+ * `payoutId` SET NULL).
+ *
+ * Auth: `canUserEditParty` only. Any cohost with edit access on the party
+ * sees ALL the party's receipts. The "submitter-only" filter from
+ * `gouda-83912` was removed by agnolotti-58291 so the receipts library is
+ * a shared per-event resource.
+ *
+ * Mounted BEFORE `/:partyId/payouts/:payoutId` so the literal path wins over
+ * the dynamic param.
+ */
+router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // agnolotti-58291: query payout_documents by partyId directly (no join
+    // through payouts.partyId). payoutId is nullable now — receipts attached
+    // to a since-deleted payout still surface here with `payoutId === null`.
+    const docs = await prisma.payoutDocument.findMany({
+      where: { partyId, kind: 'receipt' },
+      include: {
+        payout: { select: { id: true, status: true, hostUserId: true } },
+        // agnolotti-58291: surface uploader name/email so the UI can render
+        // "uploaded by X" — useful now that cohosts see each other's receipts.
+        uploadedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      receipts: docs.map((d) => ({
+        id: d.id,
+        payoutId: d.payoutId,
+        payoutStatus: d.payout?.status ?? null,
+        url: d.url,
+        fileName: d.fileName,
+        fileSize: d.fileSize,
+        mimeType: d.mimeType,
+        ocrAmount: d.ocrAmount != null ? numberFromDecimal(d.ocrAmount) : null,
+        ocrCurrency: d.ocrCurrency ?? null,
+        ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
+        // agnolotti-58291: uploader attribution. Falls back to cached email
+        // if the User row is later deleted.
+        uploadedByUserId: d.uploadedByUserId ?? null,
+        uploadedByName: d.uploadedBy?.name ?? null,
+        uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
+        createdAt: d.createdAt.toISOString(),
+      })),
+    });
   } catch (error) {
     next(error);
   }
@@ -1274,6 +1356,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
       ocrRaw: any;
+      // formaggi-89172: per-line structured items extracted from the receipt.
+      ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
     }> = [];
@@ -1310,6 +1394,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrCurrency: fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          // formaggi-89172: structured per-line items for pizza-price analytics.
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
           ocrError: null,
           sortOrder: i,
         });
@@ -1325,6 +1411,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrCurrency: null,
           ocrConfidence: null,
           ocrRaw: null,
+          ocrLineItems: null,
           ocrError: err,
           sortOrder: i,
         });
@@ -1341,6 +1428,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrCurrency: null,
       ocrConfidence: null,
       ocrRaw: null,
+      ocrLineItems: null,
       ocrError: null,
       sortOrder: i,
     }));
@@ -1424,10 +1512,17 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         await tx.payoutDocument.createMany({
           data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
             ...d,
+            // agnolotti-58291: stamp partyId on every new doc — the FK is now
+            // NOT NULL party-side, optional payout-side.
+            partyId,
             payoutId: existing.id,
             uploadedByUserId: uploaderUserId,
             uploadedByEmail: uploaderEmail,
             ocrRaw: d.ocrRaw === null ? Prisma.JsonNull : (d.ocrRaw as Prisma.InputJsonValue),
+            // formaggi-89172: same JsonNull handling as ocrRaw — Prisma needs
+            // an explicit JsonNull marker (not JS null) to insert a SQL NULL
+            // into a JSONB column via createMany.
+            ocrLineItems: d.ocrLineItems == null ? Prisma.JsonNull : (d.ocrLineItems as Prisma.InputJsonValue),
           })),
         });
       }
@@ -1510,6 +1605,17 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 
 // ---------- DELETE /:partyId/payouts/:payoutId ----------
 
+/**
+ * ravioli-82931: soft-withdraw. Replaced the hard-delete from gelato-72831
+ * with `status = 'withdrawn'` so the linked payout_documents (receipts) are
+ * preserved. Withdrawn rows are hidden from the host's active list (see GET
+ * above) and from `assertWithinPartyCap`'s per-party sum (it only counts
+ * `paid|pending|approved`), but remain reachable for the host's receipts
+ * library and visible in the admin queue for transparency.
+ *
+ * The HTTP verb stays DELETE for backward-compat with the cancelPayout API
+ * client; the response shape is unchanged.
+ */
 router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, payoutId } = req.params;
@@ -1534,7 +1640,7 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
     }
 
     // gouda-83912: only the cohost who submitted the payout (or any admin)
-    // may delete it. Other cohosts on the same party can see the row but
+    // may withdraw it. Other cohosts on the same party can see the row but
     // cannot mutate it.
     const isAdminCaller = await isAnyAdmin(req.userEmail);
     if (!isAdminCaller && existing.hostUserId !== req.userId) {
@@ -1545,7 +1651,26 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
       );
     }
 
-    await prisma.payout.delete({ where: { id: payoutId } });
+    // ravioli-82931: soft-delete via status flip + 'cancel' audit row. Using
+    // 'cancel' (already in the action enum) instead of adding a new
+    // 'withdraw' constraint value to keep this PR DB-migration-scope small.
+    await prisma.$transaction(async (tx) => {
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: { status: 'withdrawn' },
+      });
+      await tx.payoutAudit.create({
+        data: {
+          payoutId,
+          action: 'cancel',
+          oldStatus: existing.status,
+          newStatus: 'withdrawn',
+          actorEmail: (req.userEmail || '').toLowerCase(),
+          actorKind: 'host',
+          note: 'Host withdrew payment request (receipts preserved).',
+        },
+      });
+    });
 
     res.json({ success: true });
   } catch (error) {
