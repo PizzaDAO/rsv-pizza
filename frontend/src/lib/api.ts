@@ -4254,6 +4254,68 @@ export async function markAdminPayoutPaid(
 }
 
 /**
+ * panettone-92103: party-level "mark party paid" preview. Returns the in-flight
+ * (pending + approved) payouts for a party so MarkPartyPaidModal can render
+ * the count + total + per-row breakdown before the admin confirms. Read-only.
+ */
+export interface MarkPartyPaidPreviewPayout {
+  id: string;
+  status: 'pending' | 'approved';
+  finalAmountUsd: number;
+  payoutMethod: PayoutMethod | null;
+  hostName: string | null;
+  hostEmail: string | null;
+}
+
+export interface MarkPartyPaidPreviewResponse {
+  party: { id: string; name: string };
+  count: number;
+  totalUsd: number;
+  payouts: MarkPartyPaidPreviewPayout[];
+}
+
+export async function fetchMarkPartyPaidPreview(
+  partyId: string,
+): Promise<MarkPartyPaidPreviewResponse> {
+  return apiRequest<MarkPartyPaidPreviewResponse>(
+    `/api/admin/parties/${partyId}/mark-paid-preview`,
+  );
+}
+
+/**
+ * panettone-92103: flip every in-flight (pending + approved) payout on a
+ * party to `paid` in one atomic transaction. Used when the admin paid the
+ * host the full amount out-of-band (Venmo / wire / etc.) and wants to close
+ * out everything in one click.
+ *
+ * `note` is appended to each row's `admin_notes` with a timestamp and also
+ * written to the per-row payout_audit row.
+ *
+ * `paidMethod` ('external' means "leave method unchanged") stamps the chosen
+ * method on rows whose `payout_method` is currently null. Existing methods
+ * are preserved so we don't lie about how an already-routed payout was paid.
+ *
+ * Returns `{ count, party, payoutIds }`. count=0 (HTTP 200) when there are no
+ * in-flight payouts — modal renders "0 payouts to mark paid".
+ */
+export async function markPartyPaid(
+  partyId: string,
+  body?: {
+    note?: string;
+    paidMethod?: PayoutMethod | 'external';
+  },
+): Promise<{ count: number; party: { id: string; name: string }; payoutIds: string[] }> {
+  return apiRequest<{
+    count: number;
+    party: { id: string; name: string };
+    payoutIds: string[];
+  }>(`/api/admin/parties/${partyId}/mark-paid`, {
+    method: 'POST',
+    body: body ?? {},
+  });
+}
+
+/**
  * Execute an approved payout (PR 5). Body shape is method-specific:
  *   - usdc_base    → no body required; server sends via Privy server-wallet
  *   - wire         → { wireReference: string } REQUIRED

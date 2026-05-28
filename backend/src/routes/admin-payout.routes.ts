@@ -1826,6 +1826,19 @@ router.get(
 
 // ============================================
 // PATCH /api/admin/payouts/:id — edit amount / notes / method / target
+//
+// panettone-92103: admin PATCH NEVER auto-recomputes `finalAmountUsd` from the
+// child receipts' OCR sum. The admin's `finalAmountUsd` (if provided in the
+// body) is canonical; if it isn't provided, the existing `final_amount_usd`
+// is preserved as-is. OCR is informational once admin has set an amount.
+//
+// Why: when a receipt OCR'd at e.g. $1500 (mis-read) and admin then set
+// `finalAmountUsd = 200`, subsequent admin edits to OTHER fields (notes,
+// wallet, method) used to re-trigger an OCR recompute path that summed the
+// wrong OCR amounts back to $1500 and threw PER_SUBMISSION_CAP_EXCEEDED —
+// admin couldn't save notes. Host-side PATCH (`payout.routes.ts`) keeps the
+// OCR recompute since it's part of the host's in-progress upload UX
+// (provolone-39042: only on `pending` status anyway).
 // ============================================
 router.patch(
   '/:id',
@@ -3694,6 +3707,245 @@ payoutWalletRouter.get(
         usdcBalance: formatUnits(usdcRaw, 6),
         usdcBalanceUnits: usdcRaw.toString(),
         fetchedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
+// panettone-92103: party-level "mark party paid" bulk action.
+//
+// Exported as a separate Router (mounted at `/api/admin/parties` in
+// `index.ts`) so the URL is `POST /api/admin/parties/:partyId/mark-paid`.
+// Lives in this file to share the existing actor / audit / serialization
+// helpers with the rest of the admin-payout surface.
+//
+// Use case: admin paid the host the full amount out-of-band (Venmo, bank
+// wire, etc.) and wants to close out every in-flight payout for that party
+// in one click instead of clicking through each row.
+//
+// Auth: admin / super_admin / payment_admin (`requireAnyAdminOrPaymentAdmin`).
+// Regional underbosses are NOT allowed — funds-acknowledgement counts as a
+// funds-sending mutation, same gate as `mark-paid` / `execute`.
+// ============================================
+export const partyMarkPaidRouter = Router();
+
+const ALLOWED_MARK_PAID_METHODS = ['mercury_card', 'wire', 'usdc_base', 'external'] as const;
+
+/**
+ * GET /api/admin/parties/:partyId/mark-paid-preview
+ *
+ * Returns the in-flight (pending + approved) payout list + count + total for
+ * a party, so the MarkPartyPaidModal can render the impact summary before the
+ * admin confirms. Read-only; no mutations.
+ */
+partyMarkPaidRouter.get(
+  '/:partyId/mark-paid-preview',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, name: true },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      const payouts = await prisma.payout.findMany({
+        where: {
+          partyId,
+          status: { in: ['pending', 'approved'] },
+        },
+        select: {
+          id: true,
+          status: true,
+          finalAmountUsd: true,
+          payoutMethod: true,
+          host: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const totalUsd = payouts.reduce(
+        (sum, p) => sum + Number(p.finalAmountUsd),
+        0,
+      );
+
+      res.json({
+        party: { id: party.id, name: party.name },
+        count: payouts.length,
+        totalUsd,
+        payouts: payouts.map((p) => ({
+          id: p.id,
+          status: p.status,
+          finalAmountUsd: Number(p.finalAmountUsd),
+          payoutMethod: p.payoutMethod ?? null,
+          hostName: p.host?.name ?? null,
+          hostEmail: p.host?.email ?? null,
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/admin/parties/:partyId/mark-paid
+ *
+ * Body:
+ *   {
+ *     note?: string;       // shared admin note appended (with timestamp) to
+ *                          // each payout's admin_notes; also written to
+ *                          // payout_audit.note
+ *     paidMethod?: 'mercury_card' | 'wire' | 'usdc_base' | 'external';
+ *                          // optional; if set, stamps payout_method on each
+ *                          // row ONLY when currently null. Existing methods
+ *                          // are preserved so we don't lie about how an
+ *                          // already-routed payout was paid.
+ *   }
+ *
+ * Atomic via `prisma.$transaction`. For each in-flight payout on the party:
+ *   1. status -> 'paid'
+ *   2. paid_at -> now()
+ *   3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] <note>" on a new line
+ *      preserving any existing notes; no-op when note is missing/blank.
+ *   4. payout_method: set to `paidMethod` ONLY IF currently null. (External
+ *      payouts that had no on-platform method get stamped; existing methods
+ *      are left untouched.)
+ *   5. payout_audit row with action='mark_paid', old_status, new_status='paid'.
+ *
+ * Returns `{ count, party: { id, name }, payoutIds }`. count=0 with HTTP 200
+ * when there are no in-flight payouts to flip — not an error.
+ */
+partyMarkPaidRouter.post(
+  '/:partyId/mark-paid',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const actor = await loadActor(req);
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, name: true },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      const body = req.body || {};
+      const note =
+        typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
+      const paidMethod =
+        typeof body.paidMethod === 'string' && body.paidMethod.trim()
+          ? body.paidMethod.trim()
+          : null;
+      if (paidMethod && !ALLOWED_MARK_PAID_METHODS.includes(paidMethod as any)) {
+        throw new AppError('Invalid paidMethod', 400, 'VALIDATION_ERROR');
+      }
+      // 'external' isn't a stored payoutMethod enum value — it's the modal's
+      // "leave unchanged / off-platform" sentinel. Treat it as "don't stamp
+      // a method" rather than persisting the literal string.
+      const methodToStamp = paidMethod && paidMethod !== 'external' ? paidMethod : null;
+
+      // Find all in-flight payouts BEFORE the transaction so we can do per-row
+      // self-payout checks + log a clean count even if zero match.
+      const inflight = await prisma.payout.findMany({
+        where: {
+          partyId,
+          status: { in: ['pending', 'approved'] },
+        },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          adminNotes: true,
+          payoutMethod: true,
+        },
+      });
+
+      if (inflight.length === 0) {
+        // Not an error — modal can render "0 payouts to mark paid".
+        res.json({
+          count: 0,
+          party: { id: party.id, name: party.name },
+          payoutIds: [],
+        });
+        return;
+      }
+
+      // Self-payout guard — payment_admin actors can't mark their own row
+      // paid. Even one self-row in the batch aborts the whole operation
+      // (atomic semantics; safer than silently skipping one row).
+      for (const p of inflight) {
+        assertNotSelfPayout(actor, p.hostUserId);
+      }
+
+      const now = new Date();
+      const noteTimestamp = now.toISOString();
+      const updatedIds: string[] = [];
+
+      await prisma.$transaction(async (tx) => {
+        for (const p of inflight) {
+          // Preserve existing admin_notes, append the bulk note with a
+          // timestamp on its own line so the trail is readable.
+          let nextAdminNotes: string | null | undefined = undefined;
+          if (note) {
+            const existing = p.adminNotes && p.adminNotes.trim() ? p.adminNotes : '';
+            const appended = `[${noteTimestamp}] ${note}`;
+            nextAdminNotes = existing
+              ? `${existing}\n${appended}`
+              : appended;
+          }
+
+          // Only stamp payoutMethod when (a) admin supplied one AND (b) the
+          // row currently has none. Preserves the truth of how routed rows
+          // were originally configured.
+          const shouldStampMethod = !!methodToStamp && !p.payoutMethod;
+
+          const data: any = {
+            status: 'paid',
+            paidAt: now,
+          };
+          if (nextAdminNotes !== undefined) {
+            data.adminNotes = nextAdminNotes;
+          }
+          if (shouldStampMethod) {
+            data.payoutMethod = methodToStamp;
+          }
+
+          await tx.payout.update({
+            where: { id: p.id },
+            data,
+          });
+
+          await tx.payoutAudit.create({
+            data: {
+              payoutId: p.id,
+              action: 'mark_paid',
+              oldStatus: p.status,
+              newStatus: 'paid',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: note,
+            },
+          });
+
+          updatedIds.push(p.id);
+        }
+      });
+
+      res.json({
+        count: updatedIds.length,
+        party: { id: party.id, name: party.name },
+        payoutIds: updatedIds,
       });
     } catch (err) {
       next(err);
