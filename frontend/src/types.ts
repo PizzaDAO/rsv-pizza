@@ -1961,6 +1961,12 @@ export interface AdminPayoutFilters {
   purpose?: PayoutPurpose | 'all';
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * arancino-92103: sort order for the payouts queue. Default `created_desc`
+   * preserves prior implicit ordering. When non-default, the backend falls
+   * back to offset-based pagination (cursor is encoded as an offset count).
+   */
+  sort?: 'created_desc' | 'created_asc' | 'amount_desc' | 'amount_asc';
   cursor?: string;
   limit?: number;
 }

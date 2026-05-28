@@ -86,6 +86,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // salumi-89172: purpose filter default — 'all' shows both event and
   // shipping payouts so the existing admin queue is unchanged out of box.
   purpose: 'all',
+  // arancino-92103: sort order default — newest submitted first. Matches the
+  // prior implicit backend ordering, so non-sorting callers see no change.
+  sort: 'created_desc',
 };
 
 // lardo-58294: substring filter shared between the search input and the
