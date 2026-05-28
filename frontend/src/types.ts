@@ -2075,3 +2075,59 @@ export interface OcrPreviewResult {
   fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
   conversionNote?: string;
 }
+
+/**
+ * etruria-92103: one row of the by-city payments table — `GET
+ * /api/admin/payouts/by-party`. Top-level rows are one per party; click the
+ * chevron to expand and see the underlying AdminPayout[] (rendered with the
+ * same PayoutRow primitive as the per-payment view).
+ *
+ * The filters that scope the LIST endpoint (status / country / region /
+ * purpose / search / dateRange) all scope the underlying payouts BEFORE this
+ * aggregation runs — a party with no pending payouts simply doesn't appear in
+ * the queue when "Pending" is selected.
+ */
+export interface PartyPayoutsRow {
+  party: {
+    id: string;
+    name: string;
+    customUrl: string | null;
+    /** Mirrors `party.inviteCode` so the frontend can build `/host/:slug` links. */
+    inviteCode: string | null;
+    country: string | null;
+    /** Optional — backend currently surfaces null since the value isn't on PAYOUT_PARTY_SELECT. */
+    region: string | null;
+    effectiveReimbursementCapUsd: number | null;
+    eventTags: string[];
+    primaryHostInCohosts: boolean;
+    /** Primary host (parties.userId). */
+    userId: string | null;
+  };
+  aggregates: {
+    pendingCount: number;
+    pendingUsd: number;
+    approvedCount: number;
+    approvedUsd: number;
+    paidCount: number;
+    paidUsd: number;
+    rejectedCount: number;
+    rejectedUsd: number;
+    failedCount: number;
+    failedUsd: number;
+    withdrawnCount: number;
+    withdrawnUsd: number;
+    /** payout_documents rows where kind='receipt' for this party. */
+    totalReceiptCount: number;
+    /** ISO timestamp — max(updated_at) across this party's payouts. */
+    lastActivityAt: string;
+    /** Count of payouts whose sticky `flaggedReady` is currently true (argentina-92103). */
+    flaggedReadyCount: number;
+  };
+  /** Underlying AdminPayouts for this party, scoped to the same filters. */
+  payouts: AdminPayout[];
+}
+
+export interface PartyPayoutsResponse {
+  rows: PartyPayoutsRow[];
+  total: number;
+}

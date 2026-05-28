@@ -1506,6 +1506,232 @@ router.post(
 );
 
 // ============================================
+// GET /api/admin/payouts/by-party — etruria-92103
+//
+// Group-by-city view of the /payments admin queue. Same filters as the LIST
+// endpoint scope the underlying payouts BEFORE grouping; the response shape is
+// one row per Party with per-status counts/sums + receipt count + last
+// activity, plus the underlying AdminPayout[] for the expansion section.
+//
+// Auth chain mirrors GET /:  admin/payment-admin OR regional underboss via
+// `?regions=`. Funds-sending affordances stay admin-only and aren't reachable
+// from this endpoint anyway.
+//
+// Literal `/by-party` MUST be declared before `/:id` so the literal path wins
+// on route matching.
+// ============================================
+router.get(
+  '/by-party',
+  requireAuth,
+  requireAdminOrRegionalUnderboss(),
+  async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const where = buildPayoutWhere(req.query);
+
+      // 1. Fetch every payout matching the filter set — no skip cursor in v1.
+      //    Same include shape as the LIST endpoint so `serializePayout` returns
+      //    a consistent AdminPayout. Ordered DESC by createdAt so the inner
+      //    payouts array per party is already newest-first.
+      const payoutRows = await prisma.payout.findMany({
+        where,
+        include: {
+          party: { select: PAYOUT_PARTY_SELECT },
+          host: { select: { id: true, name: true, email: true } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // 2. Per-party paid totals + flag-ready signal — same augmentation as
+      //    the LIST endpoint so the embedded AdminPayout rows match shape.
+      const uniquePartyIds = Array.from(
+        new Set(
+          payoutRows
+            .map((p) => (p as any).party?.id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      );
+      const [pagePaidTotals, pageFlagged] = await Promise.all([
+        fetchPaidTotalsByParty(uniquePartyIds),
+        fetchFlaggedReadyByPayoutId(payoutRows.map((p) => p.id)),
+      ]);
+
+      // 3. Per-party receipt count from payout_documents (kind='receipt'). One
+      //    batched groupBy over every party id present in the filtered set.
+      const receiptCounts = new Map<string, number>();
+      if (uniquePartyIds.length > 0) {
+        const docRows = await prisma.payoutDocument.groupBy({
+          by: ['partyId'],
+          where: { partyId: { in: uniquePartyIds }, kind: 'receipt' },
+          _count: { id: true },
+        });
+        for (const r of docRows) {
+          receiptCounts.set(r.partyId, r._count.id);
+        }
+      }
+
+      // 4. Group payouts by partyId in JS. Sum amounts by status, take the
+      //    most recent updatedAt, count flagged-ready, capture the party meta
+      //    from the first row encountered (PAYOUT_PARTY_SELECT is identical
+      //    across rows in the same party).
+      type Bucket = {
+        partyMeta: any;
+        pendingCount: number;
+        pendingUsd: number;
+        approvedCount: number;
+        approvedUsd: number;
+        paidCount: number;
+        paidUsd: number;
+        rejectedCount: number;
+        rejectedUsd: number;
+        failedCount: number;
+        failedUsd: number;
+        withdrawnCount: number;
+        withdrawnUsd: number;
+        flaggedReadyCount: number;
+        lastActivityAt: Date;
+        payouts: any[]; // raw Prisma rows; serialized below
+      };
+
+      const buckets = new Map<string, Bucket>();
+
+      for (const row of payoutRows) {
+        const partyMeta = (row as any).party;
+        if (!partyMeta) continue;
+        const partyId = partyMeta.id;
+        const usd = Number(row.finalAmountUsd);
+        let b = buckets.get(partyId);
+        if (!b) {
+          b = {
+            partyMeta,
+            pendingCount: 0, pendingUsd: 0,
+            approvedCount: 0, approvedUsd: 0,
+            paidCount: 0, paidUsd: 0,
+            rejectedCount: 0, rejectedUsd: 0,
+            failedCount: 0, failedUsd: 0,
+            withdrawnCount: 0, withdrawnUsd: 0,
+            flaggedReadyCount: 0,
+            lastActivityAt: row.updatedAt,
+            payouts: [],
+          };
+          buckets.set(partyId, b);
+        }
+        if (row.updatedAt > b.lastActivityAt) b.lastActivityAt = row.updatedAt;
+        switch (row.status) {
+          case 'pending':
+            b.pendingCount += 1; b.pendingUsd += usd; break;
+          case 'approved':
+            b.approvedCount += 1; b.approvedUsd += usd; break;
+          case 'paid':
+            b.paidCount += 1; b.paidUsd += usd; break;
+          case 'rejected':
+            b.rejectedCount += 1; b.rejectedUsd += usd; break;
+          case 'failed':
+            b.failedCount += 1; b.failedUsd += usd; break;
+          case 'withdrawn':
+            b.withdrawnCount += 1; b.withdrawnUsd += usd; break;
+        }
+        if (pageFlagged.has(row.id)) b.flaggedReadyCount += 1;
+        b.payouts.push(row);
+      }
+
+      // 5. Serialize. Reuse `serializePayout` for the inner AdminPayout array
+      //    so the embedded rows are byte-identical to the LIST endpoint's. Also
+      //    apply the same per-party paidTotal + flag-ready augmentation so
+      //    PayoutRow renders the "Already paid" caption + the green flag icon
+      //    inside the expansion.
+      const rows = Array.from(buckets.values()).map((b) => {
+        const partyId = b.partyMeta.id;
+        const totals = pagePaidTotals.get(partyId);
+        const serializedPayouts = b.payouts.map((p) => {
+          const sp = serializePayout(p);
+          if (sp.party?.id) {
+            sp.party.paidTotalUsd = totals?.paidUsd ?? 0;
+            sp.party.paidTotalCount = totals?.paidCount ?? 0;
+          }
+          const flag = pageFlagged.get(sp.id);
+          if (flag) {
+            sp.flaggedReady = true;
+            sp.flaggedReadyAt = flag.at;
+            sp.flaggedReadyBy = flag.by;
+          }
+          return sp;
+        });
+
+        return {
+          party: {
+            id: partyId,
+            name: b.partyMeta.name,
+            customUrl: b.partyMeta.customUrl ?? null,
+            inviteCode: b.partyMeta.inviteCode ?? null,
+            country: b.partyMeta.country ?? null,
+            // region isn't on PAYOUT_PARTY_SELECT; surface null so frontend
+            // doesn't depend on it (party object also rendered in expansion).
+            region: null as string | null,
+            effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+              reimbursementCapUsd: b.partyMeta.reimbursementCapUsd,
+              eventTags: b.partyMeta.eventTags,
+            }),
+            eventTags: Array.isArray(b.partyMeta.eventTags) ? b.partyMeta.eventTags : [],
+            primaryHostInCohosts: isPrimaryHostInCohosts(b.partyMeta),
+            userId: b.partyMeta.userId ?? null,
+          },
+          aggregates: {
+            pendingCount: b.pendingCount,
+            pendingUsd: b.pendingUsd,
+            approvedCount: b.approvedCount,
+            approvedUsd: b.approvedUsd,
+            paidCount: b.paidCount,
+            paidUsd: b.paidUsd,
+            rejectedCount: b.rejectedCount,
+            rejectedUsd: b.rejectedUsd,
+            failedCount: b.failedCount,
+            failedUsd: b.failedUsd,
+            withdrawnCount: b.withdrawnCount,
+            withdrawnUsd: b.withdrawnUsd,
+            totalReceiptCount: receiptCounts.get(partyId) ?? 0,
+            lastActivityAt: b.lastActivityAt.toISOString(),
+            flaggedReadyCount: b.flaggedReadyCount,
+          },
+          payouts: serializedPayouts,
+        };
+      });
+
+      // 6. Sort outer rows. Default: most recent activity desc. The same
+      //    `sort` query param shape is supported as the LIST endpoint for
+      //    forward-compat, but only a handful of keys make sense at the
+      //    party-row level — fall back to activity-desc for unknown values.
+      const sortRaw = typeof req.query.sort === 'string' ? req.query.sort : 'activity_desc';
+      rows.sort((a, b) => {
+        switch (sortRaw) {
+          case 'amount_desc':
+            return (b.aggregates.pendingUsd + b.aggregates.approvedUsd + b.aggregates.paidUsd)
+                 - (a.aggregates.pendingUsd + a.aggregates.approvedUsd + a.aggregates.paidUsd);
+          case 'amount_asc':
+            return (a.aggregates.pendingUsd + a.aggregates.approvedUsd + a.aggregates.paidUsd)
+                 - (b.aggregates.pendingUsd + b.aggregates.approvedUsd + b.aggregates.paidUsd);
+          case 'name_asc':
+            return a.party.name.localeCompare(b.party.name);
+          case 'name_desc':
+            return b.party.name.localeCompare(a.party.name);
+          case 'activity_desc':
+          default:
+            return new Date(b.aggregates.lastActivityAt).getTime()
+                 - new Date(a.aggregates.lastActivityAt).getTime();
+        }
+      });
+
+      res.json({ rows, total: rows.length });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // GET /api/admin/payouts — list with filters + totals + cursor pagination
 // ============================================
 router.get(
