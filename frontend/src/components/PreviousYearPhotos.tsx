@@ -590,8 +590,7 @@ function UploadModal({
         </div>
 
         <p className="text-theme-text-muted text-xs mb-4">
-          Upload your own photos from previous years. They're added to your event photo
-          gallery and, if photo moderation is on, appear once you approve them.
+          Upload photos from your event — they'll appear in your event's photo gallery and on the public photo feed.
         </p>
 
         <div
