@@ -278,6 +278,66 @@ async function assertPartyApproved(partyId: string): Promise<void> {
 }
 
 /**
+ * pizzaiolo-92103: gate host payout submission on the submitting user having
+ * a valid saved payment method. Re-introduces the gate that arugula-38633 v3
+ * removed — admins shouldn't have to chase hosts for method details after the
+ * receipt is already in the queue.
+ *
+ * "Valid" mirrors the frontend `methodValid` check in PaymentDetailsCard:
+ *   - method must be one of usdc_base | mercury_card | wire
+ *   - usdc_base: payoutWalletAddress must be a non-empty trimmed string. NOT
+ *     gated on the strict 0x regex — ENS strings are valid (taleggio-30219).
+ *   - wire: payoutBankDetails.email must match the loose email regex
+ *   - mercury_card: no extra fields required
+ *
+ * Throws 400 PAYMENT_METHOD_NOT_SET when no method is set, 400
+ * PAYMENT_METHOD_INCOMPLETE when method is set but its required field is
+ * missing/invalid. Admin /external POSTs bypass this gate (admin records
+ * off-platform sends).
+ */
+async function assertUserHasValidPayoutMethod(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      preferredPayoutMethod: true,
+      payoutWalletAddress: true,
+      payoutBankDetails: true,
+    },
+  });
+  if (!user) {
+    throw new AppError('User not found', 401, 'UNAUTHORIZED');
+  }
+  const m = user.preferredPayoutMethod;
+  if (m == null) {
+    throw new AppError(
+      'Set your payment method on the Payments tab before submitting a receipt.',
+      400,
+      'PAYMENT_METHOD_NOT_SET',
+    );
+  }
+  if (m === 'usdc_base' && !(user.payoutWalletAddress ?? '').trim()) {
+    throw new AppError(
+      'Set your USDC wallet address before submitting a receipt.',
+      400,
+      'PAYMENT_METHOD_INCOMPLETE',
+    );
+  }
+  if (m === 'wire') {
+    const bank = user.payoutBankDetails as { email?: unknown } | null;
+    const email = bank && typeof bank.email === 'string' ? bank.email : '';
+    const ok = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!ok) {
+      throw new AppError(
+        'Set the email address for bank correspondence before submitting a receipt.',
+        400,
+        'PAYMENT_METHOD_INCOMPLETE',
+      );
+    }
+  }
+  // mercury_card: no extra fields required.
+}
+
+/**
  * pepperoni-47301: Mercury (our virtual debit card issuer) cannot issue cards
  * to hosts in sanctioned/restricted countries. When the host (or admin) tries
  * to submit `mercury_card` for a party whose `country` matches the block list,
@@ -642,6 +702,23 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // legitimate reason to disburse funds for a party the underboss hasn't
     // approved yet.
     await assertPartyApproved(partyId);
+
+    // pizzaiolo-92103: gate host submission on the submitter having a valid
+    // saved payment method. Re-introduces the gate arugula-38633 v3 removed.
+    // SKIP when an admin is creating a prepayment ON BEHALF OF a cohost
+    // (bismarck-92103) — the admin's own method isn't the relevant signal in
+    // that flow. Shipping-coordinator submissions DO get the gate (they're
+    // recipients of the resulting payout, same as event-reimbursement hosts).
+    // Admins recording fully off-platform sends use POST /api/admin/payouts/external
+    // and don't pass through this handler at all.
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+    const adminPrepayingForCohost =
+      recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
+    if (!adminPrepayingForCohost) {
+      await assertUserHasValidPayoutMethod(req.userId);
+    }
 
     // Validate optional one-shot attendance setup. Only persisted to the party
     // below if the party's current expectedGuests is null (see updateMany call).

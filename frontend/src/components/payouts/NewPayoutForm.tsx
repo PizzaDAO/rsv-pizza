@@ -155,13 +155,49 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
     effectiveCapUsd != null && effectiveCapUsd > 0 && finalAmount > effectiveCapUsd;
   const exceedsHardCeiling = finalAmount > PER_PAYMENT_HARD_CEILING_USD;
 
-  // arugula-38633 v3 follow-up: payment details + receipts are no longer
-  // required for submission. The submit button stays active whenever the
-  // host has entered a positive amount and nothing async is in flight.
+  // pizzaiolo-92103: re-introduce the payment-method gate that arugula-38633
+  // v3 removed. Hosts can submit receipts only when they have a saved method
+  // AND its required field is filled in. Mirrors the methodValid check used
+  // by PaymentDetailsCard (see comment there). Wallet validity is non-empty
+  // only — ENS strings count (taleggio-30219), no 0x regex enforcement.
+  const userMethodValid = useMemo(() => {
+    const m = user?.preferredPayoutMethod;
+    if (m == null) return false;
+    if (m === 'usdc_base') {
+      return Boolean((user?.payoutWalletAddress ?? '').trim());
+    }
+    if (m === 'wire') {
+      const email = user?.payoutBankDetails?.email;
+      return typeof email === 'string'
+        && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+    return true; // mercury_card has no extra required fields
+  }, [user]);
+
+  // pizzaiolo-92103: explanatory message for the amber notice — varies by
+  // which sub-state of "no valid method" the host is in.
+  const methodNoticeText = useMemo(() => {
+    const m = user?.preferredPayoutMethod;
+    if (m == null) {
+      return 'Set your payment method on the Payments tab to submit this receipt.';
+    }
+    if (m === 'usdc_base') {
+      return 'Add your USDC wallet address on the Payments tab to submit this receipt.';
+    }
+    if (m === 'wire') {
+      return 'Add the email for bank correspondence on the Payments tab to submit this receipt.';
+    }
+    return '';
+  }, [user]);
+
+  // pizzaiolo-92103: submission now requires a valid saved payment method
+  // (gate also enforced backend-side as PAYMENT_METHOD_NOT_SET /
+  // PAYMENT_METHOD_INCOMPLETE).
   const canSubmit = finalAmount > 0
     && attendanceValid
     && !isProcessing
-    && !submitting;
+    && !submitting
+    && userMethodValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,11 +431,28 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       )}
 
-      {/* arugula-38633 v3 (follow-up): the amber "set your payment details
-          above before submitting a receipt" notice was removed. Payment
-          details remain in the PaymentDetailsCard at the top of the
-          Payments tab but no longer gate submission — admin asks the host
-          for them later if absent. */}
+      {/* pizzaiolo-92103: payment-method gate reinstated. When the host
+          hasn't saved a valid method (or a method-specific field is missing),
+          render an amber notice with an anchor link back up to the
+          PaymentDetailsCard at the top of the Payments tab. Submit stays
+          disabled until userMethodValid is true. Backend mirrors this gate
+          (PAYMENT_METHOD_NOT_SET / PAYMENT_METHOD_INCOMPLETE). */}
+      {!userMethodValid && (
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-100">
+              {methodNoticeText}{' '}
+              <a
+                href="#payment-details-card"
+                className="underline underline-offset-2 hover:text-amber-50"
+              >
+                Go to payment details →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
         <button
