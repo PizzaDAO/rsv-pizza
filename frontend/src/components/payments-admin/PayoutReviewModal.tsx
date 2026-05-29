@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { updatePartyApi, updatePayoutDocument } from '../../lib/api';
+import { isVideoFile } from '../../lib/mediaUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
@@ -580,7 +581,30 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
                     title={doc.fileName}
                   >
-                    <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                    {/* melanzane-92103: per bottarga-92103, hosts can attach
+                        videos to payment-app pizza photos. Browsers can't
+                        render `.mp4`/`.mov` via <img>, so detect video by
+                        mimeType (or extension fallback for missing MIMEs) and
+                        render a <video> with `preload="metadata"` so the
+                        browser fetches the first frame as a poster. */}
+                    {isVideoFile(doc) ? (
+                      <>
+                        <video
+                          src={doc.url}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/50 rounded-full p-3">
+                            <Play className="text-white" size={20} fill="white" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                    )}
                     <span
                       className={`absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
                         doc.kind === 'receipt' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
@@ -614,12 +638,33 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
                         title={p.caption || p.fileName}
                       >
-                        <img
-                          src={p.thumbnailUrl || p.url}
-                          alt={p.fileName}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                        {/* melanzane-92103: video event-photos render as
+                            <video preload=metadata> so the browser pulls the
+                            first frame for the poster, with a play-icon
+                            overlay to signal it's playable. */}
+                        {isVideoFile(p) ? (
+                          <>
+                            <video
+                              src={p.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/50 rounded-full p-3">
+                                <Play className="text-white" size={20} fill="white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img
+                            src={p.thumbnailUrl || p.url}
+                            alt={p.fileName}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
                         {isHidden && (
                           <span
                             className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-white"

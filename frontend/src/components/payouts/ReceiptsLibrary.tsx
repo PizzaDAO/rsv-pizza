@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink, Play } from 'lucide-react';
 import { fetchReceiptsLibrary } from '../../lib/api';
 import type { ReceiptLibraryEntry } from '../../types';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 import { ReceiptLightbox } from '../payments-shared';
+import { isVideoFile } from '../../lib/mediaUtils';
 
 interface ReceiptsLibraryProps {
   partyId: string;
@@ -115,7 +116,8 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
       {!loading && !error && receipts.length > 0 && (
         <ul className="divide-y divide-theme-stroke">
           {receipts.map((r, idx) => {
-            const isImage = (r.mimeType || '').startsWith('image/');
+            const isVideo = isVideoFile(r);
+            const isImage = !isVideo && (r.mimeType || '').startsWith('image/');
             const formattedDate = new Date(r.createdAt).toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'short',
@@ -138,7 +140,25 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                   aria-label={`Open ${r.fileName}`}
                   title={r.fileName}
                 >
-                  {isImage ? (
+                  {isVideo ? (
+                    /* melanzane-92103: receipt-library entries can include
+                        video uploads — render the first frame via <video
+                        preload="metadata"> with a small play overlay. */
+                    <div className="relative w-12 h-12">
+                      <video
+                        src={r.url}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        className="w-12 h-12 object-cover block"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/50 rounded-full p-1">
+                          <Play className="text-white" size={10} fill="white" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : isImage ? (
                     <img
                       src={r.url}
                       alt={r.fileName}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2 } from 'lucide-react';
+import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2, Play } from 'lucide-react';
 import { Payout, PayoutStatus } from '../../types';
 import { cancelPayout, getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,6 +9,7 @@ import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
 import { ReceiptLightbox } from '../payments-shared';
+import { isVideoFile } from '../../lib/mediaUtils';
 
 interface PayoutDetailModalProps {
   partyId: string;
@@ -529,11 +530,32 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setLightboxState({ open: true, initialIndex: pizzasLightboxOffset + idx })}
-                          className="block w-full aspect-square rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity"
+                          className="relative block w-full aspect-square rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity"
                           aria-label={`Open ${d.fileName}`}
                           title={d.fileName}
                         >
-                          <img src={d.url} alt={d.fileName} className="w-full h-full object-cover" />
+                          {/* melanzane-92103: pizza/event photo entries can
+                              be .mp4 videos (per bottarga-92103). Render a
+                              <video> with poster-frame metadata + play
+                              overlay so admins can tell at-a-glance. */}
+                          {isVideoFile(d) ? (
+                            <>
+                              <video
+                                src={d.url}
+                                preload="metadata"
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="bg-black/50 rounded-full p-3">
+                                  <Play className="text-white" size={20} fill="white" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <img src={d.url} alt={d.fileName} className="w-full h-full object-cover" />
+                          )}
                         </button>
                         {/* pancetta-37195: per-photo uploader attribution.
                             Hidden for historical rows (null uploadedByUserId). */}
@@ -689,7 +711,27 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                     {survivingPizzaPhotos.map(d => (
                       <div key={d.id} className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface group">
-                        <img src={d.url} alt="" className="w-full h-full object-cover" />
+                        {/* melanzane-92103: same video-vs-image swap as the
+                            view-mode grid above so edit mode doesn't show
+                            an empty tile for .mp4 attachments. */}
+                        {isVideoFile(d) ? (
+                          <>
+                            <video
+                              src={d.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/50 rounded-full p-3">
+                                <Play className="text-white" size={20} fill="white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img src={d.url} alt="" className="w-full h-full object-cover" />
+                        )}
                         <button
                           type="button"
                           onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
