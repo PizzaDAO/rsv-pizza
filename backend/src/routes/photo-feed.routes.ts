@@ -11,6 +11,18 @@ const MAX_FILTER_ITEMS = 50;
 type FeedSource = 'photo' | 'payout';
 type FeedSort = 'newest' | 'random';
 
+// nduja-58291: exclude GPP 2025 (and prior) legacy uploads from the global
+// /photos feed. Two-pronged filter:
+//   1. photo_year column: NULL or >= 2026 (catches Athens/Bratislava which
+//      explicitly set photo_year=2024/2025).
+//   2. file_name regex: reject names containing a 2021-2025 year string
+//      preceded by start-of-string or a non-digit. Catches WhatsApp/iPhone
+//      timestamp-prefixed filenames (e.g. IMG-20250523-WA0069.jpg) without
+//      false-negatives on 2026 timestamps. Per-party PhotoGallery is NOT
+//      filtered — hosts may legitimately want prior-year photos on their
+//      own event page.
+const PRIOR_YEAR_FILENAME_RE = /(^|[^0-9])(2021|2022|2023|2024|2025)/;
+
 // napoletana-58210: cursor format extended to include the source discriminator
 // so the (createdAt, id) tuple is unambiguous when merging two tables. Format:
 // `<iso>_<source>_<id>`. Legacy cursors (`<iso>_<id>`) are still accepted and
@@ -163,23 +175,43 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     // waste rows. The trade-off: if one source dominates the time window the
     // cursor straddles, the next page may need a follow-up query — fine for an
     // infinite-scroll UX.
+    //
+    // nduja-58291: over-fetch on the photos side to compensate for the
+    // post-query filename regex filter (some rows will drop). Capped at 100 so
+    // a pathological filter doesn't run away.
     const fetchSize = limit + 1;
+    const photoFetchSize = Math.min(limit * 2 + 1, 100);
 
     // -- photos source ----------------------------------------------------
     const photoWhere: any = {
       status: 'approved',
       starred: true,
+      // nduja-58291: column-level prior-year exclusion.
+      OR: [
+        { photoYear: null },
+        { photoYear: { gte: 2026 } },
+      ],
       party: { is: partyFilter },
     };
     if (cursor) {
       // When cursor source is explicit, only paginate within that source for
       // strict tuple ordering. When legacy (source=null), apply the cursor to
       // both sides so behavior is backwards-compatible.
+      //
+      // nduja-58291: the year-OR is already on `photoWhere.OR`. Move it into
+      // an AND clause alongside the cursor-OR so both compose without one
+      // clobbering the other.
       if (cursor.source === 'photo' || cursor.source === null) {
-        photoWhere.OR = [
-          { createdAt: { lt: cursor.createdAt } },
-          { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
+        photoWhere.AND = [
+          { OR: photoWhere.OR },
+          {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
+            ],
+          },
         ];
+        delete photoWhere.OR;
       } else {
         // Cursor is in the other source — pull photos strictly older than the
         // cursor timestamp (id tiebreak doesn't apply across sources).
@@ -233,7 +265,10 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       prisma.photo.findMany({
         where: photoWhere,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: fetchSize,
+        // nduja-58291: over-fetch on the photos side to absorb post-query
+        // filename-regex dropouts (no equivalent for payout docs — those
+        // have no fileName column, so the regex doesn't apply).
+        take: photoFetchSize,
         select: {
           id: true,
           url: true,
@@ -245,6 +280,7 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
           height: true,
           createdAt: true,
           voteCount: true,
+          fileName: true,
           votes: req.userId
             ? { where: { userId: req.userId }, select: { id: true } }
             : false,
@@ -288,9 +324,16 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       }),
     ]);
 
+    // nduja-58291: filename-regex pass. Drops legacy GPP 2025 uploads with
+    // WhatsApp/iPhone/Android timestamp-prefix filenames (e.g.
+    // IMG-20250523-WA0069.jpg) that don't have photo_year set.
+    const filteredPhotoRows = photoRows.filter(
+      (p) => !p.fileName || !PRIOR_YEAR_FILENAME_RE.test(p.fileName),
+    );
+
     // Merge into a single list, sorted by (createdAt desc, id desc) tiebreak.
     const merged: FeedItem[] = [
-      ...photoRows.map((p): FeedItem => {
+      ...filteredPhotoRows.map((p): FeedItem => {
         const votes = (p as typeof p & { votes?: { id: string }[] }).votes;
         return {
           id: p.id,
@@ -429,6 +472,13 @@ async function handleRandomFeed(
       AND pa.underboss_status = 'approved'
       AND pa.photos_public = true
       AND pa.photos_enabled = true
+      -- nduja-58291: exclude prior-year (2025-and-earlier) legacy uploads.
+      -- Column filter catches Athens/Bratislava (explicit photo_year); regex
+      -- catches Natal etc. where filename embeds a year preceded by a
+      -- non-digit (WhatsApp/iPhone/Android timestamp filenames). Mirrored in
+      -- the newest-sort Prisma path via PRIOR_YEAR_FILENAME_RE.
+      AND (p.photo_year IS NULL OR p.photo_year >= 2026)
+      AND p.file_name !~ '(^|[^0-9])(2021|2022|2023|2024|2025)'
       ${regionFilter}
       ${countryFilter}
       ${partnerTagFilter}
