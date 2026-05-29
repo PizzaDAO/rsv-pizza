@@ -45,6 +45,12 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   const [walletTotalsLoading, setWalletTotalsLoading] = useState(false);
   const [overrideCap, setOverrideCap] = useState(false);
 
+  // salame-92103: batch-level acknowledgement for the per-party cap. Surfaced
+  // when one or more selected rows would push their party past its effective
+  // reimbursement cap. The admin ticks a single checkbox to allow over-cap
+  // sends across the whole batch (matches the per-address override pattern).
+  const [overridePartyCap, setOverridePartyCap] = useState(false);
+
   // Eligibility filter — keep in sync with backend bulk-execute filter
   // (USDC + approved-or-failed + valid 0x wallet). passata-49102 added
   // failed-status retry. Anything not matching is shown as "skipped".
@@ -82,6 +88,8 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
       setErrorMsg(null);
       setWalletTotals(new Map());
       setOverrideCap(false);
+      // salame-92103: reset per-party cap ack on every fresh open.
+      setOverridePartyCap(false);
     }
   }, [isOpen]);
 
@@ -156,6 +164,54 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     return { overCapRowIds, overCapWalletCount: overCapWallets.size, capUsd };
   }, [walletTotals, eligible]);
 
+  // salame-92103: per-party cap analysis. Group eligible rows by party,
+  // accumulate the proposed in-batch amount on top of the party's already-paid
+  // total, and flag every party whose new running total would exceed its
+  // effective cap. Returns:
+  //   - overPartyCapRowIds: ids of rows whose party would exceed cap once
+  //     this batch sends.
+  //   - overPartyCapPartyCount: distinct parties that would exceed.
+  // Uses the payout row's surfaced `party.effectiveReimbursementCapUsd` +
+  // `party.paidTotalUsd`; rows with a null cap are uncapped and skipped.
+  const partyCapAnalysis = useMemo(() => {
+    if (eligible.length === 0) {
+      return { overPartyCapRowIds: new Set<string>(), overPartyCapPartyCount: 0 };
+    }
+    // Accumulate the in-batch amount per party.
+    const inBatchByParty = new Map<string, number>();
+    for (const p of eligible) {
+      const pid = p.party?.id;
+      if (!pid) continue;
+      inBatchByParty.set(
+        pid,
+        (inBatchByParty.get(pid) || 0) + Number(p.finalAmountUsd || 0),
+      );
+    }
+    // Identify parties whose running total (already-paid + in-batch) exceeds
+    // their effective cap.
+    const overParties = new Set<string>();
+    for (const p of eligible) {
+      const pid = p.party?.id;
+      if (!pid) continue;
+      const cap = p.party?.effectiveReimbursementCapUsd;
+      if (cap == null) continue;
+      const alreadyPaid = p.party?.paidTotalUsd ?? 0;
+      const inBatch = inBatchByParty.get(pid) ?? 0;
+      if (alreadyPaid + inBatch > cap + 1e-9) {
+        overParties.add(pid);
+      }
+    }
+    const overPartyCapRowIds = new Set<string>();
+    for (const p of eligible) {
+      const pid = p.party?.id;
+      if (pid && overParties.has(pid)) overPartyCapRowIds.add(p.id);
+    }
+    return {
+      overPartyCapRowIds,
+      overPartyCapPartyCount: overParties.size,
+    };
+  }, [eligible]);
+
   // Close on Escape (only when not sending — never cancel an in-flight batch)
   useEffect(() => {
     if (!isOpen) return;
@@ -177,12 +233,19 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     // bianco-89172: block submit if any row is over-cap and the admin hasn't
     // ticked the override checkbox.
     if (capAnalysis.overCapWalletCount > 0 && !overrideCap) return;
+    // salame-92103: block submit if any row would push its party past its
+    // effective cap and the admin hasn't ticked the per-party override.
+    if (partyCapAnalysis.overPartyCapPartyCount > 0 && !overridePartyCap) return;
     setPhase('sending');
     setErrorMsg(null);
     try {
       const ids = eligible.map((p) => p.id);
       const res = await bulkExecutePayouts(ids, {
         allowOverPerAddressCap: capAnalysis.overCapWalletCount > 0 ? overrideCap : false,
+        // salame-92103: batch-level per-party cap override. Backend appends
+        // `[override: party cap]` to each affected row's audit note.
+        allowOverPartyCap:
+          partyCapAnalysis.overPartyCapPartyCount > 0 ? overridePartyCap : false,
       });
       setResults(res);
       setPhase('done');
@@ -304,6 +367,40 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
               </div>
             )}
 
+            {/* salame-92103: per-party cap warning. Surfaces when one or more
+                selected rows would push their party past its effective cap. A
+                single batch-level ack covers every row; the backend appends
+                `[override: party cap]` to each affected audit row. Mirrors the
+                per-address pattern above. */}
+            {partyCapAnalysis.overPartyCapPartyCount > 0 && (
+              <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mb-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium text-amber-200 mb-1">
+                      Per-party cap warning
+                    </div>
+                    <div className="text-theme-text-secondary text-xs">
+                      {partyCapAnalysis.overPartyCapRowIds.size} selected payment
+                      {partyCapAnalysis.overPartyCapRowIds.size === 1 ? '' : 's'} would
+                      exceed {partyCapAnalysis.overPartyCapPartyCount === 1 ? 'their' : 'their'}{' '}
+                      party's cap ({partyCapAnalysis.overPartyCapPartyCount} part
+                      {partyCapAnalysis.overPartyCapPartyCount === 1 ? 'y' : 'ies'}{' '}
+                      affected).
+                    </div>
+                    <div className="mt-3">
+                      <Checkbox
+                        checked={overridePartyCap}
+                        onChange={() => setOverridePartyCap((v) => !v)}
+                        label="Allow over-party-cap sends — I acknowledge"
+                        labelClassName="text-sm text-amber-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* bianco-89172: per-row indicator so admins can see WHICH wallets
                 in their selection would exceed. Folded into the existing
                 eligibility list (kept concise — first 8 rows). */}
@@ -358,7 +455,10 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                   eligible.length === 0 ||
                   walletTotalsLoading ||
                   // bianco-89172: block Send when over-cap and admin hasn't ack'd
-                  (capAnalysis.overCapWalletCount > 0 && !overrideCap)
+                  (capAnalysis.overCapWalletCount > 0 && !overrideCap) ||
+                  // salame-92103: block Send when any row would push its party
+                  // past its cap and admin hasn't ack'd the per-party override.
+                  (partyCapAnalysis.overPartyCapPartyCount > 0 && !overridePartyCap)
                 }
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >

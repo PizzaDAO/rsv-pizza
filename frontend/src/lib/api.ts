@@ -4447,6 +4447,10 @@ export async function markPartyPaid(
  * the per-address $676 cumulative cap when the admin has acknowledged the
  * warning in PayoutReviewModal.
  *
+ * `allowOverPartyCap` (salame-92103): forwarded to the server to bypass the
+ * per-party cap when the admin has acknowledged the over-cap warning. The
+ * server appends `[override: party cap]` to the audit row's note.
+ *
  * Returns the updated payout. Throws on any server-side validation/execution failure.
  */
 export async function executeAdminPayout(
@@ -4457,6 +4461,7 @@ export async function executeAdminPayout(
     mercuryCardId?: string;
     note?: string;
     allowOverPerAddressCap?: boolean;
+    allowOverPartyCap?: boolean;
   } = {},
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {
@@ -4488,10 +4493,16 @@ export interface BulkSendResult {
 
 export async function bulkExecutePayouts(
   ids: string[],
-  opts?: { allowOverPerAddressCap?: boolean },
+  opts?: { allowOverPerAddressCap?: boolean; allowOverPartyCap?: boolean },
 ): Promise<BulkSendResult[]> {
-  const body: { ids: string[]; allowOverPerAddressCap?: boolean } = { ids };
+  const body: {
+    ids: string[];
+    allowOverPerAddressCap?: boolean;
+    allowOverPartyCap?: boolean;
+  } = { ids };
   if (opts?.allowOverPerAddressCap) body.allowOverPerAddressCap = true;
+  // salame-92103: batch-level acknowledgement for the per-party cap.
+  if (opts?.allowOverPartyCap) body.allowOverPartyCap = true;
   const res = await apiRequest<{ results: BulkSendResult[] }>(`/api/admin/payouts/bulk-execute`, {
     method: 'POST',
     body,
