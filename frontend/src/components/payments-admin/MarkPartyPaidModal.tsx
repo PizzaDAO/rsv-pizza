@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, DollarSign, Loader2, Pencil, AlertTriangle } from 'lucide-react';
+import { X, DollarSign, Loader2, Pencil, AlertTriangle, Archive } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import {
   fetchMarkPartyPaidPreview,
@@ -7,6 +7,8 @@ import {
   type MarkPartyPaidPreviewResponse,
 } from '../../lib/api';
 import type { PayoutMethod } from '../../types';
+
+type MarkPaidMode = 'mark_paid' | 'withdraw_pending';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names
@@ -40,8 +42,11 @@ interface MarkPartyPaidModalProps {
    * Called after a successful mark-paid POST. Parent should refresh both the
    * payouts list (so rows flip to paid) and the prepay queue (so the source
    * party drops off). The summary lets the parent flash a city-specific toast.
+   *
+   * caciotta-92103: `mode` is the resolved mode the server applied so the
+   * toast can phrase "Marked N paid" vs "Withdrew N pending claims".
    */
-  onSuccess: (summary: { count: number; partyName: string }) => void;
+  onSuccess: (summary: { count: number; mode: MarkPaidMode; partyName: string }) => void;
 }
 
 /**
@@ -77,6 +82,11 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [note, setNote] = useState<string>(() => `Marked paid in bulk on ${today}`);
   const [method, setMethod] = useState<PaidMethodChoice>('unchanged');
+  /**
+   * caciotta-92103: mode selector. `null` until the preview lands; then we
+   * default to the server's suggestedMode. Admin can override either way.
+   */
+  const [mode, setMode] = useState<MarkPaidMode | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -100,6 +110,9 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
       .then((res) => {
         if (cancelled) return;
         setPreview(res);
+        // caciotta-92103: default-select the server's recommendation. Admin
+        // can still override before submitting.
+        setMode(res.suggestedMode);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -118,8 +131,11 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
   const cityName = stripGppPrefix(partyName);
   const count = preview?.count ?? 0;
   const totalUsd = preview?.totalUsd ?? 0;
+  const existingPaidCount = preview?.existingPaidCount ?? 0;
+  const existingPaidUsd = preview?.existingPaidUsd ?? 0;
 
-  const canSubmit = !!preview && count > 0 && !submitting && !previewLoading;
+  const canSubmit =
+    !!preview && count > 0 && !submitting && !previewLoading && mode !== null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,11 +144,18 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
     setSubmitError(null);
     try {
       const trimmedNote = note.trim();
-      const body: { note?: string; paidMethod?: PayoutMethod | 'external' } = {};
+      const body: {
+        note?: string;
+        paidMethod?: PayoutMethod | 'external';
+        mode?: MarkPaidMode;
+      } = {};
       if (trimmedNote) body.note = trimmedNote;
-      if (method !== 'unchanged') body.paidMethod = method;
+      // payout_method is meaningful for mark_paid only; we skip it for
+      // withdraw_pending because we don't touch payout_method on withdraw.
+      if (mode === 'mark_paid' && method !== 'unchanged') body.paidMethod = method;
+      if (mode) body.mode = mode;
       const res = await markPartyPaid(partyId, body);
-      onSuccess({ count: res.count, partyName: cityName });
+      onSuccess({ count: res.count, mode: res.mode, partyName: cityName });
       onClose();
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to mark party paid');
@@ -203,6 +226,26 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
                     )}
                   </div>
                 </div>
+                {/* caciotta-92103: show what's already been paid on this party
+                    so the admin sees the recommendation rationale. When this
+                    is >= the in-flight sum the modal defaults to Withdraw
+                    pending so a re-click after recording an external payment
+                    doesn't double-count. */}
+                {existingPaidCount > 0 && (
+                  <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
+                    <div className="uppercase tracking-wide text-theme-text-muted">
+                      Existing paid
+                    </div>
+                    <div className="text-theme-text">
+                      <span className="font-semibold">
+                        ${existingPaidUsd.toFixed(2)}
+                      </span>
+                      <span className="text-theme-text-muted">
+                        {' '}({existingPaidCount})
+                      </span>
+                    </div>
+                  </div>
+                )}
                 {count === 0 ? (
                   <p className="text-xs text-theme-text-muted mt-2">
                     Nothing to mark paid — every payout for this event is already
@@ -229,6 +272,57 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             </div>
           )}
 
+          {/* caciotta-92103: mode selector — Mark all as paid (legacy) vs
+              Withdraw pending (new). Default-selected radio mirrors the
+              server's suggestedMode so the safe action is one-click in the
+              common "I already paid externally and recorded it" case. */}
+          {preview && !previewLoading && count > 0 && mode !== null && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
+                What should happen to these {count} payment{count === 1 ? '' : 's'}?
+              </div>
+              <div className="space-y-2">
+                {(['mark_paid', 'withdraw_pending'] as MarkPaidMode[]).map((m) => {
+                  const active = mode === m;
+                  const isMarkPaid = m === 'mark_paid';
+                  const title = isMarkPaid
+                    ? 'Mark all as paid'
+                    : 'Withdraw pending (reconciled by existing paid)';
+                  const explanation = isMarkPaid
+                    ? `Creates ${count} new paid record${count === 1 ? '' : 's'} summing to $${totalUsd.toFixed(2)}. Use this if you actually paid out additionally.`
+                    : `Closes out ${count} pending claim${count === 1 ? '' : 's'} without creating new paid records. Use this when you've already recorded the payment externally and the pending claims are duplicates.`;
+                  return (
+                    <label
+                      key={m}
+                      className={`flex items-start gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="markPaidMode"
+                        value={m}
+                        checked={active}
+                        onChange={() => setMode(m)}
+                        className="mt-1"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm text-theme-text font-medium">
+                          {title}
+                        </span>
+                        <span className="block text-xs text-theme-text-muted mt-0.5">
+                          {explanation}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Shared note */}
           <IconInput
             icon={Pencil}
@@ -240,7 +334,9 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             maxLength={500}
           />
 
-          {/* Optional method override */}
+          {/* Optional method override — only meaningful for mark_paid; the
+              withdraw_pending mode never stamps payout_method. */}
+          {mode === 'mark_paid' && (
           <div>
             <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
               Payout method (optional)
@@ -274,6 +370,7 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
               existing methods are preserved.
             </p>
           </div>
+          )}
 
           {submitError && (
             <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
@@ -295,15 +392,23 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
           <button
             type="submit"
             disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 ${
+              mode === 'withdraw_pending'
+                ? 'bg-amber-600 hover:bg-amber-700'
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
           >
             {submitting ? (
               <Loader2 size={14} className="animate-spin" />
+            ) : mode === 'withdraw_pending' ? (
+              <Archive size={14} />
             ) : (
               <DollarSign size={14} />
             )}
             {count > 0
-              ? `Mark ${count} payment${count === 1 ? '' : 's'} paid ($${totalUsd.toFixed(2)})`
+              ? mode === 'withdraw_pending'
+                ? `Withdraw ${count} pending claim${count === 1 ? '' : 's'}`
+                : `Mark ${count} payment${count === 1 ? '' : 's'} paid ($${totalUsd.toFixed(2)})`
               : 'Mark party paid'}
           </button>
         </div>

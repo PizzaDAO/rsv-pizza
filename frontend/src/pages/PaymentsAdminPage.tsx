@@ -1227,13 +1227,20 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             partyId={markPartyPaidTarget.partyId}
             partyNameHint={markPartyPaidTarget.partyNameHint}
             onClose={() => setMarkPartyPaidTarget(null)}
-            onSuccess={async ({ count, partyName }) => {
-              pushToast(
-                count > 0
-                  ? `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName}`
-                  : `No in-flight payouts for ${partyName} — nothing changed`,
-                'success',
-              );
+            onSuccess={async ({ count, mode, partyName }) => {
+              // caciotta-92103: toast verb mirrors the resolved server mode
+              // so admins see whether new paid rows were created
+              // (mark_paid) or pending claims were closed
+              // (withdraw_pending).
+              let msg: string;
+              if (count === 0) {
+                msg = `No in-flight payouts for ${partyName} — nothing changed`;
+              } else if (mode === 'withdraw_pending') {
+                msg = `Withdrew ${count} pending claim${count === 1 ? '' : 's'} for ${partyName}`;
+              } else {
+                msg = `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName}`;
+              }
+              pushToast(msg, 'success');
               await Promise.all([refresh(), loadPrepayQueue()]);
               if (detail && detail.partyId === markPartyPaidTarget.partyId) {
                 try {
