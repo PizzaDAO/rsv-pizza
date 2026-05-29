@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import type { AdminPayoutFilters, PayoutMethod, PayoutPurpose, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
+import {
+  PAYMENTS_REGION_DISPLAY_ORDER,
+  PAYMENTS_REGION_LABELS,
+  PAYMENTS_REGION_SCOPES,
+  type PaymentsRegionPortal,
+} from '../../utils/regions';
 
 interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
@@ -11,15 +17,9 @@ interface PayoutsFilterBarProps {
   onReset: () => void;
   availableCurrencies: string[];
   /**
-   * bruschetta-58291: distinct, non-null `party.country` values across the
-   * currently-loaded payouts. Mirrors the `availableCurrencies` pattern —
-   * derived in `PaymentsAdminPage` from the loaded set. Sorted ascending.
-   */
-  availableCountries: string[];
-  /**
    * mascarpone-49102: distinct event-tag values across the currently-loaded
    * payouts (flattened from each `party.eventTags` array). Mirrors the
-   * `availableCountries` pattern — derived in `PaymentsAdminPage`. Sorted
+   * `availableCurrencies` pattern — derived in `PaymentsAdminPage`. Sorted
    * ascending.
    */
   availableTags: string[];
@@ -29,6 +29,12 @@ interface PayoutsFilterBarProps {
    * party level), so the parent controls visibility. Defaults to false.
    */
   showHideClosedToggle?: boolean;
+  /**
+   * pancetta-92103: when true, render the Regions multi-select dropdown
+   * (admin /payments). Hidden on regional sub-portals (which are already
+   * hard-scoped by their `regionFilter` prop). Defaults to false.
+   */
+  showRegionsFilter?: boolean;
 }
 
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
@@ -92,6 +98,9 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
   if (filters.currency && filters.currency !== 'all') n += 1;
   if (filters.country && filters.country !== 'all') n += 1;
+  // pancetta-92103: regions multi-select counts as a single active filter
+  // when at least one portal is selected (regardless of how many).
+  if (Array.isArray(filters.regionPortals) && filters.regionPortals.length > 0) n += 1;
   if (filters.tag && filters.tag !== 'all') n += 1;
   if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
@@ -121,9 +130,9 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   onChange,
   onReset,
   availableCurrencies,
-  availableCountries,
   availableTags,
   showHideClosedToggle,
+  showRegionsFilter,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const activeCount = countActiveFilters(filters);
@@ -131,6 +140,47 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   const update = (patch: Partial<AdminPayoutFilters>) => {
     onChange({ ...filters, ...patch, cursor: undefined });
   };
+
+  // pancetta-92103: regions multi-select state — dropdown panel open/close +
+  // click-outside-to-close behavior (matches the project's modal/dropdown
+  // pattern). The selected-regions live in `filters.regions`; this widget
+  // only owns the open/close UI state.
+  const [regionsOpen, setRegionsOpen] = useState(false);
+  const regionsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!regionsOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (!regionsRef.current) return;
+      if (!regionsRef.current.contains(e.target as Node)) {
+        setRegionsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [regionsOpen]);
+
+  const selectedRegionPortals = useMemo<string[]>(
+    () => (Array.isArray(filters.regionPortals) ? filters.regionPortals : []),
+    [filters.regionPortals],
+  );
+  const regionsButtonLabel = useMemo(() => {
+    if (selectedRegionPortals.length === 0) return 'All regions';
+    if (selectedRegionPortals.length === 1) {
+      const slug = selectedRegionPortals[0] as PaymentsRegionPortal;
+      return PAYMENTS_REGION_LABELS[slug] ?? slug;
+    }
+    return `${selectedRegionPortals.length} regions`;
+  }, [selectedRegionPortals]);
+
+  function toggleRegionPortal(slug: PaymentsRegionPortal) {
+    const current = selectedRegionPortals;
+    const next = current.includes(slug)
+      ? current.filter((s) => s !== slug)
+      : [...current, slug];
+    // Empty array = no filter (treat same as undefined so the URL/query stays
+    // clean and `countActiveFilters` doesn't count an empty selection).
+    update({ regionPortals: next.length > 0 ? next : undefined });
+  }
 
   return (
     <div className="sticky top-0 z-20 bg-theme-surface/95 backdrop-blur-sm border border-theme-stroke rounded-xl p-4 mb-4 shadow-sm">
@@ -229,22 +279,61 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             </select>
           </div>
 
-          {/* bruschetta-58291: Country dropdown — populated from the loaded
-              payout set (parallels availableCurrencies). Backend filters by
-              exact `parties.country` match. */}
-          <div>
-            <select
-              value={filters.country ?? 'all'}
-              onChange={(e) => update({ country: e.target.value })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by country"
-            >
-              <option value="all">All countries</option>
-              {availableCountries.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+          {/* pancetta-92103: Regions multi-select — replaces the prior
+              bruschetta-58291 single-country dropdown. Each region maps to a
+              fixed list of `parties.region` slugs (PAYMENTS_REGION_SCOPES);
+              the backend `?regions=` query filters `parties.region IN (...)`.
+              Selecting zero regions = no filter (same as the old "All
+              countries"). Hidden on regional sub-portals which are already
+              hard-scoped by their parent's `regionFilter` prop. */}
+          {showRegionsFilter && (
+            <div className="relative" ref={regionsRef}>
+              <button
+                type="button"
+                onClick={() => setRegionsOpen((v) => !v)}
+                className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text inline-flex items-center justify-between gap-2"
+                aria-haspopup="listbox"
+                aria-expanded={regionsOpen}
+                aria-label="Filter by region"
+              >
+                <span className="truncate">{regionsButtonLabel}</span>
+                <ChevronDown size={14} className="flex-shrink-0 text-theme-text-muted" />
+              </button>
+              {regionsOpen && (
+                <div
+                  role="listbox"
+                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-2 min-w-[200px]"
+                >
+                  {PAYMENTS_REGION_DISPLAY_ORDER.map((slug) => {
+                    const checked = selectedRegionPortals.includes(slug);
+                    const scopeCount = PAYMENTS_REGION_SCOPES[slug].length;
+                    return (
+                      <div key={slug} className="px-3 py-1.5 hover:bg-theme-surface-hover">
+                        <Checkbox
+                          checked={checked}
+                          onChange={() => toggleRegionPortal(slug)}
+                          label={`${PAYMENTS_REGION_LABELS[slug]} (${scopeCount})`}
+                          labelClassName="text-sm text-theme-text"
+                          size={16}
+                        />
+                      </div>
+                    );
+                  })}
+                  {selectedRegionPortals.length > 0 && (
+                    <div className="border-t border-theme-stroke mt-1 pt-1 px-3">
+                      <button
+                        type="button"
+                        onClick={() => update({ regionPortals: undefined })}
+                        className="text-xs text-theme-text-muted hover:text-theme-text py-1"
+                      >
+                        Clear regions
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* mascarpone-49102: Tag dropdown — populated from event_tags
               flattened across the loaded payout set (parallels
