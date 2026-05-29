@@ -1704,6 +1704,9 @@ router.get(
       //    `sort` query param shape is supported as the LIST endpoint for
       //    forward-compat, but only a handful of keys make sense at the
       //    party-row level — fall back to activity-desc for unknown values.
+      //    lievito-92103: `activity_desc` and `activity_asc` are explicit
+      //    options on the admin Sort dropdown (the latter useful for
+      //    surfacing stale cities first).
       const sortRaw = typeof req.query.sort === 'string' ? req.query.sort : 'activity_desc';
       rows.sort((a, b) => {
         switch (sortRaw) {
@@ -1717,6 +1720,9 @@ router.get(
             return a.party.name.localeCompare(b.party.name);
           case 'name_desc':
             return b.party.name.localeCompare(a.party.name);
+          case 'activity_asc':
+            return new Date(a.aggregates.lastActivityAt).getTime()
+                 - new Date(b.aggregates.lastActivityAt).getTime();
           case 'activity_desc':
           default:
             return new Date(b.aggregates.lastActivityAt).getTime()
@@ -1762,11 +1768,16 @@ router.get(
       // `createdAt`, so when the caller picks a non-default sort we fall back
       // to offset-based pagination (parses `cursor` as the offset count)
       // instead of encoding cursors per orderBy.
+      // lievito-92103: `activity_desc` / `activity_asc` map to `updatedAt`
+      // here so the per-payout view orders by most/least recently touched.
+      // They use the same offset-pagination fallback as the amount sorts.
       const sortMap: Record<string, Prisma.PayoutOrderByWithRelationInput> = {
         created_desc: { createdAt: 'desc' },
         created_asc: { createdAt: 'asc' },
         amount_desc: { finalAmountUsd: 'desc' },
         amount_asc: { finalAmountUsd: 'asc' },
+        activity_desc: { updatedAt: 'desc' },
+        activity_asc: { updatedAt: 'asc' },
       };
       const sortKey = typeof req.query.sort === 'string' && sortMap[req.query.sort]
         ? (req.query.sort as keyof typeof sortMap)
