@@ -2094,8 +2094,12 @@ router.get(
 router.patch(
   '/:id',
   requireAuth,
-  requireAnyAdminOrPaymentAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  // cannelloni-92103: regional underbosses can EDIT payouts on parties in
+  // their region (via `?regions=`). Admins always pass. The per-row scope
+  // check is inlined below for underbosses, matching the pattern used by
+  // approve/reject/unapprove/flag-ready (argentina-92103).
+  requireAdminOrRegionalUnderboss(),
+  async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
     try {
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
@@ -2119,6 +2123,20 @@ router.patch(
       }
 
       assertNotSelfPayout(actor, existing.hostUserId);
+
+      // cannelloni-92103: underboss-scope gate. Prevents a regional underboss
+      // from editing an out-of-region payout by spoofing the `?regions=`
+      // query. Admins skip this check.
+      if (req.viewerRole === 'underboss') {
+        const regionsFromQuery = parseRegionsQuery(req.query.regions) ?? [];
+        const party = await prisma.party.findUnique({
+          where: { id: existing.partyId },
+          select: { region: true },
+        });
+        if (!party?.region || !regionsFromQuery.includes(party.region)) {
+          throw new AppError('This event is outside your region scope.', 403, 'OUT_OF_SCOPE');
+        }
+      }
 
       const data: any = {};
       const {
