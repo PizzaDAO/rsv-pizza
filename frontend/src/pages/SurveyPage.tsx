@@ -5,10 +5,19 @@ import { Loader2, AlertCircle, CheckCircle2, Star, MessageSquare } from 'lucide-
 import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { fetchSurvey, submitSurvey, type SurveyFetchResponse } from '../lib/api';
 import type { SurveyQuestion, SurveyAnswers, SurveyAnswerValue } from '../lib/surveyQuestions';
 
 export function SurveyPage() {
+  return (
+    <ThemeProvider theme="gpp">
+      <SurveyPageInner />
+    </ThemeProvider>
+  );
+}
+
+function SurveyPageInner() {
   const { token } = useParams<{ token: string }>();
 
   // All hooks declared above any early return (rules-of-hooks).
