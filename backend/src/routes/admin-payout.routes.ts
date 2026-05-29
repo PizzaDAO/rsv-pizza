@@ -1396,25 +1396,14 @@ router.post(
         throw new AppError('Host user not found', 404, 'HOST_NOT_FOUND');
       }
 
-      // acciuga-62583: hard per-submission $650 ceiling — enforced BEFORE the
-      // party-cap check so the error message is clearer even on uncapped
-      // events. Out-of-band records still get split by default.
-      // aglio-62584: admin override available here too — when the admin is
-      // recording an out-of-band payment that intentionally exceeds the cap
-      // (e.g. backfilling a pre-cap historical wire) they can pass
-      // `allowOverSubmissionCap: true`.
-      if (
-        finalAmountUsd > PER_SUBMISSION_MAX_USD &&
-        body.allowOverSubmissionCap === true
-      ) {
-        // admin acknowledged — proceed
-      } else {
-        assertWithinPerSubmissionCap(finalAmountUsd);
-      }
-
-      // tiramisu-49102: hard cap — block external records that would push the
-      // cumulative paid+pending+approved past the party's effective cap.
-      await assertWithinPartyCap(partyId, finalAmountUsd);
+      // lasagna-92103: admin amount is canonical on the external-record path
+      // too. Removed the per-submission cap throw + the per-party cap throw.
+      // Admins recording an out-of-band payment (already executed via bank /
+      // Mercury dashboard / etc.) shouldn't be cap-gated at the API
+      // boundary — they're documenting reality, not requesting an action.
+      // The USDC execute hard ceiling is irrelevant here (these are external
+      // payments, not on-chain sends). `body.allowOverSubmissionCap` is no
+      // longer read; legacy clients that still send it are ignored (no-op).
 
       const paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
       if (Number.isNaN(paidAt.getTime())) {
@@ -2154,24 +2143,23 @@ router.patch(
         if (oldAmount !== newAmount) {
           amountChanged = true;
           data.finalAmountUsd = parsed;
-          // aglio-62584: admin override for the acciuga-62583 per-submission
-          // cap. When the admin is intentionally setting an over-cap amount
-          // (e.g. editing a grandfathered $750 row, or splitting on their own),
-          // they can pass `allowOverSubmissionCap: true` to bypass. The modal
-          // surfaces an amber warning + ack Checkbox before forwarding the
-          // flag. Host-side PATCH (payout.routes.ts) still has no override.
-          if (
-            parsed > PER_SUBMISSION_MAX_USD &&
-            req.body?.allowOverSubmissionCap === true
-          ) {
-            // admin acknowledged — proceed
-          } else {
-            assertWithinPerSubmissionCap(parsed);
-          }
-          // tiramisu-49102: re-check per-party cap when admin edits amount.
-          // Exclude THIS row from the existing-total so the edit doesn't
-          // count against itself.
-          await assertWithinPartyCap(existing.partyId, parsed, existing.id);
+          // lasagna-92103: admin amount is canonical. The admin PATCH edit
+          // path is intentionally uncapped — no per-submission cap throw, no
+          // per-party cap throw. Incident that motivated this: a Medellín
+          // payout was OCR'd at $465,101.77 (COP→USD conversion error) and
+          // the admin couldn't edit it down because aglio-62584's checkbox
+          // override only covered the user-typed amount, not the in-flight
+          // value the modal recomputed against the bad OCR sum. Admins can
+          // always proceed; the soft $650 default is now informational in
+          // the modal. The USDC execute hard ceiling
+          // (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a
+          // separate safety net at on-chain send time — admins can split
+          // executes or record as external payment to handle larger sums.
+          // The per-party cap (tiramisu-49102) and per-address cap
+          // (bianco-89172) likewise stay on the approve/mark-paid/execute
+          // paths below; only the edit path is uncapped.
+          // `body.allowOverSubmissionCap` is no longer read here; existing
+          // frontends that still send it are ignored (no-op).
         }
       }
 

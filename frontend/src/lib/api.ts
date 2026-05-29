@@ -4130,9 +4130,11 @@ export async function updateAdminPayout(
     payoutBankDetails?: BankDetails | null;
     note?: string;
     /**
-     * aglio-62584: admin override for the acciuga-62583 per-submission
-     * $650 cap. Forwarded only when the admin has ticked the ack Checkbox
-     * in PayoutReviewModal's amount-edit form (or recordExternalPayment).
+     * lasagna-92103: previously the admin override for the acciuga-62583
+     * per-submission $650 cap. The backend admin PATCH no longer enforces
+     * the cap (admin amount is canonical), so this field is now a no-op
+     * kept only for back-compat with any caller that still sets it. Safe
+     * to omit.
      */
     allowOverSubmissionCap?: boolean;
   },
