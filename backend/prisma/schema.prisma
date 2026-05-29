@@ -83,6 +83,7 @@ model Party {
   parkingNotes            String?   @map("parking_notes")
   maxGuests               Int?      @map("max_guests")
   expectedGuests          Int?      @map("expected_guests")
+  estimatedAttendance     Int?      @map("estimated_attendance")
   hideGuests              Boolean   @default(false) @map("hide_guests")
   requireApproval         Boolean   @default(false) @map("require_approval")
   coHosts                 Json      @default("[]") @map("co_hosts")
@@ -287,15 +288,15 @@ model Party {
 // keyed on guestId (unique). EXPLICIT @@map so Prisma uses the actual table
 // name instead of inferring it.
 model SurveyResponse {
-  id                 String   @id @default(uuid()) @db.Uuid
-  partyId            String   @map("party_id") @db.Uuid
-  party              Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  guestId            String   @unique @map("guest_id") @db.Uuid
-  guest              Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid()) @db.Uuid
+  partyId            String    @map("party_id") @db.Uuid
+  party              Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  guestId            String    @unique @map("guest_id") @db.Uuid
+  guest              Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
   email              String
-  questionSetVersion Int      @map("question_set_version")
+  questionSetVersion Int       @map("question_set_version")
   answers            Json
-  submittedAt        DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  submittedAt        DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
   updatedAt          DateTime? @map("updated_at") @db.Timestamptz
 
   @@index([partyId])
