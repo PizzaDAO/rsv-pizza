@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, MessageSquare, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 
 export interface RejectReasonModalProps {
   isOpen: boolean;
@@ -14,7 +15,13 @@ export interface RejectReasonModalProps {
     | { kind: 'single'; hostName: string }
     | { kind: 'bulk'; count: number };
   onCancel: () => void;
-  onConfirm: (reason: string) => Promise<void>;
+  /**
+   * gouda-92103: `silent` defaults to false (= notify-as-today). When the
+   * admin ticks the "Don't notify host" ack, the caller forwards
+   * `silent: true` to the API so the backend suppresses any host-notify
+   * side effect AND records `[silent]` on the audit row.
+   */
+  onConfirm: (reason: string, opts: { silent: boolean }) => Promise<void>;
 }
 
 const MAX_LEN = 1000;
@@ -37,14 +44,17 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
   onConfirm,
 }) => {
   const [reason, setReason] = useState('');
+  const [silent, setSilent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Reset state whenever the modal transitions to closed (so re-opening is
-  // a clean slate).
+  // a clean slate). gouda-92103: `silent` defaults back to UNCHECKED on
+  // every re-open so the admin has to opt-in to suppression each time.
   useEffect(() => {
     if (!isOpen) {
       setReason('');
+      setSilent(false);
       setBusy(false);
       setErrorMsg(null);
     }
@@ -75,7 +85,7 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
     setErrorMsg(null);
     setBusy(true);
     try {
-      await onConfirm(trimmed);
+      await onConfirm(trimmed, { silent });
       // Caller closes the modal on success (so it can sequence refreshes
       // first). If `onConfirm` resolves without the parent closing us, we'll
       // still drop back to idle so the user can retry / cancel.
@@ -127,6 +137,21 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
         />
         <div className="mt-1 text-xs text-theme-text-muted text-right">
           {trimmed.length}/{MAX_LEN}
+        </div>
+
+        {/* gouda-92103: silent-removal ack. UNCHECKED by default so the
+            modal's normal behavior (today: rejection reason becomes visible
+            to the host on their payouts list) is unchanged. Ticking the box
+            forwards `silent: true` to the API, which suppresses host-notify
+            side effects and appends [silent] to the audit note. */}
+        <div className="mt-3">
+          <Checkbox
+            checked={silent}
+            onChange={() => setSilent((v) => !v)}
+            label="Don't notify host"
+            labelClassName="text-sm text-theme-text-secondary"
+            disabled={busy}
+          />
         </div>
 
         {errorMsg && (

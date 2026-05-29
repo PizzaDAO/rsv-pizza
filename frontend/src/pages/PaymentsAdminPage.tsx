@@ -656,9 +656,15 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // and clicks Reject. Performs the actual API call(s), refreshes BOTH the
   // payouts list AND the prepay queue (a rejected prepayment correctly
   // re-appears in the queue), and closes the modal on success.
-  async function confirmReject(reason: string) {
+  // gouda-92103: the modal passes `silent` as a second-arg ack — true means
+  // the admin ticked "Don't notify host"; false (default) preserves
+  // pre-gouda behavior. Threaded into `rejectAdminPayout(id, reason, opts)`.
+  async function confirmReject(reason: string, ackOpts: { silent: boolean }) {
     if (!rejectTarget) return;
-    const rejectOpts = regions ? { regions } : undefined;
+    const rejectOpts = {
+      ...(regions ? { regions } : {}),
+      ...(ackOpts.silent ? { silent: true } : {}),
+    };
     if (rejectTarget.kind === 'single') {
       setRowBusyId(rejectTarget.id);
       try {
@@ -1045,10 +1051,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 setModalBusy(false);
               }
             }}
-            onReject={async (reason) => {
+            onReject={async (reason, opts) => {
               setModalBusy(true);
               try {
-                await rejectAdminPayout(detail.id, reason, regions ? { regions } : undefined);
+                // gouda-92103: forward the modal's silent ack (when ticked)
+                // alongside the regional scope. Default (undefined) preserves
+                // today's notify-on-reject contract.
+                const rejectOpts = {
+                  ...(regions ? { regions } : {}),
+                  ...(opts?.silent ? { silent: true } : {}),
+                };
+                await rejectAdminPayout(detail.id, reason, rejectOpts);
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();

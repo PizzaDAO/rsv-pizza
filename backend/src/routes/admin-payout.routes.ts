@@ -2620,6 +2620,14 @@ router.post(
         throw new AppError('rejectionReason is required', 400, 'VALIDATION_ERROR');
       }
 
+      // gouda-92103: admin can suppress host notification on reject when
+      // cleaning up bogus/duplicate/over-cap rows where the host already
+      // knows (or doesn't need to be re-notified). Default is notify
+      // (silent === false) so behavior matches today's contract. The audit
+      // note captures `[silent]` so the trail records the suppression.
+      const silent = req.body?.silent === true;
+      const auditNote = silent ? `${reason} [silent]` : reason;
+
       const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.update({
           where: { id: existing.id },
@@ -2648,12 +2656,19 @@ router.post(
             newStatus: 'rejected',
             actorEmail: actor.email,
             actorKind: actor.actorKind,
-            note: reason,
+            note: auditNote,
           },
         });
 
         return row;
       });
+
+      // gouda-92103: host-notification side effects belong here. The reject
+      // endpoint does not currently fire an email or Telegram to the host
+      // (the rejection reason on the host's payouts list is the visible
+      // signal), so there is nothing to skip today. When a reject-notify
+      // channel is added in the future, gate it behind `if (!silent) {...}`
+      // here so this contract still holds.
 
       res.json({ payout: serializePayout(updated) });
     } catch (error) {
