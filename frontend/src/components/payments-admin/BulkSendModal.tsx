@@ -340,14 +340,18 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
               </div>
             )}
             {!walletTotalsLoading && capAnalysis.overCapWalletCount > 0 && (
+              // ricotta-92103: amber values wash out on gpp-theme where
+              // `.gpp-theme .card` repaints the panel white. Mirror the dark-
+              // amber override from PayoutReviewModal so both modals stay
+              // readable on `/payments/<region>`.
               <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mb-4">
                 <div className="flex items-start gap-2.5">
-                  <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                  <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
                   <div className="flex-1 text-sm">
-                    <div className="font-medium text-amber-200 mb-1">
+                    <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
                       Per-address cap warning
                     </div>
-                    <div className="text-theme-text-secondary text-xs">
+                    <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
                       {capAnalysis.overCapWalletCount} selected wallet
                       {capAnalysis.overCapWalletCount === 1 ? '' : 's'} would exceed the
                       ${capAnalysis.capUsd} per-address cap once this batch sends
@@ -359,7 +363,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                         checked={overrideCap}
                         onChange={() => setOverrideCap((v) => !v)}
                         label="Allow over-cap sends — I acknowledge"
-                        labelClassName="text-sm text-amber-100"
+                        labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
                       />
                     </div>
                   </div>
@@ -373,14 +377,16 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                 `[override: party cap]` to each affected audit row. Mirrors the
                 per-address pattern above. */}
             {partyCapAnalysis.overPartyCapPartyCount > 0 && (
+              // ricotta-92103: dark-amber overrides under .gpp-theme to keep
+              // the warning panel legible on light-mint pages.
               <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mb-4">
                 <div className="flex items-start gap-2.5">
-                  <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                  <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
                   <div className="flex-1 text-sm">
-                    <div className="font-medium text-amber-200 mb-1">
+                    <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
                       Per-party cap warning
                     </div>
-                    <div className="text-theme-text-secondary text-xs">
+                    <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
                       {partyCapAnalysis.overPartyCapRowIds.size} selected payment
                       {partyCapAnalysis.overPartyCapRowIds.size === 1 ? '' : 's'} would
                       exceed {partyCapAnalysis.overPartyCapPartyCount === 1 ? 'their' : 'their'}{' '}
@@ -393,7 +399,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                         checked={overridePartyCap}
                         onChange={() => setOverridePartyCap((v) => !v)}
                         label="Allow over-party-cap sends — I acknowledge"
-                        labelClassName="text-sm text-amber-100"
+                        labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
                       />
                     </div>
                   </div>
