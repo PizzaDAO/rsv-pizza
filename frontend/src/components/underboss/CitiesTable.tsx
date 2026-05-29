@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send, Star } from 'lucide-react';
+import { Search, MapPin, Check, X, Clock, ExternalLink, ArrowUpDown, ChevronDown, Camera, ChevronLeft, ChevronRight, Send, Star, StickyNote } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchSheetCities, SheetCity } from '../../lib/cities';
-import { fetchCityStatuses, updateCityStatus, CityStatusMap, getPartyPhotos } from '../../lib/api';
+import { fetchCityStatuses, updateCityStatus, updateCityNotes, CityStatusMap, getPartyPhotos } from '../../lib/api';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossMeResponse } from '../../lib/api';
 import { GPP_REGIONS } from '../../types';
@@ -30,6 +30,7 @@ interface MergedCity {
   chatUrl: string;
   status: CityStatusValue;
   priority: boolean;
+  notes: string | null;
   isAuto: boolean; // true if status came from matching event (no DB override)
   matchedEventUrl: string | null; // link to the matching event if auto-detected
   photoCount: number;
@@ -89,6 +90,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   const [gppCounts, setGppCounts] = useState<Record<string, number>>({});
+  const [notesEditingKey, setNotesEditingKey] = useState<string | null>(null);
 
   // Load GPP photo counts (cached at module level)
   useEffect(() => {
@@ -192,6 +194,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         chatUrl: sc.chatUrl,
         status,
         priority,
+        notes: dbStatus?.notes ?? null,
         isAuto,
         matchedEventUrl: matchedEvent ? `/${matchedEvent}` : null,
         photoCount: matchedEvents.reduce((sum, e) => sum + (e.photoCount || 0), 0) + (gppCounts[gppKey] || 0),
@@ -239,7 +242,8 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
         (c) =>
           c.city.toLowerCase().includes(q) ||
           c.country.toLowerCase().includes(q) ||
-          c.underboss.toLowerCase().includes(q)
+          c.underboss.toLowerCase().includes(q) ||
+          (c.notes ? c.notes.toLowerCase().includes(q) : false)
       );
     }
 
@@ -283,8 +287,11 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       const existing = cityStatuses[cityKey];
       const nextStatus: CityStatusValue = (patch.status ?? (existing?.status as CityStatusValue) ?? 'todo');
       const nextPriority: boolean = patch.priority ?? existing?.priority ?? false;
+      const existingNotes = existing?.notes ?? null;
 
-      if (nextStatus === 'todo' && nextPriority === false) {
+      // Keep the row if it carries a note, even at the default state, so the
+      // note isn't visually dropped (backend now preserves notes too).
+      if (nextStatus === 'todo' && nextPriority === false && !existingNotes) {
         // Default — remove from map
         setCityStatuses((prev) => {
           const next = { ...prev };
@@ -297,6 +304,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
           [cityKey]: {
             status: nextStatus,
             priority: nextPriority,
+            notes: prev[cityKey]?.notes ?? null,
             updatedBy: prev[cityKey]?.updatedBy ?? null,
             updatedAt: new Date().toISOString(),
           },
@@ -319,6 +327,49 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       handleStatusChange(cityKey, { priority });
     },
     [handleStatusChange]
+  );
+
+  const handleSaveNotes = useCallback(
+    async (cityKey: string, rawValue: string) => {
+      const trimmed = rawValue.trim();
+      const nextNotes = trimmed || null;
+
+      // Optimistic local update
+      const previousStatuses = { ...cityStatuses };
+      const existing = cityStatuses[cityKey];
+      const existingStatus: CityStatusValue = (existing?.status as CityStatusValue) ?? 'todo';
+      const existingPriority = existing?.priority ?? false;
+
+      if (!nextNotes && existingStatus === 'todo' && !existingPriority) {
+        // Mirror backend: row drops back to default state
+        setCityStatuses((prev) => {
+          const next = { ...prev };
+          delete next[cityKey];
+          return next;
+        });
+      } else {
+        setCityStatuses((prev) => ({
+          ...prev,
+          [cityKey]: {
+            status: existingStatus,
+            priority: existingPriority,
+            notes: nextNotes,
+            updatedBy: prev[cityKey]?.updatedBy ?? null,
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+      }
+
+      setNotesEditingKey(null);
+
+      try {
+        await updateCityNotes(cityKey, nextNotes);
+      } catch (err) {
+        setCityStatuses(previousStatuses);
+        console.error('Failed to update city notes:', err);
+      }
+    },
+    [cityStatuses]
   );
 
   const toggleSelect = useCallback((key: string) => {
@@ -591,6 +642,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
                 city={city}
                 onStatusChange={handleStatusChange}
                 onTogglePriority={handleTogglePriority}
+                onEditNotes={setNotesEditingKey}
                 isSelected={selectedKeys.has(city.key)}
                 onToggleSelect={toggleSelect}
               />
@@ -609,7 +661,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       {/* Cards (mobile) */}
       <div className="md:hidden space-y-2">
         {filteredCities.map((city) => (
-          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} onTogglePriority={handleTogglePriority} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
+          <CityCard key={city.key} city={city} onStatusChange={handleStatusChange} onTogglePriority={handleTogglePriority} onEditNotes={setNotesEditingKey} isSelected={selectedKeys.has(city.key)} onToggleSelect={toggleSelect} />
         ))}
         {filteredCities.length === 0 && (
           <p className="py-8 text-center text-theme-text-faint text-sm">
@@ -621,7 +673,86 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
       <p className="text-xs text-theme-text-faint">
         {t('cities.showingOf', { shown: filteredCities.length, total: mergedCities.length })}
       </p>
+
+      {notesEditingKey && (() => {
+        const editingCity = mergedCities.find((c) => c.key === notesEditingKey);
+        return (
+          <CityNotesModal
+            cityLabel={editingCity?.city || notesEditingKey}
+            initialNotes={editingCity?.notes ?? null}
+            onSave={(value) => handleSaveNotes(notesEditingKey, value)}
+            onClose={() => setNotesEditingKey(null)}
+          />
+        );
+      })()}
     </div>
+  );
+}
+
+// === City Notes Modal ===
+function CityNotesModal({
+  cityLabel,
+  initialNotes,
+  onSave,
+  onClose,
+}: {
+  cityLabel: string;
+  initialNotes: string | null;
+  onSave: (value: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation('partner');
+  const [value, setValue] = useState(initialNotes ?? '');
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-theme-surface border border-theme-stroke rounded-xl p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-theme-text font-semibold text-sm flex items-center gap-2">
+            <StickyNote size={16} className="text-amber-500" />
+            {t('cities.notes.title', { city: cityLabel })}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-theme-text-faint hover:text-theme-text transition-colors"
+            aria-label={t('cities.notes.close')}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <IconInput
+          multiline
+          rows={5}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={t('cities.notes.placeholder')}
+          maxLength={2000}
+        />
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+          >
+            {t('cities.notes.cancel')}
+          </button>
+          <button
+            onClick={() => onSave(value)}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+          >
+            {t('cities.notes.save')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -792,12 +923,14 @@ function CityRow({
   city,
   onStatusChange,
   onTogglePriority,
+  onEditNotes,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
   onTogglePriority: (cityKey: string, priority: boolean) => void;
+  onEditNotes: (cityKey: string) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -923,6 +1056,18 @@ function CityRow({
             >
               <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
             </button>
+            <button
+              onClick={() => onEditNotes(city.key)}
+              className={`p-1.5 rounded transition-colors ${
+                city.notes
+                  ? 'text-amber-500 hover:text-amber-400'
+                  : 'text-theme-text-faint hover:text-amber-500'
+              }`}
+              title={city.notes || t('cities.notes.add')}
+              aria-label={city.notes ? t('cities.notes.edit') : t('cities.notes.add')}
+            >
+              <StickyNote size={16} className={city.notes ? 'fill-amber-500/30' : ''} />
+            </button>
             <StatusToggle
               currentStatus={city.status}
               onStatusChange={(status) => onStatusChange(city.key, { status })}
@@ -994,12 +1139,14 @@ function CityCard({
   city,
   onStatusChange,
   onTogglePriority,
+  onEditNotes,
   isSelected,
   onToggleSelect,
 }: {
   city: MergedCity;
   onStatusChange: (cityKey: string, patch: { status?: CityStatusValue; priority?: boolean }) => void;
   onTogglePriority: (cityKey: string, priority: boolean) => void;
+  onEditNotes: (cityKey: string) => void;
   isSelected: boolean;
   onToggleSelect: (key: string) => void;
 }) {
@@ -1104,6 +1251,18 @@ function CityCard({
           aria-label={city.priority ? t('cities.unmarkPriorityTitle') : t('cities.markPriorityTitle')}
         >
           <Star size={16} className={city.priority ? 'fill-yellow-400' : ''} />
+        </button>
+        <button
+          onClick={() => onEditNotes(city.key)}
+          className={`p-1.5 rounded transition-colors ${
+            city.notes
+              ? 'text-amber-500 hover:text-amber-400'
+              : 'text-theme-text-faint hover:text-amber-500'
+          }`}
+          title={city.notes || t('cities.notes.add')}
+          aria-label={city.notes ? t('cities.notes.edit') : t('cities.notes.add')}
+        >
+          <StickyNote size={16} className={city.notes ? 'fill-amber-500/30' : ''} />
         </button>
         <StatusToggle
           currentStatus={city.status}

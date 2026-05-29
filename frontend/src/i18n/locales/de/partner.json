@@ -311,6 +311,15 @@
       "created": "Erstellt",
       "todo": "Zu erledigen",
       "skip": "Überspringen"
+    },
+    "notes": {
+      "title": "Notizen — {{city}}",
+      "add": "Notiz hinzufügen",
+      "edit": "Notiz bearbeiten",
+      "placeholder": "Notizen für diese Stadt (bleibt Jahr für Jahr erhalten)",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "close": "Schließen"
     }
   },
   "funnel": {

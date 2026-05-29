@@ -299,11 +299,12 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
 router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const rows = await prisma.cityStatus.findMany();
-    const map: Record<string, { status: string; priority: boolean; updatedBy: string | null; updatedAt: string }> = {};
+    const map: Record<string, { status: string; priority: boolean; notes: string | null; updatedBy: string | null; updatedAt: string }> = {};
     for (const row of rows) {
       map[row.cityKey] = {
         status: row.status,
         priority: row.priority,
+        notes: row.notes ?? null,
         updatedBy: row.updatedBy,
         updatedAt: row.updatedAt.toISOString(),
       };
@@ -319,7 +320,8 @@ router.get('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Unde
 // effective state is { status: 'todo', priority: false } (the default).
 router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { cityKey, status, priority } = req.body;
+    const { cityKey, status, priority, notes } = req.body;
+    const notesProvided = Object.prototype.hasOwnProperty.call(req.body, 'notes');
 
     if (!cityKey || typeof cityKey !== 'string') {
       throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
@@ -333,8 +335,8 @@ router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Un
       throw new AppError('priority must be a boolean', 400, 'VALIDATION_ERROR');
     }
 
-    if (status === undefined && priority === undefined) {
-      throw new AppError('nothing to update — provide status and/or priority', 400, 'VALIDATION_ERROR');
+    if (status === undefined && priority === undefined && !notesProvided) {
+      throw new AppError('nothing to update — provide status, priority and/or notes', 400, 'VALIDATION_ERROR');
     }
 
     // Scope check: city-scoped UBs can update only their cities (mozzarella-25815).
@@ -356,7 +358,16 @@ router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Un
     const nextStatus = status ?? existing?.status ?? 'todo';
     const nextPriority = priority ?? existing?.priority ?? false;
 
-    if (nextStatus === 'todo' && nextPriority === false) {
+    // Notes: only override if the `notes` key was sent; otherwise preserve existing.
+    let effNotes = notesProvided
+      ? (typeof notes === 'string' ? notes.trim() : null)
+      : (existing?.notes ?? null);
+    if (effNotes === '') effNotes = null;
+    if (effNotes && effNotes.length > 2000) {
+      throw new AppError('notes must be 2000 characters or fewer', 400, 'VALIDATION_ERROR');
+    }
+
+    if (nextStatus === 'todo' && nextPriority === false && !effNotes) {
       // Default state — no need to store
       await prisma.cityStatus.deleteMany({ where: { cityKey } });
       return res.json({ success: true, deleted: true });
@@ -364,8 +375,8 @@ router.patch('/city-statuses', requireAuth, requireUnderbossAuth, async (req: Un
 
     const result = await prisma.cityStatus.upsert({
       where: { cityKey },
-      update: { status: nextStatus, priority: nextPriority, updatedBy },
-      create: { cityKey, status: nextStatus, priority: nextPriority, updatedBy },
+      update: { status: nextStatus, priority: nextPriority, notes: effNotes, updatedBy },
+      create: { cityKey, status: nextStatus, priority: nextPriority, notes: effNotes, updatedBy },
     });
 
     res.json({ success: true, cityStatus: result });

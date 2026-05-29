@@ -328,6 +328,15 @@
       "created": "Created",
       "todo": "To Do",
       "skip": "Skip"
+    },
+    "notes": {
+      "title": "Notes — {{city}}",
+      "add": "Add note",
+      "edit": "Edit note",
+      "placeholder": "Notes for this city (persists year over year)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close"
     }
   },
   "funnel": {

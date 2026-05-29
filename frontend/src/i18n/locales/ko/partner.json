@@ -311,6 +311,15 @@
       "created": "생성됨",
       "todo": "할 일",
       "skip": "건너뛰기"
+    },
+    "notes": {
+      "title": "메모 — {{city}}",
+      "add": "메모 추가",
+      "edit": "메모 편집",
+      "placeholder": "이 도시에 대한 메모 (매년 유지됨)",
+      "save": "저장",
+      "cancel": "취소",
+      "close": "닫기"
     }
   },
   "funnel": {

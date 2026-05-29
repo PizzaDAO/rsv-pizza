@@ -2901,7 +2901,7 @@ export async function bulkUpdateEventTags(
 // City Status API (Underboss)
 
 export interface CityStatusMap {
-  [cityKey: string]: { status: string; priority: boolean; updatedBy: string | null; updatedAt: string };
+  [cityKey: string]: { status: string; priority: boolean; notes: string | null; updatedBy: string | null; updatedAt: string };
 }
 
 export async function fetchCityStatuses(): Promise<CityStatusMap> {
@@ -2915,6 +2915,13 @@ export async function updateCityStatus(
   await apiRequest('/api/underboss/city-statuses', {
     method: 'PATCH',
     body: { cityKey, ...patch },
+  });
+}
+
+export async function updateCityNotes(cityKey: string, notes: string | null): Promise<void> {
+  await apiRequest('/api/underboss/city-statuses', {
+    method: 'PATCH',
+    body: { cityKey, notes },
   });
 }
 
