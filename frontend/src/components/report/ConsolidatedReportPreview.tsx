@@ -83,7 +83,19 @@ export function ConsolidatedReportPreview({ report }: ConsolidatedReportPreviewP
   const downloadNewsletterEmails = hasNewsletterSignups ? async () => {
     try {
       const result = await fetchPartnerNewsletterEmails(report.tag || undefined);
-      const csv = 'email\n' + result.emails.join('\n');
+      // RFC 4180-style CSV field escape: wrap in quotes if the value contains
+      // comma, double-quote, CR, or LF; double internal quotes.
+      const csvEscape = (v: string): string => {
+        if (/[",\r\n]/.test(v)) {
+          return `"${v.replace(/"/g, '""')}"`;
+        }
+        return v;
+      };
+      const header = 'email,name,city';
+      const lines = result.rows.map(r =>
+        [csvEscape(r.email), csvEscape(r.name), csvEscape(r.city)].join(',')
+      );
+      const csv = [header, ...lines].join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
