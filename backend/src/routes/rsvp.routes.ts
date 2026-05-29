@@ -319,12 +319,16 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       throw new AppError('Name is required', 400, 'VALIDATION_ERROR');
     }
 
+    // pancetta-58472: lowercase + trim the wallet/ENS at the boundary so every
+    // downstream write (manual create, manual update, Privy auto-provision)
+    // stores the same canonical form.
+    const normalizedAddress = ethereumAddress ? ethereumAddress.trim().toLowerCase() : null;
+
     // Validate Ethereum address or ENS name format if provided
-    if (ethereumAddress && ethereumAddress.trim()) {
-      const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
-      const ensRegex = /^[a-zA-Z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
-      const trimmedAddress = ethereumAddress.trim();
-      if (!ethAddressRegex.test(trimmedAddress) && !ensRegex.test(trimmedAddress)) {
+    if (normalizedAddress) {
+      const ethAddressRegex = /^0x[a-f0-9]{40}$/;
+      const ensRegex = /^[a-z0-9-]+\.(eth|xyz|com|org|io|co|app|dev|id)$/;
+      if (!ethAddressRegex.test(normalizedAddress) && !ensRegex.test(normalizedAddress)) {
         throw new AppError('Invalid Ethereum address or ENS name format', 400, 'VALIDATION_ERROR');
       }
     }
@@ -447,6 +451,14 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     // Determine if guest should be waitlisted
     const isAtCapacity = party.maxGuests ? confirmedGuestCount >= party.maxGuests : false;
 
+    // response hint only — does not block the save
+    const existingWalletGuest = normalizedAddress
+      ? await prisma.guest.findFirst({
+          where: { partyId: party.id, ethereumAddress: normalizedAddress },
+          select: { id: true, name: true },
+        })
+      : null;
+
     // Check for duplicate email if email is provided
     if (email?.trim()) {
       const existingGuest = await prisma.guest.findFirst({
@@ -493,8 +505,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           where: { id: existingGuest.id },
           data: {
             name: name.trim(),
-            ethereumAddress: ethereumAddress?.trim() || null,
-            ...(ethereumAddress?.trim() ? { walletSource: 'manual' } : {}),
+            ethereumAddress: normalizedAddress || null,
+            ...(normalizedAddress ? { walletSource: 'manual' } : {}),
             roles: roles || [],
             mailingListOptIn: mailingListOptIn || false,
             swcOptIn: swcOptIn || false,
@@ -531,6 +543,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             id: updatedGuest.id,
             name: updatedGuest.name,
           },
+          ...(existingWalletGuest && existingWalletGuest.id !== updatedGuest.id
+            ? { walletShared: { withName: existingWalletGuest.name } }
+            : {}),
           message: 'Your RSVP has been updated!',
         });
       }
@@ -563,8 +578,8 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       data: {
         name: name.trim(),
         email: email?.trim().toLowerCase() || null,
-        ethereumAddress: ethereumAddress?.trim() || null,
-        walletSource: ethereumAddress?.trim() ? 'manual' : null,
+        ethereumAddress: normalizedAddress || null,
+        walletSource: normalizedAddress ? 'manual' : null,
         roles: roles || [],
         mailingListOptIn: mailingListOptIn || false,
         swcOptIn: swcOptIn || false,
@@ -592,19 +607,19 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
     });
 
     // Auto-provision Privy embedded wallet if no wallet address was provided and email exists
-    if (!ethereumAddress?.trim() && email?.trim()) {
+    if (!normalizedAddress && email?.trim()) {
       try {
         const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
         if (walletResult) {
           await prisma.guest.update({
             where: { id: guest.id },
             data: {
-              ethereumAddress: walletResult.walletAddress,
+              ethereumAddress: walletResult.walletAddress.toLowerCase(),
               privyUserId: walletResult.privyUserId,
               walletSource: 'privy-embedded',
             },
           });
-          console.log(`Privy embedded wallet provisioned for guest ${guest.id}: ${walletResult.walletAddress}`);
+          console.log(`Privy embedded wallet provisioned for guest ${guest.id}: ${walletResult.walletAddress.toLowerCase()}`);
         }
       } catch (privyError) {
         // Non-fatal: RSVP succeeds even if Privy provisioning fails
@@ -674,6 +689,9 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
       requireApproval: party.requireApproval,
       waitlisted: isAtCapacity,
       waitlistPosition,
+      ...(existingWalletGuest && existingWalletGuest.id !== guest.id
+        ? { walletShared: { withName: existingWalletGuest.name } }
+        : {}),
       message,
     });
   } catch (error) {

@@ -277,7 +277,8 @@ router.post('/', requireApiKey(SCOPES.GUESTS_WRITE), async (req: ApiKeyRequest, 
       data: {
         name: name.trim(),
         email: email ? email.toLowerCase() : null,
-        ethereumAddress: ethereumAddress || null,
+        // pancetta-58472: lowercase + trim wallet address at the boundary.
+        ethereumAddress: ethereumAddress ? ethereumAddress.trim().toLowerCase() : null,
         roles: roles || [],
         mailingListOptIn: mailingListOptIn || false,
         dietaryRestrictions: dietaryRestrictions || [],
@@ -396,7 +397,10 @@ router.patch('/:guestId', requireApiKey(SCOPES.GUESTS_WRITE), async (req: ApiKey
       data: {
         ...(name !== undefined && { name: name.trim() }),
         ...(email !== undefined && { email: email ? email.toLowerCase() : null }),
-        ...(ethereumAddress !== undefined && { ethereumAddress }),
+        ...(ethereumAddress !== undefined && {
+          // pancetta-58472: lowercase + trim wallet address at the boundary.
+          ethereumAddress: ethereumAddress ? ethereumAddress.trim().toLowerCase() : null,
+        }),
         ...(roles !== undefined && { roles }),
         ...(mailingListOptIn !== undefined && { mailingListOptIn }),
         ...(dietaryRestrictions !== undefined && { dietaryRestrictions }),

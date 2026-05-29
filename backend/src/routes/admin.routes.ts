@@ -109,6 +109,32 @@ router.post('/add', requireAuth, async (req: AuthRequest, res: Response, next: N
   }
 });
 
+// GET /api/admin/wallet-addresses.csv — Export DISTINCT wallet addresses across
+// all guests (super_admin only). Pushes DISTINCT into SQL per repo guardrail —
+// no JS post-filter on a paginated query.
+router.get('/wallet-addresses.csv', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+
+    const rows = await prisma.$queryRaw<Array<{ ethereum_address: string }>>`
+      SELECT DISTINCT ethereum_address
+      FROM guests
+      WHERE ethereum_address IS NOT NULL
+      ORDER BY ethereum_address ASC
+    `;
+
+    const csv = 'wallet_address\n' + rows.map(r => r.ethereum_address).join('\n');
+    res
+      .setHeader('Content-Type', 'text/csv')
+      .setHeader('Content-Disposition', 'attachment; filename=all-wallets.csv')
+      .send(csv);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // DELETE /api/admin/:id — Remove admin (super_admin only, can't remove self)
 router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -732,13 +758,15 @@ router.post('/provision-wallets', async (req: Request, res: Response, next: Next
             await prisma.guest.update({
               where: { id: guest.id },
               data: {
-                ethereumAddress: walletResult.walletAddress,
+                // pancetta-58472: store Privy-returned wallet lowercase to match the
+                // canonical form used by every other write site.
+                ethereumAddress: walletResult.walletAddress.toLowerCase(),
                 privyUserId: walletResult.privyUserId,
                 walletSource: 'privy-embedded',
               },
             });
             provisioned++;
-            console.log(`[provision-wallets] Provisioned wallet for guest ${guest.id}: ${walletResult.walletAddress}`);
+            console.log(`[provision-wallets] Provisioned wallet for guest ${guest.id}: ${walletResult.walletAddress.toLowerCase()}`);
           } else {
             skipped++;
             console.log(`[provision-wallets] Privy returned null for guest ${guest.id} (${guest.email}), skipped`);

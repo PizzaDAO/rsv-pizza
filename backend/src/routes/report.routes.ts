@@ -180,10 +180,15 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         industryOrgs,
         featuredPhotos: party.photos,
 
-        // Wallet address list for CSV export
-        walletAddressList: party.guests
-          .filter(g => g.ethereumAddress)
-          .map(g => g.ethereumAddress as string),
+        // Wallet address list for CSV export. pancetta-58472: DISTINCT so
+        // duplicate guest rows sharing a wallet don't inflate the CSV.
+        walletAddressList: Array.from(
+          new Set(
+            party.guests
+              .filter(g => g.ethereumAddress)
+              .map(g => g.ethereumAddress as string)
+          )
+        ),
 
         // Calculated stats
         stats: {
@@ -541,10 +546,15 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
         industryOrgs,
         featuredPhotos: party.photos,
 
-        // Wallet address list for CSV export
-        walletAddressList: party.guests
-          .filter(g => g.ethereumAddress)
-          .map(g => g.ethereumAddress as string),
+        // Wallet address list for CSV export. pancetta-58472: DISTINCT so
+        // duplicate guest rows sharing a wallet don't inflate the CSV.
+        walletAddressList: Array.from(
+          new Set(
+            party.guests
+              .filter(g => g.ethereumAddress)
+              .map(g => g.ethereumAddress as string)
+          )
+        ),
 
         // Calculated stats (some fields hidden for privacy)
         stats: {
