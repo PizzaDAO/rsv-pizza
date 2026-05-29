@@ -2946,6 +2946,102 @@ router.post(
 );
 
 // ============================================
+// POST /api/admin/payouts/:id/revert-paid — culatello-92103
+//
+// Flip a `paid` payout back to `approved` so the admin can re-execute or
+// re-mark-paid. Mirrors `unapprove` (approved -> pending) one step further
+// up the lifecycle for cases where an out-of-band payment was recorded in
+// error (wrong recipient, wrong amount, never actually sent, etc.).
+//
+// Works for ALL payout methods — USDC, wire, mercury_card, external,
+// off-platform — not just USDC. The original implementation gap was that
+// `unapprove` returns 400 NOT_APPROVED on a paid row and no separate endpoint
+// existed, so admins had no way to undo a `mark-paid` after the fact.
+//
+// On revert we clear the mark-paid metadata:
+//   - paidAt -> null
+//   - transactionHash, wireReference, mercuryCardId, mercuryCardLast4,
+//     externalProofUrl -> null
+//
+// The audit trail (payout_audit rows) is preserved — both the original
+// mark_paid audit and the new unmark_paid audit stay on the row so the
+// reversal is auditable.
+//
+// Idempotent: rejects unless status === 'paid' (400 NOT_PAID).
+// ============================================
+router.post(
+  '/:id/revert-paid',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const existing = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true, hostUserId: true },
+      });
+
+      if (!existing) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+      if (existing.status !== 'paid') {
+        throw new AppError(
+          `Cannot revert a payout in status '${existing.status}'`,
+          400,
+          'NOT_PAID',
+        );
+      }
+
+      assertNotSelfPayout(actor, existing.hostUserId);
+
+      const { note } = req.body || {};
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: {
+            status: 'approved',
+            paidAt: null,
+            transactionHash: null,
+            wireReference: null,
+            mercuryCardId: null,
+            mercuryCardLast4: null,
+            externalProofUrl: null,
+          },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'unmark_paid',
+            oldStatus: 'paid',
+            newStatus: 'approved',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: typeof note === 'string' ? note : null,
+          },
+        });
+
+        return row;
+      });
+
+      res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // GET /api/admin/payouts/usdc-daily-cap-remaining
 //   - Used by the UI to show "Daily cap remaining: $Y" before USDC execute.
 //   - Must be declared BEFORE POST /:id/execute (literal path) but it's a GET
