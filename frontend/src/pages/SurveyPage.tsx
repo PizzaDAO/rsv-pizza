@@ -166,20 +166,27 @@ function SurveyPageInner() {
         </div>
 
         <div className="space-y-6">
-          {questions.map((q) => (
-            <div key={q.id} className="card p-5">
-              <p className="text-sm font-medium text-theme-text mb-3">{q.text}</p>
-              <SurveyQuestionField
-                question={q}
-                value={answers[q.id]}
-                onRating={(n) => setAnswer(q.id, n)}
-                onYesNo={(b) => setAnswer(q.id, b)}
-                onSingle={(opt) => setAnswer(q.id, opt)}
-                onToggleMulti={(opt) => toggleMulti(q.id, opt)}
-                onText={(s) => setAnswer(q.id, s)}
-              />
-            </div>
-          ))}
+          {questions.map((q) => {
+            const otherKey = `${q.id}_other`;
+            const otherRaw = answers[otherKey];
+            const otherValue = typeof otherRaw === 'string' ? otherRaw : '';
+            return (
+              <div key={q.id} className="card p-5">
+                <p className="text-sm font-medium text-theme-text mb-3">{q.text}</p>
+                <SurveyQuestionField
+                  question={q}
+                  value={answers[q.id]}
+                  otherValue={otherValue}
+                  onRating={(n) => setAnswer(q.id, n)}
+                  onYesNo={(b) => setAnswer(q.id, b)}
+                  onSingle={(opt) => setAnswer(q.id, opt)}
+                  onToggleMulti={(opt) => toggleMulti(q.id, opt)}
+                  onText={(s) => setAnswer(q.id, s)}
+                  onOther={(s) => setAnswer(otherKey, s)}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {error && (
@@ -205,21 +212,25 @@ function SurveyPageInner() {
 interface FieldProps {
   question: SurveyQuestion;
   value: SurveyAnswerValue | undefined;
+  otherValue: string;
   onRating: (n: number) => void;
   onYesNo: (b: boolean) => void;
   onSingle: (opt: string) => void;
   onToggleMulti: (opt: string) => void;
   onText: (s: string) => void;
+  onOther: (s: string) => void;
 }
 
 const SurveyQuestionField: React.FC<FieldProps> = ({
   question,
   value,
+  otherValue,
   onRating,
   onYesNo,
   onSingle,
   onToggleMulti,
   onText,
+  onOther,
 }) => {
   if (question.type === 'rating') {
     const scale = question.scale ?? 5;
@@ -292,21 +303,33 @@ const SurveyQuestionField: React.FC<FieldProps> = ({
     }
     // single-select — radio-style buttons
     return (
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onSingle(opt)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              value === opt
-                ? 'bg-[#ff393a] text-white border-[#ff393a]'
-                : 'border-white/20 text-theme-text hover:border-white/40'
-            }`}
-          >
-            {opt}
-          </button>
-        ))}
+      <div>
+        <div className="flex flex-wrap gap-2">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onSingle(opt)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                value === opt
+                  ? 'bg-[#ff393a] text-white border-[#ff393a]'
+                  : 'border-white/20 text-theme-text hover:border-white/40'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+        {question.allowOther && value === 'Other' && (
+          <div className="mt-3">
+            <IconInput
+              icon={MessageSquare}
+              placeholder="Please tell us how"
+              value={otherValue}
+              onChange={(e) => onOther((e.target as HTMLInputElement).value)}
+            />
+          </div>
+        )}
       </div>
     );
   }

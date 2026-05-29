@@ -14,6 +14,7 @@ export interface SurveyQuestion {
   scale?: number;     // for type 'rating' — max value (ratings are 1..scale)
   multi?: boolean;    // for type 'multiple' — true = multi-select
   options?: string[]; // for type 'multiple'
+  allowOther?: boolean; // for type 'multiple' — when true and user picks "Other", a sibling `${id}_other` free-text field is persisted
 }
 
 export const SURVEY_QUESTION_SET_VERSION = 1;
@@ -42,6 +43,7 @@ export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
     multi: false,
     text: 'How did you hear about this event?',
     options: ['A friend', 'Twitter/X', 'The organizer', 'Other'],
+    allowOther: true,
   },
   {
     id: 'highlight',
