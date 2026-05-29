@@ -51,12 +51,17 @@ const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = 
 
 // arancino-92103: sort order for the payouts list. `created_desc` is the
 // default (newest submitted first) and matches the prior implicit ordering.
+// lievito-92103: `activity_desc` / `activity_asc` expose the by-city default
+// (lastActivityAt) as an explicit picker entry, and also order the per-payout
+// view by `updatedAt`. Useful for surfacing stale cities first.
 type SortValue = NonNullable<AdminPayoutFilters['sort']>;
 const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: 'created_desc', label: 'Newest first' },
   { value: 'created_asc', label: 'Oldest first' },
   { value: 'amount_desc', label: 'Highest amount' },
   { value: 'amount_asc', label: 'Lowest amount' },
+  { value: 'activity_desc', label: 'Most recently active' },
+  { value: 'activity_asc', label: 'Least recently active' },
 ];
 const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.label }),

@@ -1983,8 +1983,16 @@ export interface AdminPayoutFilters {
    * arancino-92103: sort order for the payouts queue. Default `created_desc`
    * preserves prior implicit ordering. When non-default, the backend falls
    * back to offset-based pagination (cursor is encoded as an offset count).
+   * lievito-92103: `activity_desc` / `activity_asc` order by `lastActivityAt`
+   * on the by-city view and by `updatedAt` on the per-payout view.
    */
-  sort?: 'created_desc' | 'created_asc' | 'amount_desc' | 'amount_asc';
+  sort?:
+    | 'created_desc'
+    | 'created_asc'
+    | 'amount_desc'
+    | 'amount_asc'
+    | 'activity_desc'
+    | 'activity_asc';
   cursor?: string;
   limit?: number;
 }
