@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { isVideoFile } from '../../lib/mediaUtils';
 
 /**
  * bresaola-89172: focused full-screen overlay for receipt / pizza-photo
@@ -96,6 +97,11 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   const current = images[index];
   if (!current) return null;
   const heic = isHeic(current);
+  // melanzane-92103: when the focused item is a video, render a <video> with
+  // controls + autoplay so admins can scrub. `muted` is required for autoplay
+  // under browser policy; `playsInline` keeps mobile from kicking into the
+  // fullscreen video shell.
+  const video = !heic && isVideoFile(current);
 
   return createPortal(
     <div
@@ -176,6 +182,18 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             </a>
             <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
           </div>
+        ) : video ? (
+          /* melanzane-92103: keying on src so swapping between videos via
+             arrow nav cleanly remounts the <video> with the new source. */
+          <video
+            key={current.url}
+            src={current.url}
+            controls
+            autoPlay
+            muted
+            playsInline
+            className="max-h-[90vh] max-w-[90vw]"
+          />
         ) : (
           <img
             src={current.url}
