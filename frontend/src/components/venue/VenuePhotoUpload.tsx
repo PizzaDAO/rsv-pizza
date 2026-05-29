@@ -110,7 +110,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif"
         multiple
         onChange={handleFileSelect}
         className="hidden"

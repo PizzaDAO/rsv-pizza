@@ -25,7 +25,7 @@ interface UploadingFile {
   photo?: Photo;
 }
 
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/avif'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const MAX_VIDEO_DURATION = 300; // 5 minutes in seconds
 
@@ -268,7 +268,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,video/mp4,video/webm,video/quicktime"
           multiple
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
           className="hidden"

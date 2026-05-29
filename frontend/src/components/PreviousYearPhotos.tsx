@@ -617,7 +617,7 @@ function UploadModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif"
             multiple
             onChange={(e) => e.target.files && onFiles(e.target.files)}
             className="hidden"
