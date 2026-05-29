@@ -62,3 +62,18 @@ export const PAYMENTS_REGION_SCOPES: Record<PaymentsRegionPortal, readonly strin
   india: INDIA_REGIONS,
   asia: ASIA_REGIONS,
 };
+
+/**
+ * pancetta-92103: display order for the /payments admin Regions multi-select.
+ * Roughly west-to-east, with the two Africa portals adjacent so the SA-overlap
+ * (see header comment) is visible at a glance.
+ */
+export const PAYMENTS_REGION_DISPLAY_ORDER: PaymentsRegionPortal[] = [
+  'latam',
+  'na',
+  'europe',
+  'africa',
+  'southafrica',
+  'india',
+  'asia',
+];

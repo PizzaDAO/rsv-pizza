@@ -373,16 +373,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     return Array.from(set).sort();
   }, [payouts]);
 
-  // bruschetta-58291: derive the country dropdown set from the currently-loaded
-  // payouts (mirrors `availableCurrencies` above). Backend exposes country via
-  // PAYOUT_PARTY_SELECT; null countries are skipped.
-  const availableCountries = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of payouts) {
-      if (p.party.country) set.add(p.party.country);
-    }
-    return Array.from(set).sort();
-  }, [payouts]);
+  // pancetta-92103: the prior `availableCountries` derivation was removed
+  // alongside the single-country dropdown. The new Regions multi-select is
+  // sourced from PAYMENTS_REGION_SCOPES (a static map) — no per-load derivation
+  // needed.
 
   // mascarpone-49102: derive the tag dropdown set from `party.eventTags`
   // (added to PAYOUT_PARTY_SELECT in tagliatelle-49102). Flattens the arrays
@@ -889,12 +883,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           onChange={setFilters}
           onReset={() => setFilters(DEFAULT_FILTERS)}
           availableCurrencies={availableCurrencies}
-          availableCountries={availableCountries}
           availableTags={availableTags}
           // pinsa-92103: Hide closed cities only makes sense on the by-city
           // view (paymentsClosedAt is a party-level signal). The per-payment
           // view has no party-row, so the toggle would be confusing there.
           showHideClosedToggle={viewMode === 'by-city'}
+          // pancetta-92103: Regions multi-select is the admin /payments tool;
+          // regional sub-portals (`/payments/latam` etc.) are hard-scoped by
+          // their `regionFilter` prop and shouldn't show a second region
+          // picker on top of that.
+          showRegionsFilter={!isRegionalPortal}
         />
 
         {/* etruria-92103: by-city / by-payment view toggle. by-city is the

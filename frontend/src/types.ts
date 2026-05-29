@@ -1993,6 +1993,16 @@ export interface AdminPayoutFilters {
    * gate regional underbosses to their region scope.
    */
   regions?: string[];
+  /**
+   * pancetta-92103: admin /payments Regions multi-select state — one or more
+   * underboss-region portal slugs (`'latam' | 'na' | 'europe' | ...`). UI
+   * state only; `buildPayoutQuery` expands each portal slug into its
+   * `PAYMENTS_REGION_SCOPES` underlying `parties.region` slugs and merges
+   * them with `regions` when calling the backend. The regional sub-portal
+   * pages (LatamPaymentsPage etc.) do not use this — they hard-scope via the
+   * `regions` field directly.
+   */
+  regionPortals?: string[];
   currency?: string;
   /**
    * salumi-89172: Purpose filter — 'event' (host reimbursements) or

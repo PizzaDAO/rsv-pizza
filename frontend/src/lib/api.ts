@@ -1,4 +1,8 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse } from '../types';
+// pancetta-92103: region portal → underlying parties.region slug map. Used by
+// `buildPayoutQuery` to expand the /payments admin Regions multi-select into
+// the existing `?regions=` query the backend already accepts.
+import { PAYMENTS_REGION_SCOPES, type PaymentsRegionPortal } from '../utils/regions';
 
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
@@ -4078,8 +4082,22 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   // argentina-92103: regional scope for /payments/latam (and any future
   // regional portal). CSV of `parties.region` values; backend filters the
   // query, totals, and per-row aggregates by region when present.
-  if (filters.regions && filters.regions.length > 0) {
-    params.set('regions', filters.regions.join(','));
+  // pancetta-92103: also expand `regionPortals` (admin /payments multi-select
+  // state — one or more portal slugs like 'latam' / 'na') into their
+  // underlying `parties.region` slugs and merge with `regions` so the backend
+  // sees a single CSV. Deduped via Set so the SA-overlap (Africa + SouthAfrica
+  // both include `south-africa`) collapses cleanly.
+  const regionSet = new Set<string>(filters.regions ?? []);
+  if (filters.regionPortals && filters.regionPortals.length > 0) {
+    for (const portal of filters.regionPortals) {
+      const scope = PAYMENTS_REGION_SCOPES[portal as PaymentsRegionPortal];
+      if (scope) {
+        for (const r of scope) regionSet.add(r);
+      }
+    }
+  }
+  if (regionSet.size > 0) {
+    params.set('regions', Array.from(regionSet).join(','));
   }
   // pinsa-92103: hide-closed-cities toggle on the by-city view. Backend
   // accepts `hideClosed=true`; the LIST endpoint ignores it.
