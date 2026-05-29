@@ -1120,6 +1120,13 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       ? (queryTag?.trim().toLowerCase() || undefined)
       : (queryTag?.trim().toLowerCase() || req.sponsorUser?.tag);
 
+    // pecorino-64118 follow-up: admin-only "Approved events only" opt-in toggle.
+    // Non-admins are already limited to approved events below; admins normally
+    // see everything for debugging, but can opt in to the same approved-only
+    // filter via ?approvedOnly=1 (lenient parsing).
+    const rawApprovedOnly = (req.query.approvedOnly as string | undefined)?.trim().toLowerCase();
+    const approvedOnlyParam = rawApprovedOnly === '1' || rawApprovedOnly === 'true' || rawApprovedOnly === 'yes';
+
     // pecorino-64118: newsletter signups count THIS tag's own opt-in column, if any.
     const optinField = tag ? NEWSLETTER_OPTIN_FIELD[tag] : undefined;
 
@@ -1137,6 +1144,9 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     // Non-admin partners only see approved events.
     if (!req.isAdminViewing) {
       where.underbossStatus = 'approved';
+    } else if (approvedOnlyParam) {
+      // Admin opted in to approved-only via the toggle.
+      where.underbossStatus = 'approved';
     }
     // Exclude cancelled events (consistent with GET /events).
     where.cancelledAt = null;
@@ -1146,6 +1156,9 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
       return res.json({
         partnerName: null,
         tag: null,
+        isAdmin: false,
+        // Non-admins are always approved-only (server-enforced above).
+        approvedOnly: true,
         eventCount: 0,
         dateRange: null,
         stats: {
@@ -1463,6 +1476,11 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     res.json({
       partnerName,
       tag: tag || null,
+      // pecorino-64118 follow-up: surface admin viewing + the resolved
+      // "approved events only" state so the frontend can render the toggle
+      // and reflect the applied filter. Non-admins are always approved-only.
+      isAdmin: req.isAdminViewing || false,
+      approvedOnly: req.isAdminViewing ? approvedOnlyParam : true,
       eventCount: parties.length,
       dateRange,
       stats: {

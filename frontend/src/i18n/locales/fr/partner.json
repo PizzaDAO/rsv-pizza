@@ -250,6 +250,7 @@
     "backToDashboard": "Retour au tableau de bord",
     "notAvailableTitle": "Rapport pas encore disponible",
     "notAvailableDesc": "Le rapport consolidé n'est pas encore disponible. Veuillez revenir bientôt.",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "Événement",
       "date": "Date",

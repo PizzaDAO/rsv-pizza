@@ -250,6 +250,7 @@
     "backToDashboard": "返回仪表板",
     "notAvailableTitle": "报告尚不可用",
     "notAvailableDesc": "汇总报告尚不可用，请稍后再查看。",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "活动",
       "date": "日期",

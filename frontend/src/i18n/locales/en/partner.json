@@ -261,6 +261,7 @@
     "backToDashboard": "Back to dashboard",
     "notAvailableTitle": "Report not available yet",
     "notAvailableDesc": "The consolidated report is not available yet. Please check back soon.",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "Event",
       "date": "Date",
