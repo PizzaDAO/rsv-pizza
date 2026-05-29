@@ -24,12 +24,13 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
- * aglio-62584: client-side mirror of backend `PER_SUBMISSION_MAX_USD` (see
- * admin-payout.routes.ts). Inlined here so the modal can render an amber
- * warning + ack Checkbox BEFORE submitting an over-cap edit. The server is
- * still the source of truth — if this constant drifts, the backend will
- * 400 with PER_SUBMISSION_CAP_EXCEEDED and the inline error panel
- * surfaces the message.
+ * lasagna-92103: $650 is the "sane-default" per-submission soft cap. The
+ * backend admin PATCH no longer enforces it (admin amount is canonical), so
+ * this constant now drives a purely informational amber warning — no
+ * Checkbox, no Save block. The USDC execute hard ceiling
+ * (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a separate
+ * safety net at on-chain send time, but admins can split executes or record
+ * external payments to handle larger sums.
  */
 const PER_SUBMISSION_MAX_USD = 650;
 
@@ -52,10 +53,11 @@ interface PayoutReviewModalProps {
    */
   onUnapprove?: () => Promise<string | void> | string | void;
   /**
-   * aglio-62584: `allowOverSubmissionCap` is forwarded when the admin has
-   * acknowledged the amber $650 cap warning by ticking the override
-   * Checkbox below the amount input. Parent should forward to
-   * `updateAdminPayout`'s `allowOverSubmissionCap` field.
+   * lasagna-92103: backend admin PATCH no longer enforces the per-submission
+   * cap, so `allowOverSubmissionCap` is no longer forwarded by this modal.
+   * The signature still accepts the field for back-compat with parents that
+   * pass it through to the API client; the value (if any) is ignored by the
+   * server.
    *
    * Returns a string error message (NOT throws) when the save fails — the
    * modal renders it inline below the Save button so the failure isn't
@@ -238,11 +240,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [adminNotes, setAdminNotes] = useState(payout.adminNotes ?? '');
   const [adminNotesDirty, setAdminNotesDirty] = useState(false);
 
-  // aglio-62584: per-submission $650 cap override + inline error surface.
-  // `ackOverSubmissionCap` is required before Save enables when the draft
-  // amount exceeds the cap; `saveAmountError` renders inline below the
-  // Save button when the backend (or any other failure path) rejects.
-  const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
+  // lasagna-92103: `ackOverSubmissionCap` is gone — admin amount is now
+  // canonical on the backend, so the modal doesn't gate Save on an
+  // acknowledgement. The amber warning below stays as an informational
+  // heads-up when the typed amount exceeds the $650 sane-default cap.
+  // `saveAmountError` still renders inline below the Save button when
+  // the backend (or any other failure path) rejects — wallet/method
+  // validation, etc.
   const [saveAmountError, setSaveAmountError] = useState<string | null>(null);
 
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -653,9 +657,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     onClick={() => {
                       setDraftAmount(String(payout.finalAmountUsd));
                       setEditingAmount(true);
-                      // aglio-62584: clear any stale cap-ack / error state
-                      // from a prior open so the warning behaviour is fresh.
-                      setAckOverSubmissionCap(false);
+                      // lasagna-92103: clear any stale error from a prior open.
                       setSaveAmountError(null);
                     }}
                     disabled={selfPayoutBlocked || busy}
@@ -668,13 +670,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </div>
               {editingAmount ? (
                 (() => {
-                  // aglio-62584: per-submission cap warning + ack. Recompute
-                  // on every render so the warning toggles as the admin types.
+                  // lasagna-92103: amber warning is informational only. Save
+                  // is gated on validity (Number.isFinite + non-negative) and
+                  // not-busy — no longer on an over-cap acknowledgement.
                   const draftNum = Number(draftAmount);
                   const draftIsValid = Number.isFinite(draftNum) && draftNum >= 0;
                   const exceedsCap = draftIsValid && draftNum > PER_SUBMISSION_MAX_USD;
-                  const saveDisabled =
-                    busy || !draftIsValid || (exceedsCap && !ackOverSubmissionCap);
+                  const saveDisabled = busy || !draftIsValid;
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -695,22 +697,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           type="button"
                           onClick={async () => {
                             if (!draftIsValid) return;
-                            if (exceedsCap && !ackOverSubmissionCap) return;
                             setSaveAmountError(null);
                             try {
-                              const result = await onSaveAmount(draftNum, {
-                                allowOverSubmissionCap: exceedsCap
-                                  ? ackOverSubmissionCap
-                                  : undefined,
-                              });
-                              // aglio-62584: parent may return a string instead
-                              // of throwing — surface it inline.
+                              // lasagna-92103: no longer forward
+                              // `allowOverSubmissionCap` — the backend admin
+                              // PATCH ignores it. Admin amount is canonical.
+                              const result = await onSaveAmount(draftNum);
+                              // Parent may return a string instead of throwing
+                              // — surface it inline.
                               if (typeof result === 'string' && result.length > 0) {
                                 setSaveAmountError(result);
                                 return;
                               }
                               setEditingAmount(false);
-                              setAckOverSubmissionCap(false);
                             } catch (err: any) {
                               setSaveAmountError(
                                 (err && (err.message || String(err))) ||
@@ -727,7 +726,6 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           type="button"
                           onClick={() => {
                             setEditingAmount(false);
-                            setAckOverSubmissionCap(false);
                             setSaveAmountError(null);
                           }}
                           className="px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:bg-theme-surface-hover"
@@ -735,41 +733,34 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           Cancel
                         </button>
                       </div>
-                      {/* aglio-62584: amber warning + ack Checkbox when the
-                          typed value exceeds the per-submission cap. The
-                          backend will reject the save unless the modal
-                          forwards `allowOverSubmissionCap: true`. */}
+                      {/* lasagna-92103: informational amber heads-up when the
+                          typed value exceeds the $650 sane-default cap. NOT a
+                          gate — admin amount is canonical on the backend; the
+                          warning is purely a visual nudge so admins notice
+                          unusually large amounts before saving. */}
                       {exceedsCap && (
                         <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
                           <div className="flex items-start gap-2.5">
                             <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
                             <div className="flex-1 text-sm">
                               <div className="font-medium text-amber-200 mb-1">
-                                Per-submission cap warning
+                                Heads-up: over per-submission soft cap
                               </div>
                               <div className="text-theme-text-secondary text-xs">
-                                Payments are normally capped at{' '}
-                                <b>${PER_SUBMISSION_MAX_USD}</b> per submission.
-                                Saving <b>${draftNum.toFixed(2)}</b> requires an
-                                explicit override (used for grandfathered or
-                                pre-cap rows).
-                              </div>
-                              <div className="mt-3">
-                                <Checkbox
-                                  checked={ackOverSubmissionCap}
-                                  onChange={() => setAckOverSubmissionCap((v) => !v)}
-                                  label={`I acknowledge — this exceeds the $${PER_SUBMISSION_MAX_USD} per-submission cap`}
-                                  labelClassName="text-sm text-amber-100"
-                                />
+                                <b>${draftNum.toFixed(2)}</b> is over the{' '}
+                                <b>${PER_SUBMISSION_MAX_USD}</b> per-submission
+                                soft cap. Admin edits aren&apos;t gated by
+                                this — proceed if intentional. USDC execute
+                                still caps at <b>${PER_SUBMISSION_MAX_USD}</b>{' '}
+                                per on-chain tx.
                               </div>
                             </div>
                           </div>
                         </div>
                       )}
-                      {/* aglio-62584: inline error surface so save failures
-                          aren't silent. Covers backend rejections (bad
-                          wallet, party cap exceeded, etc.) and network
-                          errors. */}
+                      {/* Inline error surface so save failures aren't silent.
+                          Covers backend rejections (bad wallet, etc.) and
+                          network errors. */}
                       {saveAmountError && (
                         <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10">
                           <div className="flex items-start gap-2.5">

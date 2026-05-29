@@ -19,7 +19,6 @@ import {
   Star,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { Checkbox } from '../Checkbox';
 import {
   recordExternalPayment,
   searchApprovedParties,
@@ -29,10 +28,12 @@ import { uploadPayoutPhoto } from '../../lib/supabase';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 
 /**
- * vegetariana-92103: client-side mirror of backend `PER_SUBMISSION_MAX_USD`
- * (see backend/src/routes/admin-payout.routes.ts). Used to surface the amber
- * warning + ack Checkbox when an admin enters > $650. Server is the source
- * of truth — this is purely UX so admins can opt into the override.
+ * lasagna-92103: $650 is the "sane-default" per-submission soft cap. The
+ * backend admin POST /external no longer enforces it (admin amount is
+ * canonical), so this constant now drives a purely informational amber
+ * warning — no Checkbox, no Submit block. The USDC execute hard ceiling
+ * is irrelevant for external (off-platform) payments which are already
+ * settled outside our hot wallet.
  */
 const PER_SUBMISSION_MAX_USD = 650;
 
@@ -97,10 +98,9 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // vegetariana-92103: ack for the per-submission cap override. Required
-  // before Record Payment enables when the typed amount > $650. Reset on
-  // every modal close so re-opening starts clean.
-  const [ackOverSubmissionCap, setAckOverSubmissionCap] = useState(false);
+  // lasagna-92103: removed `ackOverSubmissionCap` — backend POST /external no
+  // longer enforces the per-submission cap. Admin amount is canonical; the
+  // amber warning below is informational only.
 
   // Close on Escape
   useEffect(() => {
@@ -110,14 +110,6 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  // vegetariana-92103: reset the over-cap ack whenever the modal unmounts so
-  // the next open doesn't carry a stale acknowledgement forward.
-  useEffect(() => {
-    return () => {
-      setAckOverSubmissionCap(false);
-    };
-  }, []);
 
   // Debounced party search — only runs when the picker is "open" (no party
   // selected yet) and the query has ≥2 chars.
@@ -155,8 +147,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
-  // vegetariana-92103: typed amount exceeds the per-submission cap. Recomputed
-  // every render so the amber warning toggles as the admin types.
+  // lasagna-92103: typed amount exceeds the $650 soft cap. Drives the
+  // informational amber warning below — no longer blocks Submit.
   const exceedsCap =
     Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
 
@@ -181,8 +173,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     if (!recipientReady) return false;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return false;
     if (!adminNotes.trim()) return false;
-    // vegetariana-92103: over-cap submissions require an explicit ack.
-    if (exceedsCap && !ackOverSubmissionCap) return false;
+    // lasagna-92103: over-cap submissions are no longer gated on an ack —
+    // admin amount is canonical; the warning is informational only.
     return !submitting && !uploading;
   }, [
     partyId,
@@ -191,8 +183,6 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     adminNotes,
     submitting,
     uploading,
-    exceedsCap,
-    ackOverSubmissionCap,
   ]);
 
   function handlePickParty(p: ApprovedPartySearchResult) {
@@ -283,11 +273,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
       } else {
         body.recipientHostUserId = recipientUserId;
       }
-      // vegetariana-92103: only forward the override when the admin actually
-      // acked the over-cap warning. Backend rejects > $650 without it.
-      if (exceedsCap && ackOverSubmissionCap) {
-        body.allowOverSubmissionCap = true;
-      }
+      // lasagna-92103: no longer forward `allowOverSubmissionCap` — the
+      // backend POST /external ignores it. Admin amount is canonical.
       if (method === 'wire' || method === 'other') {
         if (wireReference.trim()) body.wireReference = wireReference.trim();
       }
@@ -528,33 +515,25 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               onChange={(e) => setAmountStr(e.target.value)}
               required
             />
-            {/* vegetariana-92103: amber warning + ack Checkbox when the typed
-                amount exceeds the per-submission cap. The backend will reject
-                the record unless `allowOverSubmissionCap: true` is forwarded.
-                External (off-platform) payments don't go through our hot
-                wallet so the admin override is fine when the funds already
-                moved via Venmo/wire/multisig. */}
+            {/* lasagna-92103: informational amber heads-up when the typed
+                amount exceeds the $650 sane-default cap. NOT a gate — admin
+                amount is canonical for external records. External payments
+                don't go through our hot wallet so the per-tx ceiling is
+                irrelevant; this is purely a visual nudge so admins notice
+                unusually large amounts before submitting. */}
             {exceedsCap && (
               <div className="card p-4 border-l-4 border-l-amber-500 bg-amber-500/10 mt-3">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={18} />
                   <div className="flex-1 text-sm">
                     <div className="font-medium text-amber-200 mb-1">
-                      Over per-submission cap
+                      Heads-up: over per-submission soft cap
                     </div>
                     <div className="text-theme-text-secondary">
-                      ${amountNum.toFixed(2)} exceeds the ${PER_SUBMISSION_MAX_USD} per-submission cap.
-                      Most rsv.pizza-managed sends still cap at ${PER_SUBMISSION_MAX_USD} per tx for safety,
-                      but external (off-platform) payments don't go through our hot wallet —
-                      admin override is fine here when you've already paid via Venmo/wire/your own multisig.
-                    </div>
-                    <div className="mt-3">
-                      <Checkbox
-                        checked={ackOverSubmissionCap}
-                        onChange={() => setAckOverSubmissionCap((v) => !v)}
-                        label="I acknowledge — record the over-cap external payment"
-                        labelClassName="text-sm text-amber-100"
-                      />
+                      ${amountNum.toFixed(2)} is over the ${PER_SUBMISSION_MAX_USD} per-submission
+                      soft cap. Admin edits aren&apos;t gated by this — proceed if intentional.
+                      External payments don&apos;t go through our hot wallet so the USDC per-tx
+                      ceiling doesn&apos;t apply here.
                     </div>
                   </div>
                 </div>

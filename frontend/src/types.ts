@@ -1789,10 +1789,10 @@ export interface ExternalPaymentInput {
   externalProofUrl?: string;
   adminNotes: string;         // REQUIRED — must explain why this is being recorded
   /**
-   * aglio-62584: admin override for the acciuga-62583 per-submission $650
-   * cap. Set to `true` when backfilling a pre-cap historical out-of-band
-   * payment that legitimately exceeded $650. Without this, finalAmountUsd
-   * > $650 is rejected with PER_SUBMISSION_CAP_EXCEEDED.
+   * lasagna-92103: previously the admin override for the acciuga-62583
+   * per-submission $650 cap. The backend POST /external no longer enforces
+   * the cap (admin amount is canonical), so this field is now a no-op kept
+   * only for back-compat with any caller that still sets it. Safe to omit.
    */
   allowOverSubmissionCap?: boolean;
 }
