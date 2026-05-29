@@ -669,9 +669,17 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     const partyFilter = buildPartyFilter({ regions, countries, partnerTag });
 
     // Mirror /feed's photo-source WHERE: status=approved + starred=true + party.
+    // nduja-58292: also apply the same prior-year filter as /feed so the ZIP
+    // download doesn't include the very photos /photos hides. Two-pronged:
+    // photo_year column (NULL or >=2026) here, plus a post-query filename
+    // regex pass below (Prisma can't express POSIX regex on string columns).
     const photoWhere: Prisma.PhotoWhereInput = {
       status: 'approved',
       starred: true,
+      OR: [
+        { photoYear: null },
+        { photoYear: { gte: 2026 } },
+      ],
       party: { is: partyFilter },
     };
 
@@ -695,7 +703,15 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
       },
     });
 
-    if (photos.length === 0) {
+    // nduja-58292: filename-regex post-filter — same approach as /feed's
+    // newest-sort path. Drops legacy GPP 2025 uploads with WhatsApp/iPhone/
+    // Android timestamp-prefix filenames (e.g. IMG-20250523-WA0069.jpg) that
+    // don't have photo_year set.
+    const filtered = photos.filter(
+      (p) => !p.fileName || !PRIOR_YEAR_FILENAME_RE.test(p.fileName),
+    );
+
+    if (filtered.length === 0) {
       return res.status(404).json({ error: { message: 'No photos match the filter' } });
     }
 
@@ -705,7 +721,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
-    res.setHeader('X-Photo-Count', String(photos.length));
+    res.setHeader('X-Photo-Count', String(filtered.length));
 
     // zlib level 1 — images are already compressed (JPEG/WebP/PNG); spending
     // CPU on level 6+ rarely shrinks the archive but adds significant latency.
@@ -721,7 +737,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     let skipped = 0;
     const usedNames = new Set<string>();
 
-    for (const p of photos) {
+    for (const p of filtered) {
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), DOWNLOAD_PHOTO_TIMEOUT_MS);
@@ -765,7 +781,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
       `Generated: ${new Date().toISOString()}`,
       `Photos included: ${added}`,
       `Photos skipped (download error): ${skipped}`,
-      `Total matching feed (capped at ${DOWNLOAD_MAX_PHOTOS}): ${photos.length}`,
+      `Total matching feed (capped at ${DOWNLOAD_MAX_PHOTOS}): ${filtered.length}`,
       '',
       'Source: https://www.rsv.pizza/photos',
     ].join('\n');
