@@ -1,6 +1,5 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import { Prisma } from '@prisma/client';
-import { Readable } from 'stream';
 import archiver from 'archiver';
 import { prisma } from '../config/database.js';
 import { optionalAuth, requireAuth, AuthRequest } from '../middleware/auth.js';
@@ -737,7 +736,17 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     let skipped = 0;
     const usedNames = new Set<string>();
 
-    for (const p of filtered) {
+    // nduja-58295: parallelize photo fetches with a concurrency-10 worker pool.
+    // Sequential fetches were the dominant timeout cause (97 photos × ~1s each
+    // + occasional 15s slow fetches blew through Vercel's default 60s budget).
+    // Buffer each photo fully via arrayBuffer() before calling archive.append
+    // so multiple concurrent fetches don't interleave streams into the single
+    // zip output. Per-photo 100MB cap keeps peak memory bounded
+    // (10 × 100MB worst case is fine under Vercel's 1024MB lambda limit).
+    const CONCURRENCY = 10;
+    const PER_PHOTO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+
+    const processOne = async (p: typeof filtered[number]) => {
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), DOWNLOAD_PHOTO_TIMEOUT_MS);
@@ -745,7 +754,14 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
         clearTimeout(t);
         if (!r.ok || !r.body) {
           skipped++;
-          continue;
+          return;
+        }
+
+        // Per-photo size cap (advisory via Content-Length; skipped if missing).
+        const contentLen = parseInt(r.headers.get('content-length') || '0', 10);
+        if (contentLen > PER_PHOTO_MAX_BYTES) {
+          skipped++;
+          return;
         }
 
         const slug = sanitizeForFilename(p.party.customUrl || p.party.inviteCode || 'unknown');
@@ -758,22 +774,43 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
           'jpg'
         ).toLowerCase();
 
+        // Buffer the whole photo before appending — keeps archive.append calls
+        // atomic so the zip output stream isn't interleaved with concurrent
+        // sources.
+        const buf = Buffer.from(await r.arrayBuffer());
+
         // Avoid duplicate entry names within the archive (e.g. two payout
         // photos with the same generic original filename in the same city).
+        // Resolve after fetch so name selection happens in the same critical
+        // section as the append below.
         let entryName = `${city}/${base}.${ext}`;
         if (usedNames.has(entryName)) {
           entryName = `${city}/${base}-${p.id}.${ext}`;
         }
         usedNames.add(entryName);
 
-        // r.body is a Web ReadableStream — adapt to a Node Readable so
-        // archiver can stream it directly into the zip without buffering
-        // the whole file in memory.
-        archive.append(Readable.fromWeb(r.body as any), { name: entryName });
+        archive.append(buf, { name: entryName });
         added++;
       } catch (e) {
         skipped++;
       }
+    };
+
+    // Worker pool: keep CONCURRENCY fetches in flight; whenever one finishes,
+    // pull the next item off the queue. Promise.race() returns when the next
+    // inflight completes; the .finally() removes it from the inflight array.
+    const queue = [...filtered];
+    const inflight: Promise<void>[] = [];
+    while (queue.length > 0 || inflight.length > 0) {
+      while (inflight.length < CONCURRENCY && queue.length > 0) {
+        const p = queue.shift()!;
+        const promise = processOne(p).finally(() => {
+          const idx = inflight.indexOf(promise);
+          if (idx >= 0) inflight.splice(idx, 1);
+        });
+        inflight.push(promise);
+      }
+      if (inflight.length > 0) await Promise.race(inflight);
     }
 
     const readme = [
