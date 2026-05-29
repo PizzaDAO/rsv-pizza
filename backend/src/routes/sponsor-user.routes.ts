@@ -1409,12 +1409,13 @@ sponsorDashboardRouter.get('/newsletter-emails', requireAuth, requireSponsorAuth
     // Find party ids in the event-set first, then fetch matching guest emails.
     const parties = await prisma.party.findMany({
       where,
-      select: { id: true },
+      select: { id: true, city: true, name: true, date: true },
     });
+    const partyById = new Map(parties.map(p => [p.id, p]));
     const partyIds = parties.map(p => p.id);
 
     if (partyIds.length === 0) {
-      return res.json({ emails: [], count: 0, tag, optinField });
+      return res.json({ rows: [], emails: [], count: 0, tag, optinField });
     }
 
     const guests = await prisma.guest.findMany({
@@ -1426,18 +1427,39 @@ sponsorDashboardRouter.get('/newsletter-emails', requireAuth, requireSponsorAuth
         OR: [{ approved: true }, { approved: null }],
         [optinField]: true,
       },
-      select: { email: true },
+      select: { email: true, name: true, partyId: true },
     });
 
-    // Dedupe (lowercased), drop empties, sort alphabetically.
-    const seen = new Set<string>();
-    for (const g of guests) {
-      const e = (g.email || '').trim().toLowerCase();
-      if (e) seen.add(e);
-    }
-    const emails = Array.from(seen).sort();
+    // Sort matching guests by party.date DESC NULLS LAST so the most-recent
+    // event wins when we dedupe by lowercased email below.
+    const sortedGuests = guests.slice().sort((a, b) => {
+      const pa = partyById.get(a.partyId);
+      const pb = partyById.get(b.partyId);
+      const ta = pa?.date ? new Date(pa.date).getTime() : Number.NEGATIVE_INFINITY;
+      const tb = pb?.date ? new Date(pb.date).getTime() : Number.NEGATIVE_INFINITY;
+      return tb - ta;
+    });
 
-    res.json({ emails, count: emails.length, tag, optinField });
+    // Dedupe by lowercased email, keeping the row from the most recent event.
+    const rowByEmail = new Map<string, { email: string; name: string; city: string }>();
+    for (const g of sortedGuests) {
+      const e = (g.email || '').trim().toLowerCase();
+      if (!e) continue;
+      if (rowByEmail.has(e)) continue;
+      const party = partyById.get(g.partyId);
+      rowByEmail.set(e, {
+        email: e,
+        name: (g.name || '').trim(),
+        // Do NOT fall back to party.name — leave empty if party has no city.
+        city: party?.city ?? '',
+      });
+    }
+
+    // Sort final list alphabetically by email.
+    const rows = Array.from(rowByEmail.values()).sort((a, b) => a.email.localeCompare(b.email));
+    const emails = rows.map(r => r.email);
+
+    res.json({ rows, emails, count: rows.length, tag, optinField });
   } catch (error) {
     next(error);
   }

@@ -3405,11 +3405,21 @@ export async function revokePartnerAiShareToken(
 // without a newsletter (e.g. pizzadao).
 export async function fetchPartnerNewsletterEmails(
   tag?: string
-): Promise<{ emails: string[]; count: number; tag: string; optinField: string }> {
+): Promise<{
+  rows: { email: string; name: string; city: string }[];
+  emails: string[];
+  count: number;
+  tag: string;
+  optinField: string;
+}> {
   const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
-  return apiRequest<{ emails: string[]; count: number; tag: string; optinField: string }>(
-    `/api/sponsor/newsletter-emails${params}`
-  );
+  return apiRequest<{
+    rows: { email: string; name: string; city: string }[];
+    emails: string[];
+    count: number;
+    tag: string;
+    optinField: string;
+  }>(`/api/sponsor/newsletter-emails${params}`);
 }
 
 // Admin-only time-series for partner dashboard chart
