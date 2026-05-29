@@ -4208,13 +4208,15 @@ export async function approveAdminPayout(
 export async function rejectAdminPayout(
   id: string,
   rejectionReason: string,
-  opts?: { regions?: string[] },
+  opts?: { regions?: string[]; silent?: boolean },
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(
     `/api/admin/payouts/${id}/reject${regionsQuery(opts?.regions)}`,
     {
       method: 'POST',
-      body: { rejectionReason },
+      // gouda-92103: `silent: true` suppresses host notification on reject.
+      // Default omitted (= notify-as-today). Audit note records [silent].
+      body: { rejectionReason, silent: opts?.silent === true ? true : undefined },
     },
   );
   return res.payout;

@@ -41,7 +41,13 @@ interface PayoutReviewModalProps {
   selfPayoutBlocked?: boolean;
   onClose: () => void;
   onApprove: (note?: string) => Promise<void> | void;
-  onReject: (reason: string) => Promise<void> | void;
+  /**
+   * gouda-92103: optional second arg lets the admin opt into a silent
+   * reject — backend suppresses host-notify side effects and records
+   * `[silent]` on the audit row. Default (no opts) preserves today's
+   * notify-on-reject contract.
+   */
+  onReject: (reason: string, opts?: { silent?: boolean }) => Promise<void> | void;
   /**
    * caprino-92103: revert an `approved` payout back to `pending`. Surfaced
    * as an amber "Revert to Pending" button in the modal footer when the
@@ -258,6 +264,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  // gouda-92103: silent-reject ack. UNCHECKED by default so today's
+  // notify-on-reject contract holds; admin opts into suppression by ticking.
+  const [rejectSilent, setRejectSilent] = useState(false);
 
   // caprino-92103: inline error for "Revert to Pending". Rendered below the
   // footer button row. Mirrors the saveAmountError pattern from aglio-62584.
@@ -1242,14 +1251,28 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   value={rejectReason}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectReason(e.target.value)}
                 />
+                {/* gouda-92103: silent-removal ack. UNCHECKED by default so
+                    today's notify-on-reject contract holds. Ticking forwards
+                    `silent: true` to onReject → API; backend appends [silent]
+                    to the audit note and skips any host-notify side effect. */}
+                <div className="mt-2">
+                  <Checkbox
+                    checked={rejectSilent}
+                    onChange={() => setRejectSilent((v) => !v)}
+                    label="Don't notify host"
+                    labelClassName="text-sm text-red-900"
+                    disabled={busy}
+                  />
+                </div>
                 <div className="flex gap-2 mt-2">
                   <button
                     type="button"
                     onClick={async () => {
                       if (!rejectReason.trim()) return;
-                      await onReject(rejectReason.trim());
+                      await onReject(rejectReason.trim(), { silent: rejectSilent });
                       setShowRejectForm(false);
                       setRejectReason('');
+                      setRejectSilent(false);
                     }}
                     disabled={busy || !rejectReason.trim()}
                     className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs disabled:opacity-50"
@@ -1258,7 +1281,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowRejectForm(false)}
+                    onClick={() => {
+                      setShowRejectForm(false);
+                      setRejectSilent(false);
+                    }}
                     className="px-3 py-1.5 rounded-lg text-xs text-theme-text-secondary hover:bg-theme-surface-hover"
                   >
                     Cancel
