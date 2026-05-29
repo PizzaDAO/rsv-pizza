@@ -1,7 +1,9 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import { Prisma } from '@prisma/client';
+import { Readable } from 'stream';
+import archiver from 'archiver';
 import { prisma } from '../config/database.js';
-import { optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { optionalAuth, requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 const DEFAULT_LIMIT = 24;
@@ -586,6 +588,143 @@ router.get('/feed/my-partner-tags', optionalAuth, async (req: AuthRequest, res: 
     res.json({ tags });
   } catch (error) {
     next(error);
+  }
+});
+
+// salame-58291: ZIP-download endpoint for partners. Streams the matching feed
+// (same WHERE clauses as /feed) into a single .zip. Caps at 1000 photos and
+// 15s per-photo fetch timeout. v1 only queries the `photos` table — after
+// napoletana-58211 most payout pizzas are mirrored there, so the payout-docs
+// UNION is intentionally dropped for the download path (simpler, matches the
+// vast majority of partner photos).
+const DOWNLOAD_MAX_PHOTOS = 1000;
+const DOWNLOAD_PHOTO_TIMEOUT_MS = 15000;
+
+function sanitizeForFilename(s: string): string {
+  // Strip filesystem-unsafe + control chars, leading dots, then fall back to
+  // 'photo' if nothing's left.
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^\.+/, '').trim() || 'photo';
+}
+
+router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const regions = parseCsv(req.query.regions);
+    const countries = parseCsv(req.query.countries);
+    const partnerTagRaw = req.query.partnerTag;
+    const partnerTag = typeof partnerTagRaw === 'string' && partnerTagRaw.trim()
+      ? partnerTagRaw.trim()
+      : null;
+
+    const partyFilter = buildPartyFilter({ regions, countries, partnerTag });
+
+    // Mirror /feed's photo-source WHERE: status=approved + starred=true + party.
+    const photoWhere: Prisma.PhotoWhereInput = {
+      status: 'approved',
+      starred: true,
+      party: { is: partyFilter },
+    };
+
+    const photos = await prisma.photo.findMany({
+      where: photoWhere,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: DOWNLOAD_MAX_PHOTOS,
+      select: {
+        id: true,
+        url: true,
+        fileName: true,
+        mimeType: true,
+        party: {
+          select: {
+            city: true,
+            customUrl: true,
+            inviteCode: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (photos.length === 0) {
+      return res.status(404).json({ error: { message: 'No photos match the filter' } });
+    }
+
+    const tag = partnerTag || 'photos';
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const zipName = `${sanitizeForFilename(tag)}-photos-${dateStr}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+    res.setHeader('X-Photo-Count', String(photos.length));
+
+    // zlib level 1 — images are already compressed (JPEG/WebP/PNG); spending
+    // CPU on level 6+ rarely shrinks the archive but adds significant latency.
+    const archive = archiver('zip', { zlib: { level: 1 } });
+    archive.on('error', (err: Error) => {
+      console.error('[salame-58291] archive error:', err);
+      if (!res.headersSent) res.status(500).end();
+      else res.end();
+    });
+    archive.pipe(res);
+
+    let added = 0;
+    let skipped = 0;
+    const usedNames = new Set<string>();
+
+    for (const p of photos) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), DOWNLOAD_PHOTO_TIMEOUT_MS);
+        const r = await fetch(p.url, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!r.ok || !r.body) {
+          skipped++;
+          continue;
+        }
+
+        const slug = sanitizeForFilename(p.party.customUrl || p.party.inviteCode || 'unknown');
+        const city = sanitizeForFilename(p.party.city || slug);
+        const baseFromFile = p.fileName ? p.fileName.replace(/\.[^.]+$/, '') : null;
+        const base = sanitizeForFilename(baseFromFile || p.id);
+        const ext = (
+          p.fileName?.split('.').pop() ||
+          p.mimeType?.split('/').pop() ||
+          'jpg'
+        ).toLowerCase();
+
+        // Avoid duplicate entry names within the archive (e.g. two payout
+        // photos with the same generic original filename in the same city).
+        let entryName = `${city}/${base}.${ext}`;
+        if (usedNames.has(entryName)) {
+          entryName = `${city}/${base}-${p.id}.${ext}`;
+        }
+        usedNames.add(entryName);
+
+        // r.body is a Web ReadableStream — adapt to a Node Readable so
+        // archiver can stream it directly into the zip without buffering
+        // the whole file in memory.
+        archive.append(Readable.fromWeb(r.body as any), { name: entryName });
+        added++;
+      } catch (e) {
+        skipped++;
+      }
+    }
+
+    const readme = [
+      `Pizza Party Photos - ${tag}`,
+      `Generated: ${new Date().toISOString()}`,
+      `Photos included: ${added}`,
+      `Photos skipped (download error): ${skipped}`,
+      `Total matching feed (capped at ${DOWNLOAD_MAX_PHOTOS}): ${photos.length}`,
+      '',
+      'Source: https://www.rsv.pizza/photos',
+    ].join('\n');
+    archive.append(readme, { name: 'README.txt' });
+
+    await archive.finalize();
+  } catch (error) {
+    if (!res.headersSent) next(error);
+    else res.end();
   }
 });
 

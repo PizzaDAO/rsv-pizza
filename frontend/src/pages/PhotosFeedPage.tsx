@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp, Shuffle } from 'lucide-react';
+import { Loader2, Play, MapPin, ChevronLeft, ChevronRight, ChevronDown, Check, Search, X, ThumbsUp, Shuffle, Download } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -251,6 +251,64 @@ export function PhotosFeedPage() {
     setSeed(null);
   };
 
+  // salame-58291: ZIP download of all photos matching the current filters.
+  // Auth lives in localStorage as a Bearer token (see apiRequest), so an
+  // `<a download>` won't carry it — we fetch with the header, then create a
+  // blob URL and click an anchor to trigger the save dialog.
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+
+  const buildDownloadParams = useCallback((): string => {
+    const params = new URLSearchParams();
+    const expandedCountries = buildCountriesForBackend(activeCountries);
+    if (expandedCountries.length > 0) params.append('countries', expandedCountries.join(','));
+    if (activeRegions.length > 0) params.append('regions', activeRegions.join(','));
+    if (activePartnerTag) params.append('partnerTag', activePartnerTag);
+    if (sortMode === 'random' && seed) {
+      params.append('sort', 'random');
+      params.append('seed', seed);
+    }
+    return params.toString();
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, buildCountriesForBackend]);
+
+  const handleDownloadZip = async () => {
+    if (downloading || !activePartnerTag) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setDownloadError('Please log in to download.');
+        return;
+      }
+      const res = await fetch(`${API_URL}/api/photos/feed/download?${buildDownloadParams()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const msg = res.status === 404
+          ? 'No photos match the current filters.'
+          : `Download failed (${res.status})`;
+        setDownloadError(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `${activePartnerTag}-photos-${dateStr}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setDownloadError('Download failed. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // salame-58195: propagate vote changes back into the photos array so the
   // count + filled icon update immediately on click (and stay in sync across
   // tile <-> lightbox).
@@ -326,6 +384,23 @@ export function PhotosFeedPage() {
               </span>
             )}
           </button>
+          {/* salame-58291: download all matching photos as a ZIP. Only visible
+              when a partnerTag is active. Auth header is required, so we use
+              fetch+blob instead of a plain <a download>. */}
+          {activePartnerTag && (
+            <button
+              onClick={handleDownloadZip}
+              disabled={downloading}
+              title={`Download all photos tagged "${activePartnerTag}" as a ZIP`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors border-black/10 text-gray-900 hover:bg-white ${
+                downloading ? 'opacity-60 cursor-wait' : ''
+              }`}
+              style={{ background: 'rgba(255,255,255,0.85)' }}
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>{downloading ? 'Preparing ZIP...' : 'Download ZIP'}</span>
+            </button>
+          )}
           {anyFiltersActive && (
             <button
               onClick={clearAllFilters}
@@ -336,6 +411,9 @@ export function PhotosFeedPage() {
             </button>
           )}
         </div>
+        {downloadError && (
+          <div className="mb-3 text-sm text-amber-600">{downloadError}</div>
+        )}
 
         {loading && photos.length === 0 ? (
           <SkeletonGrid />
