@@ -300,6 +300,22 @@ html {
   color-scheme: dark;
 }
 
+.gpp-theme {
+  color-scheme: light;
+}
+
+/* gorgonzola-92103: Chrome on Windows ignores color-scheme for the <option>
+   popup — bg/color on <option> is the one styling Chrome still respects. */
+option {
+  background-color: #1a1a2e;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.gpp-theme option {
+  background-color: #ffffff;
+  color: #1a1a1a;
+}
+
 body {
   margin: 0;
   padding: 0;
