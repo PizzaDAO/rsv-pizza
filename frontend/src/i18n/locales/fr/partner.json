@@ -311,6 +311,15 @@
       "created": "Créé",
       "todo": "À faire",
       "skip": "Ignorer"
+    },
+    "notes": {
+      "title": "Notes — {{city}}",
+      "add": "Ajouter une note",
+      "edit": "Modifier la note",
+      "placeholder": "Notes pour cette ville (conservées dannée en année)",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "close": "Fermer"
     }
   },
   "funnel": {

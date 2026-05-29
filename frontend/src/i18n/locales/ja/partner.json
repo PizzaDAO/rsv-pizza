@@ -311,6 +311,15 @@
       "created": "作成済み",
       "todo": "未対応",
       "skip": "スキップ"
+    },
+    "notes": {
+      "title": "メモ — {{city}}",
+      "add": "メモを追加",
+      "edit": "メモを編集",
+      "placeholder": "この都市のメモ（年をまたいで保持されます）",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "close": "閉じる"
     }
   },
   "funnel": {

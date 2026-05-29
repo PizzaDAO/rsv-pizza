@@ -311,6 +311,15 @@
       "created": "已创建",
       "todo": "待办",
       "skip": "跳过"
+    },
+    "notes": {
+      "title": "备注 — {{city}}",
+      "add": "添加备注",
+      "edit": "编辑备注",
+      "placeholder": "此城市的备注（逐年保留）",
+      "save": "保存",
+      "cancel": "取消",
+      "close": "关闭"
     }
   },
   "funnel": {
