@@ -529,6 +529,28 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
       }
     }
 
+    // sicilian-58196: dedup pre-check. If a photo already exists in this party
+    // with identical (fileSize, mimeType), return the original instead of
+    // creating a duplicate row. Returns 200 (not 201) with `deduped: true` so
+    // the client can render a soft "already uploaded" hint. Skipped if either
+    // fileSize or mimeType is missing — those are required by the validation
+    // above, but be defensive. The original photo keeps its existing
+    // starred / status / votes; we do NOT replay host-auto-star or
+    // auto-approve on the dedup hit.
+    if (fileSize && mimeType) {
+      const existing = await prisma.photo.findFirst({
+        where: { partyId, fileSize, mimeType },
+        select: { id: true },
+      });
+      if (existing) {
+        const dedupedPhoto = await prisma.photo.findUnique({
+          where: { id: existing.id },
+          include: { guest: { select: { id: true, name: true } } },
+        });
+        return res.status(200).json({ photo: dedupedPhoto, deduped: true });
+      }
+    }
+
     // margherita-43821: host uploads (owner / co-host w/ canEdit / super-admin /
     // GPP editor) are auto-approved + auto-starred so they appear in /photos
     // immediately. Guest uploads still go through pending moderation.

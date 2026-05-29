@@ -1096,27 +1096,44 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         docsToCreate.map(async (d) => {
           let photoId: string | null = d.photoId;
           if (d.kind === 'pizza') {
-            const photo = await tx.photo.create({
-              data: {
+            // sicilian-58196: dedup pre-check. If a photo with the same
+            // (partyId, fileSize, mimeType) already exists, reuse its id
+            // instead of inserting a new row. Same bytes uploaded a second
+            // time via the payout flow should NOT create a duplicate row in
+            // the canonical `photos` table.
+            const dup = await tx.photo.findFirst({
+              where: {
                 partyId,
-                url: d.url,
-                fileName: d.fileName,
                 fileSize: d.fileSize,
                 mimeType: d.mimeType,
-                // uploadedBy is a Guest FK; payout submitters are Users.
-                // Leave null and rely on uploaderEmail for attribution.
-                uploadedBy: null,
-                uploaderName: null,
-                uploaderEmail: uploaderEmail,
-                status: 'approved',
-                starred: true,
-                starredAt: now,
-                reviewedAt: now,
-                reviewedBy: uploaderUserId,
               },
               select: { id: true },
             });
-            photoId = photo.id;
+            if (dup) {
+              photoId = dup.id;
+            } else {
+              const photo = await tx.photo.create({
+                data: {
+                  partyId,
+                  url: d.url,
+                  fileName: d.fileName,
+                  fileSize: d.fileSize,
+                  mimeType: d.mimeType,
+                  // uploadedBy is a Guest FK; payout submitters are Users.
+                  // Leave null and rely on uploaderEmail for attribution.
+                  uploadedBy: null,
+                  uploaderName: null,
+                  uploaderEmail: uploaderEmail,
+                  status: 'approved',
+                  starred: true,
+                  starredAt: now,
+                  reviewedAt: now,
+                  reviewedBy: uploaderUserId,
+                },
+                select: { id: true },
+              });
+              photoId = photo.id;
+            }
           }
           return {
             ...d,
@@ -1780,8 +1797,24 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         // payout_documents row links to the canonical photos record. If any
         // photos.create fails, the surrounding transaction aborts and the
         // patch is rolled back. Receipts skip this step (photoId stays null).
+        //
+        // sicilian-58196: dedup pre-check before insert — if a photo already
+        // exists with the same (partyId, fileSize, mimeType), reuse it
+        // instead of creating a duplicate row.
         const now = new Date();
         for (const d of newPizzaDocs) {
+          const dup = await tx.photo.findFirst({
+            where: {
+              partyId,
+              fileSize: d.fileSize,
+              mimeType: d.mimeType,
+            },
+            select: { id: true },
+          });
+          if (dup) {
+            d.photoId = dup.id;
+            continue;
+          }
           const photo = await tx.photo.create({
             data: {
               partyId,
