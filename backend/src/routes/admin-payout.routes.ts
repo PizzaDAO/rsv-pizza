@@ -275,11 +275,12 @@ async function fetchPaidTotalsByParty(
 }
 
 /**
- * tiramisu-49102: hard per-party cap enforcement. Sums every payout for the
- * party that is `pending | approved | paid` and throws 409 PARTY_CAP_EXCEEDED
- * if `usedUsd + proposedUsd` exceeds the party's `effectiveReimbursementCapUsd`
- * (validated cap OR max numeric event tag). Parties without an effective cap
- * stay uncapped.
+ * tiramisu-49102 + fontina-92103: hard per-party cap enforcement. Sums every
+ * COMMITTED payout for the party (status `paid` or `approved`) and throws
+ * 409 PARTY_CAP_EXCEEDED if `usedUsd + proposedUsd` exceeds the party's
+ * `effectiveReimbursementCapUsd`. Pending claims are excluded — hosts may
+ * submit receipts above the approved cap; the cap only constrains what
+ * admins commit (approve/pay).
  *
  * `ignorePayoutId` excludes a row from the existing-total — used by PATCH so a
  * row being edited doesn't count against itself.
@@ -304,7 +305,7 @@ async function assertWithinPartyCap(
 
   const where: any = {
     partyId,
-    status: { in: ['paid', 'pending', 'approved'] },
+    status: { in: ['paid', 'approved'] },
   };
   if (ignorePayoutId) {
     where.id = { not: ignorePayoutId };
