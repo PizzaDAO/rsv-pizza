@@ -1552,6 +1552,11 @@ export interface ConsolidatedReportSocialPost {
 export interface ConsolidatedReport {
   partnerName: string | null;
   tag: string | null;
+  // pecorino-64118 follow-up: server tells us whether the caller is admin
+  // viewing (so we can render the admin-only "Approved events only" toggle)
+  // and the resolved approvedOnly state actually applied to the result.
+  isAdmin?: boolean;
+  approvedOnly?: boolean;
   eventCount: number;
   dateRange: { start: string; end: string } | null;
   stats: {

@@ -3347,8 +3347,16 @@ export async function fetchSponsorEvents(tag?: string): Promise<SponsorDashboard
 }
 
 // pecorino-64118: consolidated cross-event partner report (private, full rollup).
-export async function fetchSponsorConsolidatedReport(tag?: string): Promise<ConsolidatedReport> {
-  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+// pecorino-64118 follow-up: optional admin-only `approvedOnly` opt-in filter
+// (non-admins are server-scoped to approved-only regardless).
+export async function fetchSponsorConsolidatedReport(
+  tag?: string,
+  approvedOnly?: boolean
+): Promise<ConsolidatedReport> {
+  const parts: string[] = [];
+  if (tag) parts.push(`tag=${encodeURIComponent(tag)}`);
+  if (approvedOnly) parts.push('approvedOnly=1');
+  const params = parts.length > 0 ? `?${parts.join('&')}` : '';
   return apiRequest<ConsolidatedReport>(`/api/sponsor/report${params}`);
 }
 

@@ -250,6 +250,7 @@
     "backToDashboard": "대시보드로 돌아가기",
     "notAvailableTitle": "리포트를 아직 사용할 수 없습니다",
     "notAvailableDesc": "통합 리포트를 아직 사용할 수 없습니다. 잠시 후 다시 확인해 주세요.",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "이벤트",
       "date": "날짜",

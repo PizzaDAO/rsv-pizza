@@ -250,6 +250,7 @@
     "backToDashboard": "ダッシュボードに戻る",
     "notAvailableTitle": "レポートはまだ利用できません",
     "notAvailableDesc": "統合レポートはまだ利用できません。しばらくしてからもう一度ご確認ください。",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "イベント",
       "date": "日付",

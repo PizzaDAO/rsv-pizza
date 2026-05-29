@@ -6,6 +6,7 @@ import { Loader2, Shield, FileText, ArrowLeft } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
+import { Checkbox } from '../components/Checkbox';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorConsolidatedReport } from '../lib/api';
 import { ConsolidatedReportPreview } from '../components/report/ConsolidatedReportPreview';
@@ -20,8 +21,13 @@ const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4
 export function ConsolidatedReportPage() {
   const { t } = useTranslation('partner');
   const { user, loading: authLoading } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tagParam = searchParams.get('tag') || undefined;
+  // pecorino-64118 follow-up: admin-only "Approved events only" opt-in.
+  // Read from URL so the filter persists across reloads / shares.
+  const approvedOnlyParam = ['1', 'true', 'yes'].includes(
+    (searchParams.get('approvedOnly') || '').toLowerCase()
+  );
 
   // Set body class for elements outside React tree
   useEffect(() => {
@@ -60,7 +66,7 @@ export function ConsolidatedReportPage() {
           || undefined;
 
         try {
-          const data = await fetchSponsorConsolidatedReport(resolvedTag);
+          const data = await fetchSponsorConsolidatedReport(resolvedTag, approvedOnlyParam);
           setReport(data);
         } catch (err: any) {
           // Backend not deployed yet (preview talks to prod backend) → friendly state.
@@ -79,7 +85,19 @@ export function ConsolidatedReportPage() {
     }
 
     load();
-  }, [user, authLoading, tagParam]);
+  }, [user, authLoading, tagParam, approvedOnlyParam]);
+
+  // pecorino-64118 follow-up: toggle the approvedOnly URL param (admin-only).
+  // useSearchParams will trigger the load effect above to re-fetch.
+  const handleToggleApprovedOnly = () => {
+    const next = new URLSearchParams(searchParams);
+    if (approvedOnlyParam) {
+      next.delete('approvedOnly');
+    } else {
+      next.set('approvedOnly', '1');
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   // Loading state
   if (authLoading || loading) {
@@ -171,7 +189,21 @@ export function ConsolidatedReportPage() {
               <p className="text-theme-text-muted max-w-md mx-auto">{t('consolidated.notAvailableDesc')}</p>
             </div>
           ) : report ? (
-            <ConsolidatedReportPreview report={report} />
+            <>
+              {/* pecorino-64118 follow-up: admin-only "Approved events only" toggle.
+                  Non-admins are already server-scoped to approved+non-cancelled. */}
+              {report.isAdmin && (
+                <div className="mb-4 flex justify-end">
+                  <Checkbox
+                    checked={!!report.approvedOnly}
+                    onChange={handleToggleApprovedOnly}
+                    label={t('consolidated.approvedOnly')}
+                    labelClassName="text-sm text-theme-text-secondary"
+                  />
+                </div>
+              )}
+              <ConsolidatedReportPreview report={report} />
+            </>
           ) : (
             <div className="text-center py-16">
               <FileText size={48} className="text-theme-text-faint mx-auto mb-4" />

@@ -250,6 +250,7 @@
     "backToDashboard": "Zurück zum Dashboard",
     "notAvailableTitle": "Bericht noch nicht verfügbar",
     "notAvailableDesc": "Der Gesamtbericht ist noch nicht verfügbar. Bitte schauen Sie bald wieder vorbei.",
+    "approvedOnly": "Approved events only",
     "table": {
       "event": "Event",
       "date": "Datum",
