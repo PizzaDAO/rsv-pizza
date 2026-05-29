@@ -17,7 +17,7 @@ export interface SurveyQuestion {
   allowOther?: boolean; // for type 'multiple' — when true and user picks "Other", a sibling `${id}_other` free-text field is persisted
 }
 
-export const SURVEY_QUESTION_SET_VERSION = 1;
+export const SURVEY_QUESTION_SET_VERSION = 2;
 
 export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
   {
@@ -42,7 +42,7 @@ export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
     type: 'multiple',
     multi: false,
     text: 'How did you hear about this event?',
-    options: ['A friend', 'Twitter/X', 'The organizer', 'Other'],
+    options: ['A friend', 'Twitter/X', 'The organizer', 'Brave browser', 'Other'],
     allowOther: true,
   },
   {
