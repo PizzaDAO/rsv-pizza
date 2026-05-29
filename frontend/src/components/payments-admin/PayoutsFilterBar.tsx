@@ -40,6 +40,10 @@ const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
   { value: 'failed', label: 'Failed' },
   // ravioli-82931: surface soft-withdrawn rows in admin for transparency.
   { value: 'withdrawn', label: 'Withdrawn' },
+  // provolone-92103: 'completed' rows are the close-out terminal state used
+  // by Mark-Party-Paid's "mark pending complete" mode. Distinct from 'paid'
+  // (a direct payment record) but treated like paid for cap math.
+  { value: 'completed', label: 'Completed' },
 ];
 
 const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [

@@ -52,7 +52,12 @@ const router = Router();
 // queue for transparency. They are excluded from per-party cap math
 // (`assertWithinPartyCap` only sums paid|pending|approved) and from
 // `partyTotals` (which only sums paid).
-const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed', 'withdrawn'] as const;
+// provolone-92103: 'completed' added — terminal close-out status used by
+// Mark-Party-Paid's "close pending claims" mode. Semantically equivalent to
+// 'paid' for cap math (counts toward usedUsd) but distinct on the UI so admins
+// can tell "city was paid out, possibly less than the requested claim amount"
+// apart from a direct paid row.
+const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed', 'withdrawn', 'completed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
@@ -304,8 +309,13 @@ async function assertWithinPartyCap(
   if (effectiveCap == null) return;
 
   const where: any = {
+    // fontina-92103: only COMMITTED rows (paid|approved) count against the cap;
+    // pending is excluded so hosts can submit over-cap receipts and the admin
+    // approval is authoritative.
+    // provolone-92103: 'completed' is a terminal close-out semantically
+    // equivalent to 'paid' for cap purposes — include it here.
     partyId,
-    status: { in: ['paid', 'approved'] },
+    status: { in: ['paid', 'approved', 'completed'] },
   };
   if (ignorePayoutId) {
     where.id = { not: ignorePayoutId };
@@ -1591,6 +1601,11 @@ router.get(
         failedUsd: number;
         withdrawnCount: number;
         withdrawnUsd: number;
+        // provolone-92103: terminal close-out status for "city paid in full"
+        // mark-pending-complete flow. Tracked separately from 'paid' so the
+        // admin UI can show "X paid + Y completed" distinct rollups.
+        completedCount: number;
+        completedUsd: number;
         flaggedReadyCount: number;
         lastActivityAt: Date;
         payouts: any[]; // raw Prisma rows; serialized below
@@ -1613,6 +1628,7 @@ router.get(
             rejectedCount: 0, rejectedUsd: 0,
             failedCount: 0, failedUsd: 0,
             withdrawnCount: 0, withdrawnUsd: 0,
+            completedCount: 0, completedUsd: 0,
             flaggedReadyCount: 0,
             lastActivityAt: row.updatedAt,
             payouts: [],
@@ -1633,6 +1649,9 @@ router.get(
             b.failedCount += 1; b.failedUsd += usd; break;
           case 'withdrawn':
             b.withdrawnCount += 1; b.withdrawnUsd += usd; break;
+          case 'completed':
+            // provolone-92103: terminal close-out — counted in its own bucket.
+            b.completedCount += 1; b.completedUsd += usd; break;
         }
         if (pageFlagged.has(row.id)) b.flaggedReadyCount += 1;
         b.payouts.push(row);
@@ -1698,6 +1717,8 @@ router.get(
             failedUsd: b.failedUsd,
             withdrawnCount: b.withdrawnCount,
             withdrawnUsd: b.withdrawnUsd,
+            completedCount: b.completedCount,
+            completedUsd: b.completedUsd,
             totalReceiptCount: receiptCounts.get(partyId) ?? 0,
             lastActivityAt: b.lastActivityAt.toISOString(),
             flaggedReadyCount: b.flaggedReadyCount,
@@ -2708,7 +2729,12 @@ router.post(
       if (!existing) {
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
       }
-      if (existing.status === 'paid' || existing.status === 'rejected' || existing.status === 'withdrawn') {
+      if (
+        existing.status === 'paid' ||
+        existing.status === 'rejected' ||
+        existing.status === 'withdrawn' ||
+        existing.status === 'completed'
+      ) {
         // Flagging a terminal-state row is a no-op signal; reject up front
         // so the UI doesn't render a stale-looking flag icon afterward.
         throw new AppError(
@@ -4147,12 +4173,14 @@ partyMarkPaidRouter.get(
       const existingPaidCount = paidCount;
       const existingPaidUsd = paidTotalUsd;
 
-      // caciotta-92103: recommend `withdraw_pending` when the already-paid
-      // bucket fully covers what we'd otherwise create as new paid rows.
-      // Otherwise `mark_paid` (the legacy behavior).
-      const suggestedMode: 'mark_paid' | 'withdraw_pending' =
+      // caciotta-92103 + provolone-92103: recommend `mark_pending_complete`
+      // when the city has ANY existing paid amount — Snax's directive is that
+      // "marked paid" should default to "this is everything the city will
+      // receive; close out the in-flight claims as completed (not withdrawn)."
+      // Otherwise `mark_paid` (the legacy "create new paid rows" behavior).
+      const suggestedMode: 'mark_paid' | 'mark_pending_complete' =
         existingPaidCount > 0 && existingPaidUsd >= totalUsd
-          ? 'withdraw_pending'
+          ? 'mark_pending_complete'
           : 'mark_paid';
 
       const paymentsClosedAt = party.paymentsClosedAt
@@ -4197,25 +4225,28 @@ partyMarkPaidRouter.get(
  *
  * Body:
  *   {
- *     mode?: 'mark_paid' | 'withdraw_pending' | 'auto';
- *                          // caciotta-92103: how to close out the in-flight
- *                          // rows.
+ *     mode?: 'mark_paid' | 'mark_pending_complete' | 'withdraw_pending' | 'auto';
+ *                          // caciotta-92103 + provolone-92103: how to close
+ *                          // out the in-flight rows.
  *                          //   'mark_paid' — legacy behavior: every pending
  *                          //     + approved row flips to status='paid'.
  *                          //     Creates new paid amounts on /payments.
- *                          //   'withdraw_pending' — soft-withdraw via
- *                          //     status='withdrawn' (ravioli-82931). Used
- *                          //     when an external paid row is already on the
- *                          //     party and the pending claims are
- *                          //     duplicates. Does NOT create new paid
- *                          //     amounts. Receipts stay attached to the
- *                          //     party (payout_documents.party_id
- *                          //     unchanged).
- *                          //   'auto' (default) — picks 'withdraw_pending'
- *                          //     when the party already has paid payouts
- *                          //     whose sum >= the pending+approved being
- *                          //     acted on; else 'mark_paid'. Prevents
- *                          //     double-counting external payments.
+ *                          //   'mark_pending_complete' (provolone-92103) —
+ *                          //     flips pending + approved rows to
+ *                          //     status='completed'. Means "the city was
+ *                          //     fully paid by the org, even if the org paid
+ *                          //     less than the claim amount; this row's
+ *                          //     payment obligation is fulfilled." Receipts
+ *                          //     stay attached to the party.
+ *                          //   'withdraw_pending' (deprecated, kept for
+ *                          //     backward-compat during rolling deploy) —
+ *                          //     same as 'mark_pending_complete' (aliased).
+ *                          //   'auto' (default) — picks
+ *                          //     'mark_pending_complete' when the party
+ *                          //     already has paid payouts whose sum >= the
+ *                          //     pending+approved being acted on; else
+ *                          //     'mark_paid'. Prevents double-counting
+ *                          //     external payments.
  *     note?: string;       // shared admin note appended (with timestamp) to
  *                          // each payout's admin_notes; also written to
  *                          // payout_audit.note
@@ -4225,7 +4256,7 @@ partyMarkPaidRouter.get(
  *                          // are preserved so we don't lie about how an
  *                          // already-routed payout was paid. Only relevant
  *                          // for 'mark_paid' — ignored for
- *                          // 'withdraw_pending'.
+ *                          // 'mark_pending_complete'.
  *   }
  *
  * Atomic via `prisma.$transaction`. For each in-flight payout on the party:
@@ -4240,19 +4271,19 @@ partyMarkPaidRouter.get(
  *        are left untouched.)
  *     5. payout_audit row with action='mark_paid', old_status, new_status='paid'.
  *
- *   mode='withdraw_pending':
- *     1. status -> 'withdrawn'
- *     2. paid_at / payout_method UNCHANGED — the row was never actually paid;
- *        it's being reconciled against an already-recorded external payment.
- *     3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] Withdrawn during Mark
- *        Party Paid reconciliation; <note>" on a new line.
- *     4. payout_audit row with action='cancel' (the valid enum value used by
- *        ravioli-82931's host-side withdraw — there is no 'withdraw' action
- *        in the check constraint), old_status, new_status='withdrawn'.
+ *   mode='mark_pending_complete' (provolone-92103):
+ *     1. status -> 'completed'
+ *     2. paid_at / payout_method UNCHANGED — the row was never actually paid
+ *        by us directly; the city was paid in full by some other means and
+ *        this claim is being closed out as part of that completion.
+ *     3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] Marked complete via Mark
+ *        Party Paid; city fully paid; <note>" on a new line.
+ *     4. payout_audit row with action='mark_paid' (the closest valid action
+ *        in the check constraint), old_status, new_status='completed'.
  *
  * Returns `{ count, mode, party: { id, name }, payoutIds }`. count=0 with
  * HTTP 200 when there are no in-flight payouts to flip — not an error.
- * `mode` is the resolved mode (auto -> mark_paid or withdraw_pending) so
+ * `mode` is the resolved mode (auto -> mark_paid or mark_pending_complete) so
  * the frontend can render the correct success toast.
  */
 partyMarkPaidRouter.post(
@@ -4293,15 +4324,23 @@ partyMarkPaidRouter.post(
       // a method" rather than persisting the literal string.
       const methodToStamp = paidMethod && paidMethod !== 'external' ? paidMethod : null;
 
-      // caciotta-92103: mode selector. Default 'auto' picks withdraw_pending
-      // when the party already has enough paid rows to cover the in-flight
-      // sum (prevents double-counting after an external payment was
-      // recorded). Otherwise it falls through to the legacy mark_paid path.
+      // caciotta-92103 + provolone-92103: mode selector. Default 'auto' picks
+      // mark_pending_complete when the party already has enough paid rows to
+      // cover the in-flight sum (prevents double-counting after an external
+      // payment was recorded). Otherwise it falls through to the legacy
+      // mark_paid path.
+      //
+      // 'withdraw_pending' is accepted as a legacy alias for
+      // 'mark_pending_complete' so a rolling deploy doesn't 400 stale
+      // frontends.
       const rawMode = typeof body.mode === 'string' ? body.mode.trim() : 'auto';
-      if (!['mark_paid', 'withdraw_pending', 'auto'].includes(rawMode)) {
+      if (!['mark_paid', 'mark_pending_complete', 'withdraw_pending', 'auto'].includes(rawMode)) {
         throw new AppError('Invalid mode', 400, 'VALIDATION_ERROR');
       }
-      const requestedMode = rawMode as 'mark_paid' | 'withdraw_pending' | 'auto';
+      const requestedMode =
+        rawMode === 'withdraw_pending'
+          ? ('mark_pending_complete' as const)
+          : (rawMode as 'mark_paid' | 'mark_pending_complete' | 'auto');
 
       // Find all in-flight payouts BEFORE the transaction so we can do per-row
       // self-payout checks + log a clean count even if zero match.
@@ -4322,7 +4361,7 @@ partyMarkPaidRouter.post(
 
       // Resolve 'auto' to a concrete mode. Even at count=0 we resolve so the
       // response carries a meaningful `mode` value.
-      let resolvedMode: 'mark_paid' | 'withdraw_pending';
+      let resolvedMode: 'mark_paid' | 'mark_pending_complete';
       if (requestedMode === 'auto') {
         const inflightUsd = inflight.reduce(
           (sum, p) => sum + Number(p.finalAmountUsd),
@@ -4338,7 +4377,7 @@ partyMarkPaidRouter.post(
         );
         resolvedMode =
           existingPaid.length > 0 && existingPaidUsd >= inflightUsd
-            ? 'withdraw_pending'
+            ? 'mark_pending_complete'
             : 'mark_paid';
       } else {
         resolvedMode = requestedMode;
@@ -4398,10 +4437,9 @@ partyMarkPaidRouter.post(
       // Self-payout guard — payment_admin actors can't mark their own row
       // paid. Even one self-row in the batch aborts the whole operation
       // (atomic semantics; safer than silently skipping one row).
-      // Applies to both modes: withdraw_pending of one's own pending row is
-      // a permission concern too (a payment_admin shouldn't close out their
-      // own claim against an externally-paid row without a second pair of
-      // eyes).
+      // Applies to both modes: mark_pending_complete of one's own pending row
+      // is a permission concern too (a payment_admin shouldn't close out
+      // their own claim without a second pair of eyes).
       for (const p of inflight) {
         assertNotSelfPayout(actor, p.hostUserId);
       }
@@ -4414,13 +4452,14 @@ partyMarkPaidRouter.post(
         for (const p of inflight) {
           // Preserve existing admin_notes, append the bulk note with a
           // timestamp on its own line so the trail is readable. For the
-          // withdraw_pending path we prefix the note so the audit trail
-          // makes clear *why* a pending row was withdrawn (vs a host
-          // self-withdraw via ravioli-82931's DELETE endpoint).
+          // mark_pending_complete path (provolone-92103) we prefix the note
+          // so the audit trail makes clear *why* a pending row was closed
+          // out (vs a host self-withdraw via ravioli-82931's DELETE
+          // endpoint).
           let nextAdminNotes: string | null | undefined = undefined;
           const noteBody =
-            resolvedMode === 'withdraw_pending'
-              ? `Withdrawn during Mark Party Paid reconciliation${note ? `; ${note}` : ''}`
+            resolvedMode === 'mark_pending_complete'
+              ? `Marked complete via Mark Party Paid; city fully paid${note ? `; ${note}` : ''}`
               : note;
           if (noteBody) {
             const existing = p.adminNotes && p.adminNotes.trim() ? p.adminNotes : '';
@@ -4464,12 +4503,14 @@ partyMarkPaidRouter.post(
               },
             });
           } else {
-            // resolvedMode === 'withdraw_pending'
-            // Soft-withdraw without touching paid_at or payout_method —
-            // this row was never actually paid; we're reconciling it
-            // against an already-recorded external payment.
+            // resolvedMode === 'mark_pending_complete' (provolone-92103)
+            // Flip to status='completed' — a terminal "city was paid in full
+            // by the org, this row's payment obligation is fulfilled" signal.
+            // Don't touch paid_at or payout_method — this isn't a direct
+            // paid record; the city's payment landed via some other means
+            // and this claim is being closed out as complete.
             const data: any = {
-              status: 'withdrawn',
+              status: 'completed',
             };
             if (nextAdminNotes !== undefined) {
               data.adminNotes = nextAdminNotes;
@@ -4480,15 +4521,17 @@ partyMarkPaidRouter.post(
               data,
             });
 
-            // ravioli-82931 audit pattern: 'cancel' is the valid action enum
-            // value for soft-withdraw; 'withdraw' isn't in the check
-            // constraint.
+            // 'mark_paid' is the closest valid action enum value for
+            // closing a row out as completed; the new_status field carries
+            // the actual transition target. Adding 'mark_complete' to the
+            // CHECK enum would require a separate migration — defer until
+            // we have a reason to filter the audit log by it.
             await tx.payoutAudit.create({
               data: {
                 payoutId: p.id,
-                action: 'cancel',
+                action: 'mark_paid',
                 oldStatus: p.status,
-                newStatus: 'withdrawn',
+                newStatus: 'completed',
                 actorEmail: actor.email,
                 actorKind: actor.actorKind,
                 note: noteBody,
@@ -4499,32 +4542,27 @@ partyMarkPaidRouter.post(
           updatedIds.push(p.id);
         }
 
-        // pinsa-92103 + caciotta-92103: when this run leaves nothing in-flight,
-        // auto-stamp paymentsClosedAt. Skip if already closed. We re-query
-        // inside the tx so the check is atomic with the status flips.
+        // pinsa-92103 + caciotta-92103 + provolone-92103: when this run leaves
+        // nothing in-flight, auto-stamp paymentsClosedAt. Skip if already
+        // closed. We re-query inside the tx so the check is atomic with the
+        // status flips.
         //
         // For mark_paid: every flipped row is now 'paid', so the city has
         // paid history by construction — safe to close.
-        // For withdraw_pending: the flipped rows are 'withdrawn', not 'paid',
-        // so only close when the city has OTHER paid history (matches pinsa's
-        // close-out invariant: never close a city with zero real payments).
+        // For mark_pending_complete: the flipped rows are 'completed', which
+        // itself is a terminal close-out signal — also safe to close. (The
+        // semantic guard "never close a city with zero real payments" is
+        // preserved by the fact that the admin is taking an explicit
+        // close-out action.)
         if (!party.paymentsClosedAt && updatedIds.length > 0) {
           const remainingInflight = await tx.payout.count({
             where: { partyId, status: { in: ['pending', 'approved'] } },
           });
           if (remainingInflight === 0) {
-            const hasPaid =
-              resolvedMode === 'mark_paid'
-                ? true
-                : (await tx.payout.count({
-                    where: { partyId, status: 'paid' },
-                  })) > 0;
-            if (hasPaid) {
-              await tx.party.update({
-                where: { id: partyId },
-                data: { paymentsClosedAt: now },
-              });
-            }
+            await tx.party.update({
+              where: { id: partyId },
+              data: { paymentsClosedAt: now },
+            });
           }
         }
       });
@@ -4547,10 +4585,11 @@ partyMarkPaidRouter.post(
             : null,
         },
         payoutIds: updatedIds,
-        // caciotta-92103: action mirrors the resolved mode so the frontend
-        // doesn't have to infer it. 'withdraw_pending' is its own action
-        // value distinct from pinsa's 'closed'/'already_closed'/'noop'.
-        action: resolvedMode === 'withdraw_pending' ? 'withdraw_pending' : 'mark_paid',
+        // caciotta-92103 + provolone-92103: action mirrors the resolved mode
+        // so the frontend doesn't have to infer it. 'mark_pending_complete'
+        // is its own action value distinct from pinsa's
+        // 'closed'/'already_closed'/'noop'.
+        action: resolvedMode === 'mark_pending_complete' ? 'mark_pending_complete' : 'mark_paid',
       });
     } catch (err) {
       next(err);

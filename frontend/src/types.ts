@@ -1608,7 +1608,11 @@ export interface UnifiedPartner {
 // ravioli-82931: 'withdrawn' is the soft-delete state hosts move pending|approved
 // rows into via DELETE /:partyId/payouts/:payoutId. Receipts on the row are
 // retained for the host's receipts-library tab.
-export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn';
+// provolone-92103: 'completed' is the admin close-out state used by
+// Mark-Party-Paid's "mark pending complete" mode. Means "the city was fully
+// paid by the org and this row's payment obligation is fulfilled, even if the
+// org paid less than the original claim amount."
+export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn' | 'completed';
 
 /**
  * ravioli-82931 + agnolotti-58291: one entry in the party-scoped receipts
@@ -2145,6 +2149,12 @@ export interface PartyPayoutsRow {
     failedUsd: number;
     withdrawnCount: number;
     withdrawnUsd: number;
+    /**
+     * provolone-92103: terminal close-out status — "city paid in full, this
+     * row done." Optional for backward-compat with cached payloads.
+     */
+    completedCount?: number;
+    completedUsd?: number;
     /** payout_documents rows where kind='receipt' for this party. */
     totalReceiptCount: number;
     /** ISO timestamp — max(updated_at) across this party's payouts. */

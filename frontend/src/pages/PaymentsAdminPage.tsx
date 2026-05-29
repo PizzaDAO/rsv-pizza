@@ -1265,11 +1265,12 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             partyNameHint={markPartyPaidTarget.partyNameHint}
             onClose={() => setMarkPartyPaidTarget(null)}
             onSuccess={async ({ count, mode, partyName, action, paymentsClosedAt }) => {
-              // caciotta-92103 + pinsa-92103: split the toast copy by the
-              // resolved server action so the admin gets a clear signal
-              // whether they (a) flipped payouts to paid, (b) withdrew
-              // pending claims (caciotta), (c) closed out a fully-paid
-              // city (pinsa), or (d) the city was already closed / no-op.
+              // caciotta-92103 + pinsa-92103 + provolone-92103: split the
+              // toast copy by the resolved server action so the admin gets a
+              // clear signal whether they (a) flipped payouts to paid,
+              // (b) closed out pending claims as completed
+              // (mark_pending_complete), (c) closed out a fully-paid city
+              // (pinsa), or (d) the city was already closed / no-op.
               let toastMsg: string;
               if (action === 'closed') {
                 toastMsg = `Closed out ${partyName} — all payouts already paid`;
@@ -1277,9 +1278,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 toastMsg = `${partyName} is already closed out`;
               } else if (action === 'noop') {
                 toastMsg = `No payouts to action for ${partyName}`;
-              } else if (action === 'withdraw_pending' || mode === 'withdraw_pending') {
+              } else if (action === 'mark_pending_complete' || mode === 'mark_pending_complete') {
                 toastMsg = count > 0
-                  ? `Withdrew ${count} pending claim${count === 1 ? '' : 's'} for ${partyName}`
+                  ? `Marked ${count} pending claim${count === 1 ? '' : 's'} complete for ${partyName}`
                   : `No in-flight payouts for ${partyName} — nothing changed`;
               } else if (count > 0) {
                 const closedNow = !!paymentsClosedAt;
