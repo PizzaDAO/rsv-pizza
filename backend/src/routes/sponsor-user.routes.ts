@@ -1559,3 +1559,63 @@ sponsorDashboardRouter.get('/newsletter-emails', requireAuth, requireSponsorAuth
     next(error);
   }
 });
+
+// GET /api/sponsor/opt-in-emails - crust-71429: ethconf-only combined opt-in
+// download. Returns per-guest rows of guests at ethconf-tagged events who
+// opted into EITHER `mailingListOptIn` (PizzaDAO) OR `ethconfOptIn`, with
+// each guest's event city + which flags they opted into. The frontend dedupes
+// by lowercased email and renders an "Opt-In Source" (Mailing List / Ethconf /
+// Both) column. Only `tag=ethconf` is accepted for now.
+sponsorDashboardRouter.get('/opt-in-emails', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
+  try {
+    const queryTag = ((req.query.tag as string | undefined) || 'ethconf').trim().toLowerCase();
+    if (queryTag !== 'ethconf') {
+      throw new AppError('Only tag=ethconf is supported.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Auth: requireSponsorAuth already gates by tag-match for non-admins (it 403s
+    // when ?tag= doesn't match any of the user's sponsor rows). Defense in depth:
+    // ensure the resolved sponsorUser tag matches OR the caller is an admin.
+    if (!req.isAdminViewing && req.sponsorUser?.tag !== queryTag) {
+      throw new AppError('Not authorized for this tag', 403, 'FORBIDDEN');
+    }
+
+    const parties = await prisma.party.findMany({
+      where: { eventTags: { has: queryTag } },
+      select: { id: true, name: true, country: true },
+    });
+    const partyById = new Map(parties.map(p => [p.id, p]));
+
+    if (parties.length === 0) {
+      return res.json([]);
+    }
+
+    const guests = await prisma.guest.findMany({
+      where: {
+        partyId: { in: parties.map(p => p.id) },
+        email: { not: null },
+        NOT: { email: '' },
+        OR: [
+          { mailingListOptIn: true },
+          { ethconfOptIn: true },
+        ],
+      },
+      select: { email: true, partyId: true, mailingListOptIn: true, ethconfOptIn: true },
+    });
+
+    const rows = guests.map(g => {
+      const party = partyById.get(g.partyId);
+      const city = (party?.name || '').replace(/^Global Pizza Party\s*/i, '').trim();
+      return {
+        email: g.email,
+        city,
+        mailingListOptIn: g.mailingListOptIn,
+        ethconfOptIn: g.ethconfOptIn,
+      };
+    });
+
+    res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+});

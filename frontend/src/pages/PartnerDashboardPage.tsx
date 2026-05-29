@@ -8,7 +8,7 @@ import { LoginModal } from '../components/LoginModal';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote, getPartyPhotos } from '../lib/api';
+import { fetchSponsorMe, fetchSponsorEvents, toggleSponsorChecklistItem, updatePartnerEventNote, getPartyPhotos, apiRequest } from '../lib/api';
 import {
   Loader2, Shield, Tag, Users,
   Search, BarChart3, Calendar, MapPin,
@@ -306,6 +306,63 @@ export function PartnerDashboardPage() {
     a.download = `partner-events-${tagPart}-${datePart}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // crust-71429: ethconf-only — download combined PizzaDAO + ethconf opt-in
+  // email list for guests at ethconf-tagged events. Dedupes by lowercased
+  // email (OR-ing both flags, first-seen city), then builds a CSV with
+  // Email, City, Opt-In Source columns.
+  async function handleDownloadOptInEmails() {
+    try {
+      const rows = await apiRequest<Array<{
+        email: string | null;
+        city: string;
+        mailingListOptIn: boolean;
+        ethconfOptIn: boolean;
+      }>>('/api/sponsor/opt-in-emails?tag=ethconf');
+
+      const merged = new Map<string, { city: string; mailingListOptIn: boolean; ethconfOptIn: boolean }>();
+      for (const r of rows) {
+        if (!r.email) continue;
+        const key = r.email.toLowerCase();
+        const existing = merged.get(key);
+        if (existing) {
+          existing.mailingListOptIn = existing.mailingListOptIn || r.mailingListOptIn;
+          existing.ethconfOptIn = existing.ethconfOptIn || r.ethconfOptIn;
+          // keep first-seen city
+        } else {
+          merged.set(key, {
+            city: r.city,
+            mailingListOptIn: r.mailingListOptIn,
+            ethconfOptIn: r.ethconfOptIn,
+          });
+        }
+      }
+
+      const csvRows: (string | number | null | undefined)[][] = [['Email', 'City', 'Opt-In Source']];
+      for (const [email, info] of merged) {
+        let source = '';
+        if (info.mailingListOptIn && info.ethconfOptIn) source = 'Both';
+        else if (info.mailingListOptIn) source = 'Mailing List';
+        else if (info.ethconfOptIn) source = 'Ethconf';
+        csvRows.push([email, info.city, source]);
+      }
+
+      const csv = csvRows
+        .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const datePart = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `ethconf-opt-in-emails-${datePart}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to download opt-in emails');
+    }
   }
 
   async function handleToggleChecklist(eventId: string, itemId: string) {
@@ -866,6 +923,18 @@ export function PartnerDashboardPage() {
                 <Download size={14} />
                 {t('dashboard.downloadCsv')}
               </button>
+              {/* crust-71429: ethconf-only — download combined PizzaDAO + ethconf opt-in emails.
+                  Gate on dashboardData.tag (server-resolved tag) rather than selectedTag, which
+                  is undefined for non-admin single-tag partners. */}
+              {dashboardData?.tag === 'ethconf' && (
+                <button
+                  onClick={handleDownloadOptInEmails}
+                  className="inline-flex items-center gap-1.5 bg-theme-input border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text hover:border-theme-stroke-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Mail size={14} />
+                  Download Opt-In Emails
+                </button>
+              )}
             </div>
           </div>
         )}
