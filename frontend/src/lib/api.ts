@@ -4131,7 +4131,7 @@ export async function updateAdminPayout(
     note?: string;
     /**
      * lasagna-92103: previously the admin override for the acciuga-62583
-     * per-submission $650 cap. The backend admin PATCH no longer enforces
+     * per-submission $675 cap. The backend admin PATCH no longer enforces
      * the cap (admin amount is canonical), so this field is now a no-op
      * kept only for back-compat with any caller that still sets it. Safe
      * to omit.
@@ -4435,7 +4435,7 @@ export async function markPartyPaid(
  *   - mercury_card → { mercuryCardLast4: 'NNNN', mercuryCardId?: string, note?: string } REQUIRED
  *
  * `allowOverPerAddressCap` (bianco-89172): forwarded to the server to bypass
- * the per-address $651 cumulative cap when the admin has acknowledged the
+ * the per-address $676 cumulative cap when the admin has acknowledged the
  * warning in PayoutReviewModal.
  *
  * Returns the updated payout. Throws on any server-side validation/execution failure.
@@ -4493,7 +4493,7 @@ export async function bulkExecutePayouts(
 /**
  * bianco-89172: fetch the cumulative paid-USDC total for a single recipient
  * wallet, optionally with a "wouldExceed" check for a proposed additional
- * amount. Backs the per-address $651 cap warning in PayoutReviewModal +
+ * amount. Backs the per-address $676 cap warning in PayoutReviewModal +
  * BulkSendModal. Returns `wouldExceed: null` when `amount` is omitted.
  *
  * Admin-only — throws via `apiRequest` if the caller is not a payment admin.

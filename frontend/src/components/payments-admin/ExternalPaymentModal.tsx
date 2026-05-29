@@ -28,14 +28,14 @@ import { uploadPayoutPhoto } from '../../lib/supabase';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 
 /**
- * lasagna-92103: $650 is the "sane-default" per-submission soft cap. The
+ * lasagna-92103: $675 is the "sane-default" per-submission soft cap. The
  * backend admin POST /external no longer enforces it (admin amount is
  * canonical), so this constant now drives a purely informational amber
  * warning — no Checkbox, no Submit block. The USDC execute hard ceiling
  * is irrelevant for external (off-platform) payments which are already
  * settled outside our hot wallet.
  */
-const PER_SUBMISSION_MAX_USD = 650;
+const PER_SUBMISSION_MAX_USD = 675;
 
 interface ExternalPaymentModalProps {
   onClose: () => void;
@@ -147,7 +147,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
-  // lasagna-92103: typed amount exceeds the $650 soft cap. Drives the
+  // lasagna-92103: typed amount exceeds the $675 soft cap. Drives the
   // informational amber warning below — no longer blocks Submit.
   const exceedsCap =
     Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
@@ -516,7 +516,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               required
             />
             {/* lasagna-92103: informational amber heads-up when the typed
-                amount exceeds the $650 sane-default cap. NOT a gate — admin
+                amount exceeds the $675 sane-default cap. NOT a gate — admin
                 amount is canonical for external records. External payments
                 don't go through our hot wallet so the per-tx ceiling is
                 irrelevant; this is purely a visual nudge so admins notice
