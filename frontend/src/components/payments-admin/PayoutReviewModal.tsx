@@ -25,7 +25,7 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
- * lasagna-92103: $650 is the "sane-default" per-submission soft cap. The
+ * lasagna-92103: $675 is the "sane-default" per-submission soft cap. The
  * backend admin PATCH no longer enforces it (admin amount is canonical), so
  * this constant now drives a purely informational amber warning — no
  * Checkbox, no Save block. The USDC execute hard ceiling
@@ -33,7 +33,7 @@ function stripGppPrefix(name: string): string {
  * safety net at on-chain send time, but admins can split executes or record
  * external payments to handle larger sums.
  */
-const PER_SUBMISSION_MAX_USD = 650;
+const PER_SUBMISSION_MAX_USD = 675;
 
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
@@ -81,7 +81,7 @@ interface PayoutReviewModalProps {
    * For wire / mercury_card → admin-supplied refs.
    *
    * `allowOverPerAddressCap` (bianco-89172): forwarded when the admin has
-   * acknowledged the per-address $651 cap warning by ticking the override
+   * acknowledged the per-address $676 cap warning by ticking the override
    * checkbox in the execute form.
    */
   onExecute: (body: {
@@ -244,7 +244,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // lasagna-92103: `ackOverSubmissionCap` is gone — admin amount is now
   // canonical on the backend, so the modal doesn't gate Save on an
   // acknowledgement. The amber warning below stays as an informational
-  // heads-up when the typed amount exceeds the $650 sane-default cap.
+  // heads-up when the typed amount exceeds the $675 sane-default cap.
   // `saveAmountError` still renders inline below the Save button when
   // the backend (or any other failure path) rejects — wallet/method
   // validation, etc.
@@ -275,7 +275,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   >(null);
   const [usdcCapLoading, setUsdcCapLoading] = useState(false);
 
-  // bianco-89172: per-address $651 cap warning state. `walletPaidTotal` is
+  // bianco-89172: per-address $676 cap warning state. `walletPaidTotal` is
   // null until the USDC execute form opens; `overrideCap` is the admin's
   // acknowledgement of the warning (required to enable Execute when
   // `wouldExceed === true`).
@@ -472,7 +472,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       }
     }
     // bianco-89172: fetch the per-address paid-total for the recipient wallet
-    // so we can warn the admin if this payout would push past the $651 cap.
+    // so we can warn the admin if this payout would push past the $676 cap.
     if (
       payout.payoutMethod === 'usdc_base' &&
       payout.payoutWalletAddress &&
@@ -779,7 +779,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         </button>
                       </div>
                       {/* lasagna-92103: informational amber heads-up when the
-                          typed value exceeds the $650 sane-default cap. NOT a
+                          typed value exceeds the $675 sane-default cap. NOT a
                           gate — admin amount is canonical on the backend; the
                           warning is purely a visual nudge so admins notice
                           unusually large amounts before saving. */}
@@ -1273,7 +1273,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="text-emerald-800/70">Daily cap status unavailable.</span>
                       )}
                     </div>
-                    {/* bianco-89172: per-address $651 cap warning. Only shown
+                    {/* bianco-89172: per-address $676 cap warning. Only shown
                         when the proposed send would push the recipient's
                         cumulative paid total past the cap. The admin must
                         explicitly tick the override checkbox; until they do,

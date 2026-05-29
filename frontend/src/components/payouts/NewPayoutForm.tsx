@@ -12,13 +12,13 @@ import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
 
 /**
- * speck-89172: the $650 per-payment hard ceiling is still informative — USDC
- * execute still caps at $650 per tx (grana-92103, was $625), so a single
+ * speck-89172: the $675 per-payment hard ceiling is still informative — USDC
+ * execute still caps at $675 per tx (cassoeula-92103, was $650), so a single
  * oversize submission may require admin to split into multiple sends. Host
  * submission is no longer blocked; instead we render an amber warning so the
  * host knows what to expect on the admin side.
  */
-const PER_PAYMENT_HARD_CEILING_USD = 650;
+const PER_PAYMENT_HARD_CEILING_USD = 675;
 
 interface NewPayoutFormProps {
   partyId: string;
@@ -148,7 +148,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
     || (estimatedAttendance != null && estimatedAttendance > 0);
 
   // speck-89172: hosts can now submit any positive amount. The party-cap and
-  // $650 hard-ceiling checks are surfaced as non-blocking amber warnings
+  // $675 hard-ceiling checks are surfaced as non-blocking amber warnings
   // instead. Admin moderates over-cap rows from /payments.
   const effectiveCapUsd = party?.effectiveReimbursementCapUsd ?? null;
   const exceedsPartyCap =
@@ -418,8 +418,8 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       )}
 
-      {/* speck-89172: $650 hard-ceiling amber warning. USDC execute caps at
-          $650 per tx, so admin may need to split this into multiple sends. */}
+      {/* speck-89172: $675 hard-ceiling amber warning. USDC execute caps at
+          $675 per tx, so admin may need to split this into multiple sends. */}
       {exceedsHardCeiling && (
         <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
           <div className="flex items-start gap-2.5">

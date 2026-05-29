@@ -1790,7 +1790,7 @@ export interface ExternalPaymentInput {
   adminNotes: string;         // REQUIRED — must explain why this is being recorded
   /**
    * lasagna-92103: previously the admin override for the acciuga-62583
-   * per-submission $650 cap. The backend POST /external no longer enforces
+   * per-submission $675 cap. The backend POST /external no longer enforces
    * the cap (admin amount is canonical), so this field is now a no-op kept
    * only for back-compat with any caller that still sets it. Safe to omit.
    */
@@ -1948,7 +1948,7 @@ export interface AdminPayoutDetail extends AdminPayout {
 
 /**
  * bianco-89172: cumulative paid-USDC summary for a single recipient wallet.
- * Backs the per-address $651 cap warning in PayoutReviewModal + BulkSendModal.
+ * Backs the per-address $676 cap warning in PayoutReviewModal + BulkSendModal.
  * `wouldExceed` is null when no proposed `amount` was supplied to the
  * `/wallet-paid-total` endpoint; true / false when one was.
  */

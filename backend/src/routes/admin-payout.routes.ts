@@ -56,14 +56,14 @@ const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'fai
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
- * acciuga-62583: hard per-submission ceiling of $650 (grana-92103, was $625) —
+ * acciuga-62583: hard per-submission ceiling of $675 (cassoeula-92103, was $650) —
  * same value as `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the
  * USDC-execute ceiling) but enforced here at SUBMISSION time across all admin
  * create/edit paths (external POST + PATCH). No override path. Inlined here
  * per task spec — mirror of the helper in payout.routes.ts so we don't extract
  * a shared module just for two callsites.
  */
-const PER_SUBMISSION_MAX_USD = 650;
+const PER_SUBMISSION_MAX_USD = 675;
 
 function assertWithinPerSubmissionCap(amountUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
@@ -2150,7 +2150,7 @@ router.patch(
           // the admin couldn't edit it down because aglio-62584's checkbox
           // override only covered the user-typed amount, not the in-flight
           // value the modal recomputed against the bad OCR sum. Admins can
-          // always proceed; the soft $650 default is now informational in
+          // always proceed; the soft $675 default is now informational in
           // the modal. The USDC execute hard ceiling
           // (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a
           // separate safety net at on-chain send time — admins can split
@@ -2837,7 +2837,7 @@ router.get(
 // Returns cumulative paid USDC for a single recipient wallet, optionally with
 // a `wouldExceed` flag for a proposed additional amount. Backs the warning
 // panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
-// already received $Y; sending $Z more would push past the $651 per-address
+// already received $Y; sending $Z more would push past the $676 per-address
 // cap" before they fire off a duplicate payment.
 //
 // Query params:
@@ -2916,7 +2916,7 @@ async function executePayout(params: {
   };
   body: any;
   /**
-   * bianco-89172: when true, skip the per-address $651 cumulative cap
+   * bianco-89172: when true, skip the per-address $676 cumulative cap
    * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
    * the warning's acknowledgement checkbox has been ticked.
    */
@@ -3207,7 +3207,7 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
-        // bianco-89172: admin can acknowledge the per-address $651 cap
+        // bianco-89172: admin can acknowledge the per-address $676 cap
         // warning via the PayoutReviewModal checkbox; the frontend forwards
         // the flag here.
         allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
