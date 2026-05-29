@@ -40,6 +40,13 @@ const PER_SUBMISSION_MAX_USD = 675;
 interface ExternalPaymentModalProps {
   onClose: () => void;
   onCreated: () => void;
+  /**
+   * mostarda-92103: optional pre-filled search query so opening this modal
+   * from a specific city row in the by-city table seeds the party picker
+   * with the city name. Admin still has to confirm the pick from the
+   * dropdown so we don't silently stamp the wrong party.
+   */
+  initialQuery?: string;
 }
 
 type ExternalMethod = PayoutMethod | 'other';
@@ -59,6 +66,7 @@ type ExternalMethod = PayoutMethod | 'other';
 export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   onClose,
   onCreated,
+  initialQuery,
 }) => {
   // Party picker state — `selectedParty` is the source of truth for partyId +
   // the list of host candidates. `recipientUserId` is the chosen userId within
@@ -71,7 +79,10 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   const [recipientUserId, setRecipientUserId] = useState<string>('');
   const [recipientEmailInput, setRecipientEmailInput] = useState('');
 
-  const [partyQuery, setPartyQuery] = useState('');
+  // mostarda-92103: seed the party picker with the caller-provided query so
+  // the by-city "Add external payment" action lands on a populated search
+  // result list instead of an empty picker.
+  const [partyQuery, setPartyQuery] = useState(initialQuery ?? '');
   const [partyResults, setPartyResults] = useState<ApprovedPartySearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);

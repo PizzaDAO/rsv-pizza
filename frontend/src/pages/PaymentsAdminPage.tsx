@@ -189,8 +189,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // CSV export
   const [exporting, setExporting] = useState(false);
 
-  // External payment modal (arugula-38633 v2 follow-up)
-  const [showExternalModal, setShowExternalModal] = useState(false);
+  // External payment modal (arugula-38633 v2 follow-up).
+  // mostarda-92103: when opened from a city row in the by-city table, the
+  // initial-query prefills the party picker with the city name so the admin
+  // doesn't have to re-type it.
+  const [externalModalState, setExternalModalState] = useState<
+    | { open: false }
+    | { open: true; initialQuery?: string }
+  >({ open: false });
 
   // bismarck-92103: prepay queue + the "Create prepayment" modal target row.
   const [prepayQueue, setPrepayQueue] = useState<PrepayQueueRow[]>([]);
@@ -783,7 +789,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           {!isUnderboss && (
             <button
               type="button"
-              onClick={() => setShowExternalModal(true)}
+              onClick={() => setExternalModalState({ open: true })}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
             >
               <Plus size={14} />
@@ -986,6 +992,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 partyId,
                 partyNameHint: row?.party.name ?? '',
               });
+            }}
+            // mostarda-92103: city-level "Add external payment" — opens the
+            // ExternalPaymentModal with the city name seeded in the party
+            // picker so the admin can confirm-and-go. Admin-only via the
+            // viewerRole gate on the menu.
+            onAddExternalPayment={(_partyId, partyName) => {
+              // The picker searches by name, not id — strip the GPP prefix
+              // off so the search matches the visible label cleanly.
+              const seed = partyName.replace(/^Global Pizza Party\s+/i, '');
+              setExternalModalState({ open: true, initialQuery: seed });
             }}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
@@ -1273,10 +1289,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             }}
           />
         )}
-        {showExternalModal && (
+        {externalModalState.open && (
           <ExternalPaymentModal
-            onClose={() => setShowExternalModal(false)}
+            onClose={() => setExternalModalState({ open: false })}
             onCreated={() => refresh()}
+            initialQuery={externalModalState.initialQuery}
           />
         )}
 
