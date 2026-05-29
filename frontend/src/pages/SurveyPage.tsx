@@ -150,7 +150,7 @@ function SurveyPageInner() {
         <title>{data ? `Survey · ${data.eventName}` : 'Survey'} | RSV.Pizza</title>
       </Helmet>
       <div className="max-w-2xl mx-auto px-4 py-10">
-        <div className="mb-8 text-center">
+        <div className="card p-5 mb-6 text-center">
           <h1 className="text-3xl font-bold text-theme-text mb-1">
             How was {data?.eventName}?
           </h1>
