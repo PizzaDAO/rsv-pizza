@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
 import { OcrPreviewResult } from '../../types';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 export interface ReceiptItem {
   /** Stable client-side id for React keys. */
@@ -76,7 +77,14 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       onChange(nextItems);
 
       try {
-        const ocr = await previewReceiptOCR(partyId, uploaded.url);
+        // bocconcino-92104: PDFs can't be OCR'd directly by gpt-4o vision
+        // (image-only). Hand the OCR pipeline the convention-derived
+        // `.thumb.png` rendered at upload time instead. The backend uses the
+        // same derivation in its ocr-preview / POST /payouts handlers.
+        const ocrUrl = uploaded.mimeType === 'application/pdf'
+          ? derivePdfThumbnailUrl(uploaded.url)
+          : uploaded.url;
+        const ocr = await previewReceiptOCR(partyId, ocrUrl);
         nextItems = updateItem(nextItems, itemId, { status: 'done', ocr });
         onChange(nextItems);
       } catch (err: any) {
@@ -120,7 +128,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
           multiple
           className="hidden"
           onChange={e => {
@@ -135,7 +143,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
             : 'Drop receipts here, or click to choose files'}
         </p>
         <p className="text-xs text-theme-text-muted mt-1">
-          {remaining > 0 && `Up to ${remaining} more — JPEG, PNG, WebP, HEIC.`}
+          {remaining > 0 && `Up to ${remaining} more — JPEG, PNG, WebP, HEIC, PDF.`}
         </p>
       </div>
 
@@ -146,13 +154,8 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
               key={item.id}
               className="flex items-center gap-3 p-3 rounded-xl bg-theme-surface-hover"
             >
-              <div className="w-12 h-12 rounded-md overflow-hidden bg-theme-surface flex-shrink-0 flex items-center justify-center">
-                {item.url ? (
-                  <img src={item.url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <ReceiptIcon size={20} className="text-theme-text-muted" />
-                )}
-              </div>
+              <ReceiptThumb item={item} />
+
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-theme-text truncate">{item.fileName}</p>
@@ -234,3 +237,36 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 function updateItem(items: ReceiptItem[], id: string, patch: Partial<ReceiptItem>): ReceiptItem[] {
   return items.map(it => (it.id === id ? { ...it, ...patch } : it));
 }
+
+/**
+ * bocconcino-92104: small thumbnail component for an in-progress upload. PDFs
+ * try the convention-derived `.thumb.png`; if that 404s (thumbnail upload
+ * failed at upload time, or the bucket allowlist hasn't been extended yet),
+ * we fall back to a generic PDF icon. Local error state so the icon only
+ * appears after the <img> definitively fails.
+ */
+const ReceiptThumb: React.FC<{ item: ReceiptItem }> = ({ item }) => {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const isPdf = isPdfFile(item);
+
+  return (
+    <div className="relative w-12 h-12 rounded-md overflow-hidden bg-theme-surface flex-shrink-0 flex items-center justify-center">
+      {!item.url ? (
+        <ReceiptIcon size={20} className="text-theme-text-muted" />
+      ) : isPdf ? (
+        thumbFailed ? (
+          <FileText size={20} className="text-theme-text-muted" aria-label="PDF receipt" />
+        ) : (
+          <img
+            src={derivePdfThumbnailUrl(item.url)}
+            alt=""
+            className="w-full h-full object-cover"
+            onError={() => setThumbFailed(true)}
+          />
+        )
+      ) : (
+        <img src={item.url} alt="" className="w-full h-full object-cover" />
+      )}
+    </div>
+  );
+};

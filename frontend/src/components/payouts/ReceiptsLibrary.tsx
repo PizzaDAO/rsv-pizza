@@ -5,6 +5,7 @@ import type { ReceiptLibraryEntry } from '../../types';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 import { ReceiptLightbox } from '../payments-shared';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 interface ReceiptsLibraryProps {
   partyId: string;
@@ -117,7 +118,8 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
         <ul className="divide-y divide-theme-stroke">
           {receipts.map((r, idx) => {
             const isVideo = isVideoFile(r);
-            const isImage = !isVideo && (r.mimeType || '').startsWith('image/');
+            const isPdf = !isVideo && isPdfFile(r);
+            const isImage = !isVideo && !isPdf && (r.mimeType || '').startsWith('image/');
             const formattedDate = new Date(r.createdAt).toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'short',
@@ -165,6 +167,13 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                       className="w-12 h-12 object-cover block"
                       loading="lazy"
                     />
+                  ) : isPdf ? (
+                    /* bocconcino-92104: PDFs render via the convention-derived
+                       `.thumb.png` sibling (uploaded client-side when the PDF
+                       was first attached). If the thumbnail is missing (pre-
+                       bocconcino rows, render failed), fall back to a generic
+                       PDF icon via the broken-image swap. */
+                    <PdfThumb url={r.url} fileName={r.fileName} />
                   ) : (
                     <div className="w-12 h-12 bg-theme-surface-hover flex items-center justify-center">
                       <FileText size={20} className="text-theme-text-secondary" />
@@ -208,5 +217,31 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
         onClose={() => setLightboxState({ open: false, initialIndex: 0 })}
       />
     </div>
+  );
+};
+
+/**
+ * bocconcino-92104: thumbnail slot for PDF receipts. Tries the derived
+ * `.thumb.png` sibling first; on 404 (thumbnail upload failed or row
+ * predates bocconcino-92104), swaps to a generic PDF icon so the list
+ * still renders cleanly.
+ */
+const PdfThumb: React.FC<{ url: string; fileName: string }> = ({ url, fileName }) => {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="w-12 h-12 bg-theme-surface-hover flex items-center justify-center">
+        <FileText size={20} className="text-theme-text-secondary" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={derivePdfThumbnailUrl(url)}
+      alt={fileName}
+      className="w-12 h-12 object-cover block"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 };

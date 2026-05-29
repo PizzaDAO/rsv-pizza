@@ -2,6 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { isPdfFile } from '../../lib/pdfUtils';
 
 /**
  * bresaola-89172: focused full-screen overlay for receipt / pizza-photo
@@ -102,6 +103,11 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   // under browser policy; `playsInline` keeps mobile from kicking into the
   // fullscreen video shell.
   const video = !heic && isVideoFile(current);
+  // bocconcino-92104: PDF receipts render via <embed> so admins / hosts can
+  // scroll multi-page receipts (vendor scans often include itemization on
+  // pages 2+). Falls back to a download link for browsers without a native
+  // PDF viewer.
+  const pdf = !heic && !video && isPdfFile(current);
 
   return createPortal(
     <div
@@ -194,6 +200,27 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             playsInline
             className="max-h-[90vh] max-w-[90vw]"
           />
+        ) : pdf ? (
+          /* bocconcino-92104: embedded native PDF viewer (Chrome/Edge/Safari/
+             Firefox all support this). Keyed on URL so arrow-nav across the
+             carousel remounts the embed with the new source instead of
+             caching the previous file. Sized to match other media slots. */
+          <div className="relative w-[90vw] h-[90vh] bg-white rounded-md overflow-hidden">
+            <embed
+              key={current.url}
+              src={current.url}
+              type="application/pdf"
+              className="w-full h-full"
+            />
+            <a
+              href={current.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-2 right-2 inline-flex items-center gap-1.5 text-xs bg-black/60 text-white rounded-full px-2.5 py-1 hover:bg-black/80"
+            >
+              Open in new tab <ExternalLink size={12} />
+            </a>
+          </div>
         ) : (
           <img
             src={current.url}

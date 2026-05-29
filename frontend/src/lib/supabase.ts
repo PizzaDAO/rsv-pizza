@@ -14,6 +14,7 @@ import {
 import { uuid } from './utils';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
 import type { HostGoals } from '../types';
+import { renderPdfPageOneToPng } from './pdfUtils';
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -323,7 +324,15 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
  * structure without updating `assertSupabasePayoutUrl` in
  * `backend/src/routes/payout.routes.ts`.
  *
- * @param file       The image file (JPEG / PNG / WebP / HEIC)
+ * bocconcino-92104: receipts also accept `application/pdf`. On PDF upload we
+ * render page 1 to a PNG client-side via pdfjs-dist and upload it as a
+ * sibling object at `<path>.thumb.png`. The PNG is what we feed to the OCR
+ * pipeline (gpt-4o vision is image-only) and what the receipt thumbnails
+ * render via `<img>` in PayoutReviewModal / PayoutDetailModal / ReceiptsLibrary.
+ * The original PDF stays the canonical URL; the lightbox renders it via
+ * `<embed>` for full-fidelity review.
+ *
+ * @param file       The image file (JPEG / PNG / WebP / HEIC) or PDF (receipt only)
  * @param partyId    The party we're submitting a payout against
  * @param payoutTempId  A client-generated id to group files for one in-progress submission
  * @param kind       'pizza' or 'receipt' — drives OCR behavior server-side
@@ -339,7 +348,12 @@ export async function uploadPayoutPhoto(
   fileSize: number;
   mimeType: string;
 } | null> {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  // bocconcino-92104: receipts accept PDF in addition to image MIMEs. Pizza
+  // photos remain image-only (PDFs make no sense as a pizza shot).
+  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  const allowedTypes = kind === 'receipt'
+    ? [...allowedImageTypes, 'application/pdf']
+    : allowedImageTypes;
   if (!allowedTypes.includes(file.type)) {
     console.error('Invalid file type for payout photo:', file.type);
     return null;
@@ -368,6 +382,36 @@ export async function uploadPayoutPhoto(
     const { data: urlData } = supabase.storage
       .from('event-images')
       .getPublicUrl(path);
+
+    // bocconcino-92104: for PDF receipts, also render page 1 to a PNG and
+    // upload it as a sibling at `<path>.thumb.png`. Convention-based path so
+    // the backend OCR pipeline + display sites can derive the thumbnail URL
+    // without a database column (avoids the 7-place field-add gauntlet).
+    // Failures here aren't fatal — we still return the PDF URL so the host's
+    // submit attempt isn't blocked. They'll see the PDF in the lightbox but
+    // OCR may fall back to "no thumbnail" on the server.
+    if (kind === 'receipt' && file.type === 'application/pdf') {
+      try {
+        const thumbBlob = await renderPdfPageOneToPng(file);
+        if (thumbBlob) {
+          const thumbPath = `${path}.thumb.png`;
+          const { error: thumbErr } = await supabase.storage
+            .from('event-images')
+            .upload(thumbPath, thumbBlob, {
+              cacheControl: '3600',
+              upsert: false,
+              contentType: 'image/png',
+            });
+          if (thumbErr) {
+            console.warn('PDF thumbnail upload failed (continuing without):', thumbErr);
+          }
+        } else {
+          console.warn('PDF page-1 render returned null (continuing without thumbnail)');
+        }
+      } catch (thumbErr) {
+        console.warn('PDF thumbnail generation error (continuing without):', thumbErr);
+      }
+    }
 
     return {
       url: urlData.publicUrl,

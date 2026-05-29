@@ -150,6 +150,27 @@ function numberFromDecimal(d: any): number {
  *   https://<project>.supabase.co/storage/v1/object/public/event-images/payouts/<partyId>/...
  * and the raw object form too.
  */
+/**
+ * bocconcino-92104: receipts can now be PDFs. The OCR pipeline (gpt-4o
+ * vision) is image-only, so for PDFs the frontend uploads a sibling
+ * `.thumb.png` rendered client-side from page 1; we feed that to OCR.
+ *
+ * This helper returns the URL suitable for OCR consumption — the PNG thumb
+ * for PDFs, or the canonical URL for images. The display logic uses the
+ * same convention via `frontend/src/lib/pdfUtils.ts`.
+ *
+ * If the file is a PDF but no thumbnail was uploaded (e.g. client-side
+ * pdfjs render failed), the OCR call will 404 on fetch and we'll persist
+ * the receipt with an ocrError — the host can still attach it and fix the
+ * amount manually.
+ */
+function deriveOcrUrl(doc: { url: string; mimeType?: string | null }): string {
+  const mime = (doc.mimeType || '').toLowerCase();
+  const looksLikePdf =
+    mime === 'application/pdf' || doc.url.toLowerCase().split('?')[0].endsWith('.pdf');
+  return looksLikePdf ? `${doc.url}.thumb.png` : doc.url;
+}
+
 function assertSupabasePayoutUrl(imageUrl: string, partyId: string): void {
   let url: URL;
   try {
@@ -836,7 +857,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       : await Promise.allSettled(
           (receiptPhotos as IncomingDocument[]).map(async (r) => {
             try {
-              const ocr = await analyzeReceipt({ imageUrl: r.url, partyCountry });
+              // bocconcino-92104: PDFs are OCR'd via their `.thumb.png` sibling.
+              const ocr = await analyzeReceipt({
+                imageUrl: deriveOcrUrl(r),
+                partyCountry,
+              });
               const fx = await convertToUSD(ocr.amount, ocr.currency);
               return { ok: true as const, doc: r, ocr, fx };
             } catch (err: any) {
@@ -1570,8 +1595,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       : await Promise.allSettled(
           newReceipts.map(async (r) => {
             try {
+              // bocconcino-92104: PDFs are OCR'd via their `.thumb.png` sibling.
               const ocr = await analyzeReceipt({
-                imageUrl: r.url,
+                imageUrl: deriveOcrUrl(r),
                 partyCountry: patchPartyCountry,
               });
               const fx = await convertToUSD(ocr.amount, ocr.currency);
