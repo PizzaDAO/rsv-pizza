@@ -24,6 +24,12 @@ import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
+import { SouthAfricaPaymentsPage } from './pages/SouthAfricaPaymentsPage';
+import { AfricaPaymentsPage } from './pages/AfricaPaymentsPage';
+import { NaPaymentsPage } from './pages/NaPaymentsPage';
+import { EuropePaymentsPage } from './pages/EuropePaymentsPage';
+import { IndiaPaymentsPage } from './pages/IndiaPaymentsPage';
+import { AsiaPaymentsPage } from './pages/AsiaPaymentsPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
@@ -81,6 +87,15 @@ function App() {
                 underboss. Wraps PaymentsAdminPage with regionFilter +
                 portalSlug. Must come before /:slug. */}
             <Route path="/payments/latam" element={<LatamPaymentsPage />} />
+            {/* tortelli-92103: regional /payments/<region> portals for the
+                rest of the UB regional split. Each wraps PaymentsAdminPage
+                with a fixed regionFilter + portalSlug. Must come before /:slug. */}
+            <Route path="/payments/southafrica" element={<SouthAfricaPaymentsPage />} />
+            <Route path="/payments/africa" element={<AfricaPaymentsPage />} />
+            <Route path="/payments/na" element={<NaPaymentsPage />} />
+            <Route path="/payments/europe" element={<EuropePaymentsPage />} />
+            <Route path="/payments/india" element={<IndiaPaymentsPage />} />
+            <Route path="/payments/asia" element={<AsiaPaymentsPage />} />
             {/* margherita-43821: /photos public global feed; must come before /:slug */}
             <Route path="/photos" element={<PhotosFeedPage />} />
             <Route path="/account" element={<AccountPage />} />
