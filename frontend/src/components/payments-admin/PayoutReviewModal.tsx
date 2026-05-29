@@ -1066,9 +1066,30 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             <span className="text-xs text-red-600">{r.ocrError}</span>
                           ) : r.ocrAmount != null && r.ocrCurrency ? (
                             <>
+                              {/* mortadella-92103: ocrAmount is the USD-converted
+                                  value. Render the original-currency amount as
+                                  a secondary pill when we have it on the doc,
+                                  so admins can see exactly what each receipt
+                                  was converted from. Falls back to just USD
+                                  for pre-mortadella rows that lack the columns. */}
                               <span className="text-theme-text font-medium">
-                                {formatOriginalCurrency(Number(r.ocrAmount), r.ocrCurrency)}
+                                ${Number(r.ocrAmount).toFixed(2)} USD
                               </span>
+                              {r.originalAmount != null
+                                && r.originalCurrency
+                                && r.originalCurrency.toUpperCase() !== 'USD' && (
+                                <span
+                                  className="text-xs text-theme-text-faint"
+                                  title={
+                                    r.exchangeRate != null
+                                      ? `1 ${r.originalCurrency} = $${Number(r.exchangeRate).toFixed(6)} USD`
+                                      : undefined
+                                  }
+                                >
+                                  ({formatOriginalCurrency(Number(r.originalAmount), r.originalCurrency)}
+                                  {r.exchangeRate != null && ` @ ${Number(r.exchangeRate).toFixed(4)}`})
+                                </span>
+                              )}
                               <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
                                 {(conf * 100).toFixed(0)}%
                               </span>
@@ -1088,11 +1109,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   })}
                 </ul>
                 <div className="text-xs text-theme-text-muted mt-2 border-t border-theme-stroke pt-2">
-                  Sum of OCR amounts (in their own currencies, not normalized): {ocrSum.toFixed(2)}
+                  {/* mortadella-92103: ocrAmount is now USD (post-fix). Old
+                      rows uploaded pre-mortadella may have non-USD amounts
+                      stamped as USD — the backfill script corrects those. */}
+                  Sum of OCR amounts (USD): ${ocrSum.toFixed(2)}
                   {canEditReceipts && (
                     <span className="block mt-1 text-theme-text-faint">
                       Editing a receipt's OCR amount or currency here updates the document only —
                       use the Edit Amount affordance on the payment itself to change the final USD total.
+                      Changing the currency re-runs FX automatically using the receipt's original amount.
                     </span>
                   )}
                 </div>

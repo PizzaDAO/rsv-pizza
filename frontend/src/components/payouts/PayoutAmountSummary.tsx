@@ -19,8 +19,13 @@ export const PayoutAmountSummary: React.FC<PayoutAmountSummaryProps> = ({
   overrideAmount,
   onOverrideChange,
 }) => {
+  // mortadella-92103: exclude unresolved-currency receipts from the sum so
+  // the host can see at a glance that they need to pick a currency before
+  // the receipt counts. `r.ocr.amount` is USD-converted (see OcrPreviewResult).
   const ocrSum = receipts
-    .filter(r => r.status === 'done' && r.ocr)
+    .filter(r =>
+      r.status === 'done' && r.ocr && r.ocr.ocrError !== 'CURRENCY_UNRESOLVED'
+    )
     .reduce((sum, r) => sum + (r.ocr?.amount ?? 0), 0);
 
   const lowConfidenceCount = receipts.filter(

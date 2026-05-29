@@ -39,8 +39,12 @@ export interface OcrLineItem {
 }
 
 export interface OcrResult {
+  // mortadella-92103: currency can now be null when the receipt is ambiguous
+  // (`$` symbol with no surrounding country/locale hint). Callers must treat
+  // a null currency as "do not auto-convert" — `convertToUSD` will return
+  // CURRENCY_UNRESOLVED instead of a passthrough.
   amount: number;
-  currency: string;
+  currency: string | null;
   confidence: number;
   items?: string[];
   // formaggi-89172: new — structured line items + merchant/date for analytics.
@@ -50,10 +54,45 @@ export interface OcrResult {
   raw: unknown;
 }
 
-const SYSTEM_PROMPT = `You are a receipt analysis assistant. Extract the total amount and per-line items from the receipt image.
+// mortadella-92103: ISO-2 country → primary ISO-4217 currency. Used as a
+// strong currency prior when the receipt symbol is ambiguous (most LATAM
+// countries use `$`, which OCR otherwise misreads as USD). Keep this list
+// conservative — only include codes where there's a single dominant
+// currency. Multi-currency regions (EU members → EUR is fine; UA → UAH is
+// fine; but countries with significant dollarization like Lebanon are
+// intentionally omitted).
+export const COUNTRY_TO_PRIMARY_CURRENCY: Record<string, string> = {
+  // North America
+  US: 'USD', CA: 'CAD', MX: 'MXN',
+  // LATAM (the actual problem set — `$` ambiguity)
+  AR: 'ARS', BO: 'BOB', BR: 'BRL', CL: 'CLP', CO: 'COP', CR: 'CRC',
+  DO: 'DOP', EC: 'USD', GT: 'GTQ', HN: 'HNL', NI: 'NIO', PA: 'USD',
+  PE: 'PEN', PY: 'PYG', SV: 'USD', UY: 'UYU', VE: 'VES',
+  // Eurozone (EUR — €, but receipts in some regions still use `$` or `S`)
+  AT: 'EUR', BE: 'EUR', CY: 'EUR', DE: 'EUR', EE: 'EUR', ES: 'EUR',
+  FI: 'EUR', FR: 'EUR', GR: 'EUR', HR: 'EUR', IE: 'EUR', IT: 'EUR',
+  LT: 'EUR', LU: 'EUR', LV: 'EUR', MT: 'EUR', NL: 'EUR', PT: 'EUR',
+  SI: 'EUR', SK: 'EUR',
+  // Rest of Europe
+  GB: 'GBP', CH: 'CHF', NO: 'NOK', SE: 'SEK', DK: 'DKK', IS: 'ISK',
+  PL: 'PLN', CZ: 'CZK', HU: 'HUF', RO: 'RON', BG: 'BGN', RS: 'RSD',
+  UA: 'UAH', TR: 'TRY',
+  // Asia-Pacific
+  CN: 'CNY', JP: 'JPY', KR: 'KRW', IN: 'INR', ID: 'IDR', MY: 'MYR',
+  PH: 'PHP', SG: 'SGD', TH: 'THB', VN: 'VND', TW: 'TWD', HK: 'HKD',
+  AU: 'AUD', NZ: 'NZD', PK: 'PKR', BD: 'BDT', LK: 'LKR',
+  // Middle East
+  AE: 'AED', SA: 'SAR', IL: 'ILS', QA: 'QAR', KW: 'KWD', BH: 'BHD',
+  // Africa
+  EG: 'EGP', NG: 'NGN', ZA: 'ZAR', KE: 'KES', GH: 'GHS', MA: 'MAD',
+  TN: 'TND', ET: 'ETB', UG: 'UGX', TZ: 'TZS',
+};
+
+function buildSystemPrompt(partyCountry?: string | null): string {
+  const base = `You are a receipt analysis assistant. Extract the total amount and per-line items from the receipt image.
 Return ONLY a JSON object with these fields:
 - amount: number (the total amount paid, as a decimal number)
-- currency: string (USD, EUR, INR, etc. - default to USD if unclear)
+- currency: string (USD, EUR, INR, etc. - the ISO-4217 code as printed/implied by the receipt). If the currency is genuinely ambiguous (e.g. just a "$" symbol with no surrounding country/locale hint and no party-country prior), return "UNKNOWN". DO NOT default to USD when uncertain — "UNKNOWN" is correct.
 - confidence: number (0-1, your confidence in the total extraction)
 - merchant: string (restaurant/store name if visible, else null)
 - receiptDate: string (YYYY-MM-DD if visible, else null)
@@ -71,6 +110,19 @@ Use your best judgment for category. Default "other".
 If the receipt is unreadable, return lineItems: [] and confidence: 0.
 
 Always return valid JSON.`;
+
+  // mortadella-92103: country prior. When the host's event has a known country
+  // and that country has a single dominant ISO-4217 currency, prefer it for
+  // ambiguous-symbol receipts (the `$` problem in MX/AR/CL/CO/UY/...).
+  const code = typeof partyCountry === 'string'
+    ? partyCountry.trim().toUpperCase().slice(0, 2)
+    : '';
+  const primary = code ? COUNTRY_TO_PRIMARY_CURRENCY[code] : undefined;
+  if (code && primary) {
+    return `${base}\n\nContext: this receipt is from ${code}; the primary currency in ${code} is ${primary}. If the printed currency symbol is ambiguous (e.g. just "$"), prefer ${primary}. Only return USD if the receipt clearly shows USD (e.g. "USD", "US$", or an unambiguous US-based merchant).`;
+  }
+  return base;
+}
 
 /**
  * Fetch an image from a public URL and convert to a base64 data URL.
@@ -135,13 +187,25 @@ function sanitizeLineItems(raw: unknown): OcrLineItem[] {
  * Throws on network/auth/parse errors. Callers (e.g. the bulk endpoint) should
  * wrap in `Promise.allSettled` so one bad receipt doesn't fail the whole batch.
  */
-export async function analyzeReceipt(imageUrl: string): Promise<OcrResult> {
+/**
+ * mortadella-92103: now accepts an optional `partyCountry` (ISO-2). When the
+ * receipt symbol is ambiguous, the country prior steers OCR toward the local
+ * primary currency instead of silently defaulting to USD.
+ *
+ * Back-compat shim: callers passing a string (legacy `analyzeReceipt(url)`)
+ * still work — the function accepts either a string or `{ imageUrl, partyCountry }`.
+ */
+export async function analyzeReceipt(
+  arg: string | { imageUrl: string; partyCountry?: string | null },
+): Promise<OcrResult> {
+  const imageUrl = typeof arg === 'string' ? arg : arg.imageUrl;
+  const partyCountry = typeof arg === 'string' ? null : (arg.partyCountry ?? null);
   const base64Image = await imageUrlToBase64DataUrl(imageUrl);
 
   const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildSystemPrompt(partyCountry) },
       {
         role: 'user',
         content: [
@@ -170,12 +234,21 @@ export async function analyzeReceipt(imageUrl: string): Promise<OcrResult> {
 
   // Validate minimum shape
   const amount = typeof parsed.amount === 'number' ? parsed.amount : Number(parsed.amount);
-  const currency = typeof parsed.currency === 'string' && parsed.currency.length > 0
-    ? parsed.currency
-    : 'USD';
-  const confidence = typeof parsed.confidence === 'number'
+  // mortadella-92103: do NOT default to USD on ambiguity. When the model
+  // returns missing/empty/'UNKNOWN' currency, surface `null` so the caller
+  // refuses to auto-convert (CURRENCY_UNRESOLVED on the doc; admin/host must
+  // pick the correct code via the override dropdown).
+  const rawCurrency = typeof parsed.currency === 'string' ? parsed.currency.trim() : '';
+  const currency: string | null =
+    rawCurrency.length === 0 || rawCurrency.toUpperCase() === 'UNKNOWN'
+      ? null
+      : rawCurrency;
+  const modelConfidence = typeof parsed.confidence === 'number'
     ? Math.max(0, Math.min(1, parsed.confidence))
     : 0;
+  // Clamp confidence to 0.49 when currency is unresolved so the UI consistently
+  // surfaces it as "low" and asks for review.
+  const confidence = currency === null ? Math.min(modelConfidence, 0.49) : modelConfidence;
 
   if (!Number.isFinite(amount)) {
     throw new Error(`OpenAI returned non-numeric amount: ${JSON.stringify(parsed)}`);

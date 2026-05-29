@@ -132,10 +132,24 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // mortadella-92103: exclude receipts whose currency couldn't be resolved
+  // (the `$` ambiguity in non-USD countries) from the auto-sum. They keep
+  // their preview row but aren't counted until the host picks a currency
+  // via CurrencyOverrideSelect. The amber notice below tells the host what
+  // to do. `r.ocr.amount` is USD-converted (see OcrPreviewResult).
   const ocrSum = useMemo(
     () => receipts
-      .filter(r => r.status === 'done' && r.ocr)
+      .filter(r => r.status === 'done' && r.ocr && r.ocr.ocrError !== 'CURRENCY_UNRESOLVED')
       .reduce((sum, r) => sum + (r.ocr?.amount ?? 0), 0),
+    [receipts]
+  );
+  // mortadella-92103: count of unresolved-currency receipts so we can show
+  // a single amber notice rather than per-row warnings (the per-receipt
+  // row already shows its low-confidence state via the dropdown).
+  const unresolvedReceiptCount = useMemo(
+    () => receipts.filter(r =>
+      r.status === 'done' && r.ocr && r.ocr.ocrError === 'CURRENCY_UNRESOLVED'
+    ).length,
     [receipts]
   );
   const finalAmount = overrideAmount != null ? overrideAmount : ocrSum;
@@ -401,6 +415,23 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       {submitError && (
         <div className="card p-4 border-red-500/40 bg-red-500/10 text-sm text-red-300">
           {submitError}
+        </div>
+      )}
+
+      {/* mortadella-92103: amber notice when one or more receipts have an
+          unresolved currency (OCR returned $ without a strong country prior).
+          The auto-sum excludes those receipts until the host picks a code via
+          the per-row CurrencyOverrideSelect dropdown. */}
+      {unresolvedReceiptCount > 0 && (
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-100">
+              {unresolvedReceiptCount === 1
+                ? "1 receipt's currency could not be detected. Use the currency picker on that row to set the correct currency — it isn't counted in the total yet."
+                : `${unresolvedReceiptCount} receipts' currencies could not be detected. Use the currency picker on those rows — they aren't counted in the total yet.`}
+            </div>
+          </div>
         </div>
       )}
 

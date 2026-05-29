@@ -1659,6 +1659,13 @@ export interface PayoutDocument {
   ocrAmount: number | null;
   ocrCurrency: string | null;
   ocrConfidence: number | null;
+  // mortadella-92103: per-receipt FX persistence. Drives the reviewer pill
+  // ("$X.YZ USD (1234.56 MXN @ rate)") so admins can see exactly what each
+  // receipt was converted from. All three are null on rows uploaded before
+  // mortadella-92103 — those rely on the parent payout's headline FX.
+  originalAmount?: number | null;
+  originalCurrency?: string | null;
+  exchangeRate?: number | null;
   ocrError: string | null;
   sortOrder: number;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows
@@ -2091,15 +2098,22 @@ export interface PrepayQueueRow {
 }
 
 export interface OcrPreviewResult {
-  amount: number;             // USD-converted total
+  amount: number;             // USD-converted total (0 when ocrError='CURRENCY_UNRESOLVED')
   currency: 'USD';
   originalAmount: number;
   originalCurrency: string;
   exchangeRate: number;
   confidence: number;
   items?: string[];
-  fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
+  // mortadella-92103: 'unresolved' is the new source for "OCR could not
+  // determine currency and no country prior was strong enough to pick one
+  // automatically". Host must override via CurrencyOverrideSelect.
+  fxSource: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown' | 'unresolved';
   conversionNote?: string;
+  // mortadella-92103: 'CURRENCY_UNRESOLVED' when OCR couldn't pick a code
+  // and FX refused to passthrough. Frontend should surface a warning and
+  // exclude the receipt from the auto-sum.
+  ocrError?: string | null;
 }
 
 /**
