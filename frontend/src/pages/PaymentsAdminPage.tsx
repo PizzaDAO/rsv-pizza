@@ -12,6 +12,7 @@ import {
   approveAdminPayout,
   rejectAdminPayout,
   unapproveAdminPayout,
+  revertPaidAdminPayout,
   updateAdminPayout,
   markAdminPayoutPaid,
   executeAdminPayout,
@@ -1080,6 +1081,41 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await Promise.all([refresh(), loadPrepayQueue()]);
+                return;
+              } catch (err: any) {
+                return err?.message || 'Revert failed';
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            // culatello-92103: revert a paid payout back to approved. Works
+            // for every payout method (USDC, wire, mercury_card, external,
+            // off-platform). Stays-open + refreshes the same way unapprove
+            // does so the admin can immediately re-execute / re-mark-paid.
+            // Toast on success surfaces the method so the admin can confirm
+            // the right row reverted.
+            onRevertPaid={async () => {
+              setModalBusy(true);
+              try {
+                const priorMethod = detail.payoutMethod;
+                await revertPaidAdminPayout(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
+                setDetail(fresh);
+                await Promise.all([refresh(), loadPrepayQueue()]);
+                const m = fresh.payoutMethod ?? priorMethod;
+                const methodLabel =
+                  m === 'usdc_base'
+                    ? 'USDC'
+                    : m === 'wire'
+                      ? 'wire'
+                      : m === 'mercury_card'
+                        ? 'Mercury card'
+                        : m === 'external'
+                          ? 'external'
+                          : m === 'off_platform'
+                            ? 'off-platform'
+                            : (m ?? 'external');
+                pushToast(`Reverted ${methodLabel} payment to approved status`, 'success');
                 return;
               } catch (err: any) {
                 return err?.message || 'Revert failed';

@@ -60,6 +60,22 @@ interface PayoutReviewModalProps {
    */
   onUnapprove?: () => Promise<string | void> | string | void;
   /**
+   * culatello-92103: revert a `paid` payout back to `approved`. Surfaced as
+   * an amber "Revert to Approved" button in the modal footer when the
+   * current status is `paid`. Works for every payout method (USDC, wire,
+   * mercury_card, external, off-platform) — previously there was no UI
+   * affordance to undo a `mark-paid` after the fact.
+   *
+   * Mirrors `onUnapprove`'s contract: returns a string error message (NOT
+   * throws) when the call fails so the modal can surface it inline;
+   * resolves to `undefined` on success.
+   *
+   * Surfaces a one-step confirm before firing — the action clears
+   * paidAt + tx metadata (preserving the audit trail) and the parent will
+   * normally re-fetch the row, so a misclick is recoverable but unwanted.
+   */
+  onRevertPaid?: () => Promise<string | void> | string | void;
+  /**
    * lasagna-92103: backend admin PATCH no longer enforces the per-submission
    * cap, so `allowOverSubmissionCap` is no longer forwarded by this modal.
    * The signature still accepts the field for back-compat with parents that
@@ -170,6 +186,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onApprove,
   onReject,
   onUnapprove,
+  onRevertPaid,
   onSaveAmount,
   onSaveAdminNotes,
   onMarkPaid,
@@ -271,6 +288,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // caprino-92103: inline error for "Revert to Pending". Rendered below the
   // footer button row. Mirrors the saveAmountError pattern from aglio-62584.
   const [unapproveError, setUnapproveError] = useState<string | null>(null);
+
+  // culatello-92103: inline error + confirm gate for "Revert to Approved"
+  // (paid -> approved). Confirm is a one-click ack so the admin doesn't
+  // accidentally drop the historical mark-paid record.
+  const [revertPaidError, setRevertPaidError] = useState<string | null>(null);
+  const [revertPaidConfirming, setRevertPaidConfirming] = useState(false);
 
   const [showMarkPaidForm, setShowMarkPaidForm] = useState(false);
   const [wireRef, setWireRef] = useState('');
@@ -1845,6 +1868,46 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               Re-open
             </button>
           )}
+          {/* culatello-92103: revert paid -> approved. Surfaced for ANY
+              payout method (USDC, wire, mercury_card, external,
+              off-platform) — previously the only "undo" affordance lived on
+              `approved` rows. Click 1 = arm confirm; click 2 = fire.
+              Confirms are unusual on reversible actions per project
+              convention, but this one drops the historical mark-paid record
+              (paidAt + tx metadata cleared) so a misclick is undesirable.
+              Audit trail is preserved either way. Admin-only — gated on
+              isAdminViewer to match mark-paid's own permission. */}
+          {isPaid && isAdminViewer && onRevertPaid && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!revertPaidConfirming) {
+                  setRevertPaidConfirming(true);
+                  return;
+                }
+                setRevertPaidError(null);
+                const err = await onRevertPaid();
+                setRevertPaidConfirming(false);
+                if (typeof err === 'string' && err) {
+                  setRevertPaidError(err);
+                }
+              }}
+              disabled={busy || selfPayoutBlocked}
+              className={
+                revertPaidConfirming
+                  ? 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50'
+                  : 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-500/50 text-amber-300 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50'
+              }
+              title={
+                revertPaidConfirming
+                  ? 'Click again to confirm — clears paidAt + tx metadata'
+                  : 'Move this paid payout back to approved (clears paidAt + tx metadata)'
+              }
+            >
+              <Undo2 size={14} />
+              {revertPaidConfirming ? 'Click again to confirm' : 'Revert to Approved'}
+            </button>
+          )}
           {/* tiramisu-49102: Pay-again button. Surfaced only when status is
               paid AND we have enough to pre-fill the CreatePrepaymentModal —
               i.e. a method is set, and (for USDC) a wallet, or (for wire) a
@@ -1953,6 +2016,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
               <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
               <span>{unapproveError}</span>
+            </div>
+          )}
+          {/* culatello-92103: inline error for Revert-paid. Surfaces backend
+              NOT_PAID + network failure. */}
+          {revertPaidError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{revertPaidError}</span>
             </div>
           )}
           {/* argentina-92103: inline error for Flag-ready. Same pattern

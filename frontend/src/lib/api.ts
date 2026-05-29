@@ -4311,6 +4311,32 @@ export async function unapproveAdminPayout(
 }
 
 /**
+ * culatello-92103: revert a `paid` payout back to `approved`. The previous
+ * "Revert to Pending" affordance only worked for `approved` rows — there
+ * was no way to undo an out-of-band `mark-paid` (wire, mercury_card,
+ * external, off-platform). This endpoint covers every payout method:
+ * status flips paid -> approved and the mark-paid metadata (paidAt,
+ * transactionHash, wireReference, mercuryCardId, mercuryCardLast4,
+ * externalProofUrl) is cleared. The audit trail is preserved.
+ *
+ * Backend validates the current status is 'paid' (400 NOT_PAID otherwise)
+ * and writes a payout_audit row with action='unmark_paid'.
+ */
+export async function revertPaidAdminPayout(
+  id: string,
+  opts?: { note?: string },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/revert-paid`,
+    {
+      method: 'POST',
+      body: { note: opts?.note },
+    },
+  );
+  return res.payout;
+}
+
+/**
  * argentina-92103: regional underbosses (and admins) signal "this payout is
  * ready for the payments team to pay" without actually changing status or
  * sending funds. Writes a payout_audit row + fires Telegram + email to the
