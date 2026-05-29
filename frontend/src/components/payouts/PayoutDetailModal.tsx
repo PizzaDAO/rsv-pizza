@@ -436,7 +436,12 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 </p>
                 {payout.payoutMethod === 'usdc_base' && payout.payoutWalletAddress && (
                   <p className="text-xs text-theme-text-muted font-mono mt-1">
-                    {payout.payoutWalletAddress}
+                    {/* caciotta-92104: show "name.eth -> 0xa1b2..." when the
+                        host typed an ENS name. Falls back to the raw address. */}
+                    {payout.payoutWalletInput &&
+                    payout.payoutWalletInput.toLowerCase() !== payout.payoutWalletAddress.toLowerCase()
+                      ? `${payout.payoutWalletInput} → ${payout.payoutWalletAddress}`
+                      : payout.payoutWalletAddress}
                   </p>
                 )}
                 {payout.payoutMethod === 'wire' && payout.payoutBankDetails && (() => {

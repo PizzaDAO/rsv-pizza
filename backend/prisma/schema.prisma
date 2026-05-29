@@ -1701,6 +1701,12 @@ model Payout {
   payoutMethod String? @map("payout_method")
 
   payoutWalletAddress String? @map("payout_wallet_address")
+  // caciotta-92104: original user-typed wallet input (e.g. an ENS name like
+  // `ariutokintumi.eth`). `payoutWalletAddress` stays canonical (always 0x for
+  // viem.sendTransaction). When the input is identical to the resolved 0x
+  // we leave this null. Used by admin UI to show "name.eth -> 0xa1b2..."
+  // instead of silently losing the ENS string at write time.
+  payoutWalletInput   String? @map("payout_wallet_input")
   payoutBankDetails   Json?   @map("payout_bank_details")
   mercuryCardId       String? @map("mercury_card_id")
   mercuryCardLast4    String? @map("mercury_card_last4")

@@ -61,3 +61,33 @@ export async function resolveWalletInput(input: string): Promise<`0x${string}`> 
   }
   throw new Error('Wallet address must be a 0x… address or an ENS name (e.g. alice.eth)');
 }
+
+/**
+ * caciotta-92104: same contract as `resolveWalletInput` but also returns
+ * whether the resolution went through ENS, plus the canonical input shape.
+ * Lets callers persist both the resolved 0x AND the human-readable input
+ * (e.g. `ariutokintumi.eth`) without re-deriving "was this ENS?" downstream.
+ */
+export interface WalletResolution {
+  address: `0x${string}`;
+  /** The trimmed user input — preserved as-is for display (ENS name or 0x). */
+  input: string;
+  /** True when the input was an ENS name (so display can show "name -> 0x"). */
+  wasEns: boolean;
+}
+
+export async function resolveWalletInputWithMeta(input: string): Promise<WalletResolution> {
+  const trimmed = input.trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
+    return {
+      address: trimmed.toLowerCase() as `0x${string}`,
+      input: trimmed.toLowerCase(),
+      wasEns: false,
+    };
+  }
+  if (looksLikeEnsName(trimmed)) {
+    const address = await resolveEns(trimmed);
+    return { address, input: trimmed, wasEns: true };
+  }
+  throw new Error('Wallet address must be a 0x… address or an ENS name (e.g. alice.eth)');
+}

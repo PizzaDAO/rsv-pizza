@@ -1275,7 +1275,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               )}
               {payout.payoutMethod === 'usdc_base' && payout.payoutWalletAddress && (
                 <div className="font-mono text-xs break-all text-theme-text-secondary">
-                  {payout.payoutWalletAddress}
+                  {/* caciotta-92104: when the host typed an ENS name, show
+                      "name.eth -> 0xa1b2…" so admins see both the input and
+                      the canonical on-chain destination. */}
+                  {payout.payoutWalletInput &&
+                  payout.payoutWalletInput.toLowerCase() !== payout.payoutWalletAddress.toLowerCase() ? (
+                    <>
+                      {payout.payoutWalletInput}
+                      <span className="text-theme-text-muted"> → </span>
+                      {payout.payoutWalletAddress}
+                    </>
+                  ) : (
+                    payout.payoutWalletAddress
+                  )}
                 </div>
               )}
               {payout.payoutMethod === 'wire' && payout.payoutBankDetails && (
@@ -1514,7 +1526,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       Send <strong>{formatUsd(Number(payout.finalAmountUsd))}</strong> USDC on Base to:
                     </p>
                     <p className="font-mono text-xs break-all text-emerald-900/80 bg-white/50 px-2 py-1.5 rounded">
-                      {payout.payoutWalletAddress || '(no address set — cannot execute)'}
+                      {/* caciotta-92104: render ENS -> 0x when input differs
+                          from the canonical 0x so admins see the human-readable
+                          name AND the on-chain destination before executing. */}
+                      {payout.payoutWalletAddress
+                        ? payout.payoutWalletInput &&
+                          payout.payoutWalletInput.toLowerCase() !== payout.payoutWalletAddress.toLowerCase()
+                          ? `${payout.payoutWalletInput} → ${payout.payoutWalletAddress}`
+                          : payout.payoutWalletAddress
+                        : '(no address set — cannot execute)'}
                     </p>
                     <div className="text-xs text-emerald-800">
                       {usdcCapLoading ? (
