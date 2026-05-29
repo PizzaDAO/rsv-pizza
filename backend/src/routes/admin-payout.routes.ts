@@ -1869,7 +1869,6 @@ router.get(
       let totalUsdPending = 0;
       let totalUsdPaid = 0;
       let totalUsdThisMonth = 0;
-      let sumUsd = 0;
       let awaitingReview = 0;
 
       // parmigiana-58291: per-party rollup over `status === 'paid'` rows.
@@ -1879,6 +1878,13 @@ router.get(
         string,
         { partyId: string; partyName: string; country: string | null; totalPaidUsd: number; payoutCount: number }
       >();
+
+      // taleggio-92104: separate per-party rollup of *committed* USD
+      // (status IN paid+approved) used only to compute `avgUsd` as the
+      // average per-city total, not per-payout. Kept isolated from the
+      // parmigiana-58291 paid-only `partyTotals` Map so existing
+      // serialization semantics are unchanged.
+      const committedByParty = new Map<string, number>();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1890,7 +1896,6 @@ router.get(
         const methodKey = r.payoutMethod ?? 'unset';
         byMethod[methodKey] = (byMethod[methodKey] || 0) + 1;
         const usd = Number(r.finalAmountUsd);
-        sumUsd += usd;
         if (r.status === 'pending') {
           totalUsdPending += usd;
           awaitingReview += 1;
@@ -1919,9 +1924,35 @@ router.get(
             }
           }
         }
+
+        // taleggio-92104: accumulate committed (paid + approved) totals per
+        // party for the AVG PAYMENT KPI. "Committed" matches fontina-92103's
+        // cap-check definition: USD that has either left the wallet (`paid`)
+        // or been queued to leave (`approved`). Pending/rejected/failed do
+        // not count.
+        if ((r.status === 'paid' || r.status === 'approved') && r.party) {
+          committedByParty.set(
+            r.party.id,
+            (committedByParty.get(r.party.id) ?? 0) + usd,
+          );
+        }
       }
 
-      const avgUsd = allFiltered.length > 0 ? sumUsd / allFiltered.length : 0;
+      // taleggio-92104: AVG PAYMENT averages per-city committed totals
+      // (sum of each party's paid+approved finalAmountUsd, then average
+      // across parties with any committed total) instead of averaging
+      // finalAmountUsd per payout row. The per-row average over-weighted
+      // cities with one large payout and under-weighted cities with many
+      // smaller ones. Same filter-window scope as the rest of `totals`
+      // since both derive from `allFiltered`.
+      let avgUsd = 0;
+      if (committedByParty.size > 0) {
+        let committedSum = 0;
+        for (const partyTotal of committedByParty.values()) {
+          committedSum += partyTotal;
+        }
+        avgUsd = committedSum / committedByParty.size;
+      }
 
       // taleggio-49183: the parmigiana-58291 top-level `byParty` aggregate
       // was removed — the per-row "Already paid: $X (N)" rendering on each
