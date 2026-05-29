@@ -2939,8 +2939,15 @@ async function executePayout(params: {
    * the warning's acknowledgement checkbox has been ticked.
    */
   allowOverPerAddressCap?: boolean;
+  /**
+   * salame-92103: when true, skip the per-party cap re-check at execute
+   * time. Matches the bianco-89172 / aglio-62584 override pattern — admin UI
+   * sets this only when the over-party-cap warning's acknowledgement
+   * checkbox has been ticked. Audited via the mark_paid note suffix.
+   */
+  allowOverPartyCap?: boolean;
 }) {
-  const { payoutId, actor, body, allowOverPerAddressCap } = params;
+  const { payoutId, actor, body, allowOverPerAddressCap, allowOverPartyCap } = params;
 
   const existing = await prisma.payout.findUnique({
     where: { id: payoutId },
@@ -2975,8 +2982,16 @@ async function executePayout(params: {
   // POST /bulk-execute (which serially calls this helper). `assertWithinPartyCap`
   // re-queries on every call, so successive bulk rows see the freshly-paid
   // earlier rows in their `usedUsd` totals.
+  //
+  // salame-92103: when `allowOverPartyCap` is set (admin-class only, sourced
+  // from the modal's acknowledgement checkbox), skip the per-party cap throw
+  // so admins can execute a payment that exceeds the party's effective cap.
+  // The per-submission ceiling ($675), per-address cap, and daily cap are
+  // unchanged.
   assertWithinPerSubmissionCap(finalAmountUsd);
-  await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
+  if (!allowOverPartyCap) {
+    await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
+  }
 
   // arugula-38633 v3 follow-up: payout_method can be null when the host
   // submitted before setting their payment details. Block execute with a
@@ -3031,9 +3046,12 @@ async function executePayout(params: {
             newStatus: 'paid',
             actorEmail: actor.email,
             actorKind: actor.actorKind,
+            // salame-92103: append the override marker so the audit row
+            // captures that the per-party cap was bypassed for this payout.
             note: `USDC on Base sent: tx ${result.txHash}, ` +
               `from ${result.fromAddress} to ${result.toAddress}, ` +
-              `$${result.amountUsd.toFixed(2)}`,
+              `$${result.amountUsd.toFixed(2)}` +
+              (allowOverPartyCap ? ' [override: party cap]' : ''),
           },
         });
         return row;
@@ -3116,8 +3134,10 @@ async function executePayout(params: {
           newStatus: 'paid',
           actorEmail: actor.email,
           actorKind: actor.actorKind,
+          // salame-92103: append override marker when per-party cap was bypassed.
           note: `Wire executed out-of-band, reference: ${wireRef}` +
-            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : ''),
+            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : '') +
+            (allowOverPartyCap ? ' [override: party cap]' : ''),
         },
       });
       return row;
@@ -3168,9 +3188,11 @@ async function executePayout(params: {
           newStatus: 'paid',
           actorEmail: actor.email,
           actorKind: actor.actorKind,
+          // salame-92103: append override marker when per-party cap was bypassed.
           note: `Mercury card issued via dashboard, last4=${last4Raw}` +
             (cardId ? `, id=${cardId}` : '') +
-            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : ''),
+            (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : '') +
+            (allowOverPartyCap ? ' [override: party cap]' : ''),
         },
       });
       return row;
@@ -3229,6 +3251,10 @@ router.post(
         // warning via the PayoutReviewModal checkbox; the frontend forwards
         // the flag here.
         allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
+        // salame-92103: admin can acknowledge the per-party cap warning via
+        // the PayoutReviewModal checkbox; same admin-class gate as the route
+        // itself (requireAnyAdminOrPaymentAdmin above).
+        allowOverPartyCap: !!(req.body && req.body.allowOverPartyCap),
       });
 
       res.json({ payout: serializePayout(updated) });
@@ -3381,6 +3407,10 @@ router.post(
       // BulkSendModal disables Send when any selected wallet would exceed the
       // per-address cap unless the admin ticks "Allow over-cap sends".
       const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
+      // salame-92103: same batch-level acknowledgement model for the per-party
+      // cap. BulkSendModal counts how many selected rows would push their
+      // party past its cap and requires this ack before enabling Send.
+      const allowOverPartyCap = !!(req.body && req.body.allowOverPartyCap);
 
       // SEQUENTIAL execution — nonce safety. Do NOT switch to Promise.all.
       const results: BulkSendResult[] = [];
@@ -3392,6 +3422,7 @@ router.post(
             actor: { email: actor.email, actorKind: actor.actorKind },
             body: {},
             allowOverPerAddressCap,
+            allowOverPartyCap,
           });
           // Record a batch-context audit alongside the mark_paid audit that
           // executePayout already wrote.

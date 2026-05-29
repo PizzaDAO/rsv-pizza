@@ -90,6 +90,12 @@ interface PayoutReviewModalProps {
     mercuryCardId?: string;
     note?: string;
     allowOverPerAddressCap?: boolean;
+    /**
+     * salame-92103: forwarded when the admin has ticked the per-party cap
+     * override checkbox in the execute form. Server appends
+     * `[override: party cap]` to the audit row's note.
+     */
+    allowOverPartyCap?: boolean;
   }) => Promise<void> | void;
   /**
    * Optional fetcher for the USDC daily-cap-remaining hint. Only called when
@@ -283,6 +289,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [walletPaidLoading, setWalletPaidLoading] = useState(false);
   const [overrideCap, setOverrideCap] = useState(false);
 
+  // salame-92103: per-party cap override state. The amber warning + ack
+  // surfaces when this proposed payment would push the party past its
+  // effective reimbursement cap (already-paid total + this amount > cap).
+  // Required to enable Execute when `partyWouldExceedCap === true`.
+  const [overridePartyCap, setOverridePartyCap] = useState(false);
+
   // taralli-58291: lightbox uses an index into `allPhotos` so ArrowLeft /
   // ArrowRight can cycle through receipts + pizza photos. Hooks must be
   // declared above any early return — see feedback_hooks_above_early_returns.
@@ -436,6 +448,23 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
+  // salame-92103: party-cap analysis for the Execute panel. Derived from
+  // `payout.party.effectiveReimbursementCapUsd` (the resolved cap — validated
+  // cap OR max numeric event tag) and `payout.party.paidTotalUsd` (sum of
+  // already-paid payouts on this party). When this proposed payment would push
+  // the party's running paid total past its cap, the modal renders an amber
+  // warning + ack checkbox and disables Execute until the admin ticks it.
+  const partyCap = payout.party?.effectiveReimbursementCapUsd ?? null;
+  const partyPaidSoFar = payout.party?.paidTotalUsd ?? 0;
+  const proposedAmount = Number(payout.finalAmountUsd) || 0;
+  const partyCapRemaining =
+    partyCap != null ? Math.max(0, partyCap - partyPaidSoFar) : null;
+  const partyWouldExceedCap =
+    partyCap != null && partyPaidSoFar + proposedAmount > partyCap + 1e-9;
+  const partyOverBy = partyWouldExceedCap && partyCap != null
+    ? Math.max(0, partyPaidSoFar + proposedAmount - partyCap)
+    : 0;
+
   const isPending = payout.status === 'pending';
   const isFailed = payout.status === 'failed';
   // passata-49102: failed payouts are now re-executable, so treat them like
@@ -460,6 +489,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // ack checkbox doesn't carry over from a previous Execute attempt.
     setWalletPaidTotal(null);
     setOverrideCap(false);
+    // salame-92103: clear the per-party cap ack on every open.
+    setOverridePartyCap(false);
     if (payout.payoutMethod === 'usdc_base' && fetchUsdcCapRemaining) {
       setUsdcCapLoading(true);
       try {
@@ -1251,6 +1282,41 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   </div>
                 )}
 
+                {/* salame-92103: per-party cap warning. Surfaces when the
+                    proposed payment would push this party past its effective
+                    reimbursement cap (e.g. a $135 cap already covered by a
+                    $125 prepayment with $10 remaining can't take another $135
+                    without an explicit acknowledgement). Mirrors the per-
+                    address cap pattern (bianco-89172) — amber panel + ack
+                    Checkbox + Execute button disabled until ticked. Method-
+                    agnostic; the server-side check fires for usdc / wire /
+                    mercury_card alike. */}
+                {partyWouldExceedCap && partyCap != null && (
+                  <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
+                      <div className="flex-1 text-sm">
+                        <div className="font-medium text-amber-200 mb-1">
+                          Per-party cap warning
+                        </div>
+                        <div className="text-theme-text-secondary text-xs">
+                          This payment exceeds the party's ${partyCap.toFixed(2)} cap by{' '}
+                          <b>${partyOverBy.toFixed(2)}</b>{' '}
+                          (remaining: ${(partyCapRemaining ?? 0).toFixed(2)}).
+                        </div>
+                        <div className="mt-3">
+                          <Checkbox
+                            checked={overridePartyCap}
+                            onChange={() => setOverridePartyCap((v) => !v)}
+                            label="I acknowledge — proceed anyway"
+                            labelClassName="text-sm text-amber-100"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {payout.payoutMethod === 'usdc_base' && (
                   <div className="space-y-2">
                     <p className="text-emerald-900">
@@ -1386,6 +1452,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       ) {
                         return;
                       }
+                      // salame-92103: block submit if the per-party cap would
+                      // exceed and the admin hasn't ticked the override.
+                      if (partyWouldExceedCap && !overridePartyCap) {
+                        return;
+                      }
                       await onExecute({
                         wireReference: payout.payoutMethod === 'wire' ? execWireRef.trim() : undefined,
                         mercuryCardLast4:
@@ -1401,6 +1472,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           payout.payoutMethod === 'usdc_base' && walletPaidTotal?.wouldExceed
                             ? overrideCap
                             : undefined,
+                        // salame-92103: forward the admin's acknowledgement so
+                        // the server bypasses its own per-party cap check + adds
+                        // `[override: party cap]` to the audit row's note.
+                        allowOverPartyCap: partyWouldExceedCap ? overridePartyCap : undefined,
                       });
                       setShowExecuteForm(false);
                     }}
@@ -1413,7 +1488,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       // bianco-89172: disabled until ack when the cap would exceed.
                       (payout.payoutMethod === 'usdc_base' &&
                         !!walletPaidTotal?.wouldExceed &&
-                        !overrideCap)
+                        !overrideCap) ||
+                      // salame-92103: disabled until ack when the per-party cap would exceed.
+                      (partyWouldExceedCap && !overridePartyCap)
                     }
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
