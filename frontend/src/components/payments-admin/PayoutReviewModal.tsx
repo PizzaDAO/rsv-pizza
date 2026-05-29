@@ -457,6 +457,113 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
   const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
 
+  // coppa-92103: the parent Payout row's `originalAmount` / `originalCurrency`
+  // / `exchangeRate` columns only ever hold the FIRST successful FX conversion
+  // (legacy single-value fields preserved for backwards compatibility). On a
+  // multi-receipt payout (e.g. Marbella: 3 EUR receipts) this misleadingly
+  // showed an arbitrary subset of the real original-currency total.
+  //
+  // After mortadella-92103 each receipt carries its own original_amount +
+  // original_currency + exchange_rate, so aggregate the "Original / Rate /
+  // Extracted" summary from those per-receipt fields instead. Falls back to
+  // the parent-row single value when none of the receipts have the new FX
+  // columns populated (pre-mortadella rows before the backfill lands).
+  const originalSummary = useMemo(() => {
+    const receiptsWithFx = receipts.filter(
+      (r) =>
+        r.originalCurrency != null &&
+        r.originalCurrency !== '' &&
+        r.originalAmount != null &&
+        Number.isFinite(Number(r.originalAmount)),
+    );
+
+    if (receiptsWithFx.length === 0) {
+      // Legacy fallback — use the parent-row single value if present.
+      if (
+        payout.originalCurrency &&
+        payout.originalCurrency.toUpperCase() !== 'USD' &&
+        payout.originalAmount != null
+      ) {
+        return {
+          mode: 'legacy' as const,
+          line: `Original: ${formatOriginalCurrency(
+            Number(payout.originalAmount),
+            payout.originalCurrency,
+          )} · Rate: ${Number(payout.exchangeRate).toFixed(4)} · Extracted: ${formatUsd(
+            Number(payout.extractedAmountUsd),
+          )}`,
+        };
+      }
+      return null;
+    }
+
+    // Sum the USD-converted ocrAmount across the same receipts so the
+    // "Extracted" half of the line matches the originals we're summarizing.
+    const extractedUsdSum = receiptsWithFx.reduce(
+      (s, r) => s + (Number(r.ocrAmount) || 0),
+      0,
+    );
+
+    const distinctCurrencies = Array.from(
+      new Set(
+        receiptsWithFx.map((r) => (r.originalCurrency ?? '').toUpperCase()),
+      ),
+    );
+
+    if (distinctCurrencies.length === 1) {
+      const cur = distinctCurrencies[0];
+      const sum = receiptsWithFx.reduce(
+        (s, r) => s + Number(r.originalAmount),
+        0,
+      );
+      // If every receipt is already in USD, suppress the Original line — it
+      // would just repeat the Extracted total.
+      if (cur === 'USD') {
+        return null;
+      }
+      const rates = receiptsWithFx
+        .map((r) => Number(r.exchangeRate))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      let rateDisplay = '';
+      if (rates.length > 0) {
+        const minRate = Math.min(...rates);
+        const maxRate = Math.max(...rates);
+        rateDisplay =
+          maxRate - minRate < 0.001
+            ? rates[0].toFixed(4)
+            : `${minRate.toFixed(4)}–${maxRate.toFixed(4)}`;
+      }
+      return {
+        mode: 'single' as const,
+        line: `Original: ${formatOriginalCurrency(sum, cur)}${
+          rateDisplay ? ` · Rate: ${rateDisplay}` : ''
+        } · Extracted: ${formatUsd(extractedUsdSum)}`,
+      };
+    }
+
+    // Multi-currency — render a per-currency breakdown.
+    const byCurrency = new Map<string, number>();
+    for (const r of receiptsWithFx) {
+      const cur = (r.originalCurrency ?? '').toUpperCase();
+      byCurrency.set(cur, (byCurrency.get(cur) ?? 0) + Number(r.originalAmount));
+    }
+    const parts = Array.from(byCurrency.entries()).map(([cur, amt]) =>
+      formatOriginalCurrency(amt, cur),
+    );
+    return {
+      mode: 'multi' as const,
+      line: `Original: ${parts.join(' + ')} · Extracted: ${formatUsd(
+        extractedUsdSum,
+      )}`,
+    };
+  }, [
+    receipts,
+    payout.originalAmount,
+    payout.originalCurrency,
+    payout.exchangeRate,
+    payout.extractedAmountUsd,
+  ]);
+
   // salame-92103: party-cap analysis for the Execute panel. Derived from
   // `payout.party.effectiveReimbursementCapUsd` (the resolved cap — validated
   // cap OR max numeric event tag) and `payout.party.paidTotalUsd` (sum of
@@ -878,10 +985,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         </span>
                       )}
                   </div>
-                  {payout.originalCurrency && payout.originalCurrency.toUpperCase() !== 'USD' && (
+                  {/* coppa-92103: aggregated per-receipt summary. The legacy
+                      parent-row single value (originalAmount/Currency/Rate)
+                      only captured the first FX conversion — misleading on
+                      multi-receipt payouts. See `originalSummary` memo above. */}
+                  {originalSummary && (
                     <div className="text-xs text-theme-text-muted mt-0.5">
-                      Original: {formatOriginalCurrency(Number(payout.originalAmount), payout.originalCurrency)} ·{' '}
-                      Rate: {Number(payout.exchangeRate).toFixed(4)} · Extracted: {formatUsd(Number(payout.extractedAmountUsd))}
+                      {originalSummary.line}
                     </div>
                   )}
                   {/* lonza-92103: city-level cumulative paid total, mirrored
