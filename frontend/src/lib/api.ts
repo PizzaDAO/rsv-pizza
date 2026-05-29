@@ -4286,6 +4286,20 @@ export interface MarkPartyPaidPreviewResponse {
   party: { id: string; name: string };
   count: number;
   totalUsd: number;
+  /**
+   * caciotta-92103: sum + count of payouts on this party that are already
+   * `paid`. Used by the modal to warn about double-counting — if the host
+   * was already paid externally and that payment was recorded as its own
+   * paid row, marking the pending claim paid would inflate /payments
+   * totals by 2x.
+   */
+  existingPaidCount: number;
+  existingPaidUsd: number;
+  /**
+   * caciotta-92103: what 'auto' mode will do given the current state. The
+   * modal default-selects the radio matching this value.
+   */
+  suggestedMode: 'mark_paid' | 'withdraw_pending';
   payouts: MarkPartyPaidPreviewPayout[];
 }
 
@@ -4318,10 +4332,26 @@ export async function markPartyPaid(
   body?: {
     note?: string;
     paidMethod?: PayoutMethod | 'external';
+    /**
+     * caciotta-92103: how to close out the in-flight rows.
+     *   'mark_paid' — legacy behavior; flips pending+approved to paid.
+     *   'withdraw_pending' — soft-withdraws pending+approved (no new paid
+     *     amounts; receipts preserved). Use when the host was already paid
+     *     externally and that payment is already on the party.
+     *   'auto' (default) — picks withdraw_pending when existing paid sum
+     *     >= pending+approved sum; else mark_paid.
+     */
+    mode?: 'mark_paid' | 'withdraw_pending' | 'auto';
   },
-): Promise<{ count: number; party: { id: string; name: string }; payoutIds: string[] }> {
+): Promise<{
+  count: number;
+  mode: 'mark_paid' | 'withdraw_pending';
+  party: { id: string; name: string };
+  payoutIds: string[];
+}> {
   return apiRequest<{
     count: number;
+    mode: 'mark_paid' | 'withdraw_pending';
     party: { id: string; name: string };
     payoutIds: string[];
   }>(`/api/admin/parties/${partyId}/mark-paid`, {

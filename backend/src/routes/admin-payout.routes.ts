@@ -4002,10 +4002,38 @@ partyMarkPaidRouter.get(
         0,
       );
 
+      // caciotta-92103: also surface the already-paid payouts on this party so
+      // the modal can warn about double-counting. If the host was already paid
+      // out-of-band (recorded as a separate paid row), marking the pending
+      // claim paid would inflate /payments totals.
+      const existingPaid = await prisma.payout.findMany({
+        where: {
+          partyId,
+          status: 'paid',
+        },
+        select: { id: true, finalAmountUsd: true },
+      });
+      const existingPaidCount = existingPaid.length;
+      const existingPaidUsd = existingPaid.reduce(
+        (sum, p) => sum + Number(p.finalAmountUsd),
+        0,
+      );
+
+      // Recommend `withdraw_pending` when the already-paid bucket fully
+      // covers what we'd otherwise create as new paid rows. Otherwise
+      // `mark_paid` (the legacy behavior).
+      const suggestedMode: 'mark_paid' | 'withdraw_pending' =
+        existingPaidCount > 0 && existingPaidUsd >= totalUsd
+          ? 'withdraw_pending'
+          : 'mark_paid';
+
       res.json({
         party: { id: party.id, name: party.name },
         count: payouts.length,
         totalUsd,
+        existingPaidCount,
+        existingPaidUsd,
+        suggestedMode,
         payouts: payouts.map((p) => ({
           id: p.id,
           status: p.status,
@@ -4026,6 +4054,25 @@ partyMarkPaidRouter.get(
  *
  * Body:
  *   {
+ *     mode?: 'mark_paid' | 'withdraw_pending' | 'auto';
+ *                          // caciotta-92103: how to close out the in-flight
+ *                          // rows.
+ *                          //   'mark_paid' — legacy behavior: every pending
+ *                          //     + approved row flips to status='paid'.
+ *                          //     Creates new paid amounts on /payments.
+ *                          //   'withdraw_pending' — soft-withdraw via
+ *                          //     status='withdrawn' (ravioli-82931). Used
+ *                          //     when an external paid row is already on the
+ *                          //     party and the pending claims are
+ *                          //     duplicates. Does NOT create new paid
+ *                          //     amounts. Receipts stay attached to the
+ *                          //     party (payout_documents.party_id
+ *                          //     unchanged).
+ *                          //   'auto' (default) — picks 'withdraw_pending'
+ *                          //     when the party already has paid payouts
+ *                          //     whose sum >= the pending+approved being
+ *                          //     acted on; else 'mark_paid'. Prevents
+ *                          //     double-counting external payments.
  *     note?: string;       // shared admin note appended (with timestamp) to
  *                          // each payout's admin_notes; also written to
  *                          // payout_audit.note
@@ -4033,21 +4080,37 @@ partyMarkPaidRouter.get(
  *                          // optional; if set, stamps payout_method on each
  *                          // row ONLY when currently null. Existing methods
  *                          // are preserved so we don't lie about how an
- *                          // already-routed payout was paid.
+ *                          // already-routed payout was paid. Only relevant
+ *                          // for 'mark_paid' — ignored for
+ *                          // 'withdraw_pending'.
  *   }
  *
  * Atomic via `prisma.$transaction`. For each in-flight payout on the party:
- *   1. status -> 'paid'
- *   2. paid_at -> now()
- *   3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] <note>" on a new line
- *      preserving any existing notes; no-op when note is missing/blank.
- *   4. payout_method: set to `paidMethod` ONLY IF currently null. (External
- *      payouts that had no on-platform method get stamped; existing methods
- *      are left untouched.)
- *   5. payout_audit row with action='mark_paid', old_status, new_status='paid'.
  *
- * Returns `{ count, party: { id, name }, payoutIds }`. count=0 with HTTP 200
- * when there are no in-flight payouts to flip — not an error.
+ *   mode='mark_paid':
+ *     1. status -> 'paid'
+ *     2. paid_at -> now()
+ *     3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] <note>" on a new line
+ *        preserving any existing notes; no-op when note is missing/blank.
+ *     4. payout_method: set to `paidMethod` ONLY IF currently null. (External
+ *        payouts that had no on-platform method get stamped; existing methods
+ *        are left untouched.)
+ *     5. payout_audit row with action='mark_paid', old_status, new_status='paid'.
+ *
+ *   mode='withdraw_pending':
+ *     1. status -> 'withdrawn'
+ *     2. paid_at / payout_method UNCHANGED — the row was never actually paid;
+ *        it's being reconciled against an already-recorded external payment.
+ *     3. admin_notes: append "[YYYY-MM-DDTHH:MM:SS] Withdrawn during Mark
+ *        Party Paid reconciliation; <note>" on a new line.
+ *     4. payout_audit row with action='cancel' (the valid enum value used by
+ *        ravioli-82931's host-side withdraw — there is no 'withdraw' action
+ *        in the check constraint), old_status, new_status='withdrawn'.
+ *
+ * Returns `{ count, mode, party: { id, name }, payoutIds }`. count=0 with
+ * HTTP 200 when there are no in-flight payouts to flip — not an error.
+ * `mode` is the resolved mode (auto -> mark_paid or withdraw_pending) so
+ * the frontend can render the correct success toast.
  */
 partyMarkPaidRouter.post(
   '/:partyId/mark-paid',
@@ -4081,6 +4144,16 @@ partyMarkPaidRouter.post(
       // a method" rather than persisting the literal string.
       const methodToStamp = paidMethod && paidMethod !== 'external' ? paidMethod : null;
 
+      // caciotta-92103: mode selector. Default 'auto' picks withdraw_pending
+      // when the party already has enough paid rows to cover the in-flight
+      // sum (prevents double-counting after an external payment was
+      // recorded). Otherwise it falls through to the legacy mark_paid path.
+      const rawMode = typeof body.mode === 'string' ? body.mode.trim() : 'auto';
+      if (!['mark_paid', 'withdraw_pending', 'auto'].includes(rawMode)) {
+        throw new AppError('Invalid mode', 400, 'VALIDATION_ERROR');
+      }
+      const requestedMode = rawMode as 'mark_paid' | 'withdraw_pending' | 'auto';
+
       // Find all in-flight payouts BEFORE the transaction so we can do per-row
       // self-payout checks + log a clean count even if zero match.
       const inflight = await prisma.payout.findMany({
@@ -4094,13 +4167,39 @@ partyMarkPaidRouter.post(
           hostUserId: true,
           adminNotes: true,
           payoutMethod: true,
+          finalAmountUsd: true,
         },
       });
+
+      // Resolve 'auto' to a concrete mode. Even at count=0 we resolve so the
+      // response carries a meaningful `mode` value.
+      let resolvedMode: 'mark_paid' | 'withdraw_pending';
+      if (requestedMode === 'auto') {
+        const inflightUsd = inflight.reduce(
+          (sum, p) => sum + Number(p.finalAmountUsd),
+          0,
+        );
+        const existingPaid = await prisma.payout.findMany({
+          where: { partyId, status: 'paid' },
+          select: { finalAmountUsd: true },
+        });
+        const existingPaidUsd = existingPaid.reduce(
+          (sum, p) => sum + Number(p.finalAmountUsd),
+          0,
+        );
+        resolvedMode =
+          existingPaid.length > 0 && existingPaidUsd >= inflightUsd
+            ? 'withdraw_pending'
+            : 'mark_paid';
+      } else {
+        resolvedMode = requestedMode;
+      }
 
       if (inflight.length === 0) {
         // Not an error — modal can render "0 payouts to mark paid".
         res.json({
           count: 0,
+          mode: resolvedMode,
           party: { id: party.id, name: party.name },
           payoutIds: [],
         });
@@ -4110,6 +4209,10 @@ partyMarkPaidRouter.post(
       // Self-payout guard — payment_admin actors can't mark their own row
       // paid. Even one self-row in the batch aborts the whole operation
       // (atomic semantics; safer than silently skipping one row).
+      // Applies to both modes: withdraw_pending of one's own pending row is
+      // a permission concern too (a payment_admin shouldn't close out their
+      // own claim against an externally-paid row without a second pair of
+      // eyes).
       for (const p of inflight) {
         assertNotSelfPayout(actor, p.hostUserId);
       }
@@ -4121,48 +4224,88 @@ partyMarkPaidRouter.post(
       await prisma.$transaction(async (tx) => {
         for (const p of inflight) {
           // Preserve existing admin_notes, append the bulk note with a
-          // timestamp on its own line so the trail is readable.
+          // timestamp on its own line so the trail is readable. For the
+          // withdraw_pending path we prefix the note so the audit trail
+          // makes clear *why* a pending row was withdrawn (vs a host
+          // self-withdraw via ravioli-82931's DELETE endpoint).
           let nextAdminNotes: string | null | undefined = undefined;
-          if (note) {
+          const noteBody =
+            resolvedMode === 'withdraw_pending'
+              ? `Withdrawn during Mark Party Paid reconciliation${note ? `; ${note}` : ''}`
+              : note;
+          if (noteBody) {
             const existing = p.adminNotes && p.adminNotes.trim() ? p.adminNotes : '';
-            const appended = `[${noteTimestamp}] ${note}`;
+            const appended = `[${noteTimestamp}] ${noteBody}`;
             nextAdminNotes = existing
               ? `${existing}\n${appended}`
               : appended;
           }
 
-          // Only stamp payoutMethod when (a) admin supplied one AND (b) the
-          // row currently has none. Preserves the truth of how routed rows
-          // were originally configured.
-          const shouldStampMethod = !!methodToStamp && !p.payoutMethod;
+          if (resolvedMode === 'mark_paid') {
+            // Only stamp payoutMethod when (a) admin supplied one AND (b) the
+            // row currently has none. Preserves the truth of how routed rows
+            // were originally configured.
+            const shouldStampMethod = !!methodToStamp && !p.payoutMethod;
 
-          const data: any = {
-            status: 'paid',
-            paidAt: now,
-          };
-          if (nextAdminNotes !== undefined) {
-            data.adminNotes = nextAdminNotes;
+            const data: any = {
+              status: 'paid',
+              paidAt: now,
+            };
+            if (nextAdminNotes !== undefined) {
+              data.adminNotes = nextAdminNotes;
+            }
+            if (shouldStampMethod) {
+              data.payoutMethod = methodToStamp;
+            }
+
+            await tx.payout.update({
+              where: { id: p.id },
+              data,
+            });
+
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: p.id,
+                action: 'mark_paid',
+                oldStatus: p.status,
+                newStatus: 'paid',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: note,
+              },
+            });
+          } else {
+            // resolvedMode === 'withdraw_pending'
+            // Soft-withdraw without touching paid_at or payout_method —
+            // this row was never actually paid; we're reconciling it
+            // against an already-recorded external payment.
+            const data: any = {
+              status: 'withdrawn',
+            };
+            if (nextAdminNotes !== undefined) {
+              data.adminNotes = nextAdminNotes;
+            }
+
+            await tx.payout.update({
+              where: { id: p.id },
+              data,
+            });
+
+            // ravioli-82931 audit pattern: 'cancel' is the valid action enum
+            // value for soft-withdraw; 'withdraw' isn't in the check
+            // constraint.
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: p.id,
+                action: 'cancel',
+                oldStatus: p.status,
+                newStatus: 'withdrawn',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: noteBody,
+              },
+            });
           }
-          if (shouldStampMethod) {
-            data.payoutMethod = methodToStamp;
-          }
-
-          await tx.payout.update({
-            where: { id: p.id },
-            data,
-          });
-
-          await tx.payoutAudit.create({
-            data: {
-              payoutId: p.id,
-              action: 'mark_paid',
-              oldStatus: p.status,
-              newStatus: 'paid',
-              actorEmail: actor.email,
-              actorKind: actor.actorKind,
-              note: note,
-            },
-          });
 
           updatedIds.push(p.id);
         }
@@ -4170,6 +4313,7 @@ partyMarkPaidRouter.post(
 
       res.json({
         count: updatedIds.length,
+        mode: resolvedMode,
         party: { id: party.id, name: party.name },
         payoutIds: updatedIds,
       });
