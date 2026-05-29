@@ -31,6 +31,7 @@ import type {
   PrepayCandidate,
 } from '../types';
 import { formatUsd } from '../components/payments-shared';
+import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import {
   PayoutsFilterBar,
   PayoutsTable,
@@ -120,7 +121,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     () => (regionFilter && regionFilter.length > 0 ? [...regionFilter] : undefined),
     [regionFilter],
   );
-  const portalLabel = portalSlug ? portalSlug.toUpperCase() : null;
+  // tortelli-92103: use the canonical PAYMENTS_REGION_LABELS map so each
+  // portal renders its proper display name ("Africa", "North America",
+  // "Asia & Oceania") instead of an upper-cased slug. Falls back to the
+  // upper-cased slug for any portal not in the map (defensive — shouldn't
+  // happen, but avoids a runtime crash on a typo).
+  const portalLabel = portalSlug
+    ? PAYMENTS_REGION_LABELS[portalSlug as PaymentsRegionPortal] ?? portalSlug.toUpperCase()
+    : null;
   const isRegionalPortal = !!regions;
 
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
@@ -727,8 +735,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             {/* argentina-92103: tailored message for regional portals so the
                 UB knows which account to sign in as. Falls back to the
                 global message for the unscoped /payments dashboard. */}
-            {portalSlug
-              ? `Sign in as the ${portalSlug.toLowerCase()} underboss or as an admin to view this portal.`
+            {portalLabel
+              ? `Sign in as the ${portalLabel} underboss or as an admin to view this portal.`
               : 'The host payments dashboard is only available to admins and payment admins.'}
           </p>
         </div>
