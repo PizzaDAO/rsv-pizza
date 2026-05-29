@@ -83,6 +83,7 @@ model Party {
   parkingNotes            String?   @map("parking_notes")
   maxGuests               Int?      @map("max_guests")
   expectedGuests          Int?      @map("expected_guests")
+  estimatedAttendance     Int?      @map("estimated_attendance")
   hideGuests              Boolean   @default(false) @map("hide_guests")
   requireApproval         Boolean   @default(false) @map("require_approval")
   coHosts                 Json      @default("[]") @map("co_hosts")

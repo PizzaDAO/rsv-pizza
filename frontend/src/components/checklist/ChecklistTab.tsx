@@ -13,6 +13,8 @@ import {
 import { ChecklistItemRow } from './ChecklistItemRow';
 import { ChecklistItemForm } from './ChecklistItemForm';
 import { FindVenueModal } from './FindVenueModal';
+import { EstimatedAttendanceModal } from './EstimatedAttendanceModal';
+import { usePizza } from '../../contexts/PizzaContext';
 
 interface ChecklistTabProps {
   partyId: string;
@@ -27,6 +29,7 @@ function isItemCompleted(item: ChecklistItem, autoStates: AutoCompleteStates): b
 
 export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   const { t } = useTranslation('host');
+  const { party } = usePizza();
   const [data, setData] = useState<ChecklistData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +37,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
+  const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -99,6 +103,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   };
 
   const handleNavigate = (tab: string) => {
+    if (tab === 'attendance') { setAttendanceModalOpen(true); return; }
     if (tab === 'venue') {
       setFindVenueOpen(true);
       return;
@@ -221,6 +226,15 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       <FindVenueModal
         open={findVenueOpen}
         onClose={() => setFindVenueOpen(false)}
+        onSaved={loadChecklist}
+      />
+
+      <EstimatedAttendanceModal
+        open={attendanceModalOpen}
+        onClose={() => setAttendanceModalOpen(false)}
+        partyId={partyId}
+        inviteCode={inviteCode ?? ''}
+        currentEstimate={party?.estimatedAttendance ?? null}
         onSaved={loadChecklist}
       />
 

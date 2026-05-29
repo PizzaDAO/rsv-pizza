@@ -7,6 +7,7 @@ import { AutoCompleteStates, ChecklistItem, Payout } from '../../types';
 import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from '../checklist/FindVenueModal';
+import { EstimatedAttendanceModal } from '../checklist/EstimatedAttendanceModal';
 import { DashboardKPIs } from './DashboardKPIs';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 
@@ -22,6 +23,7 @@ export const GPPDashboardTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
+  const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
   // polpetta-49102: surface latest payouts on the dashboard so hosts don't
   // need to switch to the Payments tab to confirm a prepayment landed.
   const [recentPayouts, setRecentPayouts] = useState<Payout[]>([]);
@@ -88,6 +90,7 @@ export const GPPDashboardTab: React.FC = () => {
     'Post to Socials': Megaphone,
     'Throw the Party': Rocket,
     'Get reviewed for funding': ShieldCheck,
+    'Estimated Attendance': Users,
   };
 
   const goToTab = (tab: string) => {
@@ -128,7 +131,8 @@ export const GPPDashboardTab: React.FC = () => {
         tab: item.linkTab,
         onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
                  item.name === 'Find Partners' ? () => goToTab('partners') :
-                 item.name === 'Find a Venue' ? () => setFindVenueOpen(true) : undefined,
+                 item.name === 'Find a Venue' ? () => setFindVenueOpen(true) :
+                 item.name === 'Estimated Attendance' ? () => setAttendanceModalOpen(true) : undefined,
         icon: ICON_MAP[item.name] ?? ClipboardCheck,
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
@@ -487,6 +491,15 @@ export const GPPDashboardTab: React.FC = () => {
       <FindVenueModal
         open={findVenueOpen}
         onClose={() => setFindVenueOpen(false)}
+        onSaved={loadChecklist}
+      />
+
+      <EstimatedAttendanceModal
+        open={attendanceModalOpen}
+        onClose={() => setAttendanceModalOpen(false)}
+        partyId={party.id}
+        inviteCode={inviteCode!}
+        currentEstimate={party.estimatedAttendance ?? null}
         onSaved={loadChecklist}
       />
 
