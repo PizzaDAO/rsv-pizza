@@ -22,7 +22,7 @@
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
     "@supabase/supabase-js": "^2.49.1",
-    "archiver": "^8.0.0",
+    "archiver": "^7.0.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",

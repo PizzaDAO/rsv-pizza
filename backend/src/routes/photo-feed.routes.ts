@@ -1,13 +1,9 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import { Prisma } from '@prisma/client';
 import { Readable } from 'stream';
-import { createRequire } from 'module';
+import archiver from 'archiver';
 import { prisma } from '../config/database.js';
 import { optionalAuth, requireAuth, AuthRequest } from '../middleware/auth.js';
-
-const require = createRequire(import.meta.url);
-// archiver is CJS-only and has no default export; createRequire bypasses ESM resolution
-const archiver = require('archiver') as typeof import('archiver');
 
 const router = Router();
 const DEFAULT_LIMIT = 24;
