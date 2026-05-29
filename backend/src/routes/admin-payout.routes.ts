@@ -1915,6 +1915,17 @@ router.get(
       // serialization semantics are unchanged.
       const committedByParty = new Map<string, number>();
 
+      // cotechino-92103: per-party status-breakdown for the PAID CITIES
+      // KPI. A party is "paid/complete" when it has at least one payout
+      // in `paid` OR `completed` AND zero payouts in `pending` OR
+      // `approved`. `rejected`/`failed`/`withdrawn` rows don't count
+      // either way (dead claims). Same filter-window scope as the rest
+      // of `totals` since this derives from `allFiltered`.
+      const byPartyStatusCounts = new Map<
+        string,
+        { paidOrCompletedCount: number; pendingOrApprovedCount: number }
+      >();
+
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -1964,6 +1975,30 @@ router.get(
             r.party.id,
             (committedByParty.get(r.party.id) ?? 0) + usd,
           );
+        }
+
+        // cotechino-92103: tally paid/completed vs pending/approved
+        // counts per party for the PAID CITIES KPI below.
+        if (r.party) {
+          const existing = byPartyStatusCounts.get(r.party.id) ?? {
+            paidOrCompletedCount: 0,
+            pendingOrApprovedCount: 0,
+          };
+          if (r.status === 'paid' || r.status === 'completed') {
+            existing.paidOrCompletedCount += 1;
+          } else if (r.status === 'pending' || r.status === 'approved') {
+            existing.pendingOrApprovedCount += 1;
+          }
+          byPartyStatusCounts.set(r.party.id, existing);
+        }
+      }
+
+      // cotechino-92103: count cities whose payouts are all "settled" —
+      // at least one paid/completed row AND no in-flight pending/approved.
+      let paidCitiesCount = 0;
+      for (const counts of byPartyStatusCounts.values()) {
+        if (counts.paidOrCompletedCount > 0 && counts.pendingOrApprovedCount === 0) {
+          paidCitiesCount++;
         }
       }
 
@@ -2035,6 +2070,7 @@ router.get(
           totalUsdThisMonth,
           avgUsd,
           awaitingReview,
+          paidCitiesCount,
         },
       });
     } catch (error) {

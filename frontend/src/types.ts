@@ -2045,6 +2045,13 @@ export interface AdminPayoutTotals {
   totalUsdThisMonth: number;
   avgUsd: number;
   awaitingReview: number;
+  /**
+   * cotechino-92103: count of cities (parties) that are fully paid /
+   * complete — at least one payout in `paid` OR `completed` status AND
+   * zero payouts in `pending` OR `approved` status. Same filter-window
+   * scope as the other KPI fields.
+   */
+  paidCitiesCount: number;
 }
 
 export interface AdminPayoutsResponse {
