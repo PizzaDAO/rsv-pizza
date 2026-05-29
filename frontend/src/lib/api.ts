@@ -4073,6 +4073,11 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.regions && filters.regions.length > 0) {
     params.set('regions', filters.regions.join(','));
   }
+  // pinsa-92103: hide-closed-cities toggle on the by-city view. Backend
+  // accepts `hideClosed=true`; the LIST endpoint ignores it.
+  if (filters.hideClosed) {
+    params.set('hideClosed', 'true');
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
@@ -4283,8 +4288,20 @@ export interface MarkPartyPaidPreviewPayout {
 }
 
 export interface MarkPartyPaidPreviewResponse {
-  party: { id: string; name: string };
+  party: {
+    id: string;
+    name: string;
+    /**
+     * pinsa-92103: surfaced so the modal can pre-render the close-out body
+     * when the city is already closed (rare — the by-city table normally
+     * hides the entry button in that case, but PayoutReviewModal can still
+     * open this modal directly).
+     */
+    paymentsClosedAt?: string | null;
+  };
+  /** In-flight (pending + approved) payouts. */
   count: number;
+  /** Sum of in-flight payouts in USD. */
   totalUsd: number;
   /**
    * caciotta-92103: sum + count of payouts on this party that are already
@@ -4300,6 +4317,25 @@ export interface MarkPartyPaidPreviewResponse {
    * modal default-selects the radio matching this value.
    */
   suggestedMode: 'mark_paid' | 'withdraw_pending';
+  /**
+   * pinsa-92103: count of paid payouts for the party. Powers the close-out
+   * body copy ("Existing paid records (N payments, $X.XX total) stay
+   * unchanged"). Optional for backward-compat with cached payloads.
+   */
+  paidCount?: number;
+  /** pinsa-92103: sum of paid payouts in USD. */
+  paidTotalUsd?: number;
+  /**
+   * pinsa-92103: when null and `count + paidCount > 0`, the modal switches to
+   * close-out mode. Mirrors `party.paymentsClosedAt` for convenience.
+   */
+  paymentsClosedAt?: string | null;
+  /**
+   * pinsa-92103: false = no payouts of any status, so admin shouldn't see
+   * the Mark Paid button at all. True = at least something to action.
+   * Optional for backward-compat (older payloads default to in-flight-only).
+   */
+  eligible?: boolean;
   payouts: MarkPartyPaidPreviewPayout[];
 }
 
@@ -4327,6 +4363,43 @@ export async function fetchMarkPartyPaidPreview(
  * Returns `{ count, party, payoutIds }`. count=0 (HTTP 200) when there are no
  * in-flight payouts — modal renders "0 payouts to mark paid".
  */
+/**
+ * pinsa-92103 + caciotta-92103: response shape for POST
+ * /api/admin/parties/:id/mark-paid.
+ *
+ * `action` distinguishes the executed path. The handler resolves caciotta's
+ * `mode` first ('auto' picks between mark_paid and withdraw_pending) and
+ * then, if nothing is left in-flight after that resolution, pinsa's close-out
+ * path may auto-stamp `paymentsClosedAt`.
+ *
+ *   - `'mark_paid'`       — flipped 1+ in-flight payouts to paid.
+ *   - `'withdraw_pending'`— soft-withdrew pending+approved rows (caciotta).
+ *   - `'closed'`          — no in-flight rows, but the city had paid history,
+ *                           so we stamped `paymentsClosedAt` as a pure
+ *                           close-out (pinsa).
+ *   - `'already_closed'`  — no-op, city was already closed.
+ *   - `'noop'`            — no in-flight, no paid history; nothing to do.
+ *
+ * `mode` is preserved for backward compat with callers that pre-dated
+ * `action` — for mark_paid / withdraw_pending it mirrors `action`.
+ */
+export interface MarkPartyPaidResponse {
+  count: number;
+  mode?: 'mark_paid' | 'withdraw_pending';
+  party: {
+    id: string;
+    name: string;
+    paymentsClosedAt?: string | null;
+  };
+  payoutIds: string[];
+  action?:
+    | 'mark_paid'
+    | 'withdraw_pending'
+    | 'closed'
+    | 'already_closed'
+    | 'noop';
+}
+
 export async function markPartyPaid(
   partyId: string,
   body?: {
@@ -4343,21 +4416,14 @@ export async function markPartyPaid(
      */
     mode?: 'mark_paid' | 'withdraw_pending' | 'auto';
   },
-): Promise<{
-  count: number;
-  mode: 'mark_paid' | 'withdraw_pending';
-  party: { id: string; name: string };
-  payoutIds: string[];
-}> {
-  return apiRequest<{
-    count: number;
-    mode: 'mark_paid' | 'withdraw_pending';
-    party: { id: string; name: string };
-    payoutIds: string[];
-  }>(`/api/admin/parties/${partyId}/mark-paid`, {
-    method: 'POST',
-    body: body ?? {},
-  });
+): Promise<MarkPartyPaidResponse> {
+  return apiRequest<MarkPartyPaidResponse>(
+    `/api/admin/parties/${partyId}/mark-paid`,
+    {
+      method: 'POST',
+      body: body ?? {},
+    },
+  );
 }
 
 /**

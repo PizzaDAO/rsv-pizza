@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, DollarSign, Loader2, Pencil, AlertTriangle, Archive } from 'lucide-react';
+import { X, DollarSign, Loader2, Pencil, AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import {
   fetchMarkPartyPaidPreview,
@@ -45,8 +45,22 @@ interface MarkPartyPaidModalProps {
    *
    * caciotta-92103: `mode` is the resolved mode the server applied so the
    * toast can phrase "Marked N paid" vs "Withdrew N pending claims".
+   * pinsa-92103: `action` lets the parent vary the toast copy — `'closed'`
+   * (or `'mark_paid'` when the flip auto-stamped the close timestamp) means
+   * the city is now fully closed-out.
    */
-  onSuccess: (summary: { count: number; mode: MarkPaidMode; partyName: string }) => void;
+  onSuccess: (summary: {
+    count: number;
+    mode?: MarkPaidMode;
+    partyName: string;
+    action?:
+      | 'mark_paid'
+      | 'withdraw_pending'
+      | 'closed'
+      | 'already_closed'
+      | 'noop';
+    paymentsClosedAt?: string | null;
+  }) => void;
 }
 
 /**
@@ -133,9 +147,28 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
   const totalUsd = preview?.totalUsd ?? 0;
   const existingPaidCount = preview?.existingPaidCount ?? 0;
   const existingPaidUsd = preview?.existingPaidUsd ?? 0;
+  // pinsa-92103: separate from caciotta's existingPaid* (which is the same
+  // data via a different field name). Modal body uses `paidCount` /
+  // `paidTotalUsd` for the close-out copy, falling back to caciotta's fields
+  // so the optional pinsa fields don't break in older payloads.
+  const paidCount = preview?.paidCount ?? existingPaidCount;
+  const paidTotalUsd = preview?.paidTotalUsd ?? existingPaidUsd;
+  const alreadyClosedAt = preview?.paymentsClosedAt ?? null;
 
+  // pinsa-92103: close-out mode = preview loaded, nothing in-flight, party has
+  // paid history, and not already closed. In this mode the modal hides the
+  // method-override radio and switches the button copy to "Close out {city}".
+  const isCloseOutMode =
+    !!preview && count === 0 && paidCount > 0 && !alreadyClosedAt;
+
+  // caciotta + pinsa: standard mark-paid mode requires in-flight rows AND a
+  // resolved mode selection. Close-out mode (pinsa) is a valid submit even
+  // with count===0 because it stamps a timestamp; it doesn't need `mode`.
   const canSubmit =
-    !!preview && count > 0 && !submitting && !previewLoading && mode !== null;
+    !!preview &&
+    !submitting &&
+    !previewLoading &&
+    (isCloseOutMode || (count > 0 && mode !== null));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -150,12 +183,24 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
         mode?: MarkPaidMode;
       } = {};
       if (trimmedNote) body.note = trimmedNote;
-      // payout_method is meaningful for mark_paid only; we skip it for
-      // withdraw_pending because we don't touch payout_method on withdraw.
-      if (mode === 'mark_paid' && method !== 'unchanged') body.paidMethod = method;
-      if (mode) body.mode = mode;
+      // payout_method is meaningful for mark_paid only; skip it for
+      // withdraw_pending (caciotta) and for close-out mode (pinsa) since
+      // neither path touches payout_method on existing rows.
+      if (!isCloseOutMode && mode === 'mark_paid' && method !== 'unchanged') {
+        body.paidMethod = method;
+      }
+      // caciotta-92103: send the resolved mode when there's something to act
+      // on. In close-out mode we leave it unset and let the server pick the
+      // pure close-out path.
+      if (!isCloseOutMode && mode) body.mode = mode;
       const res = await markPartyPaid(partyId, body);
-      onSuccess({ count: res.count, mode: res.mode, partyName: cityName });
+      onSuccess({
+        count: res.count,
+        mode: res.mode,
+        partyName: cityName,
+        action: res.action,
+        paymentsClosedAt: res.party?.paymentsClosedAt ?? null,
+      });
       onClose();
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to mark party paid');
@@ -178,10 +223,14 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
         <div className="flex items-center gap-3 px-5 py-4 border-b border-theme-stroke">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold text-theme-text truncate">
-              Mark party paid: {cityName}
+              {isCloseOutMode
+                ? `Mark ${cityName} as fully paid out`
+                : `Mark party paid: ${cityName}`}
             </h2>
             <p className="text-xs text-theme-text-muted mt-0.5">
-              Flips every pending + approved payout for this event to paid.
+              {isCloseOutMode
+                ? 'Closes out this city — every expected reimbursement is already paid.'
+                : 'Flips every pending + approved payout for this event to paid.'}
             </p>
           </div>
           <button
@@ -211,64 +260,94 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
           )}
           {preview && !previewLoading && (
             <div>
-              <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover p-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="text-xs uppercase tracking-wide text-theme-text-muted">
-                    In-flight payouts
-                  </div>
-                  <div className="text-sm text-theme-text">
-                    <span className="font-semibold">{count}</span>
-                    {count > 0 && (
-                      <>
-                        {' '}for a total of{' '}
-                        <span className="font-semibold">${totalUsd.toFixed(2)}</span>
-                      </>
-                    )}
+              {/* pinsa-92103: close-out mode renders a distinct emerald
+                  panel so admins immediately see this is the "no work to do,
+                  just record completion" path, not the bulk-flip one. */}
+              {isCloseOutMode ? (
+                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2
+                      size={16}
+                      className="text-emerald-500 mt-0.5 flex-shrink-0"
+                    />
+                    <div className="text-sm text-theme-text">
+                      <p>
+                        This city has no pending payments. Closing it out
+                        records that all expected reimbursements have been
+                        completed.
+                      </p>
+                      <p className="text-xs text-theme-text-muted mt-2">
+                        Existing paid records ({paidCount} payment
+                        {paidCount === 1 ? '' : 's'},{' '}
+                        <span className="font-medium text-theme-text">
+                          ${paidTotalUsd.toFixed(2)}
+                        </span>{' '}
+                        total) stay unchanged.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                {/* caciotta-92103: show what's already been paid on this party
-                    so the admin sees the recommendation rationale. When this
-                    is >= the in-flight sum the modal defaults to Withdraw
-                    pending so a re-click after recording an external payment
-                    doesn't double-count. */}
-                {existingPaidCount > 0 && (
-                  <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
-                    <div className="uppercase tracking-wide text-theme-text-muted">
-                      Existing paid
+              ) : (
+                <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover p-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="text-xs uppercase tracking-wide text-theme-text-muted">
+                      In-flight payouts
                     </div>
-                    <div className="text-theme-text">
-                      <span className="font-semibold">
-                        ${existingPaidUsd.toFixed(2)}
-                      </span>
-                      <span className="text-theme-text-muted">
-                        {' '}({existingPaidCount})
-                      </span>
+                    <div className="text-sm text-theme-text">
+                      <span className="font-semibold">{count}</span>
+                      {count > 0 && (
+                        <>
+                          {' '}for a total of{' '}
+                          <span className="font-semibold">${totalUsd.toFixed(2)}</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
-                {count === 0 ? (
-                  <p className="text-xs text-theme-text-muted mt-2">
-                    Nothing to mark paid — every payout for this event is already
-                    paid, rejected, or withdrawn.
-                  </p>
-                ) : (
-                  <ul className="mt-2 space-y-1 text-xs text-theme-text-secondary">
-                    {preview.payouts.map((p) => (
-                      <li key={p.id} className="flex items-baseline gap-2">
-                        <span className="text-theme-text-muted uppercase text-[10px] tracking-wide w-16 flex-shrink-0">
-                          {p.status}
+                  {/* caciotta-92103: show what's already been paid on this party
+                      so the admin sees the recommendation rationale. When this
+                      is >= the in-flight sum the modal defaults to Withdraw
+                      pending so a re-click after recording an external payment
+                      doesn't double-count. */}
+                  {existingPaidCount > 0 && (
+                    <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
+                      <div className="uppercase tracking-wide text-theme-text-muted">
+                        Existing paid
+                      </div>
+                      <div className="text-theme-text">
+                        <span className="font-semibold">
+                          ${existingPaidUsd.toFixed(2)}
                         </span>
-                        <span className="flex-1 truncate">
-                          {p.hostName ?? p.hostEmail ?? 'Unknown host'}
+                        <span className="text-theme-text-muted">
+                          {' '}({existingPaidCount})
                         </span>
-                        <span className="font-medium text-theme-text">
-                          ${p.finalAmountUsd.toFixed(2)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                      </div>
+                    </div>
+                  )}
+                  {count === 0 ? (
+                    <p className="text-xs text-theme-text-muted mt-2">
+                      {alreadyClosedAt
+                        ? 'This city is already closed out — every payout is paid, rejected, or withdrawn.'
+                        : 'Nothing to mark paid — every payout for this event is already paid, rejected, or withdrawn.'}
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-xs text-theme-text-secondary">
+                      {preview.payouts.map((p) => (
+                        <li key={p.id} className="flex items-baseline gap-2">
+                          <span className="text-theme-text-muted uppercase text-[10px] tracking-wide w-16 flex-shrink-0">
+                            {p.status}
+                          </span>
+                          <span className="flex-1 truncate">
+                            {p.hostName ?? p.hostEmail ?? 'Unknown host'}
+                          </span>
+                          <span className="font-medium text-theme-text">
+                            ${p.finalAmountUsd.toFixed(2)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -334,42 +413,45 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             maxLength={500}
           />
 
-          {/* Optional method override — only meaningful for mark_paid; the
-              withdraw_pending mode never stamps payout_method. */}
-          {mode === 'mark_paid' && (
-          <div>
-            <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
-              Payout method (optional)
+          {/* Optional method override.
+              caciotta-92103: only meaningful for mark_paid; withdraw_pending
+              never stamps payout_method.
+              pinsa-92103: hidden in close-out mode — there are no in-flight
+              rows for the method to stamp, so the choice is meaningless. */}
+          {!isCloseOutMode && mode === 'mark_paid' && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
+                Payout method (optional)
+              </div>
+              <div className="space-y-1.5">
+                {(Object.keys(METHOD_LABELS) as PaidMethodChoice[]).map((k) => {
+                  const active = method === k;
+                  return (
+                    <label
+                      key={k}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paidMethod"
+                        value={k}
+                        checked={active}
+                        onChange={() => setMethod(k)}
+                      />
+                      <span className="text-sm text-theme-text">{METHOD_LABELS[k]}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-theme-text-muted mt-1">
+                Only stamps the method on payouts that don't already have one —
+                existing methods are preserved.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              {(Object.keys(METHOD_LABELS) as PaidMethodChoice[]).map((k) => {
-                const active = method === k;
-                return (
-                  <label
-                    key={k}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                      active
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paidMethod"
-                      value={k}
-                      checked={active}
-                      onChange={() => setMethod(k)}
-                    />
-                    <span className="text-sm text-theme-text">{METHOD_LABELS[k]}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <p className="text-xs text-theme-text-muted mt-1">
-              Only stamps the method on payouts that don't already have one —
-              existing methods are preserved.
-            </p>
-          </div>
           )}
 
           {submitError && (
@@ -393,23 +475,29 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             type="submit"
             disabled={!canSubmit}
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 ${
-              mode === 'withdraw_pending'
-                ? 'bg-amber-600 hover:bg-amber-700'
-                : 'bg-red-500 hover:bg-red-600'
+              isCloseOutMode
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : mode === 'withdraw_pending'
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-red-500 hover:bg-red-600'
             }`}
           >
             {submitting ? (
               <Loader2 size={14} className="animate-spin" />
+            ) : isCloseOutMode ? (
+              <CheckCircle2 size={14} />
             ) : mode === 'withdraw_pending' ? (
               <Archive size={14} />
             ) : (
               <DollarSign size={14} />
             )}
-            {count > 0
-              ? mode === 'withdraw_pending'
-                ? `Withdraw ${count} pending claim${count === 1 ? '' : 's'}`
-                : `Mark ${count} payment${count === 1 ? '' : 's'} paid ($${totalUsd.toFixed(2)})`
-              : 'Mark party paid'}
+            {isCloseOutMode
+              ? `Close out ${cityName}`
+              : count > 0
+                ? mode === 'withdraw_pending'
+                  ? `Withdraw ${count} pending claim${count === 1 ? '' : 's'}`
+                  : `Mark ${count} payment${count === 1 ? '' : 's'} paid ($${totalUsd.toFixed(2)})`
+                : 'Mark party paid'}
           </button>
         </div>
       </form>
