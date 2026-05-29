@@ -110,6 +110,13 @@ export function RSVPFlowContent({
             Your RSVP is pending approval from the host. You'll receive an email with your check-in QR code once approved.
           </p>
         )}
+        {/* pancetta-58472: wallet is also on another event's guest list. Saved
+            anyway; non-blocking heads-up. */}
+        {form.walletShared && (
+          <p className="text-xs text-theme-text-muted mb-4">
+            Heads up — this wallet is already on the guest list for {form.walletShared.withName}. Saved anyway.
+          </p>
+        )}
         {/* Share Section */}
         {(!form.alreadyRegistered || form.wasUpdated) && (
           <ShareRSVP

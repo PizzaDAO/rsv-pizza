@@ -1483,11 +1483,15 @@ export async function addGuestToParty(
   ethconfOptIn?: boolean,
   optinAbVariant?: 'control' | 'variant' | null,
   visitorSessionId?: string,
-): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null }> {
+): Promise<{ guest: DbGuest; alreadyRegistered: boolean; requireApproval: boolean; updated: boolean; waitlisted: boolean; waitlistPosition: number | null; walletShared: { withName: string } | null }> {
   if (!inviteCode) {
     console.error('Invite code is required to add guest');
     throw new Error('Invite code is required to submit RSVP');
   }
+
+  // pancetta-58472: lowercase+trim wallet on the wire (belt + suspenders;
+  // backend already normalizes). Caller keeps the user-typed value in state.
+  const normalizedWallet = ethereumAddress?.trim().toLowerCase() || null;
 
   try {
     const response = await fetch(`${API_URL}/api/rsvp/${inviteCode}/guest`, {
@@ -1496,7 +1500,7 @@ export async function addGuestToParty(
       body: JSON.stringify({
         name,
         email: email || null,
-        ethereumAddress: ethereumAddress || null,
+        ethereumAddress: normalizedWallet,
         roles: roles || [],
         mailingListOptIn: mailingListOptIn || false,
         dietaryRestrictions,
@@ -1536,7 +1540,7 @@ export async function addGuestToParty(
       party_id: partyId,
       name: data.guest.name,
       email: email || null,
-      ethereum_address: ethereumAddress || null,
+      ethereum_address: normalizedWallet,
       roles: roles || [],
       mailing_list_opt_in: mailingListOptIn || false,
       dietary_restrictions: dietaryRestrictions,
@@ -1567,6 +1571,11 @@ export async function addGuestToParty(
       updated: data.updated || false,
       waitlisted: data.waitlisted || false,
       waitlistPosition: data.waitlistPosition || null,
+      // pancetta-58472: backend may signal that this wallet is also on another
+      // event's guest list. Saved anyway; surfaced as a heads-up on success.
+      walletShared: data.walletShared && typeof data.walletShared.withName === 'string'
+        ? { withName: data.walletShared.withName }
+        : null,
     };
   } catch (error) {
     console.error('Error adding guest:', error);
