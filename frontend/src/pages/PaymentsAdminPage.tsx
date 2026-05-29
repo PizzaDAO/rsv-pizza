@@ -959,6 +959,18 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onUnapprove={handleRowUnapprove}
             onHostClick={(userId) => setHostDetailUserId(userId)}
             onCapUpdated={() => refresh()}
+            // bocconcini-92103: bridge the panettone-92103 "Mark party paid"
+            // action into the by-city default view. Looks up the row so the
+            // modal header can render the city name while the preview
+            // request is in flight. Hidden for underbosses via viewerRole.
+            onMarkPartyPaid={(partyId) => {
+              const row = byPartyRows.find((r) => r.party.id === partyId);
+              setMarkPartyPaidTarget({
+                partyId,
+                partyNameHint: row?.party.name ?? '',
+              });
+            }}
+            viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}
           />
