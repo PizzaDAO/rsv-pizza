@@ -10,6 +10,7 @@ import { Checkbox } from '../components/Checkbox';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchSponsorMe, fetchSponsorConsolidatedReport } from '../lib/api';
 import { ConsolidatedReportPreview } from '../components/report/ConsolidatedReportPreview';
+import { ShareWithAiButton } from '../components/report/ShareWithAiButton';
 import type { SponsorMeResponse, ConsolidatedReport } from '../types';
 
 const themeClass = 'gpp-theme';
@@ -191,17 +192,19 @@ export function ConsolidatedReportPage() {
           ) : report ? (
             <>
               {/* pecorino-64118 follow-up: admin-only "Approved events only" toggle.
-                  Non-admins are already server-scoped to approved+non-cancelled. */}
-              {report.isAdmin && (
-                <div className="mb-4 flex justify-end">
+                  Non-admins are already server-scoped to approved+non-cancelled.
+                  scamorza-71819: "Share with AI" sits alongside the toggle. */}
+              <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+                {report.isAdmin && (
                   <Checkbox
                     checked={!!report.approvedOnly}
                     onChange={handleToggleApprovedOnly}
                     label={t('consolidated.approvedOnly')}
                     labelClassName="text-sm text-theme-text-secondary"
                   />
-                </div>
-              )}
+                )}
+                <ShareWithAiButton tag={report.tag} />
+              </div>
               <ConsolidatedReportPreview report={report} />
             </>
           ) : (
