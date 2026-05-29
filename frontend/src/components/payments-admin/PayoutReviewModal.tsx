@@ -1709,11 +1709,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           {/* argentina-92103: Flag ready for payment. Visible for both UB
               and admin (admins can pre-flag a row so the payments-team
               channel surfaces it as a to-do). Hidden once the row is in
-              a terminal state (paid / rejected / withdrawn) — the
-              backend would 400 in that case anyway. Renders sticky-green
-              "Flagged" pill instead when already flagged so the actor
+              a terminal state (paid / rejected / withdrawn / completed) —
+              the backend would 400 in that case anyway. Renders sticky-
+              green "Flagged" pill instead when already flagged so the actor
               doesn't double-fire notifications. */}
-          {onFlagReady && !isPaid && !isClosed && payout.status !== 'withdrawn' && (
+          {onFlagReady &&
+            !isPaid &&
+            !isClosed &&
+            payout.status !== 'withdrawn' &&
+            payout.status !== 'completed' && (
             payout.flaggedReady ? (
               <span
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-sm font-medium"

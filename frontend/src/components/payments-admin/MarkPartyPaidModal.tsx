@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, DollarSign, Loader2, Pencil, AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
+import { X, DollarSign, Loader2, Pencil, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import {
   fetchMarkPartyPaidPreview,
@@ -8,7 +8,10 @@ import {
 } from '../../lib/api';
 import type { PayoutMethod } from '../../types';
 
-type MarkPaidMode = 'mark_paid' | 'withdraw_pending';
+// provolone-92103: 'mark_pending_complete' replaces caciotta's
+// 'withdraw_pending' — the close-out terminal state is now `'completed'`
+// (city paid in full, this claim done) instead of `'withdrawn'` (claim invalid).
+type MarkPaidMode = 'mark_paid' | 'mark_pending_complete';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names
@@ -43,8 +46,9 @@ interface MarkPartyPaidModalProps {
    * payouts list (so rows flip to paid) and the prepay queue (so the source
    * party drops off). The summary lets the parent flash a city-specific toast.
    *
-   * caciotta-92103: `mode` is the resolved mode the server applied so the
-   * toast can phrase "Marked N paid" vs "Withdrew N pending claims".
+   * caciotta-92103 + provolone-92103: `mode` is the resolved mode the server
+   * applied so the toast can phrase "Marked N paid" vs "Closed out N pending
+   * claims as completed".
    * pinsa-92103: `action` lets the parent vary the toast copy — `'closed'`
    * (or `'mark_paid'` when the flip auto-stamped the close timestamp) means
    * the city is now fully closed-out.
@@ -55,7 +59,7 @@ interface MarkPartyPaidModalProps {
     partyName: string;
     action?:
       | 'mark_paid'
-      | 'withdraw_pending'
+      | 'mark_pending_complete'
       | 'closed'
       | 'already_closed'
       | 'noop';
@@ -184,14 +188,14 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
       } = {};
       if (trimmedNote) body.note = trimmedNote;
       // payout_method is meaningful for mark_paid only; skip it for
-      // withdraw_pending (caciotta) and for close-out mode (pinsa) since
-      // neither path touches payout_method on existing rows.
+      // mark_pending_complete (provolone) and for close-out mode (pinsa)
+      // since neither path touches payout_method on existing rows.
       if (!isCloseOutMode && mode === 'mark_paid' && method !== 'unchanged') {
         body.paidMethod = method;
       }
-      // caciotta-92103: send the resolved mode when there's something to act
-      // on. In close-out mode we leave it unset and let the server pick the
-      // pure close-out path.
+      // caciotta-92103 + provolone-92103: send the resolved mode when there's
+      // something to act on. In close-out mode we leave it unset and let the
+      // server pick the pure close-out path.
       if (!isCloseOutMode && mode) body.mode = mode;
       const res = await markPartyPaid(partyId, body);
       onSuccess({
@@ -303,11 +307,12 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
                       )}
                     </div>
                   </div>
-                  {/* caciotta-92103: show what's already been paid on this party
-                      so the admin sees the recommendation rationale. When this
-                      is >= the in-flight sum the modal defaults to Withdraw
-                      pending so a re-click after recording an external payment
-                      doesn't double-count. */}
+                  {/* caciotta-92103 + provolone-92103: show what's already
+                      been paid on this party so the admin sees the
+                      recommendation rationale. When this is >= the in-flight
+                      sum the modal defaults to Mark pending complete so a
+                      re-click after recording an external payment doesn't
+                      double-count. */}
                   {existingPaidCount > 0 && (
                     <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
                       <div className="uppercase tracking-wide text-theme-text-muted">
@@ -326,8 +331,8 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
                   {count === 0 ? (
                     <p className="text-xs text-theme-text-muted mt-2">
                       {alreadyClosedAt
-                        ? 'This city is already closed out — every payout is paid, rejected, or withdrawn.'
-                        : 'Nothing to mark paid — every payout for this event is already paid, rejected, or withdrawn.'}
+                        ? 'This city is already closed out — every payout is paid, completed, rejected, or withdrawn.'
+                        : 'Nothing to mark paid — every payout for this event is already paid, completed, rejected, or withdrawn.'}
                     </p>
                   ) : (
                     <ul className="mt-2 space-y-1 text-xs text-theme-text-secondary">
@@ -351,25 +356,26 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             </div>
           )}
 
-          {/* caciotta-92103: mode selector — Mark all as paid (legacy) vs
-              Withdraw pending (new). Default-selected radio mirrors the
-              server's suggestedMode so the safe action is one-click in the
-              common "I already paid externally and recorded it" case. */}
+          {/* caciotta-92103 + provolone-92103: mode selector — Mark all as
+              paid (legacy) vs Mark pending complete (new). Default-selected
+              radio mirrors the server's suggestedMode so the safe action is
+              one-click in the common "I already paid externally and recorded
+              it" case. */}
           {preview && !previewLoading && count > 0 && mode !== null && (
             <div>
               <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
                 What should happen to these {count} payment{count === 1 ? '' : 's'}?
               </div>
               <div className="space-y-2">
-                {(['mark_paid', 'withdraw_pending'] as MarkPaidMode[]).map((m) => {
+                {(['mark_paid', 'mark_pending_complete'] as MarkPaidMode[]).map((m) => {
                   const active = mode === m;
                   const isMarkPaid = m === 'mark_paid';
                   const title = isMarkPaid
                     ? 'Mark all as paid'
-                    : 'Withdraw pending (reconciled by existing paid)';
+                    : 'Mark pending complete (city fully paid)';
                   const explanation = isMarkPaid
                     ? `Creates ${count} new paid record${count === 1 ? '' : 's'} summing to $${totalUsd.toFixed(2)}. Use this if you actually paid out additionally.`
-                    : `Closes out ${count} pending claim${count === 1 ? '' : 's'} without creating new paid records. Use this when you've already recorded the payment externally and the pending claims are duplicates.`;
+                    : `Closes out ${count} pending claim${count === 1 ? '' : 's'} as completed without creating new paid records. The city is fully paid even if the org paid less than the requested amount.`;
                   return (
                     <label
                       key={m}
@@ -414,8 +420,8 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
           />
 
           {/* Optional method override.
-              caciotta-92103: only meaningful for mark_paid; withdraw_pending
-              never stamps payout_method.
+              caciotta-92103 + provolone-92103: only meaningful for mark_paid;
+              mark_pending_complete never stamps payout_method.
               pinsa-92103: hidden in close-out mode — there are no in-flight
               rows for the method to stamp, so the choice is meaningless. */}
           {!isCloseOutMode && mode === 'mark_paid' && (
@@ -477,8 +483,8 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 ${
               isCloseOutMode
                 ? 'bg-emerald-600 hover:bg-emerald-700'
-                : mode === 'withdraw_pending'
-                  ? 'bg-amber-600 hover:bg-amber-700'
+                : mode === 'mark_pending_complete'
+                  ? 'bg-teal-600 hover:bg-teal-700'
                   : 'bg-red-500 hover:bg-red-600'
             }`}
           >
@@ -486,16 +492,16 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
               <Loader2 size={14} className="animate-spin" />
             ) : isCloseOutMode ? (
               <CheckCircle2 size={14} />
-            ) : mode === 'withdraw_pending' ? (
-              <Archive size={14} />
+            ) : mode === 'mark_pending_complete' ? (
+              <CheckCircle2 size={14} />
             ) : (
               <DollarSign size={14} />
             )}
             {isCloseOutMode
               ? `Close out ${cityName}`
               : count > 0
-                ? mode === 'withdraw_pending'
-                  ? `Withdraw ${count} pending claim${count === 1 ? '' : 's'}`
+                ? mode === 'mark_pending_complete'
+                  ? `Mark ${count} pending complete`
                   : `Mark ${count} payment${count === 1 ? '' : 's'} paid ($${totalUsd.toFixed(2)})`
                 : 'Mark party paid'}
           </button>

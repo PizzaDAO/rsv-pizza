@@ -30,6 +30,10 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   // already filters these out, so this style only kicks in for stale-state
   // edge cases (e.g. realtime race after withdraw).
   withdrawn: 'bg-gray-500/20 text-gray-300',
+  // provolone-92103: teal for completed (close-out) — distinct from paid's
+  // emerald so admins can tell "city was closed; org's obligation fulfilled"
+  // apart from a direct paid record.
+  completed: 'bg-teal-500/20 text-teal-300',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -39,6 +43,7 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   paid: 'Paid',
   failed: 'Failed',
   withdrawn: 'Withdrawn',
+  completed: 'Completed',
 };
 
 // arugula-38633 v3 follow-up: helper to display a method (or "Not set" placeholder).

@@ -4324,10 +4324,12 @@ export interface MarkPartyPaidPreviewResponse {
   existingPaidCount: number;
   existingPaidUsd: number;
   /**
-   * caciotta-92103: what 'auto' mode will do given the current state. The
-   * modal default-selects the radio matching this value.
+   * caciotta-92103 + provolone-92103: what 'auto' mode will do given the
+   * current state. The modal default-selects the radio matching this value.
+   * 'mark_pending_complete' replaces the legacy 'withdraw_pending' value
+   * (which is still accepted by the backend for backward compat).
    */
-  suggestedMode: 'mark_paid' | 'withdraw_pending';
+  suggestedMode: 'mark_paid' | 'mark_pending_complete';
   /**
    * pinsa-92103: count of paid payouts for the party. Powers the close-out
    * body copy ("Existing paid records (N payments, $X.XX total) stay
@@ -4379,24 +4381,26 @@ export async function fetchMarkPartyPaidPreview(
  * /api/admin/parties/:id/mark-paid.
  *
  * `action` distinguishes the executed path. The handler resolves caciotta's
- * `mode` first ('auto' picks between mark_paid and withdraw_pending) and
+ * `mode` first ('auto' picks between mark_paid and mark_pending_complete) and
  * then, if nothing is left in-flight after that resolution, pinsa's close-out
  * path may auto-stamp `paymentsClosedAt`.
  *
- *   - `'mark_paid'`       — flipped 1+ in-flight payouts to paid.
- *   - `'withdraw_pending'`— soft-withdrew pending+approved rows (caciotta).
- *   - `'closed'`          — no in-flight rows, but the city had paid history,
- *                           so we stamped `paymentsClosedAt` as a pure
- *                           close-out (pinsa).
- *   - `'already_closed'`  — no-op, city was already closed.
- *   - `'noop'`            — no in-flight, no paid history; nothing to do.
+ *   - `'mark_paid'`             — flipped 1+ in-flight payouts to paid.
+ *   - `'mark_pending_complete'` — closed out pending+approved rows by flipping
+ *                                 them to status='completed' (provolone-92103;
+ *                                 replaces caciotta's 'withdraw_pending').
+ *   - `'closed'`                — no in-flight rows, but the city had paid
+ *                                 history, so we stamped `paymentsClosedAt`
+ *                                 as a pure close-out (pinsa).
+ *   - `'already_closed'`        — no-op, city was already closed.
+ *   - `'noop'`                  — no in-flight, no paid history; nothing to do.
  *
  * `mode` is preserved for backward compat with callers that pre-dated
- * `action` — for mark_paid / withdraw_pending it mirrors `action`.
+ * `action` — for mark_paid / mark_pending_complete it mirrors `action`.
  */
 export interface MarkPartyPaidResponse {
   count: number;
-  mode?: 'mark_paid' | 'withdraw_pending';
+  mode?: 'mark_paid' | 'mark_pending_complete';
   party: {
     id: string;
     name: string;
@@ -4405,7 +4409,7 @@ export interface MarkPartyPaidResponse {
   payoutIds: string[];
   action?:
     | 'mark_paid'
-    | 'withdraw_pending'
+    | 'mark_pending_complete'
     | 'closed'
     | 'already_closed'
     | 'noop';
@@ -4417,15 +4421,17 @@ export async function markPartyPaid(
     note?: string;
     paidMethod?: PayoutMethod | 'external';
     /**
-     * caciotta-92103: how to close out the in-flight rows.
+     * caciotta-92103 + provolone-92103: how to close out the in-flight rows.
      *   'mark_paid' — legacy behavior; flips pending+approved to paid.
-     *   'withdraw_pending' — soft-withdraws pending+approved (no new paid
-     *     amounts; receipts preserved). Use when the host was already paid
-     *     externally and that payment is already on the party.
-     *   'auto' (default) — picks withdraw_pending when existing paid sum
+     *   'mark_pending_complete' — flips pending+approved to status='completed'
+     *     (no new paid amounts; receipts preserved). Means "the city was
+     *     fully paid by the org, even if the org paid less than the claim
+     *     amount." Use when marking a city paid and you want the in-flight
+     *     claims closed out as completed.
+     *   'auto' (default) — picks mark_pending_complete when existing paid sum
      *     >= pending+approved sum; else mark_paid.
      */
-    mode?: 'mark_paid' | 'withdraw_pending' | 'auto';
+    mode?: 'mark_paid' | 'mark_pending_complete' | 'auto';
   },
 ): Promise<MarkPartyPaidResponse> {
   return apiRequest<MarkPartyPaidResponse>(
