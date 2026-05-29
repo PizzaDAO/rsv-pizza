@@ -90,7 +90,13 @@ export const PaymentDetailsCard: React.FC = () => {
   const methodValid = useMemo(() => {
     if (method == null) return false;
     if (method === 'usdc_base') {
-      return /^0x[0-9a-fA-F]{40}$/.test(walletAddress.trim());
+      // nduja-92103: accept hex OR ENS (matches PayoutMethodPicker
+      // taleggio-30219). Strict 0x-only check silently grayed out
+      // the autosave for hosts typing puebla.eth-style names.
+      const trimmed = walletAddress.trim();
+      const isHex = /^0x[0-9a-fA-F]{40}$/.test(trimmed);
+      const isEns = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(trimmed);
+      return isHex || isEns;
     }
     if (method === 'wire') {
       // arugula-38633 (follow-up): wire is now a single email field —
