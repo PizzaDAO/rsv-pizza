@@ -13,6 +13,7 @@ import {
   DollarSign,
   Send,
   Undo2,
+  Coins,
 } from 'lucide-react';
 import type { AdminPayout, PartyPayoutsRow, PayoutStatus } from '../../types';
 import { PayoutRow } from '../payments-shared';
@@ -43,6 +44,20 @@ interface PayoutsByPartyTableProps {
   onUnapprove?: (id: string) => void;
   onHostClick?: (userId: string) => void;
   onCapUpdated?: (partyId: string) => void;
+  /**
+   * bocconcini-92103: open MarkPartyPaidModal for the row's party so the
+   * admin can flip every in-flight (pending + approved) payout for the city
+   * paid in one go. Same handler used by PrepayQueueTable and the
+   * PayoutReviewModal footer. Hidden for underbosses (funds-team-only).
+   */
+  onMarkPartyPaid?: (partyId: string) => void;
+  /**
+   * bocconcini-92103: viewer role. Defaults to `'admin'` so existing callers
+   * keep the full action set. `'underboss'` hides the per-row "Mark paid"
+   * button — flipping payouts to paid is a funds-acknowledgement action
+   * reserved for admins.
+   */
+  viewerRole?: 'admin' | 'underboss';
   busyRowId?: string | null;
   loading?: boolean;
 }
@@ -180,11 +195,17 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onUnapprove,
   onHostClick,
   onCapUpdated,
+  onMarkPartyPaid,
+  viewerRole = 'admin',
   busyRowId,
   loading,
 }) => {
   // Default state: all collapsed. Tracks `party.id`s the admin has expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // bocconcini-92103: funds-acknowledgement action — admin-only. Underbosses
+  // see the by-city table read-only for this column.
+  const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
 
   function toggleExpanded(partyId: string) {
     setExpanded((prev) => {
@@ -229,6 +250,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
             {rows.map((row) => {
               const isOpen = expanded.has(row.party.id);
               const partySlug = row.party.customUrl ?? row.party.inviteCode ?? '';
+              // bocconcini-92103: surface a per-row "Mark paid" button on
+              // cities with any in-flight (pending OR approved) payouts so
+              // admins can flip everything to paid in one click without
+              // expanding the row first. Hidden when there's nothing to do
+              // (no pending/approved rows) and for underboss viewers.
+              const hasInFlight =
+                row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
+              const showMarkPartyPaid = canMarkPartyPaid && hasInFlight;
               return (
                 <React.Fragment key={row.party.id}>
                   {/* Outer party row */}
@@ -304,8 +333,28 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                       )}
                     </td>
                     <td className="px-3 py-3 text-sm text-theme-text-secondary">
-                      <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
-                        {relativeTime(new Date(row.aggregates.lastActivityAt))}
+                      <div className="flex items-center justify-between gap-2">
+                        <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
+                          {relativeTime(new Date(row.aggregates.lastActivityAt))}
+                        </div>
+                        {/* bocconcini-92103: per-row "Mark paid" — bridges
+                            the panettone modal into the by-city default view.
+                            Click stops propagation so it doesn't toggle the
+                            row's expansion. */}
+                        {showMarkPartyPaid && onMarkPartyPaid && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onMarkPartyPaid(row.party.id);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs font-medium"
+                            title="Mark all pending + approved payments paid for this city"
+                          >
+                            <Coins size={12} />
+                            Mark paid
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
