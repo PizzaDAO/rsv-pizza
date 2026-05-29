@@ -325,6 +325,7 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
     const yesno: Record<string, { yes: number; no: number }> = {};
     const multiple: Record<string, Record<string, number>> = {};
     const comments: Record<string, string[]> = {};
+    const otherTexts: Record<string, string[]> = {};
 
     for (const q of SURVEY_QUESTION_SET) {
       if (q.type === 'rating') ratings[q.id] = { sum: 0, count: 0, average: null };
@@ -333,6 +334,7 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
         multiple[q.id] = {};
         for (const opt of q.options ?? []) multiple[q.id][opt] = 0;
       } else if (q.type === 'text') comments[q.id] = [];
+      if (q.allowOther) otherTexts[q.id] = [];
     }
 
     for (const r of responses) {
@@ -357,6 +359,15 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
           comments[q.id].push(v.trim());
         }
       }
+      // Collect "Other" custom-text free responses for any question with allowOther.
+      for (const q of SURVEY_QUESTION_SET) {
+        if (!q.allowOther) continue;
+        const otherRaw = a[`${q.id}_other`];
+        if (typeof otherRaw === 'string') {
+          const trimmed = otherRaw.trim();
+          if (trimmed.length > 0) otherTexts[q.id].push(trimmed);
+        }
+      }
     }
 
     for (const id of Object.keys(ratings)) {
@@ -374,6 +385,7 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
       yesno,
       multiple,
       comments,
+      otherTexts,
     });
   } catch (error) {
     next(error);

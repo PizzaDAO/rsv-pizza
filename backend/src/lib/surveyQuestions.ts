@@ -14,6 +14,7 @@ export interface SurveyQuestion {
   scale?: number;     // for type 'rating' — max value (ratings are 1..scale)
   multi?: boolean;    // for type 'multiple' — true = multi-select, false/absent = single-select
   options?: string[]; // for type 'multiple'
+  allowOther?: boolean; // for type 'multiple' — when true and user picks "Other", a sibling `${id}_other` free-text field is persisted
 }
 
 export const SURVEY_QUESTION_SET_VERSION = 1;
@@ -42,6 +43,7 @@ export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
     multi: false,
     text: 'How did you hear about this event?',
     options: ['A friend', 'Twitter/X', 'The organizer', 'Other'],
+    allowOther: true,
   },
   {
     id: 'highlight',
@@ -123,6 +125,21 @@ export function validateSurveyAnswers(
           out[q.id] = v.trim().slice(0, 5000);
         }
         break;
+      }
+    }
+
+    // "Other" custom-text sibling key for questions that opt in via allowOther.
+    // We only persist `${qid}_other` when the chosen value of `qid` is strictly
+    // the literal string "Other" AND a non-empty trimmed string remains. This
+    // strips stale `_other` values when the user switches their choice.
+    if (q.allowOther) {
+      const otherKey = `${q.id}_other`;
+      const rawOther = input[otherKey];
+      if (typeof rawOther === 'string' && out[q.id] === 'Other') {
+        const trimmed = rawOther.trim();
+        if (trimmed.length > 0) {
+          out[otherKey] = trimmed.slice(0, 200);
+        }
       }
     }
   }
