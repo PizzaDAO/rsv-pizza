@@ -552,6 +552,14 @@ function serializePayout(row: any): any {
       ocrAmount: d.ocrAmount == null ? null : Number(d.ocrAmount),
       ocrCurrency: d.ocrCurrency,
       ocrConfidence: d.ocrConfidence == null ? null : Number(d.ocrConfidence),
+      // mortadella-92103: per-receipt FX. Drives the reviewer pill
+      // ("$X.YZ USD (1234.56 MXN @ rate)") so admins can see exactly what
+      // each receipt was converted from. Null for receipts uploaded before
+      // mortadella-92103 — those rows still have the parent payout's
+      // headline FX, but no per-doc detail.
+      originalAmount: d.originalAmount == null ? null : Number(d.originalAmount),
+      originalCurrency: d.originalCurrency,
+      exchangeRate: d.exchangeRate == null ? null : Number(d.exchangeRate),
       ocrError: d.ocrError,
       sortOrder: d.sortOrder,
       // pancetta-37195: per-doc uploader attribution. Live name from the
@@ -3518,13 +3526,25 @@ router.patch(
           payoutId: true,
           ocrAmount: true,
           ocrCurrency: true,
+          // mortadella-92103: pull the existing original-amount + raw OCR
+          // payload so we can re-run FX when admin changes the currency.
+          originalAmount: true,
+          originalCurrency: true,
+          exchangeRate: true,
+          ocrRaw: true,
         },
       });
       if (!doc) {
         throw new AppError('Document not found', 404, 'NOT_FOUND');
       }
 
-      const data: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
+      const data: {
+        ocrAmount?: number | null;
+        ocrCurrency?: string | null;
+        originalAmount?: number | null;
+        originalCurrency?: string | null;
+        exchangeRate?: number | null;
+      } = {};
 
       if (body.ocrAmount !== undefined) {
         if (body.ocrAmount === null) {
@@ -3558,6 +3578,100 @@ router.patch(
         }
       }
 
+      // mortadella-92103: when admin changes the currency on a doc that has
+      // a known original-amount (either persisted in the column or buried in
+      // ocrRaw.ocr.amount), re-run FX so ocr_amount is the correctly-converted
+      // USD value. Admin can override by passing both ocrAmount + ocrCurrency
+      // explicitly; in that case we trust the admin's numbers and skip FX.
+      const currencyChanged =
+        data.ocrCurrency !== undefined && data.ocrCurrency !== doc.ocrCurrency;
+      const adminSetBothExplicitly =
+        body.ocrAmount !== undefined && body.ocrCurrency !== undefined;
+
+      if (currencyChanged && !adminSetBothExplicitly && data.ocrCurrency != null) {
+        // Resolve the original foreign-currency amount. Preference order:
+        //   1. body.originalAmount if the admin provided it
+        //   2. the existing originalAmount column (mortadella-92103+)
+        //   3. ocrRaw.ocr.amount (pre-mortadella-92103 rows)
+        let originalAmount: number | null = null;
+        if (body.originalAmount !== undefined && body.originalAmount !== null) {
+          const n = Number(body.originalAmount);
+          if (!Number.isFinite(n) || n <= 0) {
+            throw new AppError(
+              'originalAmount must be a positive number',
+              400,
+              'VALIDATION_ERROR',
+            );
+          }
+          originalAmount = n;
+        } else if (doc.originalAmount != null) {
+          originalAmount = Number(doc.originalAmount.toString());
+        } else if (
+          doc.ocrRaw
+          && typeof doc.ocrRaw === 'object'
+          && 'ocr' in (doc.ocrRaw as any)
+          && typeof (doc.ocrRaw as any).ocr?.amount === 'number'
+        ) {
+          originalAmount = (doc.ocrRaw as any).ocr.amount;
+        }
+
+        if (originalAmount == null) {
+          throw new AppError(
+            'Cannot re-convert FX: original-currency amount unknown. Pass originalAmount in the body, or set both ocrAmount and ocrCurrency explicitly.',
+            400,
+            'FX_ORIGINAL_AMOUNT_MISSING',
+          );
+        }
+
+        const { convertToUSD } = await import('../services/fx.service.js');
+        const fx = await convertToUSD(originalAmount, data.ocrCurrency);
+        if (fx.source === 'unresolved' || fx.usdAmount == null) {
+          throw new AppError(
+            `Could not convert ${originalAmount} ${data.ocrCurrency} to USD — unresolved currency.`,
+            400,
+            'CURRENCY_UNRESOLVED',
+          );
+        }
+        if (fx.source === 'unknown') {
+          throw new AppError(
+            `Could not look up exchange rate for currency "${data.ocrCurrency}".`,
+            400,
+            'UNKNOWN_CURRENCY',
+          );
+        }
+        data.ocrAmount = fx.usdAmount;
+        data.originalAmount = originalAmount;
+        data.originalCurrency = fx.originalCurrency;
+        data.exchangeRate = fx.exchangeRate;
+      } else if (
+        body.originalAmount !== undefined
+        && body.originalAmount !== null
+        && data.originalAmount === undefined
+      ) {
+        // Admin updated originalAmount directly (e.g. correcting a misread
+        // number on an already-correct currency). Re-run FX on the doc's
+        // existing currency too.
+        const n = Number(body.originalAmount);
+        if (!Number.isFinite(n) || n <= 0) {
+          throw new AppError(
+            'originalAmount must be a positive number',
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        const cur = data.ocrCurrency ?? doc.ocrCurrency;
+        if (cur) {
+          const { convertToUSD } = await import('../services/fx.service.js');
+          const fx = await convertToUSD(n, cur);
+          if (fx.usdAmount != null && fx.exchangeRate != null) {
+            data.ocrAmount = fx.usdAmount;
+            data.originalAmount = n;
+            data.originalCurrency = fx.originalCurrency;
+            data.exchangeRate = fx.exchangeRate;
+          }
+        }
+      }
+
       if (Object.keys(data).length === 0) {
         throw new AppError('No editable fields supplied', 400, 'VALIDATION_ERROR');
       }
@@ -3581,6 +3695,20 @@ router.patch(
             ocrCurrency: data.ocrCurrency === undefined
               ? undefined
               : data.ocrCurrency,
+            // mortadella-92103: persist the re-derived FX detail when set.
+            originalAmount: data.originalAmount === undefined
+              ? undefined
+              : data.originalAmount === null
+                ? null
+                : (data.originalAmount as any),
+            originalCurrency: data.originalCurrency === undefined
+              ? undefined
+              : data.originalCurrency,
+            exchangeRate: data.exchangeRate === undefined
+              ? undefined
+              : data.exchangeRate === null
+                ? null
+                : (data.exchangeRate as any),
           },
         });
 
@@ -3626,6 +3754,12 @@ router.patch(
           ocrAmount: updated.ocrAmount == null ? null : Number(updated.ocrAmount),
           ocrCurrency: updated.ocrCurrency,
           ocrConfidence: updated.ocrConfidence == null ? null : Number(updated.ocrConfidence),
+          // mortadella-92103: surface the per-receipt FX detail so the
+          // reviewer modal can render an inline "X.YZ CUR → $X.YZ USD"
+          // pill without re-fetching.
+          originalAmount: updated.originalAmount == null ? null : Number(updated.originalAmount),
+          originalCurrency: updated.originalCurrency,
+          exchangeRate: updated.exchangeRate == null ? null : Number(updated.exchangeRate),
           ocrError: updated.ocrError,
           sortOrder: updated.sortOrder,
           uploadedByUserId: updated.uploadedByUserId ?? null,

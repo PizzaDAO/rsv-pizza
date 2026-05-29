@@ -53,14 +53,29 @@ export const FALLBACK_RATES_TO_USD: Record<string, number> = {
   ZAR: 0.055,
 };
 
-export type FxSource = 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown';
+export type FxSource =
+  | 'jsdelivr'
+  | 'frankfurter'
+  | 'fallback'
+  | 'usd-passthrough'
+  | 'unknown'
+  // mortadella-92103: the OCR couldn't determine a currency and no override
+  // was supplied. Callers MUST surface this as ocrError = 'CURRENCY_UNRESOLVED'
+  // and refuse to count the receipt toward the USD sum.
+  | 'unresolved';
 
 export interface FxConversionResult {
-  usdAmount: number;
-  exchangeRate: number;
+  // mortadella-92103: when source === 'unresolved' the receipt should be
+  // surfaced to the host/admin for manual currency selection. We don't write
+  // a synthetic USD value — usdAmount is null in that case, NOT zero, so the
+  // caller can distinguish "skip from sum" from "$0 receipt".
+  usdAmount: number | null;
+  exchangeRate: number | null;
   originalAmount: number;
-  originalCurrency: string;
+  originalCurrency: string | null;
   source: FxSource;
+  /** Set when source === 'unresolved'. */
+  error?: 'CURRENCY_UNRESOLVED';
 }
 
 /**
@@ -68,12 +83,35 @@ export interface FxConversionResult {
  * Returns a normalized `originalCurrency`, the locked `exchangeRate`,
  * and which provider supplied the rate (`source`).
  *
+ * Refuses to convert when `fromCurrency` is null/empty/'UNKNOWN' — returns
+ * `source: 'unresolved'` so the caller can surface CURRENCY_UNRESOLVED on
+ * the doc instead of silently writing the raw amount as USD.
+ *
  * Never throws — falls back through the cascade and ultimately returns a
- * passthrough (rate=1) if no provider can serve the currency. Callers should
- * check `source === 'unknown'` if they want to flag suspicious conversions.
+ * passthrough (rate=1) if no provider can serve a *known* currency. Callers
+ * should check `source === 'unknown'` for flag-but-still-accept conversions,
+ * and `source === 'unresolved'` for refuse-to-convert.
  */
-export async function convertToUSD(amount: number, fromCurrency: string): Promise<FxConversionResult> {
-  const normalizedCurrency = CURRENCY_MAP[fromCurrency] || fromCurrency.toUpperCase();
+export async function convertToUSD(
+  amount: number,
+  fromCurrency: string | null | undefined,
+): Promise<FxConversionResult> {
+  // mortadella-92103: refuse the passthrough when currency is missing or
+  // explicitly 'UNKNOWN'. Previously this branched into the USD passthrough
+  // (rate=1), silently stamping the raw foreign-currency amount as USD.
+  const rawInput = typeof fromCurrency === 'string' ? fromCurrency.trim() : '';
+  if (rawInput.length === 0 || rawInput.toUpperCase() === 'UNKNOWN') {
+    return {
+      usdAmount: null,
+      exchangeRate: null,
+      originalAmount: amount,
+      originalCurrency: null,
+      source: 'unresolved',
+      error: 'CURRENCY_UNRESOLVED',
+    };
+  }
+
+  const normalizedCurrency = CURRENCY_MAP[rawInput] || rawInput.toUpperCase();
 
   if (normalizedCurrency === 'USD') {
     return {

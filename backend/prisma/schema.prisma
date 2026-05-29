@@ -1754,6 +1754,13 @@ model PayoutDocument {
   ocrAmount        Decimal? @map("ocr_amount") @db.Decimal(12, 2)
   ocrCurrency      String?  @map("ocr_currency")
   ocrConfidence    Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
+  // mortadella-92103: per-receipt FX persistence so non-USD receipts can be
+  // re-converted in-place when the admin corrects the currency, and so the
+  // reviewer modal can render the original-currency amount per receipt
+  // without re-parsing ocrRaw. ocrAmount stays the USD-converted value.
+  originalAmount   Decimal? @map("original_amount") @db.Decimal(14, 4)
+  originalCurrency String?  @map("original_currency") @db.Char(3)
+  exchangeRate     Decimal? @map("exchange_rate") @db.Decimal(18, 8)
   ocrRaw           Json?    @map("ocr_raw")
   // formaggi-89172: structured per-line items extracted from the receipt OCR.
   // Schema is OcrLineItem[] (see backend/src/services/ocr.service.ts) — each

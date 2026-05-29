@@ -119,6 +119,12 @@ function serializeDocument(d: any) {
     ocrAmount: d.ocrAmount != null ? numberFromDecimal(d.ocrAmount) : null,
     ocrCurrency: d.ocrCurrency ?? null,
     ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
+    // mortadella-92103: per-receipt FX detail. Old rows have null for all
+    // three (no migration backfill — the parent payout's headline FX is
+    // still the source of truth for those).
+    originalAmount: d.originalAmount != null ? numberFromDecimal(d.originalAmount) : null,
+    originalCurrency: d.originalCurrency ?? null,
+    exchangeRate: d.exchangeRate != null ? numberFromDecimal(d.exchangeRate) : null,
     ocrError: d.ocrError ?? null,
     sortOrder: d.sortOrder,
     // pancetta-37195: surface the per-doc uploader so cohosts can tell who
@@ -465,22 +471,40 @@ router.post(
 
       assertSupabasePayoutUrl(imageUrl, partyId);
 
-      const ocr = await analyzeReceipt(imageUrl);
+      // mortadella-92103: country prior for ambiguous-symbol receipts. We
+      // already loaded the canEdit signal above; pulling country here is a
+      // single extra column read.
+      const partyForCountry = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { country: true },
+      });
+      const ocr = await analyzeReceipt({
+        imageUrl,
+        partyCountry: partyForCountry?.country ?? null,
+      });
       const fx = await convertToUSD(ocr.amount, ocr.currency);
 
+      // mortadella-92103: when FX can't resolve (no currency from OCR + no
+      // country prior + no override), surface that to the host so they can
+      // fix it with the currency override dropdown. We still return shape-
+      // compatible fields so the frontend type doesn't have to branch.
+      const unresolved = fx.source === 'unresolved';
       res.json({
-        amount: fx.usdAmount,
+        amount: unresolved ? 0 : (fx.usdAmount ?? 0),
         currency: 'USD',
         originalAmount: fx.originalAmount,
-        originalCurrency: fx.originalCurrency,
-        exchangeRate: fx.exchangeRate,
+        originalCurrency: unresolved ? '' : (fx.originalCurrency ?? ''),
+        exchangeRate: unresolved ? 0 : (fx.exchangeRate ?? 0),
         confidence: ocr.confidence,
         items: ocr.items,
         fxSource: fx.source,
-        conversionNote:
-          fx.originalCurrency !== 'USD'
+        conversionNote: unresolved
+          ? `Currency could not be determined automatically — please pick the correct currency to convert ${fx.originalAmount.toLocaleString()} to USD.`
+          : fx.originalCurrency && fx.originalCurrency !== 'USD' && fx.usdAmount != null && fx.exchangeRate != null
             ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate.toFixed(6)} USD)`
             : undefined,
+        // mortadella-92103: explicit signal so the frontend can warn the host.
+        ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
       });
     } catch (error) {
       next(error);
@@ -535,9 +559,10 @@ router.post(
       const fx = await convertToUSD(amt, originalCurrency.trim());
 
       // convertToUSD never throws — it returns source='unknown' with rate=1
-      // when no provider can serve the currency. Reject that case so the
-      // host gets explicit feedback (and so the dropdown reverts client-side).
-      if (fx.source === 'unknown') {
+      // when no provider can serve the currency, and 'unresolved' when no
+      // currency was supplied at all. Reject those so the host gets explicit
+      // feedback (and so the dropdown reverts client-side).
+      if (fx.source === 'unknown' || fx.source === 'unresolved') {
         throw new AppError(
           `Could not look up exchange rate for currency "${originalCurrency.trim().toUpperCase()}".`,
           400,
@@ -545,15 +570,18 @@ router.post(
         );
       }
 
+      // After the guard above, usdAmount/exchangeRate/originalCurrency are
+      // all non-null. Use `!` rather than coalescing zeros so a future bug
+      // surfaces as a 500 instead of a silent $0 stamp.
       res.json({
-        usdAmount: fx.usdAmount,
+        usdAmount: fx.usdAmount!,
         originalAmount: fx.originalAmount,
-        originalCurrency: fx.originalCurrency,
-        exchangeRate: fx.exchangeRate,
+        originalCurrency: fx.originalCurrency!,
+        exchangeRate: fx.exchangeRate!,
         source: fx.source,
         conversionNote:
           fx.originalCurrency !== 'USD'
-            ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate.toFixed(6)} USD)`
+            ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount!.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate!.toFixed(6)} USD)`
             : undefined,
       });
     } catch (error) {
@@ -787,6 +815,16 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       assertSupabasePayoutUrl(p.url, partyId);
     }
 
+    // mortadella-92103: read the party's country once so OCR can use it as a
+    // currency prior when the receipt symbol is ambiguous (the `$` problem
+    // in MX/AR/CL/CO/UY/...). One column read, hoisted above the parallel
+    // OCR fan-out so it's shared across receipts.
+    const partyForOcr = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { country: true },
+    });
+    const partyCountry = partyForOcr?.country ?? null;
+
     // arugula-38633 v3 follow-up: skip the parallel-OCR step when there are
     // no receipts — the host supplied `finalAmountUsd` directly. FX fields
     // collapse to USD passthrough below.
@@ -798,7 +836,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       : await Promise.allSettled(
           (receiptPhotos as IncomingDocument[]).map(async (r) => {
             try {
-              const ocr = await analyzeReceipt(r.url);
+              const ocr = await analyzeReceipt({ imageUrl: r.url, partyCountry });
               const fx = await convertToUSD(ocr.amount, ocr.currency);
               return { ok: true as const, doc: r, ocr, fx };
             } catch (err: any) {
@@ -828,6 +866,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       ocrAmount: Decimal | null;
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
+      // mortadella-92103: per-receipt original-amount / original-currency /
+      // exchange-rate columns. ocrAmount stays USD; these capture what the
+      // host actually paid in the source currency + the locked FX rate.
+      originalAmount: Decimal | null;
+      originalCurrency: string | null;
+      exchangeRate: Decimal | null;
       ocrRaw: any;
       // formaggi-89172: per-line structured items extracted from the receipt.
       // null for pizza-photo rows + receipts whose OCR errored.
@@ -847,12 +891,20 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       const doc = (receiptPhotos as IncomingDocument[])[idx];
       if (result && result.ok) {
         const { ocr, fx } = result;
-        extractedUsdSum += fx.usdAmount;
-        if (!foundFirstRate) {
-          originalAmount = fx.originalAmount;
-          originalCurrency = fx.originalCurrency;
-          exchangeRate = fx.exchangeRate;
-          foundFirstRate = true;
+        // mortadella-92103: refuse to count an unresolved-currency receipt
+        // toward the sum. The row is still persisted (so the receipt image
+        // and OCR amount are preserved for forensics + host override) but
+        // ocrAmount is NULL and ocrError carries CURRENCY_UNRESOLVED. Host
+        // /admin must pick the correct currency via the override dropdown.
+        const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
+        if (!unresolved) {
+          extractedUsdSum += fx.usdAmount!;
+          if (!foundFirstRate) {
+            originalAmount = fx.originalAmount;
+            originalCurrency = fx.originalCurrency ?? 'USD';
+            exchangeRate = fx.exchangeRate ?? 1;
+            foundFirstRate = true;
+          }
         }
         docsToCreate.push({
           kind: 'receipt',
@@ -860,13 +912,19 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           fileName: doc.fileName || extractFileName(doc.url),
           fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
           mimeType: doc.mimeType || 'image/jpeg',
-          ocrAmount: new Decimal(fx.usdAmount),
-          ocrCurrency: fx.originalCurrency,
+          ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
+          ocrCurrency: unresolved ? null : fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
+          // mortadella-92103: persist the raw foreign-currency amount + ISO
+          // code + locked rate per receipt. Even unresolved rows carry
+          // originalAmount (the host needs to see what the receipt said).
+          originalAmount: new Decimal(fx.originalAmount),
+          originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+          exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
           // formaggi-89172: structured per-line items for pizza-price analytics.
           ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
-          ocrError: null,
+          ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
           sortOrder: idx,
           photoId: null,
         });
@@ -881,6 +939,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrAmount: null,
           ocrCurrency: null,
           ocrConfidence: null,
+          originalAmount: null,
+          originalCurrency: null,
+          exchangeRate: null,
           ocrRaw: null,
           ocrLineItems: null,
           ocrError: err,
@@ -902,6 +963,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrAmount: null,
         ocrCurrency: null,
         ocrConfidence: null,
+        // mortadella-92103: pizza photos have no FX detail.
+        originalAmount: null,
+        originalCurrency: null,
+        exchangeRate: null,
         ocrRaw: null,
         ocrLineItems: null,
         ocrError: null,
@@ -1474,6 +1539,13 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       }
     }
 
+    // mortadella-92103: country prior for OCR (`$` ambiguity).
+    const partyForPatchOcr = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { country: true },
+    });
+    const patchPartyCountry = partyForPatchOcr?.country ?? null;
+
     // Run OCR on each new receipt in parallel BEFORE the transaction so the
     // transaction stays short and we can roll up the new OCR sum cleanly.
     const ocrResults = newReceipts.length === 0
@@ -1481,7 +1553,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       : await Promise.allSettled(
           newReceipts.map(async (r) => {
             try {
-              const ocr = await analyzeReceipt(r.url);
+              const ocr = await analyzeReceipt({
+                imageUrl: r.url,
+                partyCountry: patchPartyCountry,
+              });
               const fx = await convertToUSD(ocr.amount, ocr.currency);
               return { ok: true as const, doc: r, ocr, fx };
             } catch (err: any) {
@@ -1500,6 +1575,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrAmount: Decimal | null;
       ocrCurrency: string | null;
       ocrConfidence: Decimal | null;
+      // mortadella-92103: per-receipt FX persistence.
+      originalAmount: Decimal | null;
+      originalCurrency: string | null;
+      exchangeRate: Decimal | null;
       ocrRaw: any;
       // formaggi-89172: per-line structured items extracted from the receipt.
       ocrLineItems: any;
@@ -1525,13 +1604,18 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       const result = settled.status === 'fulfilled' ? settled.value : null;
       if (result && result.ok) {
         const { ocr, fx } = result;
-        newOcrSum += fx.usdAmount;
-        if (firstFxBox.value === null) {
-          firstFxBox.value = {
-            originalAmount: fx.originalAmount,
-            originalCurrency: fx.originalCurrency,
-            exchangeRate: fx.exchangeRate,
-          };
+        // mortadella-92103: don't count unresolved-currency receipts in the
+        // sum. Same rules as the POST aggregator.
+        const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
+        if (!unresolved) {
+          newOcrSum += fx.usdAmount!;
+          if (firstFxBox.value === null && fx.originalCurrency && fx.exchangeRate != null) {
+            firstFxBox.value = {
+              originalAmount: fx.originalAmount,
+              originalCurrency: fx.originalCurrency,
+              exchangeRate: fx.exchangeRate,
+            };
+          }
         }
         newReceiptDocs.push({
           kind: 'receipt',
@@ -1539,13 +1623,16 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           fileName: doc.fileName || extractFileName(doc.url),
           fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
           mimeType: doc.mimeType || 'image/jpeg',
-          ocrAmount: new Decimal(fx.usdAmount),
-          ocrCurrency: fx.originalCurrency,
+          ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
+          ocrCurrency: unresolved ? null : fx.originalCurrency,
           ocrConfidence: new Decimal(ocr.confidence),
+          originalAmount: new Decimal(fx.originalAmount),
+          originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+          exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
           ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
           // formaggi-89172: structured per-line items for pizza-price analytics.
           ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
-          ocrError: null,
+          ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
           sortOrder: i,
           photoId: null,
         });
@@ -1560,6 +1647,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrAmount: null,
           ocrCurrency: null,
           ocrConfidence: null,
+          originalAmount: null,
+          originalCurrency: null,
+          exchangeRate: null,
           ocrRaw: null,
           ocrLineItems: null,
           ocrError: err,
@@ -1578,6 +1668,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrAmount: null,
       ocrCurrency: null,
       ocrConfidence: null,
+      // mortadella-92103: pizza photos have no FX detail.
+      originalAmount: null as Decimal | null,
+      originalCurrency: null as string | null,
+      exchangeRate: null as Decimal | null,
       ocrRaw: null,
       ocrLineItems: null,
       ocrError: null,
