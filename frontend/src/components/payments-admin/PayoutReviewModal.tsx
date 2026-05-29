@@ -421,13 +421,38 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // bottarga-92103: event-level photos from the party's Photos tab. Separate
   // from payment-app photos (`payout.documents`). Optional on the wire — older
   // cached responses simply render an empty section.
-  const eventPhotos = useMemo(
+  //
+  // focaccia-92104: split party.photos into "Pizza photos" (tag `Pizza` — the
+  // default-tagger value — or `pizza-selfie`, the EventPage selfie tag) and
+  // "Event photos" (everything else). Case-insensitive to tolerate legacy
+  // casing. `tags` may be missing on older cached payloads, in which case the
+  // photo falls into Event photos.
+  const allEventPhotos = useMemo(
     () => payout.eventPhotos ?? [],
     [payout.eventPhotos],
   );
-  // Unified lightbox carousel: payment-app pizzas → payment-app receipts →
-  // event-level photos. Order matters so `lightboxIndex` from each thumbnail
-  // grid resolves to the right starting image.
+  const pizzaPhotos = useMemo(
+    () => allEventPhotos.filter((p) =>
+      (p.tags ?? []).some((t) => {
+        const tl = t.toLowerCase();
+        return tl === 'pizza' || tl === 'pizza-selfie';
+      })
+    ),
+    [allEventPhotos],
+  );
+  const eventPhotos = useMemo(
+    () => allEventPhotos.filter((p) =>
+      !(p.tags ?? []).some((t) => {
+        const tl = t.toLowerCase();
+        return tl === 'pizza' || tl === 'pizza-selfie';
+      })
+    ),
+    [allEventPhotos],
+  );
+  // Unified lightbox carousel order (focaccia-92104):
+  //   pizzas (payment-app) → receipts → pizzaPhotos → eventPhotos
+  // Order matters so each thumbnail grid's offset into `allPhotos` resolves
+  // to the right starting image.
   const allPhotos = useMemo(
     () => [
       ...pizzas.map((d) => ({
@@ -440,13 +465,18 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         fileName: d.fileName,
         mimeType: d.mimeType,
       })),
+      ...pizzaPhotos.map((p) => ({
+        url: p.url,
+        fileName: p.fileName,
+        mimeType: p.mimeType,
+      })),
       ...eventPhotos.map((p) => ({
         url: p.url,
         fileName: p.fileName,
         mimeType: p.mimeType,
       })),
     ],
-    [pizzas, receipts, eventPhotos],
+    [pizzas, receipts, pizzaPhotos, eventPhotos],
   );
 
   async function saveReceiptEdit(docId: string) {
@@ -826,72 +856,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
         <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
           {/* Left: photo galleries
-              bottarga-92103: split into two sections — payment-app docs (the
-              original "Photos" grid) and event-level photos uploaded via the
-              host Photos tab. The lightbox carousel is one merged array
-              (pizzas → receipts → eventPhotos) so arrow-key nav crosses both
-              sections seamlessly. */}
+              focaccia-92104: three explicit sections — Event photos, Pizza
+              photos, Receipts. The party.photos list is split by tag
+              (`Pizza` / `pizza-selfie` → Pizza photos; everything else →
+              Event photos). The kind=pizza payment-app screenshots are
+              demoted to "Payment proof" under Payments on the right.
+              Lightbox carousel order: pizzas → receipts → pizzaPhotos →
+              eventPhotos so arrow-key nav crosses all sections. */}
           <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-theme-text mb-2">
-                Payment-app photos ({pizzas.length + receipts.length})
-              </h3>
-              {pizzas.length + receipts.length === 0 && (
-                <p className="text-sm text-theme-text-faint">No payment-app photos attached.</p>
-              )}
-              <div className="grid grid-cols-3 gap-2">
-                {[...pizzas, ...receipts].map((doc, idx) => (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    onClick={() => setLightboxIndex(idx)}
-                    className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                    title={doc.fileName}
-                  >
-                    {/* melanzane-92103: per bottarga-92103, hosts can attach
-                        videos to payment-app pizza photos. Browsers can't
-                        render `.mp4`/`.mov` via <img>, so detect video by
-                        mimeType (or extension fallback for missing MIMEs) and
-                        render a <video> with `preload="metadata"` so the
-                        browser fetches the first frame as a poster. */}
-                    {isVideoFile(doc) ? (
-                      <>
-                        <video
-                          src={doc.url}
-                          preload="metadata"
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="bg-black/50 rounded-full p-3">
-                            <Play className="text-white" size={20} fill="white" />
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      /* bocconcino-92104: PDF receipts thumbnail off their
-                          sibling `.thumb.png` (rendered client-side at upload).
-                          Image receipts render via the canonical URL. */
-                      <img
-                        src={isPdfFile(doc) ? derivePdfThumbnailUrl(doc.url) : doc.url}
-                        alt={doc.fileName}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <span
-                      className={`absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                        doc.kind === 'receipt' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                      }`}
-                    >
-                      {doc.kind}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div>
               <h3 className="text-sm font-semibold text-theme-text mb-2">
                 Event photos ({eventPhotos.length})
@@ -901,9 +873,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   {eventPhotos.map((p, idx) => {
-                    // Carousel index: event photos sit after the payment-app
-                    // pizzas + receipts in the merged `allPhotos` array.
-                    const carouselIdx = pizzas.length + receipts.length + idx;
+                    // focaccia-92104: event photos sit at the END of the
+                    // merged carousel.
+                    const carouselIdx =
+                      pizzas.length + receipts.length + pizzaPhotos.length + idx;
                     const isHidden = p.status !== 'approved';
                     return (
                       <button
@@ -953,6 +926,131 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             ★
                           </span>
                         )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* focaccia-92104: Pizza photos — party.photos tagged
+                `Pizza` (default tagger) or `pizza-selfie` (EventPage). */}
+            <div>
+              <h3 className="text-sm font-semibold text-theme-text mb-2">
+                Pizza photos ({pizzaPhotos.length})
+              </h3>
+              {pizzaPhotos.length === 0 ? (
+                <p className="text-sm text-theme-text-faint">No pizza photos yet.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {pizzaPhotos.map((p, idx) => {
+                    // focaccia-92104: pizza photos sit between receipts and
+                    // event photos in the merged carousel.
+                    const carouselIdx = pizzas.length + receipts.length + idx;
+                    const isHidden = p.status !== 'approved';
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setLightboxIndex(carouselIdx)}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                        title={p.caption || p.fileName}
+                      >
+                        {isVideoFile(p) ? (
+                          <>
+                            <video
+                              src={p.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/50 rounded-full p-3">
+                                <Play className="text-white" size={20} fill="white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img
+                            src={p.thumbnailUrl || p.url}
+                            alt={p.fileName}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                        {isHidden && (
+                          <span
+                            className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-white"
+                            title={`Photo status: ${p.status} — not visible to the public`}
+                          >
+                            Hidden
+                          </span>
+                        )}
+                        {p.starred && (
+                          <span className="absolute top-1 right-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-400 text-black">
+                            ★
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* focaccia-92104: Receipts photo grid — kind=receipt
+                PayoutDocuments. The per-receipt OCR list on the right is the
+                editable companion to these thumbnails. */}
+            <div>
+              <h3 className="text-sm font-semibold text-theme-text mb-2">
+                Receipts ({receipts.length})
+              </h3>
+              {receipts.length === 0 ? (
+                <p className="text-sm text-theme-text-faint">No receipts attached.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {receipts.map((doc, idx) => {
+                    // focaccia-92104: receipt thumbnails sit after the
+                    // payment-app pizzas in the merged carousel.
+                    const carouselIdx = pizzas.length + idx;
+                    return (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => setLightboxIndex(carouselIdx)}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                        title={doc.fileName}
+                      >
+                        {isVideoFile(doc) ? (
+                          <>
+                            <video
+                              src={doc.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/50 rounded-full p-3">
+                                <Play className="text-white" size={20} fill="white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          /* bocconcino-92104: PDF receipts thumbnail off their
+                              sibling `.thumb.png` (rendered client-side at upload).
+                              Image receipts render via the canonical URL. */
+                          <img
+                            src={isPdfFile(doc) ? derivePdfThumbnailUrl(doc.url) : doc.url}
+                            alt={doc.fileName}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                        <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                          receipt
+                        </span>
                       </button>
                     );
                   })}
@@ -1460,6 +1558,52 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* focaccia-92104: Payment proof — demoted from its prior status
+                as a top-level "Payment-app photos" gallery on the left. These
+                are the kind=pizza PayoutDocument screenshots (proof-of-
+                payment app evidence), so they belong next to the payment
+                method/target rather than the party photos. */}
+            {pizzas.length > 0 && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
+                <h3 className="text-sm font-semibold text-theme-text mb-2">
+                  Payment proof ({pizzas.length})
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {pizzas.map((doc, idx) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => setLightboxIndex(idx)}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                      title={doc.fileName}
+                    >
+                      {isVideoFile(doc) ? (
+                        <>
+                          <video
+                            src={doc.url}
+                            preload="metadata"
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-black/50 rounded-full p-3">
+                              <Play className="text-white" size={20} fill="white" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                      <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white">
+                        pizza
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Host notes */}
             {payout.hostNotes && (
@@ -2307,8 +2451,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       {/* bresaola-89172: shared ReceiptLightbox renders into document.body
           via createPortal, so it isn't clipped by the modal's overflow. It
           owns its own Esc + arrow-key handlers and the HEIC fallback.
-          bottarga-92103: `allPhotos` is the unified carousel — pizzas →
-          receipts → event-level photos — so arrow-key nav crosses sections. */}
+          focaccia-92104: `allPhotos` order is pizzas (Payment proof) →
+          receipts → pizzaPhotos → eventPhotos so arrow-key nav crosses
+          sections in the same order they're rendered. */}
       <ReceiptLightbox
         isOpen={lightboxIndex != null}
         images={allPhotos}
