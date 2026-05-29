@@ -41,6 +41,10 @@ const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
+  // gnocchi-92104: 'queued' = wire request sent, awaiting settlement. Sits
+  // between Approved and Paid so admins can spot in-flight wires that need
+  // settlement follow-up.
+  { value: 'queued', label: 'Queued' },
   { value: 'paid', label: 'Paid' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'failed', label: 'Failed' },

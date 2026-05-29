@@ -34,6 +34,11 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   // emerald so admins can tell "city was closed; org's obligation fulfilled"
   // apart from a direct paid record.
   completed: 'bg-teal-500/20 text-teal-300',
+  // gnocchi-92104: amber/yellow for queued ("wire sent, awaiting settlement")
+  // — sits between approved (sky) and paid (emerald) visually. Distinct from
+  // pending's amber-300 by using a brighter amber-200 text on a slightly
+  // heavier bg, signalling forward-motion rather than waiting-on-host.
+  queued: 'bg-amber-400/25 text-amber-200',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -44,6 +49,9 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   failed: 'Failed',
   withdrawn: 'Withdrawn',
   completed: 'Completed',
+  // gnocchi-92104: hosts see this label on their own list while a wire
+  // request is in flight.
+  queued: 'Queued for payment',
 };
 
 // arugula-38633 v3 follow-up: helper to display a method (or "Not set" placeholder).

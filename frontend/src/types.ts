@@ -1617,7 +1617,11 @@ export interface UnifiedPartner {
 // Mark-Party-Paid's "mark pending complete" mode. Means "the city was fully
 // paid by the org and this row's payment obligation is fulfilled, even if the
 // org paid less than the original claim amount."
-export type PayoutStatus = 'pending' | 'approved' | 'rejected' | 'paid' | 'failed' | 'withdrawn' | 'completed';
+// gnocchi-92104: 'queued' is the intermediate state between 'approved' and
+// 'paid' — used when the wire transfer email request has been sent but the
+// wire hasn't yet settled. Counts toward the per-party committed cap the same
+// as approved/paid/completed (see backend assertWithinPartyCap).
+export type PayoutStatus = 'pending' | 'approved' | 'queued' | 'rejected' | 'paid' | 'failed' | 'withdrawn' | 'completed';
 
 /**
  * ravioli-82931 + agnolotti-58291: one entry in the party-scoped receipts

@@ -13,6 +13,8 @@ import {
   rejectAdminPayout,
   unapproveAdminPayout,
   revertPaidAdminPayout,
+  markPayoutQueued,
+  unmarkPayoutQueued,
   updateAdminPayout,
   markAdminPayoutPaid,
   executeAdminPayout,
@@ -1119,6 +1121,44 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 return;
               } catch (err: any) {
                 return err?.message || 'Revert failed';
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            // gnocchi-92104: mark-queued = approved -> queued (wire request
+            // sent, awaiting settlement). Stays-open like unapprove/revertPaid
+            // so admin sees the queued pill flip in-modal. Refreshes the
+            // payouts list (so the row shows the new pill) and the prepay
+            // queue (so the source party drops off since 'queued' is now in
+            // the in-flight set).
+            onMarkQueued={async () => {
+              setModalBusy(true);
+              try {
+                await markPayoutQueued(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
+                setDetail(fresh);
+                await Promise.all([refresh(), loadPrepayQueue()]);
+                pushToast('Marked queued — wire request sent', 'success');
+                return;
+              } catch (err: any) {
+                return err?.message || 'Mark queued failed';
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            // gnocchi-92104: un-queue = queued -> approved (admin oops
+            // un-queue). Same stays-open/refresh pattern.
+            onUnmarkQueued={async () => {
+              setModalBusy(true);
+              try {
+                await unmarkPayoutQueued(detail.id);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
+                setDetail(fresh);
+                await Promise.all([refresh(), loadPrepayQueue()]);
+                pushToast('Un-queued — payment back to approved', 'success');
+                return;
+              } catch (err: any) {
+                return err?.message || 'Un-queue failed';
               } finally {
                 setModalBusy(false);
               }

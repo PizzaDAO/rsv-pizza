@@ -179,6 +179,21 @@ function InnerActionsCell({
           </button>
         </>
       )}
+
+      {/* gnocchi-92104: queued row gets a single Mark paid (settled) button.
+          Approved -> queued / queued -> approved transitions live in the
+          modal so the admin can leave a confirmation note. */}
+      {status === 'queued' && (
+        <button
+          type="button"
+          onClick={() => onMarkPaid(payout)}
+          disabled={busy}
+          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 disabled:opacity-50"
+          title="Mark paid (wire settled)"
+        >
+          <DollarSign size={15} />
+        </button>
+      )}
     </div>
   );
 }
