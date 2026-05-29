@@ -3,7 +3,7 @@ import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSig
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
-import { updatePartyApi, updatePayoutDocument } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
@@ -349,6 +349,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   type ReceiptDraft = { amount: string; currency: string };
   const [receiptDrafts, setReceiptDrafts] = useState<Record<string, ReceiptDraft>>({});
 
+  // pancetta-92104: per-row "Retry OCR" state. Admin can re-trigger the OCR
+  // pipeline on a single doc that previously errored (e.g. quota / timeout /
+  // bad image). The retry resets ocr_attempt_count + ocr_attempted_at and
+  // runs analyzeReceipt inline; on success we clear ocrError locally so the
+  // per-row error chip and the global 429 banner both update without a
+  // parent refetch.
+  const [retryingDocId, setRetryingDocId] = useState<string | null>(null);
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  // Map of docId -> cleared (true) so the row stops rendering the stale
+  // ocrError from `payout.documents` once retry succeeds. We only set true
+  // on success; failures still surface a per-row error chip.
+  const [retryClearedErrors, setRetryClearedErrors] = useState<Record<string, boolean>>({});
+
   // Hooks must be declared above any early returns. There aren't any early
   // returns in this component today, but keeping all hooks grouped here makes
   // the rule-of-hooks invariant easier to verify.
@@ -462,6 +475,51 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       setReceiptSavingId(null);
     }
   }
+
+  // pancetta-92104: admin-triggered single-doc OCR retry. Resets the cooldown
+  // + attempt counter on the doc and re-runs analyzeReceipt inline. On a
+  // non-quota success we drop the local ocrError so the row updates without
+  // a parent refetch; on failure we surface the new error inline.
+  async function retryOcr(docId: string) {
+    setRetryingDocId(docId);
+    setRetryErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const res = await retryPayoutDocumentOcr(docId, { runNow: true });
+      if (res.inlineError) {
+        setRetryErrors((m) => ({ ...m, [docId]: res.inlineError ?? 'OCR failed' }));
+      } else if (res.ranInline) {
+        // Success — locally suppress the stale ocrError from payout.documents.
+        setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
+      }
+    } catch (err: any) {
+      setRetryErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Retry failed',
+      }));
+    } finally {
+      setRetryingDocId(null);
+    }
+  }
+
+  // pancetta-92104: collapse identical OpenAI 429/quota errors across rows
+  // into ONE banner at the top of the receipt section. Cuts noise when the
+  // entire event's receipts share the same upload-time OCR quota failure
+  // (the Mexico City symptom that triggered this task). Per-row chips hide
+  // when the banner is showing so admins don't see "429 You exceeded your
+  // current quota" repeated six times.
+  const quotaErrorRows = useMemo(() => {
+    return receipts
+      .filter((r) => !retryClearedErrors[r.id])
+      .filter((r) => {
+        const msg = (r.ocrError || '').toLowerCase();
+        return msg && (msg.includes('429') || msg.includes('quota'));
+      });
+  }, [receipts, retryClearedErrors]);
+  const showQuotaBanner = quotaErrorRows.length >= 2;
 
   // bresaola-89172: keyboard nav for the lightbox now lives inside the
   // ReceiptLightbox component itself (Esc to close, arrows to cycle). The
@@ -1111,10 +1169,45 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             {receipts.length > 0 && (
               <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
                 <h3 className="text-sm font-semibold text-theme-text mb-2">Receipts ({receipts.length})</h3>
+                {/* pancetta-92104: global quota banner collapses N identical
+                    429s into one row of context. Per-row chips are hidden
+                    below when this banner is showing. */}
+                {showQuotaBanner && (
+                  <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-50 p-2 text-xs text-amber-900">
+                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <span className="font-semibold">OpenAI OCR quota exceeded</span>
+                      {' '}— line-item extraction temporarily unavailable on{' '}
+                      {quotaErrorRows.length} receipt{quotaErrorRows.length === 1 ? '' : 's'}.
+                      Receipts uploaded normally; manual amount/currency edits work.
+                      {canEditReceipts && (
+                        <span className="block mt-0.5 text-amber-800">
+                          Use Retry OCR on a row to re-attempt once the quota issue is resolved.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <ul className="space-y-1.5">
                   {receipts.map((r) => {
                     const conf = r.ocrConfidence ?? 0;
                     const lowConf = conf > 0 && conf < 0.8;
+                    // pancetta-92104: locally suppress ocrError after a
+                    // successful inline retry so the per-row chip + dot
+                    // refresh without a parent refetch.
+                    const localOcrError = retryClearedErrors[r.id]
+                      ? null
+                      : (retryErrors[r.id] ?? r.ocrError);
+                    const isQuotaErr = !!localOcrError
+                      && (localOcrError.toLowerCase().includes('429')
+                        || localOcrError.toLowerCase().includes('quota'));
+                    // When the global banner is shown, per-row quota errors
+                    // hide (the banner covers them). Non-quota errors still
+                    // render so admins can distinguish which rows need a
+                    // targeted fix vs which are waiting on the quota reset.
+                    const hidePerRowError = isQuotaErr && showQuotaBanner;
+                    const renderOcrError = hidePerRowError ? null : localOcrError;
+                    const isRetrying = retryingDocId === r.id;
                     // agnolotti-58291: capture the OCR'd values as placeholders
                     // so admins can see what the model originally returned
                     // when they're correcting the field. `original*` reflects
@@ -1134,7 +1227,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <div className="flex items-center gap-2">
                           <span
                             className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                              r.ocrError ? 'bg-red-500' :
+                              localOcrError ? (isQuotaErr ? 'bg-amber-500' : 'bg-red-500') :
                               lowConf ? 'bg-amber-500' :
                               conf >= 0.8 ? 'bg-emerald-500' :
                               'bg-gray-400'
@@ -1189,14 +1282,35 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                               >
                                 {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                               </button>
+                              {/* pancetta-92104: per-row "Retry OCR" — admin
+                                  resets attempt counter + re-runs analyze
+                                  inline. Surfaced for any failed row so a
+                                  one-off bad image / timeout doesn't need
+                                  the global backfill loop. */}
+                              {localOcrError && (
+                                <button
+                                  type="button"
+                                  onClick={() => retryOcr(r.id)}
+                                  disabled={isRetrying}
+                                  className="px-2 py-1 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center gap-1"
+                                  title="Reset attempt counter and re-run OCR for this receipt"
+                                >
+                                  {isRetrying ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <RefreshCw size={12} />
+                                  )}
+                                  Retry OCR
+                                </button>
+                              )}
                               {conf > 0 && (
                                 <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
                                   {(conf * 100).toFixed(0)}%
                                 </span>
                               )}
                             </>
-                          ) : r.ocrError ? (
-                            <span className="text-xs text-red-600">{r.ocrError}</span>
+                          ) : renderOcrError ? (
+                            <span className="text-xs text-red-600">{renderOcrError}</span>
                           ) : r.ocrAmount != null && r.ocrCurrency ? (
                             <>
                               {/* mortadella-92103: ocrAmount is the USD-converted
@@ -1231,8 +1345,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             <span className="text-xs text-theme-text-faint">no OCR</span>
                           )}
                         </div>
-                        {canEditReceipts && r.ocrError && (
-                          <div className="text-xs text-red-600 mt-0.5 ml-4">{r.ocrError}</div>
+                        {canEditReceipts && renderOcrError && (
+                          <div className="text-xs text-red-600 mt-0.5 ml-4">{renderOcrError}</div>
                         )}
                         {saveError && (
                           <div className="text-xs text-red-600 mt-0.5 ml-4">{saveError}</div>

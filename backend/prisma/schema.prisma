@@ -1790,6 +1790,16 @@ model PayoutDocument {
   // analytics queries (e.g. average pizza prices by country/city).
   ocrLineItems     Json?    @map("ocr_line_items")
   ocrError         String?  @map("ocr_error")
+  // pancetta-92104: timestamp + attempt-count for the line-items backfill
+  // loop. The backfill used to query `ocr_line_items IS NULL` candidates
+  // unconditionally, so docs whose `analyzeReceipt` threw (OpenAI 429, bad
+  // image, timeout) stayed candidates forever and the loop burned quota
+  // re-trying the same rows every iteration. Now: the loop filters out
+  // docs whose last attempt was < 24h ago AND caps at 3 attempts. The
+  // marker is written success-or-failure. Reset both to retry a stuck doc
+  // via the `/documents/:docId/retry-ocr` admin endpoint.
+  ocrAttemptedAt   DateTime? @map("ocr_attempted_at") @db.Timestamptz
+  ocrAttemptCount  Int       @default(0) @map("ocr_attempt_count")
   // pancetta-37195: per-receipt uploader attribution. Both nullable so
   // historical rows are valid. uploadedByEmail caches the email at upload
   // time so display still works if the User is later deleted.
