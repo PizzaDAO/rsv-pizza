@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
 import type { AdminPayoutFilters, PayoutMethod, PayoutPurpose, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 
@@ -22,6 +23,12 @@ interface PayoutsFilterBarProps {
    * ascending.
    */
   availableTags: string[];
+  /**
+   * pinsa-92103: when true, render the "Hide closed cities" checkbox.
+   * Only meaningful on the by-city view (`paymentsClosedAt` lives at the
+   * party level), so the parent controls visibility. Defaults to false.
+   */
+  showHideClosedToggle?: boolean;
 }
 
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
@@ -88,6 +95,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   // arancino-92103: count sort as an active filter when it differs from
   // the default `created_desc` (newest first).
   if (filters.sort && filters.sort !== 'created_desc') n += 1;
+  // pinsa-92103: count Hide closed cities so admins see they've hidden rows.
+  if (filters.hideClosed) n += 1;
   return n;
 }
 
@@ -110,6 +119,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   availableCurrencies,
   availableCountries,
   availableTags,
+  showHideClosedToggle,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const activeCount = countActiveFilters(filters);
@@ -307,6 +317,19 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#E52828]/10 text-[#E52828] text-xs font-medium">
                 Sort: {SORT_LABEL[filters.sort]}
               </span>
+            )}
+            {/* pinsa-92103: Hide closed cities toggle. Only rendered on the
+                by-city view (`paymentsClosedAt` is a party-level signal so
+                the by-payment view has nothing to hide). Backend honors
+                `hideClosed=true` on the /by-party endpoint. */}
+            {showHideClosedToggle && (
+              <Checkbox
+                checked={!!filters.hideClosed}
+                onChange={() => update({ hideClosed: !filters.hideClosed })}
+                label="Hide closed cities"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
             )}
           </div>
           <button

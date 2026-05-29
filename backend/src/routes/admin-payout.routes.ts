@@ -106,6 +106,10 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   userId: true,
   coHosts: true,
   user: { select: { email: true } },
+  // pinsa-92103: surface the "city closed out" timestamp. Drives the green
+  // ✓ Closed pill on the by-city table + hides the Mark Paid affordance for
+  // already-closed parties.
+  paymentsClosedAt: true,
   _count: {
     select: {
       guests: {
@@ -589,6 +593,12 @@ function serializePayout(row: any): any {
           // event UI.
           userId: row.party.userId ?? null,
           primaryHostInCohosts: isPrimaryHostInCohosts(row.party),
+          // pinsa-92103: payments-closed-at timestamp drives the by-city
+          // ✓ Closed pill + hides the Mark Paid affordance for fully
+          // closed-out cities (Ekiti, Tangier).
+          paymentsClosedAt: row.party.paymentsClosedAt
+            ? row.party.paymentsClosedAt.toISOString()
+            : null,
         }
       : undefined,
     host: row.host
@@ -1678,6 +1688,12 @@ router.get(
             eventTags: Array.isArray(b.partyMeta.eventTags) ? b.partyMeta.eventTags : [],
             primaryHostInCohosts: isPrimaryHostInCohosts(b.partyMeta),
             userId: b.partyMeta.userId ?? null,
+            // pinsa-92103: surface the close timestamp on the outer party so
+            // the by-city table can hide the Mark paid button + render the
+            // green ✓ Closed pill without expanding the row first.
+            paymentsClosedAt: b.partyMeta.paymentsClosedAt
+              ? b.partyMeta.paymentsClosedAt.toISOString()
+              : null,
           },
           aggregates: {
             pendingCount: b.pendingCount,
@@ -1700,6 +1716,15 @@ router.get(
         };
       });
 
+      // pinsa-92103: optional `?hideClosed=true` filters out rows the admin
+      // has explicitly closed out (Ekiti, Tangier). Doing this server-side
+      // (vs. in the table component) keeps row counts honest and is cheap —
+      // grouping has already happened and the bucket meta has the flag.
+      const hideClosed = req.query.hideClosed === 'true' || req.query.hideClosed === '1';
+      const filteredRows = hideClosed
+        ? rows.filter((r) => !r.party.paymentsClosedAt)
+        : rows;
+
       // 6. Sort outer rows. Default: most recent activity desc. The same
       //    `sort` query param shape is supported as the LIST endpoint for
       //    forward-compat, but only a handful of keys make sense at the
@@ -1708,7 +1733,7 @@ router.get(
       //    options on the admin Sort dropdown (the latter useful for
       //    surfacing stale cities first).
       const sortRaw = typeof req.query.sort === 'string' ? req.query.sort : 'activity_desc';
-      rows.sort((a, b) => {
+      filteredRows.sort((a, b) => {
         switch (sortRaw) {
           case 'amount_desc':
             return (b.aggregates.pendingUsd + b.aggregates.approvedUsd + b.aggregates.paidUsd)
@@ -1730,7 +1755,7 @@ router.get(
         }
       });
 
-      res.json({ rows, total: rows.length });
+      res.json({ rows: filteredRows, total: filteredRows.length });
     } catch (error) {
       next(error);
     }
@@ -3987,7 +4012,14 @@ partyMarkPaidRouter.get(
       const { partyId } = req.params;
       const party = await prisma.party.findUnique({
         where: { id: partyId },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          // pinsa-92103: surface so the modal can branch into close-out mode
+          // when there's nothing in-flight but the city still needs a "done"
+          // signal (e.g. Ekiti / Tangier — all rows already paid).
+          paymentsClosedAt: true,
+        },
       });
       if (!party) {
         throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -4013,38 +4045,54 @@ partyMarkPaidRouter.get(
         0,
       );
 
-      // caciotta-92103: also surface the already-paid payouts on this party so
-      // the modal can warn about double-counting. If the host was already paid
-      // out-of-band (recorded as a separate paid row), marking the pending
-      // claim paid would inflate /payments totals.
-      const existingPaid = await prisma.payout.findMany({
-        where: {
-          partyId,
-          status: 'paid',
-        },
-        select: { id: true, finalAmountUsd: true },
+      // caciotta-92103 + pinsa-92103: surface the already-paid payouts on this
+      // party. Caciotta uses count + sum to warn the modal about
+      // double-counting (and to pick suggestedMode). Pinsa uses the same data
+      // for the close-out body copy ("Existing paid records (N payments,
+      // $X.XX total) stay unchanged") and the `eligible` flag that drives
+      // Mark Paid button visibility in the by-city table.
+      const paidAgg = await prisma.payout.aggregate({
+        where: { partyId, status: 'paid' },
+        _count: { _all: true },
+        _sum: { finalAmountUsd: true },
       });
-      const existingPaidCount = existingPaid.length;
-      const existingPaidUsd = existingPaid.reduce(
-        (sum, p) => sum + Number(p.finalAmountUsd),
-        0,
-      );
+      const paidCount = paidAgg._count?._all ?? 0;
+      const paidTotalUsd = Number(paidAgg._sum?.finalAmountUsd ?? 0);
+      // caciotta-92103 aliases — same data, surfaced under the field names the
+      // existing modal already reads.
+      const existingPaidCount = paidCount;
+      const existingPaidUsd = paidTotalUsd;
 
-      // Recommend `withdraw_pending` when the already-paid bucket fully
-      // covers what we'd otherwise create as new paid rows. Otherwise
-      // `mark_paid` (the legacy behavior).
+      // caciotta-92103: recommend `withdraw_pending` when the already-paid
+      // bucket fully covers what we'd otherwise create as new paid rows.
+      // Otherwise `mark_paid` (the legacy behavior).
       const suggestedMode: 'mark_paid' | 'withdraw_pending' =
         existingPaidCount > 0 && existingPaidUsd >= totalUsd
           ? 'withdraw_pending'
           : 'mark_paid';
 
+      const paymentsClosedAt = party.paymentsClosedAt
+        ? party.paymentsClosedAt.toISOString()
+        : null;
+
+      // pinsa-92103: the by-city table uses `eligible` to decide whether to
+      // render the Mark Paid button. True when there's work to do (anything
+      // in-flight) OR when the city has paid history but no close stamp
+      // (Ekiti / Tangier). Cities with no payouts at all stay ineligible —
+      // there's nothing to close.
+      const eligible = payouts.length > 0 || (paymentsClosedAt === null && paidCount > 0);
+
       res.json({
-        party: { id: party.id, name: party.name },
+        party: { id: party.id, name: party.name, paymentsClosedAt },
         count: payouts.length,
         totalUsd,
         existingPaidCount,
         existingPaidUsd,
         suggestedMode,
+        paidCount,
+        paidTotalUsd,
+        paymentsClosedAt,
+        eligible,
         payouts: payouts.map((p) => ({
           id: p.id,
           status: p.status,
@@ -4134,7 +4182,13 @@ partyMarkPaidRouter.post(
 
       const party = await prisma.party.findUnique({
         where: { id: partyId },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          // pinsa-92103: needed so we don't double-stamp paymentsClosedAt
+          // on a city that's already marked closed.
+          paymentsClosedAt: true,
+        },
       });
       if (!party) {
         throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -4207,12 +4261,52 @@ partyMarkPaidRouter.post(
       }
 
       if (inflight.length === 0) {
-        // Not an error — modal can render "0 payouts to mark paid".
+        // pinsa-92103: nothing in-flight. If the city has any paid rows AND
+        // isn't already marked closed, treat this as a close-out: stamp
+        // payments_closed_at and return `action: 'closed'` so the modal can
+        // flash the right toast. Cities with no payouts at all stay
+        // unchanged — there's nothing to close.
+        const paidCount = await prisma.payout.count({
+          where: { partyId, status: 'paid' },
+        });
+
+        if (paidCount > 0 && !party.paymentsClosedAt) {
+          const closedAt = new Date();
+          const updated = await prisma.party.update({
+            where: { id: partyId },
+            data: { paymentsClosedAt: closedAt },
+            select: { id: true, name: true, paymentsClosedAt: true },
+          });
+          res.json({
+            count: 0,
+            party: {
+              id: updated.id,
+              name: updated.name,
+              paymentsClosedAt: updated.paymentsClosedAt
+                ? updated.paymentsClosedAt.toISOString()
+                : null,
+            },
+            payoutIds: [],
+            action: 'closed',
+          });
+          return;
+        }
+
+        // Either no paid rows at all, or already-closed — no-op. Surface the
+        // current close timestamp so the frontend can refresh its UI either
+        // way.
         res.json({
           count: 0,
           mode: resolvedMode,
-          party: { id: party.id, name: party.name },
+          party: {
+            id: party.id,
+            name: party.name,
+            paymentsClosedAt: party.paymentsClosedAt
+              ? party.paymentsClosedAt.toISOString()
+              : null,
+          },
           payoutIds: [],
+          action: party.paymentsClosedAt ? 'already_closed' : 'noop',
         });
         return;
       }
@@ -4320,13 +4414,59 @@ partyMarkPaidRouter.post(
 
           updatedIds.push(p.id);
         }
+
+        // pinsa-92103 + caciotta-92103: when this run leaves nothing in-flight,
+        // auto-stamp paymentsClosedAt. Skip if already closed. We re-query
+        // inside the tx so the check is atomic with the status flips.
+        //
+        // For mark_paid: every flipped row is now 'paid', so the city has
+        // paid history by construction — safe to close.
+        // For withdraw_pending: the flipped rows are 'withdrawn', not 'paid',
+        // so only close when the city has OTHER paid history (matches pinsa's
+        // close-out invariant: never close a city with zero real payments).
+        if (!party.paymentsClosedAt && updatedIds.length > 0) {
+          const remainingInflight = await tx.payout.count({
+            where: { partyId, status: { in: ['pending', 'approved'] } },
+          });
+          if (remainingInflight === 0) {
+            const hasPaid =
+              resolvedMode === 'mark_paid'
+                ? true
+                : (await tx.payout.count({
+                    where: { partyId, status: 'paid' },
+                  })) > 0;
+            if (hasPaid) {
+              await tx.party.update({
+                where: { id: partyId },
+                data: { paymentsClosedAt: now },
+              });
+            }
+          }
+        }
+      });
+
+      // Re-read so the response surfaces the (possibly newly stamped)
+      // paymentsClosedAt. Cheap follow-up read — one indexed pkey lookup.
+      const finalParty = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, name: true, paymentsClosedAt: true },
       });
 
       res.json({
         count: updatedIds.length,
         mode: resolvedMode,
-        party: { id: party.id, name: party.name },
+        party: {
+          id: party.id,
+          name: party.name,
+          paymentsClosedAt: finalParty?.paymentsClosedAt
+            ? finalParty.paymentsClosedAt.toISOString()
+            : null,
+        },
         payoutIds: updatedIds,
+        // caciotta-92103: action mirrors the resolved mode so the frontend
+        // doesn't have to infer it. 'withdraw_pending' is its own action
+        // value distinct from pinsa's 'closed'/'already_closed'/'noop'.
+        action: resolvedMode === 'withdraw_pending' ? 'withdraw_pending' : 'mark_paid',
       });
     } catch (err) {
       next(err);

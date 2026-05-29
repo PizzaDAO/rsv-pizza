@@ -232,6 +232,14 @@ model Party {
   reimbursementCapAppealNote String?   @map("reimbursement_cap_appeal_note")
   reimbursementCapAppealedAt DateTime? @map("reimbursement_cap_appealed_at") @db.Timestamptz
 
+  // pinsa-92103: "fully paid out / closed" timestamp on the city's payout
+  // ledger. Stamped by the panettone-92103 Mark Party Paid flow when there's
+  // nothing left in-flight — either because every pending+approved row just
+  // flipped to paid, or because the admin closed out a city whose payouts
+  // were already paid (Ekiti, Tangier). NULL = still open. Partial index
+  // makes "show closed cities" filter cheap; most rows stay NULL.
+  paymentsClosedAt DateTime? @map("payments_closed_at") @db.Timestamptz
+
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

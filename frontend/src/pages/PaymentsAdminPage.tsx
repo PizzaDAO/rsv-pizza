@@ -877,6 +877,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           availableCurrencies={availableCurrencies}
           availableCountries={availableCountries}
           availableTags={availableTags}
+          // pinsa-92103: Hide closed cities only makes sense on the by-city
+          // view (paymentsClosedAt is a party-level signal). The per-payment
+          // view has no party-row, so the toggle would be confusing there.
+          showHideClosedToggle={viewMode === 'by-city'}
         />
 
         {/* etruria-92103: by-city / by-payment view toggle. by-city is the
@@ -1227,20 +1231,32 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             partyId={markPartyPaidTarget.partyId}
             partyNameHint={markPartyPaidTarget.partyNameHint}
             onClose={() => setMarkPartyPaidTarget(null)}
-            onSuccess={async ({ count, mode, partyName }) => {
-              // caciotta-92103: toast verb mirrors the resolved server mode
-              // so admins see whether new paid rows were created
-              // (mark_paid) or pending claims were closed
-              // (withdraw_pending).
-              let msg: string;
-              if (count === 0) {
-                msg = `No in-flight payouts for ${partyName} — nothing changed`;
-              } else if (mode === 'withdraw_pending') {
-                msg = `Withdrew ${count} pending claim${count === 1 ? '' : 's'} for ${partyName}`;
+            onSuccess={async ({ count, mode, partyName, action, paymentsClosedAt }) => {
+              // caciotta-92103 + pinsa-92103: split the toast copy by the
+              // resolved server action so the admin gets a clear signal
+              // whether they (a) flipped payouts to paid, (b) withdrew
+              // pending claims (caciotta), (c) closed out a fully-paid
+              // city (pinsa), or (d) the city was already closed / no-op.
+              let toastMsg: string;
+              if (action === 'closed') {
+                toastMsg = `Closed out ${partyName} — all payouts already paid`;
+              } else if (action === 'already_closed') {
+                toastMsg = `${partyName} is already closed out`;
+              } else if (action === 'noop') {
+                toastMsg = `No payouts to action for ${partyName}`;
+              } else if (action === 'withdraw_pending' || mode === 'withdraw_pending') {
+                toastMsg = count > 0
+                  ? `Withdrew ${count} pending claim${count === 1 ? '' : 's'} for ${partyName}`
+                  : `No in-flight payouts for ${partyName} — nothing changed`;
+              } else if (count > 0) {
+                const closedNow = !!paymentsClosedAt;
+                toastMsg = closedNow
+                  ? `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName} — city closed out`
+                  : `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName}`;
               } else {
-                msg = `Marked ${count} payment${count === 1 ? '' : 's'} paid for ${partyName}`;
+                toastMsg = `No in-flight payouts for ${partyName} — nothing changed`;
               }
-              pushToast(msg, 'success');
+              pushToast(toastMsg, 'success');
               await Promise.all([refresh(), loadPrepayQueue()]);
               if (detail && detail.partyId === markPartyPaidTarget.partyId) {
                 try {

@@ -1900,6 +1900,13 @@ export interface AdminPayout extends Payout, FlaggedReadyFields {
      * backward-compat.
      */
     primaryHostInCohosts?: boolean;
+    /**
+     * pinsa-92103: ISO timestamp when the admin marked the city's payouts
+     * fully closed-out. Null = still open. Used by the by-city table to
+     * render the ✓ Closed pill and hide the Mark paid affordance. Optional
+     * for backward-compat with cached payloads during a rolling deploy.
+     */
+    paymentsClosedAt?: string | null;
   };
   host: {
     id: string;
@@ -1995,6 +2002,13 @@ export interface AdminPayoutFilters {
     | 'activity_asc';
   cursor?: string;
   limit?: number;
+  /**
+   * pinsa-92103: hide cities whose payouts have been marked fully closed-out
+   * (paymentsClosedAt IS NOT NULL). Only the by-city endpoint honors this
+   * — the flat LIST endpoint ignores it. Default false / undefined = show
+   * closed cities (with the ✓ Closed pill).
+   */
+  hideClosed?: boolean;
 }
 
 export interface AdminPayoutTotals {
@@ -2110,6 +2124,13 @@ export interface PartyPayoutsRow {
     primaryHostInCohosts: boolean;
     /** Primary host (parties.userId). */
     userId: string | null;
+    /**
+     * pinsa-92103: ISO timestamp marking the city as fully closed out. Null
+     * = still open. The by-city table renders a ✓ Closed pill on these rows
+     * and hides the Mark paid button. Optional for backward-compat with
+     * cached payloads during a rolling deploy.
+     */
+    paymentsClosedAt?: string | null;
   };
   aggregates: {
     pendingCount: number;

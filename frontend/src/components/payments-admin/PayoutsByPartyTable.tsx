@@ -7,6 +7,7 @@ import {
   Paperclip,
   Flag,
   Check,
+  CheckCircle2,
   X,
   Pencil,
   Eye,
@@ -257,7 +258,19 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               // (no pending/approved rows) and for underboss viewers.
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
-              const showMarkPartyPaid = canMarkPartyPaid && hasInFlight;
+              // pinsa-92103: ALSO show the button when the city has paid
+              // payouts but hasn't been closed yet (Ekiti, Tangier) so the
+              // admin can stamp the close timestamp. Cities with NO payouts
+              // at all stay hidden — there's nothing to close.
+              const closedAt = row.party.paymentsClosedAt ?? null;
+              const isClosed = !!closedAt;
+              const canCloseOut =
+                !hasInFlight && !isClosed && row.aggregates.paidCount > 0;
+              const showMarkPartyPaid =
+                canMarkPartyPaid && !isClosed && (hasInFlight || canCloseOut);
+              const markPaidTooltip = hasInFlight
+                ? 'Mark all pending + approved payments paid for this city'
+                : 'Close out this city — no pending payments to action';
               return (
                 <React.Fragment key={row.party.id}>
                   {/* Outer party row */}
@@ -292,6 +305,20 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         >
                           <Flag size={11} />
                           {row.aggregates.flaggedReadyCount} flagged ready
+                        </div>
+                      )}
+                      {/* pinsa-92103: ✓ Closed pill — admin marked this
+                          city's payouts fully closed-out. Renders next to
+                          the city name so it's the first thing the admin
+                          sees on the row. Tooltip surfaces the close
+                          timestamp for audit traceability. */}
+                      {isClosed && (
+                        <div
+                          className="inline-flex items-center gap-1 text-[11px] text-emerald-500 mt-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30"
+                          title={`Closed out ${new Date(closedAt!).toLocaleString()}`}
+                        >
+                          <CheckCircle2 size={11} />
+                          Closed
                         </div>
                       )}
                     </td>
@@ -340,7 +367,12 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         {/* bocconcini-92103: per-row "Mark paid" — bridges
                             the panettone modal into the by-city default view.
                             Click stops propagation so it doesn't toggle the
-                            row's expansion. */}
+                            row's expansion.
+                            pinsa-92103: also shown when the city has only
+                            paid payouts (no pending/approved) and hasn't
+                            been closed yet — admin clicks to stamp the
+                            close timestamp (Ekiti / Tangier). Hidden when
+                            the city is already closed. */}
                         {showMarkPartyPaid && onMarkPartyPaid && (
                           <button
                             type="button"
@@ -349,7 +381,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                               onMarkPartyPaid(row.party.id);
                             }}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs font-medium"
-                            title="Mark all pending + approved payments paid for this city"
+                            title={markPaidTooltip}
                           >
                             <Coins size={12} />
                             Mark paid
