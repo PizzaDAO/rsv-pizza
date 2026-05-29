@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Loader2, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Checkbox } from '../Checkbox';
+import { SwcHubWarning } from './SwcHubWarning';
+import { isSwcHubParty } from '../../utils/swcHub';
 import type { AdminPayout, WalletPaidTotal } from '../../types';
 import { bulkExecutePayouts, fetchWalletPaidTotal, type BulkSendResult } from '../../lib/api';
 
@@ -51,6 +53,13 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   // sends across the whole batch (matches the per-address override pattern).
   const [overridePartyCap, setOverridePartyCap] = useState(false);
 
+  // parmigiana-92104: batch-level SWC Hub ack. Surfaced when one or more
+  // selected rows belong to SWC Hub parties (US or `event_tags`-tagged).
+  // A single checkbox covers the whole batch — stacks alongside the
+  // per-address (bianco) and per-party (salame) caps; all three can be
+  // active simultaneously, each with its own checkbox.
+  const [swcHubAck, setSwcHubAck] = useState(false);
+
   // Eligibility filter — keep in sync with backend bulk-execute filter
   // (USDC + approved-or-failed + valid 0x wallet). passata-49102 added
   // failed-status retry. Anything not matching is shown as "skipped".
@@ -90,6 +99,8 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
       setOverrideCap(false);
       // salame-92103: reset per-party cap ack on every fresh open.
       setOverridePartyCap(false);
+      // parmigiana-92104: reset SWC Hub ack on every fresh open.
+      setSwcHubAck(false);
     }
   }, [isOpen]);
 
@@ -212,6 +223,25 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     };
   }, [eligible]);
 
+  // parmigiana-92104: SWC Hub analysis. Flag every eligible row whose party is
+  // either `country === 'United States'` OR carries the 'SWC Hub' event-tag.
+  // Used for the per-row indicator + the batch-level summary copy + the
+  // disabled state on Send (gated on `swcHubAck` when the count > 0).
+  const swcHubAnalysis = useMemo(() => {
+    if (eligible.length === 0) {
+      return { swcHubRowIds: new Set<string>(), swcHubPartyCount: 0 };
+    }
+    const swcHubRowIds = new Set<string>();
+    const swcHubParties = new Set<string>();
+    for (const p of eligible) {
+      if (isSwcHubParty(p.party)) {
+        swcHubRowIds.add(p.id);
+        if (p.party?.id) swcHubParties.add(p.party.id);
+      }
+    }
+    return { swcHubRowIds, swcHubPartyCount: swcHubParties.size };
+  }, [eligible]);
+
   // Close on Escape (only when not sending — never cancel an in-flight batch)
   useEffect(() => {
     if (!isOpen) return;
@@ -236,6 +266,10 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     // salame-92103: block submit if any row would push its party past its
     // effective cap and the admin hasn't ticked the per-party override.
     if (partyCapAnalysis.overPartyCapPartyCount > 0 && !overridePartyCap) return;
+    // parmigiana-92104: block submit if any row belongs to an SWC Hub party
+    // and the admin hasn't ticked the SWC Hub ack. Frontend-only guardrail;
+    // the bulk-execute endpoint stays open so admins can still override.
+    if (swcHubAnalysis.swcHubRowIds.size > 0 && !swcHubAck) return;
     setPhase('sending');
     setErrorMsg(null);
     try {
@@ -407,6 +441,29 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
               </div>
             )}
 
+            {/* parmigiana-92104: SWC Hub batch warning. Surfaces a per-batch
+                summary count ("N selected payments are SWC Hub parties") +
+                a single ack checkbox. Stacks with the bianco / salame
+                warnings above. */}
+            {swcHubAnalysis.swcHubRowIds.size > 0 && (
+              <SwcHubWarning
+                isSwcHub={true}
+                acked={swcHubAck}
+                onAckChange={setSwcHubAck}
+                title="SWC Hub parties in this batch"
+                body={
+                  <>
+                    {swcHubAnalysis.swcHubRowIds.size} of {eligible.length} selected
+                    payment{eligible.length === 1 ? '' : 's'} belong to SWC Hub
+                    part{swcHubAnalysis.swcHubPartyCount === 1 ? 'y' : 'ies'} (
+                    {swcHubAnalysis.swcHubPartyCount} affected). Reimbursement for
+                    those should be processed through SWC, not rsv.pizza.
+                  </>
+                }
+                ackLabel="Allow SWC Hub sends — I acknowledge"
+              />
+            )}
+
             {/* bianco-89172: per-row indicator so admins can see WHICH wallets
                 in their selection would exceed. Folded into the existing
                 eligibility list (kept concise — first 8 rows). */}
@@ -464,7 +521,10 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                   (capAnalysis.overCapWalletCount > 0 && !overrideCap) ||
                   // salame-92103: block Send when any row would push its party
                   // past its cap and admin hasn't ack'd the per-party override.
-                  (partyCapAnalysis.overPartyCapPartyCount > 0 && !overridePartyCap)
+                  (partyCapAnalysis.overPartyCapPartyCount > 0 && !overridePartyCap) ||
+                  // parmigiana-92104: block Send when one or more rows belong to
+                  // SWC Hub parties and the admin hasn't ack'd the override.
+                  (swcHubAnalysis.swcHubRowIds.size > 0 && !swcHubAck)
                 }
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >

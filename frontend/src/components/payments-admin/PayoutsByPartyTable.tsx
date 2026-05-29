@@ -29,6 +29,7 @@ import {
   formatUsd,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
+import { isSwcHubParty } from '../../utils/swcHub';
 
 /**
  * mostarda-92103: rework of the /payments by-city expanded row. Each city
@@ -843,6 +844,19 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {/* parmigiana-92104: tiny SWC Hub pill so admins notice
+                            before they expand the row + click into a modal. The
+                            table-level actions aren't disabled here — the per-
+                            action modals (PayoutReviewModal, MarkPartyPaidModal)
+                            are the canonical gate point. */}
+                        {isSwcHubParty(row.party) && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] text-amber-300 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30"
+                            title="SWC Hub party — reimbursement should be processed via SWC, not rsv.pizza"
+                          >
+                            SWC Hub
+                          </span>
+                        )}
                         {row.aggregates.flaggedReadyCount > 0 && (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] text-emerald-500"

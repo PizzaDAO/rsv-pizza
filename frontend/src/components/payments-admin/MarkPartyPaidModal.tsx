@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, DollarSign, Loader2, Pencil, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { SwcHubWarning } from './SwcHubWarning';
 import {
   fetchMarkPartyPaidPreview,
   markPartyPaid,
@@ -40,6 +41,15 @@ interface MarkPartyPaidModalProps {
    * once it lands.
    */
   partyNameHint?: string;
+  /**
+   * parmigiana-92104: caller-supplied SWC Hub signal. The preview endpoint
+   * doesn't surface party.country / party.eventTags, so the parent (which has
+   * the full row in hand) passes the resolved flag in. When `true`, the modal
+   * renders the amber warning + ack and disables the Mark/Close button until
+   * the admin ticks the override. Optional for backward-compat with callers
+   * that haven't been threaded yet.
+   */
+  isSwcHub?: boolean;
   onClose: () => void;
   /**
    * Called after a successful mark-paid POST. Parent should refresh both the
@@ -90,6 +100,7 @@ interface MarkPartyPaidModalProps {
 export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
   partyId,
   partyNameHint,
+  isSwcHub = false,
   onClose,
   onSuccess,
 }) => {
@@ -108,6 +119,15 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // parmigiana-92104: SWC Hub ack — required when `isSwcHub` is true.
+  // Reset when the modal target changes so an ack doesn't carry across
+  // distinct parties (parent unmounts/remounts the modal per partyId, but
+  // belt-and-suspenders on partyId change for safety).
+  const [swcAck, setSwcAck] = useState(false);
+  useEffect(() => {
+    setSwcAck(false);
+  }, [partyId]);
 
   // Esc to close — same pattern as CreatePrepaymentModal and PayoutReviewModal.
   useEffect(() => {
@@ -168,11 +188,14 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
   // caciotta + pinsa: standard mark-paid mode requires in-flight rows AND a
   // resolved mode selection. Close-out mode (pinsa) is a valid submit even
   // with count===0 because it stamps a timestamp; it doesn't need `mode`.
+  // parmigiana-92104: an SWC Hub party additionally requires an ack from the
+  // admin before any path is enabled.
   const canSubmit =
     !!preview &&
     !submitting &&
     !previewLoading &&
-    (isCloseOutMode || (count > 0 && mode !== null));
+    (isCloseOutMode || (count > 0 && mode !== null)) &&
+    (!isSwcHub || swcAck);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -249,6 +272,16 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* parmigiana-92104: SWC Hub reimbursement warning. Parent passes
+              `isSwcHub` based on the row's party.country / event_tags; the
+              preview endpoint doesn't surface those fields. Confirm button
+              stays disabled until the admin ticks the ack. */}
+          <SwcHubWarning
+            isSwcHub={isSwcHub}
+            acked={swcAck}
+            onAckChange={setSwcAck}
+          />
+
           {/* Preview summary */}
           {previewLoading && (
             <div className="flex items-center gap-2 text-sm text-theme-text-muted">

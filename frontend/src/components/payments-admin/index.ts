@@ -13,3 +13,4 @@ export { ExportSafeJsonModal } from './ExportSafeJsonModal';
 export { BulkSendModal } from './BulkSendModal';
 export { RejectReasonModal } from './RejectReasonModal';
 export { HotWalletCard } from './HotWalletCard';
+export { SwcHubWarning } from './SwcHubWarning';
