@@ -1071,13 +1071,20 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onSaveAmount={async (newAmount, opts) => {
               setModalBusy(true);
               try {
-                await updateAdminPayout(detail.id, {
-                  finalAmountUsd: newAmount,
-                  note: opts?.note,
-                  // aglio-62584: forward the admin's per-submission cap
-                  // acknowledgement so the backend bypasses the 400.
-                  allowOverSubmissionCap: opts?.allowOverSubmissionCap,
-                });
+                await updateAdminPayout(
+                  detail.id,
+                  {
+                    finalAmountUsd: newAmount,
+                    note: opts?.note,
+                    // aglio-62584: forward the admin's per-submission cap
+                    // acknowledgement so the backend bypasses the 400.
+                    allowOverSubmissionCap: opts?.allowOverSubmissionCap,
+                  },
+                  // cannelloni-92103: thread `?regions=` so regional UB
+                  // PATCH passes the `requireAdminOrRegionalUnderboss`
+                  // gate on the backend.
+                  regions ? { regions } : undefined,
+                );
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
                 await refresh();
@@ -1095,7 +1102,12 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onSaveAdminNotes={async (notes) => {
               setModalBusy(true);
               try {
-                await updateAdminPayout(detail.id, { adminNotes: notes });
+                await updateAdminPayout(
+                  detail.id,
+                  { adminNotes: notes },
+                  // cannelloni-92103: same regions thread for UB notes edits.
+                  regions ? { regions } : undefined,
+                );
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);
               } catch (err: any) {

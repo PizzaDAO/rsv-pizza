@@ -4138,11 +4138,20 @@ export async function updateAdminPayout(
      */
     allowOverSubmissionCap?: boolean;
   },
+  /**
+   * cannelloni-92103: regional underbosses can edit payouts on parties in
+   * their region. The backend PATCH gate (`requireAdminOrRegionalUnderboss`)
+   * needs the `regions=` CSV query to verify scope. Admins ignore it.
+   */
+  opts?: { regions?: string[] },
 ): Promise<AdminPayout> {
-  const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}`, {
-    method: 'PATCH',
-    body: fields,
-  });
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}${regionsQuery(opts?.regions)}`,
+    {
+      method: 'PATCH',
+      body: fields,
+    },
+  );
   return res.payout;
 }
 
