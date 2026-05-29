@@ -117,7 +117,7 @@ export function ShareWithAiButton({ tag }: ShareWithAiButtonProps) {
             onClick={() => setOpen(false)}
           >
             <div
-              className="bg-theme-card border border-theme-stroke rounded-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
+              className="bg-white border border-theme-stroke rounded-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-4">
@@ -177,11 +177,11 @@ export function ShareWithAiButton({ tag }: ShareWithAiButtonProps) {
                       type="button"
                       onClick={handleRevoke}
                       disabled={acting !== null}
-                      className="px-3 py-2 rounded-lg text-sm text-red-500 hover:text-red-600 disabled:opacity-50"
+                      className="px-3 py-2 rounded-lg text-sm bg-white border border-red-500 hover:bg-red-50 text-red-500 hover:text-red-600 disabled:opacity-50 inline-flex items-center gap-1"
                     >
                       {acting === 'revoke' ? (
-                        <Loader2 size={14} className="animate-spin inline" />
-                      ) : null}{' '}
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : null}
                       {t('consolidated.shareWithAiRevoke')}
                     </button>
                     <button
