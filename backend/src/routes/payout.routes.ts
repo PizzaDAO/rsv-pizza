@@ -913,8 +913,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     });
 
     // Final amount: host override (if provided) or OCR sum
-    const finalUsd = typeof finalAmountUsd === 'number' && finalAmountUsd > 0
-      ? finalAmountUsd
+    const hasExplicitAmount = typeof finalAmountUsd === 'number' && finalAmountUsd > 0;
+    let finalUsd = hasExplicitAmount
+      ? (finalAmountUsd as number)
       : extractedUsdSum;
 
     if (finalUsd <= 0) {
@@ -923,6 +924,25 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         400,
         'INVALID_AMOUNT'
       );
+    }
+
+    // crocchetta-92103: default the payout's amount to min(receipts_sum, party_cap).
+    // Receipts persist as evidence of the host's gross claim; final_amount_usd is
+    // what we'll reimburse. Admin can edit later to over-cap. Host's explicit
+    // `finalAmountUsd` body field bypasses the clamp (matching speck-89172's
+    // "hosts can submit any amount" — the warning still surfaces in UI).
+    if (!hasExplicitAmount) {
+      const partyForCap = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { reimbursementCapUsd: true, eventTags: true },
+      });
+      const cap = computeEffectiveCapUsd({
+        reimbursementCapUsd: partyForCap?.reimbursementCapUsd,
+        eventTags: partyForCap?.eventTags,
+      });
+      if (typeof cap === 'number' && cap > 0 && finalUsd > cap) {
+        finalUsd = cap;
+      }
     }
 
     // speck-89172: host POST is no longer cap-enforced. Hosts can submit any
@@ -1603,6 +1623,23 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
 
       if (!explicitAmount && fullOcrSum > 0) {
         recomputedAmount = new Decimal(fullOcrSum);
+
+        // crocchetta-92103: clamp the recomputed amount to the party's effective
+        // cap. Receipts retain their full OCR amounts as evidence; the payout's
+        // final_amount_usd reflects what we'll actually reimburse. Admin PATCH
+        // (panettone-92103) bypasses this path entirely.
+        const partyForCap = await prisma.party.findUnique({
+          where: { id: partyId },
+          select: { reimbursementCapUsd: true, eventTags: true },
+        });
+        const cap = computeEffectiveCapUsd({
+          reimbursementCapUsd: partyForCap?.reimbursementCapUsd,
+          eventTags: partyForCap?.eventTags,
+        });
+        const recomputedNum = Number(recomputedAmount.toString());
+        if (typeof cap === 'number' && cap > 0 && recomputedNum > cap) {
+          recomputedAmount = new Decimal(cap);
+        }
       }
 
       // If this is the first receipt OCR'd successfully, pull FX headline
