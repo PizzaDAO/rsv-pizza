@@ -412,7 +412,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
             <div className="flex-1 text-sm text-amber-100">
-              Heads up: ${finalAmount.toFixed(2)} exceeds your ${effectiveCapUsd!.toFixed(2)} reimbursement cap. Admin will review.
+              Heads up: receipts total ${finalAmount.toFixed(2)}, but your reimbursement cap is ${effectiveCapUsd!.toFixed(2)}. We'll reimburse the cap; the receipts stay attached as evidence. Admin can approve more in special cases.
             </div>
           </div>
         </div>
