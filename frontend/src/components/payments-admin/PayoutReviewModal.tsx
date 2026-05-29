@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
-import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
+import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 import {
   PayoutStatusPill,
   PayoutMethodIcon,
@@ -366,10 +366,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // agnolotti-58291: per-receipt OCR amount + currency edit state. The modal
   // ships an inline form per receipt row (gated to full admins + payment_admin)
   // so admins can correct OCR misreads without recomputing the parent payout.
-  // `receiptOverrides` is a docId -> { ocrAmount, ocrCurrency } map applied on
-  // top of `payout.documents` for rendering, so the row reflects the saved
-  // value immediately without waiting for a parent refresh.
-  type ReceiptOverride = { ocrAmount: number | null; ocrCurrency: string | null };
+  // `receiptOverrides` is a docId -> { ocrAmount, ocrCurrency, ocrLineItems }
+  // map applied on top of `payout.documents` for rendering, so the row
+  // reflects the saved value immediately without waiting for a parent refresh.
+  //
+  // taralli-92104: extended with `ocrLineItems` so the line item grid stays
+  // in sync with what we just persisted (no parent re-fetch required).
+  type ReceiptOverride = {
+    ocrAmount: number | null;
+    ocrCurrency: string | null;
+    ocrLineItems?: ReceiptLineItem[] | null;
+  };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
   const [receiptSavingId, setReceiptSavingId] = useState<string | null>(null);
@@ -393,6 +400,29 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // on success; failures still surface a per-row error chip.
   const [retryClearedErrors, setRetryClearedErrors] = useState<Record<string, boolean>>({});
 
+  // taralli-92104: per-receipt line-item editor state.
+  //
+  //  - `lineItemsExpanded` tracks the collapse caret per docId. Default
+  //    collapsed (false) so the modal isn't overwhelming when a payout has
+  //    many receipts.
+  //  - `lineItemDrafts` holds the in-flight edits as string-typed inputs so
+  //    admins can type freely (decimals, partial values, etc.) without us
+  //    fighting the cursor. Numeric coercion happens at save time.
+  //  - `lineItemsSavingId` and `lineItemsSaveErrors` are scoped to the
+  //    line-items section so they don't collide with the amount/currency
+  //    save state above.
+  type LineItemDraft = {
+    name: string;
+    qty: string;
+    unitPrice: string;
+    subtotal: string;
+    category: ReceiptLineItemCategory;
+  };
+  const [lineItemsExpanded, setLineItemsExpanded] = useState<Record<string, boolean>>({});
+  const [lineItemDrafts, setLineItemDrafts] = useState<Record<string, LineItemDraft[]>>({});
+  const [lineItemsSavingId, setLineItemsSavingId] = useState<string | null>(null);
+  const [lineItemsSaveErrors, setLineItemsSaveErrors] = useState<Record<string, string>>({});
+
   // Hooks must be declared above any early returns. There aren't any early
   // returns in this component today, but keeping all hooks grouped here makes
   // the rule-of-hooks invariant easier to verify.
@@ -410,7 +440,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         .filter((d) => d.kind === 'receipt')
         .map((d) => {
           const ov = receiptOverrides[d.id];
-          return ov ? { ...d, ocrAmount: ov.ocrAmount, ocrCurrency: ov.ocrCurrency } : d;
+          if (!ov) return d;
+          // taralli-92104: layer the persisted line items on top of the
+          // original document too so the grid renders the saved values
+          // after PATCH without waiting for a parent refresh.
+          return {
+            ...d,
+            ocrAmount: ov.ocrAmount,
+            ocrCurrency: ov.ocrCurrency,
+            ocrLineItems:
+              ov.ocrLineItems !== undefined ? ov.ocrLineItems : d.ocrLineItems,
+          };
         }),
     [payout.documents, receiptOverrides],
   );
@@ -486,6 +526,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         [docId]: {
           ocrAmount: updated.ocrAmount,
           ocrCurrency: updated.ocrCurrency,
+          // taralli-92104: preserve any line items override that was already
+          // saved (e.g. admin saved line items first, then bumped the total).
+          // The backend echoes the current persisted array regardless of
+          // whether we PATCHed it, so trust the server response.
+          ocrLineItems: updated.ocrLineItems,
         },
       }));
       // Sync the draft text to the canonical saved value so the inputs match
@@ -551,6 +596,159 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       });
   }, [receipts, retryClearedErrors]);
   const showQuotaBanner = quotaErrorRows.length >= 2;
+
+  // taralli-92104: helpers + persistence for the per-receipt line items
+  // grid. Drafts are seeded on first expansion from the canonical
+  // `ocrLineItems` so admins can edit freely without round-tripping every
+  // keystroke. `saveLineItemsEdit` flushes the drafts through the same
+  // `updatePayoutDocument` endpoint and updates `receiptOverrides` so the
+  // rendered row reflects the saved values without a parent refresh.
+  function lineItemToDraft(item: ReceiptLineItem): LineItemDraft {
+    return {
+      name: item.name ?? '',
+      qty: String(item.qty ?? 0),
+      unitPrice: String(item.unitPrice ?? 0),
+      subtotal: String(item.subtotal ?? 0),
+      category: item.category ?? 'other',
+    };
+  }
+
+  function emptyLineItemDraft(): LineItemDraft {
+    return { name: '', qty: '1', unitPrice: '0', subtotal: '0', category: 'other' };
+  }
+
+  function ensureLineItemDrafts(docId: string, items: ReceiptLineItem[] | null | undefined) {
+    setLineItemDrafts((m) => {
+      if (m[docId]) return m; // already seeded — don't clobber in-flight edits
+      return {
+        ...m,
+        [docId]: (items ?? []).map(lineItemToDraft),
+      };
+    });
+  }
+
+  function toggleLineItems(docId: string, items: ReceiptLineItem[] | null | undefined) {
+    setLineItemsExpanded((m) => {
+      const next = !m[docId];
+      if (next) ensureLineItemDrafts(docId, items);
+      return { ...m, [docId]: next };
+    });
+  }
+
+  function updateLineItemDraft(
+    docId: string,
+    idx: number,
+    patch: Partial<LineItemDraft>,
+  ) {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      const next = cur.slice();
+      next[idx] = { ...next[idx], ...patch };
+      return { ...m, [docId]: next };
+    });
+  }
+
+  function addLineItem(docId: string) {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      return { ...m, [docId]: [...cur, emptyLineItemDraft()] };
+    });
+  }
+
+  function removeLineItem(docId: string, idx: number) {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      const next = cur.slice();
+      next.splice(idx, 1);
+      return { ...m, [docId]: next };
+    });
+  }
+
+  // Sum of subtotals across the current draft (used by the "Use line sum"
+  // button + the live total at the bottom of the editor).
+  function draftSubtotalSum(drafts: LineItemDraft[] | undefined): number {
+    if (!drafts) return 0;
+    let sum = 0;
+    for (const d of drafts) {
+      const n = Number(d.subtotal);
+      if (Number.isFinite(n) && n >= 0) sum += n;
+    }
+    return sum;
+  }
+
+  // Clamp the receipt-amount draft to the current line-sum. Convenience
+  // affordance — admins still get the explicit Save button to confirm.
+  function useLineSumForAmount(docId: string) {
+    const drafts = lineItemDrafts[docId];
+    const sum = draftSubtotalSum(drafts);
+    setReceiptDrafts((m) => {
+      const prev = m[docId];
+      // Preserve the existing currency draft (or empty) so we don't reset it.
+      return {
+        ...m,
+        [docId]: {
+          amount: sum.toFixed(2),
+          currency: prev?.currency ?? '',
+        },
+      };
+    });
+  }
+
+  async function saveLineItemsEdit(docId: string) {
+    const drafts = lineItemDrafts[docId];
+    if (!drafts) return;
+    setLineItemsSavingId(docId);
+    setLineItemsSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const items: ReceiptLineItem[] = drafts.map((d, idx) => {
+        const qty = Number(d.qty);
+        const unitPrice = Number(d.unitPrice);
+        const subtotal = Number(d.subtotal);
+        if (!Number.isFinite(qty) || qty < 0) {
+          throw new Error(`Line ${idx + 1}: qty must be a non-negative number`);
+        }
+        if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+          throw new Error(`Line ${idx + 1}: unit price must be a non-negative number`);
+        }
+        if (!Number.isFinite(subtotal) || subtotal < 0) {
+          throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
+        }
+        return {
+          name: d.name,
+          qty,
+          unitPrice,
+          subtotal,
+          category: d.category,
+        };
+      });
+      const updated = await updatePayoutDocument(docId, { ocrLineItems: items });
+      setReceiptOverrides((m) => ({
+        ...m,
+        [docId]: {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+          ocrLineItems: updated.ocrLineItems,
+        },
+      }));
+      // Re-seed the draft from the canonical saved array so the next render
+      // matches the persisted state (server may have rounded/sanitized).
+      setLineItemDrafts((m) => ({
+        ...m,
+        [docId]: (updated.ocrLineItems ?? []).map(lineItemToDraft),
+      }));
+    } catch (err: any) {
+      setLineItemsSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to save line items',
+      }));
+    } finally {
+      setLineItemsSavingId(null);
+    }
+  }
 
   // bresaola-89172: keyboard nav for the lightbox now lives inside the
   // ReceiptLightbox component itself (Esc to close, arrows to cycle). The
@@ -1394,6 +1592,184 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         {saveError && (
                           <div className="text-xs text-red-600 mt-0.5 ml-4">{saveError}</div>
                         )}
+                        {/* taralli-92104: collapsed line item editor. Caret
+                            toggles expansion; on expand we seed the drafts
+                            from the canonical `ocrLineItems`. Renders for
+                            every admin who can edit receipts, including
+                            receipts with no items today (admin can add).
+                        */}
+                        {canEditReceipts && (() => {
+                          const expanded = !!lineItemsExpanded[r.id];
+                          const persistedItems = r.ocrLineItems ?? null;
+                          const persistedCount = Array.isArray(persistedItems)
+                            ? persistedItems.length
+                            : 0;
+                          const drafts = lineItemDrafts[r.id];
+                          const draftCount = drafts?.length ?? persistedCount;
+                          const lineSum = draftSubtotalSum(drafts);
+                          const itemsSaving = lineItemsSavingId === r.id;
+                          const itemsSaveError = lineItemsSaveErrors[r.id];
+                          // Currency for the live sum label — receipt's
+                          // original currency if known, else USD as a
+                          // last-resort. The save endpoint stores numeric
+                          // values; the label is purely informational.
+                          const sumCurrency =
+                            r.originalCurrency
+                              ?? r.ocrCurrency
+                              ?? 'USD';
+                          return (
+                            <div className="ml-4 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleLineItems(r.id, persistedItems)}
+                                className="text-xs text-theme-text-muted hover:text-theme-text inline-flex items-center gap-1"
+                                title={expanded ? 'Hide line items' : 'Show line items'}
+                              >
+                                {expanded
+                                  ? <ChevronDown size={12} />
+                                  : <ChevronRight size={12} />}
+                                <span>
+                                  {expanded ? 'Hide' : 'Show'} line items ({draftCount})
+                                </span>
+                              </button>
+                              {expanded && (
+                                <div className="mt-2 rounded border border-theme-stroke p-2 bg-theme-bg space-y-1">
+                                  {/*
+                                    taralli-92104: data-grid cells, not form
+                                    fields — IconInput hardcodes `w-full
+                                    !pl-14` which doesn't fit a tight 4-cell
+                                    + remove-button layout. Same precedent as
+                                    agnolotti-58291's per-row amount/currency
+                                    inputs above; raw inputs are intentional
+                                    here.
+                                  */}
+                                  {(drafts ?? []).length === 0 && (
+                                    <div className="text-xs text-theme-text-faint">
+                                      No line items yet. Click "Add line" to start.
+                                    </div>
+                                  )}
+                                  {(drafts ?? []).map((d, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-1.5"
+                                    >
+                                      <input
+                                        type="text"
+                                        value={d.name}
+                                        placeholder="name"
+                                        onChange={(e) =>
+                                          updateLineItemDraft(r.id, idx, { name: e.target.value })
+                                        }
+                                        className="flex-1 min-w-0 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
+                                      />
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        inputMode="decimal"
+                                        value={d.qty}
+                                        placeholder="qty"
+                                        onChange={(e) =>
+                                          updateLineItemDraft(r.id, idx, { qty: e.target.value })
+                                        }
+                                        className="w-14 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                                      />
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        inputMode="decimal"
+                                        value={d.unitPrice}
+                                        placeholder="unit"
+                                        onChange={(e) =>
+                                          updateLineItemDraft(r.id, idx, { unitPrice: e.target.value })
+                                        }
+                                        className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                                      />
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        inputMode="decimal"
+                                        value={d.subtotal}
+                                        placeholder="subtotal"
+                                        onChange={(e) =>
+                                          updateLineItemDraft(r.id, idx, { subtotal: e.target.value })
+                                        }
+                                        className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                                      />
+                                      <select
+                                        value={d.category}
+                                        onChange={(e) =>
+                                          updateLineItemDraft(r.id, idx, {
+                                            category: e.target.value as ReceiptLineItemCategory,
+                                          })
+                                        }
+                                        className="px-1 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
+                                        title="Category — pizza-prices analytics filters on 'pizza'"
+                                      >
+                                        <option value="pizza">pizza</option>
+                                        <option value="beverage">beverage</option>
+                                        <option value="topping">topping</option>
+                                        <option value="side">side</option>
+                                        <option value="dessert">dessert</option>
+                                        <option value="tax">tax</option>
+                                        <option value="tip">tip</option>
+                                        <option value="fee">fee</option>
+                                        <option value="other">other</option>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeLineItem(r.id, idx)}
+                                        className="p-1 rounded text-theme-text-muted hover:text-red-500 hover:bg-red-50"
+                                        title="Remove this line"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => addLineItem(r.id)}
+                                      className="px-2 py-1 rounded border border-theme-stroke text-theme-text text-xs inline-flex items-center gap-1 hover:bg-theme-surface"
+                                      title="Append a new line"
+                                    >
+                                      <Plus size={12} />
+                                      Add line
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => useLineSumForAmount(r.id)}
+                                      className="px-2 py-1 rounded border border-theme-stroke text-theme-text text-xs inline-flex items-center gap-1 hover:bg-theme-surface"
+                                      title="Copy the line sum into the receipt total above"
+                                      disabled={(drafts ?? []).length === 0}
+                                    >
+                                      Use line sum
+                                    </button>
+                                    <span className="text-xs text-theme-text-muted ml-auto">
+                                      Sum: {sumCurrency} {lineSum.toFixed(2)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => saveLineItemsEdit(r.id)}
+                                      disabled={itemsSaving}
+                                      className="px-2 py-1 rounded bg-[#E52828] text-white text-xs disabled:opacity-40 inline-flex items-center gap-1"
+                                      title="Save line items"
+                                    >
+                                      {itemsSaving
+                                        ? <Loader2 size={12} className="animate-spin" />
+                                        : 'Save lines'}
+                                    </button>
+                                  </div>
+                                  {itemsSaveError && (
+                                    <div className="text-xs text-red-600">{itemsSaveError}</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </li>
                     );
                   })}

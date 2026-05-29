@@ -1675,6 +1675,12 @@ export interface PayoutDocument {
   originalAmount?: number | null;
   originalCurrency?: string | null;
   exchangeRate?: number | null;
+  // taralli-92104: structured per-line OCR items (formaggi-89172's
+  // `ocr_line_items` JSONB column) surfaced for the admin reviewer modal.
+  // Admins edit these inline; PATCH /api/admin/payouts/documents/:docId
+  // persists the new array wholesale. `null` when OCR didn't extract any
+  // line items (pre-formaggi rows or unparseable receipts).
+  ocrLineItems?: ReceiptLineItem[] | null;
   ocrError: string | null;
   sortOrder: number;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows
@@ -1682,6 +1688,32 @@ export interface PayoutDocument {
   uploadedByUserId?: string | null;
   uploadedByName?: string | null;
   uploadedByEmail?: string | null;
+}
+
+/**
+ * taralli-92104: line item shape extracted by the OCR pipeline
+ * (formaggi-89172) and edited by admins in the reviewer modal. Categories
+ * mirror the backend `OcrLineItemCategory` enum — the pizza-prices
+ * analytics endpoint (`/api/admin/payouts/pizza-prices`) filters on
+ * `category === 'pizza'`, so the shape must stay compatible.
+ */
+export type ReceiptLineItemCategory =
+  | 'pizza'
+  | 'beverage'
+  | 'topping'
+  | 'side'
+  | 'dessert'
+  | 'tax'
+  | 'tip'
+  | 'fee'
+  | 'other';
+
+export interface ReceiptLineItem {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
+  category: ReceiptLineItemCategory;
 }
 
 export interface BankDetails {
