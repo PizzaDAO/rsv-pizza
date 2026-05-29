@@ -292,6 +292,12 @@ textarea {
 /* iOS status bar tap-to-scroll: let the viewport be the main scroll container */
 html {
   height: 100%;
+  /* polenta-92103: tell the browser the page is in dark mode so native UI
+     (the <select> options popup, scrollbars, autofill backgrounds, form
+     control defaults) renders dark instead of falling back to the OS light
+     theme. Page colors are unaffected — color-scheme is metadata.
+     The GPP light theme overrides this back to `light` below. */
+  color-scheme: dark;
 }
 
 body {
@@ -422,6 +428,9 @@ body.gpp-theme-active {
   --accent-hover: #CC2020;
 
   --color-scheme: light;
+  /* polenta-92103: GPP pages are light-themed — override the html-level
+     dark color-scheme so native UI (scrollbars, autofill) stays light. */
+  color-scheme: light;
 
   background: linear-gradient(to bottom, #7EC8E3, #B6E4F7) !important;
   color: #1a1a1a;
