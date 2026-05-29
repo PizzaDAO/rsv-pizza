@@ -1468,11 +1468,32 @@ model SponsorUser {
   checklistItems        SponsorChecklistItem[]
   quizQuestionTemplates QuizQuestionTemplate[]
   partnerEventNotes     PartnerEventNote[]
+  // scamorza-71819: read-only AI-share tokens for the consolidated report.
+  partnerAiShareTokens  PartnerAiShareToken[]
 
   @@unique([email, tag])
   @@index([email])
   @@index([tag])
   @@map("sponsor_users")
+}
+
+// scamorza-71819: per-partner read-only AI-share tokens. Each row is a
+// long-lived bearer token that lets an LLM assistant fetch the partner's
+// consolidated report via the public `/api/sponsor/report/ai/:token` endpoint
+// (Markdown by default, ?format=json for JSON). The partial unique index on
+// (sponsor_user_id, tag) WHERE revoked_at IS NULL keeps at most one active
+// token per partner+tag; rotation revokes the old row and inserts a new one.
+model PartnerAiShareToken {
+  id            String      @id @default(uuid()) @db.Uuid
+  sponsorUserId String      @map("sponsor_user_id") @db.Uuid
+  sponsorUser   SponsorUser @relation(fields: [sponsorUserId], references: [id], onDelete: Cascade)
+  tag           String
+  token         String      @unique
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt    DateTime?   @map("last_used_at") @db.Timestamptz
+  revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz
+
+  @@map("partner_ai_share_tokens")
 }
 
 model SponsorChecklistItem {

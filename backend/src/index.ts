@@ -56,7 +56,7 @@ import adminPayoutRoutes, { payoutWalletRouter, partyMarkPaidRouter } from './ro
 import adminPartyRoutes from './routes/admin-party.routes.js';
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
-import { sponsorUserAdminRouter, sponsorDashboardRouter } from './routes/sponsor-user.routes.js';
+import { sponsorUserAdminRouter, sponsorDashboardRouter, partnerAiShareRouter } from './routes/sponsor-user.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
@@ -150,6 +150,10 @@ app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (befor
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management
 app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
+// scamorza-71819: public AI-share consolidated report endpoint. Must mount
+// BEFORE `sponsorDashboardRouter` so the unauthenticated `/report/ai/:token`
+// path matches first, before any of the auth-gated /api/sponsor routes.
+app.use('/api/sponsor/report/ai', partnerAiShareRouter);
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/auth', authRoutes);

@@ -3364,6 +3364,42 @@ export async function fetchSponsorConsolidatedReport(
   return apiRequest<ConsolidatedReport>(`/api/sponsor/report${params}`);
 }
 
+// scamorza-71819: AI-share token management for the partner consolidated report.
+// The token is a long-lived bearer that powers the public read-only
+// `/api/sponsor/report/ai/:token` endpoint pasted into LLM assistants.
+export interface PartnerAiShareTokenResponse {
+  token: string | null;
+  url: string | null;
+  tag: string;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+}
+
+export async function getPartnerAiShareToken(
+  tag?: string
+): Promise<PartnerAiShareTokenResponse> {
+  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+  return apiRequest<PartnerAiShareTokenResponse>(`/api/sponsor/ai-share-token${params}`);
+}
+
+export async function createPartnerAiShareToken(
+  tag?: string
+): Promise<PartnerAiShareTokenResponse> {
+  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+  return apiRequest<PartnerAiShareTokenResponse>(`/api/sponsor/ai-share-token${params}`, {
+    method: 'POST',
+  });
+}
+
+export async function revokePartnerAiShareToken(
+  tag?: string
+): Promise<{ success: boolean }> {
+  const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+  return apiRequest<{ success: boolean }>(`/api/sponsor/ai-share-token${params}`, {
+    method: 'DELETE',
+  });
+}
+
 // pecorino-64118 follow-up: download list of guest emails opted into a partner's
 // newsletter (ethconf + SWC family). Errors with 400 NO_NEWSLETTER for tags
 // without a newsletter (e.g. pizzadao).

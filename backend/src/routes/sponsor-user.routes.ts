@@ -1,4 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isAdmin, isUnderboss } from '../middleware/auth.js';
@@ -6,6 +7,8 @@ import { requireSponsorAuth, SponsorRequest } from '../middleware/sponsorAuth.js
 import { AppError } from '../middleware/error.js';
 import { syncPartnerToAllEvents, syncAutoSponsorsToAllEvents, removePartnerFromAllEvents, removeAutoSponsorsFromAllEvents } from '../helpers/partnerSync.js';
 import { buildIndustryOrgs } from '../lib/emailDomains.js';
+import { buildConsolidatedReport } from '../lib/consolidatedReport.js';
+import { renderConsolidatedReportMarkdown } from '../lib/consolidatedReportMarkdown.js';
 
 // Admin management routes (mounted at /api/sponsor-users)
 
@@ -1113,6 +1116,232 @@ const NEWSLETTER_OPTIN_FIELD: Record<string, 'swcOptIn' | 'swcCaOptIn' | 'swcAuO
   swc: 'swcOptIn', swcca: 'swcCaOptIn', swcau: 'swcAuOptIn', swceu: 'swcEuOptIn', swcuk: 'swcUkOptIn', swcbr: 'swcBrOptIn', ethconf: 'ethconfOptIn',
 };
 
+// scamorza-71819: per-partner AI-share token endpoints.
+//
+// These let a logged-in partner mint, view and revoke a long-lived read-only
+// bearer token that can be pasted into an LLM assistant to give it access to
+// the consolidated report via the public `/api/sponsor/report/ai/:token`
+// endpoint (Markdown by default, ?format=json for JSON).
+//
+// Storage invariant: at most one ACTIVE token per (sponsorUserId, tag); the
+// `partner_ai_share_tokens_active_unique` partial index enforces it.
+
+function buildAiShareUrl(token: string): string {
+  const base = (process.env.BACKEND_PUBLIC_URL || 'https://api.rsv.pizza').replace(/\/+$/, '');
+  return `${base}/api/sponsor/report/ai/${token}`;
+}
+
+// Resolve the same tag the /report endpoint resolves (admin can pass ?tag=).
+function resolveAiTokenTag(req: SponsorRequest): string | null {
+  const queryTag = (req.query.tag as string | undefined)?.trim().toLowerCase();
+  const tag = req.isAdminViewing
+    ? (queryTag || req.sponsorUser?.tag || undefined)
+    : (queryTag || req.sponsorUser?.tag);
+  return tag || null;
+}
+
+// GET /api/sponsor/ai-share-token — return the currently-active token (if any).
+sponsorDashboardRouter.get(
+  '/ai-share-token',
+  requireAuth,
+  requireSponsorAuth,
+  async (req: SponsorRequest, res: Response, next: NextFunction) => {
+    try {
+      const sponsorUserId = req.sponsorUser?.id;
+      if (!sponsorUserId) {
+        throw new AppError('Sponsor user required', 400, 'VALIDATION_ERROR');
+      }
+      const tag = resolveAiTokenTag(req);
+      if (!tag) {
+        throw new AppError('A tag is required to manage AI-share tokens.', 400, 'VALIDATION_ERROR');
+      }
+
+      const row = await prisma.partnerAiShareToken.findFirst({
+        where: { sponsorUserId, tag, revokedAt: null },
+      });
+
+      if (!row) {
+        return res.json({ token: null, url: null, tag, createdAt: null, lastUsedAt: null });
+      }
+      return res.json({
+        token: row.token,
+        url: buildAiShareUrl(row.token),
+        tag,
+        createdAt: row.createdAt,
+        lastUsedAt: row.lastUsedAt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/sponsor/ai-share-token — idempotent rotate.
+// Revokes any existing active token for (sponsorUserId, tag) and inserts a new
+// one in a single transaction (so the partial unique index never sees two
+// active rows at once).
+sponsorDashboardRouter.post(
+  '/ai-share-token',
+  requireAuth,
+  requireSponsorAuth,
+  async (req: SponsorRequest, res: Response, next: NextFunction) => {
+    try {
+      const sponsorUserId = req.sponsorUser?.id;
+      if (!sponsorUserId) {
+        throw new AppError('Sponsor user required', 400, 'VALIDATION_ERROR');
+      }
+      const tag = resolveAiTokenTag(req);
+      if (!tag) {
+        throw new AppError('A tag is required to manage AI-share tokens.', 400, 'VALIDATION_ERROR');
+      }
+
+      const newToken = crypto.randomBytes(32).toString('base64url');
+
+      const created = await prisma.$transaction(async tx => {
+        await tx.partnerAiShareToken.updateMany({
+          where: { sponsorUserId, tag, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        return tx.partnerAiShareToken.create({
+          data: { sponsorUserId, tag, token: newToken },
+        });
+      });
+
+      return res.status(201).json({
+        token: created.token,
+        url: buildAiShareUrl(created.token),
+        tag,
+        createdAt: created.createdAt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /api/sponsor/ai-share-token — revoke (no-op when nothing active).
+sponsorDashboardRouter.delete(
+  '/ai-share-token',
+  requireAuth,
+  requireSponsorAuth,
+  async (req: SponsorRequest, res: Response, next: NextFunction) => {
+    try {
+      const sponsorUserId = req.sponsorUser?.id;
+      if (!sponsorUserId) {
+        throw new AppError('Sponsor user required', 400, 'VALIDATION_ERROR');
+      }
+      const tag = resolveAiTokenTag(req);
+      if (!tag) {
+        throw new AppError('A tag is required to manage AI-share tokens.', 400, 'VALIDATION_ERROR');
+      }
+
+      await prisma.partnerAiShareToken.updateMany({
+        where: { sponsorUserId, tag, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// scamorza-71819: public AI-fetch router. NO auth middleware — the token is
+// the bearer. Mount this on the app under `/api/sponsor/report/ai` from index.ts
+// so it lives alongside the rest of the /api/sponsor surface but is reachable
+// without a JWT. Rate-limited per (token, IP) via a small in-process limiter.
+
+export const partnerAiShareRouter = Router();
+
+// Simple in-process rate limiter — 60 requests / 60s per (token, IP).
+// (`express-rate-limit` doesn't easily key on a path param without ceremony,
+// and we want the limit to apply BEFORE we look up the token row.)
+interface RateBucket { count: number; resetAt: number }
+const AI_RATE_WINDOW_MS = 60 * 1000;
+const AI_RATE_MAX = 60;
+const aiRateBuckets = new Map<string, RateBucket>();
+
+function aiRateLimitKey(tokenParam: string, req: Request): string {
+  const ip = (req.ip || req.headers['x-forwarded-for'] || 'unknown').toString().split(',')[0].trim();
+  return `${tokenParam}::${ip}`;
+}
+
+function aiCheckRateLimit(tokenParam: string, req: Request): { ok: true } | { ok: false; retryAfterSec: number } {
+  const key = aiRateLimitKey(tokenParam, req);
+  const now = Date.now();
+  const bucket = aiRateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    aiRateBuckets.set(key, { count: 1, resetAt: now + AI_RATE_WINDOW_MS });
+    return { ok: true };
+  }
+  if (bucket.count >= AI_RATE_MAX) {
+    return { ok: false, retryAfterSec: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)) };
+  }
+  bucket.count += 1;
+  return { ok: true };
+}
+
+// Best-effort prune so the map doesn't grow unbounded in long-running processes.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of aiRateBuckets) {
+    if (v.resetAt <= now) aiRateBuckets.delete(k);
+  }
+}, AI_RATE_WINDOW_MS).unref?.();
+
+partnerAiShareRouter.get('/:token', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tokenParam = req.params.token;
+    if (!tokenParam || tokenParam.length < 16) {
+      throw new AppError('Token not found', 404, 'NOT_FOUND');
+    }
+
+    const limit = aiCheckRateLimit(tokenParam, req);
+    if (!limit.ok) {
+      res.setHeader('Retry-After', String(limit.retryAfterSec));
+      throw new AppError('Rate limit exceeded', 429, 'RATE_LIMITED');
+    }
+
+    const row = await prisma.partnerAiShareToken.findFirst({
+      where: { token: tokenParam, revokedAt: null },
+    });
+    if (!row) {
+      throw new AppError('Token not found', 404, 'NOT_FOUND');
+    }
+
+    // Fire-and-forget last-used update — don't block the response on it.
+    prisma.partnerAiShareToken
+      .update({ where: { id: row.id }, data: { lastUsedAt: new Date() } })
+      .catch(err => console.error('[ai-share] failed to bump lastUsedAt:', err));
+
+    const sponsorUser = await prisma.sponsorUser.findUnique({
+      where: { id: row.sponsorUserId },
+      select: { id: true, name: true, tag: true, isActive: true },
+    });
+    if (!sponsorUser || !sponsorUser.isActive) {
+      throw new AppError('Token not found', 404, 'NOT_FOUND');
+    }
+
+    const report = await buildConsolidatedReport({
+      tag: row.tag,
+      isAdminViewing: false,
+      sponsorUser: { id: sponsorUser.id, name: sponsorUser.name },
+      approvedOnly: true,
+    });
+
+    const format = (req.query.format as string | undefined)?.trim().toLowerCase();
+    if (format === 'json') {
+      return res.json(report);
+    }
+
+    const md = renderConsolidatedReportMarkdown(report);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    return res.send(md);
+  } catch (error) {
+    next(error);
+  }
+});
+
 sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (req: SponsorRequest, res: Response, next: NextFunction) => {
   try {
     const queryTag = req.query.tag as string | undefined;
@@ -1127,386 +1356,22 @@ sponsorDashboardRouter.get('/report', requireAuth, requireSponsorAuth, async (re
     const rawApprovedOnly = (req.query.approvedOnly as string | undefined)?.trim().toLowerCase();
     const approvedOnlyParam = rawApprovedOnly === '1' || rawApprovedOnly === 'true' || rawApprovedOnly === 'yes';
 
-    // pecorino-64118: newsletter signups count THIS tag's own opt-in column, if any.
-    const optinField = tag ? NEWSLETTER_OPTIN_FIELD[tag] : undefined;
-
-    // Build where clause — identical to GET /events
-    const where: any = {};
-    if (tag && tag !== 'pizzadao') {
-      where.eventTags = { has: tag };
-    } else if (tag === 'pizzadao') {
-      where.eventType = 'gpp';
-    } else if (req.isAdminViewing) {
-      where.eventType = 'gpp';
-      where.NOT = { eventTags: { equals: [] } };
-    }
-
-    // Non-admin partners only see approved events.
-    if (!req.isAdminViewing) {
-      where.underbossStatus = 'approved';
-    } else if (approvedOnlyParam) {
-      // Admin opted in to approved-only via the toggle.
-      where.underbossStatus = 'approved';
-    }
-    // Exclude cancelled events (consistent with GET /events).
-    where.cancelledAt = null;
-
-    // Non-admin with no resolvable tag (shouldn't happen): early-return empty.
-    if (!tag && !req.isAdminViewing) {
-      return res.json({
-        partnerName: null,
-        tag: null,
-        isAdmin: false,
-        // Non-admins are always approved-only (server-enforced above).
-        approvedOnly: true,
-        eventCount: 0,
-        dateRange: null,
-        stats: {
-          totalRsvps: 0, approvedGuests: 0, mailingListSignups: null, walletAddresses: 0,
-          poapMints: 0, poapMoments: 0, socialPostViews: 0, socialPostCount: 0,
-        },
-        impressions: { totalViews: 0, uniqueVisitors: 0 },
-        clickStats: { totalClicks: 0, uniqueClickers: 0, byLink: [] },
-        notableAttendees: [],
-        industryOrgs: [],
-        socialPosts: [],
-        featuredPhotos: [],
-        walletAddressList: [],
-        events: [],
-      });
-    }
-
-    // Load all matching parties with report-relevant includes (mirrors report.routes.ts GET).
-    const parties = await prisma.party.findMany({
-      where,
-      include: {
-        socialPosts: { orderBy: { sortOrder: 'asc' } },
-        notableAttendees: {
-          orderBy: { sortOrder: 'asc' },
-          include: { guest: { select: { email: true } } },
-        },
-        photos: {
-          where: { status: 'approved' },
-          orderBy: [{ starred: 'desc' }, { createdAt: 'desc' }],
-          take: 10,
-        },
-        user: { select: { name: true, profilePictureUrl: true } },
-        guests: {
-          select: {
-            id: true,
-            email: true,
-            mailingListOptIn: true,
-            // pecorino-64118: per-tag newsletter opt-ins (counted instead of PizzaDAO's).
-            swcOptIn: true,
-            swcCaOptIn: true,
-            swcAuOptIn: true,
-            swcEuOptIn: true,
-            swcUkOptIn: true,
-            swcBrOptIn: true,
-            ethconfOptIn: true,
-            ethereumAddress: true,
-            approved: true,
-            status: true,
-          },
-        },
-      },
-      orderBy: { date: 'asc' },
+    // scamorza-71819: data-gathering moved to backend/src/lib/consolidatedReport.ts
+    // so the public AI-share endpoint can reuse the exact same payload.
+    const report = await buildConsolidatedReport({
+      tag: tag ?? null,
+      isAdminViewing: !!req.isAdminViewing,
+      sponsorUser: req.sponsorUser
+        ? { id: req.sponsorUser.id, name: req.sponsorUser.name }
+        : null,
+      approvedOnly: approvedOnlyParam,
     });
-
-    const eventIds = parties.map(p => p.id);
-
-    // pecorino-64118: collect approved guest emails across ALL loaded events for
-    // one combined Industry RSVPs rollup (org domains only, personal providers
-    // excluded). Raw emails are never returned — only { domain, count }.
-    const industryOrgEmails: (string | null | undefined)[] = [];
-
-    // Aggregate per-event stats + the rollup.
-    let totalRsvps = 0;
-    let approvedGuests = 0;
-    let mailingListSignups = 0;
-    let walletAddresses = 0;
-    let poapMints = 0;
-    let poapMoments = 0;
-    let socialPostViews = 0;
-    let socialPostCount = 0;
-
-    const walletSet = new Set<string>();
-    const combinedSocialPosts: any[] = [];
-    const combinedNotable: any[] = [];
-    const combinedPhotos: any[] = [];
-
-    // Page-view (impression) aggregation — total + TRUE cross-event distinct visitors.
-    const viewStats = eventIds.length > 0
-      ? await prisma.pageView.groupBy({
-          by: ['partyId'],
-          where: { partyId: { in: eventIds } },
-          _count: true,
-        })
-      : [];
-    const viewCountMap = new Map(viewStats.map(r => [r.partyId, r._count]));
-    let totalViews = 0;
-    for (const v of viewStats) totalViews += v._count;
-
-    let uniqueVisitors = 0;
-    if (eventIds.length > 0) {
-      const uniqRows = await prisma.$queryRaw<{ unique_count: bigint }[]>`
-        SELECT COUNT(DISTINCT visitor_hash) AS unique_count
-        FROM page_views
-        WHERE party_id::text IN (${Prisma.join(eventIds)})
-          AND visitor_hash IS NOT NULL
-      `;
-      uniqueVisitors = Number(uniqRows[0]?.unique_count || 0);
-    }
-
-    // Per-event unique visitors (for the per-event table rows).
-    const perEventUniqueViewMap = new Map<string, number>();
-    if (eventIds.length > 0) {
-      const perEventUniq = await prisma.$queryRaw<{ party_id: string; unique_count: bigint }[]>`
-        SELECT party_id::text, COUNT(DISTINCT visitor_hash) AS unique_count
-        FROM page_views
-        WHERE party_id::text IN (${Prisma.join(eventIds)})
-        GROUP BY party_id
-      `;
-      for (const r of perEventUniq) perEventUniqueViewMap.set(r.party_id, Number(r.unique_count));
-    }
-
-    // Determine partner names to filter link clicks by (same logic as GET /events).
-    let partnerNames: string[] = [];
-    if (!req.isAdminViewing && req.sponsorUser) {
-      const partnerRecord = await prisma.sponsorUser.findUnique({
-        where: { id: req.sponsorUser.id },
-        select: { coHostName: true, name: true, email: true },
-      });
-      const displayName = partnerRecord?.coHostName || partnerRecord?.name || partnerRecord?.email || '';
-      if (displayName) partnerNames = [displayName];
-    } else if (req.isAdminViewing) {
-      const tagPartners = await prisma.sponsorUser.findMany({
-        where: { ...(tag ? { tag } : {}), isActive: true },
-        select: { coHostName: true, name: true, email: true },
-      });
-      partnerNames = tagPartners
-        .map(p => p.coHostName || p.name || p.email)
-        .filter(Boolean) as string[];
-    }
-
-    let labelFilter = Prisma.empty;
-    if (partnerNames.length === 1) {
-      labelFilter = Prisma.sql`AND (link_label = ${partnerNames[0]} OR link_label LIKE ${partnerNames[0] + '_%'})`;
-    } else if (partnerNames.length > 1) {
-      const conditions = partnerNames.map(n =>
-        Prisma.sql`link_label = ${n} OR link_label LIKE ${n + '_%'}`
-      );
-      labelFilter = Prisma.sql`AND (${Prisma.join(conditions, ' OR ')})`;
-    }
-
-    // Link-click aggregation: per-link rollup + per-event totals.
-    const clicksByLink = eventIds.length > 0
-      ? await prisma.$queryRaw<{ party_id: string; url: string; link_type: string; link_label: string | null; total_clicks: bigint; unique_clicks: bigint }[]>`
-        SELECT
-          party_id::text,
-          url,
-          link_type,
-          MAX(link_label) as link_label,
-          COUNT(*) as total_clicks,
-          COUNT(DISTINCT visitor_hash) as unique_clicks
-        FROM link_clicks
-        WHERE party_id::text IN (${Prisma.join(eventIds)})
-        AND link_type IN ('sponsor', 'host_social')
-        ${labelFilter}
-        GROUP BY party_id, url, link_type
-        ORDER BY total_clicks DESC
-      `
-      : [];
-
-    const perEventClickCount = new Map<string, number>();
-    const byLinkAgg = new Map<string, { url: string; linkType: string; linkLabel: string | null; clicks: number; uniqueClickers: number }>();
-    let totalClicks = 0;
-    for (const row of clicksByLink) {
-      perEventClickCount.set(row.party_id, (perEventClickCount.get(row.party_id) || 0) + Number(row.total_clicks));
-      totalClicks += Number(row.total_clicks);
-      // Aggregate per-link across events by url+type.
-      const key = `${row.link_type}::${row.url}`;
-      const existing = byLinkAgg.get(key);
-      if (existing) {
-        existing.clicks += Number(row.total_clicks);
-        existing.uniqueClickers += Number(row.unique_clicks);
-      } else {
-        byLinkAgg.set(key, {
-          url: row.url,
-          linkType: row.link_type,
-          linkLabel: row.link_label,
-          clicks: Number(row.total_clicks),
-          uniqueClickers: Number(row.unique_clicks),
-        });
-      }
-    }
-    const byLink = Array.from(byLinkAgg.values()).sort((a, b) => b.clicks - a.clicks);
-
-    // TRUE cross-event distinct clickers (don't sum per-event uniques).
-    let uniqueClickers = 0;
-    if (eventIds.length > 0) {
-      const labelFilterClause = labelFilter === Prisma.empty ? Prisma.empty : labelFilter;
-      const uniqClickRows = await prisma.$queryRaw<{ unique_count: bigint }[]>`
-        SELECT COUNT(DISTINCT visitor_hash) AS unique_count
-        FROM link_clicks
-        WHERE party_id::text IN (${Prisma.join(eventIds)})
-          AND link_type IN ('sponsor', 'host_social')
-          AND visitor_hash IS NOT NULL
-          ${labelFilterClause}
-      `;
-      uniqueClickers = Number(uniqClickRows[0]?.unique_count || 0);
-    }
-
-    // Per-event rows + scalar rollups from the loaded parties.
-    const events = parties.map(party => {
-      const submitted = party.guests.filter(g => g.status !== 'INVITED');
-      const rsvpCount = submitted.length;
-      const approvedCount = submitted.filter(g => g.approved !== false).length;
-      totalRsvps += rsvpCount;
-      approvedGuests += approvedCount;
-      // pecorino-64118: newsletter signups count THIS tag's own opt-in column on
-      // approved guests only. For tags without a newsletter, this stays null and
-      // the frontend hides the tile.
-      if (optinField) {
-        mailingListSignups += submitted.filter(g => g.approved !== false && g[optinField] === true).length;
-      }
-
-      // pecorino-64118: gather approved guest emails for the combined Industry RSVPs.
-      for (const g of submitted) {
-        if (g.approved !== false) industryOrgEmails.push(g.email);
-      }
-
-      for (const g of submitted) {
-        if (g.ethereumAddress) {
-          walletAddresses += 1;
-          walletSet.add(g.ethereumAddress);
-        }
-      }
-
-      poapMints += party.poapMints || 0;
-      poapMoments += party.poapMoments || 0;
-
-      const partyContext = {
-        slug: party.customUrl || party.inviteCode,
-        name: party.name,
-        city: party.city,
-        country: party.country,
-      };
-
-      socialPostCount += party.socialPosts.length;
-      for (const sp of party.socialPosts) {
-        socialPostViews += sp.views || 0;
-        combinedSocialPosts.push({ ...sp, eventName: party.name, party: partyContext });
-      }
-
-      // Notable attendees — mask email to @domain (mirrors published public report).
-      for (const a of party.notableAttendees) {
-        const { guest, ...attendee } = a as any;
-        const fullEmail = guest?.email as string | undefined;
-        const domain = fullEmail?.split('@')[1] || null;
-        combinedNotable.push({
-          ...attendee,
-          email: domain ? `@${domain}` : null,
-          eventName: party.name,
-        });
-      }
-
-      for (const ph of party.photos) {
-        combinedPhotos.push({ ...ph, party: partyContext });
-      }
-
-      // pecorino-64118: per-event Industry RSVPs — org domains from THIS event's
-      // approved guests, so the consolidated report can group industry orgs by city.
-      const eventIndustryOrgs = buildIndustryOrgs(
-        submitted.filter(g => g.approved !== false).map(g => g.email)
-      );
-
-      const reportSlug = party.reportPublicSlug || party.customUrl || party.inviteCode;
-      return {
-        id: party.id,
-        name: party.name,
-        date: party.date,
-        slug: party.customUrl || party.inviteCode,
-        city: party.city,
-        country: party.country,
-        reportSlug,
-        rsvpCount,
-        approvedCount,
-        impressions: {
-          totalViews: viewCountMap.get(party.id) || 0,
-          uniqueVisitors: perEventUniqueViewMap.get(party.id) || 0,
-        },
-        clicks: perEventClickCount.get(party.id) || 0,
-        industryOrgs: eventIndustryOrgs,
-      };
-    });
-
-    // pecorino-64118: report shows a representative SAMPLE (starred/best first,
-    // then recent); the "View all photos" link covers the rest via /photos.
-    const featuredPhotos = combinedPhotos.slice(0, 24);
-
-    // Deduped wallet address list.
-    const walletAddressList = Array.from(walletSet);
-
-    // Date range.
-    const dates = parties.map(p => p.date).filter((d): d is Date => !!d).map(d => new Date(d).getTime());
-    const dateRange = dates.length > 0
-      ? { start: new Date(Math.min(...dates)).toISOString(), end: new Date(Math.max(...dates)).toISOString() }
-      : null;
-
-    // pecorino-64118: combined Industry RSVPs across all events.
-    const industryOrgs = buildIndustryOrgs(industryOrgEmails);
-
-    // pecorino-64118 follow-up: header shows the ORG name for the filtered tag
-    // (sponsor_users.coHostName), not the logged-in user's personal name.
-    let partnerName: string | null = null;
-    if (tag) {
-      const tagSponsors = await prisma.sponsorUser.findMany({
-        where: { tag, isActive: true },
-        select: { coHostName: true },
-      });
-      const orgName = tagSponsors
-        .map(s => s.coHostName?.trim())
-        .find((v): v is string => !!v);
-      partnerName = orgName || (tag === 'pizzadao' ? 'PizzaDAO' : tag);
-    } else if (req.isAdminViewing) {
-      partnerName = 'All Partners';
-    }
-
-    res.json({
-      partnerName,
-      tag: tag || null,
-      // pecorino-64118 follow-up: surface admin viewing + the resolved
-      // "approved events only" state so the frontend can render the toggle
-      // and reflect the applied filter. Non-admins are always approved-only.
-      isAdmin: req.isAdminViewing || false,
-      approvedOnly: req.isAdminViewing ? approvedOnlyParam : true,
-      eventCount: parties.length,
-      dateRange,
-      stats: {
-        totalRsvps,
-        approvedGuests,
-        // pecorino-64118: null = no per-tag newsletter → frontend hides the tile.
-        mailingListSignups: optinField ? mailingListSignups : null,
-        walletAddresses,
-        poapMints,
-        poapMoments,
-        socialPostViews,
-        socialPostCount,
-      },
-      impressions: { totalViews, uniqueVisitors },
-      clickStats: { totalClicks, uniqueClickers, byLink },
-      notableAttendees: combinedNotable,
-      industryOrgs,
-      socialPosts: combinedSocialPosts,
-      featuredPhotos,
-      walletAddressList,
-      events,
-    });
+    return res.json(report);
   } catch (error) {
     next(error);
   }
 });
+
 
 // GET /api/sponsor/newsletter-emails - CSV-source list of emails opted into THIS
 // partner's newsletter (ethconf + SWC family). Follow-up to pecorino-64118: lets

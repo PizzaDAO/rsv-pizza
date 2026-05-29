@@ -258,7 +258,19 @@
       "attendees": "Asistentes",
       "impressions": "Impresiones",
       "clicks": "Clics"
-    }
+    },
+    "shareWithAi": "Share with AI",
+    "shareWithAiHint": "Copy this URL and paste it into your AI assistant to give it read-only access to your full report.",
+    "shareWithAiCopy": "Copy",
+    "shareWithAiCopied": "Copied!",
+    "shareWithAiCreate": "Create AI share link",
+    "shareWithAiRegenerate": "Regenerate link",
+    "shareWithAiRegenerateConfirm": "Regenerating will revoke the current link. Continue?",
+    "shareWithAiRevoke": "Revoke",
+    "shareWithAiRevokeConfirm": "Revoke the current AI share link?",
+    "shareWithAiLastUsed": "Last used",
+    "shareWithAiNever": "Never used",
+    "shareWithAiNoTag": "No tag selected — pick a partner from the menu to share its report."
   },
   "cities": {
     "loading": "Cargando ciudades...",
