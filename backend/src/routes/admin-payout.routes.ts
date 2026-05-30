@@ -2541,17 +2541,32 @@ router.post(
         }
       }
 
+      // nduja-92106: admin-class can opt to bypass the per-party cap at
+      // approve time via `allowOverPartyCap` (mirrors salame-92103's existing
+      // override on /execute). Underbosses can NEVER skip the cap — only the
+      // four admin-class roles (admin / super_admin / payment_admin) get the
+      // ack pathway. The per-submission ceiling ($675), per-address cap, and
+      // daily cap are unchanged.
+      const allowOverPartyCap =
+        actor.actorKind !== 'underboss' &&
+        !!(req.body && req.body.allowOverPartyCap);
+
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // approve time so rows created/edited BEFORE the cap rules landed (or
       // rows whose party's cap was tightened after creation) can't be pushed
       // through to `approved` (and from there to `paid`). Helpers are
       // idempotent — better to over-check than to under-check.
+      //
+      // nduja-92106: skip the per-party throw when the admin has ticked the
+      // override checkbox in PayoutReviewModal. Per-submission ceiling stays.
       assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
-      await assertWithinPartyCap(
-        existing.partyId,
-        Number(existing.finalAmountUsd),
-        existing.id,
-      );
+      if (!allowOverPartyCap) {
+        await assertWithinPartyCap(
+          existing.partyId,
+          Number(existing.finalAmountUsd),
+          existing.id,
+        );
+      }
 
       const { note, autoExecute } = req.body || {};
 
@@ -2574,6 +2589,13 @@ router.post(
           },
         });
 
+        // nduja-92106: append `[override: party cap]` so the audit row
+        // captures that the per-party cap was bypassed at approve time. Mirrors
+        // salame-92103's mark_paid suffix on /execute.
+        const baseNote = typeof note === 'string' && note ? note : null;
+        const auditNote = allowOverPartyCap
+          ? (baseNote ? `${baseNote} [override: party cap]` : '[override: party cap]')
+          : baseNote;
         await tx.payoutAudit.create({
           data: {
             payoutId: existing.id,
@@ -2582,7 +2604,7 @@ router.post(
             newStatus: 'approved',
             actorEmail: actor.email,
             actorKind: actor.actorKind,
-            note: typeof note === 'string' ? note : null,
+            note: auditNote,
           },
         });
 
@@ -2611,6 +2633,12 @@ router.post(
               payoutId: existing.id,
               actor: { email: actor.email, actorKind: actor.actorKind },
               body: {},
+              // nduja-92106: when the admin ticked the per-party cap override
+              // ack on approve, the same flag has to flow into the inline
+              // execute or the cap recheck inside executePayout will throw
+              // (salame-92103 already wired the override on /execute; we just
+              // forward it here).
+              allowOverPartyCap,
             });
             autoExecuted = true;
           } catch (err: any) {
