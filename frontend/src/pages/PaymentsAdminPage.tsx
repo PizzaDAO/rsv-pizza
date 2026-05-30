@@ -95,6 +95,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // salumi-89172: purpose filter default — 'all' shows both event and
   // shipping payouts so the existing admin queue is unchanged out of box.
   purpose: 'all',
+  // caciotta-92105: hide payments-closed cities (pinsa-92103) by default.
+  hideClosed: true,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
