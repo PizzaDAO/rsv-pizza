@@ -238,6 +238,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         effectiveReimbursementCapUsd: number | null;
         paidTotalUsd: number;
         primaryHostUserId: string | null;
+        // Map of recipient User id -> the USDC wallet that host submitted on
+        // their most recent receipt payout for this city (ENS input preferred
+        // over the resolved 0x). Lets SendPaymentModal pre-fill the wallet
+        // field per selected recipient instead of making the admin re-type it.
+        hostWalletByUserId: Record<string, string>;
       }
     | null
   >(null);
@@ -1099,6 +1104,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                   receiptsTotalUsd += Number(d.ocrAmount) || 0;
                 }
               }
+              // Pull in each host's submitted USDC wallet so the modal can
+              // pre-fill it per recipient. Walk payouts newest-first (ISO
+              // createdAt sorts lexically) and keep the first non-empty wallet
+              // per recipient — preferring the original ENS input over the
+              // resolved 0x (caciotta-92104). Only usdc_base payouts carry a
+              // wallet, so presence is the filter.
+              const hostWalletByUserId: Record<string, string> = {};
+              const payoutsNewestFirst = [...row.payouts].sort((a, b) =>
+                b.createdAt.localeCompare(a.createdAt),
+              );
+              for (const p of payoutsNewestFirst) {
+                if (!p.hostUserId || hostWalletByUserId[p.hostUserId]) continue;
+                const wallet = (p.payoutWalletInput || p.payoutWalletAddress || '').trim();
+                if (wallet) hostWalletByUserId[p.hostUserId] = wallet;
+              }
               setSendPaymentTarget({
                 partyId: row.party.id,
                 partyName: row.party.name,
@@ -1109,6 +1129,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 effectiveReimbursementCapUsd: row.party.effectiveReimbursementCapUsd,
                 paidTotalUsd: paidSumUsd,
                 primaryHostUserId: row.party.userId ?? null,
+                hostWalletByUserId,
               });
             }}
             // bottarga-92104: after the table toggles the `possible-scam` tag,
@@ -1521,6 +1542,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             }
             paidTotalUsd={sendPaymentTarget.paidTotalUsd}
             primaryHostUserId={sendPaymentTarget.primaryHostUserId}
+            hostWalletByUserId={sendPaymentTarget.hostWalletByUserId}
             onClose={() => setSendPaymentTarget(null)}
             onSent={async ({ partyName: sentTo, method, amountUsd }) => {
               const methodLabel =
