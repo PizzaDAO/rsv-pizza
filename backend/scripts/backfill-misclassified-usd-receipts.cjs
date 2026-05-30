@@ -83,6 +83,15 @@ const COUNTRY_NAME_TO_ISO2 = {
   'uruguay': 'UY', 'venezuela': 'VE', 'vietnam': 'VN', 'zambia': 'ZM',
   'zimbabwe': 'ZW', 'puerto rico': 'PR', 'antigua and barbuda': 'AG',
   'bahrain': 'BH',
+  // salame-92107: MWK + XOF (UEMOA) + XAF (CEMAC) country members.
+  // (Côte d'Ivoire is already mapped above.)
+  'malawi': 'MW',
+  'togo': 'TG', 'benin': 'BJ', 'burkina faso': 'BF', 'ivory coast': 'CI',
+  'mali': 'ML', 'senegal': 'SN',
+  'guinea-bissau': 'GW', 'guinea bissau': 'GW', 'niger': 'NE',
+  'cameroon': 'CM', 'gabon': 'GA', 'chad': 'TD',
+  'central african republic': 'CF', 'equatorial guinea': 'GQ',
+  'republic of the congo': 'CG', 'congo-brazzaville': 'CG', 'congo': 'CG',
 };
 
 function normalizeCountryToIso2(raw) {
@@ -114,7 +123,11 @@ const COUNTRY_TO_PRIMARY_CURRENCY = {
   AU: 'AUD', NZ: 'NZD', PK: 'PKR', BD: 'BDT', LK: 'LKR',
   AE: 'AED', SA: 'SAR', IL: 'ILS', QA: 'QAR', KW: 'KWD', BH: 'BHD',
   EG: 'EGP', NG: 'NGN', ZA: 'ZAR', KE: 'KES', GH: 'GHS', MA: 'MAD',
-  TN: 'TND', ET: 'ETB', UG: 'UGX', TZ: 'TZS',
+  TN: 'TND', ET: 'ETB', UG: 'UGX', TZ: 'TZS', MW: 'MWK',
+  // salame-92107: XOF (UEMOA) + XAF (CEMAC).
+  BJ: 'XOF', BF: 'XOF', CI: 'XOF', GW: 'XOF', ML: 'XOF', NE: 'XOF',
+  SN: 'XOF', TG: 'XOF',
+  CM: 'XAF', CF: 'XAF', TD: 'XAF', GQ: 'XAF', GA: 'XAF', CG: 'XAF',
 };
 
 // Minimal FX fallback rates (mirrored from fx.service.ts). Kept here so the
@@ -134,6 +147,8 @@ const FALLBACK_RATES_TO_USD = {
   AED: 0.27, SAR: 0.27, ILS: 0.27, QAR: 0.27, KWD: 3.25, BHD: 2.65,
   EGP: 0.020, KES: 0.0078, GHS: 0.063, MAD: 0.10, TND: 0.32,
   ETB: 0.018, UGX: 0.00027, TZS: 0.00039,
+  // salame-92107: MWK + XOF/XAF (both pegged to EUR via 655.957/€1).
+  MWK: 0.00058, XOF: 0.0016, XAF: 0.0016,
 };
 
 async function fetchRate(currency) {
