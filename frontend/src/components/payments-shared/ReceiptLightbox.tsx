@@ -17,6 +17,16 @@ import { isPdfFile } from '../../lib/pdfUtils';
  *   ArrowRight keys also navigate.
  * - HEIC files can't be previewed natively in browsers — show a fallback
  *   link to open the raw URL in a new tab.
+ *
+ * pesto-92104: the lightbox can now host a right-pane editor (admin-only
+ * receipt editor in PayoutReviewModal). When `editorPane` is non-null we
+ * render a two-pane layout: photo on the left, editor on the right; on
+ * narrow viewports (< md) the editor stacks below the photo. The lightbox
+ * stays kind-agnostic — callers decide whether to render an editor based
+ * on which image is current via `onIndexChange`. Optional shortcut hooks:
+ *  - `onDuplicateShortcut` — fired on `D` keypress (admin "mark duplicate").
+ *  - `onBeforeNavigate(direction)` — gate arrow / nav-button navigation so
+ *    the parent can prompt about unsaved edits. Return `true` to proceed.
  */
 export interface ReceiptLightboxImage {
   url: string;
@@ -30,6 +40,34 @@ interface ReceiptLightboxProps {
   /** Index into `images` to display on open. Defaults to 0. */
   initialIndex?: number;
   onClose: () => void;
+  /**
+   * pesto-92104: editor pane content for the CURRENT image. When non-null
+   * the lightbox switches to a 2-pane layout (photo left, editor right on
+   * desktop; stacked on mobile). The parent component is responsible for
+   * deciding what to render based on `onIndexChange` — pass `null` to
+   * render the plain photo-only lightbox (event photos, pizza photos,
+   * non-admin viewers, etc.).
+   */
+  editorPane?: React.ReactNode;
+  /**
+   * pesto-92104: notified whenever the displayed image changes (open,
+   * prev/next, initialIndex clamp). Parent uses this to swap the editor
+   * pane content to match the current doc.
+   */
+  onIndexChange?: (idx: number) => void;
+  /**
+   * pesto-92104: optional gate for nav (arrows + nav buttons). Return
+   * `false` (or a Promise resolving to `false`) to cancel navigation —
+   * used by PayoutReviewModal to prompt "Save changes before navigating?"
+   * when the editor has unsaved drafts.
+   */
+  onBeforeNavigate?: (direction: 'prev' | 'next') => boolean | Promise<boolean>;
+  /**
+   * pesto-92104: `D` keypress handler. Wired by PayoutReviewModal to the
+   * mark-duplicate toggle for the current receipt. Lightbox only fires
+   * when admin context provides this prop.
+   */
+  onDuplicateShortcut?: () => void;
 }
 
 /** Some HEIC files come through with non-image/heic MIME types or no MIME at
@@ -48,6 +86,10 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   images,
   initialIndex = 0,
   onClose,
+  editorPane,
+  onIndexChange,
+  onBeforeNavigate,
+  onDuplicateShortcut,
 }) => {
   // Index lives in this component so callers only need to pass the starting
   // image. Reset whenever the lightbox is (re-)opened so each open starts
@@ -59,22 +101,50 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
       // by the time the lightbox opens.
       const safe = Math.max(0, Math.min(initialIndex, Math.max(0, images.length - 1)));
       setIndex(safe);
+      // pesto-92104: notify parent of the starting index so it can prime
+      // the editor pane for the right doc.
+      onIndexChange?.(safe);
     }
+    // We intentionally exclude `onIndexChange` from deps — it's a callback
+    // the parent may re-create per render, and we only want to fire on
+    // open / initialIndex change to avoid an effect loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialIndex, images.length]);
 
   const count = images.length;
   const hasMultiple = count > 1;
+  const hasEditor = editorPane != null && editorPane !== false;
 
-  const goPrev = useCallback(() => {
+  const goPrev = useCallback(async () => {
     if (count === 0) return;
-    setIndex((i) => (i - 1 + count) % count);
-  }, [count]);
-  const goNext = useCallback(() => {
+    // pesto-92104: gate on parent-supplied unsaved-edits prompt.
+    if (onBeforeNavigate) {
+      const ok = await onBeforeNavigate('prev');
+      if (!ok) return;
+    }
+    setIndex((i) => {
+      const next = (i - 1 + count) % count;
+      onIndexChange?.(next);
+      return next;
+    });
+  }, [count, onBeforeNavigate, onIndexChange]);
+  const goNext = useCallback(async () => {
     if (count === 0) return;
-    setIndex((i) => (i + 1) % count);
-  }, [count]);
+    if (onBeforeNavigate) {
+      const ok = await onBeforeNavigate('next');
+      if (!ok) return;
+    }
+    setIndex((i) => {
+      const next = (i + 1) % count;
+      onIndexChange?.(next);
+      return next;
+    });
+  }, [count, onBeforeNavigate, onIndexChange]);
 
   // Keyboard nav — Esc closes, arrows cycle (when more than one image).
+  // pesto-92104: `D` fires onDuplicateShortcut (admin only — guarded by the
+  // prop being supplied). Ignore D when focus is inside an editable input
+  // so typing the letter in a text field doesn't accidentally toggle.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -83,15 +153,26 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
         onClose();
       } else if (e.key === 'ArrowLeft' && hasMultiple) {
         e.preventDefault();
-        goPrev();
+        void goPrev();
       } else if (e.key === 'ArrowRight' && hasMultiple) {
         e.preventDefault();
-        goNext();
+        void goNext();
+      } else if ((e.key === 'd' || e.key === 'D') && onDuplicateShortcut) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName?.toLowerCase();
+        const editable =
+          tag === 'input' ||
+          tag === 'textarea' ||
+          tag === 'select' ||
+          (target?.isContentEditable ?? false);
+        if (editable) return;
+        e.preventDefault();
+        onDuplicateShortcut();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, goPrev, goNext, hasMultiple]);
+  }, [isOpen, onClose, goPrev, goNext, hasMultiple, onDuplicateShortcut]);
 
   if (!isOpen || count === 0) return null;
 
@@ -108,6 +189,15 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   // pages 2+). Falls back to a download link for browsers without a native
   // PDF viewer.
   const pdf = !heic && !video && isPdfFile(current);
+
+  // pesto-92104: when an editor pane is supplied we render a two-column
+  // layout (photo left, editor right). Stacked on narrow viewports so the
+  // editor doesn't crowd the photo. Photo + editor each take ~half the
+  // viewport; the photo's max-height is dialed down so the editor stays
+  // visible without forcing scroll on common laptop sizes.
+  const mediaSizing = hasEditor
+    ? 'max-h-[50vh] md:max-h-[85vh] max-w-full md:max-w-full'
+    : 'max-h-[90vh] max-w-[90vw]';
 
   return createPortal(
     <div
@@ -144,7 +234,7 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              goPrev();
+              void goPrev();
             }}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60 z-10"
             aria-label="Previous image"
@@ -155,7 +245,7 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              goNext();
+              void goNext();
             }}
             className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60 z-10"
             aria-label="Next image"
@@ -165,73 +255,104 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
         </>
       )}
 
-      {/* Main content — image OR HEIC fallback. Stop click propagation so the
-          centered image isn't a click-through dead zone that triggers close. */}
+      {/* pesto-92104: outer container switches between centered single-pane
+          (photo only) and a 2-column / stacked grid when an editor pane is
+          supplied. Stop click propagation so neither pane is a click-through
+          dead zone that triggers close. */}
       <div
-        className="max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+        className={
+          hasEditor
+            ? 'w-full max-w-[95vw] max-h-[95vh] grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden'
+            : 'max-w-[90vw] max-h-[90vh] flex items-center justify-center'
+        }
         onClick={(e) => e.stopPropagation()}
       >
-        {heic ? (
-          <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
-            <p className="text-sm font-semibold">Can't preview HEIC files</p>
-            <p className="text-xs text-theme-text-muted">
-              Your browser doesn't render <span className="font-mono">.heic</span>{' '}
-              images natively. Open the file in a new tab to download or view it.
-            </p>
-            <a
-              href={current.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
-            >
-              Open in new tab <ExternalLink size={14} />
-            </a>
-            <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
-          </div>
-        ) : video ? (
-          /* melanzane-92103: keying on src so swapping between videos via
-             arrow nav cleanly remounts the <video> with the new source. */
-          <video
-            key={current.url}
-            src={current.url}
-            controls
-            autoPlay
-            muted
-            playsInline
-            className="max-h-[90vh] max-w-[90vw]"
-          />
-        ) : pdf ? (
-          /* bocconcino-92104: embedded native PDF viewer (Chrome/Edge/Safari/
-             Firefox all support this). Keyed on URL so arrow-nav across the
-             carousel remounts the embed with the new source instead of
-             caching the previous file. Sized to match other media slots. */
-          <div className="relative w-[90vw] h-[90vh] bg-white rounded-md overflow-hidden">
-            <embed
+        <div
+          className={
+            hasEditor
+              ? 'flex items-center justify-center min-h-0'
+              : 'flex items-center justify-center'
+          }
+        >
+          {heic ? (
+            <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+              <p className="text-sm font-semibold">Can't preview HEIC files</p>
+              <p className="text-xs text-theme-text-muted">
+                Your browser doesn't render <span className="font-mono">.heic</span>{' '}
+                images natively. Open the file in a new tab to download or view it.
+              </p>
+              <a
+                href={current.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
+              >
+                Open in new tab <ExternalLink size={14} />
+              </a>
+              <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+            </div>
+          ) : video ? (
+            /* melanzane-92103: keying on src so swapping between videos via
+               arrow nav cleanly remounts the <video> with the new source. */
+            <video
               key={current.url}
               src={current.url}
-              type="application/pdf"
-              className="w-full h-full"
+              controls
+              autoPlay
+              muted
+              playsInline
+              className={mediaSizing}
             />
-            <a
-              href={current.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute top-2 right-2 inline-flex items-center gap-1.5 text-xs bg-black/60 text-white rounded-full px-2.5 py-1 hover:bg-black/80"
+          ) : pdf ? (
+            /* bocconcino-92104: embedded native PDF viewer (Chrome/Edge/Safari/
+               Firefox all support this). Keyed on URL so arrow-nav across the
+               carousel remounts the embed with the new source instead of
+               caching the previous file. Sized to match other media slots. */
+            <div
+              className={`relative ${hasEditor ? 'w-full h-[50vh] md:h-[85vh]' : 'w-[90vw] h-[90vh]'} bg-white rounded-md overflow-hidden`}
             >
-              Open in new tab <ExternalLink size={12} />
-            </a>
+              <embed
+                key={current.url}
+                src={current.url}
+                type="application/pdf"
+                className="w-full h-full"
+              />
+              <a
+                href={current.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute top-2 right-2 inline-flex items-center gap-1.5 text-xs bg-black/60 text-white rounded-full px-2.5 py-1 hover:bg-black/80"
+              >
+                Open in new tab <ExternalLink size={12} />
+              </a>
+            </div>
+          ) : (
+            <img
+              src={current.url}
+              alt={current.fileName}
+              className={`${mediaSizing} object-contain`}
+            />
+          )}
+        </div>
+
+        {/* pesto-92104: editor pane. Scrolls independently so a long
+            line-items list doesn't push the photo off-screen. */}
+        {hasEditor && (
+          <div className="min-h-0 overflow-y-auto rounded-xl bg-theme-surface border border-theme-stroke">
+            {editorPane}
           </div>
-        ) : (
-          <img
-            src={current.url}
-            alt={current.fileName}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-          />
         )}
       </div>
 
-      {/* Footer — counter + file name. Only show counter when more than one. */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/90 text-xs sm:text-sm flex items-center gap-2 bg-black/40 rounded-full px-3 py-1.5 max-w-[90vw]">
+      {/* Footer — counter + file name. Only show counter when more than one.
+          pesto-92104: when an editor is showing, anchor the footer at the
+          bottom of the PHOTO pane instead of the centre so it doesn't
+          overlap the editor on the right. */}
+      <div
+        className={`absolute ${
+          hasEditor ? 'bottom-4 left-4 md:left-[25%]' : 'bottom-4 left-1/2 -translate-x-1/2'
+        } text-white/90 text-xs sm:text-sm flex items-center gap-2 bg-black/40 rounded-full px-3 py-1.5 max-w-[90vw]`}
+      >
         {hasMultiple && (
           <span className="font-medium">
             {index + 1} of {count}
