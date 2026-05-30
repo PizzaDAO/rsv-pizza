@@ -23,7 +23,7 @@ import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
-import { looksLikeEnsName, resolveWalletInput } from '../services/ens.service.js';
+import { looksLikeEnsName, resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 
@@ -91,6 +91,10 @@ function serializePayout(p: any) {
     status: p.status,
     payoutMethod: p.payoutMethod,
     payoutWalletAddress: p.payoutWalletAddress ?? null,
+    // caciotta-92104: original user input (ENS name) when the resolved 0x
+    // came from ENS resolution. Null otherwise — frontend uses this to
+    // render "name.eth -> 0xa1b2..." in admin views.
+    payoutWalletInput: p.payoutWalletInput ?? null,
     payoutBankDetails: p.payoutBankDetails ?? null,
     mercuryCardId: p.mercuryCardId ?? null,
     mercuryCardLast4: p.mercuryCardLast4 ?? null,
@@ -264,6 +268,31 @@ function validateMethodSpecificFields(
 async function resolveWalletOrThrow(input: string): Promise<string> {
   try {
     return await resolveWalletInput(input);
+  } catch (err: any) {
+    throw new AppError(
+      err?.message || 'Could not resolve wallet address',
+      400,
+      'INVALID_WALLET_ADDRESS'
+    );
+  }
+}
+
+/**
+ * caciotta-92104: same as `resolveWalletOrThrow` but also returns the original
+ * input + whether it was ENS. Used by POST/PATCH so we can persist the human-
+ * readable input (e.g. `puebla.eth`) alongside the canonical 0x address.
+ */
+async function resolveWalletOrThrowWithMeta(input: string): Promise<{
+  address: string;
+  /** The original input when ENS was used, null otherwise (no display needed). */
+  walletInput: string | null;
+}> {
+  try {
+    const resolved = await resolveWalletInputWithMeta(input);
+    return {
+      address: resolved.address,
+      walletInput: resolved.wasEns ? resolved.input : null,
+    };
   } catch (err: any) {
     throw new AppError(
       err?.message || 'Could not resolve wallet address',
@@ -1093,9 +1122,14 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // taleggio-30219: resolve the wallet input once, BEFORE the create, so
     // we persist a canonical 0x address even if the host typed an ENS name.
     // Reused by the `saveAsDefault` write below so we don't resolve twice.
+    // caciotta-92104: also capture the original input so we can persist
+    // `payoutWalletInput` for display.
     let resolvedWallet: string | null = null;
+    let resolvedWalletInput: string | null = null;
     if (hasMethod && payoutMethod === 'usdc_base' && typeof payoutWalletAddress === 'string') {
-      resolvedWallet = await resolveWalletOrThrow(payoutWalletAddress);
+      const r = await resolveWalletOrThrowWithMeta(payoutWalletAddress);
+      resolvedWallet = r.address;
+      resolvedWalletInput = r.walletInput;
     }
 
     // pancetta-37195: stamp each new document with the uploader.
@@ -1192,6 +1226,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           // when the host hasn't set their payment details yet.
           payoutMethod: hasMethod ? payoutMethod : null,
           payoutWalletAddress: resolvedWallet,
+          // caciotta-92104: preserve original ENS input alongside 0x. Null
+          // when the host typed a 0x directly (no display difference to show).
+          payoutWalletInput: resolvedWalletInput,
           ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
             ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
             : {}),
@@ -1491,16 +1528,28 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       await assertMercuryAllowed(partyId, payoutMethod);
       data.payoutMethod = payoutMethod;
       // Clear stale method-specific fields when method changes
-      if (payoutMethod !== 'usdc_base') data.payoutWalletAddress = null;
+      if (payoutMethod !== 'usdc_base') {
+        data.payoutWalletAddress = null;
+        // caciotta-92104: paired with payoutWalletAddress; never leave a
+        // stale ENS string after the host switches to wire/mercury.
+        data.payoutWalletInput = null;
+      }
       if (payoutMethod !== 'wire') data.payoutBankDetails = Prisma.JsonNull;
       if (payoutMethod !== 'mercury_card') data.mercuryCardLast4 = null;
     }
 
     if (payoutWalletAddress !== undefined) {
       // taleggio-30219: resolve ENS → 0x before persisting. Null clears the field.
-      data.payoutWalletAddress = payoutWalletAddress === null
-        ? null
-        : await resolveWalletOrThrow(String(payoutWalletAddress));
+      // caciotta-92104: also persist the original input alongside the resolved
+      // 0x so admin UI can render "name.eth -> 0xa1b2...". Null clears both.
+      if (payoutWalletAddress === null) {
+        data.payoutWalletAddress = null;
+        data.payoutWalletInput = null;
+      } else {
+        const r = await resolveWalletOrThrowWithMeta(String(payoutWalletAddress));
+        data.payoutWalletAddress = r.address;
+        data.payoutWalletInput = r.walletInput;
+      }
     }
     if (payoutBankDetails !== undefined) {
       data.payoutBankDetails = payoutBankDetails === null

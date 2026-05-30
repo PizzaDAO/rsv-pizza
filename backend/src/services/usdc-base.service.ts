@@ -32,6 +32,7 @@ import {
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { prisma } from '../config/database.js';
+import { looksLikeEnsName, resolveEns } from './ens.service.js';
 
 const USDC_BASE_ADDRESS: Hex = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
@@ -76,6 +77,14 @@ export interface SendUsdcResult {
   fromAddress: `0x${string}`;
   toAddress: `0x${string}`;
   amountUsd: number;
+  /**
+   * caciotta-92104: when the caller passed an ENS name, this is the
+   * resolved 0x address used on-chain (same as `toAddress`); when the
+   * caller passed a 0x address, this is null. Used by the execute path
+   * to persist the canonical 0x back onto the Payout row so subsequent
+   * retries skip resolution and the audit trail shows what was sent.
+   */
+  resolvedFromEns: { input: string; address: `0x${string}` } | null;
 }
 
 function getEnvNumber(name: string, fallback: number): number {
@@ -224,11 +233,43 @@ export async function sendUsdcPayment(
   amountUsd: number,
   opts?: { allowOverPerAddressCap?: boolean },
 ): Promise<SendUsdcResult> {
-  // 1. Address validation
-  if (!toAddress || !isAddress(toAddress)) {
+  // 1. Address validation. caciotta-92104: also accept ENS names — older
+  //    Payout rows (or any path that slipped past the write-side resolver)
+  //    can carry an ENS string in `payoutWalletAddress`. Resolving here is
+  //    defense-in-depth so the execute path never silently fails on a
+  //    `.eth` recipient. Puebla's ariutokintumi.eth payout died this way
+  //    (status -> failed) before this fix.
+  if (!toAddress || typeof toAddress !== 'string') {
     throw new Error(`Invalid recipient address: ${toAddress}`);
   }
-  const recipient = toAddress as `0x${string}`;
+  const trimmedInput = toAddress.trim();
+  let recipient: `0x${string}`;
+  let resolvedFromEns: { input: string; address: `0x${string}` } | null = null;
+  if (isAddress(trimmedInput)) {
+    recipient = trimmedInput as `0x${string}`;
+  } else if (looksLikeEnsName(trimmedInput)) {
+    try {
+      const resolved = await resolveEns(trimmedInput);
+      recipient = resolved;
+      resolvedFromEns = { input: trimmedInput, address: resolved };
+      console.log(
+        `[usdc-base] resolved ENS ${trimmedInput} -> ${resolved} via ETH mainnet`,
+      );
+    } catch (err: any) {
+      // Surface a clear, machine-checkable error code so the admin UI can
+      // distinguish "ENS lookup failed" from "address is malformed" or
+      // "balance too low". The execute path catches this and writes the
+      // message into the failed payout audit row.
+      const reason = err?.message || 'ENS resolution failed';
+      const e = new Error(
+        `ENS_RESOLUTION_FAILED: could not resolve ${trimmedInput} on Ethereum mainnet (${reason}). ` +
+          `Edit the wallet to a 0x address or a different ENS name and retry.`,
+      );
+      throw e;
+    }
+  } else {
+    throw new Error(`Invalid recipient address: ${toAddress}`);
+  }
 
   // 2. Amount range checks
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
@@ -322,5 +363,6 @@ export async function sendUsdcPayment(
     fromAddress,
     toAddress: recipient,
     amountUsd,
+    resolvedFromEns,
   };
 }

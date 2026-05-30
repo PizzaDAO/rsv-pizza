@@ -35,7 +35,7 @@ import {
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
-import { resolveWalletInput } from '../services/ens.service.js';
+import { resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { notifyHostOfPaymentExecution } from '../services/payoutTelegramNotify.js';
 import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
@@ -539,6 +539,10 @@ function serializePayout(row: any): any {
     status: row.status,
     payoutMethod: row.payoutMethod,
     payoutWalletAddress: row.payoutWalletAddress,
+    // caciotta-92104: original ENS input (e.g. `puebla.eth`) when the
+    // canonical 0x came from ENS resolution. Null when the host typed a
+    // 0x directly. Frontend renders "name.eth -> 0xa1b2..." in admin views.
+    payoutWalletInput: row.payoutWalletInput ?? null,
     payoutBankDetails: row.payoutBankDetails,
     mercuryCardId: row.mercuryCardId,
     mercuryCardLast4: row.mercuryCardLast4,
@@ -2309,16 +2313,27 @@ router.patch(
         // taleggio-30219: admin override also accepts ENS names; resolve to
         // 0x before persisting so the execution path (which already expects
         // 0x) stays untouched.
+        // caciotta-92104: also persist the original input alongside the
+        // resolved 0x so admin UI can render "name.eth -> 0xa1b2..." instead
+        // of silently losing the ENS string at write time. Resolution failures
+        // surface as 400 ENS_RESOLUTION_FAILED so the admin sees the problem
+        // BEFORE clicking Execute (not as a silent fail at send time).
         if (payoutWalletAddress === null) {
           data.payoutWalletAddress = null;
+          data.payoutWalletInput = null;
         } else {
           try {
-            data.payoutWalletAddress = await resolveWalletInput(String(payoutWalletAddress));
+            const resolved = await resolveWalletInputWithMeta(String(payoutWalletAddress));
+            data.payoutWalletAddress = resolved.address;
+            // Only persist the input when it differs from the canonical 0x
+            // (i.e. when ENS was used). Storing the 0x in both columns is
+            // redundant and clutters the display logic.
+            data.payoutWalletInput = resolved.wasEns ? resolved.input : null;
           } catch (err: any) {
             throw new AppError(
               err?.message || 'Could not resolve wallet address',
               400,
-              'INVALID_WALLET_ADDRESS'
+              'ENS_RESOLUTION_FAILED'
             );
           }
         }
@@ -3240,6 +3255,17 @@ async function executePayout(params: {
             status: 'paid',
             paidAt: new Date(),
             transactionHash: result.txHash,
+            // caciotta-92104: when ENS was resolved at send time, persist
+            // the canonical 0x back to `payoutWalletAddress` and preserve
+            // the original ENS string in `payoutWalletInput`. Future retries
+            // skip the lookup, and the admin UI can show "name.eth -> 0xa1b2..."
+            // alongside the audit trail. No-op when the input was already 0x.
+            ...(result.resolvedFromEns
+              ? {
+                  payoutWalletAddress: result.resolvedFromEns.address,
+                  payoutWalletInput: result.resolvedFromEns.input,
+                }
+              : {}),
           },
           include: {
             party: { select: PAYOUT_PARTY_SELECT },
@@ -3261,9 +3287,16 @@ async function executePayout(params: {
             actorKind: actor.actorKind,
             // salame-92103: append the override marker so the audit row
             // captures that the per-party cap was bypassed for this payout.
+            // caciotta-92104: when ENS was resolved, the audit note records
+            // the name -> 0x mapping so the audit trail reflects what was
+            // sent on-chain (the 0x) and where the human-readable input came
+            // from (the ENS name).
             note: `USDC on Base sent: tx ${result.txHash}, ` +
               `from ${result.fromAddress} to ${result.toAddress}, ` +
               `$${result.amountUsd.toFixed(2)}` +
+              (result.resolvedFromEns
+                ? ` [resolved ENS ${result.resolvedFromEns.input} -> ${result.resolvedFromEns.address}]`
+                : '') +
               (allowOverPartyCap ? ' [override: party cap]' : ''),
           },
         });

@@ -1751,6 +1751,14 @@ export interface Payout {
   // them via PaymentDetailsCard.
   payoutMethod: PayoutMethod | null;
   payoutWalletAddress: string | null;
+  /**
+   * caciotta-92104: original user-typed wallet input. Non-null only when the
+   * input was an ENS name (e.g. `puebla.eth`) that was resolved to the
+   * canonical 0x stored in `payoutWalletAddress`. Frontend renders
+   * "name.eth -> 0xa1b2..." in admin views when this differs from the address.
+   * Optional for backward-compat with cached payloads during rolling deploy.
+   */
+  payoutWalletInput?: string | null;
   payoutBankDetails: BankDetails | null;
   mercuryCardId: string | null;
   mercuryCardLast4: string | null;
