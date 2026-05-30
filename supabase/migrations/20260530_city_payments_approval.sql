@@ -3,4 +3,4 @@
 
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS payments_approved_usd numeric(10,2);
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS payments_approved_at timestamptz;
-ALTER TABLE parties ADD COLUMN IF NOT EXISTS payments_approved_by uuid REFERENCES auth.users(id);
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS payments_approved_by text;

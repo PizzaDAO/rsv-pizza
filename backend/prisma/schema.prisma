@@ -252,7 +252,7 @@ model Party {
   // City-level payment approval. Admin approves a total amount before sending.
   paymentsApprovedUsd Decimal?  @map("payments_approved_usd") @db.Decimal(10, 2)
   paymentsApprovedAt  DateTime? @map("payments_approved_at") @db.Timestamptz
-  paymentsApprovedBy  String?   @map("payments_approved_by") @db.Uuid
+  paymentsApprovedBy  String?   @map("payments_approved_by")
 
   userId String? @map("user_id")
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
