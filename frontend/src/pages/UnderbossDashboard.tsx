@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Download } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -190,6 +190,34 @@ export function UnderbossDashboard() {
     }
     return t('underbossDashboard.regionsCount', { count: selectedRegions.length });
   }, [selectedRegions, availableRegions.length, t]);
+
+  // pancetta-58472: admin-only download of all guest wallet addresses across
+  // events. Backend endpoint added in PR 2. Uses the same Bearer-auth pattern
+  // as exportShippingKitsCsv.
+  const handleDownloadAllWallets = useCallback(async () => {
+    try {
+      const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/api/admin/wallet-addresses.csv`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to download wallets CSV (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'all-wallets.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('wallet csv download failed:', err);
+      alert(err?.message || 'Failed to download wallets CSV');
+    }
+  }, []);
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -468,6 +496,15 @@ export function UnderbossDashboard() {
               >
                 <UserPlus size={14} />
                 {t('underbossDashboard.addUnderboss')}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleDownloadAllWallets}
+                className="flex items-center gap-1.5 text-sm text-red-500/70 hover:text-red-500 transition-colors"
+              >
+                <Download size={14} />
+                Download all wallets (CSV)
               </button>
             )}
           </div>
