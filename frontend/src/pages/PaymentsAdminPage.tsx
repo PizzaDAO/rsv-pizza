@@ -1017,6 +1017,28 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               const seed = partyName.replace(/^Global Pizza Party\s+/i, '');
               setExternalModalState({ open: true, initialQuery: seed });
             }}
+            // bottarga-92104: after the table toggles the `possible-scam` tag,
+            // surface a toast and patch the in-memory row's eventTags so the
+            // pill survives a re-render even before the next full refresh.
+            // The table also keeps its own optimistic override, so this is
+            // belt + suspenders — but it also catches downstream consumers
+            // (filter chips, counts) that read off byPartyRows directly.
+            onScamFlagChanged={(partyId, nextTags) => {
+              setByPartyRows((prev) =>
+                prev.map((r) =>
+                  r.party.id === partyId
+                    ? { ...r, party: { ...r.party, eventTags: nextTags } }
+                    : r,
+                ),
+              );
+              const flagged = nextTags.includes('possible-scam');
+              pushToast(
+                flagged
+                  ? 'Flagged as possible scam'
+                  : 'Unflagged possible scam',
+                'success',
+              );
+            }}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}
