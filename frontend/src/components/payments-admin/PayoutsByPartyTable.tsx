@@ -342,7 +342,7 @@ function CityActionsMenu({
                 onClick={() => setMenuOpen(false)}
               />
               <div
-                className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-1"
+                className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-[#1a1a2e] shadow-xl py-1"
                 role="menu"
               >
                 {canAddExternal && (
