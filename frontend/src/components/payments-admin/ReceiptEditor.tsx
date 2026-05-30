@@ -153,7 +153,29 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   const manualUsdMode = draft.manualUsdAmount !== undefined;
 
   return (
-    <div className="p-4 space-y-4 text-theme-text">
+    /* coppa-92105: when this receipt is admin-marked as a duplicate, paint
+        the entire editor pane with a red left border + faint red background
+        + DUPLICATE banner across the top so the admin can't miss that the
+        edits they're making are on an excluded row. The dim is intentionally
+        lighter than the thumbnail/right-row treatment (opacity-95 + tint)
+        because the editor is interactive — admins still need to read the
+        inputs to un-mark. */
+    <div
+      className={`p-4 space-y-4 text-theme-text ${
+        isDuplicate
+          ? 'border-l-4 border-red-500/60 bg-red-500/5'
+          : ''
+      }`}
+    >
+      {/* coppa-92105: DUPLICATE banner across the top of the editor when
+          marked. Heavier than the per-row pill so it can't be missed even on
+          a quick scan. */}
+      {isDuplicate && (
+        <div className="-mx-4 -mt-4 mb-2 px-4 py-2 bg-red-500/15 border-b border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wide flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+          Duplicate — excluded from all USD totals
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">

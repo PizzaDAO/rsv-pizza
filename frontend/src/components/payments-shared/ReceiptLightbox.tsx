@@ -68,6 +68,14 @@ interface ReceiptLightboxProps {
    * when admin context provides this prop.
    */
   onDuplicateShortcut?: () => void;
+  /**
+   * coppa-92105: when true, render a heavy DUPLICATE banner across the top
+   * of the photo + diagonal-stripe overlay across the image so admins can't
+   * confuse a duplicate receipt for a valid one while reviewing it
+   * full-screen. Parent decides per-image via the same onIndexChange hook
+   * used to pick `editorPane`. Pure visual — no behavior change.
+   */
+  isDuplicate?: boolean;
 }
 
 /** Some HEIC files come through with non-image/heic MIME types or no MIME at
@@ -90,6 +98,7 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   onIndexChange,
   onBeforeNavigate,
   onDuplicateShortcut,
+  isDuplicate = false,
 }) => {
   // Index lives in this component so callers only need to pass the starting
   // image. Reset whenever the lightbox is (re-)opened so each open starts
@@ -268,12 +277,30 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={
+          className={`relative ${
             hasEditor
               ? 'flex items-center justify-center min-h-0'
               : 'flex items-center justify-center'
-          }
+          }`}
         >
+          {/* coppa-92105: heavy DUPLICATE banner + diagonal-stripe overlay
+              on the photo pane when the current receipt is admin-marked as
+              a duplicate. Pointer-events-none so the underlying photo / nav
+              controls stay interactive. */}
+          {isDuplicate && (
+            <>
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-red-500 text-white text-xs font-bold uppercase tracking-wide shadow-lg pointer-events-none">
+                Duplicate — excluded from totals
+              </div>
+              <div
+                className="absolute inset-0 z-10 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(45deg, rgba(239,68,68,0.18) 0 6px, transparent 6px 14px)',
+                }}
+              />
+            </>
+          )}
           {heic ? (
             <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
               <p className="text-sm font-semibold">Can't preview HEIC files</p>
