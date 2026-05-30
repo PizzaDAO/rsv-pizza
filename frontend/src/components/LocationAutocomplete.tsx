@@ -190,8 +190,13 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             onLocationSelectedRef.current(null);
           }
 
-          // Parse city data from address_components
-          if (onCitySelectedRef.current && place.address_components && place.geometry?.location) {
+          // Parse city data from address_components.
+          // marinara-92106: fire onCitySelected whenever ANY of city OR country
+          // is available, not only when city+geometry are both present. Country
+          // alone is enough to persist parties.country (74 prod rows had NULL
+          // country because the previous guard short-circuited any pick that
+          // lacked a locality, e.g. street-only or establishment picks).
+          if (onCitySelectedRef.current && place.address_components) {
             const components = place.address_components;
             const getComponent = (type: string) =>
               components.find(c => c.types.includes(type));
@@ -200,14 +205,16 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             const countryComponent = getComponent('country');
             const stateComponent = getComponent('administrative_area_level_1');
 
-            if (cityComponent) {
+            if (cityComponent || countryComponent) {
+              const lat = place.geometry?.location?.lat();
+              const lng = place.geometry?.location?.lng();
               onCitySelectedRef.current({
-                cityName: cityComponent.long_name,
+                cityName: cityComponent?.long_name || '',
                 country: countryComponent?.long_name || '',
                 countryCode: countryComponent?.short_name || '',
                 state: stateComponent?.short_name,
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng(),
+                lat: typeof lat === 'number' ? lat : 0,
+                lng: typeof lng === 'number' ? lng : 0,
                 formattedName: selectedAddress,
               });
             }
