@@ -36,6 +36,7 @@ import type {
 import { formatUsd } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
+import { fetchSheetCities } from '../lib/cities';
 import {
   PayoutsFilterBar,
   PayoutsTable,
@@ -286,6 +287,37 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     },
     [],
   );
+
+  // crocchetta-92107: city-name → Telegram group chat_id map, sourced from
+  // the same GPP sheet (`fetchSheetCities` → `SheetCity.groupId`) that
+  // /underboss uses for its broadcast tooling. Drives the per-city group
+  // post on the Send-receipts-reminder action; rows without a matching city
+  // entry skip the group post server-side. Fetched once on mount; failures
+  // collapse to an empty map (the host DM still goes out).
+  const [cityGroupChatIds, setCityGroupChatIds] = useState<Map<string, string>>(
+    new Map(),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    fetchSheetCities()
+      .then((cities) => {
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        for (const c of cities) {
+          if (c.groupId) {
+            map.set(c.city.toLowerCase().trim(), c.groupId);
+          }
+        }
+        setCityGroupChatIds(map);
+      })
+      .catch(() => {
+        // Sheet fetch is best-effort — silently collapse on failure. The DM
+        // path still runs and the toast surfaces "no city TG group set".
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadPrepayQueue = useCallback(async () => {
     try {
@@ -1127,6 +1159,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 result.hostDmSent || result.groupSent ? 'success' : 'error';
               pushToast(`Reminder: ${hostLabel} | ${groupLabel}`, tone);
             }}
+            // crocchetta-92107: sheet-derived city → TG group chat_id map so
+            // the Send-receipts-reminder action can post into the city's
+            // group chat (same source /underboss uses).
+            cityGroupChatIds={cityGroupChatIds}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}

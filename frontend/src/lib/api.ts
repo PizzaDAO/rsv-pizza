@@ -425,14 +425,18 @@ export async function flagPartyAsScam(
 }
 
 /**
- * crocchetta-92106: Send the "Make sure you've uploaded receipts and photos
- * to rsv.pizza/<custom_url>" reminder via the Molto Benny Telegram bot.
+ * crocchetta-92106 + crocchetta-92107: Send the "Make sure you've uploaded
+ * receipts and photos to rsv.pizza/<custom_url>" reminder via the Molto
+ * Benny Telegram bot.
  *
  * Two messages, same body:
  *   1. DM to the primary host (uses `parties.host_telegram_chat_id`; skipped
  *      with a reason when the host hasn't linked Telegram).
- *   2. Post to the GPP-wide group chat (uses `GPP_GROUP_TG_CHAT_ID` env;
- *      skipped with a reason when the env var isn't configured yet).
+ *   2. Post to the **city's** Telegram group chat. The caller resolves the
+ *      chat_id from the GPP sheet (same `SheetCity.groupId` field that
+ *      powers /underboss broadcasts) and passes it in `groupChatId`. When
+ *      omitted/empty, the backend skips with `groupReason: 'no city TG
+ *      group set'` (per-party, not a global env var).
  *
  * Backend returns per-channel success + skip reason so the UI can render an
  * accurate partial-success toast. Triggered from the /payments by-city ⋮
@@ -447,12 +451,14 @@ export interface SendTgReceiptsReminderResponse {
 
 export async function sendTgReceiptsReminder(
   partyId: string,
+  groupChatId?: string | null,
 ): Promise<SendTgReceiptsReminderResponse> {
   return apiRequest<SendTgReceiptsReminderResponse>(
     `/api/admin/payouts/${partyId}/tg-receipts-reminder`,
     {
       method: 'POST',
       requireAuth: true,
+      body: groupChatId ? { groupChatId } : undefined,
     },
   );
 }

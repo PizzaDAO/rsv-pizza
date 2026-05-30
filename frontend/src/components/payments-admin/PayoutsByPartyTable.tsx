@@ -157,6 +157,15 @@ interface PayoutsByPartyTableProps {
       groupReason?: string;
     } | { error: string },
   ) => void;
+  /**
+   * crocchetta-92107: per-city Telegram group chat_id map keyed by the
+   * lower-cased, trimmed city name (with the "Global Pizza Party " prefix
+   * stripped). Populated by the parent from `fetchSheetCities()` —
+   * `SheetCity.groupId` — the same source /underboss uses for its broadcast
+   * tooling. When a row's city is missing from the map, the group post is
+   * skipped server-side with `groupReason: 'no city TG group set'`.
+   */
+  cityGroupChatIds?: Map<string, string>;
   viewerRole?: 'admin' | 'underboss';
   busyRowId?: string | null;
   loading?: boolean;
@@ -1765,6 +1774,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onSendPayment,
   onScamFlagChanged,
   onTgReminderResult,
+  cityGroupChatIds,
   viewerRole = 'admin',
   busyRowId,
   loading,
@@ -1859,17 +1869,23 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   }
 
   /**
-   * crocchetta-92106: dispatch the Send-receipts-reminder POST and surface
-   * the per-channel outcome to the parent via `onTgReminderResult` so the
-   * page-level toast stack renders the right message. Errors are caught and
-   * forwarded with an `error` shape so the parent can flash a failure toast
-   * without the table needing its own alert path.
+   * crocchetta-92106 + crocchetta-92107: dispatch the Send-receipts-reminder
+   * POST and surface the per-channel outcome to the parent via
+   * `onTgReminderResult` so the page-level toast stack renders the right
+   * message. The per-city Telegram group chat_id is resolved from
+   * `cityGroupChatIds` (a sheet-derived map keyed by the stripped,
+   * lower-cased city name); when the map has no entry the request omits the
+   * field and the backend marks the group post skipped. Errors are caught
+   * and forwarded with an `error` shape so the parent can flash a failure
+   * toast without the table needing its own alert path.
    */
   async function handleSendTgReminder(row: PartyPayoutsRow) {
     const partyId = row.party.id;
+    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
+    const groupChatId = cityGroupChatIds?.get(cityKey);
     setTgReminderBusyPartyId(partyId);
     try {
-      const result = await sendTgReceiptsReminder(partyId);
+      const result = await sendTgReceiptsReminder(partyId, groupChatId);
       onTgReminderResult?.(partyId, result);
     } catch (err) {
       onTgReminderResult?.(partyId, {

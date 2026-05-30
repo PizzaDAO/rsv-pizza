@@ -5141,7 +5141,7 @@ router.post(
 );
 
 // ============================================
-// crocchetta-92106: Telegram receipts reminder.
+// crocchetta-92106 + crocchetta-92107: Telegram receipts reminder.
 //
 // Sends a Telegram nudge via the Molto Benny bot (`TELEGRAM_BOT_TOKEN`) to:
 //   1. The host's private DM, using `parties.host_telegram_chat_id` — set
@@ -5149,11 +5149,14 @@ router.post(
 //      backend/src/routes/telegram-webhook.routes.ts). When null, the host
 //      DM is silently skipped and `hostDmSent=false` with a reason returned
 //      to the caller.
-//   2. The shared GPP group chat — `GPP_GROUP_TG_CHAT_ID` env var. When
-//      unset (it's a new env var introduced by this task), the group send is
-//      skipped and `groupSent=false` with a reason returned to the caller.
-//      Kept separate from the existing `PAYMENTS_TEAM_TG_CHAT_ID` so the
-//      payments-team feed isn't spammed with host reminders.
+//   2. The city's Telegram group chat — chat_id passed in the request body
+//      as `groupChatId`, resolved client-side from the same GPP sheet that
+//      powers the /underboss broadcast tooling (`fetchSheetCities` →
+//      `SheetCity.groupId`). When the party's city has no group_id on file,
+//      the frontend omits the field and the backend skips the group post
+//      with `groupReason: 'no city TG group set'`. This mirrors the
+//      per-row chat_id pattern used by /api/telegram/broadcast — the
+//      backend never fetches the sheet itself.
 //
 // Both messages carry the same body:
 //   "Make sure you've uploaded receipts and photos to rsv.pizza/<custom_url>"
@@ -5252,19 +5255,24 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      // Group chat — only when GPP_GROUP_TG_CHAT_ID is configured.
-      const groupChatId = process.env.GPP_GROUP_TG_CHAT_ID;
+      // Group chat — per-city chat_id supplied by the caller. The frontend
+      // resolves it from the GPP sheet (`SheetCity.groupId`) using the same
+      // city→chat_id map that /underboss uses for its broadcast tooling. We
+      // intentionally don't fetch the sheet from the backend; mirrors the
+      // `/api/telegram/broadcast` contract where the client supplies chatIds.
+      const rawGroupChatId =
+        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
       let groupSent = false;
       let groupReason: string | undefined;
-      if (groupChatId && groupChatId.trim()) {
-        const result = await sendTelegramMessage(groupChatId.trim(), text);
+      if (rawGroupChatId) {
+        const result = await sendTelegramMessage(rawGroupChatId, text);
         if (result.ok) {
           groupSent = true;
         } else {
           groupReason = result.reason;
         }
       } else {
-        groupReason = 'GPP_GROUP_TG_CHAT_ID env var not configured';
+        groupReason = 'no city TG group set';
       }
 
       // Grep-marker audit line (no DB row per task spec). Includes party id,
