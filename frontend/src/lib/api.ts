@@ -464,6 +464,30 @@ export async function sendTgReceiptsReminder(
 }
 
 /**
+ * mortadella-92106: set admin-only city notes on a party. Backed by the
+ * dedicated `PATCH /api/admin/parties/:partyId/admin-notes` endpoint so
+ * the generic host-accessible PATCH whitelist doesn't have to gate this
+ * admin-only field.
+ *
+ * Pass `null` (or an empty string — the server normalizes) to clear the
+ * column. Returns the persisted value so the caller can reconcile against
+ * any concurrent edit.
+ */
+export async function setCityAdminNotes(
+  partyId: string,
+  notes: string | null,
+): Promise<{ adminNotes: string | null }> {
+  const res = await apiRequest<{ ok: boolean; party: { id: string; adminNotes: string | null } }>(
+    `/api/admin/parties/${partyId}/admin-notes`,
+    {
+      method: 'PATCH',
+      body: { notes },
+    },
+  );
+  return { adminNotes: res.party.adminNotes };
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.
