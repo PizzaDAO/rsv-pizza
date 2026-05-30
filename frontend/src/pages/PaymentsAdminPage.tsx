@@ -406,7 +406,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         setTotals(listRes.totals);
         setNextCursor(listRes.nextCursor);
         if (!append && viewMode === 'by-city') {
-          const grouped = await fetchPayoutsByParty(merged);
+          // The status tab filters which CITIES show, not which payout rows —
+          // so we always fetch the COMPLETE per-city rollup (every status) and
+          // apply the status membership test client-side (see
+          // `displayedByPartyRows`). Passing `status` to /by-party filters at
+          // the payout-row level, which both (a) drops a city whose matching
+          // status isn't the selected one and (b) zeroes its other-status
+          // columns — e.g. a partially-paid city under "Approved" lost its
+          // Paid column. Stripping it here keeps Approved/Paid/Outstanding
+          // accurate for every shown city.
+          const { status: _byCityStatus, ...byCityFilters } = merged;
+          const grouped = await fetchPayoutsByParty(byCityFilters);
           setByPartyRows(grouped.rows);
         }
       } catch (err: any) {
@@ -488,6 +498,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     }
     return partyIds.size;
   }, [selectedPayouts, viewMode]);
+
+  // Status-tab membership filter for the by-city table. `byPartyRows` always
+  // holds the COMPLETE per-city rollup (loadPage strips `status` from the
+  // /by-party fetch), so here we only decide which CITIES to show: a city
+  // appears under a status tab when it has at least one payout of that exact
+  // status. 'all' / unset shows every city. This is the "has a still-X entry"
+  // membership rule — shown cities still render their full Approved/Paid/
+  // Outstanding columns since the rollup is computed from all their payouts.
+  const displayedByPartyRows = useMemo(() => {
+    const status = filters.status;
+    if (!status || status === 'all') return byPartyRows;
+    return byPartyRows.filter((row) =>
+      row.payouts.some((p) => p.status === status),
+    );
+  }, [byPartyRows, filters.status]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -1042,7 +1067,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             bulk-action concept, so selection lives inside the expansion. */}
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
-            rows={byPartyRows}
+            rows={displayedByPartyRows}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onRowClick={openDetail}
