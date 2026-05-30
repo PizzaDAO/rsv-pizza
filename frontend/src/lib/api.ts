@@ -425,6 +425,39 @@ export async function flagPartyAsScam(
 }
 
 /**
+ * crocchetta-92106: Send the "Make sure you've uploaded receipts and photos
+ * to rsv.pizza/<custom_url>" reminder via the Molto Benny Telegram bot.
+ *
+ * Two messages, same body:
+ *   1. DM to the primary host (uses `parties.host_telegram_chat_id`; skipped
+ *      with a reason when the host hasn't linked Telegram).
+ *   2. Post to the GPP-wide group chat (uses `GPP_GROUP_TG_CHAT_ID` env;
+ *      skipped with a reason when the env var isn't configured yet).
+ *
+ * Backend returns per-channel success + skip reason so the UI can render an
+ * accurate partial-success toast. Triggered from the /payments by-city ⋮
+ * menu (PayoutsByPartyTable).
+ */
+export interface SendTgReceiptsReminderResponse {
+  hostDmSent: boolean;
+  hostDmReason?: string;
+  groupSent: boolean;
+  groupReason?: string;
+}
+
+export async function sendTgReceiptsReminder(
+  partyId: string,
+): Promise<SendTgReceiptsReminderResponse> {
+  return apiRequest<SendTgReceiptsReminderResponse>(
+    `/api/admin/payouts/${partyId}/tg-receipts-reminder`,
+    {
+      method: 'POST',
+      requireAuth: true,
+    },
+  );
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.

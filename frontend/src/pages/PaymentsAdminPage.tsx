@@ -1100,6 +1100,33 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 'success',
               );
             }}
+            // crocchetta-92106: Send-receipts-reminder result toast. The
+            // backend returns per-channel success + skip reason; we render
+            // each channel as a "✓"/"–" so the admin can see at a glance
+            // whether both messages went out, or just the group post when
+            // the host hasn't linked TG yet.
+            onTgReminderResult={(_partyId, result) => {
+              if ('error' in result) {
+                pushToast(
+                  `Could not send reminder: ${result.error}`,
+                  'error',
+                );
+                return;
+              }
+              const hostLabel = result.hostDmSent
+                ? 'DM ✓'
+                : `DM skipped${
+                    result.hostDmReason ? ` (${result.hostDmReason})` : ''
+                  }`;
+              const groupLabel = result.groupSent
+                ? 'Group ✓'
+                : `Group skipped${
+                    result.groupReason ? ` (${result.groupReason})` : ''
+                  }`;
+              const tone =
+                result.hostDmSent || result.groupSent ? 'success' : 'error';
+              pushToast(`Reminder: ${hostLabel} | ${groupLabel}`, tone);
+            }}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}
