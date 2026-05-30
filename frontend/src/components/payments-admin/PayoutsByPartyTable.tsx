@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
@@ -22,6 +22,7 @@ import type {
   PartyPayoutsRow,
   PayoutDocument,
   PayoutStatus,
+  ReceiptLineItem,
 } from '../../types';
 import {
   PayoutStatusPill,
@@ -33,6 +34,18 @@ import {
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
 import { isVideoFile } from '../../lib/mediaUtils';
+import {
+  updatePayoutDocument,
+  markReceiptDuplicate,
+  retryPayoutDocumentOcr,
+} from '../../lib/api';
+import {
+  ReceiptEditor,
+  lineItemToDraft,
+  emptyLineItemDraft,
+  type ReceiptDraft,
+  type LineItemDraft,
+} from './ReceiptEditor';
 
 /**
  * ricotta-92104: split party.photos into "Pizza photos" (tag === 'Pizza' —
@@ -279,6 +292,16 @@ function CityActionsMenu({
  * Expanded panel — rendered inside a single full-width cell under the city
  * row. Owns its own local state for the lightbox + the "show pending claim
  * list" toggle.
+ *
+ * pesto-92105: when the viewer is an admin AND a receipt thumbnail is opened
+ * in the lightbox, the lightbox renders the shared ReceiptEditor in its right
+ * pane so amount / currency / line items / duplicate can be edited without
+ * leaving the photo view. Mirrors the pesto-92104 wiring in
+ * PayoutReviewModal but using receipt-edit state local to this expansion —
+ * the save handlers PATCH the same `/api/admin/payouts/documents/:docId`
+ * endpoint, and a per-doc `receiptOverrides` map mirrors the saved values so
+ * the merged receipt grid + USD rollup update immediately without a full
+ * by-party refetch.
  */
 function CityExpansion({
   row,
@@ -286,13 +309,22 @@ function CityExpansion({
   onToggleSelect,
   onRowClick,
   busyRowId,
+  canEditReceipts,
 }: {
   row: PartyPayoutsRow;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onRowClick: (payout: AdminPayout) => void;
   busyRowId?: string | null;
+  /**
+   * pesto-92105: gates the in-lightbox receipt editor. True for admin /
+   * super_admin / payment_admin (`viewerRole === 'admin'`); underbosses get
+   * the plain photo-only lightbox.
+   */
+  canEditReceipts: boolean;
 }) {
+  // Hooks-above-early-returns: all useState / useMemo / useCallback live up
+  // front so adding a conditional return below can't change hook order.
   // Hooks first — never below a conditional return. (feedback_hooks_above_early_returns)
   //
   // ricotta-92104: the lightbox now serves three distinct buckets (receipts,
@@ -305,8 +337,62 @@ function CityExpansion({
   } | null>(null);
   const [showPendingClaims, setShowPendingClaims] = useState(false);
 
-  // Merge receipts across all payouts on the party — multi-host pot.
-  const receiptEntries = useMemo(() => collectReceipts(row.payouts), [row.payouts]);
+  // pesto-92105: per-receipt edit state. Mirrors the agnolotti-58291 /
+  // taralli-92104 / culatello-92104 state on PayoutReviewModal but local to
+  // this expansion. `receiptOverrides` is applied on top of the docs pulled
+  // off `row.payouts` so the merged receipt grid + USD rollup reflect a save
+  // immediately without re-fetching `/admin/payouts/by-party`. The lightbox
+  // tracks which receipt is currently displayed via `lightboxCurrentIndex`
+  // (index into the receipt-bucket carousel; we derive the doc from it in a
+  // memo below).
+  type ReceiptOverride = {
+    ocrAmount: number | null;
+    ocrCurrency: string | null;
+    ocrLineItems?: ReceiptLineItem[] | null;
+    isDuplicate?: boolean;
+  };
+  const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
+  // Amount/currency drafts (string-typed so admins can type freely).
+  const [receiptDrafts, setReceiptDrafts] = useState<Record<string, ReceiptDraft>>({});
+  const [receiptSavingId, setReceiptSavingId] = useState<string | null>(null);
+  const [receiptSaveErrors, setReceiptSaveErrors] = useState<Record<string, string>>({});
+  // Mark-duplicate state.
+  const [duplicateSavingId, setDuplicateSavingId] = useState<string | null>(null);
+  const [duplicateSaveErrors, setDuplicateSaveErrors] = useState<Record<string, string>>({});
+  // Line-item editor state.
+  const [lineItemDrafts, setLineItemDrafts] = useState<Record<string, LineItemDraft[]>>({});
+  const [lineItemsSavingId, setLineItemsSavingId] = useState<string | null>(null);
+  const [lineItemsSaveErrors, setLineItemsSaveErrors] = useState<Record<string, string>>({});
+  // OCR retry state.
+  const [retryingDocId, setRetryingDocId] = useState<string | null>(null);
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  const [retryClearedErrors, setRetryClearedErrors] = useState<Record<string, boolean>>({});
+  // Tracks which receipt index in the bucket carousel is currently displayed
+  // so we can rebuild the editor pane for the right doc on arrow-key nav.
+  const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState<number | null>(null);
+
+  // Merge receipts across all payouts on the party — multi-host pot. Layers
+  // `receiptOverrides` (pesto-92105) on top so saves reflect immediately.
+  const receiptEntries = useMemo(() => {
+    const raw = collectReceipts(row.payouts);
+    if (Object.keys(receiptOverrides).length === 0) return raw;
+    return raw.map((e) => {
+      const ov = receiptOverrides[e.doc.id];
+      if (!ov) return e;
+      return {
+        ...e,
+        doc: {
+          ...e.doc,
+          ocrAmount: ov.ocrAmount,
+          ocrCurrency: ov.ocrCurrency,
+          ocrLineItems:
+            ov.ocrLineItems !== undefined ? ov.ocrLineItems : e.doc.ocrLineItems,
+          isDuplicate:
+            ov.isDuplicate !== undefined ? ov.isDuplicate : e.doc.isDuplicate,
+        },
+      };
+    });
+  }, [row.payouts, receiptOverrides]);
 
   // ricotta-92104: party-level photos for the Event/Pizza preview sections.
   // Backend now ships these on the by-party row (mirrors the per-payout
@@ -443,6 +529,401 @@ function CityExpansion({
     );
     return combined;
   }, [rollup.pendingPayouts, rollup.approvedNotPaidPayouts]);
+
+  // pesto-92105: receipt currently displayed in the lightbox (if the active
+  // bucket is `receipt`). Drives the editor pane below.
+  const lightboxReceipt = useMemo<PayoutDocument | null>(() => {
+    if (lightbox?.bucket !== 'receipt') return null;
+    if (lightboxCurrentIndex == null) return null;
+    const e = receiptEntries[lightboxCurrentIndex];
+    return e ? e.doc : null;
+  }, [lightbox?.bucket, lightboxCurrentIndex, receiptEntries]);
+
+  /* ---------------------------------------------------------------------- *
+   * pesto-92105: receipt-edit handlers. Mirror PayoutReviewModal's save     *
+   * paths. PATCH /admin/payouts/documents/:docId is the single endpoint —  *
+   * server is authoritative, we layer the response into `receiptOverrides` *
+   * so the visible row + sums update immediately.                          *
+   * ---------------------------------------------------------------------- */
+
+  const saveReceiptEdit = useCallback(async (docId: string) => {
+    const draft = receiptDrafts[docId];
+    if (!draft) return;
+    setReceiptSavingId(docId);
+    setReceiptSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const trimmedAmt = draft.amount.trim();
+      const trimmedCur = draft.currency.trim();
+      const patch: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
+      if (trimmedAmt === '') {
+        patch.ocrAmount = null;
+      } else {
+        const n = Number(trimmedAmt);
+        if (!Number.isFinite(n) || n < 0) {
+          throw new Error('Amount must be a non-negative number');
+        }
+        patch.ocrAmount = n;
+      }
+      if (trimmedCur === '') {
+        patch.ocrCurrency = null;
+      } else if (trimmedCur.length > 8) {
+        throw new Error('Currency must be 8 characters or fewer');
+      } else {
+        patch.ocrCurrency = trimmedCur.toUpperCase();
+      }
+      const updated = await updatePayoutDocument(docId, patch);
+      setReceiptOverrides((m) => ({
+        ...m,
+        [docId]: {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+          ocrLineItems: updated.ocrLineItems,
+          isDuplicate: updated.isDuplicate,
+        },
+      }));
+      setReceiptDrafts((m) => ({
+        ...m,
+        [docId]: {
+          amount: updated.ocrAmount == null ? '' : String(updated.ocrAmount),
+          currency: updated.ocrCurrency ?? '',
+        },
+      }));
+    } catch (err: any) {
+      setReceiptSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to save',
+      }));
+    } finally {
+      setReceiptSavingId(null);
+    }
+  }, [receiptDrafts]);
+
+  const toggleDuplicate = useCallback(async (docId: string, nextValue: boolean) => {
+    setDuplicateSavingId(docId);
+    setDuplicateSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    // Capture the prior doc so we can roll back on PATCH failure.
+    const prior = receiptEntries.find((e) => e.doc.id === docId)?.doc;
+    setReceiptOverrides((m) => {
+      const cur = m[docId] ?? {
+        ocrAmount: prior?.ocrAmount ?? null,
+        ocrCurrency: prior?.ocrCurrency ?? null,
+      };
+      return { ...m, [docId]: { ...cur, isDuplicate: nextValue } };
+    });
+    try {
+      const updated = await markReceiptDuplicate(docId, nextValue);
+      setReceiptOverrides((m) => {
+        const cur = m[docId] ?? {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+        };
+        return {
+          ...m,
+          [docId]: {
+            ...cur,
+            ocrAmount: updated.ocrAmount,
+            ocrCurrency: updated.ocrCurrency,
+            ocrLineItems: updated.ocrLineItems,
+            isDuplicate: updated.isDuplicate,
+          },
+        };
+      });
+    } catch (err: any) {
+      // Roll back the optimistic flag.
+      setReceiptOverrides((m) => {
+        const cur = m[docId];
+        if (!cur) return m;
+        return {
+          ...m,
+          [docId]: { ...cur, isDuplicate: prior?.isDuplicate === true },
+        };
+      });
+      setDuplicateSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to mark duplicate',
+      }));
+    } finally {
+      setDuplicateSavingId(null);
+    }
+  }, [receiptEntries]);
+
+  const updateLineItemDraft = useCallback((
+    docId: string,
+    idx: number,
+    patch: Partial<LineItemDraft>,
+  ) => {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      const next = cur.slice();
+      next[idx] = { ...next[idx], ...patch };
+      return { ...m, [docId]: next };
+    });
+  }, []);
+
+  const addLineItem = useCallback((docId: string) => {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      return { ...m, [docId]: [...cur, emptyLineItemDraft()] };
+    });
+  }, []);
+
+  const removeLineItem = useCallback((docId: string, idx: number) => {
+    setLineItemDrafts((m) => {
+      const cur = m[docId] ?? [];
+      const next = cur.slice();
+      next.splice(idx, 1);
+      return { ...m, [docId]: next };
+    });
+  }, []);
+
+  const useLineSumForAmount = useCallback((docId: string) => {
+    const drafts = lineItemDrafts[docId] ?? [];
+    let sum = 0;
+    for (const d of drafts) {
+      const n = Number(d.subtotal);
+      if (Number.isFinite(n) && n >= 0) sum += n;
+    }
+    setReceiptDrafts((m) => {
+      const prev = m[docId];
+      return {
+        ...m,
+        [docId]: {
+          amount: sum.toFixed(2),
+          currency: prev?.currency ?? '',
+        },
+      };
+    });
+  }, [lineItemDrafts]);
+
+  const saveLineItemsEdit = useCallback(async (docId: string) => {
+    const drafts = lineItemDrafts[docId];
+    if (!drafts) return;
+    setLineItemsSavingId(docId);
+    setLineItemsSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const items: ReceiptLineItem[] = drafts.map((d, idx) => {
+        const qty = Number(d.qty);
+        const unitPrice = Number(d.unitPrice);
+        const subtotal = Number(d.subtotal);
+        if (!Number.isFinite(qty) || qty < 0) {
+          throw new Error(`Line ${idx + 1}: qty must be a non-negative number`);
+        }
+        if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+          throw new Error(`Line ${idx + 1}: unit price must be a non-negative number`);
+        }
+        if (!Number.isFinite(subtotal) || subtotal < 0) {
+          throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
+        }
+        return {
+          name: d.name,
+          qty,
+          unitPrice,
+          subtotal,
+          category: d.category,
+        };
+      });
+      const updated = await updatePayoutDocument(docId, { ocrLineItems: items });
+      setReceiptOverrides((m) => ({
+        ...m,
+        [docId]: {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+          ocrLineItems: updated.ocrLineItems,
+          isDuplicate: updated.isDuplicate,
+        },
+      }));
+      setLineItemDrafts((m) => ({
+        ...m,
+        [docId]: (updated.ocrLineItems ?? []).map(lineItemToDraft),
+      }));
+    } catch (err: any) {
+      setLineItemsSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to save line items',
+      }));
+    } finally {
+      setLineItemsSavingId(null);
+    }
+  }, [lineItemDrafts]);
+
+  const retryOcr = useCallback(async (docId: string) => {
+    setRetryingDocId(docId);
+    setRetryErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const res = await retryPayoutDocumentOcr(docId, { runNow: true });
+      if (res.inlineError) {
+        setRetryErrors((m) => ({ ...m, [docId]: res.inlineError ?? 'OCR failed' }));
+      } else if (res.ranInline) {
+        setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
+      }
+    } catch (err: any) {
+      setRetryErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Retry failed',
+      }));
+    } finally {
+      setRetryingDocId(null);
+    }
+  }, []);
+
+  // pesto-92105: "is the editor dirty?" for the currently-shown receipt.
+  // Drives the navigation-confirm prompt on arrow-key nav so admins don't
+  // lose in-flight edits when cycling through receipts.
+  const receiptHasUnsavedEdits = useCallback((docId: string): boolean => {
+    const r = receiptEntries.find((e) => e.doc.id === docId)?.doc;
+    if (!r) return false;
+    const draft = receiptDrafts[docId];
+    if (draft) {
+      const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
+      const persistedCur = r.ocrCurrency ?? '';
+      if (draft.amount !== persistedAmt || draft.currency !== persistedCur) {
+        return true;
+      }
+    }
+    const liDrafts = lineItemDrafts[docId];
+    if (liDrafts) {
+      const persisted = (r.ocrLineItems ?? []).map(lineItemToDraft);
+      if (persisted.length !== liDrafts.length) return true;
+      for (let i = 0; i < liDrafts.length; i++) {
+        const a = liDrafts[i];
+        const b = persisted[i];
+        if (
+          a.name !== b.name ||
+          a.qty !== b.qty ||
+          a.unitPrice !== b.unitPrice ||
+          a.subtotal !== b.subtotal ||
+          a.category !== b.category
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [receiptEntries, receiptDrafts, lineItemDrafts]);
+
+  const lightboxOnBeforeNavigate = useCallback(async (): Promise<boolean> => {
+    if (!lightboxReceipt) return true;
+    if (!receiptHasUnsavedEdits(lightboxReceipt.id)) return true;
+    return window.confirm(
+      'This receipt has unsaved edits. Discard them and navigate?',
+    );
+  }, [lightboxReceipt, receiptHasUnsavedEdits]);
+
+  const lightboxOnDuplicateShortcut = useCallback(() => {
+    if (!lightboxReceipt) return;
+    toggleDuplicate(lightboxReceipt.id, !(lightboxReceipt.isDuplicate === true));
+  }, [lightboxReceipt, toggleDuplicate]);
+
+  // pesto-92105: build the editor pane for the lightbox. Gated to receipt
+  // bucket + admin viewer; null for event/pizza photos and underbosses (the
+  // lightbox then renders its plain photo-only layout).
+  const lightboxEditorPane = useMemo(() => {
+    if (!canEditReceipts) return null;
+    if (lightbox?.bucket !== 'receipt') return null;
+    if (!lightboxReceipt) return null;
+    const r = lightboxReceipt;
+    const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
+      amount: r.ocrAmount == null ? '' : String(r.ocrAmount),
+      currency: r.ocrCurrency ?? '',
+    };
+    const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
+    const persistedCur = r.ocrCurrency ?? '';
+    const isDirty =
+      draft.amount !== persistedAmt || draft.currency !== persistedCur;
+    const liDraftsExisting = lineItemDrafts[r.id];
+    const liDrafts =
+      liDraftsExisting ?? (r.ocrLineItems ?? []).map(lineItemToDraft);
+    const localOcrError = retryClearedErrors[r.id]
+      ? null
+      : (retryErrors[r.id] ?? r.ocrError);
+    return (
+      <ReceiptEditor
+        doc={r}
+        draft={draft}
+        onDraftChange={(next) =>
+          setReceiptDrafts((m) => ({ ...m, [r.id]: next }))
+        }
+        saving={receiptSavingId === r.id}
+        saveError={receiptSaveErrors[r.id]}
+        onSave={() => saveReceiptEdit(r.id)}
+        isDirty={isDirty}
+        isDuplicate={r.isDuplicate === true}
+        dupSaving={duplicateSavingId === r.id}
+        dupError={duplicateSaveErrors[r.id]}
+        onToggleDuplicate={() => toggleDuplicate(r.id, !(r.isDuplicate === true))}
+        lineItemDrafts={liDrafts}
+        lineItemsSaving={lineItemsSavingId === r.id}
+        lineItemsSaveError={lineItemsSaveErrors[r.id]}
+        onLineItemDraftChange={(idx, patch) => {
+          // Seed the persistent draft on first edit so subsequent renders
+          // pick up in-flight edits (mirrors the lazy-seed pattern in
+          // PayoutReviewModal).
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          updateLineItemDraft(r.id, idx, patch);
+        }}
+        onAddLineItem={() => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          addLineItem(r.id);
+        }}
+        onRemoveLineItem={(idx) => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          removeLineItem(r.id, idx);
+        }}
+        onSaveLineItems={() => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          saveLineItemsEdit(r.id);
+        }}
+        onUseLineSumForAmount={() => useLineSumForAmount(r.id)}
+        hasOcrError={!!localOcrError}
+        retrying={retryingDocId === r.id}
+        retryError={retryErrors[r.id]}
+        onRetryOcr={() => retryOcr(r.id)}
+      />
+    );
+    // The save callbacks are stable across renders (declared with
+    // useCallback); they read fresh state internally via the dep arrays
+    // above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    canEditReceipts,
+    lightbox?.bucket,
+    lightboxReceipt,
+    receiptDrafts,
+    receiptSavingId,
+    receiptSaveErrors,
+    duplicateSavingId,
+    duplicateSaveErrors,
+    lineItemDrafts,
+    lineItemsSavingId,
+    lineItemsSaveErrors,
+    retryingDocId,
+    retryErrors,
+    retryClearedErrors,
+  ]);
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -765,11 +1246,29 @@ function CityExpansion({
         </div>
       )}
 
+      {/* pesto-92105: same shared lightbox the modal uses. When the active
+          bucket is `receipt` AND the viewer is admin, pass `editorPane` so
+          the lightbox switches to the 2-pane photo + ReceiptEditor layout.
+          Event/pizza buckets and underbosses get the plain photo-only
+          lightbox (editorPane stays null). */}
       <ReceiptLightbox
         isOpen={lightbox != null}
         images={activeLightboxImages}
         initialIndex={lightbox?.index ?? 0}
-        onClose={() => setLightbox(null)}
+        onClose={() => {
+          setLightbox(null);
+          setLightboxCurrentIndex(null);
+        }}
+        onIndexChange={setLightboxCurrentIndex}
+        editorPane={lightboxEditorPane}
+        onBeforeNavigate={
+          lightbox?.bucket === 'receipt' ? lightboxOnBeforeNavigate : undefined
+        }
+        onDuplicateShortcut={
+          lightbox?.bucket === 'receipt' && canEditReceipts
+            ? lightboxOnDuplicateShortcut
+            : undefined
+        }
       />
     </div>
   );
@@ -932,6 +1431,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
+  // pesto-92105: same gate the per-payout PayoutReviewModal applies for
+  // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
+  // the plain photo-only lightbox.
+  const canEditReceipts = viewerRole === 'admin';
 
   function toggleExpanded(partyId: string) {
     setExpanded((prev) => {
@@ -1158,6 +1661,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             onToggleSelect={onToggleSelect}
                             onRowClick={onRowClick}
                             busyRowId={busyRowId}
+                            canEditReceipts={canEditReceipts}
                           />
                         </div>
                       </td>
