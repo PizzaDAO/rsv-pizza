@@ -597,6 +597,11 @@ function serializePayout(row: any): any {
       originalAmount: d.originalAmount == null ? null : Number(d.originalAmount),
       originalCurrency: d.originalCurrency,
       exchangeRate: d.exchangeRate == null ? null : Number(d.exchangeRate),
+      // taralli-92104: surface the structured line items so the admin
+      // PayoutReviewModal can render the editable per-line grid. JSONB
+      // column — `null` when OCR didn't extract any items (older rows
+      // pre-formaggi-89172 or receipts the model couldn't parse).
+      ocrLineItems: Array.isArray(d.ocrLineItems) ? d.ocrLineItems : null,
       ocrError: d.ocrError,
       sortOrder: d.sortOrder,
       // pancetta-37195: per-doc uploader attribution. Live name from the
@@ -3974,13 +3979,34 @@ router.post(
 // when the model misread a receipt amount or currency.
 //
 // Auth: requireAnyAdminOrPaymentAdmin (admin / super_admin / payment_admin).
-// Body: { ocrAmount?: number | null, ocrCurrency?: string | null }
+// Body: {
+//   ocrAmount?: number | null,
+//   ocrCurrency?: string | null,
+//   // taralli-92104: structured line items the admin has manually edited
+//   // in the reviewer modal. The OCR extractor still seeds the initial
+//   // shape (formaggi-89172) but the admin's edits are authoritative —
+//   // we do NOT re-run OCR here. Pass `null` to clear, `undefined` to
+//   // leave untouched, or an array of { name, qty, unitPrice, subtotal,
+//   // category? } to replace.
+//   ocrLineItems?: Array<{
+//     name?: string,
+//     qty?: number,
+//     unitPrice?: number,
+//     subtotal?: number,
+//     category?: 'pizza'|'beverage'|'topping'|'side'|'dessert'|'tax'|'tip'|'fee'|'other'
+//   }> | null
+// }
 //   - null clears the field; undefined leaves it untouched.
 //   - ocrAmount must be finite (or null).
 //   - ocrCurrency must be a non-empty string ≤8 chars (or null).
+//   - ocrLineItems must be an array; each entry is sanitized (qty/price
+//     coerced to non-negative numbers, name to string, category to one
+//     of the OcrLineItemCategory values — invalid categories fall back
+//     to 'other').
 //
-// Audit: writes a payout_audit row with action='edit_amount' when the document
-// still has a parent payout. Skips audit when payoutId is null (orphaned
+// Audit: writes a payout_audit row with action='edit_amount' for amount/
+// currency changes, and a separate action='edit_documents' row when
+// ocrLineItems is touched. Skips audit when payoutId is null (orphaned
 // receipt — parent payout was deleted; nothing to audit against).
 // ============================================
 router.patch(
@@ -4006,10 +4032,90 @@ router.patch(
           originalCurrency: true,
           exchangeRate: true,
           ocrRaw: true,
+          // taralli-92104: pull the existing line items so the audit row
+          // can record old → new counts when the admin edits them.
+          ocrLineItems: true,
         },
       });
       if (!doc) {
         throw new AppError('Document not found', 404, 'NOT_FOUND');
+      }
+
+      // taralli-92104: sanitize an admin-supplied line item entry. Mirrors
+      // the OCR-side sanitization in `services/ocr.service.ts` so a saved
+      // edit is shape-compatible with the pizza-prices analytics consumer
+      // (which reads `category`, `qty`, `unitPrice`, `subtotal`, `name`).
+      // Defensive defaults: name → '' (empty allowed per task spec), qty/
+      // prices clamped to non-negative finite numbers, unknown categories
+      // collapse to 'other'.
+      const ALLOWED_LINE_ITEM_CATEGORIES = [
+        'pizza',
+        'beverage',
+        'topping',
+        'side',
+        'dessert',
+        'tax',
+        'tip',
+        'fee',
+        'other',
+      ] as const;
+      type SanitizedLineItem = {
+        name: string;
+        qty: number;
+        unitPrice: number;
+        subtotal: number;
+        category: (typeof ALLOWED_LINE_ITEM_CATEGORIES)[number];
+      };
+      function sanitizeLineItem(raw: unknown, idx: number): SanitizedLineItem {
+        if (!raw || typeof raw !== 'object') {
+          throw new AppError(
+            `ocrLineItems[${idx}] must be an object`,
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        const e = raw as Record<string, unknown>;
+        const name = typeof e.name === 'string' ? e.name.trim() : '';
+
+        const qtyNum = Number(e.qty);
+        if (!Number.isFinite(qtyNum) || qtyNum < 0) {
+          throw new AppError(
+            `ocrLineItems[${idx}].qty must be a non-negative finite number`,
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        const qty = qtyNum;
+
+        const unitNum = Number(e.unitPrice);
+        if (!Number.isFinite(unitNum) || unitNum < 0) {
+          throw new AppError(
+            `ocrLineItems[${idx}].unitPrice must be a non-negative finite number`,
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        const unitPrice = unitNum;
+
+        const subNum = Number(e.subtotal);
+        if (!Number.isFinite(subNum) || subNum < 0) {
+          throw new AppError(
+            `ocrLineItems[${idx}].subtotal must be a non-negative finite number`,
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        const subtotal = subNum;
+
+        const rawCategory = typeof e.category === 'string'
+          ? e.category.toLowerCase().trim()
+          : 'other';
+        const category: SanitizedLineItem['category'] =
+          (ALLOWED_LINE_ITEM_CATEGORIES as readonly string[]).includes(rawCategory)
+            ? (rawCategory as SanitizedLineItem['category'])
+            : 'other';
+
+        return { name, qty, unitPrice, subtotal, category };
       }
 
       const data: {
@@ -4018,6 +4124,7 @@ router.patch(
         originalAmount?: number | null;
         originalCurrency?: string | null;
         exchangeRate?: number | null;
+        ocrLineItems?: Prisma.InputJsonValue | typeof Prisma.DbNull;
       } = {};
 
       if (body.ocrAmount !== undefined) {
@@ -4049,6 +4156,37 @@ router.patch(
             );
           }
           data.ocrCurrency = c;
+        }
+      }
+
+      // taralli-92104: accept the admin's manually-edited line items. `null`
+      // clears the column (Prisma.DbNull writes a JSON null to the column);
+      // an array replaces the existing items wholesale (no merge — admin's
+      // edits in the modal are authoritative). Each entry is sanitized via
+      // `sanitizeLineItem` above. Hard cap at 200 entries so a malicious
+      // body can't blow up the row size.
+      if (body.ocrLineItems !== undefined) {
+        if (body.ocrLineItems === null) {
+          data.ocrLineItems = Prisma.DbNull;
+        } else {
+          if (!Array.isArray(body.ocrLineItems)) {
+            throw new AppError(
+              'ocrLineItems must be an array of line items or null',
+              400,
+              'VALIDATION_ERROR',
+            );
+          }
+          if (body.ocrLineItems.length > 200) {
+            throw new AppError(
+              'ocrLineItems may contain at most 200 entries',
+              400,
+              'VALIDATION_ERROR',
+            );
+          }
+          const sanitized: SanitizedLineItem[] = body.ocrLineItems.map(
+            (entry: unknown, idx: number) => sanitizeLineItem(entry, idx),
+          );
+          data.ocrLineItems = sanitized as unknown as Prisma.InputJsonValue;
         }
       }
 
@@ -4155,6 +4293,15 @@ router.patch(
       // audit against, since payout_audit.payout_id is NOT NULL with CASCADE.
       const oldAmount = doc.ocrAmount == null ? null : Number(doc.ocrAmount.toString());
       const oldCurrency = doc.ocrCurrency;
+      // taralli-92104: track whether the admin's edit changed the amount/
+      // currency fields vs only line items, so the audit row is recorded
+      // under the most accurate action (edit_amount vs edit_documents).
+      const amountOrCurrencyChanged =
+        data.ocrAmount !== undefined || data.ocrCurrency !== undefined;
+      const lineItemsChanged = data.ocrLineItems !== undefined;
+      const oldLineItemsCount = Array.isArray(doc.ocrLineItems)
+        ? (doc.ocrLineItems as unknown[]).length
+        : 0;
       const actor = await loadActor(req);
 
       const updated = await prisma.$transaction(async (tx) => {
@@ -4183,6 +4330,13 @@ router.patch(
               : data.exchangeRate === null
                 ? null
                 : (data.exchangeRate as any),
+            // taralli-92104: persist the admin's edited line items. The
+            // backend's POST /backfill-line-items + initial OCR extractor
+            // remain the seed paths; this PATCH is purely user-driven
+            // correction so we trust the sanitized payload.
+            ocrLineItems: data.ocrLineItems === undefined
+              ? undefined
+              : data.ocrLineItems,
           },
         });
 
@@ -4196,22 +4350,48 @@ router.patch(
           const newCurrency = data.ocrCurrency === undefined
             ? oldCurrency
             : data.ocrCurrency;
-          await tx.payoutAudit.create({
-            data: {
-              payoutId: doc.payoutId,
-              action: 'edit_amount',
-              actorEmail: actor.email,
-              actorKind: actor.actorKind,
-              note: JSON.stringify({
-                scope: 'receipt',
-                documentId: docId,
-                oldAmount,
-                newAmount,
-                oldCurrency,
-                newCurrency,
-              }),
-            },
-          });
+          if (amountOrCurrencyChanged) {
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: doc.payoutId,
+                action: 'edit_amount',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: JSON.stringify({
+                  scope: 'receipt',
+                  documentId: docId,
+                  oldAmount,
+                  newAmount,
+                  oldCurrency,
+                  newCurrency,
+                }),
+              },
+            });
+          }
+          // taralli-92104: separate audit row for line item edits so the
+          // forensics tools can attribute them distinctly from amount/
+          // currency tweaks. Action='edit_documents' is the existing enum
+          // value used for receipt-attached changes (PayoutAuditEntry type).
+          if (lineItemsChanged) {
+            const newLineItemsCount = Array.isArray(data.ocrLineItems)
+              ? (data.ocrLineItems as unknown[]).length
+              : 0;
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: doc.payoutId,
+                action: 'edit_documents',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: JSON.stringify({
+                  scope: 'receipt',
+                  documentId: docId,
+                  message: 'edited line items',
+                  oldLineItemsCount,
+                  newLineItemsCount,
+                }),
+              },
+            });
+          }
         }
 
         return row;
@@ -4234,6 +4414,9 @@ router.patch(
           originalAmount: updated.originalAmount == null ? null : Number(updated.originalAmount),
           originalCurrency: updated.originalCurrency,
           exchangeRate: updated.exchangeRate == null ? null : Number(updated.exchangeRate),
+          // taralli-92104: echo the persisted line items so the modal can
+          // sync its draft state to the canonical row without re-fetching.
+          ocrLineItems: Array.isArray(updated.ocrLineItems) ? updated.ocrLineItems : null,
           ocrError: updated.ocrError,
           sortOrder: updated.sortOrder,
           uploadedByUserId: updated.uploadedByUserId ?? null,
