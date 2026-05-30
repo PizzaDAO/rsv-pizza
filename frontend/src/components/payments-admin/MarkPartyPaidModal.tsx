@@ -7,11 +7,15 @@ import {
   markPartyPaid,
   type MarkPartyPaidPreviewResponse,
 } from '../../lib/api';
-import type { PayoutMethod } from '../../types';
 
 // provolone-92103: 'mark_pending_complete' replaces caciotta's
 // 'withdraw_pending' — the close-out terminal state is now `'completed'`
 // (city paid in full, this claim done) instead of `'withdrawn'` (claim invalid).
+//
+// The legacy 'mark_paid' close path (which created brand-new paid records) was
+// removed from this modal — closing a city always uses 'mark_pending_complete'
+// now. The union is kept for the onSuccess summary `mode` field the server can
+// still echo back for older payloads.
 type MarkPaidMode = 'mark_paid' | 'mark_pending_complete';
 
 /**
@@ -22,16 +26,6 @@ type MarkPaidMode = 'mark_paid' | 'mark_pending_complete';
 function stripGppPrefix(name: string): string {
   return name.replace(/^Global Pizza Party\s+/i, '');
 }
-
-type PaidMethodChoice = PayoutMethod | 'external' | 'unchanged';
-
-const METHOD_LABELS: Record<PaidMethodChoice, string> = {
-  unchanged: 'Leave method unchanged',
-  mercury_card: 'Mercury virtual card',
-  wire: 'Wire transfer',
-  usdc_base: 'USDC on Base',
-  external: 'External / off-platform',
-};
 
 interface MarkPartyPaidModalProps {
   partyId: string;
@@ -89,9 +83,9 @@ interface MarkPartyPaidModalProps {
  * mark paid" notice and disables the destructive button.
  *
  * The shared `note` is appended (with timestamp) to each row's `admin_notes`
- * and also written to the per-row payout_audit entry. Optional `paidMethod`
- * stamps on each payout's `payout_method` ONLY when currently null — existing
- * methods are preserved server-side.
+ * and also written to the per-row payout_audit entry. In-flight rows are always
+ * closed out as `completed` (provolone-92103) — the legacy "Mark all as paid"
+ * mode (new paid records + payout_method stamping) was removed from this modal.
  *
  * Reversible: each row can be flipped back via the existing PayoutReviewModal
  * "Revert to Pending" path (caprino-92103) — no confirm step here per project
@@ -110,10 +104,10 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [note, setNote] = useState<string>(() => `Marked paid in bulk on ${today}`);
-  const [method, setMethod] = useState<PaidMethodChoice>('unchanged');
   /**
-   * caciotta-92103: mode selector. `null` until the preview lands; then we
-   * default to the server's suggestedMode. Admin can override either way.
+   * Closing a city always uses 'mark_pending_complete' — the "Mark all as
+   * paid" path (new paid records) was removed. `null` until the preview lands
+   * so canSubmit gates on a loaded preview.
    */
   const [mode, setMode] = useState<MarkPaidMode | null>(null);
 
@@ -148,9 +142,9 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
       .then((res) => {
         if (cancelled) return;
         setPreview(res);
-        // caciotta-92103: default-select the server's recommendation. Admin
-        // can still override before submitting.
-        setMode(res.suggestedMode);
+        // Always close out via mark_pending_complete — the legacy "Mark all as
+        // paid" mode is no longer offered.
+        setMode('mark_pending_complete');
       })
       .catch((err) => {
         if (cancelled) return;
@@ -206,20 +200,13 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
       const trimmedNote = note.trim();
       const body: {
         note?: string;
-        paidMethod?: PayoutMethod | 'external';
         mode?: MarkPaidMode;
       } = {};
       if (trimmedNote) body.note = trimmedNote;
-      // payout_method is meaningful for mark_paid only; skip it for
-      // mark_pending_complete (provolone) and for close-out mode (pinsa)
-      // since neither path touches payout_method on existing rows.
-      if (!isCloseOutMode && mode === 'mark_paid' && method !== 'unchanged') {
-        body.paidMethod = method;
-      }
-      // caciotta-92103 + provolone-92103: send the resolved mode when there's
-      // something to act on. In close-out mode we leave it unset and let the
-      // server pick the pure close-out path.
-      if (!isCloseOutMode && mode) body.mode = mode;
+      // provolone-92103: in-flight rows are always closed out as completed.
+      // In close-out mode (no in-flight rows) we leave mode unset and let the
+      // server take the pure close-out path (stamp paymentsClosedAt only).
+      if (!isCloseOutMode) body.mode = 'mark_pending_complete';
       const res = await markPartyPaid(partyId, body);
       onSuccess({
         count: res.count,
@@ -389,54 +376,28 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             </div>
           )}
 
-          {/* caciotta-92103 + provolone-92103: mode selector — Mark all as
-              paid (legacy) vs Mark pending complete (new). Default-selected
-              radio mirrors the server's suggestedMode so the safe action is
-              one-click in the common "I already paid externally and recorded
-              it" case. */}
-          {preview && !previewLoading && count > 0 && mode !== null && (
-            <div>
-              <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
-                What should happen to these {count} payment{count === 1 ? '' : 's'}?
-              </div>
-              <div className="space-y-2">
-                {(['mark_paid', 'mark_pending_complete'] as MarkPaidMode[]).map((m) => {
-                  const active = mode === m;
-                  const isMarkPaid = m === 'mark_paid';
-                  const title = isMarkPaid
-                    ? 'Mark all as paid'
-                    : 'Mark pending complete (city fully paid)';
-                  const explanation = isMarkPaid
-                    ? `Creates ${count} new paid record${count === 1 ? '' : 's'} summing to $${totalUsd.toFixed(2)}. Use this if you actually paid out additionally.`
-                    : `Closes out ${count} pending claim${count === 1 ? '' : 's'} as completed without creating new paid records. The city is fully paid even if the org paid less than the requested amount.`;
-                  return (
-                    <label
-                      key={m}
-                      className={`flex items-start gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                        active
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="markPaidMode"
-                        value={m}
-                        checked={active}
-                        onChange={() => setMode(m)}
-                        className="mt-1"
-                      />
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm text-theme-text font-medium">
-                          {title}
-                        </span>
-                        <span className="block text-xs text-theme-text-muted mt-0.5">
-                          {explanation}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
+          {/* provolone-92103: closing a city always closes out its in-flight
+              claims as completed (no new paid records). The legacy "Mark all
+              as paid" option was removed — this panel just explains what the
+              one remaining action does. */}
+          {preview && !previewLoading && count > 0 && (
+            <div className="rounded-lg border border-teal-500/40 bg-teal-500/5 p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle2
+                  size={16}
+                  className="text-teal-400 mt-0.5 flex-shrink-0"
+                />
+                <div className="text-sm text-theme-text">
+                  <p>
+                    Closes out {count} pending claim{count === 1 ? '' : 's'} as
+                    completed without creating new paid records.
+                  </p>
+                  <p className="text-xs text-theme-text-muted mt-1">
+                    The city is marked fully paid even if the org paid less than
+                    the requested ${totalUsd.toFixed(2)}. Existing paid records
+                    stay unchanged.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -451,47 +412,6 @@ export const MarkPartyPaidModal: React.FC<MarkPartyPaidModalProps> = ({
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
           />
-
-          {/* Optional method override.
-              caciotta-92103 + provolone-92103: only meaningful for mark_paid;
-              mark_pending_complete never stamps payout_method.
-              pinsa-92103: hidden in close-out mode — there are no in-flight
-              rows for the method to stamp, so the choice is meaningless. */}
-          {!isCloseOutMode && mode === 'mark_paid' && (
-            <div>
-              <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
-                Payout method (optional)
-              </div>
-              <div className="space-y-1.5">
-                {(Object.keys(METHOD_LABELS) as PaidMethodChoice[]).map((k) => {
-                  const active = method === k;
-                  return (
-                    <label
-                      key={k}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                        active
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="paidMethod"
-                        value={k}
-                        checked={active}
-                        onChange={() => setMethod(k)}
-                      />
-                      <span className="text-sm text-theme-text">{METHOD_LABELS[k]}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-theme-text-muted mt-1">
-                Only stamps the method on payouts that don't already have one —
-                existing methods are preserved.
-              </p>
-            </div>
-          )}
 
           {submitError && (
             <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">

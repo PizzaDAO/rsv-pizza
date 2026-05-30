@@ -23,6 +23,7 @@ import {
   AlertCircle,
   StickyNote,
   ThumbsUp,
+  RotateCcw,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -53,6 +54,7 @@ import {
   sendTgReceiptsReminder,
   setCityAdminNotes,
   approveCity,
+  reopenParty,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -128,6 +130,13 @@ interface PayoutsByPartyTableProps {
    * paid, close out a fully-paid city, etc. Hidden for underbosses.
    */
   onMarkPartyPaid?: (partyId: string) => void;
+  /**
+   * Refresh hook called after a closed city is reopened. The table owns the
+   * `reopenParty` API call + busy spinner (mirrors the scam-flag pattern); the
+   * parent uses this to re-fetch the by-party feed (statuses + close pill
+   * change) and flash a toast. Admin-only via the viewerRole gate on the menu.
+   */
+  onReopened?: (partyId: string, reopenedCount: number) => void;
   /**
    * mostarda-92103: opens the Add External Payment modal pre-targeted at
    * this city. Hidden for underbosses (admins only).
@@ -291,16 +300,19 @@ function CityActionsMenu({
   onToggleScamFlag,
   onSendTgReminder,
   onApproveCity,
+  onReopen,
   canMarkPaid,
   canAddExternal,
   canSendPayment,
   canToggleScamFlag,
   canSendTgReminder,
   canApproveCity,
+  canReopen,
   markPaidLabel,
   isFlaggedScam,
   scamFlagBusy,
   tgReminderBusy,
+  reopenBusy,
   approveBusy,
   receiptsReminderSentAt,
   paymentsApprovedUsd,
@@ -319,16 +331,20 @@ function CityActionsMenu({
   onSendTgReminder?: () => void;
   /** Approve city payment amount. Called with the amount to approve. */
   onApproveCity?: (amountUsd: number | null) => void;
+  /** Reopen a closed city (undo the close). */
+  onReopen?: () => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
   canSendPayment: boolean;
   canToggleScamFlag: boolean;
   canSendTgReminder: boolean;
   canApproveCity: boolean;
+  canReopen: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
   tgReminderBusy: boolean;
+  reopenBusy: boolean;
   approveBusy: boolean;
   receiptsReminderSentAt?: string | null;
   paymentsApprovedUsd?: number | null;
@@ -345,7 +361,8 @@ function CityActionsMenu({
   // within the open menu actually fires. Resetting whenever the menu closes
   // prevents a stale confirm state carrying over to the next open.
   const [confirmTgReminder, setConfirmTgReminder] = useState(false);
-  const hasMenuItems = canAddExternal || canToggleScamFlag || canSendTgReminder;
+  const hasMenuItems =
+    canAddExternal || canToggleScamFlag || canSendTgReminder || canReopen;
   // Nothing to show at all — render nothing.
   if (!canMarkPaid && !canSendPayment && !canApproveCity && !hasMenuItems) {
     return null;
@@ -457,6 +474,29 @@ function CityActionsMenu({
                 className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-[#1a1a2e] shadow-xl py-1"
                 role="menu"
               >
+                {/* Reopen a city that was closed by mistake. Reverts the
+                    payouts the close flipped to completed + clears the close
+                    flag. Reversible (re-close) — no confirm. Listed first
+                    since it's the relevant action on a closed row. */}
+                {canReopen && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={reopenBusy}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onReopen?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {reopenBusy ? (
+                      <Loader2 size={14} className="animate-spin text-theme-text-muted" />
+                    ) : (
+                      <RotateCcw size={14} className="text-amber-400" />
+                    )}
+                    Reopen city
+                  </button>
+                )}
                 {canAddExternal && (
                   <button
                     type="button"
@@ -2161,6 +2201,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onExecute,
   onMarkPaid,
   onMarkPartyPaid,
+  onReopened,
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
@@ -2186,6 +2227,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const [tgReminderBusyPartyId, setTgReminderBusyPartyId] = useState<string | null>(null);
   // City-level approval busy spinner.
   const [approveBusyPartyId, setApproveBusyPartyId] = useState<string | null>(null);
+  // Per-row busy spinner for the Reopen city action.
+  const [reopenBusyPartyId, setReopenBusyPartyId] = useState<string | null>(null);
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
@@ -2201,6 +2244,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const canSendTgReminder = viewerRole === 'admin';
   // City-level approval is admin-only.
   const canApproveCity = viewerRole === 'admin';
+  // Reopen (undo a close) is admin-only — the endpoint enforces
+  // requireAnyAdminOrPaymentAdmin server-side; the per-row gate also requires
+  // the city to be closed (computed in the row render).
+  const canReopenCap = viewerRole === 'admin';
   // pesto-92105: same gate the per-payout PayoutReviewModal applies for
   // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
   // the plain photo-only lightbox.
@@ -2264,6 +2311,29 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
       );
     } finally {
       setScamBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
+   * Undo an accidental city close. Calls the reopen endpoint (clears the close
+   * flag + reverts the payouts the close flipped to `completed`) and asks the
+   * parent to refresh + toast. Reversible — no confirm step per project
+   * convention (feedback_reversible_actions_no_confirm). Errors surface via a
+   * minimal alert, matching the scam-flag path.
+   */
+  async function handleReopen(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    setReopenBusyPartyId(partyId);
+    try {
+      const { reopenedCount } = await reopenParty(partyId);
+      onReopened?.(partyId, reopenedCount);
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      window.alert(
+        `Could not reopen this city: ${(err as Error)?.message ?? 'unknown error'}`,
+      );
+    } finally {
+      setReopenBusyPartyId((id) => (id === partyId ? null : id));
     }
   }
 
@@ -2583,10 +2653,12 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canToggleScamFlag={canToggleScamFlag}
                           canSendTgReminder={canSendTgReminder}
                           canApproveCity={canApproveCity}
+                          canReopen={isClosed && canReopenCap}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
                           tgReminderBusy={tgReminderBusy}
+                          reopenBusy={reopenBusyPartyId === row.party.id}
                           approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
                           paymentsApprovedUsd={row.party.paymentsApprovedUsd}
@@ -2624,6 +2696,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onSendTgReminder={
                             canSendTgReminder
                               ? () => handleSendTgReminder(row)
+                              : undefined
+                          }
+                          onReopen={
+                            isClosed && canReopenCap
+                              ? () => handleReopen(row)
                               : undefined
                           }
                         />

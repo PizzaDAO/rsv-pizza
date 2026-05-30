@@ -1094,6 +1094,23 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 isSwcHub: isSwcHubParty(row?.party),
               });
             }}
+            // Undo an accidental close. The table owns the reopenParty call +
+            // busy spinner; we just refresh the feeds (statuses + close pill
+            // changed) and flash a toast.
+            onReopened={async (partyId, reopenedCount) => {
+              const row = byPartyRows.find((r) => r.party.id === partyId);
+              const name = (row?.party.name ?? 'City').replace(
+                /^Global Pizza Party\s+/i,
+                '',
+              );
+              pushToast(
+                reopenedCount > 0
+                  ? `Reopened ${name} — ${reopenedCount} payment${reopenedCount === 1 ? '' : 's'} restored to in-flight`
+                  : `Reopened ${name}`,
+                'success',
+              );
+              await Promise.all([refresh(), loadPrepayQueue()]);
+            }}
             // mostarda-92103: city-level "Add external payment" — opens the
             // ExternalPaymentModal with the city name seeded in the party
             // picker so the admin can confirm-and-go. Admin-only via the

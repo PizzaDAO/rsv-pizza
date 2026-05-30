@@ -4854,6 +4854,31 @@ export async function markPartyPaid(
 }
 
 /**
+ * Undo an accidental city close. Clears `payments_closed_at` and reverts the
+ * payouts the close flipped to `completed` back to their pre-close status
+ * (pending / approved / queued). Returns the cleared party + how many payouts
+ * were reverted. Throws 400 NOT_CLOSED if the city isn't currently closed.
+ */
+export interface ReopenPartyResponse {
+  party: { id: string; name: string; paymentsClosedAt: string | null };
+  reopenedCount: number;
+  payoutIds: string[];
+}
+
+export async function reopenParty(
+  partyId: string,
+  note?: string,
+): Promise<ReopenPartyResponse> {
+  return apiRequest<ReopenPartyResponse>(
+    `/api/admin/parties/${partyId}/reopen`,
+    {
+      method: 'POST',
+      body: note ? { note } : {},
+    },
+  );
+}
+
+/**
  * Execute an approved payout (PR 5). Body shape is method-specific:
  *   - usdc_base    → no body required; server sends via Privy server-wallet
  *   - wire         → { wireReference: string } REQUIRED

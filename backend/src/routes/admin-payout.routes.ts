@@ -6122,3 +6122,101 @@ partyMarkPaidRouter.post(
     }
   },
 );
+
+// ============================================
+// POST /api/admin/parties/:partyId/reopen
+//
+// Undo an accidental city close. Clears `payments_closed_at` and reverts the
+// payouts the close flipped to `completed` back to their pre-close status.
+//
+// The `mark_pending_complete` path of Mark Party Paid stamps the close
+// timestamp AND flips pending/approved/queued rows to `completed` in one
+// transaction, so a clean undo has to do both. We identify which rows the close
+// touched by their most-recent `new_status='completed'` audit landing at/after
+// `payments_closed_at`, and restore each to that audit's `old_status`. Rows
+// that became `completed` in an EARLIER action (before this close) are left
+// untouched — they weren't part of the mistake.
+//
+// A pure close-out (no in-flight rows, just a stamped timestamp) reverts
+// nothing — only the timestamp is cleared.
+//
+// Idempotent: 400 NOT_CLOSED if the city isn't currently closed.
+// ============================================
+partyMarkPaidRouter.post(
+  '/:partyId/reopen',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const actor = await loadActor(req);
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, name: true, paymentsClosedAt: true },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+      if (!party.paymentsClosedAt) {
+        throw new AppError('City is not closed', 400, 'NOT_CLOSED');
+      }
+      const closedAt = party.paymentsClosedAt;
+
+      const body = req.body || {};
+      const note =
+        typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
+
+      const reopenedIds: string[] = [];
+      await prisma.$transaction(async (tx) => {
+        const completed = await tx.payout.findMany({
+          where: { partyId, status: 'completed' },
+          select: { id: true },
+        });
+        for (const p of completed) {
+          // The transition INTO 'completed' carries the pre-close status in
+          // its old_status. Only undo rows the close itself flipped (audit
+          // at/after the close stamp); skip rows completed in an earlier pass.
+          const lastComplete = await tx.payoutAudit.findFirst({
+            where: { payoutId: p.id, newStatus: 'completed' },
+            orderBy: { createdAt: 'desc' },
+            select: { oldStatus: true, createdAt: true },
+          });
+          if (!lastComplete || lastComplete.createdAt < closedAt) continue;
+          const restoreTo = lastComplete.oldStatus || 'approved';
+          await tx.payout.update({
+            where: { id: p.id },
+            data: { status: restoreTo },
+          });
+          await tx.payoutAudit.create({
+            data: {
+              payoutId: p.id,
+              action: 'unmark_paid',
+              oldStatus: 'completed',
+              newStatus: restoreTo,
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: note
+                ? `Reopened city; ${note}`
+                : 'Reopened city — reverted completed close-out to pre-close status',
+            },
+          });
+          reopenedIds.push(p.id);
+        }
+
+        await tx.party.update({
+          where: { id: partyId },
+          data: { paymentsClosedAt: null },
+        });
+      });
+
+      res.json({
+        party: { id: party.id, name: party.name, paymentsClosedAt: null },
+        reopenedCount: reopenedIds.length,
+        payoutIds: reopenedIds,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
