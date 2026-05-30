@@ -1,7 +1,8 @@
 import React from 'react';
-import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Receipt } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
+import { CurrencyPicker } from './CurrencyPicker';
 import type { PayoutDocument, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 
 /**
@@ -19,7 +20,30 @@ import type { PayoutDocument, ReceiptLineItem, ReceiptLineItemCategory } from '.
  * data-grid) so the existing flow isn't regressed.
  */
 
-export type ReceiptDraft = { amount: string; currency: string };
+/**
+ * caprino-92104: per-receipt draft. The editor now exposes the receipt's
+ * original-currency amount + the currency picker (the inputs admins type
+ * into) plus a derived USD value that's recomputed server-side via FX on
+ * save. The deprecated single-`amount` field (USD-only) has been replaced
+ * by `originalAmount`; `manualUsdAmount` is an optional opt-in for the
+ * "FX rate unavailable — set USD manually" fallback path.
+ *
+ * The field name `originalAmount` here matches the server-side column
+ * name (`payout_documents.original_amount`).
+ */
+export type ReceiptDraft = {
+  /** Receipt's local-currency value (what's printed on the paper). */
+  originalAmount: string;
+  /** ISO 4217 code, uppercase. */
+  currency: string;
+  /**
+   * Optional manual USD value. Only set when the admin has opted into the
+   * "Set USD manually" fallback after an FX_RATE_UNAVAILABLE error — the
+   * default save path leaves this undefined and lets the backend derive USD
+   * from `originalAmount` + `currency`.
+   */
+  manualUsdAmount?: string;
+};
 export type LineItemDraft = {
   name: string;
   qty: string;
@@ -35,6 +59,11 @@ interface ReceiptEditorProps {
   onDraftChange: (next: ReceiptDraft) => void;
   saving: boolean;
   saveError?: string;
+  /**
+   * caprino-92104: backend error code surfaced from a failed save (e.g.
+   * `FX_RATE_UNAVAILABLE`). Drives the "Set USD manually" fallback toggle.
+   */
+  saveErrorCode?: string;
   onSave: () => void;
 
   /** Mark-duplicate state. */
@@ -80,6 +109,7 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   onDraftChange,
   saving,
   saveError,
+  saveErrorCode,
   onSave,
   isDuplicate,
   dupSaving,
@@ -106,6 +136,22 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   // matches what admins are typing into the per-line subtotals.
   const sumCurrency = doc.originalCurrency ?? doc.ocrCurrency ?? 'USD';
 
+  // caprino-92104: legacy-row hint. When the receipt has no persisted
+  // `originalAmount` column (pre-mortadella row that's never been edited via
+  // the new editor), we surface a small note telling the admin the seeded
+  // value comes from `ocrAmount` — they should sanity-check before saving in
+  // case the OCR'd value was actually USD-converted.
+  const isLegacyRow = doc.originalAmount == null;
+  // Hide the rate line when the receipt is already USD (rate=1 is noise).
+  const rateAvailable =
+    doc.exchangeRate != null
+    && doc.exchangeRate !== 1
+    && doc.originalCurrency
+    && doc.originalCurrency !== 'USD'
+    && doc.ocrAmount != null;
+  const fxRateUnavailable = saveErrorCode === 'FX_RATE_UNAVAILABLE';
+  const manualUsdMode = draft.manualUsdAmount !== undefined;
+
   return (
     <div className="p-4 space-y-4 text-theme-text">
       {/* Header */}
@@ -130,44 +176,111 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
         )}
       </div>
 
-      {/* Amount + currency */}
-      <div className="space-y-2">
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2">
-          <IconInput
-            icon={DollarSign}
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Amount"
-            value={draft.amount}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              onDraftChange({ ...draft, amount: e.target.value })
-            }
-          />
-          {/*
-            Currency is short (3-letter ISO usually). IconInput's full-width
-            layout would crowd the row, so a compact uppercase input cell
-            keeps the field reasonable — same precedent as the per-row
-            data-grid currency input in PayoutReviewModal. */}
-          <input
-            type="text"
-            maxLength={8}
-            value={draft.currency}
-            placeholder={doc.ocrCurrency || 'CUR'}
-            onChange={(e) => onDraftChange({ ...draft, currency: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border border-theme-stroke bg-theme-surface text-theme-text text-sm uppercase"
-          />
+      {/* caprino-92104: Amount + currency split into two visible rows.
+          Top row = "Original amount" (the local-currency value the admin
+          types) + the searchable currency picker. Bottom row = derived USD
+          value, read-only display unless the admin opts into "Set USD
+          manually" after an FX_RATE_UNAVAILABLE error.
+
+          Save sends both `originalAmount` + `ocrCurrency` together; backend
+          re-runs convertToUSD and persists the recomputed ocr_amount +
+          exchange_rate. */}
+      <div className="space-y-3">
+        {/* Original amount row */}
+        <div className="space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2 items-start">
+            <IconInput
+              icon={Receipt}
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              placeholder="Original amount (as printed)"
+              value={draft.originalAmount}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onDraftChange({ ...draft, originalAmount: e.target.value })
+              }
+            />
+            <CurrencyPicker
+              value={draft.currency}
+              onChange={(code) => onDraftChange({ ...draft, currency: code })}
+              disabled={saving}
+            />
+          </div>
+          <p className="text-xs text-white/40">
+            The receipt's local-currency total. USD is derived via FX on save.
+          </p>
+          {isLegacyRow && !manualUsdMode && (
+            <p className="text-xs text-amber-400">
+              Legacy receipt — original amount inferred from stored value. Verify before saving.
+            </p>
+          )}
         </div>
-        <p className="text-xs text-white/40">
-          Amount is the USD-converted total stored on this receipt. Changing the
-          currency re-runs FX automatically against the receipt's original
-          amount on save.
-        </p>
+
+        {/* USD value (derived, read-only) — or manual-USD mode after FX failure */}
+        {!manualUsdMode ? (
+          <div className="space-y-1">
+            <div className="px-3 py-2 rounded-lg border border-theme-stroke bg-theme-bg text-theme-text text-sm flex items-baseline gap-2">
+              <DollarSign size={14} className="text-theme-text-muted self-center" />
+              <span className="font-medium">
+                {doc.ocrAmount == null ? '—' : doc.ocrAmount.toFixed(2)}
+              </span>
+              {rateAvailable && (
+                <span className="text-xs text-theme-text-muted">
+                  at rate 1 {doc.originalCurrency} = ${(doc.exchangeRate ?? 0).toFixed(4)}
+                </span>
+              )}
+              <span className="ml-auto text-xs text-white/40">USD (auto)</span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-amber-400">
+              Set USD manually — FX rate unavailable for {draft.currency || 'this currency'}.
+            </p>
+            <IconInput
+              icon={DollarSign}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="USD value"
+              value={draft.manualUsdAmount ?? ''}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onDraftChange({ ...draft, manualUsdAmount: e.target.value })
+              }
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const { manualUsdAmount: _, ...rest } = draft;
+                onDraftChange(rest);
+              }}
+              className="text-xs text-theme-text-muted underline hover:text-theme-text"
+            >
+              Cancel manual USD — try FX again
+            </button>
+          </div>
+        )}
+
         {saveError && (
           <div className="text-xs text-red-300 flex items-start gap-1.5">
             <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
             <span>{saveError}</span>
           </div>
+        )}
+        {fxRateUnavailable && !manualUsdMode && (
+          <button
+            type="button"
+            onClick={() =>
+              onDraftChange({
+                ...draft,
+                manualUsdAmount: doc.ocrAmount == null ? '' : String(doc.ocrAmount),
+              })
+            }
+            className="text-xs text-amber-400 underline hover:text-amber-300"
+          >
+            Set USD manually instead
+          </button>
         )}
       </div>
 

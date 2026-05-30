@@ -350,12 +350,20 @@ function CityExpansion({
     ocrCurrency: string | null;
     ocrLineItems?: ReceiptLineItem[] | null;
     isDuplicate?: boolean;
+    // caprino-92104: persist the FX recompute details so the lightbox
+    // editor's "USD value @ rate" line refreshes immediately on save.
+    originalAmount?: number | null;
+    originalCurrency?: string | null;
+    exchangeRate?: number | null;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Amount/currency drafts (string-typed so admins can type freely).
   const [receiptDrafts, setReceiptDrafts] = useState<Record<string, ReceiptDraft>>({});
   const [receiptSavingId, setReceiptSavingId] = useState<string | null>(null);
   const [receiptSaveErrors, setReceiptSaveErrors] = useState<Record<string, string>>({});
+  // caprino-92104: per-row backend error code (e.g. FX_RATE_UNAVAILABLE) so
+  // the editor can render the "Set USD manually" fallback toggle.
+  const [receiptSaveErrorCodes, setReceiptSaveErrorCodes] = useState<Record<string, string>>({});
   // Mark-duplicate state.
   const [duplicateSavingId, setDuplicateSavingId] = useState<string | null>(null);
   const [duplicateSaveErrors, setDuplicateSaveErrors] = useState<Record<string, string>>({});
@@ -389,6 +397,14 @@ function CityExpansion({
             ov.ocrLineItems !== undefined ? ov.ocrLineItems : e.doc.ocrLineItems,
           isDuplicate:
             ov.isDuplicate !== undefined ? ov.isDuplicate : e.doc.isDuplicate,
+          // caprino-92104: layer the FX recompute fields so the lightbox
+          // editor's "USD value @ rate" row refreshes without a refetch.
+          originalAmount:
+            ov.originalAmount !== undefined ? ov.originalAmount : e.doc.originalAmount,
+          originalCurrency:
+            ov.originalCurrency !== undefined ? ov.originalCurrency : e.doc.originalCurrency,
+          exchangeRate:
+            ov.exchangeRate !== undefined ? ov.exchangeRate : e.doc.exchangeRate,
         },
       };
     });
@@ -555,19 +571,23 @@ function CityExpansion({
       delete next[docId];
       return next;
     });
+    setReceiptSaveErrorCodes((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
     try {
-      const trimmedAmt = draft.amount.trim();
+      // caprino-92104: send originalAmount + ocrCurrency; backend re-runs FX
+      // and returns the canonical USD value + exchange rate. Manual-USD mode
+      // bypasses FX and sends ocrAmount + ocrCurrency verbatim.
+      const trimmedOrig = draft.originalAmount.trim();
       const trimmedCur = draft.currency.trim();
-      const patch: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
-      if (trimmedAmt === '') {
-        patch.ocrAmount = null;
-      } else {
-        const n = Number(trimmedAmt);
-        if (!Number.isFinite(n) || n < 0) {
-          throw new Error('Amount must be a non-negative number');
-        }
-        patch.ocrAmount = n;
-      }
+      const patch: {
+        ocrAmount?: number | null;
+        ocrCurrency?: string | null;
+        originalAmount?: number | null;
+      } = {};
+
       if (trimmedCur === '') {
         patch.ocrCurrency = null;
       } else if (trimmedCur.length > 8) {
@@ -575,6 +595,37 @@ function CityExpansion({
       } else {
         patch.ocrCurrency = trimmedCur.toUpperCase();
       }
+
+      if (draft.manualUsdAmount !== undefined) {
+        const trimmedUsd = draft.manualUsdAmount.trim();
+        if (trimmedUsd === '') {
+          patch.ocrAmount = null;
+        } else {
+          const n = Number(trimmedUsd);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new Error('USD value must be a non-negative number');
+          }
+          patch.ocrAmount = n;
+        }
+        if (trimmedOrig !== '') {
+          const n = Number(trimmedOrig);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new Error('Original amount must be a non-negative number');
+          }
+          patch.originalAmount = n;
+        }
+      } else {
+        if (trimmedOrig === '') {
+          patch.originalAmount = null;
+        } else {
+          const n = Number(trimmedOrig);
+          if (!Number.isFinite(n) || n <= 0) {
+            throw new Error('Original amount must be a positive number');
+          }
+          patch.originalAmount = n;
+        }
+      }
+
       const updated = await updatePayoutDocument(docId, patch);
       setReceiptOverrides((m) => ({
         ...m,
@@ -583,12 +634,17 @@ function CityExpansion({
           ocrCurrency: updated.ocrCurrency,
           ocrLineItems: updated.ocrLineItems,
           isDuplicate: updated.isDuplicate,
+          originalAmount: updated.originalAmount,
+          originalCurrency: updated.originalCurrency,
+          exchangeRate: updated.exchangeRate,
         },
       }));
       setReceiptDrafts((m) => ({
         ...m,
         [docId]: {
-          amount: updated.ocrAmount == null ? '' : String(updated.ocrAmount),
+          originalAmount: updated.originalAmount == null
+            ? ''
+            : String(updated.originalAmount),
           currency: updated.ocrCurrency ?? '',
         },
       }));
@@ -597,6 +653,10 @@ function CityExpansion({
         ...m,
         [docId]: err?.message || 'Failed to save',
       }));
+      const code = (err && typeof err.code === 'string') ? err.code : '';
+      if (code) {
+        setReceiptSaveErrorCodes((m) => ({ ...m, [docId]: code }));
+      }
     } finally {
       setReceiptSavingId(null);
     }
@@ -691,12 +751,14 @@ function CityExpansion({
       const n = Number(d.subtotal);
       if (Number.isFinite(n) && n >= 0) sum += n;
     }
+    // caprino-92104: line items are in the receipt's ORIGINAL currency, so
+    // the line sum maps to the originalAmount draft, not USD.
     setReceiptDrafts((m) => {
       const prev = m[docId];
       return {
         ...m,
         [docId]: {
-          amount: sum.toFixed(2),
+          originalAmount: sum.toFixed(2),
           currency: prev?.currency ?? '',
         },
       };
@@ -790,9 +852,20 @@ function CityExpansion({
     if (!r) return false;
     const draft = receiptDrafts[docId];
     if (draft) {
-      const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
-      const persistedCur = r.ocrCurrency ?? '';
-      if (draft.amount !== persistedAmt || draft.currency !== persistedCur) {
+      // caprino-92104: compare against the seed (originalAmount column,
+      // falling back to ocrAmount for legacy rows) and originalCurrency.
+      const seededOriginal =
+        r.originalAmount != null
+          ? String(r.originalAmount)
+          : r.ocrAmount != null
+            ? String(r.ocrAmount)
+            : '';
+      const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+      if (
+        draft.originalAmount !== seededOriginal
+        || draft.currency !== seededCurrency
+        || draft.manualUsdAmount !== undefined
+      ) {
         return true;
       }
     }
@@ -838,14 +911,24 @@ function CityExpansion({
     if (lightbox?.bucket !== 'receipt') return null;
     if (!lightboxReceipt) return null;
     const r = lightboxReceipt;
+    // caprino-92104: seed from the canonical persisted shape — prefer the
+    // `originalAmount` column, fall back to `ocrAmount` for legacy rows
+    // (matches the backend's legacy fallback for FX recompute).
+    const seededOriginal =
+      r.originalAmount != null
+        ? String(r.originalAmount)
+        : r.ocrAmount != null
+          ? String(r.ocrAmount)
+          : '';
+    const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
     const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
-      amount: r.ocrAmount == null ? '' : String(r.ocrAmount),
-      currency: r.ocrCurrency ?? '',
+      originalAmount: seededOriginal,
+      currency: seededCurrency,
     };
-    const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
-    const persistedCur = r.ocrCurrency ?? '';
     const isDirty =
-      draft.amount !== persistedAmt || draft.currency !== persistedCur;
+      draft.originalAmount !== seededOriginal
+      || draft.currency !== seededCurrency
+      || draft.manualUsdAmount !== undefined;
     const liDraftsExisting = lineItemDrafts[r.id];
     const liDrafts =
       liDraftsExisting ?? (r.ocrLineItems ?? []).map(lineItemToDraft);
@@ -861,6 +944,7 @@ function CityExpansion({
         }
         saving={receiptSavingId === r.id}
         saveError={receiptSaveErrors[r.id]}
+        saveErrorCode={receiptSaveErrorCodes[r.id]}
         onSave={() => saveReceiptEdit(r.id)}
         isDirty={isDirty}
         isDuplicate={r.isDuplicate === true}
@@ -915,6 +999,7 @@ function CityExpansion({
     receiptDrafts,
     receiptSavingId,
     receiptSaveErrors,
+    receiptSaveErrorCodes,
     duplicateSavingId,
     duplicateSaveErrors,
     lineItemDrafts,
