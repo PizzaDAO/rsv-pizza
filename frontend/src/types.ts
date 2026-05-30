@@ -267,6 +267,7 @@ export interface Party {
   showToppingsOnRsvp?: boolean;
   maxGuests: number | null;
   expectedGuests?: number | null;
+  estimatedAttendance?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;
@@ -1053,6 +1054,7 @@ export interface AutoCompleteStates {
   team_built?: boolean;
   pizzerias_selected?: boolean;
   underboss_reviewed?: boolean;
+  attendance_estimated?: boolean;
 }
 
 export interface ChecklistData {
