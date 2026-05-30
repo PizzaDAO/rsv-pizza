@@ -7,8 +7,9 @@ import {
   Paperclip,
   Flag,
   CheckCircle2,
-  MoreHorizontal,
+  MoreVertical,
   Coins,
+  DollarSign,
   XCircle,
   Plus,
   Send,
@@ -231,7 +232,23 @@ function collectReceipts(payouts: AdminPayout[]): Array<{
   return out;
 }
 
-/** City-row action menu — Mark paid/closed + Add external payment + scam flag. */
+/**
+ * City-row action cluster — gnocchi-92105 restructure.
+ *
+ * Before: a single "[⋯ Actions]" dropdown holding all four city-level
+ * actions (Mark paid · Add external · Flag scam · Send payment).
+ *
+ * After: the two most-used actions get promoted to inline buttons sitting
+ * next to a much smaller "⋮" three-dots icon menu that holds only the
+ * secondary record/flag actions:
+ *
+ *   [$ Mark paid] [💸 Send payment] [⋮]                                  →
+ *                                       Add external payment
+ *                                       Flag / Unflag possible scam
+ *
+ * All four handler props stay intact — we just slot them across two
+ * surfaces (inline buttons + dropdown) instead of one.
+ */
 function CityActionsMenu({
   onMarkPartyPaid,
   onAddExternalPayment,
@@ -257,114 +274,125 @@ function CityActionsMenu({
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  // No actions to show? Render nothing.
-  if (
-    !canMarkPaid &&
-    !canAddExternal &&
-    !canSendPayment &&
-    !canToggleScamFlag
-  ) {
+  // Hooks-above-early-returns: declare useState before the no-actions guard
+  // so the conditional return can't reorder hooks on a re-render where the
+  // capability props flip. (feedback_hooks_above_early_returns)
+  const [menuOpen, setMenuOpen] = useState(false);
+  const hasMenuItems = canAddExternal || canToggleScamFlag;
+  // Nothing to show at all — render nothing.
+  if (!canMarkPaid && !canSendPayment && !hasMenuItems) {
     return null;
   }
 
   return (
-    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-theme-stroke text-theme-text-secondary hover:bg-theme-surface-hover text-xs font-medium"
-        title="City actions"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <MoreHorizontal size={14} />
-        Actions
-      </button>
-      {open && (
-        <>
-          {/* click-out overlay */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-1"
-            role="menu"
+    <div
+      className="inline-flex items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Primary: Mark city paid (or Close city, depending on label). Same
+          handler as before; lifted out of the dropdown into a green button
+          per gnocchi-92105 so the most-used action is one click away. */}
+      {canMarkPaid && (
+        <button
+          type="button"
+          onClick={onMarkPartyPaid}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
+          title={markPaidLabel}
+        >
+          <DollarSign size={12} />
+          {markPaidLabel}
+        </button>
+      )}
+      {/* Secondary: Send payment — actively sends via Privy / wire / Mercury.
+          Same handler as the old menu item; pulled out to a secondary
+          (outline) button so it sits next to Mark paid. */}
+      {canSendPayment && (
+        <button
+          type="button"
+          onClick={onSendPayment}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-500/60 text-emerald-500 hover:bg-emerald-500/10 text-xs font-medium"
+          title="Send payment"
+        >
+          <Send size={12} />
+          Send payment
+        </button>
+      )}
+      {/* "⋮" three-dots — icon only, no "Actions" text. Holds the two
+          remaining secondary actions: Add external (record an off-platform
+          payment) and Flag/Unflag possible scam. Hidden entirely when
+          neither is available. */}
+      {hasMenuItems && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-theme-stroke text-theme-text-secondary hover:bg-theme-surface-hover"
+            title="More actions"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
-            {canMarkPaid && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onMarkPartyPaid?.();
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2"
+            <MoreVertical size={14} />
+          </button>
+          {menuOpen && (
+            <>
+              {/* click-out overlay */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div
+                className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-1"
+                role="menu"
               >
-                <Coins size={14} className="text-emerald-500" />
-                {markPaidLabel}
-              </button>
-            )}
-            {canAddExternal && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onAddExternalPayment?.();
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2"
-              >
-                <Plus size={14} className="text-sky-500" />
-                Add external payment
-              </button>
-            )}
-            {/* salame-92106: actively SEND a payment from rsv.pizza's
-                infrastructure (USDC / wire / mercury) — distinct from the two
-                items above which only RECORD payments that happened elsewhere.
-                Slotted between Add-external and Flag-scam so the destructive-
-                action ordering stays: send → record → flag. */}
-            {canSendPayment && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onSendPayment?.();
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2"
-              >
-                <Send size={14} className="text-emerald-500" />
-                Send payment
-              </button>
-            )}
-            {/* bottarga-92104: flip the `possible-scam` tag on/off. Reversible
-                action — no confirm modal (feedback_reversible_actions_no_confirm).
-                Label flips with the current tag state. */}
-            {canToggleScamFlag && (
-              <button
-                type="button"
-                role="menuitem"
-                disabled={scamFlagBusy}
-                onClick={() => {
-                  setOpen(false);
-                  onToggleScamFlag?.();
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
-              >
-                {scamFlagBusy ? (
-                  <Loader2 size={14} className="animate-spin text-theme-text-muted" />
-                ) : isFlaggedScam ? (
-                  <CheckCircle2 size={14} className="text-emerald-500" />
-                ) : (
-                  <AlertTriangle size={14} className="text-red-500" />
+                {canAddExternal && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onAddExternalPayment?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2"
+                  >
+                    <Plus size={14} className="text-sky-500" />
+                    Add external payment
+                  </button>
                 )}
-                {isFlaggedScam ? 'Unflag possible scam' : 'Flag as possible scam'}
-              </button>
-            )}
-          </div>
-        </>
+                {/* bottarga-92104: flip the `possible-scam` tag on/off.
+                    Reversible — no confirm modal
+                    (feedback_reversible_actions_no_confirm). Label flips
+                    with the current tag state. */}
+                {canToggleScamFlag && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={scamFlagBusy}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleScamFlag?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {scamFlagBusy ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-theme-text-muted"
+                      />
+                    ) : isFlaggedScam ? (
+                      <CheckCircle2 size={14} className="text-emerald-500" />
+                    ) : (
+                      <AlertTriangle size={14} className="text-red-500" />
+                    )}
+                    {isFlaggedScam
+                      ? 'Unflag possible scam'
+                      : 'Flag as possible scam'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

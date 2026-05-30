@@ -228,6 +228,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         partyId: string;
         partyName: string;
         outstandingUsd: number;
+        // gnocchi-92105: sum of non-duplicate receipt OCR USD across the
+        // party's payouts. Drives the new "receipts - paid" default amount
+        // in SendPaymentModal (no cap clamp).
+        receiptsTotalUsd: number;
         country: string | null;
         eventTags: string[];
         effectiveReimbursementCapUsd: number | null;
@@ -1050,10 +1054,23 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               const paidSumUsd =
                 row.aggregates.paidUsd + (row.aggregates.completedUsd ?? 0);
               const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
+              // gnocchi-92105: tally non-duplicate receipt OCR USD across
+              // every payout on the party. Matches the coppa-92105 dedup
+              // semantics used by the by-city Receipt total cell so the
+              // modal default lines up with what the admin sees in the row.
+              let receiptsTotalUsd = 0;
+              for (const p of row.payouts) {
+                for (const d of p.documents || []) {
+                  if (d.kind !== 'receipt') continue;
+                  if (d.isDuplicate === true) continue;
+                  receiptsTotalUsd += Number(d.ocrAmount) || 0;
+                }
+              }
               setSendPaymentTarget({
                 partyId: row.party.id,
                 partyName: row.party.name,
                 outstandingUsd,
+                receiptsTotalUsd,
                 country: row.party.country,
                 eventTags: row.party.eventTags ?? [],
                 effectiveReimbursementCapUsd: row.party.effectiveReimbursementCapUsd,
@@ -1432,6 +1449,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             partyId={sendPaymentTarget.partyId}
             partyName={sendPaymentTarget.partyName}
             outstandingUsd={sendPaymentTarget.outstandingUsd}
+            receiptsTotalUsd={sendPaymentTarget.receiptsTotalUsd}
             country={sendPaymentTarget.country}
             eventTags={sendPaymentTarget.eventTags}
             effectiveReimbursementCapUsd={

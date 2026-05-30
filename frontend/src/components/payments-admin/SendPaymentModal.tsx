@@ -51,8 +51,20 @@ const PER_SUBMISSION_MAX_USD = 675;
 interface SendPaymentModalProps {
   partyId: string;
   partyName: string;
-  /** Outstanding total (Approved + Paid - Paid) — defaults the amount field. */
+  /**
+   * Outstanding total (Approved - Paid). Kept for the helper-text display
+   * under the amount field, but no longer drives the default amount —
+   * gnocchi-92105 switched the pre-fill to receipts_total - paid_total so
+   * the admin sees "what the city actually spent minus what we've paid"
+   * rather than "what host claims add up to minus what's been paid."
+   */
   outstandingUsd: number;
+  /**
+   * gnocchi-92105: sum of non-duplicate receipt OCR USD values across the
+   * party's payouts. Together with `paidTotalUsd` this drives the default
+   * amount = max(0, receiptsTotal - paidTotal). No cap clamp.
+   */
+  receiptsTotalUsd: number;
   /** Optional — when present, drives the per-party cap warning + Mercury gate. */
   country: string | null;
   /** Optional — drives SWC-Hub warning via isSwcHubParty (country/tags). */
@@ -81,6 +93,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   partyId,
   partyName,
   outstandingUsd,
+  receiptsTotalUsd,
   country,
   eventTags,
   effectiveReimbursementCapUsd,
@@ -152,13 +165,16 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
     setRecipientUserId(next);
   }, [partyMeta, primaryHostUserId, recipientUserId]);
 
-  // Amount — defaults to Outstanding, clamped to per-submission max so the
-  // pre-filled value is never instantly invalid.
+  // gnocchi-92105: amount default is now receipts_total - paid_total —
+  // straight subtraction, NOT clamped by cap and NOT clamped by Outstanding.
+  // If negative (overpaid), defaults to $0. The per-submission ceiling is
+  // still enforced downstream via `exceedsPerSubmission`; we don't pre-clamp
+  // here because Snax wanted the raw subtraction visible.
   const defaultAmount = useMemo(() => {
-    const raw = outstandingUsd > 0 ? outstandingUsd : 0;
-    const clamped = Math.min(raw, PER_SUBMISSION_MAX_USD);
+    const raw = receiptsTotalUsd - paidTotalUsd;
+    const clamped = Math.max(0, raw);
     return clamped > 0 ? clamped.toFixed(2) : '';
-  }, [outstandingUsd]);
+  }, [receiptsTotalUsd, paidTotalUsd]);
   const [amountStr, setAmountStr] = useState(defaultAmount);
 
   const [method, setMethod] = useState<Method>('usdc_base');
@@ -453,8 +469,14 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
               required
             />
             <p className="text-xs text-theme-text-muted mt-1">
-              Defaults to outstanding (${outstandingUsd.toFixed(2)}). Edit
-              if you&apos;re sending a partial amount.
+              {/* gnocchi-92105: pre-fill = receipts - paid (no cap clamp).
+                  Outstanding is shown for context but isn't the default any
+                  more — Snax wanted the raw subtraction so admins can spot
+                  receipts that haven't been paid out yet. */}
+              Defaults to receipts − paid ($
+              {Math.max(0, receiptsTotalUsd - paidTotalUsd).toFixed(2)}).
+              Outstanding (Approved − Paid) for this city is $
+              {outstandingUsd.toFixed(2)}.
             </p>
             {exceedsPerSubmission && (
               <p className="text-xs text-red-500 mt-1">
