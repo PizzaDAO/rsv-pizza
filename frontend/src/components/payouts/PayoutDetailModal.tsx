@@ -10,6 +10,7 @@ import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
 import { ReceiptLightbox } from '../payments-shared';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 interface PayoutDetailModalProps {
   partyId: string;
@@ -479,7 +480,10 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                     {viewReceipts.map((d, idx) => (
                       <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
                         {/* bresaola-89172: thumbnail opens the shared lightbox
-                            instead of popping the raw URL in a new tab. */}
+                            instead of popping the raw URL in a new tab.
+                            bocconcino-92104: PDFs render via their sibling
+                            `.thumb.png` derived by convention from the
+                            canonical URL. */}
                         <button
                           type="button"
                           onClick={() => setLightboxState({ open: true, initialIndex: receiptsLightboxOffset + idx })}
@@ -487,7 +491,11 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                           aria-label={`Open ${d.fileName}`}
                           title={d.fileName}
                         >
-                          <img src={d.url} alt={d.fileName} className="w-14 h-14 object-cover block" />
+                          <img
+                            src={isPdfFile(d) ? derivePdfThumbnailUrl(d.url) : d.url}
+                            alt={d.fileName}
+                            className="w-14 h-14 object-cover block"
+                          />
                         </button>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-theme-text truncate">{d.fileName}</p>
@@ -627,7 +635,14 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                       return (
                         <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
                           <a href={d.url} target="_blank" rel="noreferrer" className="flex-shrink-0">
-                            <img src={d.url} alt="" className="w-14 h-14 rounded object-cover" />
+                            {/* bocconcino-92104: PDF receipts render via the
+                                derived `.thumb.png` sibling — PDFs don't load
+                                in <img>. */}
+                            <img
+                              src={isPdfFile(d) ? derivePdfThumbnailUrl(d.url) : d.url}
+                              alt=""
+                              className="w-14 h-14 rounded object-cover"
+                            />
                           </a>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-theme-text truncate">{d.fileName}</p>

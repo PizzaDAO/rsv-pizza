@@ -5,6 +5,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { updatePartyApi, updatePayoutDocument } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal } from '../../types';
 import {
   PayoutStatusPill,
@@ -777,7 +778,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         </div>
                       </>
                     ) : (
-                      <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                      /* bocconcino-92104: PDF receipts thumbnail off their
+                          sibling `.thumb.png` (rendered client-side at upload).
+                          Image receipts render via the canonical URL. */
+                      <img
+                        src={isPdfFile(doc) ? derivePdfThumbnailUrl(doc.url) : doc.url}
+                        alt={doc.fileName}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     )}
                     <span
                       className={`absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
