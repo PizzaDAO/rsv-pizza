@@ -127,6 +127,10 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   adminNotes: true,
   // Track when the TG receipts reminder was last sent for this city.
   receiptsReminderSentAt: true,
+  // City-level payment approval fields.
+  paymentsApprovedUsd: true,
+  paymentsApprovedAt: true,
+  paymentsApprovedBy: true,
   _count: {
     select: {
       guests: {
@@ -1830,6 +1834,13 @@ router.get(
             // When the TG receipts reminder was last sent.
             receiptsReminderSentAt: b.partyMeta.receiptsReminderSentAt
               ? b.partyMeta.receiptsReminderSentAt.toISOString()
+              : null,
+            // City-level payment approval.
+            paymentsApprovedUsd: b.partyMeta.paymentsApprovedUsd
+              ? Number(b.partyMeta.paymentsApprovedUsd)
+              : null,
+            paymentsApprovedAt: b.partyMeta.paymentsApprovedAt
+              ? b.partyMeta.paymentsApprovedAt.toISOString()
               : null,
           },
           aggregates: {
@@ -5431,6 +5442,82 @@ router.post(
         ...(hostDmReason ? { hostDmReason } : {}),
         groupSent,
         ...(groupReason ? { groupReason } : {}),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
+// City-level payment approval. Admin can approve a total amount for the party
+// before sending payment. Shows as a thumbs-up button to the left of Send.
+// ============================================
+
+/**
+ * POST /api/admin/payouts/:partyId/approve-city
+ *
+ * Body: { amountUsd: number } — the approved total for this city.
+ *       Send amountUsd: null to clear the approval.
+ *
+ * Records who approved and when. The frontend shows a filled thumbs-up icon
+ * when approved and includes the approved amount in the Send Payment modal.
+ */
+router.post(
+  '/:partyId/approve-city',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const { amountUsd } = req.body ?? {};
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, name: true },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      // Clear approval when amountUsd is null/undefined.
+      const clearing = amountUsd == null;
+      const updated = await prisma.party.update({
+        where: { id: partyId },
+        data: clearing
+          ? {
+              paymentsApprovedUsd: null,
+              paymentsApprovedAt: null,
+              paymentsApprovedBy: null,
+            }
+          : {
+              paymentsApprovedUsd: Number(amountUsd),
+              paymentsApprovedAt: new Date(),
+              paymentsApprovedBy: req.userId,
+            },
+        select: {
+          id: true,
+          name: true,
+          paymentsApprovedUsd: true,
+          paymentsApprovedAt: true,
+        },
+      });
+
+      console.log(
+        `[approve-city] party=${party.id} name="${party.name}" amount=${
+          clearing ? 'cleared' : amountUsd
+        } by=${req.userId}`,
+      );
+
+      res.json({
+        partyId: updated.id,
+        partyName: updated.name,
+        paymentsApprovedUsd: updated.paymentsApprovedUsd
+          ? Number(updated.paymentsApprovedUsd)
+          : null,
+        paymentsApprovedAt: updated.paymentsApprovedAt
+          ? updated.paymentsApprovedAt.toISOString()
+          : null,
       });
     } catch (err) {
       next(err);

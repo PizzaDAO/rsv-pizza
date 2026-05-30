@@ -52,6 +52,7 @@ import {
   POSSIBLE_SCAM_TAG,
   sendTgReceiptsReminder,
   setCityAdminNotes,
+  approveCity,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -289,16 +290,22 @@ function CityActionsMenu({
   onSendPayment,
   onToggleScamFlag,
   onSendTgReminder,
+  onApproveCity,
   canMarkPaid,
   canAddExternal,
   canSendPayment,
   canToggleScamFlag,
   canSendTgReminder,
+  canApproveCity,
   markPaidLabel,
   isFlaggedScam,
   scamFlagBusy,
   tgReminderBusy,
+  approveBusy,
   receiptsReminderSentAt,
+  paymentsApprovedUsd,
+  paymentsApprovedAt,
+  receiptsTotalUsd,
 }: {
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
@@ -310,16 +317,24 @@ function CityActionsMenu({
    * Parent runs the API call and surfaces the toast.
    */
   onSendTgReminder?: () => void;
+  /** Approve city payment amount. Called with the amount to approve. */
+  onApproveCity?: (amountUsd: number | null) => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
   canSendPayment: boolean;
   canToggleScamFlag: boolean;
   canSendTgReminder: boolean;
+  canApproveCity: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
   tgReminderBusy: boolean;
+  approveBusy: boolean;
   receiptsReminderSentAt?: string | null;
+  paymentsApprovedUsd?: number | null;
+  paymentsApprovedAt?: string | null;
+  /** Receipts total for default approval amount. */
+  receiptsTotalUsd?: number;
 }) {
   // Hooks-above-early-returns: declare useState before the no-actions guard
   // so the conditional return can't reorder hooks on a re-render where the
@@ -332,15 +347,50 @@ function CityActionsMenu({
   const [confirmTgReminder, setConfirmTgReminder] = useState(false);
   const hasMenuItems = canAddExternal || canToggleScamFlag || canSendTgReminder;
   // Nothing to show at all — render nothing.
-  if (!canMarkPaid && !canSendPayment && !hasMenuItems) {
+  if (!canMarkPaid && !canSendPayment && !canApproveCity && !hasMenuItems) {
     return null;
   }
+
+  const isApproved = paymentsApprovedUsd != null;
 
   return (
     <div
       className="inline-flex items-center gap-1.5"
       onClick={(e) => e.stopPropagation()}
     >
+      {/* Approve city — thumbs up button to the left of send. Filled when approved. */}
+      {canApproveCity && (
+        <button
+          type="button"
+          disabled={approveBusy}
+          onClick={() => {
+            if (isApproved) {
+              // Already approved — clicking clears the approval
+              onApproveCity?.(null);
+            } else {
+              // Not approved — approve with receipts total as default
+              onApproveCity?.(receiptsTotalUsd ?? 0);
+            }
+          }}
+          className={`p-1.5 rounded-md ${
+            isApproved
+              ? 'bg-amber-500 hover:bg-amber-600 text-white'
+              : 'bg-theme-surface-hover hover:bg-theme-surface text-theme-text-secondary border border-theme-stroke'
+          } disabled:opacity-50`}
+          title={
+            isApproved
+              ? `Approved: ${formatUsd(paymentsApprovedUsd)} (click to clear)`
+              : 'Approve payment amount'
+          }
+          aria-label={isApproved ? 'Clear approval' : 'Approve payment'}
+        >
+          {approveBusy ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <ThumbsUp size={14} className={isApproved ? 'fill-current' : ''} />
+          )}
+        </button>
+      )}
       {/* Primary: Send payment — actively sends via Privy / wire / Mercury.
           Icon-only button with tooltip for the action. */}
       {canSendPayment && (
@@ -2134,6 +2184,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // crocchetta-92106: per-row busy spinner for the Send receipts reminder
   // action. Avoids double-firing the POST while the bot is dispatching.
   const [tgReminderBusyPartyId, setTgReminderBusyPartyId] = useState<string | null>(null);
+  // City-level approval busy spinner.
+  const [approveBusyPartyId, setApproveBusyPartyId] = useState<string | null>(null);
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
@@ -2147,6 +2199,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // requireAnyAdminOrPaymentAdmin server-side; the UI gate just hides the
   // menu item for underbosses so they don't see a button that 403s.
   const canSendTgReminder = viewerRole === 'admin';
+  // City-level approval is admin-only.
+  const canApproveCity = viewerRole === 'admin';
   // pesto-92105: same gate the per-payout PayoutReviewModal applies for
   // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
   // the plain photo-only lightbox.
@@ -2238,6 +2292,27 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
       });
     } finally {
       setTgReminderBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
+   * City-level payment approval. Approves the receipts total as the payment
+   * amount (or clears approval when amountUsd is null).
+   */
+  async function handleApproveCity(row: PartyPayoutsRow, amountUsd: number | null) {
+    const partyId = row.party.id;
+    setApproveBusyPartyId(partyId);
+    try {
+      const result = await approveCity(partyId, amountUsd);
+      // Update the row's party data with the new approval state.
+      // The parent will need to refresh data to see the change persist,
+      // but we can optimistically update the local row for immediate feedback.
+      row.party.paymentsApprovedUsd = result.paymentsApprovedUsd;
+      row.party.paymentsApprovedAt = result.paymentsApprovedAt;
+    } catch (err) {
+      console.error('Failed to approve city:', err);
+    } finally {
+      setApproveBusyPartyId((id) => (id === partyId ? null : id));
     }
   }
 
@@ -2507,11 +2582,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canSendPayment={canSendPayment}
                           canToggleScamFlag={canToggleScamFlag}
                           canSendTgReminder={canSendTgReminder}
+                          canApproveCity={canApproveCity}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
                           tgReminderBusy={tgReminderBusy}
+                          approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
+                          paymentsApprovedUsd={row.party.paymentsApprovedUsd}
+                          paymentsApprovedAt={row.party.paymentsApprovedAt}
+                          receiptsTotalUsd={receiptUsdTotal}
                           onMarkPartyPaid={
                             showMarkPartyPaid && onMarkPartyPaid
                               ? () => onMarkPartyPaid(row.party.id)
@@ -2534,6 +2614,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onToggleScamFlag={
                             canToggleScamFlag
                               ? () => handleToggleScamFlag(row)
+                              : undefined
+                          }
+                          onApproveCity={
+                            canApproveCity
+                              ? (amountUsd) => handleApproveCity(row, amountUsd)
                               : undefined
                           }
                           onSendTgReminder={

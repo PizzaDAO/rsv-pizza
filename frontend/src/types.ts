@@ -2254,6 +2254,10 @@ export interface PartyPayoutsRow {
     adminNotes?: string | null;
     /** ISO timestamp of when the TG receipts reminder was last sent. */
     receiptsReminderSentAt?: string | null;
+    /** City-level approved payment amount. */
+    paymentsApprovedUsd?: number | null;
+    /** ISO timestamp of when the city payment was approved. */
+    paymentsApprovedAt?: string | null;
   };
   aggregates: {
     pendingCount: number;

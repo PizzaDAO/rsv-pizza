@@ -490,6 +490,31 @@ export async function setCityAdminNotes(
 }
 
 /**
+ * City-level payment approval. Admin can approve a total amount for the city
+ * before sending payment. Pass null to clear the approval.
+ */
+export interface ApproveCityResponse {
+  partyId: string;
+  partyName: string;
+  paymentsApprovedUsd: number | null;
+  paymentsApprovedAt: string | null;
+}
+
+export async function approveCity(
+  partyId: string,
+  amountUsd: number | null,
+): Promise<ApproveCityResponse> {
+  return apiRequest<ApproveCityResponse>(
+    `/api/admin/payouts/${partyId}/approve-city`,
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: { amountUsd },
+    },
+  );
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.
