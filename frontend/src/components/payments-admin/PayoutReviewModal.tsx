@@ -77,6 +77,24 @@ interface PayoutReviewModalProps {
    */
   onRevertPaid?: () => Promise<string | void> | string | void;
   /**
+   * gnocchi-92104: flip an `approved` payout to `queued` (wire request sent,
+   * awaiting settlement). Surfaced as an amber "Mark queued" button in the
+   * footer when status === 'approved'. Confirms once with body copy
+   * "Mark queued? This signals the wire request has been sent but not
+   * settled yet." Reversible via `onUnmarkQueued`.
+   *
+   * Returns a string error message (NOT throws) when the call fails so the
+   * modal can render it inline; resolves to undefined on success.
+   */
+  onMarkQueued?: () => Promise<string | void> | string | void;
+  /**
+   * gnocchi-92104: revert a `queued` payout back to `approved` (the "admin
+   * oops un-queue" path). Surfaced as an amber "Un-queue" button when
+   * status === 'queued'. Mirrors `onUnapprove`'s contract — no confirm,
+   * reversible. Returns string error / void on success.
+   */
+  onUnmarkQueued?: () => Promise<string | void> | string | void;
+  /**
    * lasagna-92103: backend admin PATCH no longer enforces the per-submission
    * cap, so `allowOverSubmissionCap` is no longer forwarded by this modal.
    * The signature still accepts the field for back-compat with parents that
@@ -188,6 +206,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   onReject,
   onUnapprove,
   onRevertPaid,
+  onMarkQueued,
+  onUnmarkQueued,
   onSaveAmount,
   onSaveAdminNotes,
   onMarkPaid,
@@ -295,6 +315,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // accidentally drop the historical mark-paid record.
   const [revertPaidError, setRevertPaidError] = useState<string | null>(null);
   const [revertPaidConfirming, setRevertPaidConfirming] = useState(false);
+
+  // gnocchi-92104: inline error + confirm gate for "Mark queued"
+  // (approved -> queued). Single-click ack mirroring revertPaidConfirming
+  // so the admin acknowledges they're signalling "the wire request has been
+  // sent" even though no money has moved.
+  const [markQueuedError, setMarkQueuedError] = useState<string | null>(null);
+  const [markQueuedConfirming, setMarkQueuedConfirming] = useState(false);
+  // Inline error for "Un-queue" (queued -> approved). No confirm — reversible
+  // action, matches the unapprove pattern.
+  const [unmarkQueuedError, setUnmarkQueuedError] = useState<string | null>(null);
 
   const [showMarkPaidForm, setShowMarkPaidForm] = useState(false);
   const [wireRef, setWireRef] = useState('');
@@ -672,6 +702,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // 'failed' is no longer "closed" — it has the Execute (Retry) button instead
   // of Re-open. Only 'rejected' remains terminal-until-reopened.
   const isClosed = payout.status === 'rejected';
+  // gnocchi-92104: queued = wire request sent, awaiting settlement. Separate
+  // footer cluster from approved — Mark Paid still works (queued → paid),
+  // but Execute / Approve are hidden and Un-queue replaces Mark queued.
+  const isQueued = payout.status === 'queued';
 
   // For Mercury, last4 must be exactly 4 digits before the button enables.
   const execMercuryValid = /^\d{4}$/.test(execCardLast4.trim());
@@ -1987,6 +2021,42 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     <Send size={14} />
                     {isFailed ? 'Retry Payment' : 'Execute Payment'}
                   </button>
+                  {/* gnocchi-92104: Mark queued — flips approved -> queued
+                      (wire request sent, awaiting settlement). Click 1 = arm
+                      confirm; click 2 = fire. Only on strictly-approved (not
+                      failed) rows; admin-only. Amber to signal "money's
+                      committed and moving" without claiming it's settled. */}
+                  {payout.status === 'approved' && onMarkQueued && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!markQueuedConfirming) {
+                          setMarkQueuedConfirming(true);
+                          return;
+                        }
+                        setMarkQueuedError(null);
+                        const err = await onMarkQueued();
+                        setMarkQueuedConfirming(false);
+                        if (typeof err === 'string' && err) {
+                          setMarkQueuedError(err);
+                        }
+                      }}
+                      disabled={busy || selfPayoutBlocked}
+                      className={
+                        markQueuedConfirming
+                          ? 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50'
+                          : 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500/80 hover:bg-amber-500 text-white text-sm font-medium disabled:opacity-50'
+                      }
+                      title={
+                        markQueuedConfirming
+                          ? 'Click again to confirm — signals the wire request has been sent but not settled yet'
+                          : 'Mark queued — the wire request has been sent but not settled yet'
+                      }
+                    >
+                      <Send size={14} />
+                      {markQueuedConfirming ? 'Click again to confirm' : 'Mark queued'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowMarkPaidForm(true)}
@@ -1998,6 +2068,42 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   </button>
                 </>
               )}
+            </>
+          )}
+          {/* gnocchi-92104: queued payout cluster — wire request sent,
+              awaiting settlement. Mark paid (manual) confirms settlement;
+              Un-queue reverts back to approved. Admin-only — same gate as
+              the approved-row primary actions. */}
+          {isQueued && isAdminViewer && (
+            <>
+              {onUnmarkQueued && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setUnmarkQueuedError(null);
+                    const err = await onUnmarkQueued();
+                    if (typeof err === 'string' && err) {
+                      setUnmarkQueuedError(err);
+                    }
+                  }}
+                  disabled={busy || selfPayoutBlocked}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-500/50 text-amber-300 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50"
+                  title="Move this payout back to approved (cancels the queued state)"
+                >
+                  <Undo2 size={14} />
+                  Un-queue
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMarkPaidForm(true)}
+                disabled={busy || selfPayoutBlocked}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+                title="Confirm the wire settled and flip to paid"
+              >
+                <DollarSign size={14} />
+                Mark paid (settled)
+              </button>
             </>
           )}
           {isClosed && onReopen && (
@@ -2094,7 +2200,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             !isPaid &&
             !isClosed &&
             payout.status !== 'withdrawn' &&
-            payout.status !== 'completed' && (
+            payout.status !== 'completed' &&
+            // gnocchi-92104: don't surface flag-ready on queued rows — the
+            // payments team has already taken visible action (wire sent), so
+            // re-flagging is a stale signal. Backend also 400s in this case.
+            payout.status !== 'queued' && (
             payout.flaggedReady ? (
               <span
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-sm font-medium"
@@ -2167,6 +2277,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
               <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
               <span>{revertPaidError}</span>
+            </div>
+          )}
+          {/* gnocchi-92104: inline errors for Mark queued + Un-queue. Same
+              red-500 pattern as unapprove/revert-paid above. */}
+          {markQueuedError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{markQueuedError}</span>
+            </div>
+          )}
+          {unmarkQueuedError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/40 text-xs text-red-300 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{unmarkQueuedError}</span>
             </div>
           )}
           {/* argentina-92103: inline error for Flag-ready. Same pattern

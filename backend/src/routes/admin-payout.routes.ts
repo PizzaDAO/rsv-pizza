@@ -57,7 +57,13 @@ const router = Router();
 // 'paid' for cap math (counts toward usedUsd) but distinct on the UI so admins
 // can tell "city was paid out, possibly less than the requested claim amount"
 // apart from a direct paid row.
-const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'rejected', 'paid', 'failed', 'withdrawn', 'completed'] as const;
+// gnocchi-92104: 'queued' added — intermediate "wire request sent, awaiting
+// settlement" status between approved and paid. Used when the wire-transfer
+// email has been sent to the payments team / bank but the wire hasn't cleared
+// yet. Money is committed (counts toward cap math like paid/approved) but
+// the row hasn't terminated — admins flip queued → paid once settlement is
+// confirmed, or queued → failed if the wire bounces.
+const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'queued', 'rejected', 'paid', 'failed', 'withdrawn', 'completed'] as const;
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
@@ -314,8 +320,13 @@ async function assertWithinPartyCap(
     // approval is authoritative.
     // provolone-92103: 'completed' is a terminal close-out semantically
     // equivalent to 'paid' for cap purposes — include it here.
+    // gnocchi-92104: 'queued' is "wire request sent, settlement pending" —
+    // money is committed (the admin signaled "we're sending this") so it
+    // counts toward usedUsd same as approved/paid/completed. Otherwise an
+    // admin queuing a wire could overshoot the cap by approving and queueing
+    // a second payment that totals over the limit before the first settles.
     partyId,
-    status: { in: ['paid', 'approved', 'completed'] },
+    status: { in: ['paid', 'approved', 'queued', 'completed'] },
   };
   if (ignorePayoutId) {
     where.id = { not: ignorePayoutId };
@@ -470,8 +481,9 @@ function isPrimaryHostInCohosts(party: any): boolean {
  *
  * Implementation: scan the row's `audits` (already sorted DESC by createdAt
  * in callsites that include them). The most recent `flag_ready` audit "wins"
- * iff there is NO subsequent `mark_paid` / `reject` / `unapprove` audit at
- * or after its timestamp.
+ * iff there is NO subsequent `mark_paid` / `mark_queued` / `reject` /
+ * `unapprove` audit at or after its timestamp (gnocchi-92104 added
+ * `mark_queued` to the consume list).
  *
  * Returns `null` shape when the audits weren't loaded so older queries don't
  * accidentally claim "not flagged" — clients should treat `flaggedReady`
@@ -503,7 +515,17 @@ function deriveFlaggedReady(audits: any[] | undefined): {
     : new Date(latestFlag.createdAt).getTime();
   const consumed = audits.some((a) => {
     if (a === latestFlag) return false;
-    if (a.action !== 'mark_paid' && a.action !== 'reject' && a.action !== 'unapprove') return false;
+    // gnocchi-92104: 'mark_queued' (wire request sent) also consumes the
+    // flag — the payments team has visibly taken action, so re-flagging is
+    // a stale signal.
+    if (
+      a.action !== 'mark_paid' &&
+      a.action !== 'mark_queued' &&
+      a.action !== 'reject' &&
+      a.action !== 'unapprove'
+    ) {
+      return false;
+    }
     const ts = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
     return ts >= flagTs;
   });
@@ -662,19 +684,22 @@ function serializePayout(row: any): any {
  * Map keyed by payoutId. Payouts with no flag entry are absent.
  *
  * Sticky semantics: the latest `flag_ready` audit wins UNLESS a subsequent
- * `mark_paid` / `reject` / `unapprove` audit exists at or after it.
+ * `mark_paid` / `mark_queued` / `reject` / `unapprove` audit exists at or
+ * after it (gnocchi-92104 added `mark_queued` to the consume list).
  */
 async function fetchFlaggedReadyByPayoutId(
   payoutIds: string[],
 ): Promise<Map<string, { at: string; by: string | null }>> {
   if (payoutIds.length === 0) return new Map();
   // Pull every relevant audit in one query so we can derive sticky state in
-  // memory. `flag_ready` + the three "consumes" actions. This is bounded:
+  // memory. `flag_ready` + the four "consumes" actions. This is bounded:
   // the page size of LIST is 100, and each payout typically has <20 audits.
+  // gnocchi-92104: include 'mark_queued' so a wire-request-sent audit
+  // invalidates a prior flag the same way mark_paid does.
   const audits = await prisma.payoutAudit.findMany({
     where: {
       payoutId: { in: payoutIds },
-      action: { in: ['flag_ready', 'mark_paid', 'reject', 'unapprove'] },
+      action: { in: ['flag_ready', 'mark_paid', 'mark_queued', 'reject', 'unapprove'] },
     },
     select: {
       payoutId: true,
@@ -1225,8 +1250,11 @@ router.get(
       }
 
       // 6. For each assembled row, drop it if ANY candidate already has an
-      //    in-flight payout for that party. "In-flight" = pending/approved/paid
+      //    in-flight payout for that party. "In-flight" = pending/approved/queued/paid
       //    (failed/rejected don't count — that prepayment never went through).
+      //    gnocchi-92104: 'queued' (wire request sent, awaiting settlement) is
+      //    in-flight too — we shouldn't surface a fresh prepay candidate while
+      //    a wire is mid-flight.
       //    Run as a single grouped query: pull all matching payouts and bucket
       //    by partyId in memory.
       const inFlight = filteredCandidateUserIds.size
@@ -1234,7 +1262,7 @@ router.get(
             where: {
               partyId: { in: optedInAssembled.map(r => r.partyMeta.id) },
               hostUserId: { in: Array.from(filteredCandidateUserIds) },
-              status: { in: ['pending', 'approved', 'paid'] },
+              status: { in: ['pending', 'approved', 'queued', 'paid'] },
             },
             select: { partyId: true, hostUserId: true },
           })
@@ -2792,7 +2820,11 @@ router.post(
         existing.status === 'paid' ||
         existing.status === 'rejected' ||
         existing.status === 'withdrawn' ||
-        existing.status === 'completed'
+        existing.status === 'completed' ||
+        // gnocchi-92104: a queued payout is already moving (wire request
+        // sent, awaiting settlement) — re-flagging it as "ready for payment"
+        // is a stale signal. Treat as terminal-ish for flag purposes.
+        existing.status === 'queued'
       ) {
         // Flagging a terminal-state row is a no-op signal; reject up front
         // so the UI doesn't render a stale-looking flag icon afterward.
@@ -3043,6 +3075,195 @@ router.post(
             actorEmail: actor.email,
             actorKind: actor.actorKind,
             note: typeof note === 'string' ? note : null,
+          },
+        });
+
+        return row;
+      });
+
+      res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// POST /api/admin/payouts/:id/mark-queued — gnocchi-92104
+//
+// Flip an `approved` payout to `queued`, meaning "the wire transfer email
+// request has been sent to the payments team / bank but the wire hasn't
+// settled yet." Semantically between approved (admin signed off) and paid
+// (money actually moved).
+//
+// `queued` counts toward the per-party committed cap the same as approved /
+// paid / completed — it's money committed, just not yet settled.
+//
+// Valid transitions:
+//   approved -> queued   (this endpoint)
+//   queued   -> paid     (POST /:id/mark-paid; existing flow, accepts queued)
+//   queued   -> failed   (mark-failed; existing flow accepts non-paid)
+//   queued   -> approved (POST /:id/unmark-queued; admin "oops un-queue")
+//
+// Not method-gated — the typical use is wire payouts, but admins may queue
+// any approved row when the settlement signal needs a staging step.
+//
+// Auth: admin / super_admin / payment_admin. payment_admin actors are
+// blocked from queueing a row they would receive (assertNotSelfPayout).
+//
+// Body:
+//   { note?: string }   — optional, written to payout_audit.note. Cap 500
+//                         chars to match flag-ready's note budget.
+// ============================================
+router.post(
+  '/:id/mark-queued',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const existing = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: {
+          id: true,
+          status: true,
+          hostUserId: true,
+          partyId: true,
+          finalAmountUsd: true,
+        },
+      });
+
+      if (!existing) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+      if (existing.status !== 'approved') {
+        throw new AppError(
+          `Can only queue an approved payout (current status: ${existing.status})`,
+          400,
+          'NOT_APPROVED',
+        );
+      }
+
+      assertNotSelfPayout(actor, existing.hostUserId);
+
+      // Cap math: queueing the row promotes it from "committed" to
+      // "committed-and-settling", but the cap rules already counted it
+      // (approved is in the assertWithinPartyCap status array). Re-running the
+      // checks here is belt-and-braces — if the party cap was tightened
+      // between approve and queue, we surface the violation instead of
+      // silently letting the wire request go out.
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      await assertWithinPartyCap(
+        existing.partyId,
+        Number(existing.finalAmountUsd),
+        existing.id,
+      );
+
+      const note = typeof req.body?.note === 'string'
+        ? req.body.note.slice(0, 500)
+        : null;
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: { status: 'queued' },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'mark_queued',
+            oldStatus: 'approved',
+            newStatus: 'queued',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note,
+          },
+        });
+
+        return row;
+      });
+
+      res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// POST /api/admin/payouts/:id/unmark-queued — gnocchi-92104
+//
+// Flip a `queued` payout back to `approved`. The "admin oops un-queue" path
+// — used when the wire request was sent in error and needs to be reset
+// before settlement (e.g. wrong recipient details, duplicate request).
+//
+// Idempotent: rejects unless status === 'queued' (400 NOT_QUEUED).
+// Audit trail (mark_queued + this unmark_queued) is preserved so the
+// reversal is visible.
+// ============================================
+router.post(
+  '/:id/unmark-queued',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const existing = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true, hostUserId: true },
+      });
+
+      if (!existing) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+      if (existing.status !== 'queued') {
+        throw new AppError(
+          `Cannot un-queue a payout in status '${existing.status}'`,
+          400,
+          'NOT_QUEUED',
+        );
+      }
+
+      assertNotSelfPayout(actor, existing.hostUserId);
+
+      const note = typeof req.body?.note === 'string'
+        ? req.body.note.slice(0, 500)
+        : null;
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: { status: 'approved' },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'unmark_queued',
+            oldStatus: 'queued',
+            newStatus: 'approved',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note,
           },
         });
 
@@ -4637,7 +4858,11 @@ partyMarkPaidRouter.get(
       const payouts = await prisma.payout.findMany({
         where: {
           partyId,
-          status: { in: ['pending', 'approved'] },
+          // gnocchi-92104: 'queued' (wire-request-sent, awaiting settlement) is
+          // in-flight too — Mark Party Paid should be able to roll it forward
+          // to 'paid' alongside pending + approved when the admin confirms the
+          // settlement out-of-band.
+          status: { in: ['pending', 'approved', 'queued'] },
         },
         select: {
           id: true,
@@ -4843,10 +5068,13 @@ partyMarkPaidRouter.post(
 
       // Find all in-flight payouts BEFORE the transaction so we can do per-row
       // self-payout checks + log a clean count even if zero match.
+      // gnocchi-92104: 'queued' (wire-request-sent, awaiting settlement) is
+      // in-flight too — Mark Party Paid flips it forward along with the
+      // pending/approved rows.
       const inflight = await prisma.payout.findMany({
         where: {
           partyId,
-          status: { in: ['pending', 'approved'] },
+          status: { in: ['pending', 'approved', 'queued'] },
         },
         select: {
           id: true,
@@ -5054,8 +5282,10 @@ partyMarkPaidRouter.post(
         // preserved by the fact that the admin is taking an explicit
         // close-out action.)
         if (!party.paymentsClosedAt && updatedIds.length > 0) {
+          // gnocchi-92104: include 'queued' in the in-flight check so a city
+          // with a pending wire settlement isn't prematurely closed.
           const remainingInflight = await tx.payout.count({
-            where: { partyId, status: { in: ['pending', 'approved'] } },
+            where: { partyId, status: { in: ['pending', 'approved', 'queued'] } },
           });
           if (remainingInflight === 0) {
             await tx.party.update({

@@ -472,7 +472,13 @@ async function assertWithinPartyCap(
 
   const where: any = {
     partyId,
-    status: { in: ['paid', 'pending', 'approved'] },
+    // gnocchi-92104: 'queued' (wire request sent, awaiting settlement) is
+    // money committed and counts against the cap the same as approved/paid.
+    // The admin-side helper already includes 'completed'; we leave it out
+    // here because hosts don't create payouts on completed parties (the
+    // city is closed out) and we want the host-side error to match the
+    // smaller view they have.
+    status: { in: ['paid', 'pending', 'approved', 'queued'] },
   };
   if (ignorePayoutId) {
     where.id = { not: ignorePayoutId };

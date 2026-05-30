@@ -4394,6 +4394,55 @@ export async function revertPaidAdminPayout(
 }
 
 /**
+ * gnocchi-92104: flip an `approved` payout to `queued` (wire request sent,
+ * awaiting settlement). Semantically between approved (admin signed off) and
+ * paid (money actually moved). Counts toward the party's committed cap the
+ * same as approved / paid / completed.
+ *
+ * Backend validates the current status is 'approved' (400 NOT_APPROVED
+ * otherwise) and writes a payout_audit row with action='mark_queued'.
+ *
+ * Used primarily for wire payouts where the admin has emailed the bank but
+ * the wire hasn't cleared yet; not method-gated though — admins can queue
+ * any approved row.
+ */
+export async function markPayoutQueued(
+  id: string,
+  opts?: { note?: string },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/mark-queued`,
+    {
+      method: 'POST',
+      body: { note: opts?.note },
+    },
+  );
+  return res.payout;
+}
+
+/**
+ * gnocchi-92104: flip a `queued` payout back to `approved`. The "admin oops
+ * un-queue" path — used when the wire request was sent in error and needs to
+ * be reset before settlement (wrong recipient, duplicate request, etc.).
+ *
+ * Backend validates the current status is 'queued' (400 NOT_QUEUED otherwise)
+ * and writes a payout_audit row with action='unmark_queued'.
+ */
+export async function unmarkPayoutQueued(
+  id: string,
+  opts?: { note?: string },
+): Promise<AdminPayout> {
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/unmark-queued`,
+    {
+      method: 'POST',
+      body: { note: opts?.note },
+    },
+  );
+  return res.payout;
+}
+
+/**
  * argentina-92103: regional underbosses (and admins) signal "this payout is
  * ready for the payments team to pay" without actually changing status or
  * sending funds. Writes a payout_audit row + fires Telegram + email to the

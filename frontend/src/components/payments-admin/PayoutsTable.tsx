@@ -138,6 +138,23 @@ function ActionsCell({
           </button>
         </>
       )}
+
+      {/* gnocchi-92104: queued row gets a single inline Mark paid (settled)
+          button. The Un-queue / Mark queued transitions live in the modal —
+          this row affordance is just for the common "wire cleared, flip to
+          paid" path so admins don't have to open the modal for every
+          settlement. */}
+      {status === 'queued' && (
+        <button
+          type="button"
+          onClick={() => onMarkPaid(payout)}
+          disabled={busy}
+          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 disabled:opacity-50"
+          title="Mark paid (wire settled)"
+        >
+          <DollarSign size={15} />
+        </button>
+      )}
     </div>
   );
 }

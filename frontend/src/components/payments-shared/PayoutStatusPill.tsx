@@ -51,6 +51,24 @@ const STATUS_STYLES: Record<PayoutStatus, { bg: string; text: string; border: st
     border: 'border-gray-300',
     label: 'Withdrawn',
   },
+  // gnocchi-92104: 'queued' = wire request sent, awaiting settlement.
+  // Amber/yellow sits visually between approved (blue) and paid (emerald) to
+  // signal "money committed and in motion, but not settled."
+  queued: {
+    bg: 'bg-amber-100',
+    text: 'text-amber-800',
+    border: 'border-amber-300',
+    label: 'Queued',
+  },
+  // provolone-92103: 'completed' is the terminal close-out state used by
+  // Mark-Party-Paid's "mark pending complete" mode. Teal so admins can tell
+  // it apart from a direct paid record (emerald).
+  completed: {
+    bg: 'bg-teal-100',
+    text: 'text-teal-800',
+    border: 'border-teal-300',
+    label: 'Completed',
+  },
 };
 
 export const PayoutStatusPill: React.FC<PayoutStatusPillProps> = ({ status, size = 'sm' }) => {
