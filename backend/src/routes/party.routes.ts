@@ -549,6 +549,21 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
           );
         }
       }
+      // bottarga-92104: audit trail for the manual "Possible scam" flag set
+      // from /payments (PayoutsByPartyTable city Actions menu). The tag
+      // itself in `parties.event_tags` is the durable signal; this log line
+      // makes the WHO + WHEN grep-able from prod logs even without a
+      // dedicated audit table. Mirrors the lightweight audit pattern used
+      // for other manual moderation actions.
+      const hadScam = currentTags.includes('possible-scam');
+      const wantsScam = eventTags.includes('possible-scam');
+      if (hadScam !== wantsScam) {
+        console.log(
+          `[bottarga-92104][possible-scam-tag] party=${id} action=${
+            wantsScam ? 'flag' : 'unflag'
+          } actor=${req.userEmail ?? 'unknown'} at=${new Date().toISOString()}`,
+        );
+      }
     }
 
     // Validate externalLinks if provided

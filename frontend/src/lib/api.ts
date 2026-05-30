@@ -384,6 +384,47 @@ export async function updateHostGoals(partyId: string, hostGoals: HostGoals) {
 }
 
 /**
+ * bottarga-92104: shared constant for the "possible scam" manual flag. Stored
+ * as a value in `parties.event_tags` (alongside other tags) so existing tag
+ * filters / chip strips / the fake-detection scorer's event_tags-aware
+ * heuristics pick it up automatically without a separate column.
+ *
+ * Toggled from the /payments by-city Actions menu (PayoutsByPartyTable). Both
+ * directions are reversible; per the reversible-action convention there is no
+ * confirm modal.
+ */
+export const POSSIBLE_SCAM_TAG = 'possible-scam';
+
+/**
+ * bottarga-92104: toggle the `possible-scam` tag on a party's `event_tags`
+ * array via the existing PATCH /api/parties/:id endpoint. Returns the next
+ * tag array so callers can patch local state without a full refetch.
+ *
+ * `currentTags` is what the caller currently has in hand (the by-party row's
+ * `party.eventTags`); we union/remove in-place rather than blindly setting
+ * to keep other tags intact (SWC Hub, prepay, etc.).
+ *
+ * Audit: backend logs the eventTags change as part of its normal PATCH log;
+ * a dedicated audit row is not required since the tag itself is the durable
+ * signal (visible from any read of the party).
+ */
+export async function flagPartyAsScam(
+  partyId: string,
+  currentTags: string[],
+  flag: boolean,
+): Promise<{ eventTags: string[] }> {
+  const set = new Set(currentTags ?? []);
+  if (flag) {
+    set.add(POSSIBLE_SCAM_TAG);
+  } else {
+    set.delete(POSSIBLE_SCAM_TAG);
+  }
+  const nextTags = Array.from(set);
+  await updatePartyApi(partyId, { eventTags: nextTags });
+  return { eventTags: nextTags };
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.

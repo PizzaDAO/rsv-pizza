@@ -15,6 +15,7 @@ import {
   Tag,
   User as UserIcon,
   Play,
+  AlertTriangle,
 } from 'lucide-react';
 import type {
   AdminPayout,
@@ -38,6 +39,8 @@ import {
   updatePayoutDocument,
   markReceiptDuplicate,
   retryPayoutDocumentOcr,
+  flagPartyAsScam,
+  POSSIBLE_SCAM_TAG,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -118,6 +121,14 @@ interface PayoutsByPartyTableProps {
    * this city. Hidden for underbosses (admins only).
    */
   onAddExternalPayment?: (partyId: string, partyName: string) => void;
+  /**
+   * bottarga-92104: parent-supplied refresh hook called after the
+   * `possible-scam` tag is toggled. The toggle itself happens locally via
+   * `flagPartyAsScam`; the parent uses this to re-fetch the by-party feed so
+   * any downstream consumers (filters, counts) stay in sync. Admin-only via
+   * the viewerRole gate on the menu.
+   */
+  onScamFlagChanged?: (partyId: string, nextTags: string[]) => void;
   viewerRole?: 'admin' | 'underboss';
   busyRowId?: string | null;
   loading?: boolean;
@@ -211,23 +222,31 @@ function collectReceipts(payouts: AdminPayout[]): Array<{
   return out;
 }
 
-/** City-row action menu — Mark paid/closed + Add external payment. */
+/** City-row action menu — Mark paid/closed + Add external payment + scam flag. */
 function CityActionsMenu({
   onMarkPartyPaid,
   onAddExternalPayment,
+  onToggleScamFlag,
   canMarkPaid,
   canAddExternal,
+  canToggleScamFlag,
   markPaidLabel,
+  isFlaggedScam,
+  scamFlagBusy,
 }: {
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
+  onToggleScamFlag?: () => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
+  canToggleScamFlag: boolean;
   markPaidLabel: string;
+  isFlaggedScam: boolean;
+  scamFlagBusy: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // No actions to show? Render nothing.
-  if (!canMarkPaid && !canAddExternal) return null;
+  if (!canMarkPaid && !canAddExternal && !canToggleScamFlag) return null;
 
   return (
     <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
@@ -279,6 +298,30 @@ function CityActionsMenu({
               >
                 <Plus size={14} className="text-sky-500" />
                 Add external payment
+              </button>
+            )}
+            {/* bottarga-92104: flip the `possible-scam` tag on/off. Reversible
+                action — no confirm modal (feedback_reversible_actions_no_confirm).
+                Label flips with the current tag state. */}
+            {canToggleScamFlag && (
+              <button
+                type="button"
+                role="menuitem"
+                disabled={scamFlagBusy}
+                onClick={() => {
+                  setOpen(false);
+                  onToggleScamFlag?.();
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+              >
+                {scamFlagBusy ? (
+                  <Loader2 size={14} className="animate-spin text-theme-text-muted" />
+                ) : isFlaggedScam ? (
+                  <CheckCircle2 size={14} className="text-emerald-500" />
+                ) : (
+                  <AlertTriangle size={14} className="text-red-500" />
+                )}
+                {isFlaggedScam ? 'Unflag possible scam' : 'Flag as possible scam'}
               </button>
             )}
           </div>
@@ -1508,14 +1551,28 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onRowClick,
   onMarkPartyPaid,
   onAddExternalPayment,
+  onScamFlagChanged,
   viewerRole = 'admin',
   busyRowId,
   loading,
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // bottarga-92104: optimistic-override map for the `possible-scam` tag so the
+  // pill + menu label flip immediately on click without waiting for a parent
+  // refetch. Keyed on partyId; value is the next eventTags array (mirrors the
+  // pesto-92105 receiptOverrides pattern). Cleared when the parent re-renders
+  // with the persisted value (the override is consulted ONLY for rendering;
+  // the row's own eventTags are still the source of truth).
+  const [tagOverrides, setTagOverrides] = useState<Record<string, string[]>>({});
+  // Per-row busy spinner state for the scam-flag toggle. Avoids double-clicks
+  // during the PATCH round-trip.
+  const [scamBusyPartyId, setScamBusyPartyId] = useState<string | null>(null);
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
+  // bottarga-92104: same admin gate as the other two menu items. Underbosses
+  // never see the scam-flag action.
+  const canToggleScamFlag = viewerRole === 'admin';
   // pesto-92105: same gate the per-payout PayoutReviewModal applies for
   // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
   // the plain photo-only lightbox.
@@ -1528,6 +1585,54 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
       else next.add(partyId);
       return next;
     });
+  }
+
+  /**
+   * bottarga-92104: toggle the `possible-scam` tag for a city. Optimistic —
+   * patches `tagOverrides` immediately so the pill + menu label flip without
+   * waiting for the PATCH. On error, roll back the override and let the
+   * caller surface the failure (we keep it inline-silent for now; a future
+   * pass can wire this into the page-level pushToast).
+   */
+  async function handleToggleScamFlag(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    const currentTags =
+      tagOverrides[partyId] ?? row.party.eventTags ?? [];
+    const wasFlagged = currentTags.includes(POSSIBLE_SCAM_TAG);
+    const nextFlag = !wasFlagged;
+    // Optimistic write — derived next tags computed in the API helper but
+    // mirror it here so we don't await before showing the flip.
+    const optimisticSet = new Set(currentTags);
+    if (nextFlag) optimisticSet.add(POSSIBLE_SCAM_TAG);
+    else optimisticSet.delete(POSSIBLE_SCAM_TAG);
+    const optimisticTags = Array.from(optimisticSet);
+    setTagOverrides((m) => ({ ...m, [partyId]: optimisticTags }));
+    setScamBusyPartyId(partyId);
+    try {
+      const { eventTags } = await flagPartyAsScam(partyId, currentTags, nextFlag);
+      // Server is authoritative — replace the optimistic value with what came
+      // back so any tag-set drift (e.g. another admin removed a tag in
+      // parallel) is reconciled.
+      setTagOverrides((m) => ({ ...m, [partyId]: eventTags }));
+      onScamFlagChanged?.(partyId, eventTags);
+    } catch (err) {
+      // Roll back the optimistic flip so the UI reflects the persisted state.
+      setTagOverrides((m) => {
+        const next = { ...m };
+        delete next[partyId];
+        return next;
+      });
+      // Minimal user feedback — the menu silently fails. The next refresh
+      // would surface the real state; for now, an alert keeps it visible.
+      // eslint-disable-next-line no-alert
+      window.alert(
+        `Could not ${nextFlag ? 'flag' : 'unflag'} this city as possible scam: ${
+          (err as Error)?.message ?? 'unknown error'
+        }`,
+      );
+    } finally {
+      setScamBusyPartyId((id) => (id === partyId ? null : id));
+    }
   }
 
   return (
@@ -1566,6 +1671,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               const partySlug = row.party.customUrl ?? row.party.inviteCode ?? '';
               const closedAt = row.party.paymentsClosedAt ?? null;
               const isClosed = !!closedAt;
+              // bottarga-92104: prefer the local override when present so the
+              // pill + menu label reflect the optimistic toggle while the
+              // PATCH is in flight (and after, until the parent reloads the
+              // by-party rows).
+              const effectiveTags =
+                tagOverrides[row.party.id] ?? row.party.eventTags ?? [];
+              const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
+              const scamFlagBusy = scamBusyPartyId === row.party.id;
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
               // pinsa-92103: ALSO show the button when the city has paid
@@ -1661,6 +1774,35 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             Closed
                           </span>
                         )}
+                        {/* bottarga-92104: red "Possible scam" pill — visible
+                            in the city header next to other status pills when
+                            the `possible-scam` tag is present on the party.
+                            Click toggles the flag via the same handler the
+                            Actions menu uses (reversible — no confirm). */}
+                        {isFlaggedScam && (
+                          <button
+                            type="button"
+                            disabled={scamFlagBusy || !canToggleScamFlag}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canToggleScamFlag) return;
+                              handleToggleScamFlag(row);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] text-red-500 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/40 hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                            title={
+                              canToggleScamFlag
+                                ? 'Click to unflag this city as possible scam'
+                                : 'Flagged as possible scam'
+                            }
+                          >
+                            {scamFlagBusy ? (
+                              <Loader2 size={11} className="animate-spin" />
+                            ) : (
+                              <AlertTriangle size={11} />
+                            )}
+                            Possible scam
+                          </button>
+                        )}
                         {row.aggregates.pendingCount > 0 && (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] text-amber-400"
@@ -1714,7 +1856,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         <CityActionsMenu
                           canMarkPaid={showMarkPartyPaid}
                           canAddExternal={canAddExternal}
+                          canToggleScamFlag={canToggleScamFlag}
                           markPaidLabel={markPaidLabel}
+                          isFlaggedScam={isFlaggedScam}
+                          scamFlagBusy={scamFlagBusy}
                           onMarkPartyPaid={
                             showMarkPartyPaid && onMarkPartyPaid
                               ? () => onMarkPartyPaid(row.party.id)
@@ -1727,6 +1872,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                                     row.party.id,
                                     row.party.name,
                                   )
+                              : undefined
+                          }
+                          onToggleScamFlag={
+                            canToggleScamFlag
+                              ? () => handleToggleScamFlag(row)
                               : undefined
                           }
                         />
