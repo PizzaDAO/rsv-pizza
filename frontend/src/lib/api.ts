@@ -4317,6 +4317,11 @@ export async function updatePayoutDocument(
     ocrLineItems?: ReceiptLineItem[] | null;
     // culatello-92104: admin-toggleable duplicate flag. Reversible.
     isDuplicate?: boolean;
+    // provola-92106: admin-toggleable "ineligible for reimbursement" flag.
+    // Distinct from `isDuplicate` (legitimate purchase but doesn't qualify
+    // under policy — alcohol, tips, personal items). Reversible. Same
+    // exclusion semantics as `isDuplicate` everywhere it's read.
+    ineligible?: boolean;
   },
 ): Promise<{
   id: string;
@@ -4333,6 +4338,9 @@ export async function updatePayoutDocument(
   exchangeRate: number | null;
   ocrLineItems: ReceiptLineItem[] | null;
   isDuplicate: boolean;
+  // provola-92106: echoed back so callers can sync their optimistic
+  // override against the server-authoritative value after PATCH.
+  ineligible: boolean;
   ocrError: string | null;
   sortOrder: number;
   uploadedByUserId: string | null;
@@ -4355,6 +4363,22 @@ export async function markReceiptDuplicate(
   isDuplicate: boolean,
 ) {
   return updatePayoutDocument(docId, { isDuplicate });
+}
+
+/**
+ * provola-92106: typed wrapper for the per-receipt "Mark ineligible" toggle.
+ * Mirrors `markReceiptDuplicate` above. Semantically distinct from duplicate
+ * — ineligibles are legitimate purchases the host paid for that don't
+ * qualify under the reimbursement policy (alcohol, tips, personal items).
+ * Reversible — pass `false` to un-mark. Independent of `isDuplicate` (both
+ * flags can be true on the same row, though the UI prefers duplicate as the
+ * primary visual signal).
+ */
+export async function markReceiptIneligible(
+  docId: string,
+  ineligible: boolean,
+) {
+  return updatePayoutDocument(docId, { ineligible });
 }
 
 /**

@@ -1686,6 +1686,12 @@ export interface PayoutDocument {
   // the host PATCH finalAmountUsd recompute path. Optional on the wire so
   // older cached payloads still type-check.
   isDuplicate?: boolean;
+  // provola-92106: admin-marked "ineligible for reimbursement" flag.
+  // Distinct from `isDuplicate` — this is a legitimate purchase that
+  // doesn't qualify under policy (alcohol, tips, personal items). Same
+  // exclusion semantics as `isDuplicate` (USD sums + recompute paths).
+  // Optional on the wire so older cached payloads still type-check.
+  ineligible?: boolean;
   ocrError: string | null;
   sortOrder: number;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows
@@ -1719,6 +1725,13 @@ export interface ReceiptLineItem {
   unitPrice: number;
   subtotal: number;
   category: ReceiptLineItemCategory;
+  // provola-92106: per-line "ineligible for reimbursement" flag. Stored
+  // alongside the other fields in the `payout_documents.ocr_line_items`
+  // jsonb column (no schema change). When true the row is excluded from
+  // the receipt's live line sum + the "Use line sum" button. Optional on
+  // the wire — older cached payloads + items the admin never touched
+  // simply omit the field instead of carrying `false`.
+  ineligible?: boolean;
 }
 
 export interface BankDetails {

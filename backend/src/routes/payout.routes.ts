@@ -1810,10 +1810,14 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       // recompute sum so the admin's intent (these two receipts are the
       // same purchase) propagates back to the payout's finalAmountUsd on
       // the next host-side edit. Receipts persist for evidence either way.
+      // provola-92106: admin-flagged ineligible receipts (alcohol, tips,
+      // personal items) get the same exclusion treatment — distinct from
+      // duplicate but identical math. The reviewer modal's `ocrSum` already
+      // mirrors this filter; this keeps the host PATCH recompute consistent.
       const survivingOcrSum = survivingReceipts.reduce(
         (sum, d) =>
           sum
-          + (d.isDuplicate
+          + (d.isDuplicate || d.ineligible
             ? 0
             : d.ocrAmount != null
               ? Number(d.ocrAmount.toString())
