@@ -1681,6 +1681,11 @@ export interface PayoutDocument {
   // persists the new array wholesale. `null` when OCR didn't extract any
   // line items (pre-formaggi rows or unparseable receipts).
   ocrLineItems?: ReceiptLineItem[] | null;
+  // culatello-92104: admin-marked duplicate flag. When true the reviewer
+  // modal dims the row + excludes its OCR amount from the receipt sum and
+  // the host PATCH finalAmountUsd recompute path. Optional on the wire so
+  // older cached payloads still type-check.
+  isDuplicate?: boolean;
   ocrError: string | null;
   sortOrder: number;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows

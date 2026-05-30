@@ -1814,6 +1814,11 @@ model PayoutDocument {
   uploadedByEmail  String?  @map("uploaded_by_email")
   uploadedBy       User?    @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   sortOrder        Int      @default(0) @map("sort_order")
+  // culatello-92104: admin-flagged duplicate receipts. Visually dimmed in the
+  // reviewer modal, excluded from the OCR sum, and ignored by the host PATCH
+  // finalAmountUsd recompute path so admin edits propagate correctly. The
+  // flag is reversible from the same toggle.
+  isDuplicate      Boolean  @default(false) @map("is_duplicate")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in

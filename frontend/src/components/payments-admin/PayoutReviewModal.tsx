@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play, ChevronDown, ChevronRight, Plus, Trash2, Copy } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
@@ -396,6 +396,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     ocrAmount: number | null;
     ocrCurrency: string | null;
     ocrLineItems?: ReceiptLineItem[] | null;
+    // culatello-92104: per-receipt duplicate flag override so the modal
+    // reflects an in-flight toggle without waiting for parent refresh.
+    isDuplicate?: boolean;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
@@ -443,6 +446,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [lineItemsSavingId, setLineItemsSavingId] = useState<string | null>(null);
   const [lineItemsSaveErrors, setLineItemsSaveErrors] = useState<Record<string, string>>({});
 
+  // culatello-92104 (#1): docId of the right-pane receipt row currently
+  // highlighted from a left-pane thumbnail click. Cleared by a setTimeout
+  // ~1.5s later so the amber outline + animate-pulse fade out.
+  const [highlightedReceiptId, setHighlightedReceiptId] = useState<string | null>(null);
+  // culatello-92104 (#2): per-row "Mark duplicate" loading state and any
+  // toggle errors. Scoped separately from the amount/currency save state
+  // above so a dup-toggle failure doesn't clobber the inline edit error.
+  const [duplicateSavingId, setDuplicateSavingId] = useState<string | null>(null);
+  const [duplicateSaveErrors, setDuplicateSaveErrors] = useState<Record<string, string>>({});
+
   // Hooks must be declared above any early returns. There aren't any early
   // returns in this component today, but keeping all hooks grouped here makes
   // the rule-of-hooks invariant easier to verify.
@@ -464,12 +477,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           // taralli-92104: layer the persisted line items on top of the
           // original document too so the grid renders the saved values
           // after PATCH without waiting for a parent refresh.
+          // culatello-92104: same treatment for the duplicate flag so the
+          // dim + pill update immediately on toggle.
           return {
             ...d,
             ocrAmount: ov.ocrAmount,
             ocrCurrency: ov.ocrCurrency,
             ocrLineItems:
               ov.ocrLineItems !== undefined ? ov.ocrLineItems : d.ocrLineItems,
+            isDuplicate:
+              ov.isDuplicate !== undefined ? ov.isDuplicate : d.isDuplicate,
           };
         }),
     [payout.documents, receiptOverrides],
@@ -581,6 +598,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           // The backend echoes the current persisted array regardless of
           // whether we PATCHed it, so trust the server response.
           ocrLineItems: updated.ocrLineItems,
+          // culatello-92104: server echoes the duplicate flag; carry it
+          // through so a previous dup toggle isn't lost when amount/currency
+          // is also edited.
+          isDuplicate: updated.isDuplicate,
         },
       }));
       // Sync the draft text to the canonical saved value so the inputs match
@@ -782,6 +803,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           ocrAmount: updated.ocrAmount,
           ocrCurrency: updated.ocrCurrency,
           ocrLineItems: updated.ocrLineItems,
+          // culatello-92104: see saveReceiptEdit comment.
+          isDuplicate: updated.isDuplicate,
         },
       }));
       // Re-seed the draft from the canonical saved array so the next render
@@ -800,6 +823,91 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     }
   }
 
+  // culatello-92104 (#1): scroll-to + highlight the right-pane receipt row
+  // matching `docId`. Triggered from a left-pane thumbnail click so admins
+  // can immediately edit amount/currency/line items after seeing the photo.
+  // Also expands the line-items section if it's collapsed so the editor is
+  // fully visible. Highlight clears ~1.5s later via setTimeout — the row
+  // gets an amber outline + animate-pulse class while active. We render
+  // ALONGSIDE the lightbox (not instead of) so admins can review the photo
+  // and edit at the same time; the lightbox already supports keyboard
+  // dismiss.
+  function scrollToReceiptRow(docId: string) {
+    const el = document.getElementById(`receipt-row-${docId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setHighlightedReceiptId(docId);
+    // Expand the line-items section so the editor is visible — same path
+    // as the chevron click but always opens (doesn't toggle off).
+    setLineItemsExpanded((m) => ({ ...m, [docId]: true }));
+    // Seed the drafts if needed so the just-expanded grid is editable.
+    const persistedItems = receipts.find((r) => r.id === docId)?.ocrLineItems;
+    ensureLineItemDrafts(docId, persistedItems);
+    window.setTimeout(() => {
+      setHighlightedReceiptId((cur) => (cur === docId ? null : cur));
+    }, 1500);
+  }
+
+  // culatello-92104 (#2): toggle the per-receipt duplicate flag via the
+  // existing PATCH /documents/:docId endpoint. Optimistic-friendly: we
+  // immediately mirror the new value into `receiptOverrides` so the dim/
+  // pill update is instant, and roll back on error. Action is reversible
+  // — same toggle un-marks (no confirm modal per project convention).
+  async function toggleDuplicate(docId: string, nextValue: boolean) {
+    setDuplicateSavingId(docId);
+    setDuplicateSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    // Capture the prior value so we can roll back on PATCH failure. Read
+    // from the override map first; fall back to the canonical document.
+    const prior = receipts.find((r) => r.id === docId);
+    const priorIsDuplicate = prior?.isDuplicate === true;
+    setReceiptOverrides((m) => {
+      const cur = m[docId] ?? {
+        ocrAmount: prior?.ocrAmount ?? null,
+        ocrCurrency: prior?.ocrCurrency ?? null,
+      };
+      return { ...m, [docId]: { ...cur, isDuplicate: nextValue } };
+    });
+    try {
+      const updated = await markReceiptDuplicate(docId, nextValue);
+      setReceiptOverrides((m) => {
+        const cur = m[docId] ?? {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+        };
+        return {
+          ...m,
+          [docId]: {
+            ...cur,
+            // Server is authoritative; sync the full override block.
+            ocrAmount: updated.ocrAmount,
+            ocrCurrency: updated.ocrCurrency,
+            ocrLineItems: updated.ocrLineItems,
+            isDuplicate: updated.isDuplicate,
+          },
+        };
+      });
+    } catch (err: any) {
+      // Roll back the optimistic mirror so the UI matches the persisted
+      // state when the PATCH failed.
+      setReceiptOverrides((m) => {
+        const cur = m[docId];
+        if (!cur) return m;
+        return { ...m, [docId]: { ...cur, isDuplicate: priorIsDuplicate } };
+      });
+      setDuplicateSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to update duplicate flag',
+      }));
+    } finally {
+      setDuplicateSavingId(null);
+    }
+  }
+
   // bresaola-89172: keyboard nav for the lightbox now lives inside the
   // ReceiptLightbox component itself (Esc to close, arrows to cycle). The
   // parent modal still listens for Esc here to close the review modal —
@@ -815,7 +923,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, lightboxIndex]);
 
-  const ocrSum = receipts.reduce((sum, r) => sum + (Number(r.ocrAmount) || 0), 0);
+  // culatello-92104: duplicates are evidence-only — exclude their OCR
+  // amounts from the receipt sum so admins see the corrected total. The
+  // host PATCH recompute path (backend/payout.routes.ts) does the same.
+  const ocrSum = receipts.reduce(
+    (sum, r) => sum + (r.isDuplicate ? 0 : (Number(r.ocrAmount) || 0)),
+    0,
+  );
+  const duplicateCount = receipts.reduce(
+    (n, r) => n + (r.isDuplicate ? 1 : 0),
+    0,
+  );
 
   // coppa-92103: the parent Payout row's `originalAmount` / `originalCurrency`
   // / `exchangeRate` columns only ever hold the FIRST successful FX conversion
@@ -831,6 +949,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const originalSummary = useMemo(() => {
     const receiptsWithFx = receipts.filter(
       (r) =>
+        // culatello-92104: exclude admin-marked duplicates from the
+        // original-currency totals + the extracted USD sum so the summary
+        // line reflects the corrected payout.
+        !r.isDuplicate &&
         r.originalCurrency != null &&
         r.originalCurrency !== '' &&
         r.originalAmount != null &&
@@ -1232,12 +1354,27 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     // focaccia-92104: receipt thumbnails sit after the
                     // payment-app pizzas in the merged carousel.
                     const carouselIdx = pizzas.length + idx;
+                    const isDup = doc.isDuplicate === true;
                     return (
                       <button
                         key={doc.id}
                         type="button"
-                        onClick={() => setLightboxIndex(carouselIdx)}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                        // culatello-92104 (#1): clicking the thumbnail now
+                        // does BOTH — opens the lightbox AND scrolls the
+                        // right-pane editor row into view + highlights it.
+                        // Picked the dual behavior over a corner-icon split
+                        // so a single tap accomplishes "see this receipt
+                        // and edit it" — the flow admins were doing manually.
+                        onClick={() => {
+                          setLightboxIndex(carouselIdx);
+                          if (canEditReceipts) scrollToReceiptRow(doc.id);
+                        }}
+                        // culatello-92104 (#2): admin-marked duplicates dim
+                        // to 50% so the grid visually reflects the corrected
+                        // payout at a glance.
+                        className={`relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group ${
+                          isDup ? 'opacity-50' : ''
+                        }`}
                         title={doc.fileName}
                       >
                         {isVideoFile(doc) ? (
@@ -1269,6 +1406,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
                           receipt
                         </span>
+                        {/* culatello-92104: DUPLICATE pill on the thumbnail
+                            so admins see at a glance which receipts are
+                            evidence-only. */}
+                        {isDup && (
+                          <span className="absolute top-1 right-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-white">
+                            duplicate
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -1592,8 +1737,22 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       draftCur !== (r.ocrCurrency ?? '');
                     const saving = receiptSavingId === r.id;
                     const saveError = receiptSaveErrors[r.id];
+                    // culatello-92104: dim the row when marked duplicate +
+                    // amber outline + pulse when admin clicked its thumbnail.
+                    const isDup = r.isDuplicate === true;
+                    const isHighlighted = highlightedReceiptId === r.id;
+                    const dupSaving = duplicateSavingId === r.id;
+                    const dupError = duplicateSaveErrors[r.id];
                     return (
-                      <li key={r.id} className="text-sm">
+                      <li
+                        key={r.id}
+                        id={`receipt-row-${r.id}`}
+                        className={`text-sm rounded ${
+                          isHighlighted
+                            ? 'ring-2 ring-amber-400 animate-pulse'
+                            : ''
+                        } ${isDup ? 'opacity-50' : ''}`}
+                      >
                         <div className="flex items-center gap-2">
                           <span
                             className={`w-2 h-2 rounded-full flex-shrink-0 ${
@@ -1673,6 +1832,34 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                   Retry OCR
                                 </button>
                               )}
+                              {/* culatello-92104 (#2): per-row "Mark duplicate"
+                                  toggle. Reversible — label + tooltip flip when
+                                  already marked. Triggers the optimistic
+                                  override + PATCH /documents/:docId path;
+                                  errors surface below the row alongside the
+                                  amount-save error. */}
+                              <button
+                                type="button"
+                                onClick={() => toggleDuplicate(r.id, !isDup)}
+                                disabled={dupSaving}
+                                className={`px-2 py-1 rounded text-xs disabled:opacity-40 inline-flex items-center gap-1 ${
+                                  isDup
+                                    ? 'border border-red-500 text-red-600 hover:bg-red-50'
+                                    : 'border border-theme-stroke text-theme-text hover:bg-theme-surface'
+                                }`}
+                                title={
+                                  isDup
+                                    ? 'Un-mark this receipt as a duplicate'
+                                    : 'Mark this receipt as a duplicate (excluded from sums)'
+                                }
+                              >
+                                {dupSaving ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <Copy size={12} />
+                                )}
+                                {isDup ? 'Unmark duplicate' : 'Mark duplicate'}
+                              </button>
                               {conf > 0 && (
                                 <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
                                   {(conf * 100).toFixed(0)}%
@@ -1720,6 +1907,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         )}
                         {saveError && (
                           <div className="text-xs text-red-600 mt-0.5 ml-4">{saveError}</div>
+                        )}
+                        {/* culatello-92104: duplicate-toggle error. Scoped
+                            separately from amount/currency save errors. */}
+                        {dupError && (
+                          <div className="text-xs text-red-600 mt-0.5 ml-4">{dupError}</div>
                         )}
                         {/* taralli-92104: collapsed line item editor. Caret
                             toggles expansion; on expand we seed the drafts
@@ -1906,8 +2098,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="text-xs text-theme-text-muted mt-2 border-t border-theme-stroke pt-2">
                   {/* mortadella-92103: ocrAmount is now USD (post-fix). Old
                       rows uploaded pre-mortadella may have non-USD amounts
-                      stamped as USD — the backfill script corrects those. */}
+                      stamped as USD — the backfill script corrects those.
+                      culatello-92104: when admin-marked duplicates exist,
+                      surface the count next to the sum so the exclusion is
+                      visible (the sum has already filtered them out). */}
                   Sum of OCR amounts (USD): ${ocrSum.toFixed(2)}
+                  {duplicateCount > 0 && (
+                    <span className="ml-1 text-theme-text-faint">
+                      (excludes {duplicateCount} duplicate{duplicateCount === 1 ? '' : 's'})
+                    </span>
+                  )}
                   {canEditReceipts && (
                     <span className="block mt-1 text-theme-text-faint">
                       Editing a receipt's OCR amount or currency here updates the document only —

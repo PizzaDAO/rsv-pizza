@@ -4258,6 +4258,8 @@ export async function updatePayoutDocument(
     ocrAmount?: number | null;
     ocrCurrency?: string | null;
     ocrLineItems?: ReceiptLineItem[] | null;
+    // culatello-92104: admin-toggleable duplicate flag. Reversible.
+    isDuplicate?: boolean;
   },
 ): Promise<{
   id: string;
@@ -4273,6 +4275,7 @@ export async function updatePayoutDocument(
   originalCurrency: string | null;
   exchangeRate: number | null;
   ocrLineItems: ReceiptLineItem[] | null;
+  isDuplicate: boolean;
   ocrError: string | null;
   sortOrder: number;
   uploadedByUserId: string | null;
@@ -4282,6 +4285,19 @@ export async function updatePayoutDocument(
     { method: 'PATCH', body: patch },
   );
   return res.document;
+}
+
+/**
+ * culatello-92104: typed wrapper for the per-receipt "Mark duplicate" toggle.
+ * Thin convenience over `updatePayoutDocument({ isDuplicate })` so the
+ * reviewer modal callsite reads as the action it performs. Reversible —
+ * pass `false` to un-mark.
+ */
+export async function markReceiptDuplicate(
+  docId: string,
+  isDuplicate: boolean,
+) {
+  return updatePayoutDocument(docId, { isDuplicate });
 }
 
 /**

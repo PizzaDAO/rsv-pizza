@@ -604,6 +604,10 @@ function serializePayout(row: any): any {
       ocrLineItems: Array.isArray(d.ocrLineItems) ? d.ocrLineItems : null,
       ocrError: d.ocrError,
       sortOrder: d.sortOrder,
+      // culatello-92104: admin-flagged duplicate receipts. Reviewer modal
+      // dims these rows + excludes them from the OCR sum + the host PATCH
+      // finalAmountUsd recompute path.
+      isDuplicate: d.isDuplicate === true,
       // pancetta-37195: per-doc uploader attribution. Live name from the
       // join; cached email is the fallback if the User is later deleted.
       uploadedByUserId: d.uploadedByUserId ?? null,
@@ -4046,7 +4050,11 @@ router.post(
 //     unitPrice?: number,
 //     subtotal?: number,
 //     category?: 'pizza'|'beverage'|'topping'|'side'|'dessert'|'tax'|'tip'|'fee'|'other'
-//   }> | null
+//   }> | null,
+//   // culatello-92104: admin-marked duplicate flag. Reversible. Excluded
+//   // from the reviewer modal's OCR sum, the host PATCH finalAmountUsd
+//   // recompute, and the pizza-prices analytics aggregate.
+//   isDuplicate?: boolean
 // }
 //   - null clears the field; undefined leaves it untouched.
 //   - ocrAmount must be finite (or null).
@@ -4087,6 +4095,9 @@ router.patch(
           // taralli-92104: pull the existing line items so the audit row
           // can record old → new counts when the admin edits them.
           ocrLineItems: true,
+          // culatello-92104: pull the old duplicate flag so the audit row
+          // can record the transition (marked vs unmarked).
+          isDuplicate: true,
         },
       });
       if (!doc) {
@@ -4177,6 +4188,9 @@ router.patch(
         originalCurrency?: string | null;
         exchangeRate?: number | null;
         ocrLineItems?: Prisma.InputJsonValue | typeof Prisma.DbNull;
+        // culatello-92104: admin-only duplicate flag. Reversible — the same
+        // toggle un-marks. Persisted to `payout_documents.is_duplicate`.
+        isDuplicate?: boolean;
       } = {};
 
       if (body.ocrAmount !== undefined) {
@@ -4240,6 +4254,22 @@ router.patch(
           );
           data.ocrLineItems = sanitized as unknown as Prisma.InputJsonValue;
         }
+      }
+
+      // culatello-92104: admin-toggleable duplicate flag. Accept strict
+      // boolean only — coercion would hide caller bugs. The flag is purely
+      // a review-side annotation; it doesn't move money on its own. The
+      // host PATCH recompute path (provolone-39042 + crocchetta-92103) and
+      // the reviewer modal's OCR sum both filter `isDuplicate=true` rows.
+      if (body.isDuplicate !== undefined) {
+        if (typeof body.isDuplicate !== 'boolean') {
+          throw new AppError(
+            'isDuplicate must be a boolean',
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        data.isDuplicate = body.isDuplicate;
       }
 
       // mortadella-92103: when admin changes the currency on a doc that has
@@ -4389,6 +4419,10 @@ router.patch(
             ocrLineItems: data.ocrLineItems === undefined
               ? undefined
               : data.ocrLineItems,
+            // culatello-92104: persist the duplicate-flag toggle.
+            isDuplicate: data.isDuplicate === undefined
+              ? undefined
+              : data.isDuplicate,
           },
         });
 
@@ -4444,6 +4478,32 @@ router.patch(
               },
             });
           }
+          // culatello-92104: audit row for duplicate-flag transitions.
+          // Only records when the value actually changes (matches the
+          // amount/currency audit precedent above — no-op PATCHes don't
+          // pollute the audit log).
+          if (
+            data.isDuplicate !== undefined
+            && data.isDuplicate !== doc.isDuplicate
+          ) {
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: doc.payoutId,
+                action: 'edit_documents',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: JSON.stringify({
+                  scope: 'receipt',
+                  documentId: docId,
+                  message: data.isDuplicate
+                    ? 'marked duplicate'
+                    : 'unmarked duplicate',
+                  oldIsDuplicate: doc.isDuplicate,
+                  newIsDuplicate: data.isDuplicate,
+                }),
+              },
+            });
+          }
         }
 
         return row;
@@ -4469,6 +4529,8 @@ router.patch(
           // taralli-92104: echo the persisted line items so the modal can
           // sync its draft state to the canonical row without re-fetching.
           ocrLineItems: Array.isArray(updated.ocrLineItems) ? updated.ocrLineItems : null,
+          // culatello-92104: echo the persisted duplicate flag.
+          isDuplicate: updated.isDuplicate === true,
           ocrError: updated.ocrError,
           sortOrder: updated.sortOrder,
           uploadedByUserId: updated.uploadedByUserId ?? null,
@@ -4537,6 +4599,10 @@ router.get(
           // Receipts without a parent payout (orphaned via Payout delete +
           // SetNull) can't be priced — skip them.
           payout: { is: payoutFilter },
+          // culatello-92104: admin-marked duplicates aren't real prices —
+          // exclude them from the analytics aggregate so the by-country
+          // averages don't double-count the same purchase.
+          isDuplicate: false,
         },
         select: {
           id: true,

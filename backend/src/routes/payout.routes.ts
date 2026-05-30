@@ -1806,8 +1806,18 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       const survivingReceipts = existing.documents.filter(
         d => d.kind === 'receipt' && !removedSet.has(d.id)
       );
+      // culatello-92104: admin-flagged duplicates are excluded from the
+      // recompute sum so the admin's intent (these two receipts are the
+      // same purchase) propagates back to the payout's finalAmountUsd on
+      // the next host-side edit. Receipts persist for evidence either way.
       const survivingOcrSum = survivingReceipts.reduce(
-        (sum, d) => sum + (d.ocrAmount != null ? Number(d.ocrAmount.toString()) : 0),
+        (sum, d) =>
+          sum
+          + (d.isDuplicate
+            ? 0
+            : d.ocrAmount != null
+              ? Number(d.ocrAmount.toString())
+              : 0),
         0
       );
       const fullOcrSum = survivingOcrSum + newOcrSum;
