@@ -14,9 +14,11 @@ import {
   ExternalLink,
   Tag,
   User as UserIcon,
+  Play,
 } from 'lucide-react';
 import type {
   AdminPayout,
+  AdminPayoutEventPhoto,
   PartyPayoutsRow,
   PayoutDocument,
   PayoutStatus,
@@ -30,6 +32,23 @@ import {
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
+import { isVideoFile } from '../../lib/mediaUtils';
+
+/**
+ * ricotta-92104: split party.photos into "Pizza photos" (tag === 'Pizza' —
+ * the default-tag value — or 'pizza-selfie' — the EventPage selfie tag) and
+ * "Event photos" (everything else). Mirrors the focaccia-92104 split in
+ * PayoutReviewModal so the by-city expansion matches the per-payout modal.
+ */
+function isPizzaPhoto(p: AdminPayoutEventPhoto): boolean {
+  return (p.tags ?? []).some((t) => {
+    const tl = t.toLowerCase();
+    return tl === 'pizza' || tl === 'pizza-selfie';
+  });
+}
+
+/** Max thumbnails rendered inline before the user has to hit "See all". */
+const PHOTO_PREVIEW_LIMIT = 4;
 
 /**
  * mostarda-92103: rework of the /payments by-city expanded row. Each city
@@ -48,6 +67,10 @@ import { isSwcHubParty } from '../../utils/swcHub';
  *     desc, click → ReceiptLightbox
  *   - Payment ledger: one row per paid/completed payout (date, USD amount,
  *     method, recipient, tx hash). Click → PayoutReviewModal for that row.
+ *   - ricotta-92104: Event photos + Pizza photos preview strips (up to 4
+ *     thumbs per bucket, "See all" expands inline). Click any thumb → opens
+ *     the bucket's own lightbox carousel. Mirrors the focaccia-92104 split
+ *     in the per-payout PayoutReviewModal.
  *   - City-level action menu: Mark city paid (or Close city) + Add external
  *     payment.
  *
@@ -271,11 +294,36 @@ function CityExpansion({
   busyRowId?: string | null;
 }) {
   // Hooks first — never below a conditional return. (feedback_hooks_above_early_returns)
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  //
+  // ricotta-92104: the lightbox now serves three distinct buckets (receipts,
+  // event photos, pizza photos) instead of just receipts. The state tracks
+  // which bucket is active alongside the index so opening a thumbnail in one
+  // section doesn't bleed images from another into the carousel.
+  const [lightbox, setLightbox] = useState<{
+    bucket: 'receipt' | 'event' | 'pizza';
+    index: number;
+  } | null>(null);
   const [showPendingClaims, setShowPendingClaims] = useState(false);
 
   // Merge receipts across all payouts on the party — multi-host pot.
   const receiptEntries = useMemo(() => collectReceipts(row.payouts), [row.payouts]);
+
+  // ricotta-92104: party-level photos for the Event/Pizza preview sections.
+  // Backend now ships these on the by-party row (mirrors the per-payout
+  // serializer's `eventPhotos`). Older cached payloads may be missing the
+  // field — fall back to empty array so the sections just hide.
+  const allEventPhotos = useMemo<AdminPayoutEventPhoto[]>(
+    () => row.eventPhotos ?? [],
+    [row.eventPhotos],
+  );
+  const pizzaPhotos = useMemo(
+    () => allEventPhotos.filter(isPizzaPhoto),
+    [allEventPhotos],
+  );
+  const eventPhotos = useMemo(
+    () => allEventPhotos.filter((p) => !isPizzaPhoto(p)),
+    [allEventPhotos],
+  );
 
   // Unified-rollup totals computed client-side from the payouts already on
   // the wire. NB: the by-party endpoint already exposes pending/approved/
@@ -341,7 +389,7 @@ function CityExpansion({
     return Array.from(seen.values());
   }, [row.payouts]);
 
-  const lightboxImages: ReceiptLightboxImage[] = useMemo(
+  const receiptLightboxImages: ReceiptLightboxImage[] = useMemo(
     () =>
       receiptEntries.map((e) => ({
         url: e.doc.url,
@@ -350,6 +398,34 @@ function CityExpansion({
       })),
     [receiptEntries],
   );
+  // ricotta-92104: separate lightbox carousels per photo bucket so navigation
+  // stays inside the section the admin clicked into (matches the
+  // focaccia-92104 pattern where each section is its own grouping).
+  const eventLightboxImages: ReceiptLightboxImage[] = useMemo(
+    () =>
+      eventPhotos.map((p) => ({
+        url: p.url,
+        fileName: p.fileName,
+        mimeType: p.mimeType,
+      })),
+    [eventPhotos],
+  );
+  const pizzaLightboxImages: ReceiptLightboxImage[] = useMemo(
+    () =>
+      pizzaPhotos.map((p) => ({
+        url: p.url,
+        fileName: p.fileName,
+        mimeType: p.mimeType,
+      })),
+    [pizzaPhotos],
+  );
+
+  const activeLightboxImages: ReceiptLightboxImage[] =
+    lightbox?.bucket === 'event'
+      ? eventLightboxImages
+      : lightbox?.bucket === 'pizza'
+        ? pizzaLightboxImages
+        : receiptLightboxImages;
 
   const tags = row.party.eventTags ?? [];
 
@@ -536,7 +612,7 @@ function CityExpansion({
               <button
                 key={e.doc.id}
                 type="button"
-                onClick={() => setLightboxIndex(idx)}
+                onClick={() => setLightbox({ bucket: 'receipt', index: idx })}
                 className="group relative w-16 h-16 rounded-md overflow-hidden border border-theme-stroke hover:border-theme-stroke-hover"
                 title={`${e.doc.fileName}${
                   e.doc.uploadedByName || e.doc.uploadedByEmail
@@ -663,18 +739,140 @@ function CityExpansion({
         </div>
       )}
 
-      {receiptEntries.length === 0 && rollup.paidPayouts.length === 0 && inflightPayouts.length === 0 && (
+      {/* ricotta-92104: party-level Event + Pizza photo previews. Sits below
+          the payment ledger so the financial rollup is the admin's first
+          read; photos give visual context when drilling in. Empty buckets
+          hide entirely via PhotoPreviewSection. Mirrors the focaccia-92104
+          split in PayoutReviewModal. */}
+      <PhotoPreviewSection
+        label="Event photos"
+        photos={eventPhotos}
+        onThumbClick={(idx) => setLightbox({ bucket: 'event', index: idx })}
+      />
+      <PhotoPreviewSection
+        label="Pizza photos"
+        photos={pizzaPhotos}
+        onThumbClick={(idx) => setLightbox({ bucket: 'pizza', index: idx })}
+      />
+
+      {receiptEntries.length === 0
+        && rollup.paidPayouts.length === 0
+        && inflightPayouts.length === 0
+        && eventPhotos.length === 0
+        && pizzaPhotos.length === 0 && (
         <div className="text-sm text-theme-text-faint italic">
           No payouts on this city match the current filters.
         </div>
       )}
 
       <ReceiptLightbox
-        isOpen={lightboxIndex != null}
-        images={lightboxImages}
-        initialIndex={lightboxIndex ?? 0}
-        onClose={() => setLightboxIndex(null)}
+        isOpen={lightbox != null}
+        images={activeLightboxImages}
+        initialIndex={lightbox?.index ?? 0}
+        onClose={() => setLightbox(null)}
       />
+    </div>
+  );
+}
+
+/**
+ * ricotta-92104: thumbnail grid for one photo bucket (Event or Pizza). Shows
+ * up to PHOTO_PREVIEW_LIMIT thumbs inline; a "See all" button reveals the
+ * full set in the same row. Click any thumb to open the section's lightbox
+ * carousel starting at the clicked index. Mirrors the per-payout
+ * PayoutReviewModal photo grids (focaccia-92104) but trimmed to a horizontal
+ * preview strip for the city-level rollup.
+ */
+function PhotoPreviewSection({
+  label,
+  photos,
+  onThumbClick,
+}: {
+  label: string;
+  photos: AdminPayoutEventPhoto[];
+  onThumbClick: (index: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (photos.length === 0) return null;
+
+  const visible = expanded ? photos : photos.slice(0, PHOTO_PREVIEW_LIMIT);
+  const hasMore = photos.length > PHOTO_PREVIEW_LIMIT;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs uppercase tracking-wide text-theme-text-muted">
+          {label} ({photos.length})
+        </div>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-sky-400 hover:text-sky-300 hover:underline"
+          >
+            {expanded
+              ? 'Show less'
+              : `See all (${photos.length})`}
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {visible.map((p, idx) => {
+          const isHidden = p.status !== 'approved';
+          const isVideo = isVideoFile(p);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onThumbClick(idx)}
+              className="relative w-16 h-16 rounded-md overflow-hidden border border-theme-stroke hover:border-theme-stroke-hover group"
+              title={p.caption || p.fileName}
+            >
+              {/* melanzane-92103 / focaccia-92104: video photos render as
+                  <video preload=metadata> so the browser pulls the first
+                  frame for the poster, with a play-icon overlay. */}
+              {isVideo ? (
+                <>
+                  <video
+                    src={p.url}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/50 rounded-full p-1">
+                      <Play className="text-white" size={12} fill="white" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <img
+                  src={p.thumbnailUrl || p.url}
+                  alt={p.fileName}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              )}
+              {/* margherita-43821 / focaccia-92104: Hidden pill when the
+                  photo isn't approved for public display. */}
+              {isHidden && (
+                <span
+                  className="absolute top-0.5 left-0.5 text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-red-500 text-white"
+                  title={`Photo status: ${p.status} — not visible to the public`}
+                >
+                  Hidden
+                </span>
+              )}
+              {p.starred && (
+                <span className="absolute top-0.5 right-0.5 text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-amber-400 text-black">
+                  ★
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
