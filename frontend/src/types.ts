@@ -336,6 +336,7 @@ export interface Party {
   telegramGroup?: string | null;
   hostTelegramChatId?: string | null;
   hostTelegramLinkToken?: string | null;
+  receiptsReminderSentAt?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
   // romana-61204: post-event survey toggle
@@ -2251,6 +2252,8 @@ export interface PartyPayoutsRow {
      * payloads during a rolling deploy.
      */
     adminNotes?: string | null;
+    /** ISO timestamp of when the TG receipts reminder was last sent. */
+    receiptsReminderSentAt?: string | null;
   };
   aggregates: {
     pendingCount: number;

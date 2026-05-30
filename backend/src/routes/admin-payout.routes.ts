@@ -125,6 +125,8 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // expansion for admin viewers and stripped from the response for
   // underbosses (see serializer below).
   adminNotes: true,
+  // Track when the TG receipts reminder was last sent for this city.
+  receiptsReminderSentAt: true,
   _count: {
     select: {
       guests: {
@@ -1825,6 +1827,10 @@ router.get(
               req.viewerRole === 'admin'
                 ? (b.partyMeta.adminNotes ?? null)
                 : null,
+            // When the TG receipts reminder was last sent.
+            receiptsReminderSentAt: b.partyMeta.receiptsReminderSentAt
+              ? b.partyMeta.receiptsReminderSentAt.toISOString()
+              : null,
           },
           aggregates: {
             pendingCount: b.pendingCount,
@@ -5404,9 +5410,16 @@ router.post(
         groupReason = 'no city TG group set';
       }
 
-      // Grep-marker audit line (no DB row per task spec). Includes party id,
-      // slug, and per-channel outcome so post-hoc recovery is one `vercel
-      // logs | grep` away.
+      // Record when the reminder was sent (if at least one message succeeded).
+      if (hostDmSent || groupSent) {
+        await prisma.party.update({
+          where: { id: partyId },
+          data: { receiptsReminderSentAt: new Date() },
+        });
+      }
+
+      // Grep-marker audit line. Includes party id, slug, and per-channel
+      // outcome so post-hoc recovery is one `vercel logs | grep` away.
       console.log(
         `[crocchetta-92106][tg-reminder] party=${party.id} slug=${slug} host_dm=${
           hostDmSent ? 'ok' : `skipped:${hostDmReason ?? 'unknown'}`

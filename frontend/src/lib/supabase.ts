@@ -822,6 +822,7 @@ export interface DbParty {
   // Host Telegram bot connection
   host_telegram_chat_id?: string | null; // serialized as string from API (BigInt)
   host_telegram_link_token?: string | null;
+  receipts_reminder_sent_at?: string | null;
   // Underboss status
   underboss_status?: string | null;
   // Turtle role selection toggle
@@ -904,7 +905,7 @@ export const SAFE_PARTY_COLUMNS = `
   quiz_enabled,
   survey_enabled,
   telegram_group,
-  host_telegram_chat_id, host_telegram_link_token,
+  host_telegram_chat_id, host_telegram_link_token, receipts_reminder_sent_at,
   turtle_roles_enabled,
   reminders_enabled,
   underboss_status,

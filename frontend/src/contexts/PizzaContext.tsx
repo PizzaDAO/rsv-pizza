@@ -168,6 +168,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     telegramGroup: dbParty.telegram_group || null,
     hostTelegramChatId: dbParty.host_telegram_chat_id ? String(dbParty.host_telegram_chat_id) : null,
     hostTelegramLinkToken: dbParty.host_telegram_link_token || null,
+    receiptsReminderSentAt: dbParty.receipts_reminder_sent_at || null,
     underbossStatus: (dbParty.underboss_status as any) || null,
     turtleRolesEnabled: dbParty.turtle_roles_enabled || false,
     surveyEnabled: dbParty.survey_enabled ?? true,

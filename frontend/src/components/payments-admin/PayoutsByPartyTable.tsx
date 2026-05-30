@@ -298,6 +298,7 @@ function CityActionsMenu({
   isFlaggedScam,
   scamFlagBusy,
   tgReminderBusy,
+  receiptsReminderSentAt,
 }: {
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
@@ -318,6 +319,7 @@ function CityActionsMenu({
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
   tgReminderBusy: boolean;
+  receiptsReminderSentAt?: string | null;
 }) {
   // Hooks-above-early-returns: declare useState before the no-actions guard
   // so the conditional return can't reorder hooks on a re-render where the
@@ -485,9 +487,18 @@ function CityActionsMenu({
                         }
                       />
                     )}
-                    {confirmTgReminder
-                      ? 'Click again to confirm'
-                      : 'Send receipts reminder'}
+                    <span className="flex flex-col items-start">
+                      <span>
+                        {confirmTgReminder
+                          ? 'Click again to confirm'
+                          : 'Send receipts reminder'}
+                      </span>
+                      {receiptsReminderSentAt && !confirmTgReminder && (
+                        <span className="text-xs text-theme-text-muted">
+                          Sent {new Date(receiptsReminderSentAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 )}
               </div>
@@ -2500,6 +2511,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
                           tgReminderBusy={tgReminderBusy}
+                          receiptsReminderSentAt={row.party.receiptsReminderSentAt}
                           onMarkPartyPaid={
                             showMarkPartyPaid && onMarkPartyPaid
                               ? () => onMarkPartyPaid(row.party.id)
