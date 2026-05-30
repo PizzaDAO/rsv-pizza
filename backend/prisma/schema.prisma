@@ -1819,6 +1819,17 @@ model PayoutDocument {
   // finalAmountUsd recompute path so admin edits propagate correctly. The
   // flag is reversible from the same toggle.
   isDuplicate      Boolean  @default(false) @map("is_duplicate")
+  // provola-92106: admin-flagged "ineligible for reimbursement" receipts.
+  // Semantically distinct from `isDuplicate` — this is a legitimate purchase
+  // (the host paid for it) that simply doesn't qualify under the reimbursement
+  // policy (alcohol, tips, personal items). Visually treated with amber tint +
+  // 135° diagonal stripes + INELIGIBLE pill (distinct from the duplicate's red
+  // 45° pattern). Same exclusion behavior as `isDuplicate`: excluded from the
+  // reviewer modal's OCR sum, the host PATCH `survivingOcrSum` recompute, the
+  // by-city `receiptUsdTotal`, and the pizza-prices analytics aggregate.
+  // Independent flags — both can be true on the same row but the UI prefers
+  // duplicate as the primary signal (duplicate pill wins on the thumbnail).
+  ineligible       Boolean  @default(false) @map("ineligible")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in

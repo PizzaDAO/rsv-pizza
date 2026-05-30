@@ -41,6 +41,7 @@ import { isVideoFile } from '../../lib/mediaUtils';
 import {
   updatePayoutDocument,
   markReceiptDuplicate,
+  markReceiptIneligible,
   retryPayoutDocumentOcr,
   flagPartyAsScam,
   POSSIBLE_SCAM_TAG,
@@ -556,6 +557,9 @@ function CityExpansion({
     ocrCurrency: string | null;
     ocrLineItems?: ReceiptLineItem[] | null;
     isDuplicate?: boolean;
+    // provola-92106: per-receipt ineligible flag override. Independent of
+    // `isDuplicate` — both can be true on the same row.
+    ineligible?: boolean;
     // caprino-92104: persist the FX recompute details so the lightbox
     // editor's "USD value @ rate" line refreshes immediately on save.
     originalAmount?: number | null;
@@ -573,6 +577,10 @@ function CityExpansion({
   // Mark-duplicate state.
   const [duplicateSavingId, setDuplicateSavingId] = useState<string | null>(null);
   const [duplicateSaveErrors, setDuplicateSaveErrors] = useState<Record<string, string>>({});
+  // provola-92106: Mark-ineligible state. Mirrors duplicate's scoping —
+  // separate buckets so a toggle failure on one doesn't clobber the other.
+  const [ineligibleSavingId, setIneligibleSavingId] = useState<string | null>(null);
+  const [ineligibleSaveErrors, setIneligibleSaveErrors] = useState<Record<string, string>>({});
   // Line-item editor state.
   const [lineItemDrafts, setLineItemDrafts] = useState<Record<string, LineItemDraft[]>>({});
   const [lineItemsSavingId, setLineItemsSavingId] = useState<string | null>(null);
@@ -603,6 +611,9 @@ function CityExpansion({
             ov.ocrLineItems !== undefined ? ov.ocrLineItems : e.doc.ocrLineItems,
           isDuplicate:
             ov.isDuplicate !== undefined ? ov.isDuplicate : e.doc.isDuplicate,
+          // provola-92106: layer in the ineligible override too.
+          ineligible:
+            ov.ineligible !== undefined ? ov.ineligible : e.doc.ineligible,
           // caprino-92104: layer the FX recompute fields so the lightbox
           // editor's "USD value @ rate" row refreshes without a refetch.
           originalAmount:
@@ -644,8 +655,14 @@ function CityExpansion({
     // OCR amounts from the "Receipts collected" rollup so the by-city tile
     // matches the per-payout modal's `ocrSum` semantics (which already
     // filters duplicates) and the host PATCH `survivingOcrSum` recompute.
+    // provola-92106: same exclusion for the ineligible flag — both filters
+    // share the same math.
     const receiptUsdTotal = receiptEntries.reduce(
-      (s, e) => s + (e.doc.isDuplicate ? 0 : (Number(e.doc.ocrAmount) || 0)),
+      (s, e) =>
+        s
+        + (e.doc.isDuplicate || e.doc.ineligible
+          ? 0
+          : (Number(e.doc.ocrAmount) || 0)),
       0,
     );
     const receiptCount = receiptEntries.length;
@@ -654,6 +671,14 @@ function CityExpansion({
     // proof the exclusion happened.
     const duplicateCount = receiptEntries.reduce(
       (n, e) => n + (e.doc.isDuplicate ? 1 : 0),
+      0,
+    );
+    // provola-92106: ineligible-but-not-also-duplicate count. The thumbnail
+    // pill + the rollup subtitle prefer duplicate as the primary signal
+    // when both flags are set, so this stays exclusive of the duplicate
+    // bucket to avoid double-counting in the "M dup + K ineligible" string.
+    const ineligibleCount = receiptEntries.reduce(
+      (n, e) => n + (!e.doc.isDuplicate && e.doc.ineligible ? 1 : 0),
       0,
     );
 
@@ -685,6 +710,7 @@ function CityExpansion({
       receiptUsdTotal,
       receiptCount,
       duplicateCount,
+      ineligibleCount,
       approvedUsd,
       paidUsd,
       outstandingUsd: Math.max(0, approvedUsd - paidUsd),
@@ -852,6 +878,10 @@ function CityExpansion({
           ocrCurrency: updated.ocrCurrency,
           ocrLineItems: updated.ocrLineItems,
           isDuplicate: updated.isDuplicate,
+          // provola-92106: carry through the server-authoritative ineligible
+          // flag so a prior toggle isn't lost when amount/currency is also
+          // edited.
+          ineligible: updated.ineligible,
           originalAmount: updated.originalAmount,
           originalCurrency: updated.originalCurrency,
           exchangeRate: updated.exchangeRate,
@@ -911,6 +941,8 @@ function CityExpansion({
             ocrCurrency: updated.ocrCurrency,
             ocrLineItems: updated.ocrLineItems,
             isDuplicate: updated.isDuplicate,
+            // provola-92106: server is authoritative on both flags.
+            ineligible: updated.ineligible,
           },
         };
       });
@@ -930,6 +962,62 @@ function CityExpansion({
       }));
     } finally {
       setDuplicateSavingId(null);
+    }
+  }, [receiptEntries]);
+
+  // provola-92106: toggle the per-receipt ineligible flag via the same
+  // PATCH /documents/:docId endpoint. Mirrors `toggleDuplicate` above —
+  // optimistic override, roll back on failure. Independent of the duplicate
+  // flag.
+  const toggleIneligible = useCallback(async (docId: string, nextValue: boolean) => {
+    setIneligibleSavingId(docId);
+    setIneligibleSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    const prior = receiptEntries.find((e) => e.doc.id === docId)?.doc;
+    setReceiptOverrides((m) => {
+      const cur = m[docId] ?? {
+        ocrAmount: prior?.ocrAmount ?? null,
+        ocrCurrency: prior?.ocrCurrency ?? null,
+      };
+      return { ...m, [docId]: { ...cur, ineligible: nextValue } };
+    });
+    try {
+      const updated = await markReceiptIneligible(docId, nextValue);
+      setReceiptOverrides((m) => {
+        const cur = m[docId] ?? {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+        };
+        return {
+          ...m,
+          [docId]: {
+            ...cur,
+            ocrAmount: updated.ocrAmount,
+            ocrCurrency: updated.ocrCurrency,
+            ocrLineItems: updated.ocrLineItems,
+            isDuplicate: updated.isDuplicate,
+            ineligible: updated.ineligible,
+          },
+        };
+      });
+    } catch (err: any) {
+      setReceiptOverrides((m) => {
+        const cur = m[docId];
+        if (!cur) return m;
+        return {
+          ...m,
+          [docId]: { ...cur, ineligible: prior?.ineligible === true },
+        };
+      });
+      setIneligibleSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to mark ineligible',
+      }));
+    } finally {
+      setIneligibleSavingId(null);
     }
   }, [receiptEntries]);
 
@@ -966,6 +1054,8 @@ function CityExpansion({
     const drafts = lineItemDrafts[docId] ?? [];
     let sum = 0;
     for (const d of drafts) {
+      // provola-92106: ineligible lines stay out of the rolled-up amount.
+      if (d.ineligible === true) continue;
       const n = Number(d.subtotal);
       if (Number.isFinite(n) && n >= 0) sum += n;
     }
@@ -1006,13 +1096,16 @@ function CityExpansion({
         if (!Number.isFinite(subtotal) || subtotal < 0) {
           throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
         }
-        return {
+        // provola-92106: persist per-line ineligible only when true.
+        const out: ReceiptLineItem = {
           name: d.name,
           qty,
           unitPrice,
           subtotal,
           category: d.category,
         };
+        if (d.ineligible === true) out.ineligible = true;
+        return out;
       });
       const updated = await updatePayoutDocument(docId, { ocrLineItems: items });
       setReceiptOverrides((m) => ({
@@ -1022,6 +1115,8 @@ function CityExpansion({
           ocrCurrency: updated.ocrCurrency,
           ocrLineItems: updated.ocrLineItems,
           isDuplicate: updated.isDuplicate,
+          // provola-92106: carry through the ineligible flag too.
+          ineligible: updated.ineligible,
         },
       }));
       setLineItemDrafts((m) => ({
@@ -1099,7 +1194,11 @@ function CityExpansion({
           a.qty !== b.qty ||
           a.unitPrice !== b.unitPrice ||
           a.subtotal !== b.subtotal ||
-          a.category !== b.category
+          a.category !== b.category ||
+          // provola-92106: per-line ineligible flag is dirty-trackable too.
+          // Normalize both sides to boolean so undefined === false comparisons
+          // don't false-positive.
+          (a.ineligible === true) !== (b.ineligible === true)
         ) {
           return true;
         }
@@ -1169,6 +1268,10 @@ function CityExpansion({
         dupSaving={duplicateSavingId === r.id}
         dupError={duplicateSaveErrors[r.id]}
         onToggleDuplicate={() => toggleDuplicate(r.id, !(r.isDuplicate === true))}
+        isIneligible={r.ineligible === true}
+        ineligibleSaving={ineligibleSavingId === r.id}
+        ineligibleError={ineligibleSaveErrors[r.id]}
+        onToggleIneligible={() => toggleIneligible(r.id, !(r.ineligible === true))}
         lineItemDrafts={liDrafts}
         lineItemsSaving={lineItemsSavingId === r.id}
         lineItemsSaveError={lineItemsSaveErrors[r.id]}
@@ -1220,6 +1323,8 @@ function CityExpansion({
     receiptSaveErrorCodes,
     duplicateSavingId,
     duplicateSaveErrors,
+    ineligibleSavingId,
+    ineligibleSaveErrors,
     lineItemDrafts,
     lineItemsSavingId,
     lineItemsSaveErrors,
@@ -1281,12 +1386,20 @@ function CityExpansion({
           /* coppa-92105: when duplicates exist, append "M duplicate(s) excluded"
               so admins see at a glance that the USD total skipped them. The
               culatello-92104 modal does the same on its "Sum of OCR amounts"
-              footer; this is the city-level mirror. */
-          sub={
-            rollup.duplicateCount > 0
-              ? `${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}, ${rollup.duplicateCount} duplicate${rollup.duplicateCount === 1 ? '' : 's'} excluded`
-              : `${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}`
-          }
+              footer; this is the city-level mirror.
+              provola-92106: parallel "K ineligible excluded" hint. Both
+              counts can appear in the same string when the city has a mix. */
+          sub={(() => {
+            const base = `${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}`;
+            const parts: string[] = [base];
+            if (rollup.duplicateCount > 0) {
+              parts.push(`${rollup.duplicateCount} duplicate${rollup.duplicateCount === 1 ? '' : 's'} excluded`);
+            }
+            if (rollup.ineligibleCount > 0) {
+              parts.push(`${rollup.ineligibleCount} ineligible excluded`);
+            }
+            return parts.join(', ');
+          })()}
           accent="text-theme-text"
         />
         <RollupTile
@@ -1405,7 +1518,10 @@ function CityExpansion({
               // duplicate thumbnails so the by-city grid matches the per-
               // payout modal's left-pane grid (culatello-92104) and admins
               // can't miss that the receipt is excluded from the rollup.
+              // provola-92106: amber variant for ineligible (135° stripes +
+              // INELIGIBLE pill, but duplicate wins when both are on).
               const isDup = e.doc.isDuplicate === true;
+              const isIne = e.doc.ineligible === true && !isDup;
               return (
                 <button
                   key={e.doc.id}
@@ -1414,9 +1530,11 @@ function CityExpansion({
                   className={`group relative w-16 h-16 rounded-md overflow-hidden border hover:border-theme-stroke-hover ${
                     isDup
                       ? 'opacity-50 border-red-500/60'
-                      : 'border-theme-stroke'
+                      : isIne
+                        ? 'opacity-60 border-amber-500/60'
+                        : 'border-theme-stroke'
                   }`}
-                  title={`${isDup ? '[DUPLICATE — excluded from totals] ' : ''}${e.doc.fileName}${
+                  title={`${isDup ? '[DUPLICATE — excluded from totals] ' : isIne ? '[INELIGIBLE — excluded from totals] ' : ''}${e.doc.fileName}${
                     e.doc.uploadedByName || e.doc.uploadedByEmail
                       ? ` — uploaded by ${e.doc.uploadedByName || e.doc.uploadedByEmail}`
                       : ''
@@ -1448,6 +1566,24 @@ function CityExpansion({
                   {isDup && (
                     <span className="absolute top-1 right-1 text-[8px] uppercase font-bold px-1 py-0.5 rounded bg-red-500 text-white">
                       dup
+                    </span>
+                  )}
+                  {/* provola-92106: 135° amber stripes (opposite angle from
+                      duplicate's 45°) + INE pill so admins can scan the grid
+                      and tell at a glance which flag is on each excluded
+                      thumbnail. */}
+                  {isIne && (
+                    <span
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage:
+                          'repeating-linear-gradient(135deg, rgba(245,158,11,0.35) 0 4px, transparent 4px 8px)',
+                      }}
+                    />
+                  )}
+                  {isIne && (
+                    <span className="absolute top-1 right-1 text-[8px] uppercase font-bold px-1 py-0.5 rounded bg-amber-500 text-white">
+                      ine
                     </span>
                   )}
                   {e.doc.ocrAmount != null && (
@@ -1616,6 +1752,13 @@ function CityExpansion({
         isDuplicate={
           lightbox?.bucket === 'receipt'
           && lightboxReceipt?.isDuplicate === true
+        }
+        /* provola-92106: amber INELIGIBLE banner — gated to NOT-also-duplicate
+            so the two banners don't fight. Same bucket scoping as isDuplicate. */
+        isIneligible={
+          lightbox?.bucket === 'receipt'
+          && lightboxReceipt?.ineligible === true
+          && lightboxReceipt?.isDuplicate !== true
         }
       />
     </div>
@@ -1968,12 +2111,22 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               let receiptUsdTotal = 0;
               let receiptCount = 0;
               let receiptDuplicateCount = 0;
+              // provola-92106: parallel "K ineligible excluded" counter for
+              // the outer cell subtitle. Counts ineligibles that aren't ALSO
+              // duplicate so the dup + ine counts don't overlap (duplicate
+              // wins as the primary signal — same convention used in the
+              // rollup tile + the per-payout modal sum line).
+              let receiptIneligibleCount = 0;
               for (const p of payouts) {
                 for (const d of p.documents || []) {
                   if (d.kind !== 'receipt') continue;
                   receiptCount += 1;
                   if (d.isDuplicate === true) {
                     receiptDuplicateCount += 1;
+                    continue;
+                  }
+                  if (d.ineligible === true) {
+                    receiptIneligibleCount += 1;
                     continue;
                   }
                   receiptUsdTotal += Number(d.ocrAmount) || 0;
@@ -2101,6 +2254,15 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         {receiptDuplicateCount > 0 && (
                           <span className="ml-1 text-theme-text-faint">
                             ({receiptDuplicateCount} dup excluded)
+                          </span>
+                        )}
+                        {/* provola-92106: parallel hint for ineligible
+                            exclusions. Amber so admins reading the outer row
+                            can tell which type of exclusion happened without
+                            expanding. */}
+                        {receiptIneligibleCount > 0 && (
+                          <span className="ml-1 text-amber-400">
+                            ({receiptIneligibleCount} ine excluded)
                           </span>
                         )}
                       </div>

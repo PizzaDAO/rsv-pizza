@@ -76,6 +76,13 @@ interface ReceiptLightboxProps {
    * used to pick `editorPane`. Pure visual — no behavior change.
    */
   isDuplicate?: boolean;
+  /**
+   * provola-92106: same as `isDuplicate` but for the ineligible flag —
+   * amber INELIGIBLE banner + 135° amber stripe overlay. When both flags
+   * are true, the duplicate visual wins (parent should pass `isIneligible`
+   * as false when also passing `isDuplicate=true`). Pure visual.
+   */
+  isIneligible?: boolean;
 }
 
 /** Some HEIC files come through with non-image/heic MIME types or no MIME at
@@ -99,6 +106,7 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   onBeforeNavigate,
   onDuplicateShortcut,
   isDuplicate = false,
+  isIneligible = false,
 }) => {
   // Index lives in this component so callers only need to pass the starting
   // image. Reset whenever the lightbox is (re-)opened so each open starts
@@ -297,6 +305,24 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
                 style={{
                   backgroundImage:
                     'repeating-linear-gradient(45deg, rgba(239,68,68,0.18) 0 6px, transparent 6px 14px)',
+                }}
+              />
+            </>
+          )}
+          {/* provola-92106: parallel INELIGIBLE banner — amber, 135° stripes
+              (distinct from duplicate's red / 45°). Rendered only when NOT
+              also duplicate so the two patterns don't fight when both are
+              on (duplicate wins as the primary signal per task spec). */}
+          {isIneligible && !isDuplicate && (
+            <>
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-amber-500 text-white text-xs font-bold uppercase tracking-wide shadow-lg pointer-events-none">
+                Ineligible — excluded from totals
+              </div>
+              <div
+                className="absolute inset-0 z-10 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(135deg, rgba(245,158,11,0.18) 0 6px, transparent 6px 14px)',
                 }}
               />
             </>

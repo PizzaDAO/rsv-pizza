@@ -50,6 +50,11 @@ export type LineItemDraft = {
   unitPrice: string;
   subtotal: string;
   category: ReceiptLineItemCategory;
+  // provola-92106: per-line "ineligible for reimbursement" flag. When true
+  // the row strikes through + tints amber + is excluded from the live line
+  // sum + the "Use line sum" button output. Optional so admins who never
+  // touched the flag don't carry `false` through every line.
+  ineligible?: boolean;
 };
 
 interface ReceiptEditorProps {
@@ -71,6 +76,19 @@ interface ReceiptEditorProps {
   dupSaving: boolean;
   dupError?: string;
   onToggleDuplicate: () => void;
+
+  /**
+   * provola-92106: Mark-ineligible state. Mirrors the duplicate toggle —
+   * reversible, optimistic-friendly, errors surfaced inline. Distinct from
+   * duplicate (legitimate purchase but doesn't qualify for reimbursement
+   * — alcohol, tips, personal items). Both flags can be true on the same
+   * row; the UI prefers duplicate as the primary visual signal when both
+   * are set.
+   */
+  isIneligible: boolean;
+  ineligibleSaving: boolean;
+  ineligibleError?: string;
+  onToggleIneligible: () => void;
 
   /** Line items editor. */
   lineItemDrafts: LineItemDraft[] | undefined;
@@ -97,6 +115,10 @@ function draftSubtotalSum(drafts: LineItemDraft[] | undefined): number {
   if (!drafts) return 0;
   let sum = 0;
   for (const d of drafts) {
+    // provola-92106: skip lines the admin marked ineligible (alcohol, tips,
+    // personal items). The live sum + "Use line sum" button both rely on
+    // this helper so the receipt total reflects only reimbursable items.
+    if (d.ineligible === true) continue;
     const n = Number(d.subtotal);
     if (Number.isFinite(n) && n >= 0) sum += n;
   }
@@ -115,6 +137,10 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   dupSaving,
   dupError,
   onToggleDuplicate,
+  isIneligible,
+  ineligibleSaving,
+  ineligibleError,
+  onToggleIneligible,
   lineItemDrafts,
   lineItemsSaving,
   lineItemsSaveError,
@@ -159,14 +185,40 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
         edits they're making are on an excluded row. The dim is intentionally
         lighter than the thumbnail/right-row treatment (opacity-95 + tint)
         because the editor is interactive — admins still need to read the
-        inputs to un-mark. */
+        inputs to un-mark.
+
+        provola-92106: same treatment for the ineligible flag but in amber
+        (visually distinct from duplicate's red). When BOTH flags are set,
+        the duplicate styling wins as the primary signal — admins can still
+        un-toggle the ineligible flag from the checkbox below.
+    */
     <div
-      className={`p-4 space-y-4 text-theme-text ${
+      className={`relative p-4 space-y-4 text-theme-text ${
         isDuplicate
           ? 'border-l-4 border-red-500/60 bg-red-500/5'
-          : ''
+          : isIneligible
+            ? 'border-l-4 border-amber-500/60 bg-amber-500/5'
+            : ''
       }`}
     >
+      {/* provola-92106: 135° amber diagonal stripes overlay when the
+          receipt is admin-marked ineligible. Distinct from duplicate's
+          45° red stripes (the by-city + modal thumbnails use 45° / red);
+          the angle difference is intentional so admins can tell the two
+          flags apart at a glance even in dense grids. Pointer-events-none
+          + low opacity so admins can still interact with the inputs below.
+          Only renders when ineligible AND NOT duplicate so the two
+          patterns don't fight each other when both flags are on. */}
+      {isIneligible && !isDuplicate && (
+        <span
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(135deg, rgba(245,158,11,0.08) 0 6px, transparent 6px 14px)',
+          }}
+          aria-hidden="true"
+        />
+      )}
       {/* coppa-92105: DUPLICATE banner across the top of the editor when
           marked. Heavier than the per-row pill so it can't be missed even on
           a quick scan. */}
@@ -174,6 +226,17 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
         <div className="-mx-4 -mt-4 mb-2 px-4 py-2 bg-red-500/15 border-b border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wide flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
           Duplicate — excluded from all USD totals
+        </div>
+      )}
+      {/* provola-92106: INELIGIBLE banner — amber, distinct from duplicate's
+          red. Only shown when the receipt is NOT also marked duplicate
+          (duplicate wins as the primary signal so the banner area doesn't
+          get crowded; the admin can still see + un-toggle the ineligible
+          checkbox below). */}
+      {isIneligible && !isDuplicate && (
+        <div className="-mx-4 -mt-4 mb-2 px-4 py-2 bg-amber-500/15 border-b border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wide flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+          Ineligible — legitimate purchase, does not qualify for reimbursement
         </div>
       )}
       {/* Header */}
@@ -336,6 +399,41 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
         </div>
       )}
 
+      {/* provola-92106: Mark-ineligible row. Distinct from the duplicate
+          checkbox above — duplicates are bookkeeping deduplication;
+          ineligibles are legitimate purchases that don't qualify under the
+          reimbursement policy (alcohol, tips, personal items). Same
+          exclusion math, different visual + semantic. Helper text spells
+          out the difference inline so admins picking between the two flags
+          don't have to guess. */}
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Checkbox
+            checked={isIneligible}
+            onChange={onToggleIneligible}
+            label={
+              isIneligible
+                ? 'Marked as ineligible for reimbursement'
+                : 'Mark as ineligible for reimbursement'
+            }
+            disabled={ineligibleSaving}
+          />
+          {ineligibleSaving && (
+            <Loader2 size={12} className="animate-spin text-theme-text-muted" />
+          )}
+        </div>
+        <p className="text-xs text-white/40 mt-1">
+          Not a duplicate — this receipt is legitimate but doesn't qualify
+          (e.g. alcohol, tips, personal items). Excluded from all USD totals.
+        </p>
+        {ineligibleError && (
+          <div className="text-xs text-amber-300 flex items-start gap-1.5 mt-1">
+            <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+            <span>{ineligibleError}</span>
+          </div>
+        )}
+      </div>
+
       {/* OCR retry — only visible when the doc errored. Keeps parity with
           the right-pane row's per-row retry affordance (pancetta-92104). */}
       {hasOcrError && onRetryOcr && (
@@ -371,6 +469,19 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           </h4>
           <span className="text-xs text-theme-text-muted">
             Sum: {sumCurrency} {lineSum.toFixed(2)}
+            {/* provola-92106: when ineligible lines exist, note how many
+                were excluded from the live sum so admins see the math is
+                doing what they expect. */}
+            {(() => {
+              const ineligibleCount = (lineItemDrafts ?? []).filter(
+                (li) => li.ineligible === true,
+              ).length;
+              return ineligibleCount > 0 ? (
+                <span className="ml-1 text-amber-400">
+                  ({ineligibleCount} ineligible excluded)
+                </span>
+              ) : null;
+            })()}
           </span>
         </div>
         <div className="rounded-lg border border-theme-stroke bg-theme-bg p-2 space-y-1.5">
@@ -379,90 +490,127 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
               No line items yet. Click <span className="font-semibold">Add line</span> to start.
             </p>
           )}
-          {(lineItemDrafts ?? []).map((d, idx) => (
-            <div
-              key={idx}
-              className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap"
-            >
-              {/*
-                taralli-92104 precedent: line-item rows are data-grid cells,
-                not form fields. Raw inputs keep the layout tight enough to
-                show all 5 columns + remove on one row. */}
-              <input
-                type="text"
-                value={d.name}
-                placeholder="name"
-                onChange={(e) =>
-                  onLineItemDraftChange(idx, { name: e.target.value })
-                }
-                className="flex-1 min-w-[120px] px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
-              />
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={d.qty}
-                placeholder="qty"
-                onChange={(e) =>
-                  onLineItemDraftChange(idx, { qty: e.target.value })
-                }
-                className="w-14 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
-              />
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={d.unitPrice}
-                placeholder="unit"
-                onChange={(e) =>
-                  onLineItemDraftChange(idx, { unitPrice: e.target.value })
-                }
-                className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
-              />
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={d.subtotal}
-                placeholder="subtotal"
-                onChange={(e) =>
-                  onLineItemDraftChange(idx, { subtotal: e.target.value })
-                }
-                className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
-              />
-              <select
-                value={d.category}
-                onChange={(e) =>
-                  onLineItemDraftChange(idx, {
-                    category: e.target.value as ReceiptLineItemCategory,
-                  })
-                }
-                className="px-1 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
-                title="Category — pizza-prices analytics filters on 'pizza'"
+          {(lineItemDrafts ?? []).map((d, idx) => {
+            // provola-92106: when admin unchecks the Eligible box for this
+            // line, strike through the row + tint amber so it's visually
+            // distinct from active lines. Reuses the same amber palette the
+            // receipt-level ineligible flag uses for consistency. The live
+            // sum + "Use line sum" both already exclude ineligible lines via
+            // `draftSubtotalSum`.
+            const lineIneligible = d.ineligible === true;
+            return (
+              <div
+                key={idx}
+                className={`flex flex-wrap items-center gap-1.5 sm:flex-nowrap rounded ${
+                  lineIneligible
+                    ? 'bg-amber-500/10 line-through text-theme-text-muted'
+                    : ''
+                }`}
               >
-                <option value="pizza">pizza</option>
-                <option value="beverage">beverage</option>
-                <option value="topping">topping</option>
-                <option value="side">side</option>
-                <option value="dessert">dessert</option>
-                <option value="tax">tax</option>
-                <option value="tip">tip</option>
-                <option value="fee">fee</option>
-                <option value="other">other</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => onRemoveLineItem(idx)}
-                className="p-1 rounded text-theme-text-muted hover:text-red-500 hover:bg-red-50"
-                title="Remove this line"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
+                {/*
+                  taralli-92104 precedent: line-item rows are data-grid cells,
+                  not form fields. Raw inputs keep the layout tight enough to
+                  show all 5 columns + remove on one row. */}
+                <input
+                  type="text"
+                  value={d.name}
+                  placeholder="name"
+                  onChange={(e) =>
+                    onLineItemDraftChange(idx, { name: e.target.value })
+                  }
+                  className="flex-1 min-w-[120px] px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  value={d.qty}
+                  placeholder="qty"
+                  onChange={(e) =>
+                    onLineItemDraftChange(idx, { qty: e.target.value })
+                  }
+                  className="w-14 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  value={d.unitPrice}
+                  placeholder="unit"
+                  onChange={(e) =>
+                    onLineItemDraftChange(idx, { unitPrice: e.target.value })
+                  }
+                  className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  value={d.subtotal}
+                  placeholder="subtotal"
+                  onChange={(e) =>
+                    onLineItemDraftChange(idx, { subtotal: e.target.value })
+                  }
+                  className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                />
+                <select
+                  value={d.category}
+                  onChange={(e) =>
+                    onLineItemDraftChange(idx, {
+                      category: e.target.value as ReceiptLineItemCategory,
+                    })
+                  }
+                  className="px-1 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
+                  title="Category — pizza-prices analytics filters on 'pizza'"
+                >
+                  <option value="pizza">pizza</option>
+                  <option value="beverage">beverage</option>
+                  <option value="topping">topping</option>
+                  <option value="side">side</option>
+                  <option value="dessert">dessert</option>
+                  <option value="tax">tax</option>
+                  <option value="tip">tip</option>
+                  <option value="fee">fee</option>
+                  <option value="other">other</option>
+                </select>
+                {/* provola-92106: per-line Eligible checkbox. Inverted
+                    semantics from the persisted `ineligible` flag — admin
+                    sees "Eligible (checked = included)" instead of "mark
+                    ineligible". Checked by default for existing items so the
+                    UI matches the historical behavior (everything counts
+                    until admin says otherwise). Tooltip clarifies what
+                    unchecking does. */}
+                <label
+                  className="inline-flex items-center gap-1 text-[10px] text-theme-text-muted px-1"
+                  title="Uncheck to exclude this line from reimbursement (alcohol, tip, personal item, etc.)"
+                >
+                  <input
+                    type="checkbox"
+                    checked={!lineIneligible}
+                    onChange={(e) =>
+                      onLineItemDraftChange(idx, {
+                        ineligible: !e.target.checked,
+                      })
+                    }
+                    className="rounded border-theme-stroke-hover"
+                    aria-label="Eligible for reimbursement"
+                  />
+                  Eligible
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onRemoveLineItem(idx)}
+                  className="p-1 rounded text-theme-text-muted hover:text-red-500 hover:bg-red-50"
+                  title="Remove this line"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            );
+          })}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
@@ -518,6 +666,10 @@ export function lineItemToDraft(item: ReceiptLineItem): LineItemDraft {
     unitPrice: String(item.unitPrice ?? 0),
     subtotal: String(item.subtotal ?? 0),
     category: item.category ?? 'other',
+    // provola-92106: carry through the per-line ineligible flag (jsonb
+    // additive field — older items + items the admin never touched just
+    // omit it, which maps to "eligible").
+    ineligible: item.ineligible === true ? true : undefined,
   };
 }
 

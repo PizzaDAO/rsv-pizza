@@ -5,7 +5,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
@@ -427,6 +427,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // culatello-92104: per-receipt duplicate flag override so the modal
     // reflects an in-flight toggle without waiting for parent refresh.
     isDuplicate?: boolean;
+    // provola-92106: per-receipt ineligible flag override. Independent of
+    // `isDuplicate` — both can be true on the same row. Same optimistic-
+    // override pattern.
+    ineligible?: boolean;
     // caprino-92104: post-FX-recompute fields so the lightbox editor's "USD
     // value" + "at rate X" display refreshes immediately on save.
     originalAmount?: number | null;
@@ -484,6 +488,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     unitPrice: string;
     subtotal: string;
     category: ReceiptLineItemCategory;
+    // provola-92106: per-line "ineligible for reimbursement" flag.
+    ineligible?: boolean;
   };
   const [lineItemsExpanded, setLineItemsExpanded] = useState<Record<string, boolean>>({});
   const [lineItemDrafts, setLineItemDrafts] = useState<Record<string, LineItemDraft[]>>({});
@@ -499,6 +505,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // above so a dup-toggle failure doesn't clobber the inline edit error.
   const [duplicateSavingId, setDuplicateSavingId] = useState<string | null>(null);
   const [duplicateSaveErrors, setDuplicateSaveErrors] = useState<Record<string, string>>({});
+  // provola-92106: per-row "Mark ineligible" loading + error state. Mirrors
+  // duplicate's scoping — separate buckets so a failure on one toggle
+  // doesn't clobber the other or the amount-edit error.
+  const [ineligibleSavingId, setIneligibleSavingId] = useState<string | null>(null);
+  const [ineligibleSaveErrors, setIneligibleSaveErrors] = useState<Record<string, string>>({});
 
   // Hooks must be declared above any early returns. There aren't any early
   // returns in this component today, but keeping all hooks grouped here makes
@@ -523,6 +534,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           // after PATCH without waiting for a parent refresh.
           // culatello-92104: same treatment for the duplicate flag so the
           // dim + pill update immediately on toggle.
+          // provola-92106: same again for the ineligible flag.
           return {
             ...d,
             ocrAmount: ov.ocrAmount,
@@ -531,6 +543,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               ov.ocrLineItems !== undefined ? ov.ocrLineItems : d.ocrLineItems,
             isDuplicate:
               ov.isDuplicate !== undefined ? ov.isDuplicate : d.isDuplicate,
+            ineligible:
+              ov.ineligible !== undefined ? ov.ineligible : d.ineligible,
             // caprino-92104: layer the FX recompute fields too so the
             // lightbox editor's "USD value" + rate display reflects the new
             // server-side values without a parent refetch.
@@ -696,6 +710,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           // through so a previous dup toggle isn't lost when amount/currency
           // is also edited.
           isDuplicate: updated.isDuplicate,
+          // provola-92106: same for the ineligible flag — server-authoritative.
+          ineligible: updated.ineligible,
           // caprino-92104: surface the recomputed FX details so the lightbox
           // editor's "USD value" display renders the new numbers without a
           // parent refetch.
@@ -789,6 +805,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       unitPrice: String(item.unitPrice ?? 0),
       subtotal: String(item.subtotal ?? 0),
       category: item.category ?? 'other',
+      // provola-92106: carry through the per-line ineligible flag. jsonb
+      // additive field — older items + items the admin never touched just
+      // omit it, mapping to "eligible" (default).
+      ineligible: item.ineligible === true ? true : undefined,
     };
   }
 
@@ -849,6 +869,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     if (!drafts) return 0;
     let sum = 0;
     for (const d of drafts) {
+      // provola-92106: skip lines the admin marked ineligible. Mirrors the
+      // shared ReceiptEditor's `draftSubtotalSum` helper so the live total
+      // shown in the right-pane editor matches the lightbox editor.
+      if (d.ineligible === true) continue;
       const n = Number(d.subtotal);
       if (Number.isFinite(n) && n >= 0) sum += n;
     }
@@ -900,13 +924,18 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         if (!Number.isFinite(subtotal) || subtotal < 0) {
           throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
         }
-        return {
+        // provola-92106: persist the per-line ineligible flag only when
+        // true so existing items + items the admin never touched don't
+        // sprout a `false` field. Backend sanitizer matches this stance.
+        const out: ReceiptLineItem = {
           name: d.name,
           qty,
           unitPrice,
           subtotal,
           category: d.category,
         };
+        if (d.ineligible === true) out.ineligible = true;
+        return out;
       });
       const updated = await updatePayoutDocument(docId, { ocrLineItems: items });
       setReceiptOverrides((m) => ({
@@ -917,6 +946,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           ocrLineItems: updated.ocrLineItems,
           // culatello-92104: see saveReceiptEdit comment.
           isDuplicate: updated.isDuplicate,
+          // provola-92106: same — carry the ineligible flag through.
+          ineligible: updated.ineligible,
         },
       }));
       // Re-seed the draft from the canonical saved array so the next render
@@ -1000,6 +1031,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             ocrCurrency: updated.ocrCurrency,
             ocrLineItems: updated.ocrLineItems,
             isDuplicate: updated.isDuplicate,
+            // provola-92106: carry through whatever the server has — keeps
+            // the two flags consistent if the server response includes both.
+            ineligible: updated.ineligible,
           },
         };
       });
@@ -1017,6 +1051,61 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       }));
     } finally {
       setDuplicateSavingId(null);
+    }
+  }
+
+  // provola-92106: toggle the per-receipt ineligible flag via the same
+  // PATCH /documents/:docId endpoint (passes `ineligible` instead of
+  // `isDuplicate`). Mirrors `toggleDuplicate` above — optimistic override,
+  // roll back on failure, server is authoritative on success. Independent
+  // of the duplicate flag (both can be true on the same row).
+  async function toggleIneligible(docId: string, nextValue: boolean) {
+    setIneligibleSavingId(docId);
+    setIneligibleSaveErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    const prior = receipts.find((r) => r.id === docId);
+    const priorIneligible = prior?.ineligible === true;
+    setReceiptOverrides((m) => {
+      const cur = m[docId] ?? {
+        ocrAmount: prior?.ocrAmount ?? null,
+        ocrCurrency: prior?.ocrCurrency ?? null,
+      };
+      return { ...m, [docId]: { ...cur, ineligible: nextValue } };
+    });
+    try {
+      const updated = await markReceiptIneligible(docId, nextValue);
+      setReceiptOverrides((m) => {
+        const cur = m[docId] ?? {
+          ocrAmount: updated.ocrAmount,
+          ocrCurrency: updated.ocrCurrency,
+        };
+        return {
+          ...m,
+          [docId]: {
+            ...cur,
+            ocrAmount: updated.ocrAmount,
+            ocrCurrency: updated.ocrCurrency,
+            ocrLineItems: updated.ocrLineItems,
+            isDuplicate: updated.isDuplicate,
+            ineligible: updated.ineligible,
+          },
+        };
+      });
+    } catch (err: any) {
+      setReceiptOverrides((m) => {
+        const cur = m[docId];
+        if (!cur) return m;
+        return { ...m, [docId]: { ...cur, ineligible: priorIneligible } };
+      });
+      setIneligibleSaveErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Failed to update ineligible flag',
+      }));
+    } finally {
+      setIneligibleSavingId(null);
     }
   }
 
@@ -1086,7 +1175,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           a.qty !== b.qty ||
           a.unitPrice !== b.unitPrice ||
           a.subtotal !== b.subtotal ||
-          a.category !== b.category
+          a.category !== b.category ||
+          // provola-92106: per-line ineligible flag is dirty-trackable too.
+          // Normalize to boolean so undefined !== false doesn't false-positive.
+          (a.ineligible === true) !== (b.ineligible === true)
         ) {
           return true;
         }
@@ -1173,6 +1265,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         dupSaving={duplicateSavingId === r.id}
         dupError={duplicateSaveErrors[r.id]}
         onToggleDuplicate={() => toggleDuplicate(r.id, !(r.isDuplicate === true))}
+        isIneligible={r.ineligible === true}
+        ineligibleSaving={ineligibleSavingId === r.id}
+        ineligibleError={ineligibleSaveErrors[r.id]}
+        onToggleIneligible={() => toggleIneligible(r.id, !(r.ineligible === true))}
         lineItemDrafts={liDrafts}
         lineItemsSaving={lineItemsSavingId === r.id}
         lineItemsSaveError={lineItemsSaveErrors[r.id]}
@@ -1223,6 +1319,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     receiptSaveErrorCodes,
     duplicateSavingId,
     duplicateSaveErrors,
+    ineligibleSavingId,
+    ineligibleSaveErrors,
     lineItemDrafts,
     lineItemsSavingId,
     lineItemsSaveErrors,
@@ -1234,12 +1332,25 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // culatello-92104: duplicates are evidence-only — exclude their OCR
   // amounts from the receipt sum so admins see the corrected total. The
   // host PATCH recompute path (backend/payout.routes.ts) does the same.
+  // provola-92106: same exclusion for the ineligible flag. Both are
+  // independent toggles but identical math — the sum reflects only rows
+  // that count toward reimbursement.
   const ocrSum = receipts.reduce(
-    (sum, r) => sum + (r.isDuplicate ? 0 : (Number(r.ocrAmount) || 0)),
+    (sum, r) =>
+      sum + (r.isDuplicate || r.ineligible ? 0 : (Number(r.ocrAmount) || 0)),
     0,
   );
   const duplicateCount = receipts.reduce(
     (n, r) => n + (r.isDuplicate ? 1 : 0),
+    0,
+  );
+  // provola-92106: surface ineligible count separately so the sum line
+  // can render "($X dup excluded, $Y ineligible excluded)". Note: a row
+  // that's BOTH duplicate AND ineligible counts toward `duplicateCount`
+  // only (duplicate wins as the primary signal — same convention used by
+  // the thumbnail pill below).
+  const ineligibleCount = receipts.reduce(
+    (n, r) => n + (!r.isDuplicate && r.ineligible ? 1 : 0),
     0,
   );
 
@@ -1260,7 +1371,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         // culatello-92104: exclude admin-marked duplicates from the
         // original-currency totals + the extracted USD sum so the summary
         // line reflects the corrected payout.
+        // provola-92106: same for the ineligible flag — both feed the
+        // recomputed reimbursable total.
         !r.isDuplicate &&
+        !r.ineligible &&
         r.originalCurrency != null &&
         r.originalCurrency !== '' &&
         r.originalAmount != null &&
@@ -1663,6 +1777,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     // payment-app pizzas in the merged carousel.
                     const carouselIdx = pizzas.length + idx;
                     const isDup = doc.isDuplicate === true;
+                    // provola-92106: ineligible-but-not-duplicate gets its
+                    // own amber treatment. When BOTH flags are true, the
+                    // duplicate visual wins (red border + 45° stripes +
+                    // DUPLICATE pill) so the grid stays scannable. Admin
+                    // can still un-toggle either flag from the editor.
+                    const isIne = doc.ineligible === true && !isDup;
                     return (
                       <button
                         key={doc.id}
@@ -1684,15 +1804,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         // exclusion reads as "rejected" rather than just
                         // "inactive". The diagonal-stripe overlay below
                         // reinforces it further.
+                        // provola-92106: amber variant for ineligible.
                         className={`relative aspect-square rounded-lg overflow-hidden border group ${
                           isDup
                             ? 'opacity-50 border-red-500/60'
-                            : 'border-theme-stroke'
+                            : isIne
+                              ? 'opacity-60 border-amber-500/60'
+                              : 'border-theme-stroke'
                         }`}
                         title={
                           isDup
                             ? `[DUPLICATE — excluded from totals] ${doc.fileName}`
-                            : doc.fileName
+                            : isIne
+                              ? `[INELIGIBLE — excluded from totals] ${doc.fileName}`
+                              : doc.fileName
                         }
                       >
                         {isVideoFile(doc) ? (
@@ -1744,6 +1869,29 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         {isDup && (
                           <span className="absolute top-1 right-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-white">
                             duplicate
+                          </span>
+                        )}
+                        {/* provola-92106: 135° amber stripes on ineligible
+                            (but not duplicate) thumbnails. The angle is
+                            opposite the duplicate's 45° pattern so admins
+                            scanning the grid can tell at a glance which
+                            flag is on each excluded receipt. */}
+                        {isIne && (
+                          <span
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              backgroundImage:
+                                'repeating-linear-gradient(135deg, rgba(245,158,11,0.35) 0 4px, transparent 4px 8px)',
+                            }}
+                          />
+                        )}
+                        {/* provola-92106: INELIGIBLE pill mirrors duplicate's
+                            position so admins know what they're looking at
+                            without hovering. Amber background to match the
+                            rest of the ineligible treatment. */}
+                        {isIne && (
+                          <span className="absolute top-1 right-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                            ineligible
                           </span>
                         )}
                       </button>
@@ -2093,9 +2241,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     // culatello-92104: dim the row when marked duplicate +
                     // amber outline + pulse when admin clicked its thumbnail.
                     const isDup = r.isDuplicate === true;
+                    // provola-92106: amber row treatment for ineligible-but-
+                    // not-duplicate (duplicate's red wins when both).
+                    const isIne = r.ineligible === true && !isDup;
                     const isHighlighted = highlightedReceiptId === r.id;
                     const dupSaving = duplicateSavingId === r.id;
                     const dupError = duplicateSaveErrors[r.id];
+                    const ineSaving = ineligibleSavingId === r.id;
+                    const ineError = ineligibleSaveErrors[r.id];
                     return (
                       <li
                         key={r.id}
@@ -2105,7 +2258,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             it. Pair with a red left border + faint red
                             background tint so the row visibly registers as
                             "excluded from totals" rather than just
-                            "inactive". */
+                            "inactive".
+                            provola-92106: amber variant for ineligible. */
                         className={`text-sm rounded ${
                           isHighlighted
                             ? 'ring-2 ring-amber-400 animate-pulse'
@@ -2113,7 +2267,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         } ${
                           isDup
                             ? 'opacity-60 border-l-4 border-red-500/60 bg-red-500/5 pl-2 py-1'
-                            : ''
+                            : isIne
+                              ? 'opacity-70 border-l-4 border-amber-500/60 bg-amber-500/5 pl-2 py-1'
+                              : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -2224,6 +2380,37 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                 )}
                                 {isDup ? 'Unmark duplicate' : 'Mark duplicate'}
                               </button>
+                              {/* provola-92106: per-row "Mark ineligible"
+                                  toggle. Same mechanics as the duplicate
+                                  button next to it — reversible, optimistic-
+                                  friendly, errors surface below. Distinct
+                                  from duplicate (legitimate purchase that
+                                  doesn't qualify for reimbursement — alcohol,
+                                  tips, personal items). Excluded from the
+                                  receipt OCR sum and the host PATCH
+                                  recompute path. */}
+                              <button
+                                type="button"
+                                onClick={() => toggleIneligible(r.id, !(r.ineligible === true))}
+                                disabled={ineSaving}
+                                className={`px-2 py-1 rounded text-xs disabled:opacity-40 inline-flex items-center gap-1 ${
+                                  r.ineligible === true
+                                    ? 'border border-amber-500 text-amber-500 hover:bg-amber-500/10'
+                                    : 'border border-theme-stroke text-theme-text hover:bg-theme-surface'
+                                }`}
+                                title={
+                                  r.ineligible === true
+                                    ? 'Un-mark this receipt as ineligible'
+                                    : 'Mark this receipt as ineligible for reimbursement (alcohol, tips, personal items — excluded from sums)'
+                                }
+                              >
+                                {ineSaving ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <AlertTriangle size={12} />
+                                )}
+                                {r.ineligible === true ? 'Unmark ineligible' : 'Mark ineligible'}
+                              </button>
                               {conf > 0 && (
                                 <span className={`text-xs ${lowConf ? 'text-amber-600' : 'text-theme-text-faint'}`}>
                                   {(conf * 100).toFixed(0)}%
@@ -2276,6 +2463,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             separately from amount/currency save errors. */}
                         {dupError && (
                           <div className="text-xs text-red-600 mt-0.5 ml-4">{dupError}</div>
+                        )}
+                        {/* provola-92106: ineligible-toggle error. Amber
+                            instead of red to match the rest of the
+                            ineligible visual language. */}
+                        {ineError && (
+                          <div className="text-xs text-amber-600 mt-0.5 ml-4">{ineError}</div>
                         )}
                         {/* taralli-92104: collapsed line item editor. Caret
                             toggles expansion; on expand we seed the drafts
@@ -2470,6 +2663,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   {duplicateCount > 0 && (
                     <span className="ml-1 text-theme-text-faint">
                       (excludes {duplicateCount} duplicate{duplicateCount === 1 ? '' : 's'})
+                    </span>
+                  )}
+                  {/* provola-92106: parallel hint for ineligible exclusions.
+                      Rendered separately from duplicate so the two flags
+                      stay legible in the rare both-set case. */}
+                  {ineligibleCount > 0 && (
+                    <span className="ml-1 text-amber-400">
+                      (excludes {ineligibleCount} ineligible{ineligibleCount === 1 ? '' : 's'})
                     </span>
                   )}
                   {canEditReceipts && (
@@ -3513,6 +3714,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             duplicate. Only fires for the receipt bucket because lightboxReceipt
             is null when navigating pizza/event photos. */
         isDuplicate={lightboxReceipt?.isDuplicate === true}
+        /* provola-92106: parallel amber INELIGIBLE banner. Gated to NOT-also-
+            duplicate so the two banners don't fight (duplicate wins as the
+            primary signal when both are on — same convention used by the
+            thumbnail pill above). */
+        isIneligible={
+          lightboxReceipt?.ineligible === true
+          && lightboxReceipt?.isDuplicate !== true
+        }
       />
     </div>
   );

@@ -608,6 +608,11 @@ function serializePayout(row: any): any {
       // dims these rows + excludes them from the OCR sum + the host PATCH
       // finalAmountUsd recompute path.
       isDuplicate: d.isDuplicate === true,
+      // provola-92106: admin-flagged "ineligible for reimbursement". Distinct
+      // from duplicate (legitimate purchase but doesn't qualify — alcohol,
+      // tips, personal items). Same exclusion semantics as `isDuplicate` —
+      // filtered out of every USD sum + the host recompute path.
+      ineligible: d.ineligible === true,
       // pancetta-37195: per-doc uploader attribution. Live name from the
       // join; cached email is the fallback if the User is later deleted.
       uploadedByUserId: d.uploadedByUserId ?? null,
@@ -4082,8 +4087,17 @@ router.post(
 //   // culatello-92104: admin-marked duplicate flag. Reversible. Excluded
 //   // from the reviewer modal's OCR sum, the host PATCH finalAmountUsd
 //   // recompute, and the pizza-prices analytics aggregate.
-//   isDuplicate?: boolean
+//   isDuplicate?: boolean,
+//   // provola-92106: admin-marked "ineligible for reimbursement" flag.
+//   // Distinct from `isDuplicate` — this is a legitimate purchase that
+//   // doesn't qualify for reimbursement under policy (alcohol, tips,
+//   // personal items). Same exclusion semantics as `isDuplicate`.
+//   ineligible?: boolean
 // }
+// Note: `ocrLineItems[*].ineligible` is supported in the same array — each
+// line item may carry an optional `ineligible?: boolean` field that excludes
+// only that line from sums. Stored alongside the existing fields in jsonb;
+// no schema change. Sanitized in `sanitizeLineItem` below.
 //   - null clears the field; undefined leaves it untouched.
 //   - ocrAmount must be finite (or null).
 //   - ocrCurrency must be a non-empty string ≤8 chars (or null).
@@ -4126,6 +4140,10 @@ router.patch(
           // culatello-92104: pull the old duplicate flag so the audit row
           // can record the transition (marked vs unmarked).
           isDuplicate: true,
+          // provola-92106: pull the old ineligible flag so the audit row can
+          // record the transition (marked vs unmarked) — same pattern as
+          // culatello-92104.
+          ineligible: true,
         },
       });
       if (!doc) {
@@ -4156,6 +4174,12 @@ router.patch(
         unitPrice: number;
         subtotal: number;
         category: (typeof ALLOWED_LINE_ITEM_CATEGORIES)[number];
+        // provola-92106: optional per-line "ineligible for reimbursement"
+        // flag. Stored alongside the other line-item fields in jsonb; no
+        // schema change. Only emitted when true so existing rows + admins
+        // who never touched the flag don't get a `false` sprinkled into
+        // every entry.
+        ineligible?: boolean;
       };
       function sanitizeLineItem(raw: unknown, idx: number): SanitizedLineItem {
         if (!raw || typeof raw !== 'object') {
@@ -4206,7 +4230,14 @@ router.patch(
             ? (rawCategory as SanitizedLineItem['category'])
             : 'other';
 
-        return { name, qty, unitPrice, subtotal, category };
+        // provola-92106: per-line "ineligible for reimbursement" flag. Only
+        // accept strict boolean; ignore anything else (matches the receipt-
+        // level isDuplicate / ineligible coercion stance — coercion would
+        // hide caller bugs). Only emit when true so admins who never touched
+        // it don't pollute every line with `ineligible:false`.
+        const out: SanitizedLineItem = { name, qty, unitPrice, subtotal, category };
+        if (e.ineligible === true) out.ineligible = true;
+        return out;
       }
 
       const data: {
@@ -4219,6 +4250,12 @@ router.patch(
         // culatello-92104: admin-only duplicate flag. Reversible — the same
         // toggle un-marks. Persisted to `payout_documents.is_duplicate`.
         isDuplicate?: boolean;
+        // provola-92106: admin-only "ineligible for reimbursement" flag.
+        // Distinct from `isDuplicate` — this is a legitimate purchase that
+        // doesn't qualify under policy (alcohol, tips, personal items).
+        // Reversible — same toggle un-marks. Persisted to
+        // `payout_documents.ineligible`.
+        ineligible?: boolean;
       } = {};
 
       if (body.ocrAmount !== undefined) {
@@ -4298,6 +4335,24 @@ router.patch(
           );
         }
         data.isDuplicate = body.isDuplicate;
+      }
+
+      // provola-92106: admin-toggleable "ineligible for reimbursement"
+      // flag. Strict boolean only (matches culatello-92104 `isDuplicate`
+      // semantics — coercion would hide caller bugs). Independent of the
+      // duplicate flag; both can be set on the same row. The reviewer
+      // modal's OCR sum + the host PATCH recompute path + the pizza-prices
+      // analytics aggregate all filter rows where this is true (same as
+      // they already do for `isDuplicate`).
+      if (body.ineligible !== undefined) {
+        if (typeof body.ineligible !== 'boolean') {
+          throw new AppError(
+            'ineligible must be a boolean',
+            400,
+            'VALIDATION_ERROR',
+          );
+        }
+        data.ineligible = body.ineligible;
       }
 
       // mortadella-92103 + caprino-92104: when admin changes the currency on a
@@ -4508,6 +4563,12 @@ router.patch(
             isDuplicate: data.isDuplicate === undefined
               ? undefined
               : data.isDuplicate,
+            // provola-92106: persist the ineligible-flag toggle. Independent
+            // of `isDuplicate` — both columns can be true on the same row,
+            // though the UI prefers duplicate as the primary visual signal.
+            ineligible: data.ineligible === undefined
+              ? undefined
+              : data.ineligible,
           },
         });
 
@@ -4600,6 +4661,33 @@ router.patch(
               },
             });
           }
+          // provola-92106: audit row for ineligible-flag transitions.
+          // Mirrors the culatello-92104 duplicate-audit precedent above —
+          // separate row per transition, only fires on actual value change.
+          // Uses the existing `edit_documents` action so it shows up in the
+          // forensics tools alongside the duplicate-flag toggles.
+          if (
+            data.ineligible !== undefined
+            && data.ineligible !== doc.ineligible
+          ) {
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: doc.payoutId,
+                action: 'edit_documents',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: JSON.stringify({
+                  scope: 'receipt',
+                  documentId: docId,
+                  message: data.ineligible
+                    ? 'marked ineligible'
+                    : 'unmarked ineligible',
+                  oldIneligible: doc.ineligible,
+                  newIneligible: data.ineligible,
+                }),
+              },
+            });
+          }
         }
 
         return row;
@@ -4627,6 +4715,9 @@ router.patch(
           ocrLineItems: Array.isArray(updated.ocrLineItems) ? updated.ocrLineItems : null,
           // culatello-92104: echo the persisted duplicate flag.
           isDuplicate: updated.isDuplicate === true,
+          // provola-92106: echo the persisted ineligible flag so the modal
+          // can update its optimistic override without a parent refetch.
+          ineligible: updated.ineligible === true,
           ocrError: updated.ocrError,
           sortOrder: updated.sortOrder,
           uploadedByUserId: updated.uploadedByUserId ?? null,
@@ -4699,6 +4790,11 @@ router.get(
           // exclude them from the analytics aggregate so the by-country
           // averages don't double-count the same purchase.
           isDuplicate: false,
+          // provola-92106: admin-marked ineligible receipts (alcohol, tips,
+          // personal items) aren't pizza prices either — same exclusion
+          // pattern. The aggregate should reflect what hosts actually paid
+          // for reimbursable items.
+          ineligible: false,
         },
         select: {
           id: true,
