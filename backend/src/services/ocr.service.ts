@@ -85,7 +85,12 @@ export const COUNTRY_TO_PRIMARY_CURRENCY: Record<string, string> = {
   AE: 'AED', SA: 'SAR', IL: 'ILS', QA: 'QAR', KW: 'KWD', BH: 'BHD',
   // Africa
   EG: 'EGP', NG: 'NGN', ZA: 'ZAR', KE: 'KES', GH: 'GHS', MA: 'MAD',
-  TN: 'TND', ET: 'ETB', UG: 'UGX', TZ: 'TZS',
+  TN: 'TND', ET: 'ETB', UG: 'UGX', TZ: 'TZS', MW: 'MWK',
+  // salame-92107: West African CFA franc (XOF) — 8 UEMOA members.
+  BJ: 'XOF', BF: 'XOF', CI: 'XOF', GW: 'XOF', ML: 'XOF', NE: 'XOF',
+  SN: 'XOF', TG: 'XOF',
+  // salame-92107: Central African CFA franc (XAF) — 6 CEMAC members.
+  CM: 'XAF', CF: 'XAF', TD: 'XAF', GQ: 'XAF', GA: 'XAF', CG: 'XAF',
 };
 
 function buildSystemPrompt(partyCountry?: string | null): string {

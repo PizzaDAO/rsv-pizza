@@ -51,6 +51,11 @@ export const FALLBACK_RATES_TO_USD: Record<string, number> = {
   KRW: 0.00075,
   CNY: 0.14,
   ZAR: 0.055,
+  // salame-92107: MWK ~1730/USD (2026), XOF + XAF both pegged to EUR
+  // (655.957/€1) so ~615/USD with EUR ≈ 1.07.
+  MWK: 0.00058,
+  XOF: 0.0016,
+  XAF: 0.0016,
 };
 
 export type FxSource =

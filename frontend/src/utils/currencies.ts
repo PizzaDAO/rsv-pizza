@@ -71,6 +71,29 @@ export const SUPPORTED_CURRENCIES: CurrencyOption[] = [
   { code: 'GHS', name: 'Ghanaian Cedi', country: 'Ghana', flag: '🇬🇭' },
   { code: 'MAD', name: 'Moroccan Dirham', country: 'Morocco', flag: '🇲🇦' },
   { code: 'ETB', name: 'Ethiopian Birr', country: 'Ethiopia', flag: '🇪🇹' },
+  { code: 'MWK', name: 'Malawian Kwacha', country: 'Malawi', flag: '🇲🇼' },
+  {
+    code: 'XOF',
+    name: 'West African CFA franc',
+    country: 'Togo',
+    flag: '🇹🇬',
+    aliases: [
+      'Benin', 'Burkina Faso', "Côte d'Ivoire", 'Cote d Ivoire', 'Ivory Coast',
+      'Guinea-Bissau', 'Guinea Bissau', 'Mali', 'Niger', 'Senegal',
+      'CFA', 'West Africa', 'WAEMU', 'UEMOA',
+    ],
+  },
+  {
+    code: 'XAF',
+    name: 'Central African CFA franc',
+    country: 'Cameroon',
+    flag: '🇨🇲',
+    aliases: [
+      'Central African Republic', 'Chad', 'Equatorial Guinea', 'Gabon',
+      'Republic of the Congo', 'Congo-Brazzaville', 'Congo',
+      'CFA', 'Central Africa', 'CEMAC',
+    ],
+  },
 
   // Middle East
   { code: 'AED', name: 'UAE Dirham', country: 'United Arab Emirates', flag: '🇦🇪', aliases: ['UAE', 'Dubai', 'Abu Dhabi'] },
