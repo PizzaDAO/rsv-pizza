@@ -75,6 +75,13 @@ interface SendPaymentModalProps {
   paidTotalUsd: number;
   /** Optional — primary host User id (parties.userId). Pre-selects recipient. */
   primaryHostUserId?: string | null;
+  /**
+   * Map of recipient User id -> the USDC wallet that host submitted on their
+   * receipt payouts for this city (ENS input preferred over the resolved 0x).
+   * Used to pre-fill the wallet field when a recipient is selected so the
+   * admin doesn't have to re-type the address the host already gave us.
+   */
+  hostWalletByUserId?: Record<string, string>;
   onClose: () => void;
   /**
    * Called on a successful send. Receives the city name + method + amount so
@@ -99,6 +106,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   effectiveReimbursementCapUsd,
   paidTotalUsd,
   primaryHostUserId,
+  hostWalletByUserId,
   onClose,
   onSent,
 }) => {
@@ -186,6 +194,17 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   const [mercuryCardLast4, setMercuryCardLast4] = useState('');
   const [mercuryCardId, setMercuryCardId] = useState('');
   const [wireReference, setWireReference] = useState('');
+
+  // Pre-fill the USDC wallet with the address the selected host submitted on
+  // their receipt payouts for this city (passed down per-recipient by the
+  // parent). Re-runs whenever the recipient changes so switching hosts pulls
+  // in that host's wallet; an empty mapping clears the field. `hostWalletByUserId`
+  // is a stable snapshot for the modal's lifetime, so this only fires on an
+  // actual recipient change — a manual edit for the same recipient is kept.
+  useEffect(() => {
+    if (!recipientUserId) return;
+    setWalletAddress(hostWalletByUserId?.[recipientUserId] ?? '');
+  }, [recipientUserId, hostWalletByUserId]);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
