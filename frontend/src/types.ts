@@ -2253,6 +2253,15 @@ export interface PartyPayoutsRow {
   };
   /** Underlying AdminPayouts for this party, scoped to the same filters. */
   payouts: AdminPayout[];
+  /**
+   * ricotta-92104: party-level event photos for the by-city expansion's
+   * Event/Pizza preview sections. Same shape as `AdminPayoutDetail.eventPhotos`
+   * (bottarga-92103) so the frontend can reuse the focaccia-92104 split rule
+   * (tags `Pizza` / `pizza-selfie` → Pizza photos; everything else → Event
+   * photos). Optional for backward-compat with cached payloads during a
+   * rolling deploy — older clients simply hide the section.
+   */
+  eventPhotos?: AdminPayoutEventPhoto[];
 }
 
 export interface PartyPayoutsResponse {

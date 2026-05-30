@@ -1638,6 +1638,52 @@ router.get(
         }
       }
 
+      // ricotta-92104: per-party event photos for the by-city expansion's
+      // Event/Pizza preview sections. Mirrors the same select shape as the
+      // per-payout serializer (admin-payout.routes.ts ~line 2189) so the
+      // frontend's photo split logic (focaccia-92104: tag === 'Pizza' or
+      // 'pizza-selfie' → Pizza photos, everything else → Event photos) can be
+      // reused as-is. Admins see every photo regardless of moderation status;
+      // the frontend renders a "Hidden" pill when `status !== 'approved'`.
+      const eventPhotosByParty = new Map<string, any[]>();
+      if (uniquePartyIds.length > 0) {
+        const photoRows = await prisma.photo.findMany({
+          where: { partyId: { in: uniquePartyIds } },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            partyId: true,
+            url: true,
+            thumbnailUrl: true,
+            fileName: true,
+            mimeType: true,
+            caption: true,
+            status: true,
+            starred: true,
+            tags: true,
+            uploaderName: true,
+            createdAt: true,
+          },
+        });
+        for (const p of photoRows) {
+          const list = eventPhotosByParty.get(p.partyId) ?? [];
+          list.push({
+            id: p.id,
+            url: p.url,
+            thumbnailUrl: p.thumbnailUrl,
+            fileName: p.fileName,
+            mimeType: p.mimeType,
+            caption: p.caption,
+            status: p.status,
+            starred: p.starred,
+            tags: p.tags,
+            uploaderName: p.uploaderName,
+            createdAt: p.createdAt.toISOString(),
+          });
+          eventPhotosByParty.set(p.partyId, list);
+        }
+      }
+
       // 4. Group payouts by partyId in JS. Sum amounts by status, take the
       //    most recent updatedAt, count flagged-ready, capture the party meta
       //    from the first row encountered (PAYOUT_PARTY_SELECT is identical
@@ -1779,6 +1825,12 @@ router.get(
             flaggedReadyCount: b.flaggedReadyCount,
           },
           payouts: serializedPayouts,
+          // ricotta-92104: party-level event photos for the city expansion's
+          // Event/Pizza preview sections. Same shape as the per-payout
+          // serializer's `eventPhotos` so the frontend can reuse the
+          // focaccia-92104 split rule (tags `Pizza`/`pizza-selfie` → Pizza
+          // photos, everything else → Event photos).
+          eventPhotos: eventPhotosByParty.get(partyId) ?? [],
         };
       });
 
