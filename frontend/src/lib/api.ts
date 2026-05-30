@@ -425,6 +425,45 @@ export async function flagPartyAsScam(
 }
 
 /**
+ * crocchetta-92106 + crocchetta-92107: Send the "Make sure you've uploaded
+ * receipts and photos to rsv.pizza/<custom_url>" reminder via the Molto
+ * Benny Telegram bot.
+ *
+ * Two messages, same body:
+ *   1. DM to the primary host (uses `parties.host_telegram_chat_id`; skipped
+ *      with a reason when the host hasn't linked Telegram).
+ *   2. Post to the **city's** Telegram group chat. The caller resolves the
+ *      chat_id from the GPP sheet (same `SheetCity.groupId` field that
+ *      powers /underboss broadcasts) and passes it in `groupChatId`. When
+ *      omitted/empty, the backend skips with `groupReason: 'no city TG
+ *      group set'` (per-party, not a global env var).
+ *
+ * Backend returns per-channel success + skip reason so the UI can render an
+ * accurate partial-success toast. Triggered from the /payments by-city ⋮
+ * menu (PayoutsByPartyTable).
+ */
+export interface SendTgReceiptsReminderResponse {
+  hostDmSent: boolean;
+  hostDmReason?: string;
+  groupSent: boolean;
+  groupReason?: string;
+}
+
+export async function sendTgReceiptsReminder(
+  partyId: string,
+  groupChatId?: string | null,
+): Promise<SendTgReceiptsReminderResponse> {
+  return apiRequest<SendTgReceiptsReminderResponse>(
+    `/api/admin/payouts/${partyId}/tg-receipts-reminder`,
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: groupChatId ? { groupChatId } : undefined,
+    },
+  );
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.

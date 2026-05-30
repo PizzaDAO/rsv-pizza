@@ -5140,6 +5140,162 @@ router.post(
   },
 );
 
+// ============================================
+// crocchetta-92106 + crocchetta-92107: Telegram receipts reminder.
+//
+// Sends a Telegram nudge via the Molto Benny bot (`TELEGRAM_BOT_TOKEN`) to:
+//   1. The host's private DM, using `parties.host_telegram_chat_id` — set
+//      when the host links Telegram via the `/start <token>` deeplink (see
+//      backend/src/routes/telegram-webhook.routes.ts). When null, the host
+//      DM is silently skipped and `hostDmSent=false` with a reason returned
+//      to the caller.
+//   2. The city's Telegram group chat — chat_id passed in the request body
+//      as `groupChatId`, resolved client-side from the same GPP sheet that
+//      powers the /underboss broadcast tooling (`fetchSheetCities` →
+//      `SheetCity.groupId`). When the party's city has no group_id on file,
+//      the frontend omits the field and the backend skips the group post
+//      with `groupReason: 'no city TG group set'`. This mirrors the
+//      per-row chat_id pattern used by /api/telegram/broadcast — the
+//      backend never fetches the sheet itself.
+//
+// Both messages carry the same body:
+//   "Make sure you've uploaded receipts and photos to rsv.pizza/<custom_url>"
+//
+// No DB writes — we surface success/failure per channel in the response and
+// emit a single console line with the `[crocchetta-92106][tg-reminder]`
+// marker for grep-driven audit recovery.
+//
+// Auth: admin / super_admin / payment_admin via
+// `requireAnyAdminOrPaymentAdmin` — same gate as the other by-city actions
+// (Mark party paid, Send payment, Flag scam). Regional underbosses don't see
+// the menu item.
+// ============================================
+
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return { ok: false, reason: 'TELEGRAM_BOT_TOKEN not configured' };
+  }
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!resp.ok) {
+      let detail = '';
+      try {
+        const body = await resp.text();
+        detail = body.slice(0, 200);
+      } catch {
+        // ignore — surface just the status
+      }
+      return {
+        ok: false,
+        reason: `Telegram API returned ${resp.status}${detail ? `: ${detail}` : ''}`,
+      };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return {
+      ok: false,
+      reason: `Telegram fetch failed: ${err?.message || String(err)}`,
+    };
+  }
+}
+
+router.post(
+  '/:partyId/tg-receipts-reminder',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: {
+          id: true,
+          customUrl: true,
+          inviteCode: true,
+          name: true,
+          hostTelegramChatId: true,
+        },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      // Prefer custom_url for the public link; fall back to invite_code so
+      // the URL always resolves even on parties without a custom slug.
+      const slug = party.customUrl || party.inviteCode;
+      const text = `Make sure you've uploaded receipts and photos to rsv.pizza/${slug}`;
+
+      // Host DM — only when the party has a linked Telegram chat id.
+      let hostDmSent = false;
+      let hostDmReason: string | undefined;
+      if (party.hostTelegramChatId) {
+        const result = await sendTelegramMessage(
+          party.hostTelegramChatId.toString(),
+          text,
+        );
+        if (result.ok) {
+          hostDmSent = true;
+        } else {
+          hostDmReason = result.reason;
+        }
+      } else {
+        hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
+      }
+
+      // Group chat — per-city chat_id supplied by the caller. The frontend
+      // resolves it from the GPP sheet (`SheetCity.groupId`) using the same
+      // city→chat_id map that /underboss uses for its broadcast tooling. We
+      // intentionally don't fetch the sheet from the backend; mirrors the
+      // `/api/telegram/broadcast` contract where the client supplies chatIds.
+      const rawGroupChatId =
+        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
+      let groupSent = false;
+      let groupReason: string | undefined;
+      if (rawGroupChatId) {
+        const result = await sendTelegramMessage(rawGroupChatId, text);
+        if (result.ok) {
+          groupSent = true;
+        } else {
+          groupReason = result.reason;
+        }
+      } else {
+        groupReason = 'no city TG group set';
+      }
+
+      // Grep-marker audit line (no DB row per task spec). Includes party id,
+      // slug, and per-channel outcome so post-hoc recovery is one `vercel
+      // logs | grep` away.
+      console.log(
+        `[crocchetta-92106][tg-reminder] party=${party.id} slug=${slug} host_dm=${
+          hostDmSent ? 'ok' : `skipped:${hostDmReason ?? 'unknown'}`
+        } group=${groupSent ? 'ok' : `skipped:${groupReason ?? 'unknown'}`}`,
+      );
+
+      res.json({
+        hostDmSent,
+        ...(hostDmReason ? { hostDmReason } : {}),
+        groupSent,
+        ...(groupReason ? { groupReason } : {}),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // Re-export the helper so other backend code (e.g. PR 5 execute route) can
 // reuse the composed guard without re-deriving it.
 export { requireAnyAdminOrPaymentAdmin, isFullAdmin };

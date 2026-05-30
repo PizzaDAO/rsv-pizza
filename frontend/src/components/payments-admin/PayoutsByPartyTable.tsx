@@ -18,6 +18,7 @@ import {
   User as UserIcon,
   Play,
   AlertTriangle,
+  MessageCircle,
 } from 'lucide-react';
 import type {
   AdminPayout,
@@ -43,6 +44,7 @@ import {
   retryPayoutDocumentOcr,
   flagPartyAsScam,
   POSSIBLE_SCAM_TAG,
+  sendTgReceiptsReminder,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -139,6 +141,31 @@ interface PayoutsByPartyTableProps {
    * the viewerRole gate on the menu.
    */
   onScamFlagChanged?: (partyId: string, nextTags: string[]) => void;
+  /**
+   * crocchetta-92106: toast callback used by the Send receipts reminder
+   * action. Called after the backend POST resolves; the menu owns the API
+   * call so the parent only needs to render the message (mirrors the
+   * gnocchi-92104 pattern). When omitted, the table falls back to a
+   * `window.alert`-free silent success (the menu still closes).
+   */
+  onTgReminderResult?: (
+    partyId: string,
+    result: {
+      hostDmSent: boolean;
+      hostDmReason?: string;
+      groupSent: boolean;
+      groupReason?: string;
+    } | { error: string },
+  ) => void;
+  /**
+   * crocchetta-92107: per-city Telegram group chat_id map keyed by the
+   * lower-cased, trimmed city name (with the "Global Pizza Party " prefix
+   * stripped). Populated by the parent from `fetchSheetCities()` —
+   * `SheetCity.groupId` — the same source /underboss uses for its broadcast
+   * tooling. When a row's city is missing from the map, the group post is
+   * skipped server-side with `groupReason: 'no city TG group set'`.
+   */
+  cityGroupChatIds?: Map<string, string>;
   viewerRole?: 'admin' | 'underboss';
   busyRowId?: string | null;
   loading?: boolean;
@@ -254,31 +281,47 @@ function CityActionsMenu({
   onAddExternalPayment,
   onSendPayment,
   onToggleScamFlag,
+  onSendTgReminder,
   canMarkPaid,
   canAddExternal,
   canSendPayment,
   canToggleScamFlag,
+  canSendTgReminder,
   markPaidLabel,
   isFlaggedScam,
   scamFlagBusy,
+  tgReminderBusy,
 }: {
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
   onSendPayment?: () => void;
   onToggleScamFlag?: () => void;
+  /**
+   * crocchetta-92106: fires after the second click on the Send receipts
+   * reminder menu item (two-click confirm pattern — DMs aren't reversible).
+   * Parent runs the API call and surfaces the toast.
+   */
+  onSendTgReminder?: () => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
   canSendPayment: boolean;
   canToggleScamFlag: boolean;
+  canSendTgReminder: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
+  tgReminderBusy: boolean;
 }) {
   // Hooks-above-early-returns: declare useState before the no-actions guard
   // so the conditional return can't reorder hooks on a re-render where the
   // capability props flip. (feedback_hooks_above_early_returns)
   const [menuOpen, setMenuOpen] = useState(false);
-  const hasMenuItems = canAddExternal || canToggleScamFlag;
+  // crocchetta-92106: two-click confirm for the TG reminder action. The
+  // first click flips the label to "Click again to confirm"; a second click
+  // within the open menu actually fires. Resetting whenever the menu closes
+  // prevents a stale confirm state carrying over to the next open.
+  const [confirmTgReminder, setConfirmTgReminder] = useState(false);
+  const hasMenuItems = canAddExternal || canToggleScamFlag || canSendTgReminder;
   // Nothing to show at all — render nothing.
   if (!canMarkPaid && !canSendPayment && !hasMenuItems) {
     return null;
@@ -325,7 +368,16 @@ function CityActionsMenu({
         <div className="relative">
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => {
+              setMenuOpen((v) => {
+                const next = !v;
+                // crocchetta-92106: closing the menu resets the TG-reminder
+                // confirm state so a stale "Click again to confirm" doesn't
+                // carry over to the next open.
+                if (!next) setConfirmTgReminder(false);
+                return next;
+              });
+            }}
             className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-theme-stroke text-theme-text-secondary hover:bg-theme-surface-hover"
             title="More actions"
             aria-label="More actions"
@@ -339,7 +391,10 @@ function CityActionsMenu({
               {/* click-out overlay */}
               <div
                 className="fixed inset-0 z-40"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmTgReminder(false);
+                }}
               />
               <div
                 className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-[#1a1a2e] shadow-xl py-1"
@@ -387,6 +442,47 @@ function CityActionsMenu({
                     {isFlaggedScam
                       ? 'Unflag possible scam'
                       : 'Flag as possible scam'}
+                  </button>
+                )}
+                {/* crocchetta-92106: Send receipts reminder via Molto Benny
+                    Telegram bot. DMs the primary host (when their TG is
+                    linked) and posts to the shared GPP group chat. Two-click
+                    confirm — first click flips the label to "Click again to
+                    confirm" because a DM can't be unsent (reversible-action
+                    convention DOESN'T apply here per
+                    feedback_reversible_actions_no_confirm). */}
+                {canSendTgReminder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={tgReminderBusy}
+                    onClick={() => {
+                      if (!confirmTgReminder) {
+                        setConfirmTgReminder(true);
+                        return;
+                      }
+                      setMenuOpen(false);
+                      setConfirmTgReminder(false);
+                      onSendTgReminder?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {tgReminderBusy ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-theme-text-muted"
+                      />
+                    ) : (
+                      <MessageCircle
+                        size={14}
+                        className={
+                          confirmTgReminder ? 'text-amber-400' : 'text-sky-400'
+                        }
+                      />
+                    )}
+                    {confirmTgReminder
+                      ? 'Click again to confirm'
+                      : 'Send receipts reminder'}
                   </button>
                 )}
               </div>
@@ -1677,6 +1773,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
+  onTgReminderResult,
+  cityGroupChatIds,
   viewerRole = 'admin',
   busyRowId,
   loading,
@@ -1692,6 +1790,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // Per-row busy spinner state for the scam-flag toggle. Avoids double-clicks
   // during the PATCH round-trip.
   const [scamBusyPartyId, setScamBusyPartyId] = useState<string | null>(null);
+  // crocchetta-92106: per-row busy spinner for the Send receipts reminder
+  // action. Avoids double-firing the POST while the bot is dispatching.
+  const [tgReminderBusyPartyId, setTgReminderBusyPartyId] = useState<string | null>(null);
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
@@ -1701,6 +1802,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // bottarga-92104: same admin gate as the other two menu items. Underbosses
   // never see the scam-flag action.
   const canToggleScamFlag = viewerRole === 'admin';
+  // crocchetta-92106: TG reminder is admin-only. The endpoint itself enforces
+  // requireAnyAdminOrPaymentAdmin server-side; the UI gate just hides the
+  // menu item for underbosses so they don't see a button that 403s.
+  const canSendTgReminder = viewerRole === 'admin';
   // pesto-92105: same gate the per-payout PayoutReviewModal applies for
   // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
   // the plain photo-only lightbox.
@@ -1763,6 +1868,34 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
     }
   }
 
+  /**
+   * crocchetta-92106 + crocchetta-92107: dispatch the Send-receipts-reminder
+   * POST and surface the per-channel outcome to the parent via
+   * `onTgReminderResult` so the page-level toast stack renders the right
+   * message. The per-city Telegram group chat_id is resolved from
+   * `cityGroupChatIds` (a sheet-derived map keyed by the stripped,
+   * lower-cased city name); when the map has no entry the request omits the
+   * field and the backend marks the group post skipped. Errors are caught
+   * and forwarded with an `error` shape so the parent can flash a failure
+   * toast without the table needing its own alert path.
+   */
+  async function handleSendTgReminder(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
+    const groupChatId = cityGroupChatIds?.get(cityKey);
+    setTgReminderBusyPartyId(partyId);
+    try {
+      const result = await sendTgReceiptsReminder(partyId, groupChatId);
+      onTgReminderResult?.(partyId, result);
+    } catch (err) {
+      onTgReminderResult?.(partyId, {
+        error: (err as Error)?.message ?? 'Could not send reminder',
+      });
+    } finally {
+      setTgReminderBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -1807,6 +1940,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 tagOverrides[row.party.id] ?? row.party.eventTags ?? [];
               const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
               const scamFlagBusy = scamBusyPartyId === row.party.id;
+              const tgReminderBusy = tgReminderBusyPartyId === row.party.id;
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
               // pinsa-92103: ALSO show the button when the city has paid
@@ -2008,9 +2142,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canAddExternal={canAddExternal}
                           canSendPayment={canSendPayment}
                           canToggleScamFlag={canToggleScamFlag}
+                          canSendTgReminder={canSendTgReminder}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
+                          tgReminderBusy={tgReminderBusy}
                           onMarkPartyPaid={
                             showMarkPartyPaid && onMarkPartyPaid
                               ? () => onMarkPartyPaid(row.party.id)
@@ -2033,6 +2169,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onToggleScamFlag={
                             canToggleScamFlag
                               ? () => handleToggleScamFlag(row)
+                              : undefined
+                          }
+                          onSendTgReminder={
+                            canSendTgReminder
+                              ? () => handleSendTgReminder(row)
                               : undefined
                           }
                         />
