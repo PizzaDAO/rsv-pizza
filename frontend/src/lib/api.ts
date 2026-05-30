@@ -4274,6 +4274,46 @@ export async function updatePayoutDocument(
   return res.document;
 }
 
+/**
+ * pancetta-92104: reset a single doc's OCR retry counter so the next backfill
+ * call (or this call's inline run) re-attempts `analyzeReceipt` against the
+ * receipt. Used to un-stick docs that hit the 3-attempt cap once the
+ * underlying OpenAI quota issue is resolved, and as a one-click "Retry OCR"
+ * affordance on rows that failed for a non-quota reason (timeout, bad image).
+ *
+ * `runNow: true` (default) runs analyzeReceipt synchronously and returns the
+ * stamped result. `runNow: false` just clears the counters and lets the next
+ * scheduled backfill batch pick it up.
+ */
+export async function retryPayoutDocumentOcr(
+  docId: string,
+  opts?: { runNow?: boolean },
+): Promise<{
+  document: {
+    id: string;
+    kind: 'pizza' | 'receipt';
+    url: string;
+    fileName: string;
+    ocrAmount: number | null;
+    ocrCurrency: string | null;
+    ocrConfidence: number | null;
+    originalAmount: number | null;
+    originalCurrency: string | null;
+    exchangeRate: number | null;
+    ocrError: string | null;
+    ocrAttemptedAt: string | null;
+    ocrAttemptCount: number;
+    sortOrder: number;
+  } | null;
+  ranInline: boolean;
+  inlineError: string | null;
+}> {
+  return apiRequest(
+    `/api/admin/payouts/documents/${docId}/retry-ocr`,
+    { method: 'POST', body: { runNow: opts?.runNow ?? true } },
+  );
+}
+
 export async function approveAdminPayout(
   id: string,
   opts?: { note?: string; autoExecute?: boolean; regions?: string[] },

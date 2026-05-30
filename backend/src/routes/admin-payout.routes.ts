@@ -4221,11 +4221,43 @@ router.get(
 //    the OCR service but have no DB columns yet, so they're discarded here.
 //  - On failure, the error is logged + pushed onto `failed` and we continue.
 //
-// Returns:
-//   { processed, succeeded, failed: [{id, error}], remaining, done }
+// pancetta-92104: the original implementation only wrote `ocr_line_items` on
+// success, so failed docs (429 quota errors, timeouts, bad images) stayed
+// queryable as candidates forever. The loop script kept hitting the same
+// failed docs every iteration and burned through our OpenAI quota. Now we
+// always stamp `ocr_attempted_at` + bump `ocr_attempt_count` (success OR
+// failure), the candidate filter excludes docs attempted in the last 24h
+// AND caps at 3 attempts, and the loop short-circuits if the FIRST error
+// looks like a 429/quota response.
 //
-// Loop externally with backend/scripts/loop-backfill-line-items.cjs.
+// Returns:
+//   { processed, succeeded, failed: [{id, error}], remaining, done,
+//     quotaExceeded? }
+//
+// Loop externally with backend/scripts/loop-backfill-line-items.cjs (which
+// also breaks on `quotaExceeded: true`).
 // ============================================
+
+/**
+ * pancetta-92104: detect the OpenAI 429/quota-exceeded response shape so the
+ * backfill loop can short-circuit instead of waiting through the remaining
+ * throttled iterations. Defensive: matches either the literal 429 status
+ * code substring or the word "quota" in the error message.
+ */
+function isQuotaError(message: string): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes('429') || lower.includes('quota');
+}
+
+/**
+ * pancetta-92104: 24-hour cooldown between automatic OCR re-attempts on a
+ * single doc. Admin can bypass via `POST /:docId/retry-ocr` (resets both
+ * counter columns to zero).
+ */
+const OCR_RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const OCR_MAX_AUTO_ATTEMPTS = 3;
+
 router.post(
   '/backfill-line-items',
   requireAuth,
@@ -4241,14 +4273,22 @@ router.post(
       }
       const limit = Math.max(1, Math.min(50, Math.floor(rawLimit)));
 
-      // Candidates: receipts with no line items yet and a non-empty URL.
-      // `url: { not: '' }` excludes blank rows; the `IS NOT NULL` semantic is
-      // implicit because `url` is a non-nullable column on PayoutDocument.
+      // pancetta-92104: candidates are receipts with no line items yet, a
+      // non-empty URL, AND either never attempted OR last attempted >24h
+      // ago, AND under the per-doc attempt cap. This is the surgical fix
+      // for the re-OCR-loop bug — failed docs stop being "free candidates
+      // every iteration" once their attempt marker is set.
+      const cooldownCutoff = new Date(Date.now() - OCR_RETRY_COOLDOWN_MS);
       const candidates = await prisma.payoutDocument.findMany({
         where: {
           kind: 'receipt',
           ocrLineItems: { equals: Prisma.DbNull },
           url: { not: '' },
+          ocrAttemptCount: { lt: OCR_MAX_AUTO_ATTEMPTS },
+          OR: [
+            { ocrAttemptedAt: null },
+            { ocrAttemptedAt: { lt: cooldownCutoff } },
+          ],
         },
         orderBy: { createdAt: 'asc' },
         take: limit,
@@ -4257,18 +4297,23 @@ router.post(
 
       const failed: Array<{ id: string; error: string }> = [];
       let succeeded = 0;
+      let quotaExceeded = false;
 
       for (let i = 0; i < candidates.length; i++) {
         const doc = candidates[i];
         try {
           const result = await analyzeReceipt(doc.url);
-          // Additive write: ONLY ocr_line_items. Do not overwrite
-          // ocr_amount / ocr_currency / ocr_confidence / ocr_raw — admins may
-          // have already approved payouts based on those values.
+          // Additive write: ONLY ocr_line_items + attempt marker. Do not
+          // overwrite ocr_amount / ocr_currency / ocr_confidence / ocr_raw
+          // — admins may have already approved payouts based on those.
+          // Clear any prior ocrError since this attempt succeeded.
           await prisma.payoutDocument.update({
             where: { id: doc.id },
             data: {
               ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              ocrAttemptedAt: new Date(),
+              ocrAttemptCount: { increment: 1 },
+              ocrError: null,
             },
           });
           succeeded += 1;
@@ -4277,7 +4322,26 @@ router.post(
           console.error(
             `[backfill-line-items] doc=${doc.id} url=${doc.url} failed: ${message}`,
           );
+          // pancetta-92104: persist the attempt marker on failure too —
+          // this is the bug fix. Without this, a failed doc stays a
+          // candidate forever and the loop burns quota retrying it.
+          // Truncate the error to 500 chars to keep the column sane.
+          await prisma.payoutDocument.update({
+            where: { id: doc.id },
+            data: {
+              ocrAttemptedAt: new Date(),
+              ocrAttemptCount: { increment: 1 },
+              ocrError: message.slice(0, 500),
+            },
+          });
           failed.push({ id: doc.id, error: message });
+
+          // Short-circuit on quota errors: no point waiting through the
+          // remaining 500ms throttles when the account is rate-limited.
+          if (isQuotaError(message)) {
+            quotaExceeded = true;
+            break;
+          }
         }
 
         // Throttle between iterations (skip the wait after the last one).
@@ -4286,11 +4350,19 @@ router.post(
         }
       }
 
+      // pancetta-92104: `remaining` reflects docs still eligible for the
+      // NEXT loop call (same cooldown + cap filters). A doc that just
+      // failed today won't count again until 24h pass.
       const remaining = await prisma.payoutDocument.count({
         where: {
           kind: 'receipt',
           ocrLineItems: { equals: Prisma.DbNull },
           url: { not: '' },
+          ocrAttemptCount: { lt: OCR_MAX_AUTO_ATTEMPTS },
+          OR: [
+            { ocrAttemptedAt: null },
+            { ocrAttemptedAt: { lt: cooldownCutoff } },
+          ],
         },
       });
 
@@ -4300,6 +4372,134 @@ router.post(
         failed,
         remaining,
         done: remaining === 0,
+        // pancetta-92104: loop driver checks this and breaks early so it
+        // doesn't spam more requests once the account is rate-limited.
+        quotaExceeded,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
+// pancetta-92104: POST /documents/:docId/retry-ocr
+//
+// Admin-only: reset a single doc's `ocr_attempted_at` and `ocr_attempt_count`
+// so it becomes a candidate again on the next backfill call. Useful for
+// un-sticking docs that hit the 3-attempt cap once the underlying OpenAI
+// quota issue is resolved (or to retry a one-off failure manually).
+//
+// If `runNow` is true (default), also re-runs analyzeReceipt synchronously
+// and stamps the result. Otherwise just clears the counters and the doc
+// gets picked up by the next backfill batch.
+//
+// Returns:
+//   { document: <updated row> }
+// ============================================
+router.post(
+  '/documents/:docId/retry-ocr',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { docId } = req.params;
+      const body = (req.body || {}) as { runNow?: unknown };
+      const runNow = body.runNow === undefined ? true : Boolean(body.runNow);
+
+      const existing = await prisma.payoutDocument.findUnique({
+        where: { id: docId },
+        select: { id: true, url: true, kind: true },
+      });
+      if (!existing) {
+        throw new AppError('Document not found', 404, 'NOT_FOUND');
+      }
+
+      // Always clear the cooldown + counter first so the next backfill
+      // call (whether we run inline below or not) will pick this row up.
+      await prisma.payoutDocument.update({
+        where: { id: docId },
+        data: {
+          ocrAttemptedAt: null,
+          ocrAttemptCount: 0,
+          ocrError: null,
+        },
+      });
+
+      let ranInline = false;
+      let inlineError: string | null = null;
+
+      if (runNow && existing.kind === 'receipt' && existing.url) {
+        const { analyzeReceipt } = await import('../services/ocr.service.js');
+        try {
+          const result = await analyzeReceipt(existing.url);
+          await prisma.payoutDocument.update({
+            where: { id: docId },
+            data: {
+              ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              ocrAttemptedAt: new Date(),
+              ocrAttemptCount: { increment: 1 },
+              ocrError: null,
+            },
+          });
+          ranInline = true;
+        } catch (err: any) {
+          inlineError = err?.message ? String(err.message) : String(err);
+          await prisma.payoutDocument.update({
+            where: { id: docId },
+            data: {
+              ocrAttemptedAt: new Date(),
+              ocrAttemptCount: { increment: 1 },
+              ocrError: inlineError.slice(0, 500),
+            },
+          });
+        }
+      }
+
+      const updated = await prisma.payoutDocument.findUnique({
+        where: { id: docId },
+        select: {
+          id: true,
+          kind: true,
+          url: true,
+          fileName: true,
+          ocrAmount: true,
+          ocrCurrency: true,
+          ocrConfidence: true,
+          originalAmount: true,
+          originalCurrency: true,
+          exchangeRate: true,
+          ocrError: true,
+          ocrAttemptedAt: true,
+          ocrAttemptCount: true,
+          sortOrder: true,
+        },
+      });
+
+      res.json({
+        document: updated && {
+          id: updated.id,
+          kind: updated.kind,
+          url: updated.url,
+          fileName: updated.fileName,
+          ocrAmount: updated.ocrAmount == null ? null : Number(updated.ocrAmount),
+          ocrCurrency: updated.ocrCurrency,
+          ocrConfidence:
+            updated.ocrConfidence == null ? null : Number(updated.ocrConfidence),
+          originalAmount:
+            updated.originalAmount == null ? null : Number(updated.originalAmount),
+          originalCurrency: updated.originalCurrency,
+          exchangeRate:
+            updated.exchangeRate == null ? null : Number(updated.exchangeRate),
+          ocrError: updated.ocrError,
+          ocrAttemptedAt: updated.ocrAttemptedAt
+            ? updated.ocrAttemptedAt.toISOString()
+            : null,
+          ocrAttemptCount: updated.ocrAttemptCount,
+          sortOrder: updated.sortOrder,
+        },
+        ranInline,
+        inlineError,
       });
     } catch (err) {
       next(err);

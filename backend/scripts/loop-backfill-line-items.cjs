@@ -42,7 +42,17 @@ const BATCH = Number(process.env.BATCH || 25);
     console.log(
       `+ ${j.succeeded} (${j.failed.length} failed) — remaining: ${j.remaining}`,
     );
+    // pancetta-92104: bail out on either natural completion OR a quota
+    // signal from the server. quotaExceeded means the OpenAI account is
+    // rate-limited and the backfill endpoint already short-circuited mid
+    // batch; firing another request would just hit the same wall.
     if (j.done) break;
+    if (j.quotaExceeded) {
+      console.error(
+        'Quota exceeded — stopping. Resolve OpenAI quota issue then re-run.',
+      );
+      break;
+    }
   }
   console.log(`Done. Total succeeded: ${total}.`);
 })();
