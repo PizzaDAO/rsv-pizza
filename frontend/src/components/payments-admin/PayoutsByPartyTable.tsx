@@ -738,9 +738,11 @@ function CityExpansion({
         pendingPayouts.push(p);
       }
     }
-    // approved-but-not-yet-paid is what's typically classified as "in flight";
+    // approved-but-not-yet-paid + queued (wire awaiting settlement) are "in flight";
     // surface those alongside pending so the admin can drill into either.
-    const approvedNotPaid = payouts.filter((p) => p.status === 'approved');
+    const approvedNotPaid = payouts.filter(
+      (p) => p.status === 'approved' || p.status === 'queued'
+    );
 
     return {
       receiptUsdTotal,

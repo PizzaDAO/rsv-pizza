@@ -40,3 +40,4 @@ nul
 # Outreach scrapers (stagioni-29104)
 .cache/
 scripts/outreach/output/
+secrets.md
