@@ -1960,6 +1960,15 @@ export interface AdminPayoutEventPhoto {
   caption: string | null;
   status: string;
   starred: boolean;
+  /**
+   * focaccia-92104: drives the "Pizza photos" vs "Event photos" split in
+   * PayoutReviewModal. Photos tagged `Pizza` (the default-tag value) or
+   * `pizza-selfie` (the EventPage selfie-upload tag) render under
+   * "Pizza photos"; everything else renders under "Event photos". Optional
+   * for backwards compat with older cached payloads during a rolling deploy
+   * — falls back to `[]` which means "treat as Event photos".
+   */
+  tags?: string[];
   uploaderName: string | null;
   createdAt: string;
 }

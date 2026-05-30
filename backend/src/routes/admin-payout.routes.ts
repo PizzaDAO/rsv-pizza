@@ -2178,6 +2178,9 @@ router.get(
       // visual context of the party without bouncing to /host/:slug. Admins
       // see every photo regardless of moderation status; the frontend surfaces
       // a "Hidden from public" pill when `status !== 'approved'`.
+      // focaccia-92104: surface `tags` so the frontend can split this list
+      // into "Pizza photos" (tagged Pizza / pizza-selfie) vs "Event photos"
+      // (everything else) in PayoutReviewModal's photo grids.
       const eventPhotos = await prisma.photo.findMany({
         where: { partyId: row.partyId },
         orderBy: { createdAt: 'asc' },
@@ -2190,6 +2193,7 @@ router.get(
           caption: true,
           status: true,
           starred: true,
+          tags: true,
           uploaderName: true,
           createdAt: true,
         },
@@ -2203,6 +2207,7 @@ router.get(
         caption: p.caption,
         status: p.status,
         starred: p.starred,
+        tags: p.tags,
         uploaderName: p.uploaderName,
         createdAt: p.createdAt.toISOString(),
       }));
