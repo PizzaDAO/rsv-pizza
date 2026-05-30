@@ -121,6 +121,10 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // ✓ Closed pill on the by-city table + hides the Mark Paid affordance for
   // already-closed parties.
   paymentsClosedAt: true,
+  // mortadella-92106: admin-only city notes. Surfaced in the by-city
+  // expansion for admin viewers and stripped from the response for
+  // underbosses (see serializer below).
+  adminNotes: true,
   _count: {
     select: {
       guests: {
@@ -1813,6 +1817,14 @@ router.get(
             paymentsClosedAt: b.partyMeta.paymentsClosedAt
               ? b.partyMeta.paymentsClosedAt.toISOString()
               : null,
+            // mortadella-92106: admin-only city notes. Stripped to null for
+            // underboss viewers so they never see the text — both the input
+            // and the gating on the frontend are belt-and-braces but this
+            // is the canonical server-side gate.
+            adminNotes:
+              req.viewerRole === 'admin'
+                ? (b.partyMeta.adminNotes ?? null)
+                : null,
           },
           aggregates: {
             pendingCount: b.pendingCount,

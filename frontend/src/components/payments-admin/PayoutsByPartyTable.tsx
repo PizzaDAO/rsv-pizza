@@ -19,7 +19,11 @@ import {
   Play,
   AlertTriangle,
   MessageCircle,
+  Check,
+  AlertCircle,
+  StickyNote,
 } from 'lucide-react';
+import { IconInput } from '../IconInput';
 import type {
   AdminPayout,
   AdminPayoutEventPhoto,
@@ -46,6 +50,7 @@ import {
   flagPartyAsScam,
   POSSIBLE_SCAM_TAG,
   sendTgReceiptsReminder,
+  setCityAdminNotes,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -517,6 +522,7 @@ function CityExpansion({
   onRowClick,
   busyRowId,
   canEditReceipts,
+  canEditAdminNotes,
 }: {
   row: PartyPayoutsRow;
   selectedIds: Set<string>;
@@ -529,6 +535,13 @@ function CityExpansion({
    * the plain photo-only lightbox.
    */
   canEditReceipts: boolean;
+  /**
+   * mortadella-92106: gates the city-level admin notes textarea (read AND
+   * write). True for admin / super_admin / payment_admin. Underbosses don't
+   * see the input at all — they also receive `row.party.adminNotes === null`
+   * from the server, so this is belt-and-braces.
+   */
+  canEditAdminNotes: boolean;
 }) {
   // Hooks-above-early-returns: all useState / useMemo / useCallback live up
   // front so adding a conditional return below can't change hook order.
@@ -592,6 +605,21 @@ function CityExpansion({
   // Tracks which receipt index in the bucket carousel is currently displayed
   // so we can rebuild the editor pane for the right doc on arrow-key nav.
   const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState<number | null>(null);
+
+  // mortadella-92106: city-level admin notes state. `noteDraft` is the
+  // working value the textarea binds to so the admin can type freely before
+  // the autosave-on-blur fires. Initial value comes from `row.party.adminNotes`
+  // (server-supplied; null for underbosses). `noteSaveStatus` drives the
+  // inline "Saved" / "Saving…" / "Save failed" indicator and is intentionally
+  // unionized like PaymentDetailsCard so the same render branches work.
+  const [noteDraft, setNoteDraft] = useState<string>(row.party.adminNotes ?? '');
+  const [noteSaveStatus, setNoteSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [noteSaveError, setNoteSaveError] = useState<string | null>(null);
+  // Last value that was successfully persisted — used to detect "no-op on
+  // blur" so we don't fire a PATCH when the admin tabs away without editing.
+  const [noteSaved, setNoteSaved] = useState<string>(row.party.adminNotes ?? '');
 
   // Merge receipts across all payouts on the party — multi-host pot. Layers
   // `receiptOverrides` (pesto-92105) on top so saves reflect immediately.
@@ -1220,6 +1248,37 @@ function CityExpansion({
     toggleDuplicate(lightboxReceipt.id, !(lightboxReceipt.isDuplicate === true));
   }, [lightboxReceipt, toggleDuplicate]);
 
+  // mortadella-92106: autosave-on-blur for the city-level admin notes.
+  // Optimistic — the textarea binds to `noteDraft` and the typed value is
+  // visible immediately. On blur we PATCH only when the draft differs from
+  // the last-saved value; on failure we surface an inline error and roll the
+  // local "saved" anchor back to `noteSaved` (no rollback of the textarea
+  // contents — the admin can fix and re-blur to retry).
+  const handleSaveAdminNotes = useCallback(async () => {
+    if (!canEditAdminNotes) return;
+    const trimmed = noteDraft.trim();
+    const next = trimmed.length === 0 ? null : trimmed;
+    const prev = noteSaved.trim().length === 0 ? null : noteSaved;
+    if (next === prev) {
+      // No-op blur (admin tabbed away without editing) — don't fire a PATCH.
+      return;
+    }
+    setNoteSaveStatus('saving');
+    setNoteSaveError(null);
+    try {
+      const result = await setCityAdminNotes(row.party.id, next);
+      setNoteSaved(result.adminNotes ?? '');
+      setNoteSaveStatus('saved');
+      // Clear the "Saved" badge after a moment so it doesn't stick.
+      window.setTimeout(() => {
+        setNoteSaveStatus((s) => (s === 'saved' ? 'idle' : s));
+      }, 1800);
+    } catch (err: any) {
+      setNoteSaveStatus('error');
+      setNoteSaveError(err?.message || 'Failed to save city notes');
+    }
+  }, [canEditAdminNotes, noteDraft, noteSaved, row.party.id]);
+
   // pesto-92105: build the editor pane for the lightbox. Gated to receipt
   // bucket + admin viewer; null for event/pizza photos and underbosses (the
   // lightbox then renders its plain photo-only layout).
@@ -1375,6 +1434,55 @@ function CityExpansion({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/*
+        mortadella-92106: city-level admin notes (admin-only). Free-text
+        scratchpad for context that doesn't fit per-payout notes:
+        "host unresponsive", "follow up with city org", "claim disputed",
+        "needs translator", etc. Autosave on blur, optimistic UI, surfaced
+        only for admin viewers (underbosses also receive `adminNotes = null`
+        from the server so this is belt-and-braces).
+      */}
+      {canEditAdminNotes && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1 text-theme-text-muted text-xs uppercase tracking-wide">
+              <StickyNote size={12} />
+              City notes (admin only)
+            </span>
+            <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+              {noteSaveStatus === 'saving' && (
+                <>
+                  <Loader2 size={12} className="animate-spin text-theme-text-muted" />
+                  <span className="text-theme-text-muted">Saving…</span>
+                </>
+              )}
+              {noteSaveStatus === 'saved' && (
+                <>
+                  <Check size={12} className="text-emerald-500" />
+                  <span className="text-emerald-500">Saved</span>
+                </>
+              )}
+              {noteSaveStatus === 'error' && (
+                <>
+                  <AlertCircle size={12} className="text-[#ff393a]" />
+                  <span className="text-[#ff393a]">{noteSaveError || 'Save failed'}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <IconInput
+            multiline
+            rows={3}
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            onBlur={handleSaveAdminNotes}
+            placeholder="Internal notes about this city... (admin only)"
+            className="input"
+            maxLength={4000}
+          />
         </div>
       )}
 
@@ -1953,6 +2061,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // `canEditReceipts` (admin / super_admin / payment_admin). Underbosses get
   // the plain photo-only lightbox.
   const canEditReceipts = viewerRole === 'admin';
+  // mortadella-92106: same admin-only gate for the city-level notes textarea.
+  // Backend strips `adminNotes` to null for underbosses; this hides the input
+  // wholesale so they don't even see the section heading.
+  const canEditAdminNotes = viewerRole === 'admin';
 
   function toggleExpanded(partyId: string) {
     setExpanded((prev) => {
@@ -2356,6 +2468,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             onRowClick={onRowClick}
                             busyRowId={busyRowId}
                             canEditReceipts={canEditReceipts}
+                            canEditAdminNotes={canEditAdminNotes}
                           />
                         </div>
                       </td>

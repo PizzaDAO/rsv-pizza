@@ -330,4 +330,93 @@ router.post(
   },
 );
 
+/**
+ * PATCH /api/admin/parties/:partyId/admin-notes — mortadella-92106
+ *
+ * Free-text admin-only city notes used on the /payments by-city expansion.
+ * Distinct from per-payout `payouts.admin_notes` (per-row, scoped to one
+ * payout) and `parties.underboss_notes` (visible to underbosses). Examples:
+ * "host is unresponsive", "follow up with city org", "claim disputed",
+ * "needs translator".
+ *
+ * Auth: admin / super_admin / payment_admin only. Underbosses never see the
+ * column on read (stripped in the by-party serializer) and cannot write here.
+ *
+ * Body: { notes: string | null }  — null or empty string clears the field.
+ *
+ * Audit: lightweight console.log (mirrors the bottarga-92104 `possible-scam`
+ * audit pattern) — the column itself + git/log retention is the durable
+ * signal, and city-notes edits are reversible.
+ */
+router.patch(
+  '/:partyId/admin-notes',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      const raw = (req.body ?? {}).notes;
+
+      if (raw !== null && raw !== undefined && typeof raw !== 'string') {
+        throw new AppError('notes must be a string or null', 400, 'VALIDATION_ERROR');
+      }
+
+      // Trim + treat empty as null so the DB column stays clean (no "" rows).
+      // Cap at 4000 chars — generous for context but bounded so we don't ship
+      // novels through PATCH.
+      let nextValue: string | null;
+      if (raw === null || raw === undefined) {
+        nextValue = null;
+      } else {
+        const trimmed = raw.trim();
+        if (trimmed.length === 0) {
+          nextValue = null;
+        } else if (trimmed.length > 4000) {
+          throw new AppError(
+            'notes must be 4000 characters or fewer',
+            400,
+            'VALIDATION_ERROR',
+          );
+        } else {
+          nextValue = trimmed;
+        }
+      }
+
+      // Verify the party exists before updating so we 404 cleanly instead of
+      // surfacing a Prisma RecordNotFound.
+      const existing = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { id: true, adminNotes: true },
+      });
+      if (!existing) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      const updated = await prisma.party.update({
+        where: { id: partyId },
+        data: { adminNotes: nextValue },
+        select: { id: true, adminNotes: true },
+      });
+
+      console.log(
+        `[mortadella-92106][city-admin-notes] party=${partyId} actor=${
+          req.userEmail ?? 'unknown'
+        } prev_len=${existing.adminNotes?.length ?? 0} next_len=${
+          updated.adminNotes?.length ?? 0
+        } at=${new Date().toISOString()}`,
+      );
+
+      res.json({
+        ok: true,
+        party: {
+          id: updated.id,
+          adminNotes: updated.adminNotes,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default router;

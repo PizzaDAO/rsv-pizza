@@ -199,6 +199,13 @@ model Party {
   statusAudit     PartyStatusAudit[]
   hostTags        Json               @default("[]") @map("host_tags")
   underbossNotes  String?            @map("underboss_notes")
+  // mortadella-92106: admin-only city-level notes shown on the /payments
+  // by-city expansion. Free-text scratchpad for context like "host
+  // unresponsive", "follow up with city org", "claim disputed", etc.
+  // Distinct from per-payout `Payout.adminNotes` and from `underbossNotes`
+  // (visible to underbosses). Read AND write are gated to admins; the
+  // by-party serializer omits this field for underboss viewers.
+  adminNotes      String?            @map("admin_notes")
 
   // GPP (Global Pizza Party/Previous year) photo management
   hiddenGppPhotos Json @default("[]") @map("hidden_gpp_photos") // Array of hidden app.gpp.day photo src paths
@@ -287,15 +294,15 @@ model Party {
 // keyed on guestId (unique). EXPLICIT @@map so Prisma uses the actual table
 // name instead of inferring it.
 model SurveyResponse {
-  id                 String   @id @default(uuid()) @db.Uuid
-  partyId            String   @map("party_id") @db.Uuid
-  party              Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  guestId            String   @unique @map("guest_id") @db.Uuid
-  guest              Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid()) @db.Uuid
+  partyId            String    @map("party_id") @db.Uuid
+  party              Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  guestId            String    @unique @map("guest_id") @db.Uuid
+  guest              Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
   email              String
-  questionSetVersion Int      @map("question_set_version")
+  questionSetVersion Int       @map("question_set_version")
   answers            Json
-  submittedAt        DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  submittedAt        DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
   updatedAt          DateTime? @map("updated_at") @db.Timestamptz
 
   @@index([partyId])
@@ -1765,38 +1772,38 @@ model PartyPaymentOptIn {
 }
 
 model PayoutDocument {
-  id               String   @id @default(uuid()) @db.Uuid
+  id               String    @id @default(uuid()) @db.Uuid
   // agnolotti-58291: receipts are now PARTY-level. `partyId` is the canonical
   // owner (NOT NULL, CASCADE on party delete). `payoutId` is optional and is
   // the submission this receipt was uploaded with; it goes NULL via SET NULL
   // cascade if the payout row is later hard-deleted, so receipts survive.
-  partyId          String   @map("party_id") @db.Uuid
-  party            Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  payoutId         String?  @map("payout_id") @db.Uuid
-  payout           Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  partyId          String    @map("party_id") @db.Uuid
+  party            Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  payoutId         String?   @map("payout_id") @db.Uuid
+  payout           Payout?   @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   kind             String // 'pizza' | 'receipt'
   url              String
-  fileName         String   @map("file_name")
-  fileSize         Int      @map("file_size")
-  mimeType         String   @map("mime_type")
-  ocrAmount        Decimal? @map("ocr_amount") @db.Decimal(12, 2)
-  ocrCurrency      String?  @map("ocr_currency")
-  ocrConfidence    Decimal? @map("ocr_confidence") @db.Decimal(3, 2)
+  fileName         String    @map("file_name")
+  fileSize         Int       @map("file_size")
+  mimeType         String    @map("mime_type")
+  ocrAmount        Decimal?  @map("ocr_amount") @db.Decimal(12, 2)
+  ocrCurrency      String?   @map("ocr_currency")
+  ocrConfidence    Decimal?  @map("ocr_confidence") @db.Decimal(3, 2)
   // mortadella-92103: per-receipt FX persistence so non-USD receipts can be
   // re-converted in-place when the admin corrects the currency, and so the
   // reviewer modal can render the original-currency amount per receipt
   // without re-parsing ocrRaw. ocrAmount stays the USD-converted value.
-  originalAmount   Decimal? @map("original_amount") @db.Decimal(14, 4)
-  originalCurrency String?  @map("original_currency") @db.Char(3)
-  exchangeRate     Decimal? @map("exchange_rate") @db.Decimal(18, 8)
-  ocrRaw           Json?    @map("ocr_raw")
+  originalAmount   Decimal?  @map("original_amount") @db.Decimal(14, 4)
+  originalCurrency String?   @map("original_currency") @db.Char(3)
+  exchangeRate     Decimal?  @map("exchange_rate") @db.Decimal(18, 8)
+  ocrRaw           Json?     @map("ocr_raw")
   // formaggi-89172: structured per-line items extracted from the receipt OCR.
   // Schema is OcrLineItem[] (see backend/src/services/ocr.service.ts) — each
   // entry has name, qty, unitPrice, subtotal, category. Stored as JSONB with a
   // GIN index (`idx_payout_documents_ocr_line_items`) to support future
   // analytics queries (e.g. average pizza prices by country/city).
-  ocrLineItems     Json?    @map("ocr_line_items")
-  ocrError         String?  @map("ocr_error")
+  ocrLineItems     Json?     @map("ocr_line_items")
+  ocrError         String?   @map("ocr_error")
   // pancetta-92104: timestamp + attempt-count for the line-items backfill
   // loop. The backfill used to query `ocr_line_items IS NULL` candidates
   // unconditionally, so docs whose `analyzeReceipt` threw (OpenAI 429, bad
@@ -1810,10 +1817,10 @@ model PayoutDocument {
   // pancetta-37195: per-receipt uploader attribution. Both nullable so
   // historical rows are valid. uploadedByEmail caches the email at upload
   // time so display still works if the User is later deleted.
-  uploadedByUserId String?  @map("uploaded_by_user_id")
-  uploadedByEmail  String?  @map("uploaded_by_email")
-  uploadedBy       User?    @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  sortOrder        Int      @default(0) @map("sort_order")
+  uploadedByUserId String?   @map("uploaded_by_user_id")
+  uploadedByEmail  String?   @map("uploaded_by_email")
+  uploadedBy       User?     @relation("PayoutDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  sortOrder        Int       @default(0) @map("sort_order")
   // culatello-92104: admin-flagged duplicate receipts. Visually dimmed in the
   // reviewer modal, excluded from the OCR sum, and ignored by the host PATCH
   // finalAmountUsd recompute path so admin edits propagate correctly. The

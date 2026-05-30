@@ -2242,6 +2242,13 @@ export interface PartyPayoutsRow {
      * cached payloads during a rolling deploy.
      */
     paymentsClosedAt?: string | null;
+    /**
+     * mortadella-92106: admin-only city notes. Free-text scratchpad on the
+     * by-city expansion. Always `null` for underboss viewers (server-side
+     * gate strips the value). Optional for backward-compat with cached
+     * payloads during a rolling deploy.
+     */
+    adminNotes?: string | null;
   };
   aggregates: {
     pendingCount: number;
