@@ -406,6 +406,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // culatello-92104: per-receipt duplicate flag override so the modal
     // reflects an in-flight toggle without waiting for parent refresh.
     isDuplicate?: boolean;
+    // caprino-92104: post-FX-recompute fields so the lightbox editor's "USD
+    // value" + "at rate X" display refreshes immediately on save.
+    originalAmount?: number | null;
+    originalCurrency?: string | null;
+    exchangeRate?: number | null;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
@@ -414,8 +419,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // Per-row drafts so admins can edit without re-typing on re-render. Drafts
   // are seeded from the original OCR value on first edit and kept until the
   // row is saved or the modal closes.
-  type ReceiptDraft = { amount: string; currency: string };
+  //
+  // caprino-92104: draft now tracks the receipt's ORIGINAL-currency amount
+  // (what's printed on the receipt) plus currency; USD is derived server-side
+  // via FX on save. `manualUsdAmount` is an opt-in fallback when FX fails.
+  type ReceiptDraft = {
+    originalAmount: string;
+    currency: string;
+    manualUsdAmount?: string;
+  };
   const [receiptDrafts, setReceiptDrafts] = useState<Record<string, ReceiptDraft>>({});
+  // caprino-92104: per-row backend error code (e.g. FX_RATE_UNAVAILABLE) so
+  // the editor can render the "Set USD manually" fallback toggle.
+  const [receiptSaveErrorCodes, setReceiptSaveErrorCodes] = useState<Record<string, string>>({});
 
   // pancetta-92104: per-row "Retry OCR" state. Admin can re-trigger the OCR
   // pipeline on a single doc that previously errored (e.g. quota / timeout /
@@ -494,6 +510,15 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               ov.ocrLineItems !== undefined ? ov.ocrLineItems : d.ocrLineItems,
             isDuplicate:
               ov.isDuplicate !== undefined ? ov.isDuplicate : d.isDuplicate,
+            // caprino-92104: layer the FX recompute fields too so the
+            // lightbox editor's "USD value" + rate display reflects the new
+            // server-side values without a parent refetch.
+            originalAmount:
+              ov.originalAmount !== undefined ? ov.originalAmount : d.originalAmount,
+            originalCurrency:
+              ov.originalCurrency !== undefined ? ov.originalCurrency : d.originalCurrency,
+            exchangeRate:
+              ov.exchangeRate !== undefined ? ov.exchangeRate : d.exchangeRate,
           };
         }),
     [payout.documents, receiptOverrides],
@@ -572,21 +597,27 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       delete next[docId];
       return next;
     });
+    setReceiptSaveErrorCodes((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
     try {
-      // Empty string -> null (clear the field). Otherwise parse as number /
-      // upper-case the currency.
-      const trimmedAmt = draft.amount.trim();
+      // caprino-92104: send `originalAmount` + `ocrCurrency` together. The
+      // backend recomputes the USD value via convertToUSD() and returns the
+      // canonical (ocrAmount, originalAmount, exchangeRate, originalCurrency)
+      // tuple. When the admin has opted into manual-USD mode (after an
+      // FX_RATE_UNAVAILABLE failure), send `ocrAmount` + `ocrCurrency`
+      // instead — the backend's `adminSetBothExplicitly` branch trusts the
+      // admin's numbers and skips FX.
+      const trimmedOrig = draft.originalAmount.trim();
       const trimmedCur = draft.currency.trim();
-      const patch: { ocrAmount?: number | null; ocrCurrency?: string | null } = {};
-      if (trimmedAmt === '') {
-        patch.ocrAmount = null;
-      } else {
-        const n = Number(trimmedAmt);
-        if (!Number.isFinite(n) || n < 0) {
-          throw new Error('Amount must be a non-negative number');
-        }
-        patch.ocrAmount = n;
-      }
+      const patch: {
+        ocrAmount?: number | null;
+        ocrCurrency?: string | null;
+        originalAmount?: number | null;
+      } = {};
+
       if (trimmedCur === '') {
         patch.ocrCurrency = null;
       } else if (trimmedCur.length > 8) {
@@ -594,6 +625,41 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       } else {
         patch.ocrCurrency = trimmedCur.toUpperCase();
       }
+
+      if (draft.manualUsdAmount !== undefined) {
+        // Manual-USD fallback: trust the admin's USD value verbatim. Still
+        // persist the original amount so future re-conversions work.
+        const trimmedUsd = draft.manualUsdAmount.trim();
+        if (trimmedUsd === '') {
+          patch.ocrAmount = null;
+        } else {
+          const n = Number(trimmedUsd);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new Error('USD value must be a non-negative number');
+          }
+          patch.ocrAmount = n;
+        }
+        if (trimmedOrig !== '') {
+          const n = Number(trimmedOrig);
+          if (!Number.isFinite(n) || n < 0) {
+            throw new Error('Original amount must be a non-negative number');
+          }
+          patch.originalAmount = n;
+        }
+      } else {
+        // Standard FX path: send the original amount + currency and let the
+        // backend derive USD. Empty original amount clears the field.
+        if (trimmedOrig === '') {
+          patch.originalAmount = null;
+        } else {
+          const n = Number(trimmedOrig);
+          if (!Number.isFinite(n) || n <= 0) {
+            throw new Error('Original amount must be a positive number');
+          }
+          patch.originalAmount = n;
+        }
+      }
+
       const updated = await updatePayoutDocument(docId, patch);
       setReceiptOverrides((m) => ({
         ...m,
@@ -609,14 +675,24 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           // through so a previous dup toggle isn't lost when amount/currency
           // is also edited.
           isDuplicate: updated.isDuplicate,
+          // caprino-92104: surface the recomputed FX details so the lightbox
+          // editor's "USD value" display renders the new numbers without a
+          // parent refetch.
+          originalAmount: updated.originalAmount,
+          originalCurrency: updated.originalCurrency,
+          exchangeRate: updated.exchangeRate,
         },
       }));
       // Sync the draft text to the canonical saved value so the inputs match
-      // the rendered row on the next render.
+      // the rendered row on the next render. Drop manualUsdAmount because
+      // the save succeeded (either FX path or admin's manual value — both
+      // are now persisted as the canonical state).
       setReceiptDrafts((m) => ({
         ...m,
         [docId]: {
-          amount: updated.ocrAmount == null ? '' : String(updated.ocrAmount),
+          originalAmount: updated.originalAmount == null
+            ? ''
+            : String(updated.originalAmount),
           currency: updated.ocrCurrency ?? '',
         },
       }));
@@ -625,6 +701,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         ...m,
         [docId]: err?.message || 'Failed to save',
       }));
+      const code = (err && typeof err.code === 'string') ? err.code : '';
+      if (code) {
+        setReceiptSaveErrorCodes((m) => ({ ...m, [docId]: code }));
+      }
     } finally {
       setReceiptSavingId(null);
     }
@@ -756,6 +836,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
   // Clamp the receipt-amount draft to the current line-sum. Convenience
   // affordance — admins still get the explicit Save button to confirm.
+  //
+  // caprino-92104: line items are in the receipt's ORIGINAL currency (see
+  // `sumCurrency` in ReceiptEditor), so the sum maps to `originalAmount`,
+  // not the USD value.
   function useLineSumForAmount(docId: string) {
     const drafts = lineItemDrafts[docId];
     const sum = draftSubtotalSum(drafts);
@@ -765,7 +849,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       return {
         ...m,
         [docId]: {
-          amount: sum.toFixed(2),
+          originalAmount: sum.toFixed(2),
           currency: prev?.currency ?? '',
         },
       };
@@ -951,9 +1035,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     if (!r) return false;
     const draft = receiptDrafts[docId];
     if (draft) {
-      const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
-      const persistedCur = r.ocrCurrency ?? '';
-      if (draft.amount !== persistedAmt || draft.currency !== persistedCur) {
+      // caprino-92104: compare against the originalAmount column (the field
+      // the editor binds to) and the originalCurrency (falling back to
+      // ocrCurrency when the FX detail isn't persisted yet).
+      const seededOriginal =
+        r.originalAmount != null
+          ? String(r.originalAmount)
+          : r.ocrAmount != null
+            ? String(r.ocrAmount)
+            : '';
+      const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+      if (
+        draft.originalAmount !== seededOriginal
+        || draft.currency !== seededCurrency
+        || draft.manualUsdAmount !== undefined
+      ) {
         return true;
       }
     }
@@ -1012,17 +1108,25 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     if (!lightboxReceipt) return null;
     if (!canEditReceipts) return null;
     const r = lightboxReceipt;
-    // Seed the amount/currency draft from current persisted values if the
-    // admin hasn't typed anything yet. Keeps the editor's inputs reflecting
-    // whatever the row shows in the right-pane.
+    // caprino-92104: seed the draft from the canonical persisted shape. Prefer
+    // the receipt's `originalAmount` column (mortadella-92103+) and fall back
+    // to `ocrAmount` for legacy rows (treats the stored value as the original-
+    // currency amount on first edit — backend mirrors this fallback).
+    const seededOriginal =
+      r.originalAmount != null
+        ? String(r.originalAmount)
+        : r.ocrAmount != null
+          ? String(r.ocrAmount)
+          : '';
+    const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
     const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
-      amount: r.ocrAmount == null ? '' : String(r.ocrAmount),
-      currency: r.ocrCurrency ?? '',
+      originalAmount: seededOriginal,
+      currency: seededCurrency,
     };
-    const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
-    const persistedCur = r.ocrCurrency ?? '';
     const isDirty =
-      draft.amount !== persistedAmt || draft.currency !== persistedCur;
+      draft.originalAmount !== seededOriginal
+      || draft.currency !== seededCurrency
+      || draft.manualUsdAmount !== undefined;
     // Seed line item drafts lazily (mirrors ensureLineItemDrafts on
     // expansion in the right-pane). For the lightbox we always show the
     // editor, so seed immediately if no draft exists yet.
@@ -1041,6 +1145,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         }
         saving={receiptSavingId === r.id}
         saveError={receiptSaveErrors[r.id]}
+        saveErrorCode={receiptSaveErrorCodes[r.id]}
         onSave={() => saveReceiptEdit(r.id)}
         isDirty={isDirty}
         isDuplicate={r.isDuplicate === true}
@@ -1094,6 +1199,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     receiptDrafts,
     receiptSavingId,
     receiptSaveErrors,
+    receiptSaveErrorCodes,
     duplicateSavingId,
     duplicateSaveErrors,
     lineItemDrafts,
@@ -1908,14 +2014,35 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     // so admins can see what the model originally returned
                     // when they're correcting the field. `original*` reflects
                     // the saved-but-not-yet-overridden value.
-                    const originalAmt = payout.documents.find((d) => d.id === r.id)?.ocrAmount;
-                    const originalCur = payout.documents.find((d) => d.id === r.id)?.ocrCurrency;
+                    //
+                    // caprino-92104: the right-pane row's amount input now
+                    // edits the receipt's ORIGINAL-currency value (same field
+                    // the lightbox editor binds to) — on save, backend re-runs
+                    // FX and stores the recomputed USD. Seeded from the
+                    // `originalAmount` column, falling back to `ocrAmount`
+                    // for legacy rows (mirrors the editor's seed logic).
+                    const rawDoc = payout.documents.find((d) => d.id === r.id);
+                    const placeholderAmt =
+                      rawDoc?.originalAmount != null
+                        ? String(rawDoc.originalAmount)
+                        : rawDoc?.ocrAmount != null
+                          ? String(rawDoc.ocrAmount)
+                          : null;
+                    const placeholderCur = rawDoc?.originalCurrency ?? rawDoc?.ocrCurrency ?? null;
+                    const seededOriginalAmt =
+                      r.originalAmount != null
+                        ? String(r.originalAmount)
+                        : r.ocrAmount != null
+                          ? String(r.ocrAmount)
+                          : '';
+                    const seededCur = r.originalCurrency ?? r.ocrCurrency ?? '';
                     const draft = receiptDrafts[r.id];
-                    const draftAmt = draft?.amount ?? (r.ocrAmount == null ? '' : String(r.ocrAmount));
-                    const draftCur = draft?.currency ?? (r.ocrCurrency ?? '');
+                    const draftAmt = draft?.originalAmount ?? seededOriginalAmt;
+                    const draftCur = draft?.currency ?? seededCur;
                     const dirty =
-                      draftAmt !== (r.ocrAmount == null ? '' : String(r.ocrAmount)) ||
-                      draftCur !== (r.ocrCurrency ?? '');
+                      draftAmt !== seededOriginalAmt
+                      || draftCur !== seededCur
+                      || draft?.manualUsdAmount !== undefined;
                     const saving = receiptSavingId === r.id;
                     const saveError = receiptSaveErrors[r.id];
                     // culatello-92104: dim the row when marked duplicate +
@@ -1961,11 +2088,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                 min="0"
                                 inputMode="decimal"
                                 value={draftAmt}
-                                placeholder={originalAmt == null ? 'amount' : String(originalAmt)}
+                                placeholder={placeholderAmt ?? 'orig amt'}
+                                title="Original-currency amount (printed on receipt). USD recomputed on save."
                                 onChange={(e) =>
                                   setReceiptDrafts((m) => ({
                                     ...m,
-                                    [r.id]: { amount: e.target.value, currency: draftCur },
+                                    [r.id]: { originalAmount: e.target.value, currency: draftCur },
                                   }))
                                 }
                                 className="w-24 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
@@ -1974,11 +2102,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                 type="text"
                                 maxLength={8}
                                 value={draftCur}
-                                placeholder={originalCur || 'CUR'}
+                                placeholder={placeholderCur || 'CUR'}
                                 onChange={(e) =>
                                   setReceiptDrafts((m) => ({
                                     ...m,
-                                    [r.id]: { amount: draftAmt, currency: e.target.value },
+                                    [r.id]: { originalAmount: draftAmt, currency: e.target.value },
                                   }))
                                 }
                                 className="w-16 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs uppercase"

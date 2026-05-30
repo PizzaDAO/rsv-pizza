@@ -63,7 +63,17 @@ export async function apiRequest<T>(
 
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
 
-    throw new Error(error.message || error.error?.message || `API error: ${response.status}`);
+    // caprino-92104: surface the structured error code from the backend's
+    // AppError shape (`{ error: { message, code } }`) so callers that need to
+    // branch on it (e.g. ReceiptEditor on FX_RATE_UNAVAILABLE) can do so
+    // without parsing the message string. Plain `new Error()` callers ignore
+    // the extra property.
+    const err = new Error(
+      error.message || error.error?.message || `API error: ${response.status}`,
+    ) as Error & { code?: string };
+    if (typeof error.error?.code === 'string') err.code = error.error.code;
+    else if (typeof error.code === 'string') err.code = error.code;
+    throw err;
   }
 
   return response.json();
@@ -4257,6 +4267,12 @@ export async function updatePayoutDocument(
   patch: {
     ocrAmount?: number | null;
     ocrCurrency?: string | null;
+    // caprino-92104: original-currency amount. When sent alongside
+    // `ocrCurrency`, the backend runs `convertToUSD(originalAmount,
+    // ocrCurrency)` and persists the recomputed USD value + exchange
+    // rate. Sending originalAmount alone (without ocrCurrency) re-runs
+    // FX against the receipt's existing currency.
+    originalAmount?: number | null;
     ocrLineItems?: ReceiptLineItem[] | null;
     // culatello-92104: admin-toggleable duplicate flag. Reversible.
     isDuplicate?: boolean;

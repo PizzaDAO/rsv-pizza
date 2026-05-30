@@ -4272,21 +4272,49 @@ router.patch(
         data.isDuplicate = body.isDuplicate;
       }
 
-      // mortadella-92103: when admin changes the currency on a doc that has
-      // a known original-amount (either persisted in the column or buried in
-      // ocrRaw.ocr.amount), re-run FX so ocr_amount is the correctly-converted
-      // USD value. Admin can override by passing both ocrAmount + ocrCurrency
-      // explicitly; in that case we trust the admin's numbers and skip FX.
+      // mortadella-92103 + caprino-92104: when admin changes the currency on a
+      // doc that has a known original-amount (either persisted in the column,
+      // buried in ocrRaw.ocr.amount, or — caprino-92104 — inferable from the
+      // current ocr_amount on a legacy row), re-run FX so ocr_amount is the
+      // correctly-converted USD value. Admin can override by passing both
+      // ocrAmount + ocrCurrency explicitly; in that case we trust the admin's
+      // numbers and skip FX.
+      //
+      // caprino-92104: also re-run FX when the admin sent BOTH originalAmount
+      // + ocrCurrency together (the new editor's standard save shape). This is
+      // distinct from `adminSetBothExplicitly` (which is ocrAmount + ocrCurrency
+      // and means "trust the admin's USD value verbatim").
       const currencyChanged =
         data.ocrCurrency !== undefined && data.ocrCurrency !== doc.ocrCurrency;
       const adminSetBothExplicitly =
         body.ocrAmount !== undefined && body.ocrCurrency !== undefined;
+      const adminSentOriginalAmountAndCurrency =
+        body.originalAmount !== undefined
+        && body.originalAmount !== null
+        && body.ocrCurrency !== undefined
+        && data.ocrCurrency != null;
 
-      if (currencyChanged && !adminSetBothExplicitly && data.ocrCurrency != null) {
+      // Track whether the original amount was inferred from the legacy
+      // ocrAmount fallback so we can record it in the audit note (helps when
+      // forensically tracing FX recomputes on pre-mortadella receipts).
+      let originalAmountInferred = false;
+
+      if (
+        (currencyChanged || adminSentOriginalAmountAndCurrency)
+        && !adminSetBothExplicitly
+        && data.ocrCurrency != null
+      ) {
         // Resolve the original foreign-currency amount. Preference order:
         //   1. body.originalAmount if the admin provided it
         //   2. the existing originalAmount column (mortadella-92103+)
         //   3. ocrRaw.ocr.amount (pre-mortadella-92103 rows)
+        //   4. caprino-92104: existing ocr_amount on the doc — treat it as
+        //      the receipt's original-currency amount. This is the legacy-row
+        //      fallback for pre-mortadella receipts where neither column nor
+        //      ocr_raw has data; without it the PATCH would 400 with
+        //      FX_ORIGINAL_AMOUNT_MISSING and the admin would be stuck.
+        //      Audit row records `originalAmountInferred: true` so this
+        //      fallback is traceable.
         let originalAmount: number | null = null;
         if (body.originalAmount !== undefined && body.originalAmount !== null) {
           const n = Number(body.originalAmount);
@@ -4307,6 +4335,9 @@ router.patch(
           && typeof (doc.ocrRaw as any).ocr?.amount === 'number'
         ) {
           originalAmount = (doc.ocrRaw as any).ocr.amount;
+        } else if (doc.ocrAmount != null) {
+          originalAmount = Number(doc.ocrAmount.toString());
+          originalAmountInferred = true;
         }
 
         if (originalAmount == null) {
@@ -4326,11 +4357,15 @@ router.patch(
             'CURRENCY_UNRESOLVED',
           );
         }
-        if (fx.source === 'unknown') {
+        if (fx.source === 'unknown' || fx.exchangeRate == null) {
+          // caprino-92104: distinguish "we don't know this currency" /
+          // "network providers all failed" from "currency was missing". The
+          // frontend surfaces FX_RATE_UNAVAILABLE with a retry-or-set-USD
+          // affordance.
           throw new AppError(
-            `Could not look up exchange rate for currency "${data.ocrCurrency}".`,
+            `Could not fetch an exchange rate for ${data.ocrCurrency}. Try again, or set the USD value manually.`,
             400,
-            'UNKNOWN_CURRENCY',
+            'FX_RATE_UNAVAILABLE',
           );
         }
         data.ocrAmount = fx.usdAmount;
@@ -4345,6 +4380,11 @@ router.patch(
         // Admin updated originalAmount directly (e.g. correcting a misread
         // number on an already-correct currency). Re-run FX on the doc's
         // existing currency too.
+        //
+        // caprino-92104: previously this silently no-op'd on FX failure
+        // (`if (fx.usdAmount != null...)`), which meant the admin's edit
+        // didn't persist but they got a 200 response. Now we throw the same
+        // FX_RATE_UNAVAILABLE the currency-changed branch throws.
         const n = Number(body.originalAmount);
         if (!Number.isFinite(n) || n <= 0) {
           throw new AppError(
@@ -4354,16 +4394,33 @@ router.patch(
           );
         }
         const cur = data.ocrCurrency ?? doc.ocrCurrency;
-        if (cur) {
-          const { convertToUSD } = await import('../services/fx.service.js');
-          const fx = await convertToUSD(n, cur);
-          if (fx.usdAmount != null && fx.exchangeRate != null) {
-            data.ocrAmount = fx.usdAmount;
-            data.originalAmount = n;
-            data.originalCurrency = fx.originalCurrency;
-            data.exchangeRate = fx.exchangeRate;
-          }
+        if (!cur) {
+          throw new AppError(
+            'Cannot re-convert FX: receipt has no currency. Set ocrCurrency in the same request.',
+            400,
+            'CURRENCY_UNRESOLVED',
+          );
         }
+        const { convertToUSD } = await import('../services/fx.service.js');
+        const fx = await convertToUSD(n, cur);
+        if (fx.source === 'unresolved' || fx.usdAmount == null) {
+          throw new AppError(
+            `Could not convert ${n} ${cur} to USD — unresolved currency.`,
+            400,
+            'CURRENCY_UNRESOLVED',
+          );
+        }
+        if (fx.source === 'unknown' || fx.exchangeRate == null) {
+          throw new AppError(
+            `Could not fetch an exchange rate for ${cur}. Try again, or set the USD value manually.`,
+            400,
+            'FX_RATE_UNAVAILABLE',
+          );
+        }
+        data.ocrAmount = fx.usdAmount;
+        data.originalAmount = n;
+        data.originalCurrency = fx.originalCurrency;
+        data.exchangeRate = fx.exchangeRate;
       }
 
       if (Object.keys(data).length === 0) {
@@ -4450,6 +4507,17 @@ router.patch(
                   newAmount,
                   oldCurrency,
                   newCurrency,
+                  // caprino-92104: flag rows where we fell through to the
+                  // legacy ocr_amount fallback so forensics tools can
+                  // distinguish "FX recompute with known original" from
+                  // "FX recompute: original amount inferred from prior
+                  // ocr_amount value".
+                  ...(originalAmountInferred
+                    ? {
+                      note: 'FX recompute: original amount inferred from prior ocr_amount value',
+                      originalAmountInferred: true,
+                    }
+                    : {}),
                 }),
               },
             });
