@@ -60,9 +60,9 @@ interface SendPaymentModalProps {
    */
   outstandingUsd: number;
   /**
-   * gnocchi-92105: sum of non-duplicate receipt OCR USD values across the
-   * party's payouts. Together with `paidTotalUsd` this drives the default
-   * amount = max(0, receiptsTotal - paidTotal). No cap clamp.
+   * gnocchi-92105: sum of non-duplicate, eligible receipt OCR USD values
+   * across the party's payouts. Together with `paidTotalUsd` this drives
+   * the default amount = max(0, receiptsTotal - paidTotal). No cap clamp.
    */
   receiptsTotalUsd: number;
   /** Optional — when present, drives the per-party cap warning + Mercury gate. */

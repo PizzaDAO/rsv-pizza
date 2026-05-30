@@ -1086,15 +1086,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               const paidSumUsd =
                 row.aggregates.paidUsd + (row.aggregates.completedUsd ?? 0);
               const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
-              // gnocchi-92105: tally non-duplicate receipt OCR USD across
-              // every payout on the party. Matches the coppa-92105 dedup
-              // semantics used by the by-city Receipt total cell so the
-              // modal default lines up with what the admin sees in the row.
+              // gnocchi-92105: tally non-duplicate, eligible receipt OCR USD
+              // across every payout on the party. Matches the coppa-92105 +
+              // provola-92106 semantics used by the by-city Receipt total
+              // cell so the modal default lines up with what the admin sees.
               let receiptsTotalUsd = 0;
               for (const p of row.payouts) {
                 for (const d of p.documents || []) {
                   if (d.kind !== 'receipt') continue;
                   if (d.isDuplicate === true) continue;
+                  if (d.ineligible === true) continue;
                   receiptsTotalUsd += Number(d.ocrAmount) || 0;
                 }
               }

@@ -4330,6 +4330,27 @@ router.patch(
             (entry: unknown, idx: number) => sanitizeLineItem(entry, idx),
           );
           data.ocrLineItems = sanitized as unknown as Prisma.InputJsonValue;
+
+          // Compute sum of eligible line items and update originalAmount.
+          // This ensures the receipt total reflects the line items the admin
+          // edited. Eligible = not marked ineligible at the line level.
+          const eligibleSum = sanitized.reduce((sum, item) => {
+            if (item.ineligible === true) return sum;
+            return sum + item.subtotal;
+          }, 0);
+          // Always update the amount when line items are saved, even if sum
+          // is 0 (all items ineligible). This ensures the receipt total
+          // matches what the admin sees in the line item editor.
+          if (sanitized.length > 0) {
+            if (eligibleSum > 0) {
+              // Has eligible items — set originalAmount so FX path runs below
+              body.originalAmount = eligibleSum;
+            } else {
+              // All items ineligible — set ocrAmount directly to 0, no FX needed
+              data.ocrAmount = 0;
+              data.originalAmount = 0;
+            }
+          }
         }
       }
 

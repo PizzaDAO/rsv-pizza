@@ -22,6 +22,7 @@ import {
   Check,
   AlertCircle,
   StickyNote,
+  ThumbsUp,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -338,32 +339,30 @@ function CityActionsMenu({
       className="inline-flex items-center gap-1.5"
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Primary: Mark city paid (or Close city, depending on label). Same
-          handler as before; lifted out of the dropdown into a green button
-          per gnocchi-92105 so the most-used action is one click away. */}
-      {canMarkPaid && (
-        <button
-          type="button"
-          onClick={onMarkPartyPaid}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
-          title={markPaidLabel}
-        >
-          <DollarSign size={12} />
-          {markPaidLabel}
-        </button>
-      )}
-      {/* Secondary: Send payment — actively sends via Privy / wire / Mercury.
-          Same handler as the old menu item; pulled out to a secondary
-          (outline) button so it sits next to Mark paid. */}
+      {/* Primary: Send payment — actively sends via Privy / wire / Mercury.
+          Icon-only button with tooltip for the action. */}
       {canSendPayment && (
         <button
           type="button"
           onClick={onSendPayment}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-500/60 text-emerald-500 hover:bg-emerald-500/10 text-xs font-medium"
+          className="p-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white"
           title="Send payment"
+          aria-label="Send payment"
         >
-          <Send size={12} />
-          Send payment
+          <Send size={14} />
+        </button>
+      )}
+      {/* Secondary: Mark city paid (or Close city, depending on label).
+          Icon-only button with tooltip. */}
+      {canMarkPaid && (
+        <button
+          type="button"
+          onClick={onMarkPartyPaid}
+          className="p-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+          title={markPaidLabel}
+          aria-label={markPaidLabel}
+        >
+          <Check size={14} />
         </button>
       )}
       {/* "⋮" three-dots — icon only, no "Actions" text. Holds the two
@@ -523,6 +522,9 @@ function CityExpansion({
   busyRowId,
   canEditReceipts,
   canEditAdminNotes,
+  onApprove,
+  onExecute,
+  onMarkPaid,
 }: {
   row: PartyPayoutsRow;
   selectedIds: Set<string>;
@@ -542,6 +544,12 @@ function CityExpansion({
    * from the server, so this is belt-and-braces.
    */
   canEditAdminNotes: boolean;
+  /** Per-payout approve handler (pending -> approved). */
+  onApprove?: (id: string) => void;
+  /** Per-payout execute handler (approved/failed -> send payment). */
+  onExecute?: (payout: AdminPayout) => void;
+  /** Per-payout mark-paid handler (approved -> paid manually). */
+  onMarkPaid?: (payout: AdminPayout) => void;
 }) {
   // Hooks-above-early-returns: all useState / useMemo / useCallback live up
   // front so adding a conditional return below can't change hook order.
@@ -1564,10 +1572,21 @@ function CityExpansion({
           </button>
 
           {showPendingClaims && inflightPayouts.length > 0 && (
-            <div className="mt-2 border-t border-amber-500/20 pt-2 space-y-1">
+            <div className="mt-2 border-t border-amber-500/20 pt-2 space-y-1 max-h-64 overflow-y-auto">
               {inflightPayouts.map((p) => {
                 const isSelected = selectedIds.has(p.id);
                 const isBusy = busyRowId === p.id;
+                // Wallet/ENS display: show ENS name -> 0x if ENS was used, else just 0x
+                const walletDisplay =
+                  p.payoutMethod === 'usdc_base' && p.payoutWalletAddress
+                    ? p.payoutWalletInput &&
+                      p.payoutWalletInput !== p.payoutWalletAddress
+                      ? `${p.payoutWalletInput} → ${truncateMiddle(p.payoutWalletAddress, 6, 4)}`
+                      : truncateMiddle(p.payoutWalletAddress, 6, 4)
+                    : null;
+                const isPending = p.status === 'pending';
+                const isApprovedOrFailed =
+                  p.status === 'approved' || p.status === 'failed';
                 return (
                   <div
                     key={p.id}
@@ -1587,25 +1606,80 @@ function CityExpansion({
                     <button
                       type="button"
                       onClick={() => onRowClick(p)}
-                      className="flex-1 flex items-center gap-3 text-left"
+                      className="flex-1 flex items-center gap-3 text-left min-w-0"
                     >
                       <PayoutStatusPill status={p.status} />
-                      <span className="text-theme-text-secondary text-xs min-w-[5.5rem]">
+                      <span className="text-theme-text-secondary text-xs min-w-[5.5rem] shrink-0">
                         {formatLedgerDate(p.createdAt)}
                       </span>
-                      <span className="font-medium text-theme-text">
+                      <span className="font-medium text-theme-text shrink-0">
                         {formatUsd(Number(p.finalAmountUsd))}
                       </span>
                       <span className="text-xs text-theme-text-muted truncate">
                         {p.host?.name || p.host?.email || 'Unknown host'}
                       </span>
-                      {isBusy && (
-                        <Loader2
-                          size={12}
-                          className="animate-spin text-theme-text-muted"
-                        />
+                      {/* Wallet/ENS display */}
+                      {walletDisplay && (
+                        <span
+                          className="text-xs text-theme-text-faint font-mono truncate"
+                          title={p.payoutWalletAddress || undefined}
+                        >
+                          {walletDisplay}
+                        </span>
                       )}
                     </button>
+                    {/* Action buttons — icon-only */}
+                    <div
+                      className="flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isBusy ? (
+                        <Loader2
+                          size={14}
+                          className="animate-spin text-theme-text-muted"
+                        />
+                      ) : (
+                        <>
+                          {/* Approve (pending only) */}
+                          {isPending && onApprove && (
+                            <button
+                              type="button"
+                              onClick={() => onApprove(p.id)}
+                              className="p-1.5 rounded-md hover:bg-emerald-500/20 text-emerald-500"
+                              title="Approve"
+                            >
+                              <ThumbsUp size={14} />
+                            </button>
+                          )}
+                          {/* Send payment (approved/failed) */}
+                          {isApprovedOrFailed && onExecute && (
+                            <button
+                              type="button"
+                              onClick={() => onExecute(p)}
+                              className="p-1.5 rounded-md hover:bg-emerald-500/20 text-emerald-500"
+                              title={
+                                p.status === 'failed'
+                                  ? 'Retry payment'
+                                  : 'Send payment'
+                              }
+                            >
+                              <Send size={14} />
+                            </button>
+                          )}
+                          {/* Mark paid (approved/failed) */}
+                          {isApprovedOrFailed && onMarkPaid && (
+                            <button
+                              type="button"
+                              onClick={() => onMarkPaid(p)}
+                              className="p-1.5 rounded-md hover:bg-blue-500/20 text-blue-500"
+                              title="Mark paid (manual)"
+                            >
+                              <DollarSign size={14} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -2020,6 +2094,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   selectedIds,
   onToggleSelect,
   onRowClick,
+  onApprove,
+  onExecute,
+  onMarkPaid,
   onMarkPartyPaid,
   onAddExternalPayment,
   onSendPayment,
@@ -2469,6 +2546,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             busyRowId={busyRowId}
                             canEditReceipts={canEditReceipts}
                             canEditAdminNotes={canEditAdminNotes}
+                            onApprove={viewerRole === 'admin' ? onApprove : undefined}
+                            onExecute={viewerRole === 'admin' ? onExecute : undefined}
+                            onMarkPaid={viewerRole === 'admin' ? onMarkPaid : undefined}
                           />
                         </div>
                       </td>

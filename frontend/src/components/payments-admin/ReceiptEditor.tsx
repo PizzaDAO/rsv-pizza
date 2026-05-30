@@ -484,7 +484,7 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
             })()}
           </span>
         </div>
-        <div className="rounded-lg border border-theme-stroke bg-theme-bg p-2 space-y-1.5">
+        <div className="rounded-lg border border-theme-stroke bg-theme-bg p-2 space-y-1.5 max-h-80 overflow-y-auto">
           {(lineItemDrafts ?? []).length === 0 && (
             <p className="text-xs text-theme-text-faint p-2">
               No line items yet. Click <span className="font-semibold">Add line</span> to start.
