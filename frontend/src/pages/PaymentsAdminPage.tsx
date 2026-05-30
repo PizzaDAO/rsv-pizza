@@ -44,6 +44,7 @@ import {
   PaymentsStatsCards,
   BulkActionsBar,
   ExternalPaymentModal,
+  SendPaymentModal,
   PrepayQueueTable,
   CreatePrepaymentModal,
   HostPaymentDetailsModal,
@@ -215,6 +216,24 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // country/event_tags).
   const [markPartyPaidTarget, setMarkPartyPaidTarget] = useState<
     | { partyId: string; partyNameHint: string; isSwcHub: boolean }
+    | null
+  >(null);
+
+  // salame-92106: "Send payment" modal target — opens the SendPaymentModal
+  // pre-filled with the city's outstanding total, country, cap, paid total,
+  // and primary host id. Holds a snapshot of the PartyPayoutsRow so the modal
+  // stays decoupled from byPartyRows mutations while it's open.
+  const [sendPaymentTarget, setSendPaymentTarget] = useState<
+    | {
+        partyId: string;
+        partyName: string;
+        outstandingUsd: number;
+        country: string | null;
+        eventTags: string[];
+        effectiveReimbursementCapUsd: number | null;
+        paidTotalUsd: number;
+        primaryHostUserId: string | null;
+      }
     | null
   >(null);
 
@@ -1019,6 +1038,29 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               const seed = partyName.replace(/^Global Pizza Party\s+/i, '');
               setExternalModalState({ open: true, initialQuery: seed });
             }}
+            // salame-92106: city-level "Send payment" — opens SendPaymentModal
+            // with the row's outstanding total, country, cap, paid-total, and
+            // primary host id pre-loaded so the admin can confirm-and-send.
+            // Admin-only via the viewerRole gate on the menu.
+            onSendPayment={(row) => {
+              const approvedSumUsd =
+                row.aggregates.approvedUsd
+                + row.aggregates.paidUsd
+                + (row.aggregates.completedUsd ?? 0);
+              const paidSumUsd =
+                row.aggregates.paidUsd + (row.aggregates.completedUsd ?? 0);
+              const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
+              setSendPaymentTarget({
+                partyId: row.party.id,
+                partyName: row.party.name,
+                outstandingUsd,
+                country: row.party.country,
+                eventTags: row.party.eventTags ?? [],
+                effectiveReimbursementCapUsd: row.party.effectiveReimbursementCapUsd,
+                paidTotalUsd: paidSumUsd,
+                primaryHostUserId: row.party.userId ?? null,
+              });
+            }}
             // bottarga-92104: after the table toggles the `possible-scam` tag,
             // surface a toast and patch the in-memory row's eventTags so the
             // pill survives a re-render even before the next full refresh.
@@ -1373,6 +1415,40 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onClose={() => setExternalModalState({ open: false })}
             onCreated={() => refresh()}
             initialQuery={externalModalState.initialQuery}
+          />
+        )}
+
+        {/* salame-92106: actively-send modal. Differs from the external/mark-
+            paid flows: this creates + approves + executes a real payout via
+            rsv.pizza's payment infrastructure (USDC via Privy server-wallet,
+            wire confirmation, Mercury card). Refreshes the by-party rows on
+            success so the row's Paid total updates immediately. */}
+        {sendPaymentTarget && (
+          <SendPaymentModal
+            partyId={sendPaymentTarget.partyId}
+            partyName={sendPaymentTarget.partyName}
+            outstandingUsd={sendPaymentTarget.outstandingUsd}
+            country={sendPaymentTarget.country}
+            eventTags={sendPaymentTarget.eventTags}
+            effectiveReimbursementCapUsd={
+              sendPaymentTarget.effectiveReimbursementCapUsd
+            }
+            paidTotalUsd={sendPaymentTarget.paidTotalUsd}
+            primaryHostUserId={sendPaymentTarget.primaryHostUserId}
+            onClose={() => setSendPaymentTarget(null)}
+            onSent={async ({ partyName: sentTo, method, amountUsd }) => {
+              const methodLabel =
+                method === 'usdc_base'
+                  ? 'USDC'
+                  : method === 'wire'
+                    ? 'wire'
+                    : 'Mercury card';
+              pushToast(
+                `Sent ${methodLabel} payment of $${amountUsd.toFixed(2)} to ${sentTo}`,
+                'success',
+              );
+              await Promise.all([refresh(), loadPrepayQueue()]);
+            }}
           />
         )}
 

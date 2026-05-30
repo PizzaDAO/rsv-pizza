@@ -5,6 +5,7 @@ export { PayoutReviewModal } from './PayoutReviewModal';
 export { PaymentsStatsCards } from './PaymentsStatsCards';
 export { BulkActionsBar } from './BulkActionsBar';
 export { ExternalPaymentModal } from './ExternalPaymentModal';
+export { SendPaymentModal } from './SendPaymentModal';
 export { PrepayQueueTable } from './PrepayQueueTable';
 export { CreatePrepaymentModal } from './CreatePrepaymentModal';
 export { MarkPartyPaidModal } from './MarkPartyPaidModal';

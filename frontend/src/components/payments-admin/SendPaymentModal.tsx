@@ -1,0 +1,651 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  X,
+  DollarSign,
+  Pencil,
+  Loader2,
+  CreditCard,
+  Coins,
+  Banknote,
+  AlertTriangle,
+  Star,
+  Hash,
+  Wallet,
+  Mail,
+  Send,
+} from 'lucide-react';
+import { IconInput } from '../IconInput';
+import { Checkbox } from '../Checkbox';
+import { SwcHubWarning } from './SwcHubWarning';
+import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
+import {
+  approveAdminPayout,
+  createPayout,
+  executeAdminPayout,
+  searchApprovedParties,
+  type ApprovedPartySearchResult,
+} from '../../lib/api';
+import type { PayoutMethod } from '../../types';
+
+/**
+ * salame-92106: admin modal to ACTIVELY SEND a payment from rsv.pizza's
+ * payment infrastructure (USDC on Base via the hot wallet, wire confirmation,
+ * Mercury card) — distinct from `ExternalPaymentModal` (logs an off-platform
+ * payment that already happened) and `MarkPartyPaidModal` (flips already-in-
+ * flight payouts to paid).
+ *
+ * Opened from the city-level Actions menu in `PayoutsByPartyTable`. The
+ * partyId + city name + outstanding total + country + cap + paid-so-far are
+ * passed in by the parent so the form pre-fills sensibly.
+ *
+ * Backend strategy (option A per the plan): create a payout via the existing
+ *   POST /api/parties/:partyId/payouts (recipientHostUserId override),
+ * approve it via POST /api/admin/payouts/:id/approve, and execute via
+ *   POST /api/admin/payouts/:id/execute (or autoExecute on approve for USDC).
+ * Two-row audit chain (create + execute) — that's the trade-off for not
+ * needing a new atomic endpoint, and it's GOOD for traceability.
+ */
+
+const PER_SUBMISSION_MAX_USD = 675;
+
+interface SendPaymentModalProps {
+  partyId: string;
+  partyName: string;
+  /** Outstanding total (Approved + Paid - Paid) — defaults the amount field. */
+  outstandingUsd: number;
+  /** Optional — when present, drives the per-party cap warning + Mercury gate. */
+  country: string | null;
+  /** Optional — drives SWC-Hub warning via isSwcHubParty (country/tags). */
+  eventTags?: string[];
+  /** Optional — resolved reimbursement cap. Null = uncapped. */
+  effectiveReimbursementCapUsd: number | null;
+  /** Optional — already-paid total for this party. Drives the cap-remaining math. */
+  paidTotalUsd: number;
+  /** Optional — primary host User id (parties.userId). Pre-selects recipient. */
+  primaryHostUserId?: string | null;
+  onClose: () => void;
+  /**
+   * Called on a successful send. Receives the city name + method + amount so
+   * the parent can render a toast like "Sent USDC payment of $X to Y".
+   */
+  onSent: (summary: { partyName: string; method: PayoutMethod; amountUsd: number }) => void;
+}
+
+type Method = PayoutMethod; // 'usdc_base' | 'wire' | 'mercury_card'
+
+function stripGppPrefix(name: string): string {
+  return name.replace(/^Global Pizza Party\s+/i, '');
+}
+
+export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
+  partyId,
+  partyName,
+  outstandingUsd,
+  country,
+  eventTags,
+  effectiveReimbursementCapUsd,
+  paidTotalUsd,
+  primaryHostUserId,
+  onClose,
+  onSent,
+}) => {
+  // Hooks-above-early-returns: all useState / useEffect / useMemo live up
+  // front so adding a conditional return below can't change hook order.
+  // (feedback_hooks_above_early_returns)
+  const cleanName = useMemo(() => stripGppPrefix(partyName), [partyName]);
+
+  // Load the host-candidate list for this party via the existing
+  // `parties/search` endpoint. We search by the cleaned city name and
+  // auto-pick the row matching `partyId`. The endpoint returns name/email/role
+  // for the primary host + cohosts whose email maps to a User.
+  const [partyMeta, setPartyMeta] = useState<ApprovedPartySearchResult | null>(null);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [candidatesError, setCandidatesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCandidatesLoading(true);
+    setCandidatesError(null);
+    (async () => {
+      try {
+        // Search by stripped city name. If multiple events share the same
+        // name we filter down to `partyId` below; otherwise the auto-pick
+        // works on the single result.
+        const results = await searchApprovedParties(cleanName);
+        if (cancelled) return;
+        const match = results.find((r) => r.id === partyId) ?? null;
+        if (!match) {
+          setCandidatesError(
+            "Couldn't load recipients for this city — try again or use Add external payment.",
+          );
+        } else {
+          setPartyMeta(match);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setCandidatesError(err?.message || 'Failed to load recipients');
+        }
+      } finally {
+        if (!cancelled) setCandidatesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanName, partyId]);
+
+  // Recipient pick — defaults to the primary host id when the candidates
+  // load. Falls back to the first candidate when no primaryHostUserId match.
+  const [recipientUserId, setRecipientUserId] = useState<string>('');
+
+  useEffect(() => {
+    if (!partyMeta) return;
+    if (recipientUserId) return; // don't clobber a manual pick
+    const primaryMatch = primaryHostUserId
+      ? partyMeta.hostCandidates.find((c) => c.userId === primaryHostUserId)
+      : null;
+    const next =
+      primaryMatch?.userId ??
+      partyMeta.hostCandidates.find((c) => c.role === 'host')?.userId ??
+      partyMeta.hostCandidates[0]?.userId ??
+      '';
+    setRecipientUserId(next);
+  }, [partyMeta, primaryHostUserId, recipientUserId]);
+
+  // Amount — defaults to Outstanding, clamped to per-submission max so the
+  // pre-filled value is never instantly invalid.
+  const defaultAmount = useMemo(() => {
+    const raw = outstandingUsd > 0 ? outstandingUsd : 0;
+    const clamped = Math.min(raw, PER_SUBMISSION_MAX_USD);
+    return clamped > 0 ? clamped.toFixed(2) : '';
+  }, [outstandingUsd]);
+  const [amountStr, setAmountStr] = useState(defaultAmount);
+
+  const [method, setMethod] = useState<Method>('usdc_base');
+  const [note, setNote] = useState('');
+
+  // Destination details (per-method).
+  const [walletAddress, setWalletAddress] = useState('');
+  const [bankEmail, setBankEmail] = useState('');
+  const [mercuryCardLast4, setMercuryCardLast4] = useState('');
+  const [mercuryCardId, setMercuryCardId] = useState('');
+  const [wireReference, setWireReference] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Cap-override ack (salame-92103 pattern). Reset when amount or party
+  // changes so a stale ack doesn't carry across edits.
+  const [overridePartyCap, setOverridePartyCap] = useState(false);
+
+  // SWC Hub ack — controlled, surfaced via the shared SwcHubWarning component.
+  const [swcAck, setSwcAck] = useState(false);
+
+  // Close on Escape.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const amountNum = useMemo(() => Number(amountStr), [amountStr]);
+
+  // Cap math (salame-92103 mirror). Cap remaining = cap - already-paid. We
+  // also include this in-flight amount in `wouldExceed` so the warning fires
+  // BEFORE the backend rejects at approve-time.
+  const capRemaining =
+    effectiveReimbursementCapUsd != null
+      ? Math.max(0, effectiveReimbursementCapUsd - paidTotalUsd)
+      : null;
+  const partyWouldExceedCap =
+    effectiveReimbursementCapUsd != null &&
+    Number.isFinite(amountNum) &&
+    paidTotalUsd + amountNum > effectiveReimbursementCapUsd + 1e-9;
+  const partyOverBy =
+    partyWouldExceedCap && effectiveReimbursementCapUsd != null
+      ? Math.max(0, paidTotalUsd + amountNum - effectiveReimbursementCapUsd)
+      : 0;
+
+  // SWC Hub derivation — mirrors isSwcHubParty's two-input shape. We accept
+  // either the country='United States' OR an event_tags entry containing
+  // 'SWC Hub' (case-insensitive).
+  const swcHub = useMemo(() => {
+    if (country && country.trim().toLowerCase() === 'united states') return true;
+    return (eventTags ?? []).some((t) => t && t.toLowerCase().includes('swc hub'));
+  }, [country, eventTags]);
+
+  // Mercury blocked-country gate — same source as CreatePrepaymentModal
+  // (pepperoni-47301). Disables the Mercury option, doesn't bypass.
+  const mercuryBlocked = isMercuryBlocked(country);
+
+  // Per-submission ceiling.
+  const exceedsPerSubmission =
+    Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+
+  // Per-method destination validity.
+  const usdcValid = method !== 'usdc_base' || walletAddress.trim().length > 0;
+  const wireValid = method !== 'wire' || wireReference.trim().length > 0;
+  const mercuryValid =
+    method !== 'mercury_card' || /^\d{4}$/.test(mercuryCardLast4.trim());
+
+  const canSubmit =
+    !!recipientUserId &&
+    Number.isFinite(amountNum) &&
+    amountNum > 0 &&
+    !exceedsPerSubmission &&
+    usdcValid &&
+    wireValid &&
+    mercuryValid &&
+    // Mercury blocked = method disabled, but defensively gate Submit too.
+    !(method === 'mercury_card' && mercuryBlocked) &&
+    // salame-92103: cap-exceed requires explicit ack.
+    (!partyWouldExceedCap || overridePartyCap) &&
+    // parmigiana-92104: SWC Hub requires explicit ack.
+    (!swcHub || swcAck) &&
+    !submitting &&
+    !candidatesLoading;
+
+  const selectedCandidate = partyMeta?.hostCandidates.find((c) => c.userId === recipientUserId) ?? null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit || !selectedCandidate) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      // Step 1: create a pending payout via the host-side endpoint with the
+      // admin `recipientHostUserId` override so the row is credited to the
+      // chosen cohost, not the admin clicking Send.
+      const created = await createPayout(partyId, {
+        pizzaPhotos: [],
+        receiptPhotos: [],
+        payoutMethod: method,
+        payoutWalletAddress:
+          method === 'usdc_base' ? walletAddress.trim() : undefined,
+        payoutBankDetails:
+          method === 'wire' && bankEmail.trim()
+            ? { email: bankEmail.trim() }
+            : undefined,
+        mercuryCardLast4:
+          method === 'mercury_card' ? mercuryCardLast4.trim() : undefined,
+        finalAmountUsd: amountNum,
+        recipientHostUserId: selectedCandidate.userId,
+        adminNotes:
+          note.trim() ||
+          `Send payment via ${method} from admin /payments by-city action`,
+        hostNotes: 'Payment sent by admin (salame-92106)',
+      });
+
+      // Step 2 + 3: approve, and for USDC autoExecute via Privy server-wallet.
+      // For wire / mercury, the approve call won't execute — we follow up
+      // with a separate POST /execute carrying the refs (and any cap-override
+      // ack, which only the execute endpoint honors today).
+      if (method === 'usdc_base') {
+        await approveAdminPayout(created.id, {
+          autoExecute: true,
+          note: note.trim() || undefined,
+        });
+        // The approve handler runs executePayout server-side for USDC; any
+        // failure flips the row to `failed` and surfaces here via the API
+        // error message.
+      } else {
+        await approveAdminPayout(created.id, {
+          note: note.trim() || undefined,
+        });
+        await executeAdminPayout(created.id, {
+          wireReference:
+            method === 'wire' ? wireReference.trim() : undefined,
+          mercuryCardLast4:
+            method === 'mercury_card' ? mercuryCardLast4.trim() : undefined,
+          mercuryCardId:
+            method === 'mercury_card' && mercuryCardId.trim()
+              ? mercuryCardId.trim()
+              : undefined,
+          note: note.trim() || undefined,
+          // salame-92103: forward the admin's per-party cap ack so the
+          // server bypasses its own check + appends `[override: party cap]`
+          // to the audit row's note. (The approve step's cap check
+          // currently has no override; cap-warned sends on USDC will fail
+          // there until that gap is closed in a follow-up.)
+          allowOverPartyCap: partyWouldExceedCap ? overridePartyCap : undefined,
+        });
+      }
+
+      onSent({ partyName: cleanName, method, amountUsd: amountNum });
+      onClose();
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Failed to send payment');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="bg-theme-surface rounded-2xl shadow-2xl border border-theme-stroke w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-theme-stroke">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-theme-text truncate">
+              Send payment to {cleanName}
+            </h2>
+            <p className="text-xs text-theme-text-muted mt-0.5">
+              Actively sends from rsv.pizza&apos;s payment infrastructure
+              (USDC on Base / wire / Mercury card). Use{' '}
+              <em>Add external payment</em> to log an off-platform payment, or{' '}
+              <em>Mark city paid</em> to flip in-flight rows to paid.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-theme-surface-hover text-theme-text-muted"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* parmigiana-92104: SWC Hub warning — shared component, gated on
+              `swcHub` derived from country + event_tags. */}
+          <SwcHubWarning
+            isSwcHub={swcHub}
+            acked={swcAck}
+            onAckChange={setSwcAck}
+          />
+
+          {/* Recipient picker */}
+          <div>
+            <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
+              Recipient
+            </div>
+            {candidatesLoading && (
+              <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-theme-text-muted">
+                <Loader2 size={14} className="animate-spin" />
+                Loading recipients…
+              </div>
+            )}
+            {candidatesError && !candidatesLoading && (
+              <div className="px-3 py-2.5 text-xs text-red-400">
+                {candidatesError}
+              </div>
+            )}
+            {!candidatesLoading && partyMeta && (
+              <div className="space-y-2">
+                {partyMeta.hostCandidates.map((c) => {
+                  const active = recipientUserId === c.userId;
+                  const label = c.name && c.name.trim() ? c.name : (c.email || 'Unnamed');
+                  return (
+                    <label
+                      key={c.userId}
+                      className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="send-recipient"
+                        value={c.userId}
+                        checked={active}
+                        onChange={() => setRecipientUserId(c.userId)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-theme-text">
+                          {c.role === 'host' && (
+                            <Star size={12} className="text-amber-500 shrink-0" />
+                          )}
+                          <span className="truncate">{label}</span>
+                          {c.role === 'host' && (
+                            <span className="text-[10px] uppercase tracking-wide text-amber-500/80 shrink-0">
+                              Primary host
+                            </span>
+                          )}
+                        </div>
+                        {c.email && (
+                          <div className="text-xs text-theme-text-muted truncate">
+                            {c.email}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+                {partyMeta.hostCandidates.length === 0 && (
+                  <div className="text-xs text-red-400">
+                    No payable hosts found for this city.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Amount */}
+          <div>
+            <IconInput
+              icon={DollarSign}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Amount USD *"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              required
+            />
+            <p className="text-xs text-theme-text-muted mt-1">
+              Defaults to outstanding (${outstandingUsd.toFixed(2)}). Edit
+              if you&apos;re sending a partial amount.
+            </p>
+            {exceedsPerSubmission && (
+              <p className="text-xs text-red-500 mt-1">
+                Single payments capped at ${PER_SUBMISSION_MAX_USD}.
+              </p>
+            )}
+          </div>
+
+          {/* Method radios */}
+          <div>
+            <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
+              Method
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <MethodOption
+                value="usdc_base"
+                current={method}
+                onSelect={setMethod}
+                icon={<Coins size={16} />}
+                label="USDC on Base"
+              />
+              <MethodOption
+                value="mercury_card"
+                current={method}
+                onSelect={setMethod}
+                icon={<CreditCard size={16} />}
+                label="Mercury card"
+                disabled={mercuryBlocked}
+                disabledReason={
+                  mercuryBlocked
+                    ? `Mercury unavailable in ${country ?? 'this country'}`
+                    : null
+                }
+              />
+              <MethodOption
+                value="wire"
+                current={method}
+                onSelect={setMethod}
+                icon={<Banknote size={16} />}
+                label="Wire"
+              />
+            </div>
+          </div>
+
+          {/* Per-method destination input */}
+          {method === 'usdc_base' && (
+            <div>
+              <IconInput
+                icon={Wallet}
+                placeholder="USDC wallet address or ENS (e.g. 0x… or alice.eth) *"
+                value={walletAddress}
+                onChange={(e) => setWalletAddress(e.target.value)}
+                required
+              />
+              <p className="text-xs text-theme-text-muted mt-1">
+                ENS names are resolved server-side before the on-chain send.
+              </p>
+            </div>
+          )}
+          {method === 'wire' && (
+            <>
+              <IconInput
+                icon={Mail}
+                type="email"
+                placeholder="Recipient bank-correspondence email (optional)"
+                value={bankEmail}
+                onChange={(e) => setBankEmail(e.target.value)}
+              />
+              <IconInput
+                icon={Hash}
+                placeholder="Wire reference number *"
+                value={wireReference}
+                onChange={(e) => setWireReference(e.target.value)}
+              />
+            </>
+          )}
+          {method === 'mercury_card' && (
+            <>
+              <IconInput
+                icon={Hash}
+                placeholder="Card last 4 digits (required, exactly 4 numbers)"
+                value={mercuryCardLast4}
+                onChange={(e) =>
+                  setMercuryCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))
+                }
+                inputMode="numeric"
+                maxLength={4}
+              />
+              <IconInput
+                icon={Hash}
+                placeholder="Mercury card id (optional)"
+                value={mercuryCardId}
+                onChange={(e) => setMercuryCardId(e.target.value)}
+              />
+            </>
+          )}
+
+          {/* salame-92103: per-party cap warning + ack. */}
+          {partyWouldExceedCap && effectiveReimbursementCapUsd != null && (
+            <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0"
+                  size={16}
+                />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                    Per-party cap warning
+                  </div>
+                  <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                    This send exceeds the party&apos;s ${effectiveReimbursementCapUsd.toFixed(2)} cap by{' '}
+                    <b>${partyOverBy.toFixed(2)}</b>{' '}
+                    (remaining: ${(capRemaining ?? 0).toFixed(2)}).
+                  </div>
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={overridePartyCap}
+                      onChange={() => setOverridePartyCap((v) => !v)}
+                      label="I acknowledge — proceed anyway"
+                      labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Internal note */}
+          <IconInput
+            icon={Pencil}
+            multiline
+            rows={3}
+            placeholder="Internal note (optional, written to the audit log)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+          />
+
+          {submitError && (
+            <div className="px-3 py-2 rounded-lg bg-red-100 text-red-700 border border-red-300 text-sm">
+              {submitError}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-theme-stroke px-5 py-3 flex items-center justify-end gap-2 bg-theme-surface">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-theme-text-secondary hover:bg-theme-surface-hover text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {submitting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Send size={14} />
+            )}
+            Send payment
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const MethodOption: React.FC<{
+  value: Method;
+  current: Method;
+  onSelect: (v: Method) => void;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  disabledReason?: string | null;
+}> = ({ value, current, onSelect, icon, label, disabled, disabledReason }) => {
+  const active = current === value;
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onSelect(value)}
+      disabled={disabled}
+      title={disabled && disabledReason ? disabledReason : undefined}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+        disabled
+          ? 'border-theme-stroke bg-theme-surface text-theme-text-muted opacity-60 cursor-not-allowed'
+          : active
+            ? 'border-emerald-500 bg-emerald-500/10 text-theme-text'
+            : 'border-theme-stroke bg-theme-surface hover:border-theme-stroke-strong text-theme-text-secondary'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+};
