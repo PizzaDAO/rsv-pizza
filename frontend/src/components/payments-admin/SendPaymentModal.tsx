@@ -281,11 +281,19 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       // Step 2 + 3: approve, and for USDC autoExecute via Privy server-wallet.
       // For wire / mercury, the approve call won't execute — we follow up
       // with a separate POST /execute carrying the refs (and any cap-override
-      // ack, which only the execute endpoint honors today).
+      // ack).
+      //
+      // nduja-92106: the per-party cap ack now also flows into /approve (both
+      // direct and autoExecute branches) — previously the override only worked
+      // on /execute, so the USDC path here would 409 at approve time even
+      // with the ack ticked. Forward `allowOverPartyCap` on every approve
+      // call so the bocconcini-49102 recheck is skipped consistently.
+      const allowOverPartyCap = partyWouldExceedCap ? overridePartyCap : undefined;
       if (method === 'usdc_base') {
         await approveAdminPayout(created.id, {
           autoExecute: true,
           note: note.trim() || undefined,
+          allowOverPartyCap,
         });
         // The approve handler runs executePayout server-side for USDC; any
         // failure flips the row to `failed` and surfaces here via the API
@@ -293,6 +301,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       } else {
         await approveAdminPayout(created.id, {
           note: note.trim() || undefined,
+          allowOverPartyCap,
         });
         await executeAdminPayout(created.id, {
           wireReference:
@@ -306,10 +315,8 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
           note: note.trim() || undefined,
           // salame-92103: forward the admin's per-party cap ack so the
           // server bypasses its own check + appends `[override: party cap]`
-          // to the audit row's note. (The approve step's cap check
-          // currently has no override; cap-warned sends on USDC will fail
-          // there until that gap is closed in a follow-up.)
-          allowOverPartyCap: partyWouldExceedCap ? overridePartyCap : undefined,
+          // to the audit row's note.
+          allowOverPartyCap,
         });
       }
 

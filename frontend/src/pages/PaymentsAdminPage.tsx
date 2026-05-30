@@ -1130,12 +1130,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             }
             busy={modalBusy}
             onClose={closeDetail}
-            onApprove={async (note) => {
+            onApprove={async (note, opts) => {
               setModalBusy(true);
               try {
                 await approveAdminPayout(detail.id, {
                   note,
                   ...(regions ? { regions } : {}),
+                  // nduja-92106: forward the per-party cap override ack so the
+                  // backend skips its bocconcini-49102 recheck + records the
+                  // override marker on the audit row.
+                  ...(opts?.allowOverPartyCap ? { allowOverPartyCap: true } : {}),
                 });
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);

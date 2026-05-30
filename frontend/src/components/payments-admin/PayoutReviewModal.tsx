@@ -44,7 +44,17 @@ interface PayoutReviewModalProps {
   /** When set, indicates the actor would be paying themselves — disables mutate buttons. */
   selfPayoutBlocked?: boolean;
   onClose: () => void;
-  onApprove: (note?: string) => Promise<void> | void;
+  /**
+   * nduja-92106: optional second arg lets the admin acknowledge the per-
+   * party reimbursement cap warning at approve time (mirrors salame-92103's
+   * existing ack on Execute). When `allowOverPartyCap` is true, the backend
+   * skips the bocconcini-49102 cap recheck and records `[override: party cap]`
+   * on the audit row.
+   */
+  onApprove: (
+    note?: string,
+    opts?: { allowOverPartyCap?: boolean },
+  ) => Promise<void> | void;
   /**
    * gouda-92103: optional second arg lets the admin opt into a silent
    * reject — backend suppresses host-notify side effects and records
@@ -361,6 +371,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // Required to enable Execute when `partyWouldExceedCap === true`.
   const [overridePartyCap, setOverridePartyCap] = useState(false);
 
+  // nduja-92106: separate ack for the Approve button. bocconcini-49102 also
+  // runs the per-party cap recheck at approve time, so the same amber warning
+  // needs an ack on the pending -> approved transition (mirroring the existing
+  // Execute ack above). Kept distinct from `overridePartyCap` because Approve
+  // is shown for `isPending` payouts and Execute for `isApproved` — they
+  // never share a render path, but the ack lifecycles are independent.
+  const [approveOverridePartyCap, setApproveOverridePartyCap] = useState(false);
+
   // parmigiana-92104: SWC Hub ack. Reimbursement for SWC Hub parties is
   // processed through SWC, not rsv.pizza — admin reimbursement actions
   // (Approve, Execute, Mark paid manual) stay disabled until the admin ticks
@@ -371,8 +389,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   const [swcAck, setSwcAck] = useState(false);
   // Re-sync the ack on payout swap (parent reload after refresh()) so admins
   // don't carry an ack across distinct payouts displayed in the same modal.
+  // nduja-92106: also reset the per-party cap Approve ack on payout swap so
+  // it doesn't carry over from a previously-viewed payout.
   useEffect(() => {
     setSwcAck(false);
+    setApproveOverridePartyCap(false);
   }, [payout.id]);
   // True when an SWC Hub action button should be disabled (warning surfaces
   // and admin hasn't acked). Combined with the existing busy / selfPayout
@@ -3027,13 +3048,62 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         </div>
 
         {/* Footer actions */}
-        <div className="border-t border-theme-stroke px-5 py-3 flex items-center gap-2 flex-wrap bg-theme-surface">
+        <div className="border-t border-theme-stroke px-5 py-3 flex flex-col gap-2 bg-theme-surface">
+          {/* nduja-92106: per-party cap warning for the Approve transition.
+              bocconcini-49102 re-runs the cap check at /approve (not just at
+              /execute), so an admin trying to approve a payout that would
+              push the party past its effective cap got hit with a hard 409
+              with no override path. Mirrors the salame-92103 amber-panel +
+              ack-Checkbox pattern already used by the Execute form above. */}
+          {isPending && partyWouldExceedCap && partyCap != null && (
+            <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                    Per-party cap warning
+                  </div>
+                  <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                    Approving this payment would exceed the party's ${partyCap.toFixed(2)} cap by{' '}
+                    <b>${partyOverBy.toFixed(2)}</b>{' '}
+                    (remaining: ${(partyCapRemaining ?? 0).toFixed(2)}).
+                  </div>
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={approveOverridePartyCap}
+                      onChange={() => setApproveOverridePartyCap((v) => !v)}
+                      label="I acknowledge — proceed anyway"
+                      labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
           {isPending && (
             <>
               <button
                 type="button"
-                onClick={() => onApprove()}
-                disabled={busy || selfPayoutBlocked || swcBlocked}
+                onClick={() => {
+                  // nduja-92106: block submit if the per-party cap would
+                  // exceed and the admin hasn't ticked the override.
+                  if (partyWouldExceedCap && !approveOverridePartyCap) return;
+                  // nduja-92106: forward the admin's acknowledgement so the
+                  // server skips its bocconcini-49102 recheck + records
+                  // `[override: party cap]` on the audit row.
+                  onApprove(
+                    undefined,
+                    partyWouldExceedCap ? { allowOverPartyCap: approveOverridePartyCap } : undefined,
+                  );
+                }}
+                disabled={
+                  busy ||
+                  selfPayoutBlocked ||
+                  swcBlocked ||
+                  // nduja-92106: disabled until ack when the per-party cap would exceed.
+                  (partyWouldExceedCap && !approveOverridePartyCap)
+                }
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -3338,6 +3408,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           >
             Close
           </button>
+          </div>
           {/* caprino-92103: inline error for Revert. Takes full row width
               below the buttons via w-full on the wrapping flex container's
               flex-wrap. Surfaces backend NOT_APPROVED + any network failure. */}

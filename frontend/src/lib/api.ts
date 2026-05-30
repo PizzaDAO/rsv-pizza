@@ -4399,11 +4399,28 @@ export async function retryPayoutDocumentOcr(
 
 export async function approveAdminPayout(
   id: string,
-  opts?: { note?: string; autoExecute?: boolean; regions?: string[] },
+  opts?: {
+    note?: string;
+    autoExecute?: boolean;
+    regions?: string[];
+    /**
+     * nduja-92106: admin-class only. When true, the backend skips the per-
+     * party reimbursement cap recheck at approve time (the same recheck that
+     * bocconcini-49102 added). Mirrors `executeAdminPayout`'s salame-92103
+     * override. The PayoutReviewModal Approve button sets this when the
+     * amber per-party cap warning's ack Checkbox has been ticked; passes
+     * through to the autoExecute branch as well.
+     */
+    allowOverPartyCap?: boolean;
+  },
 ): Promise<{ payout: AdminPayout; autoExecuteDeferred: boolean }> {
   return apiRequest(`/api/admin/payouts/${id}/approve${regionsQuery(opts?.regions)}`, {
     method: 'POST',
-    body: { note: opts?.note, autoExecute: opts?.autoExecute },
+    body: {
+      note: opts?.note,
+      autoExecute: opts?.autoExecute,
+      allowOverPartyCap: opts?.allowOverPartyCap,
+    },
   });
 }
 
