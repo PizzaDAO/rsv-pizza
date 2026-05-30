@@ -11,6 +11,7 @@ import {
   Coins,
   XCircle,
   Plus,
+  Send,
   ExternalLink,
   Tag,
   User as UserIcon,
@@ -122,6 +123,14 @@ interface PayoutsByPartyTableProps {
    */
   onAddExternalPayment?: (partyId: string, partyName: string) => void;
   /**
+   * salame-92106: opens the SendPaymentModal pre-targeted at this city so
+   * the admin can actively SEND funds (USDC / wire / mercury). Distinct
+   * from `onMarkPartyPaid` (records existing payouts as paid) and
+   * `onAddExternalPayment` (logs an off-platform payment). Hidden for
+   * underbosses (admins only) via the viewerRole gate on the menu.
+   */
+  onSendPayment?: (row: PartyPayoutsRow) => void;
+  /**
    * bottarga-92104: parent-supplied refresh hook called after the
    * `possible-scam` tag is toggled. The toggle itself happens locally via
    * `flagPartyAsScam`; the parent uses this to re-fetch the by-party feed so
@@ -226,9 +235,11 @@ function collectReceipts(payouts: AdminPayout[]): Array<{
 function CityActionsMenu({
   onMarkPartyPaid,
   onAddExternalPayment,
+  onSendPayment,
   onToggleScamFlag,
   canMarkPaid,
   canAddExternal,
+  canSendPayment,
   canToggleScamFlag,
   markPaidLabel,
   isFlaggedScam,
@@ -236,9 +247,11 @@ function CityActionsMenu({
 }: {
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
+  onSendPayment?: () => void;
   onToggleScamFlag?: () => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
+  canSendPayment: boolean;
   canToggleScamFlag: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
@@ -246,7 +259,14 @@ function CityActionsMenu({
 }) {
   const [open, setOpen] = useState(false);
   // No actions to show? Render nothing.
-  if (!canMarkPaid && !canAddExternal && !canToggleScamFlag) return null;
+  if (
+    !canMarkPaid &&
+    !canAddExternal &&
+    !canSendPayment &&
+    !canToggleScamFlag
+  ) {
+    return null;
+  }
 
   return (
     <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
@@ -298,6 +318,25 @@ function CityActionsMenu({
               >
                 <Plus size={14} className="text-sky-500" />
                 Add external payment
+              </button>
+            )}
+            {/* salame-92106: actively SEND a payment from rsv.pizza's
+                infrastructure (USDC / wire / mercury) — distinct from the two
+                items above which only RECORD payments that happened elsewhere.
+                Slotted between Add-external and Flag-scam so the destructive-
+                action ordering stays: send → record → flag. */}
+            {canSendPayment && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onSendPayment?.();
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2"
+              >
+                <Send size={14} className="text-emerald-500" />
+                Send payment
               </button>
             )}
             {/* bottarga-92104: flip the `possible-scam` tag on/off. Reversible
@@ -1551,6 +1590,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onRowClick,
   onMarkPartyPaid,
   onAddExternalPayment,
+  onSendPayment,
   onScamFlagChanged,
   viewerRole = 'admin',
   busyRowId,
@@ -1570,6 +1610,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
 
   const canMarkPartyPaid = viewerRole === 'admin' && !!onMarkPartyPaid;
   const canAddExternal = viewerRole === 'admin' && !!onAddExternalPayment;
+  // salame-92106: actively-send is admin-only. Underbosses can flag-ready
+  // but never push funds. Mirrors the other handler-gated admin caps.
+  const canSendPayment = viewerRole === 'admin' && !!onSendPayment;
   // bottarga-92104: same admin gate as the other two menu items. Underbosses
   // never see the scam-flag action.
   const canToggleScamFlag = viewerRole === 'admin';
@@ -1856,6 +1899,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         <CityActionsMenu
                           canMarkPaid={showMarkPartyPaid}
                           canAddExternal={canAddExternal}
+                          canSendPayment={canSendPayment}
                           canToggleScamFlag={canToggleScamFlag}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
@@ -1872,6 +1916,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                                     row.party.id,
                                     row.party.name,
                                   )
+                              : undefined
+                          }
+                          onSendPayment={
+                            canSendPayment && onSendPayment
+                              ? () => onSendPayment(row)
                               : undefined
                           }
                           onToggleScamFlag={
