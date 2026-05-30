@@ -773,6 +773,12 @@ router.get(
           inviteCode: true,
           userId: true,
           coHosts: true,
+          // parmigiana-92104: surface country + event_tags so the
+          // ExternalPaymentModal can render the SWC Hub reimbursement warning
+          // (country='United States' OR event_tags includes 'SWC Hub') once a
+          // party is picked. Frontend-only guardrail — no backend gating.
+          country: true,
+          eventTags: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -851,6 +857,10 @@ router.get(
             inviteCode: p.inviteCode,
             hostUserId: p.user!.id,
             hostCandidates,
+            // parmigiana-92104: forwarded so the ExternalPaymentModal can
+            // render the SWC Hub reimbursement warning on the selected party.
+            country: p.country ?? null,
+            eventTags: Array.isArray(p.eventTags) ? p.eventTags : [],
           };
         });
 

@@ -35,6 +35,7 @@ import type {
 } from '../types';
 import { formatUsd } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
+import { isSwcHubParty } from '../utils/swcHub';
 import {
   PayoutsFilterBar,
   PayoutsTable,
@@ -207,8 +208,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // panettone-92103: "Mark party paid" modal target. Holds the partyId +
   // a hint name so the modal header can render the city while the preview
   // request is in flight.
+  // parmigiana-92104: also carries `isSwcHub` so the modal can render the
+  // SWC Hub reimbursement warning (the preview endpoint doesn't expose
+  // country/event_tags).
   const [markPartyPaidTarget, setMarkPartyPaidTarget] = useState<
-    | { partyId: string; partyNameHint: string }
+    | { partyId: string; partyNameHint: string; isSwcHub: boolean }
     | null
   >(null);
 
@@ -880,6 +884,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                   setMarkPartyPaidTarget({
                     partyId: row.party.id,
                     partyNameHint: row.party.name,
+                    // parmigiana-92104: PrepayQueueRow.party already carries
+                    // country + eventTags so we can resolve the flag here and
+                    // let MarkPartyPaidModal stay decoupled from the row shape.
+                    isSwcHub: isSwcHubParty(row.party),
                   })
                 }
               />
@@ -993,6 +1001,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               setMarkPartyPaidTarget({
                 partyId,
                 partyNameHint: row?.party.name ?? '',
+                // parmigiana-92104: PartyPayoutsRow.party carries
+                // country + eventTags — resolve the SWC Hub flag here so the
+                // modal stays decoupled from the row shape.
+                isSwcHub: isSwcHubParty(row?.party),
               });
             }}
             // mostarda-92103: city-level "Add external payment" — opens the
@@ -1312,6 +1324,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               setMarkPartyPaidTarget({
                 partyId: detail.partyId,
                 partyNameHint: detail.party.name,
+                // parmigiana-92104: PayoutReviewModal's `payout.party` has
+                // country + eventTags surfaced — propagate the SWC Hub flag.
+                isSwcHub: isSwcHubParty(detail.party),
               })
             }
             // tagliatelle-49102: after a tag mutation, refresh the payouts
@@ -1354,6 +1369,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           <MarkPartyPaidModal
             partyId={markPartyPaidTarget.partyId}
             partyNameHint={markPartyPaidTarget.partyNameHint}
+            // parmigiana-92104: forward the resolved SWC Hub flag so the
+            // modal can render the warning + ack.
+            isSwcHub={markPartyPaidTarget.isSwcHub}
             onClose={() => setMarkPartyPaidTarget(null)}
             onSuccess={async ({ count, mode, partyName, action, paymentsClosedAt }) => {
               // caciotta-92103 + pinsa-92103 + provolone-92103: split the

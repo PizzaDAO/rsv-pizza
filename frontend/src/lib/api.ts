@@ -4753,6 +4753,18 @@ export interface ApprovedPartySearchResult {
     email: string | null;
     role: 'host' | 'cohost';
   }>;
+  /**
+   * parmigiana-92104: surfaced so the ExternalPaymentModal can render the
+   * SWC Hub reimbursement warning once a party is selected. Optional for
+   * backward-compat with cached payloads during a rolling deploy — older
+   * clients just skip the warning.
+   */
+  country?: string | null;
+  /**
+   * parmigiana-92104: surfaced so the ExternalPaymentModal can detect the
+   * 'SWC Hub' tag even on non-US events. Optional for backward-compat.
+   */
+  eventTags?: string[];
 }
 
 export async function searchApprovedParties(

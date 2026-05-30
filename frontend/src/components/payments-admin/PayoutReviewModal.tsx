@@ -3,6 +3,8 @@ import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSig
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
+import { SwcHubWarning } from './SwcHubWarning';
+import { isSwcHubParty } from '../../utils/swcHub';
 import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
@@ -357,6 +359,24 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // effective reimbursement cap (already-paid total + this amount > cap).
   // Required to enable Execute when `partyWouldExceedCap === true`.
   const [overridePartyCap, setOverridePartyCap] = useState(false);
+
+  // parmigiana-92104: SWC Hub ack. Reimbursement for SWC Hub parties is
+  // processed through SWC, not rsv.pizza — admin reimbursement actions
+  // (Approve, Execute, Mark paid manual) stay disabled until the admin ticks
+  // the override. Revert-to-pending and revert-to-approved are NOT gated
+  // (those are rollback actions, not reimbursement). Reset on every modal
+  // close/reopen by the parent (PayoutReviewModal is re-mounted per payout).
+  const swcHub = isSwcHubParty(payout.party);
+  const [swcAck, setSwcAck] = useState(false);
+  // Re-sync the ack on payout swap (parent reload after refresh()) so admins
+  // don't carry an ack across distinct payouts displayed in the same modal.
+  useEffect(() => {
+    setSwcAck(false);
+  }, [payout.id]);
+  // True when an SWC Hub action button should be disabled (warning surfaces
+  // and admin hasn't acked). Combined with the existing busy / selfPayout
+  // / cap gates downstream.
+  const swcBlocked = swcHub && !swcAck;
 
   // taralli-58291: lightbox uses an index into `allPhotos` so ArrowLeft /
   // ArrowRight can cycle through receipts + pizza photos. Hooks must be
@@ -963,6 +983,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
           {/* Right: details */}
           <section className="space-y-4">
+            {/* parmigiana-92104: SWC Hub reimbursement warning + ack.
+                Surfaces above every reimbursement-action control (the Amount
+                edit and the footer's Approve / Execute / Mark paid). Sticks
+                in the body so it scrolls with the rest of the right column
+                instead of floating above the action footer. */}
+            <SwcHubWarning
+              isSwcHub={swcHub}
+              acked={swcAck}
+              onAckChange={setSwcAck}
+            />
+
             {/* Amount */}
             <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
               <div className="flex items-center justify-between mb-2">
@@ -1601,7 +1632,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       setRejectReason('');
                       setRejectSilent(false);
                     }}
-                    disabled={busy || !rejectReason.trim()}
+                    // parmigiana-92104: Reject is still a reimbursement action
+                    // (the host gets notified the org isn't paying), so gate it
+                    // behind the SWC Hub ack too.
+                    disabled={busy || !rejectReason.trim() || swcBlocked}
                     className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs disabled:opacity-50"
                   >
                     Confirm reject
@@ -1861,7 +1895,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         !!walletPaidTotal?.wouldExceed &&
                         !overrideCap) ||
                       // salame-92103: disabled until ack when the per-party cap would exceed.
-                      (partyWouldExceedCap && !overridePartyCap)
+                      (partyWouldExceedCap && !overridePartyCap) ||
+                      // parmigiana-92104: disabled until ack when the party is an SWC Hub
+                      // party (reimbursement should be processed via SWC, not rsv.pizza).
+                      swcBlocked
                     }
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
@@ -1938,7 +1975,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       });
                       setShowMarkPaidForm(false);
                     }}
-                    disabled={busy}
+                    // parmigiana-92104: also gate the inner "Confirm" in the
+                    // Mark paid form so a stale ack flip between the outer
+                    // button and this confirmation doesn't slip past the SWC
+                    // Hub warning.
+                    disabled={busy || swcBlocked}
                     className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-xs disabled:opacity-50"
                   >
                     Confirm
@@ -1963,7 +2004,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => onApprove()}
-                disabled={busy || selfPayoutBlocked}
+                disabled={busy || selfPayoutBlocked || swcBlocked}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -1972,7 +2013,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowRejectForm(true)}
-                disabled={busy || selfPayoutBlocked}
+                disabled={busy || selfPayoutBlocked || swcBlocked}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
               >
                 <X size={14} />
@@ -2015,7 +2056,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   <button
                     type="button"
                     onClick={openExecuteForm}
-                    disabled={busy || selfPayoutBlocked || showExecuteForm}
+                    disabled={busy || selfPayoutBlocked || showExecuteForm || swcBlocked}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
                   >
                     <Send size={14} />
@@ -2060,7 +2101,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMarkPaidForm(true)}
-                    disabled={busy || selfPayoutBlocked}
+                    disabled={busy || selfPayoutBlocked || swcBlocked}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
                   >
                     <DollarSign size={14} />
@@ -2181,7 +2222,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => onPayAgain(payout)}
-                disabled={busy || selfPayoutBlocked}
+                // parmigiana-92104: Pay-again issues a new reimbursement to the
+                // same wallet — gate behind the SWC Hub ack like every other
+                // outbound reimbursement action.
+                disabled={busy || selfPayoutBlocked || swcBlocked}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
               >
                 <Repeat2 size={14} />
@@ -2247,7 +2291,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             <button
               type="button"
               onClick={onMarkPartyPaid}
-              disabled={busy || selfPayoutBlocked}
+              // parmigiana-92104: party-level mark-paid bulk-flips every
+              // in-flight reimbursement on the city to paid — also gate behind
+              // the SWC Hub ack.
+              disabled={busy || selfPayoutBlocked || swcBlocked}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 text-sm font-medium disabled:opacity-50"
               title={`Mark every in-flight payout on ${stripGppPrefix(payout.party.name)} paid (out-of-band reconciliation)`}
             >

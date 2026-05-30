@@ -19,6 +19,8 @@ import {
   Star,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { SwcHubWarning } from './SwcHubWarning';
+import { isSwcHubParty } from '../../utils/swcHub';
 import {
   recordExternalPayment,
   searchApprovedParties,
@@ -113,6 +115,13 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   // longer enforces the per-submission cap. Admin amount is canonical; the
   // amber warning below is informational only.
 
+  // parmigiana-92104: SWC Hub ack. Surfaced after a party is selected if it
+  // matches the SWC Hub heuristic (country='United States' OR event_tags
+  // includes 'SWC Hub'). Confirm button stays disabled until acked. Reset
+  // when the admin picks a different party so the ack doesn't carry across
+  // selections.
+  const [swcAck, setSwcAck] = useState(false);
+
   // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -179,6 +188,10 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     return true;
   }, [recipientUserId, recipientEmailInput]);
 
+  // parmigiana-92104: derive SWC Hub status from the selected party (clean
+  // when nothing's selected yet).
+  const swcHub = isSwcHubParty(selectedParty);
+
   const canSubmit = useMemo(() => {
     if (!partyId.trim()) return false;
     if (!recipientReady) return false;
@@ -186,6 +199,10 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     if (!adminNotes.trim()) return false;
     // lasagna-92103: over-cap submissions are no longer gated on an ack —
     // admin amount is canonical; the warning is informational only.
+    // parmigiana-92104: SWC Hub parties require an ack before submit. The
+    // backend POST /external stays open so admins can still record the
+    // payment once they confirm.
+    if (swcHub && !swcAck) return false;
     return !submitting && !uploading;
   }, [
     partyId,
@@ -194,6 +211,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     adminNotes,
     submitting,
     uploading,
+    swcHub,
+    swcAck,
   ]);
 
   function handlePickParty(p: ApprovedPartySearchResult) {
@@ -212,6 +231,9 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     setPartyQuery('');
     setPartyResults([]);
     setSearchError(null);
+    // parmigiana-92104: reset SWC Hub ack on every party switch so the prior
+    // ack doesn't bleed into the new selection.
+    setSwcAck(false);
   }
 
   function handleChangeParty() {
@@ -220,6 +242,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     setRecipientEmailInput('');
     setPartyQuery('');
     setPartyResults([]);
+    // parmigiana-92104: also clear the SWC Hub ack when the admin unpicks.
+    setSwcAck(false);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -412,6 +436,18 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               </p>
             )}
           </div>
+
+          {/* parmigiana-92104: SWC Hub reimbursement warning. Surfaces once a
+              party is picked AND that party matches the SWC Hub heuristic
+              (country='United States' OR event_tags includes 'SWC Hub').
+              Confirm button stays disabled until the admin ticks the ack. */}
+          {selectedParty && (
+            <SwcHubWarning
+              isSwcHub={swcHub}
+              acked={swcAck}
+              onAckChange={setSwcAck}
+            />
+          )}
 
           {/* Recipient picker — only shown once a party is selected.
               mortazza-92103: radio list (ports the bismarck-92103 prepay UX)
