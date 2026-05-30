@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play, ChevronDown, ChevronRight, Plus, Trash2, Copy } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -17,6 +17,7 @@ import {
   formatOriginalCurrency,
   ReceiptLightbox,
 } from '../payments-shared';
+import { ReceiptEditor } from './ReceiptEditor';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
@@ -382,6 +383,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // ArrowRight can cycle through receipts + pizza photos. Hooks must be
   // declared above any early return — see feedback_hooks_above_early_returns.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // pesto-92104: the lightbox owns its visible index after open (so arrow
+  // nav works without parent re-renders), but the parent needs to know
+  // which doc is currently in view so it can supply the matching editor
+  // pane. `lightboxCurrentIndex` is mirrored from the lightbox via its
+  // `onIndexChange` prop.
+  const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState<number | null>(null);
 
   // agnolotti-58291: per-receipt OCR amount + currency edit state. The modal
   // ships an inline form per receipt row (gated to full admins + payment_admin)
@@ -922,6 +929,180 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, lightboxIndex]);
+
+  // pesto-92104: derive the receipt that's currently in the lightbox (if
+  // any). The unified carousel order is pizzas → receipts → pizzaPhotos →
+  // eventPhotos (see `allPhotos` above), so the receipt slice starts at
+  // `pizzas.length` and runs through `pizzas.length + receipts.length`.
+  const lightboxReceipt = useMemo(() => {
+    if (lightboxCurrentIndex == null) return null;
+    const offset = pizzas.length;
+    const idx = lightboxCurrentIndex - offset;
+    if (idx < 0 || idx >= receipts.length) return null;
+    return receipts[idx];
+  }, [lightboxCurrentIndex, pizzas.length, receipts]);
+
+  // pesto-92104: "is the editor dirty?" — used by the navigation prompt
+  // (Save / Discard / Cancel) so admins don't accidentally lose in-flight
+  // amount / currency / line-item edits when arrow-keying through receipts.
+  // Mirrors the dirty-check in the per-row right-pane editor below.
+  function receiptHasUnsavedEdits(docId: string): boolean {
+    const r = receipts.find((x) => x.id === docId);
+    if (!r) return false;
+    const draft = receiptDrafts[docId];
+    if (draft) {
+      const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
+      const persistedCur = r.ocrCurrency ?? '';
+      if (draft.amount !== persistedAmt || draft.currency !== persistedCur) {
+        return true;
+      }
+    }
+    const liDrafts = lineItemDrafts[docId];
+    if (liDrafts) {
+      const persisted = (r.ocrLineItems ?? []).map(lineItemToDraft);
+      if (persisted.length !== liDrafts.length) return true;
+      for (let i = 0; i < liDrafts.length; i++) {
+        const a = liDrafts[i];
+        const b = persisted[i];
+        if (
+          a.name !== b.name ||
+          a.qty !== b.qty ||
+          a.unitPrice !== b.unitPrice ||
+          a.subtotal !== b.subtotal ||
+          a.category !== b.category
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // pesto-92104: gate the lightbox's arrow / button nav when the current
+  // receipt has unsaved edits. Surfaces a confirm() with three implied
+  // outcomes — admins answer OK to discard and move on, Cancel to stay on
+  // the current receipt. Save is a separate path (admins explicitly click
+  // the Save button before navigating); we don't auto-save here because
+  // arrow-key navigation through 6 receipts shouldn't fire 6 PATCH calls
+  // in the happy path.
+  const lightboxOnBeforeNavigate = useCallback(async (): Promise<boolean> => {
+    if (!lightboxReceipt) return true;
+    if (!receiptHasUnsavedEdits(lightboxReceipt.id)) return true;
+    const ok = window.confirm(
+      'This receipt has unsaved edits. Discard them and navigate?',
+    );
+    return ok;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxReceipt, receiptDrafts, lineItemDrafts, receipts]);
+
+  // pesto-92104: D key = mark-duplicate toggle for the currently-shown
+  // receipt. Lightbox only wires this handler when an editor is mounted,
+  // so non-receipt photos / non-admin viewers don't accidentally toggle.
+  const lightboxOnDuplicateShortcut = useCallback(() => {
+    if (!lightboxReceipt) return;
+    toggleDuplicate(lightboxReceipt.id, !(lightboxReceipt.isDuplicate === true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxReceipt]);
+
+  // pesto-92104: render the ReceiptEditor when the lightbox is showing a
+  // receipt AND the viewer can edit (admin / super_admin / payment_admin).
+  // Non-receipt thumbnails (event photos, pizza photos, payment-proof
+  // pizzas) get the plain photo-only lightbox.
+  const lightboxEditorPane = useMemo(() => {
+    if (!lightboxReceipt) return null;
+    if (!canEditReceipts) return null;
+    const r = lightboxReceipt;
+    // Seed the amount/currency draft from current persisted values if the
+    // admin hasn't typed anything yet. Keeps the editor's inputs reflecting
+    // whatever the row shows in the right-pane.
+    const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
+      amount: r.ocrAmount == null ? '' : String(r.ocrAmount),
+      currency: r.ocrCurrency ?? '',
+    };
+    const persistedAmt = r.ocrAmount == null ? '' : String(r.ocrAmount);
+    const persistedCur = r.ocrCurrency ?? '';
+    const isDirty =
+      draft.amount !== persistedAmt || draft.currency !== persistedCur;
+    // Seed line item drafts lazily (mirrors ensureLineItemDrafts on
+    // expansion in the right-pane). For the lightbox we always show the
+    // editor, so seed immediately if no draft exists yet.
+    const liDraftsExisting = lineItemDrafts[r.id];
+    const liDrafts =
+      liDraftsExisting ?? (r.ocrLineItems ?? []).map(lineItemToDraft);
+    const localOcrError = retryClearedErrors[r.id]
+      ? null
+      : (retryErrors[r.id] ?? r.ocrError);
+    return (
+      <ReceiptEditor
+        doc={r}
+        draft={draft}
+        onDraftChange={(next) =>
+          setReceiptDrafts((m) => ({ ...m, [r.id]: next }))
+        }
+        saving={receiptSavingId === r.id}
+        saveError={receiptSaveErrors[r.id]}
+        onSave={() => saveReceiptEdit(r.id)}
+        isDirty={isDirty}
+        isDuplicate={r.isDuplicate === true}
+        dupSaving={duplicateSavingId === r.id}
+        dupError={duplicateSaveErrors[r.id]}
+        onToggleDuplicate={() => toggleDuplicate(r.id, !(r.isDuplicate === true))}
+        lineItemDrafts={liDrafts}
+        lineItemsSaving={lineItemsSavingId === r.id}
+        lineItemsSaveError={lineItemsSaveErrors[r.id]}
+        onLineItemDraftChange={(idx, patch) => {
+          // If the parent hasn't yet seeded the draft (first edit from the
+          // lightbox), persist the freshly seeded `liDrafts` into the draft
+          // map so the next render keeps the in-flight edits.
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          updateLineItemDraft(r.id, idx, patch);
+        }}
+        onAddLineItem={() => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          addLineItem(r.id);
+        }}
+        onRemoveLineItem={(idx) => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          removeLineItem(r.id, idx);
+        }}
+        onSaveLineItems={() => {
+          if (!liDraftsExisting) {
+            setLineItemDrafts((m) => ({ ...m, [r.id]: liDrafts }));
+          }
+          saveLineItemsEdit(r.id);
+        }}
+        onUseLineSumForAmount={() => useLineSumForAmount(r.id)}
+        hasOcrError={!!localOcrError}
+        retrying={retryingDocId === r.id}
+        retryError={retryErrors[r.id]}
+        onRetryOcr={() => retryOcr(r.id)}
+      />
+    );
+    // The deps list intentionally excludes the function references that
+    // are stable across renders within this component (saveReceiptEdit,
+    // toggleDuplicate, etc.) — they read fresh state internally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    lightboxReceipt,
+    canEditReceipts,
+    receiptDrafts,
+    receiptSavingId,
+    receiptSaveErrors,
+    duplicateSavingId,
+    duplicateSaveErrors,
+    lineItemDrafts,
+    lineItemsSavingId,
+    lineItemsSaveErrors,
+    retryingDocId,
+    retryErrors,
+    retryClearedErrors,
+  ]);
 
   // culatello-92104: duplicates are evidence-only — exclude their OCR
   // amounts from the receipt sum so admins see the corrected total. The
@@ -3076,12 +3257,24 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           owns its own Esc + arrow-key handlers and the HEIC fallback.
           focaccia-92104: `allPhotos` order is pizzas (Payment proof) →
           receipts → pizzaPhotos → eventPhotos so arrow-key nav crosses
-          sections in the same order they're rendered. */}
+          sections in the same order they're rendered.
+          pesto-92104: when admin opens a RECEIPT thumbnail the lightbox
+          renders a 2-pane layout — photo on the left, ReceiptEditor on
+          the right — so amount / currency / line items / duplicate can be
+          edited without leaving the photo view. Event/pizza photos and
+          non-admin viewers get the plain photo-only lightbox. */}
       <ReceiptLightbox
         isOpen={lightboxIndex != null}
         images={allPhotos}
         initialIndex={lightboxIndex ?? 0}
-        onClose={() => setLightboxIndex(null)}
+        onClose={() => {
+          setLightboxIndex(null);
+          setLightboxCurrentIndex(null);
+        }}
+        onIndexChange={setLightboxCurrentIndex}
+        editorPane={lightboxEditorPane}
+        onBeforeNavigate={lightboxOnBeforeNavigate}
+        onDuplicateShortcut={lightboxOnDuplicateShortcut}
       />
     </div>
   );
