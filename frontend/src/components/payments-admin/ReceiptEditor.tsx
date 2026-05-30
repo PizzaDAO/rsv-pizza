@@ -485,6 +485,21 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           </span>
         </div>
         <div className="rounded-lg border border-theme-stroke bg-theme-bg p-2 space-y-1.5 max-h-80 overflow-y-auto">
+          {/* Column headers. Widths mirror the input row below so each label
+              sits over its column. Hidden on mobile where rows wrap (flex-wrap
+              / sm:flex-nowrap) and the alignment would break. Only shown when
+              there are rows to label. */}
+          {(lineItemDrafts ?? []).length > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-theme-text-faint sticky top-0 bg-theme-bg">
+              <span className="flex-1 min-w-[120px]">Item</span>
+              <span className="w-14 text-right">Qty</span>
+              <span className="w-20 text-right">Unit</span>
+              <span className="w-20 text-right">Subtotal</span>
+              <span>Category</span>
+              <span>Eligible</span>
+              <span className="w-[20px]" aria-hidden="true" />
+            </div>
+          )}
           {(lineItemDrafts ?? []).length === 0 && (
             <p className="text-xs text-theme-text-faint p-2">
               No line items yet. Click <span className="font-semibold">Add line</span> to start.
