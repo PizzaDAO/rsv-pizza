@@ -516,11 +516,22 @@ function CityExpansion({
   // shown in the panel (and we can hand-pick committed-cap semantics).
   const rollup = useMemo(() => {
     const payouts = row.payouts;
+    // coppa-92105: admin-marked duplicates are evidence-only — exclude their
+    // OCR amounts from the "Receipts collected" rollup so the by-city tile
+    // matches the per-payout modal's `ocrSum` semantics (which already
+    // filters duplicates) and the host PATCH `survivingOcrSum` recompute.
     const receiptUsdTotal = receiptEntries.reduce(
-      (s, e) => s + (Number(e.doc.ocrAmount) || 0),
+      (s, e) => s + (e.doc.isDuplicate ? 0 : (Number(e.doc.ocrAmount) || 0)),
       0,
     );
     const receiptCount = receiptEntries.length;
+    // coppa-92105: surface the duplicate count on the rollup so the tile can
+    // render "$X (N receipts, M duplicates excluded)" when M > 0. Visible
+    // proof the exclusion happened.
+    const duplicateCount = receiptEntries.reduce(
+      (n, e) => n + (e.doc.isDuplicate ? 1 : 0),
+      0,
+    );
 
     let approvedUsd = 0;
     let paidUsd = 0;
@@ -549,6 +560,7 @@ function CityExpansion({
     return {
       receiptUsdTotal,
       receiptCount,
+      duplicateCount,
       approvedUsd,
       paidUsd,
       outstandingUsd: Math.max(0, approvedUsd - paidUsd),
@@ -1142,7 +1154,15 @@ function CityExpansion({
         <RollupTile
           label="Receipts collected"
           value={formatUsd(rollup.receiptUsdTotal)}
-          sub={`${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}`}
+          /* coppa-92105: when duplicates exist, append "M duplicate(s) excluded"
+              so admins see at a glance that the USD total skipped them. The
+              culatello-92104 modal does the same on its "Sum of OCR amounts"
+              footer; this is the city-level mirror. */
+          sub={
+            rollup.duplicateCount > 0
+              ? `${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}, ${rollup.duplicateCount} duplicate${rollup.duplicateCount === 1 ? '' : 's'} excluded`
+              : `${rollup.receiptCount} receipt${rollup.receiptCount === 1 ? '' : 's'}`
+          }
           accent="text-theme-text"
         />
         <RollupTile
@@ -1256,35 +1276,64 @@ function CityExpansion({
             Receipts ({receiptEntries.length})
           </div>
           <div className="flex flex-wrap gap-2">
-            {receiptEntries.map((e, idx) => (
-              <button
-                key={e.doc.id}
-                type="button"
-                onClick={() => setLightbox({ bucket: 'receipt', index: idx })}
-                className="group relative w-16 h-16 rounded-md overflow-hidden border border-theme-stroke hover:border-theme-stroke-hover"
-                title={`${e.doc.fileName}${
-                  e.doc.uploadedByName || e.doc.uploadedByEmail
-                    ? ` — uploaded by ${e.doc.uploadedByName || e.doc.uploadedByEmail}`
-                    : ''
-                }${
-                  e.doc.ocrAmount != null
-                    ? ` · ${formatUsd(Number(e.doc.ocrAmount))}`
-                    : ''
-                }`}
-              >
-                <img
-                  src={e.doc.url}
-                  alt={e.doc.fileName}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                {e.doc.ocrAmount != null && (
-                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] font-medium text-center py-0.5">
-                    {formatUsd(Number(e.doc.ocrAmount))}
-                  </span>
-                )}
-              </button>
-            ))}
+            {receiptEntries.map((e, idx) => {
+              // coppa-92105: dim + diagonal-stripe overlay + DUPLICATE pill on
+              // duplicate thumbnails so the by-city grid matches the per-
+              // payout modal's left-pane grid (culatello-92104) and admins
+              // can't miss that the receipt is excluded from the rollup.
+              const isDup = e.doc.isDuplicate === true;
+              return (
+                <button
+                  key={e.doc.id}
+                  type="button"
+                  onClick={() => setLightbox({ bucket: 'receipt', index: idx })}
+                  className={`group relative w-16 h-16 rounded-md overflow-hidden border hover:border-theme-stroke-hover ${
+                    isDup
+                      ? 'opacity-50 border-red-500/60'
+                      : 'border-theme-stroke'
+                  }`}
+                  title={`${isDup ? '[DUPLICATE — excluded from totals] ' : ''}${e.doc.fileName}${
+                    e.doc.uploadedByName || e.doc.uploadedByEmail
+                      ? ` — uploaded by ${e.doc.uploadedByName || e.doc.uploadedByEmail}`
+                      : ''
+                  }${
+                    e.doc.ocrAmount != null
+                      ? ` · ${formatUsd(Number(e.doc.ocrAmount))}`
+                      : ''
+                  }`}
+                >
+                  <img
+                    src={e.doc.url}
+                    alt={e.doc.fileName}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {/* coppa-92105: 8px alternating dark/transparent diagonal
+                      stripes laid over the thumbnail. Reinforces "do not
+                      count this" beyond the opacity-50 dim which alone reads
+                      as merely "inactive" rather than "excluded". */}
+                  {isDup && (
+                    <span
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage:
+                          'repeating-linear-gradient(45deg, rgba(0,0,0,0.35) 0 4px, transparent 4px 8px)',
+                      }}
+                    />
+                  )}
+                  {isDup && (
+                    <span className="absolute top-1 right-1 text-[8px] uppercase font-bold px-1 py-0.5 rounded bg-red-500 text-white">
+                      dup
+                    </span>
+                  )}
+                  {e.doc.ocrAmount != null && (
+                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] font-medium text-center py-0.5">
+                      {formatUsd(Number(e.doc.ocrAmount))}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1435,6 +1484,14 @@ function CityExpansion({
           lightbox?.bucket === 'receipt' && canEditReceipts
             ? lightboxOnDuplicateShortcut
             : undefined
+        }
+        /* coppa-92105: paint the lightbox photo pane with a DUPLICATE banner +
+            diagonal-stripe overlay when the focused receipt is an admin-marked
+            duplicate. Scoped to the receipt bucket (event/pizza photo lightboxes
+            never have an isDuplicate concept). */
+        isDuplicate={
+          lightbox?.bucket === 'receipt'
+          && lightboxReceipt?.isDuplicate === true
         }
       />
     </div>
@@ -1738,13 +1795,25 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               // Compute Receipt total + Outstanding for the OUTER row from
               // the payouts already on the wire (mostarda-92103 unified
               // rollup — keep the outer cells in sync with the panel).
+              // coppa-92105: admin-marked duplicates are evidence-only —
+              // exclude their OCR amounts from the outer cell's USD total so
+              // it matches the in-panel "Receipts collected" rollup tile
+              // (which is itself the city-level mirror of the per-payout
+              // modal's `ocrSum`). We still count the duplicate row toward
+              // the receipt-attachment count so admins know the file exists;
+              // a "M duplicate(s) excluded" subtitle surfaces the exclusion.
               const payouts = row.payouts;
               let receiptUsdTotal = 0;
               let receiptCount = 0;
+              let receiptDuplicateCount = 0;
               for (const p of payouts) {
                 for (const d of p.documents || []) {
                   if (d.kind !== 'receipt') continue;
                   receiptCount += 1;
+                  if (d.isDuplicate === true) {
+                    receiptDuplicateCount += 1;
+                    continue;
+                  }
                   receiptUsdTotal += Number(d.ocrAmount) || 0;
                 }
               }
@@ -1862,6 +1931,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                       <div className="text-xs text-theme-text-muted inline-flex items-center gap-1">
                         <Paperclip size={11} />
                         {receiptCount} receipt{receiptCount === 1 ? '' : 's'}
+                        {/* coppa-92105: surface duplicate exclusion on the
+                            outer city row so admins reading the table without
+                            expanding can see the USD total skipped some
+                            receipts. Mirrors the in-panel "Receipts collected"
+                            tile subtitle. */}
+                        {receiptDuplicateCount > 0 && (
+                          <span className="ml-1 text-theme-text-faint">
+                            ({receiptDuplicateCount} dup excluded)
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td

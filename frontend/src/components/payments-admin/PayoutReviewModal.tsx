@@ -1659,10 +1659,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         // culatello-92104 (#2): admin-marked duplicates dim
                         // to 50% so the grid visually reflects the corrected
                         // payout at a glance.
-                        className={`relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group ${
-                          isDup ? 'opacity-50' : ''
+                        // coppa-92105: pair the dim with a red border so the
+                        // exclusion reads as "rejected" rather than just
+                        // "inactive". The diagonal-stripe overlay below
+                        // reinforces it further.
+                        className={`relative aspect-square rounded-lg overflow-hidden border group ${
+                          isDup
+                            ? 'opacity-50 border-red-500/60'
+                            : 'border-theme-stroke'
                         }`}
-                        title={doc.fileName}
+                        title={
+                          isDup
+                            ? `[DUPLICATE — excluded from totals] ${doc.fileName}`
+                            : doc.fileName
+                        }
                       >
                         {isVideoFile(doc) ? (
                           <>
@@ -1693,6 +1703,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
                           receipt
                         </span>
+                        {/* coppa-92105: 8px alternating dark/transparent
+                            diagonal stripes laid over the thumbnail when
+                            marked duplicate. The opacity-50 dim alone reads
+                            as "inactive"; the stripes drive home "excluded
+                            from totals". Mirrors the by-city grid treatment. */}
+                        {isDup && (
+                          <span
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              backgroundImage:
+                                'repeating-linear-gradient(45deg, rgba(0,0,0,0.35) 0 4px, transparent 4px 8px)',
+                            }}
+                          />
+                        )}
                         {/* culatello-92104: DUPLICATE pill on the thumbnail
                             so admins see at a glance which receipts are
                             evidence-only. */}
@@ -2055,11 +2079,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       <li
                         key={r.id}
                         id={`receipt-row-${r.id}`}
+                        /* coppa-92105: the bare opacity-50 dim was too easy
+                            to read past — admins (Snax) reported missing
+                            it. Pair with a red left border + faint red
+                            background tint so the row visibly registers as
+                            "excluded from totals" rather than just
+                            "inactive". */
                         className={`text-sm rounded ${
                           isHighlighted
                             ? 'ring-2 ring-amber-400 animate-pulse'
                             : ''
-                        } ${isDup ? 'opacity-50' : ''}`}
+                        } ${
+                          isDup
+                            ? 'opacity-60 border-l-4 border-red-500/60 bg-red-500/5 pl-2 py-1'
+                            : ''
+                        }`}
                       >
                         <div className="flex items-center gap-2">
                           <span
@@ -3403,6 +3437,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         editorPane={lightboxEditorPane}
         onBeforeNavigate={lightboxOnBeforeNavigate}
         onDuplicateShortcut={lightboxOnDuplicateShortcut}
+        /* coppa-92105: paint the lightbox photo pane with a DUPLICATE banner +
+            diagonal-stripe overlay when the focused image is an admin-marked
+            duplicate. Only fires for the receipt bucket because lightboxReceipt
+            is null when navigating pizza/event photos. */
+        isDuplicate={lightboxReceipt?.isDuplicate === true}
       />
     </div>
   );
