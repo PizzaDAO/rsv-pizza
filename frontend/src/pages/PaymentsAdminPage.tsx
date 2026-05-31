@@ -508,11 +508,29 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // Outstanding columns since the rollup is computed from all their payouts.
   const displayedByPartyRows = useMemo(() => {
     const status = filters.status;
-    if (!status || status === 'all') return byPartyRows;
-    return byPartyRows.filter((row) =>
-      row.payouts.some((p) => p.status === status),
-    );
-  }, [byPartyRows, filters.status]);
+    const filtered =
+      !status || status === 'all'
+        ? byPartyRows
+        : byPartyRows.filter((row) => row.payouts.some((p) => p.status === status));
+
+    // "Oldest/Newest first" in the by-city view should order cities by their
+    // host UPLOAD time, not lastActivityAt. The /by-party endpoint doesn't
+    // implement created_asc/created_desc — they fall through to its activity
+    // sort — so we order here off the payouts each row already carries:
+    //   • Oldest first  → city whose EARLIEST host upload is oldest (min createdAt asc)
+    //   • Newest first  → city whose LATEST host upload is most recent (max createdAt desc)
+    const sort = filters.sort;
+    if (sort === 'created_asc' || sort === 'created_desc') {
+      const earliest = (r: PartyPayoutsRow) =>
+        Math.min(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
+      const latest = (r: PartyPayoutsRow) =>
+        Math.max(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
+      return [...filtered].sort((a, b) =>
+        sort === 'created_asc' ? earliest(a) - earliest(b) : latest(b) - latest(a),
+      );
+    }
+    return filtered;
+  }, [byPartyRows, filters.status, filters.sort]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
