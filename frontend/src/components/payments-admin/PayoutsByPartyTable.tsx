@@ -626,6 +626,7 @@ function CityExpansion({
   onApprove,
   onExecute,
   onMarkPaid,
+  onReceiptOverride,
 }: {
   row: PartyPayoutsRow;
   selectedIds: Set<string>;
@@ -651,6 +652,11 @@ function CityExpansion({
   onExecute?: (payout: AdminPayout) => void;
   /** Per-payout mark-paid handler (approved -> paid manually). */
   onMarkPaid?: (payout: AdminPayout) => void;
+  /** Callback to propagate receipt overrides to parent for row update. */
+  onReceiptOverride?: (
+    docId: string,
+    override: { ocrAmount: number | null; isDuplicate?: boolean; ineligible?: boolean },
+  ) => void;
 }) {
   // Hooks-above-early-returns: all useState / useMemo / useCallback live up
   // front so adding a conditional return below can't change hook order.
@@ -1026,6 +1032,12 @@ function CityExpansion({
           exchangeRate: updated.exchangeRate,
         },
       }));
+      // Propagate to parent so collapsed row updates
+      onReceiptOverride?.(docId, {
+        ocrAmount: updated.ocrAmount,
+        isDuplicate: updated.isDuplicate,
+        ineligible: updated.ineligible,
+      });
       setReceiptDrafts((m) => ({
         ...m,
         [docId]: {
@@ -1085,6 +1097,12 @@ function CityExpansion({
           },
         };
       });
+      // Propagate to parent so collapsed row updates
+      onReceiptOverride?.(docId, {
+        ocrAmount: updated.ocrAmount,
+        isDuplicate: updated.isDuplicate,
+        ineligible: updated.ineligible,
+      });
     } catch (err: any) {
       // Roll back the optimistic flag.
       setReceiptOverrides((m) => {
@@ -1141,6 +1159,12 @@ function CityExpansion({
             ineligible: updated.ineligible,
           },
         };
+      });
+      // Propagate to parent so collapsed row updates
+      onReceiptOverride?.(docId, {
+        ocrAmount: updated.ocrAmount,
+        isDuplicate: updated.isDuplicate,
+        ineligible: updated.ineligible,
       });
     } catch (err: any) {
       setReceiptOverrides((m) => {
@@ -1258,6 +1282,12 @@ function CityExpansion({
           ineligible: updated.ineligible,
         },
       }));
+      // Propagate to parent so collapsed row updates
+      onReceiptOverride?.(docId, {
+        ocrAmount: updated.ocrAmount,
+        isDuplicate: updated.isDuplicate,
+        ineligible: updated.ineligible,
+      });
       setLineItemDrafts((m) => ({
         ...m,
         [docId]: (updated.ocrLineItems ?? []).map(lineItemToDraft),
@@ -2219,6 +2249,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // with the persisted value (the override is consulted ONLY for rendering;
   // the row's own eventTags are still the source of truth).
   const [tagOverrides, setTagOverrides] = useState<Record<string, string[]>>({});
+  // Receipt overrides state lifted to parent so both the collapsed row and
+  // expanded panel see the same data. Keyed by partyId then docId.
+  type ParentReceiptOverride = {
+    ocrAmount: number | null;
+    isDuplicate?: boolean;
+    ineligible?: boolean;
+  };
+  const [receiptOverridesByParty, setReceiptOverridesByParty] = useState<
+    Record<string, Record<string, ParentReceiptOverride>>
+  >({});
   // Per-row busy spinner state for the scam-flag toggle. Avoids double-clicks
   // during the PATCH round-trip.
   const [scamBusyPartyId, setScamBusyPartyId] = useState<string | null>(null);
@@ -2455,6 +2495,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               // the receipt-attachment count so admins know the file exists;
               // a "M duplicate(s) excluded" subtitle surfaces the exclusion.
               const payouts = row.payouts;
+              const partyOverrides = receiptOverridesByParty[row.party.id] ?? {};
               let receiptUsdTotal = 0;
               let receiptCount = 0;
               let receiptDuplicateCount = 0;
@@ -2468,15 +2509,20 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 for (const d of p.documents || []) {
                   if (d.kind !== 'receipt') continue;
                   receiptCount += 1;
-                  if (d.isDuplicate === true) {
+                  // Apply local overrides so row updates without reload
+                  const ov = partyOverrides[d.id];
+                  const isDup = ov?.isDuplicate ?? d.isDuplicate;
+                  const isIne = ov?.ineligible ?? d.ineligible;
+                  const amt = ov?.ocrAmount ?? d.ocrAmount;
+                  if (isDup === true) {
                     receiptDuplicateCount += 1;
                     continue;
                   }
-                  if (d.ineligible === true) {
+                  if (isIne === true) {
                     receiptIneligibleCount += 1;
                     continue;
                   }
-                  receiptUsdTotal += Number(d.ocrAmount) || 0;
+                  receiptUsdTotal += Number(amt) || 0;
                 }
               }
               const approvedSumUsd =
@@ -2725,6 +2771,15 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             onApprove={viewerRole === 'admin' ? onApprove : undefined}
                             onExecute={viewerRole === 'admin' ? onExecute : undefined}
                             onMarkPaid={viewerRole === 'admin' ? onMarkPaid : undefined}
+                            onReceiptOverride={(docId, override) => {
+                              setReceiptOverridesByParty((prev) => ({
+                                ...prev,
+                                [row.party.id]: {
+                                  ...(prev[row.party.id] ?? {}),
+                                  [docId]: override,
+                                },
+                              }));
+                            }}
                           />
                         </div>
                       </td>
