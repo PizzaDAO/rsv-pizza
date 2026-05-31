@@ -93,6 +93,13 @@ export const GPPDashboardTab: React.FC = () => {
     'Estimated Attendance': Users,
   };
 
+  // Display-label overrides — the DB `name` stays the stable key (matched for
+  // the icon, the modal click handler, and the `attendance_estimated`
+  // auto-rule); only the rendered text differs.
+  const LABEL_OVERRIDES: Record<string, string> = {
+    'Estimated Attendance': 'Submit Estimated Attendance',
+  };
+
   const goToTab = (tab: string) => {
     if (tab === 'details') {
       navigate(`/host/${inviteCode}`);
@@ -126,7 +133,7 @@ export const GPPDashboardTab: React.FC = () => {
         id: item.id,
         isAuto: item.isAuto,
         autoRule: item.autoRule,
-        label: item.name,
+        label: LABEL_OVERRIDES[item.name] ?? item.name,
         done,
         tab: item.linkTab,
         onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
