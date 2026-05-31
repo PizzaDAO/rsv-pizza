@@ -253,6 +253,40 @@ function isPaidStatus(s: PayoutStatus): boolean {
 }
 
 /**
+ * prosciutto-92106: a paid payout is "proven" iff the per-method proof field
+ * is set. Keep in sync with backend `paidRowHasProof` / `PAID_HAS_PROOF_WHERE`.
+ *
+ * 'completed' rows are always treated as proven for display purposes — they
+ * are the intentional `mark_pending_complete` bookkeeping close-out
+ * (provolone-92103) which by design has no per-row proof.
+ */
+function payoutHasProof(p: {
+  status?: PayoutStatus | string | null;
+  payoutMethod?: string | null;
+  transactionHash?: string | null;
+  wireReference?: string | null;
+  mercuryCardLast4?: string | null;
+  mercuryCardId?: string | null;
+  externalProofUrl?: string | null;
+}): boolean {
+  if (p.status === 'completed') return true;
+  if (p.externalProofUrl && String(p.externalProofUrl).trim()) return true;
+  if (p.payoutMethod === 'usdc_base') {
+    return !!(p.transactionHash && String(p.transactionHash).trim());
+  }
+  if (p.payoutMethod === 'wire') {
+    return !!(p.wireReference && String(p.wireReference).trim());
+  }
+  if (p.payoutMethod === 'mercury_card') {
+    return (
+      !!(p.mercuryCardLast4 && String(p.mercuryCardLast4).trim()) ||
+      !!(p.mercuryCardId && String(p.mercuryCardId).trim())
+    );
+  }
+  return false;
+}
+
+/**
  * Builds an explorer URL for a USDC-on-Base transaction hash. Other rails
  * return null and the ledger renders a plain dash.
  */
@@ -902,6 +936,11 @@ function CityExpansion({
 
     let approvedUsd = 0;
     let paidUsd = 0;
+    // prosciutto-92106: paid rows lacking proof — surfaced separately so the
+    // rollup tile shows only proven sends while the ledger can still render
+    // the zombie row with a "no proof" chip.
+    let paidNoProofUsd = 0;
+    let paidNoProofCount = 0;
     let pendingUsd = 0;
     let pendingCount = 0;
     const pendingPayouts: AdminPayout[] = [];
@@ -909,9 +948,19 @@ function CityExpansion({
 
     for (const p of payouts) {
       const usd = Number(p.finalAmountUsd) || 0;
-      if (isCommittedStatus(p.status)) approvedUsd += usd;
+      // prosciutto-92106: zombie status='paid' rows (no proof) DON'T count
+      // toward Approved either — they neither moved money nor represent a
+      // commitment that will move money. Without this they'd inflate the
+      // Outstanding number too.
+      if (isCommittedStatus(p.status) && payoutHasProof(p)) approvedUsd += usd;
+      else if (p.status === 'approved') approvedUsd += usd; // approved always counts
       if (isPaidStatus(p.status)) {
-        paidUsd += usd;
+        if (payoutHasProof(p)) {
+          paidUsd += usd;
+        } else {
+          paidNoProofUsd += usd;
+          paidNoProofCount += 1;
+        }
         paidPayouts.push(p);
       }
       if (p.status === 'pending') {
@@ -933,6 +982,8 @@ function CityExpansion({
       ineligibleCount,
       approvedUsd,
       paidUsd,
+      paidNoProofUsd,
+      paidNoProofCount,
       outstandingUsd: Math.max(0, approvedUsd - paidUsd),
       pendingUsd,
       pendingCount,
@@ -1734,6 +1785,11 @@ function CityExpansion({
         <RollupTile
           label="Paid"
           value={formatUsd(rollup.paidUsd)}
+          sub={
+            rollup.paidNoProofCount > 0
+              ? `+ ${formatUsd(rollup.paidNoProofUsd)} unverified (${rollup.paidNoProofCount} row${rollup.paidNoProofCount === 1 ? '' : 's'} no proof)`
+              : undefined
+          }
           accent="text-emerald-500"
         />
         <RollupTile
@@ -2022,10 +2078,17 @@ function CityExpansion({
                         : p.host?.email
                           ? p.host.email
                           : null;
+                    // prosciutto-92106: render an amber "no proof" chip next
+                    // to zombie status='paid' rows (no tx_hash / wire_reference
+                    // / mercury card / external proof). Helps admins spot
+                    // rows that inflated Paid totals until the cleanup script
+                    // runs. 'completed' rows are excluded from this gate
+                    // because mark_pending_complete is bookkeeping by design.
+                    const noProof = !payoutHasProof(p);
                     return (
                       <tr
                         key={p.id}
-                        className="border-t border-theme-stroke hover:bg-theme-surface-hover cursor-pointer"
+                        className={`border-t border-theme-stroke hover:bg-theme-surface-hover cursor-pointer${noProof ? ' bg-amber-500/5' : ''}`}
                         onClick={() => onRowClick(p)}
                       >
                         <td className="px-3 py-2 text-theme-text-secondary whitespace-nowrap">
@@ -2035,11 +2098,22 @@ function CityExpansion({
                           {formatUsd(Number(p.finalAmountUsd))}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <PayoutMethodIcon
-                            method={p.payoutMethod}
-                            size={14}
-                            showLabel
-                          />
+                          <div className="flex items-center gap-2">
+                            <PayoutMethodIcon
+                              method={p.payoutMethod}
+                              size={14}
+                              showLabel
+                            />
+                            {noProof && (
+                              <span
+                                title="status=paid but no proof of send (no transaction hash / wire reference / mercury card / external proof). Inflates the Paid total — will be transitioned to 'withdrawn' by the prosciutto-92106 cleanup script."
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400 border border-amber-500/30"
+                              >
+                                <AlertTriangle size={10} />
+                                no proof
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-theme-text-secondary">
                           <div className="flex flex-col">
@@ -2072,6 +2146,10 @@ function CityExpansion({
                           ) : p.wireReference ? (
                             <span title={p.wireReference}>
                               {truncateMiddle(p.wireReference)}
+                            </span>
+                          ) : p.mercuryCardLast4 ? (
+                            <span title={`Mercury card …${p.mercuryCardLast4}`}>
+                              …{p.mercuryCardLast4}
                             </span>
                           ) : (
                             <span>—</span>

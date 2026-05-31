@@ -2266,6 +2266,15 @@ export interface PartyPayoutsRow {
     approvedUsd: number;
     paidCount: number;
     paidUsd: number;
+    /**
+     * prosciutto-92106: zombie status='paid' rows lacking method-appropriate
+     * proof (transaction_hash / wire_reference / mercury_card_last4 /
+     * external_proof_url). Excluded from `paidUsd` so the Paid tile reflects
+     * actual sends; surfaced here so the UI can render a warning chip.
+     * Optional for backward-compat with cached payloads pre-prosciutto.
+     */
+    paidNoProofCount?: number;
+    paidNoProofUsd?: number;
     rejectedCount: number;
     rejectedUsd: number;
     failedCount: number;
