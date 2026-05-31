@@ -104,6 +104,10 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   sort: 'created_desc',
 };
 
+// Prepay queue section is hidden for now. Flip to true to bring it back —
+// the data loading + filtering/sort logic is all still wired up below.
+const SHOW_PREPAY_QUEUE = false;
+
 // lardo-58294: substring filter shared between the search input and the
 // "no matches" hint. Strips the "Global Pizza Party " prefix from party.name
 // so typing a city matches what's actually rendered in the table.
@@ -939,8 +943,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             lardo-58294: client-side substring search above the table; header
             count flips to "{filtered} of {total}" while a query is active.
             pomodoro-58294: client-side sort control (country / city) sits on
-            the same row to the right of the search input. */}
-        {prepayQueue.length > 0 && (
+            the same row to the right of the search input.
+            Hidden via SHOW_PREPAY_QUEUE for now. */}
+        {SHOW_PREPAY_QUEUE && prepayQueue.length > 0 && (
           <section className="mb-6">
             <h2 className="text-base font-semibold text-theme-text mb-3">
               {prepaySearch.trim()
