@@ -29,6 +29,9 @@ export const CURRENCY_MAP: Record<string, string> = {
   CHF: 'CHF',
   A$: 'AUD',
   C$: 'CAD',
+  Bs: 'VES',    // Venezuelan Bolívar
+  'Bs.': 'VES',
+  VES: 'VES',
 };
 
 // Fallback exchange rates to USD (approximate, refresh periodically).

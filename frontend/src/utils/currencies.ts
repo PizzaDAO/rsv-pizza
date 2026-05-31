@@ -38,6 +38,7 @@ export const SUPPORTED_CURRENCIES: CurrencyOption[] = [
   { code: 'COP', name: 'Colombian Peso', country: 'Colombia', flag: '🇨🇴' },
   { code: 'UYU', name: 'Uruguayan Peso', country: 'Uruguay', flag: '🇺🇾' },
   { code: 'PEN', name: 'Peruvian Sol', country: 'Peru', flag: '🇵🇪' },
+  { code: 'VES', name: 'Venezuelan Bolívar', country: 'Venezuela', flag: '🇻🇪', aliases: ['Bolivar', 'Bolivares'] },
 
   // Europe
   {
