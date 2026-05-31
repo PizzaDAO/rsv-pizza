@@ -470,26 +470,51 @@ async function assertWithinPartyCap(
   });
   if (effectiveCap == null) return;
 
-  const where: any = {
-    partyId,
-    // gnocchi-92104: 'queued' (wire request sent, awaiting settlement) is
-    // money committed and counts against the cap the same as approved/paid.
-    // The admin-side helper already includes 'completed'; we leave it out
-    // here because hosts don't create payouts on completed parties (the
-    // city is closed out) and we want the host-side error to match the
-    // smaller view they have.
-    status: { in: ['paid', 'pending', 'approved', 'queued'] },
-  };
+  // prosciutto-92106: paid rows count toward usedUsd only when they carry
+  // proof of send (transaction_hash / wire_reference / mercury_card / external
+  // proof). Zombie status='paid' rows without proof are ignored so hosts
+  // aren't blocked by bookkeeping ghosts when submitting receipts. pending /
+  // approved / queued continue to count unconditionally (they represent
+  // money committed-but-not-yet-sent; the proof gate doesn't apply).
+  const baseWhere: any = { partyId };
   if (ignorePayoutId) {
-    where.id = { not: ignorePayoutId };
+    baseWhere.id = { not: ignorePayoutId };
   }
-  const existingTotal = await prisma.payout.aggregate({
-    where,
+  const committedAgg = await prisma.payout.aggregate({
+    where: {
+      ...baseWhere,
+      // gnocchi-92104: 'queued' (wire request sent, awaiting settlement) is
+      // money committed and counts against the cap the same as approved.
+      status: { in: ['pending', 'approved', 'queued'] },
+    },
     _sum: { finalAmountUsd: true },
   });
-  const usedUsd = existingTotal._sum.finalAmountUsd
-    ? Number(existingTotal._sum.finalAmountUsd.toString())
-    : 0;
+  const provenPaidAgg = await prisma.payout.aggregate({
+    where: {
+      ...baseWhere,
+      status: 'paid',
+      OR: [
+        { payoutMethod: 'usdc_base', transactionHash: { not: null, notIn: [''] } },
+        { payoutMethod: 'wire', wireReference: { not: null, notIn: [''] } },
+        {
+          payoutMethod: 'mercury_card',
+          OR: [
+            { mercuryCardLast4: { not: null, notIn: [''] } },
+            { mercuryCardId: { not: null, notIn: [''] } },
+          ],
+        },
+        { externalProofUrl: { not: null, notIn: [''] } },
+      ],
+    },
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd =
+    (committedAgg._sum.finalAmountUsd
+      ? Number(committedAgg._sum.finalAmountUsd.toString())
+      : 0) +
+    (provenPaidAgg._sum.finalAmountUsd
+      ? Number(provenPaidAgg._sum.finalAmountUsd.toString())
+      : 0);
   const remainingUsd = Math.max(0, effectiveCap - usedUsd);
 
   if (usedUsd + proposedUsd > effectiveCap + 1e-9) {

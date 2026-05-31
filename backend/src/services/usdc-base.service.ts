@@ -144,6 +144,12 @@ export async function getPayoutWalletBalanceUsd(): Promise<{ address: `0x${strin
 /**
  * Running 24h total of completed USDC payouts (used for daily-cap enforcement).
  * Pure read — does NOT include the in-flight payout being checked.
+ *
+ * prosciutto-92106: also require `transaction_hash` so zombie USDC rows
+ * (status='paid' but no on-chain tx, e.g. legacy mark-paid that didn't gate
+ * on proof) don't burn the daily cap and block legitimate sends. New rows
+ * always have tx_hash by construction (executePayout writes it atomically
+ * with status='paid'); older zombies need this filter to be excluded.
  */
 export async function getUsdcUsedInLast24h(): Promise<number> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -152,6 +158,7 @@ export async function getUsdcUsedInLast24h(): Promise<number> {
       payoutMethod: 'usdc_base',
       status: 'paid',
       paidAt: { gt: since },
+      transactionHash: { not: null, notIn: [''] },
     },
     select: { finalAmountUsd: true },
   });
@@ -185,11 +192,16 @@ export async function getUsdcDailyCapStatus(): Promise<UsdcDailyCapStatus> {
  */
 export async function getPerAddressPaidTotalUsd(toAddress: string): Promise<number> {
   if (!toAddress) return 0;
+  // prosciutto-92106: zombie USDC rows (status='paid' without transaction_hash)
+  // shouldn't burn against the per-address cap — they never actually went
+  // on-chain to that address. Filter on tx_hash presence so the cap reflects
+  // real receipts.
   const sum = await prisma.payout.aggregate({
     where: {
       status: 'paid',
       payoutMethod: 'usdc_base',
       payoutWalletAddress: { equals: toAddress, mode: 'insensitive' },
+      transactionHash: { not: null, notIn: [''] },
     },
     _sum: { finalAmountUsd: true },
   });
@@ -204,11 +216,15 @@ export async function getPerAddressPaidTotals(
   toAddress: string,
 ): Promise<{ paidUsd: number; paidCount: number }> {
   if (!toAddress) return { paidUsd: 0, paidCount: 0 };
+  // prosciutto-92106: same proof gate as getPerAddressPaidTotalUsd — the
+  // admin "Already paid to this wallet" warning shouldn't be misleading
+  // because of zombie rows.
   const agg = await prisma.payout.aggregate({
     where: {
       status: 'paid',
       payoutMethod: 'usdc_base',
       payoutWalletAddress: { equals: toAddress, mode: 'insensitive' },
+      transactionHash: { not: null, notIn: [''] },
     },
     _sum: { finalAmountUsd: true },
     _count: { _all: true },

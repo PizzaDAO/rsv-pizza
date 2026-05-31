@@ -88,6 +88,152 @@ function assertWithinPerSubmissionCap(amountUsd: number) {
 }
 
 /**
+ * prosciutto-92106: "proof of send" check for status='paid' rows.
+ *
+ * A paid payout has proof IFF the right per-method field is populated:
+ *   - usdc_base    → transaction_hash (on-chain tx)
+ *   - wire         → wire_reference (bank reference number)
+ *   - mercury_card → mercury_card_last4 OR mercury_card_id
+ *   - <any method> → external_proof_url (admin-attached out-of-band proof)
+ *
+ * Rows without ANY of these are "zombie paid" — flipped to status='paid' by
+ * a code path that didn't persist proof of the actual send. Alvaro city
+ * surfaced this: 4 zombie paid rows inflated the Paid tile by ~$2k while
+ * only $655 actually went on-chain.
+ *
+ * Used by:
+ *   - Backend Paid sums (`fetchPaidTotalsByParty`, KPI tile, by-city rollups)
+ *   - Backend cap math (`assertWithinPartyCap`) so zombies don't block real sends
+ *   - Backend `mark-paid` gate (proof required unless `proofless:true` override)
+ *   - Frontend ledger ("no proof" chip on zombie rows)
+ *
+ * Status='completed' rows are EXCLUDED from this gate — the mark_pending_complete
+ * reconcile mode (caciotta-92103 / provolone-92103) intentionally writes
+ * 'completed' WITHOUT proof, because that path means "the city was paid in
+ * full by some other means, this row's payment obligation is fulfilled."
+ * Completed rows continue to count toward their own bucket but NOT toward Paid.
+ *
+ * The SQL fragment + Prisma `where` predicate exposed by this helper keep the
+ * filter byte-identical across every callsite.
+ */
+const PAID_PROOF_SQL = `(
+  (payout_method = 'usdc_base' AND transaction_hash IS NOT NULL AND transaction_hash <> '')
+  OR (payout_method = 'wire' AND wire_reference IS NOT NULL AND wire_reference <> '')
+  OR (payout_method = 'mercury_card' AND ((mercury_card_last4 IS NOT NULL AND mercury_card_last4 <> '') OR (mercury_card_id IS NOT NULL AND mercury_card_id <> '')))
+  OR (external_proof_url IS NOT NULL AND external_proof_url <> '')
+)`;
+
+/**
+ * Prisma `where` fragment that matches the SAME predicate as PAID_PROOF_SQL.
+ * Use inside `prisma.payout.findMany`/`aggregate`/`count` calls when filtering
+ * "paid rows that have actual proof of send."
+ */
+const PAID_HAS_PROOF_WHERE: Prisma.PayoutWhereInput = {
+  OR: [
+    { payoutMethod: 'usdc_base', transactionHash: { not: null, notIn: [''] } },
+    { payoutMethod: 'wire', wireReference: { not: null, notIn: [''] } },
+    {
+      payoutMethod: 'mercury_card',
+      OR: [
+        { mercuryCardLast4: { not: null, notIn: [''] } },
+        { mercuryCardId: { not: null, notIn: [''] } },
+      ],
+    },
+    // Any method — externally-attached proof (e.g. lasagna-92103 external
+    // payment record path that stamped externalProofUrl).
+    { externalProofUrl: { not: null, notIn: [''] } },
+  ],
+};
+
+/**
+ * JS-side proof check (mirror of PAID_HAS_PROOF_WHERE) for use after rows are
+ * loaded — e.g. when aggregating in JS over `allFiltered`. Keep in sync with
+ * PAID_HAS_PROOF_WHERE / PAID_PROOF_SQL.
+ */
+function paidRowHasProof(row: {
+  payoutMethod: string | null;
+  transactionHash: string | null;
+  wireReference: string | null;
+  mercuryCardLast4: string | null;
+  mercuryCardId: string | null;
+  externalProofUrl: string | null;
+}): boolean {
+  if (row.externalProofUrl && row.externalProofUrl.trim()) return true;
+  if (row.payoutMethod === 'usdc_base') {
+    return !!(row.transactionHash && row.transactionHash.trim());
+  }
+  if (row.payoutMethod === 'wire') {
+    return !!(row.wireReference && row.wireReference.trim());
+  }
+  if (row.payoutMethod === 'mercury_card') {
+    return (
+      !!(row.mercuryCardLast4 && row.mercuryCardLast4.trim()) ||
+      !!(row.mercuryCardId && row.mercuryCardId.trim())
+    );
+  }
+  return false;
+}
+
+/**
+ * prosciutto-92106: gate for `mark-paid` endpoint. Throws PROOF_REQUIRED if
+ * the request body doesn't carry the right proof field for the chosen
+ * `payoutMethod`. Skipped when `proofless=true` (admin reconcile override).
+ *
+ * Note: this checks the BODY values that are about to be written, not what's
+ * already on the row. Callers should merge any pre-existing proof onto the
+ * `bodyProof` object before invoking if they want to honor stale-but-present
+ * proof — for `mark-paid` we always require fresh proof in the body because
+ * the whole point of the endpoint is "I'm marking this paid right now."
+ */
+function assertMarkPaidHasProof(args: {
+  payoutMethod: string | null;
+  bodyTransactionHash: string | null | undefined;
+  bodyWireReference: string | null | undefined;
+  bodyMercuryCardLast4: string | null | undefined;
+  bodyMercuryCardId: string | null | undefined;
+  bodyExternalProofUrl: string | null | undefined;
+}): void {
+  // External proof is always acceptable regardless of method (covers the
+  // out-of-band reconcile cases — admin paid via PayPal, Venmo, etc.).
+  if (args.bodyExternalProofUrl && String(args.bodyExternalProofUrl).trim()) {
+    return;
+  }
+  if (args.payoutMethod === 'usdc_base') {
+    if (args.bodyTransactionHash && String(args.bodyTransactionHash).trim()) return;
+    throw new AppError(
+      'transactionHash is required to mark a USDC payout paid (or pass externalProofUrl / set proofless=true with a note).',
+      400,
+      'PROOF_REQUIRED',
+    );
+  }
+  if (args.payoutMethod === 'wire') {
+    if (args.bodyWireReference && String(args.bodyWireReference).trim()) return;
+    throw new AppError(
+      'wireReference is required to mark a wire payout paid (or pass externalProofUrl / set proofless=true with a note).',
+      400,
+      'PROOF_REQUIRED',
+    );
+  }
+  if (args.payoutMethod === 'mercury_card') {
+    const last4 = args.bodyMercuryCardLast4 && String(args.bodyMercuryCardLast4).trim();
+    const cardId = args.bodyMercuryCardId && String(args.bodyMercuryCardId).trim();
+    if (last4 || cardId) return;
+    throw new AppError(
+      'mercuryCardLast4 or mercuryCardId is required to mark a Mercury card payout paid (or pass externalProofUrl / set proofless=true with a note).',
+      400,
+      'PROOF_REQUIRED',
+    );
+  }
+  // No method = nothing to verify against; admin must explicitly opt into
+  // proofless to mark something paid with no method set.
+  throw new AppError(
+    'Cannot mark a payout paid without a payment method — set payoutMethod first, or pass proofless=true with a note.',
+    400,
+    'PROOF_REQUIRED',
+  );
+}
+
+/**
  * Shared Prisma `select` for the embedded `party` on payout responses.
  *
  * `expectedGuests` is the host's planning number; `_count.guests` is a
@@ -279,9 +425,16 @@ async function fetchPaidTotalsByParty(
   partyIds: string[],
 ): Promise<Map<string, { paidUsd: number; paidCount: number }>> {
   if (partyIds.length === 0) return new Map();
+  // prosciutto-92106: only count proven-paid rows. Zombie rows (status='paid'
+  // without any proof field set) are excluded so the "Already paid" warning +
+  // by-party rollups reflect what actually went out, not bookkeeping ghosts.
   const rows = await prisma.payout.groupBy({
     by: ['partyId'],
-    where: { partyId: { in: partyIds }, status: 'paid' },
+    where: {
+      partyId: { in: partyIds },
+      status: 'paid',
+      AND: PAID_HAS_PROOF_WHERE,
+    },
     _sum: { finalAmountUsd: true },
     _count: { id: true },
   });
@@ -324,30 +477,42 @@ async function assertWithinPartyCap(
   });
   if (effectiveCap == null) return;
 
-  const where: any = {
-    // fontina-92103: only COMMITTED rows (paid|approved) count against the cap;
-    // pending is excluded so hosts can submit over-cap receipts and the admin
-    // approval is authoritative.
-    // provolone-92103: 'completed' is a terminal close-out semantically
-    // equivalent to 'paid' for cap purposes — include it here.
-    // gnocchi-92104: 'queued' is "wire request sent, settlement pending" —
-    // money is committed (the admin signaled "we're sending this") so it
-    // counts toward usedUsd same as approved/paid/completed. Otherwise an
-    // admin queuing a wire could overshoot the cap by approving and queueing
-    // a second payment that totals over the limit before the first settles.
-    partyId,
-    status: { in: ['paid', 'approved', 'queued', 'completed'] },
-  };
+  // prosciutto-92106: cap math splits paid rows into proven vs zombie. Zombie
+  // status='paid' rows (no transaction_hash / wire_reference / mercury card /
+  // external proof) are excluded from usedUsd so they can't block legitimate
+  // sends. Approved/queued/completed continue to count as before because:
+  //   - approved/queued = "money committed, hasn't moved yet" (always counts)
+  //   - completed       = intentional bookkeeping close-out (provolone-92103)
+  // Only the `paid` bucket has the zombie problem, so only `paid` gets the
+  // proof gate here.
+  const baseWhere: any = { partyId };
   if (ignorePayoutId) {
-    where.id = { not: ignorePayoutId };
+    baseWhere.id = { not: ignorePayoutId };
   }
-  const existingTotal = await prisma.payout.aggregate({
-    where,
+  // 1. approved + queued + completed — count regardless of proof.
+  const committedAgg = await prisma.payout.aggregate({
+    where: {
+      ...baseWhere,
+      status: { in: ['approved', 'queued', 'completed'] },
+    },
     _sum: { finalAmountUsd: true },
   });
-  const usedUsd = existingTotal._sum.finalAmountUsd
-    ? Number(existingTotal._sum.finalAmountUsd.toString())
-    : 0;
+  // 2. paid — only count rows with proof of send.
+  const provenPaidAgg = await prisma.payout.aggregate({
+    where: {
+      ...baseWhere,
+      status: 'paid',
+      AND: PAID_HAS_PROOF_WHERE,
+    },
+    _sum: { finalAmountUsd: true },
+  });
+  const usedUsd =
+    (committedAgg._sum.finalAmountUsd
+      ? Number(committedAgg._sum.finalAmountUsd.toString())
+      : 0) +
+    (provenPaidAgg._sum.finalAmountUsd
+      ? Number(provenPaidAgg._sum.finalAmountUsd.toString())
+      : 0);
   const remainingUsd = Math.max(0, effectiveCap - usedUsd);
 
   if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
@@ -1504,9 +1669,37 @@ router.post(
       const cardLast4 = typeof body.mercuryCardLast4 === 'string' && body.mercuryCardLast4.trim()
         ? body.mercuryCardLast4.trim()
         : null;
+      const cardId = typeof body.mercuryCardId === 'string' && body.mercuryCardId.trim()
+        ? body.mercuryCardId.trim()
+        : null;
       const extProof = typeof body.externalProofUrl === 'string' && body.externalProofUrl.trim()
         ? body.externalProofUrl.trim()
         : null;
+
+      // prosciutto-92106: PROOF GATE on external-record path too. Same escape
+      // hatch as mark-paid: full admins can set `proofless:true` with a note.
+      // Without that, the row must carry method-appropriate proof. Otherwise
+      // External Payment is the same zombie-creation vector — admins clicking
+      // through with only an adminNote.
+      const wantsProoflessExt = body.proofless === true;
+      if (wantsProoflessExt) {
+        if (actor.actorKind !== 'admin' && actor.actorKind !== 'super_admin') {
+          throw new AppError(
+            'Proofless external payment requires full admin (admin / super_admin) access.',
+            403,
+            'PROOFLESS_REQUIRES_ADMIN',
+          );
+        }
+      } else {
+        assertMarkPaidHasProof({
+          payoutMethod: storedMethod,
+          bodyTransactionHash: txHash,
+          bodyWireReference: wireRef,
+          bodyMercuryCardLast4: cardLast4,
+          bodyMercuryCardId: cardId,
+          bodyExternalProofUrl: extProof,
+        });
+      }
 
       // mortazza-92103: when the admin attributed the payment to a different
       // recipient than themselves, prepend the override marker so the audit
@@ -1533,8 +1726,11 @@ router.post(
             transactionHash: txHash,
             wireReference: wireRef,
             mercuryCardLast4: cardLast4,
+            mercuryCardId: cardId,
             externalProofUrl: extProof,
-            adminNotes: composedNote,
+            adminNotes: wantsProoflessExt
+              ? `[proofless-mark-paid] ${composedNote}`
+              : composedNote,
             reviewedBy: actor.email,
             reviewedAt: paidAt,
           },
@@ -1715,6 +1911,12 @@ router.get(
         approvedUsd: number;
         paidCount: number;
         paidUsd: number;
+        // prosciutto-92106: separate counters for zombie paid rows (status='paid'
+        // but no transaction_hash / wire_reference / mercury card / external
+        // proof). Frontend uses these to render a "no proof" chip + exclude
+        // them from the headline "Paid" tile while preserving total row count.
+        paidNoProofCount: number;
+        paidNoProofUsd: number;
         rejectedCount: number;
         rejectedUsd: number;
         failedCount: number;
@@ -1745,6 +1947,7 @@ router.get(
             pendingCount: 0, pendingUsd: 0,
             approvedCount: 0, approvedUsd: 0,
             paidCount: 0, paidUsd: 0,
+            paidNoProofCount: 0, paidNoProofUsd: 0,
             rejectedCount: 0, rejectedUsd: 0,
             failedCount: 0, failedUsd: 0,
             withdrawnCount: 0, withdrawnUsd: 0,
@@ -1762,7 +1965,15 @@ router.get(
           case 'approved':
             b.approvedCount += 1; b.approvedUsd += usd; break;
           case 'paid':
-            b.paidCount += 1; b.paidUsd += usd; break;
+            // prosciutto-92106: only proven-paid rows go into paidUsd —
+            // proofless ones go into the parallel paidNoProofUsd bucket
+            // so the UI can flag them without losing them from the count.
+            if (paidRowHasProof(row as any)) {
+              b.paidCount += 1; b.paidUsd += usd;
+            } else {
+              b.paidNoProofCount += 1; b.paidNoProofUsd += usd;
+            }
+            break;
           case 'rejected':
             b.rejectedCount += 1; b.rejectedUsd += usd; break;
           case 'failed':
@@ -1850,6 +2061,11 @@ router.get(
             approvedUsd: b.approvedUsd,
             paidCount: b.paidCount,
             paidUsd: b.paidUsd,
+            // prosciutto-92106: zombie paid totals — status='paid' but no
+            // proof field set. Frontend renders a "no proof" chip on these
+            // rows + omits them from the Paid headline tile.
+            paidNoProofCount: b.paidNoProofCount,
+            paidNoProofUsd: b.paidNoProofUsd,
             rejectedCount: b.rejectedCount,
             rejectedUsd: b.rejectedUsd,
             failedCount: b.failedCount,
@@ -2020,6 +2236,14 @@ router.get(
           finalAmountUsd: true,
           createdAt: true,
           paidAt: true,
+          // prosciutto-92106: proof fields surface so paidRowHasProof() can
+          // exclude zombie status='paid' rows (no proof set) from KPI totals,
+          // per-party rollups, and the AVG PAYMENT committed-by-party sum.
+          transactionHash: true,
+          wireReference: true,
+          mercuryCardLast4: true,
+          mercuryCardId: true,
+          externalProofUrl: true,
           party: {
             select: {
               id: true,
@@ -2077,27 +2301,36 @@ router.get(
           totalUsdPending += usd;
           awaitingReview += 1;
         } else if (r.status === 'paid') {
-          totalUsdPaid += usd;
-          if (r.paidAt && r.paidAt >= startOfMonth) {
-            totalUsdThisMonth += usd;
-          }
-          // parmigiana-58291: accumulate per-party totals. Only `paid` rows
-          // count — pending/approved/rejected don't represent USD that left
-          // the wallet. Guard against the (theoretically impossible) missing
-          // party relation so a single bad row can't 500 the dashboard.
-          if (r.party) {
-            const existing = partyTotals.get(r.party.id);
-            if (existing) {
-              existing.totalPaidUsd += usd;
-              existing.payoutCount += 1;
-            } else {
-              partyTotals.set(r.party.id, {
-                partyId: r.party.id,
-                partyName: r.party.name,
-                country: r.party.country,
-                totalPaidUsd: usd,
-                payoutCount: 1,
-              });
+          // prosciutto-92106: only proven-paid rows (have transaction_hash /
+          // wire_reference / mercury_card_last4 / external_proof_url) count
+          // toward the Paid KPI tile + per-party totals. Zombie status='paid'
+          // rows (no proof field set) are excluded so the totals reflect
+          // actual sends, not bookkeeping ghosts. Alvaro city had 4 such
+          // zombie rows inflating its Paid tile from $655 → $2,621.
+          const hasProof = paidRowHasProof(r as any);
+          if (hasProof) {
+            totalUsdPaid += usd;
+            if (r.paidAt && r.paidAt >= startOfMonth) {
+              totalUsdThisMonth += usd;
+            }
+            // parmigiana-58291: accumulate per-party totals. Only `paid` rows
+            // count — pending/approved/rejected don't represent USD that left
+            // the wallet. Guard against the (theoretically impossible) missing
+            // party relation so a single bad row can't 500 the dashboard.
+            if (r.party) {
+              const existing = partyTotals.get(r.party.id);
+              if (existing) {
+                existing.totalPaidUsd += usd;
+                existing.payoutCount += 1;
+              } else {
+                partyTotals.set(r.party.id, {
+                  partyId: r.party.id,
+                  partyName: r.party.name,
+                  country: r.party.country,
+                  totalPaidUsd: usd,
+                  payoutCount: 1,
+                });
+              }
             }
           }
         }
@@ -2107,7 +2340,14 @@ router.get(
         // cap-check definition: USD that has either left the wallet (`paid`)
         // or been queued to leave (`approved`). Pending/rejected/failed do
         // not count.
-        if ((r.status === 'paid' || r.status === 'approved') && r.party) {
+        // prosciutto-92106: only proven-paid rows count toward committed for
+        // the avg KPI — same reason as the totalUsdPaid gate above.
+        if (r.status === 'approved' && r.party) {
+          committedByParty.set(
+            r.party.id,
+            (committedByParty.get(r.party.id) ?? 0) + usd,
+          );
+        } else if (r.status === 'paid' && r.party && paidRowHasProof(r as any)) {
           committedByParty.set(
             r.party.id,
             (committedByParty.get(r.party.id) ?? 0) + usd,
@@ -3046,6 +3286,14 @@ router.post(
           hostUserId: true,
           partyId: true,
           finalAmountUsd: true,
+          payoutMethod: true,
+          // prosciutto-92106: include current proof so we can merge it with
+          // body values for the proof gate (body proof takes priority).
+          transactionHash: true,
+          wireReference: true,
+          mercuryCardLast4: true,
+          mercuryCardId: true,
+          externalProofUrl: true,
         },
       });
 
@@ -3073,7 +3321,14 @@ router.post(
         transactionHash,
         mercuryCardLast4,
         mercuryCardId,
+        externalProofUrl,
         note,
+        // prosciutto-92106: admin escape hatch for legitimate proofless
+        // reconcile cases. Requires a note so the audit trail explains why
+        // proof wasn't recorded (e.g. "Mercury statement attached in #payments
+        // channel — Q2 2026 reconcile"). Surfaced in the audit log with a
+        // `[proofless-mark-paid]` marker for grep-ability.
+        proofless,
       } = req.body || {};
 
       const data: any = {
@@ -3092,6 +3347,55 @@ router.post(
       if (mercuryCardId !== undefined) {
         data.mercuryCardId = mercuryCardId == null ? null : String(mercuryCardId).trim();
       }
+      if (externalProofUrl !== undefined) {
+        data.externalProofUrl = externalProofUrl == null ? null : String(externalProofUrl).trim();
+      }
+
+      // prosciutto-92106: PROOF GATE. Reject mark-paid attempts that don't
+      // include proof of send for the row's method, unless the admin
+      // explicitly opts into the `proofless` escape hatch with a note. This
+      // is what prevents future zombie paid rows.
+      //
+      // The check sees both incoming body proof AND any pre-existing proof
+      // already on the row, so admins can mark a row paid that already had
+      // proof attached out-of-band (rare, but legal).
+      const effectiveProof = {
+        payoutMethod: existing.payoutMethod,
+        bodyTransactionHash:
+          (data.transactionHash ?? existing.transactionHash) as string | null,
+        bodyWireReference:
+          (data.wireReference ?? existing.wireReference) as string | null,
+        bodyMercuryCardLast4:
+          (data.mercuryCardLast4 ?? existing.mercuryCardLast4) as string | null,
+        bodyMercuryCardId:
+          (data.mercuryCardId ?? existing.mercuryCardId) as string | null,
+        bodyExternalProofUrl:
+          (data.externalProofUrl ?? existing.externalProofUrl) as string | null,
+      };
+      const wantsProofless = proofless === true;
+      if (wantsProofless) {
+        // Proofless requires (a) full admin (not payment_admin) and (b) a note.
+        if (actor.actorKind !== 'admin' && actor.actorKind !== 'super_admin') {
+          throw new AppError(
+            'Proofless mark-paid requires full admin (admin / super_admin) access.',
+            403,
+            'PROOFLESS_REQUIRES_ADMIN',
+          );
+        }
+        if (typeof note !== 'string' || !note.trim()) {
+          throw new AppError(
+            'Proofless mark-paid requires a note explaining why proof is unavailable.',
+            400,
+            'PROOFLESS_REQUIRES_NOTE',
+          );
+        }
+      } else {
+        assertMarkPaidHasProof(effectiveProof);
+      }
+
+      const auditNote = wantsProofless
+        ? `[proofless-mark-paid] ${typeof note === 'string' ? note : ''}`.trim()
+        : (typeof note === 'string' ? note : null);
 
       const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.update({
@@ -3116,7 +3420,7 @@ router.post(
             newStatus: 'paid',
             actorEmail: actor.email,
             actorKind: actor.actorKind,
-            note: typeof note === 'string' ? note : null,
+            note: auditNote,
           },
         });
 
@@ -5973,8 +6277,15 @@ partyMarkPaidRouter.post(
           (sum, p) => sum + Number(p.finalAmountUsd),
           0,
         );
+        // prosciutto-92106: only count proven-paid rows when deciding
+        // whether the city is already "covered." Zombie status='paid' rows
+        // without proof shouldn't trigger the mark_pending_complete branch.
         const existingPaid = await prisma.payout.findMany({
-          where: { partyId, status: 'paid' },
+          where: {
+            partyId,
+            status: 'paid',
+            AND: PAID_HAS_PROOF_WHERE,
+          },
           select: { finalAmountUsd: true },
         });
         const existingPaidUsd = existingPaid.reduce(
@@ -5995,8 +6306,11 @@ partyMarkPaidRouter.post(
         // payments_closed_at and return `action: 'closed'` so the modal can
         // flash the right toast. Cities with no payouts at all stay
         // unchanged — there's nothing to close.
+        // prosciutto-92106: also count `completed` rows here — the
+        // mark_paid bookkeeping mode now writes 'completed' instead of
+        // 'paid' so the "has any settled rows" check must include both.
         const paidCount = await prisma.payout.count({
-          where: { partyId, status: 'paid' },
+          where: { partyId, status: { in: ['paid', 'completed'] } },
         });
 
         if (paidCount > 0 && !party.paymentsClosedAt) {
@@ -6081,8 +6395,16 @@ partyMarkPaidRouter.post(
             // were originally configured.
             const shouldStampMethod = !!methodToStamp && !p.payoutMethod;
 
+            // prosciutto-92106: the bulk Mark Party Paid flow doesn't take
+            // per-row proof in the body — it's a bulk bookkeeping action. To
+            // avoid creating zombie status='paid' rows that inflate the Paid
+            // KPI tile without proof, we now write 'completed' for this mode
+            // too (matching mark_pending_complete semantically). The audit
+            // row preserves the legacy 'mark_paid' action so existing log
+            // filters keep working. paidAt is still stamped so the
+            // close-out timestamp on the row reflects the action time.
             const data: any = {
-              status: 'paid',
+              status: 'completed',
               paidAt: now,
             };
             if (nextAdminNotes !== undefined) {
@@ -6102,7 +6424,9 @@ partyMarkPaidRouter.post(
                 payoutId: p.id,
                 action: 'mark_paid',
                 oldStatus: p.status,
-                newStatus: 'paid',
+                // prosciutto-92106: was 'paid' — now 'completed' to match the
+                // bookkeeping intent. See the data block comment above.
+                newStatus: 'completed',
                 actorEmail: actor.email,
                 actorKind: actor.actorKind,
                 note: note,
