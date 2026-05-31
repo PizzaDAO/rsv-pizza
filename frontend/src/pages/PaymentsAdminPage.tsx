@@ -1246,9 +1246,34 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 result.hostDmSent || result.groupSent ? 'success' : 'error';
               pushToast(`Reminder: ${hostLabel} | ${groupLabel}`, tone);
             }}
+            // Wallet reminder — same per-channel success/skip toast as the
+            // receipts reminder.
+            onTgWalletReminderResult={(_partyId, result) => {
+              if ('error' in result) {
+                pushToast(
+                  `Could not send wallet reminder: ${result.error}`,
+                  'error',
+                );
+                return;
+              }
+              const hostLabel = result.hostDmSent
+                ? 'DM ✓'
+                : `DM skipped${
+                    result.hostDmReason ? ` (${result.hostDmReason})` : ''
+                  }`;
+              const groupLabel = result.groupSent
+                ? 'Group ✓'
+                : `Group skipped${
+                    result.groupReason ? ` (${result.groupReason})` : ''
+                  }`;
+              const tone =
+                result.hostDmSent || result.groupSent ? 'success' : 'error';
+              pushToast(`Wallet reminder: ${hostLabel} | ${groupLabel}`, tone);
+            }}
             // crocchetta-92107: sheet-derived city → TG group chat_id map so
             // the Send-receipts-reminder action can post into the city's
-            // group chat (same source /underboss uses).
+            // group chat (same source /underboss uses). Reused by the wallet
+            // reminder too.
             cityGroupChatIds={cityGroupChatIds}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}

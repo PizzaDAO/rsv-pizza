@@ -5449,6 +5449,88 @@ router.post(
   },
 );
 
+// POST /:partyId/tg-wallet-reminder
+//
+// Sibling of tg-receipts-reminder: DMs the primary host (when their Telegram
+// is linked) and posts to the city's GPP group chat, telling the host to
+// submit their payout wallet address on the host page's Payments tab. Same
+// per-channel send + skip-reason contract; the only differences are the
+// message text + target URL. We don't persist a "sent at" timestamp for this
+// one (no DB column), so unlike receipts there's no last-sent sub-label.
+router.post(
+  '/:partyId/tg-wallet-reminder',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: {
+          id: true,
+          customUrl: true,
+          inviteCode: true,
+          name: true,
+          hostTelegramChatId: true,
+        },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      const slug = party.customUrl || party.inviteCode;
+      const text = `Please submit your payout wallet address so we can reimburse you: rsv.pizza/host/${slug}/payments`;
+
+      let hostDmSent = false;
+      let hostDmReason: string | undefined;
+      if (party.hostTelegramChatId) {
+        const result = await sendTelegramMessage(
+          party.hostTelegramChatId.toString(),
+          text,
+        );
+        if (result.ok) {
+          hostDmSent = true;
+        } else {
+          hostDmReason = result.reason;
+        }
+      } else {
+        hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
+      }
+
+      const rawGroupChatId =
+        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
+      let groupSent = false;
+      let groupReason: string | undefined;
+      if (rawGroupChatId) {
+        const result = await sendTelegramMessage(rawGroupChatId, text);
+        if (result.ok) {
+          groupSent = true;
+        } else {
+          groupReason = result.reason;
+        }
+      } else {
+        groupReason = 'no city TG group set';
+      }
+
+      console.log(
+        `[tg-wallet-reminder] party=${party.id} slug=${slug} host_dm=${
+          hostDmSent ? 'ok' : `skipped:${hostDmReason ?? 'unknown'}`
+        } group=${groupSent ? 'ok' : `skipped:${groupReason ?? 'unknown'}`}`,
+      );
+
+      res.json({
+        hostDmSent,
+        ...(hostDmReason ? { hostDmReason } : {}),
+        groupSent,
+        ...(groupReason ? { groupReason } : {}),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ============================================
 // City-level payment approval. Admin can approve a total amount for the party
 // before sending payment. Shows as a thumbs-up button to the left of Send.
