@@ -466,6 +466,27 @@ export async function sendTgReceiptsReminder(
 }
 
 /**
+ * Sibling of {@link sendTgReceiptsReminder}: sends a "submit your payout wallet
+ * address at rsv.pizza/host/<slug>/payments" reminder via the Molto Benny
+ * Telegram bot — DM to the primary host + post to the city's group chat. Same
+ * per-channel success + skip-reason contract. Unlike the receipts reminder this
+ * does NOT persist a sent-at timestamp.
+ */
+export async function sendTgWalletReminder(
+  partyId: string,
+  groupChatId?: string | null,
+): Promise<SendTgReceiptsReminderResponse> {
+  return apiRequest<SendTgReceiptsReminderResponse>(
+    `/api/admin/payouts/${partyId}/tg-wallet-reminder`,
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: groupChatId ? { groupChatId } : undefined,
+    },
+  );
+}
+
+/**
  * mortadella-92106: set admin-only city notes on a party. Backed by the
  * dedicated `PATCH /api/admin/parties/:partyId/admin-notes` endpoint so
  * the generic host-accessible PATCH whitelist doesn't have to gate this

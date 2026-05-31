@@ -24,6 +24,7 @@ import {
   StickyNote,
   ThumbsUp,
   RotateCcw,
+  Wallet,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -52,6 +53,7 @@ import {
   flagPartyAsScam,
   POSSIBLE_SCAM_TAG,
   sendTgReceiptsReminder,
+  sendTgWalletReminder,
   setCityAdminNotes,
   approveCity,
   reopenParty,
@@ -166,6 +168,19 @@ interface PayoutsByPartyTableProps {
    * `window.alert`-free silent success (the menu still closes).
    */
   onTgReminderResult?: (
+    partyId: string,
+    result: {
+      hostDmSent: boolean;
+      hostDmReason?: string;
+      groupSent: boolean;
+      groupReason?: string;
+    } | { error: string },
+  ) => void;
+  /**
+   * Toast callback for the Send wallet reminder action — same per-channel
+   * success/skip shape as `onTgReminderResult`. The menu owns the API call.
+   */
+  onTgWalletReminderResult?: (
     partyId: string,
     result: {
       hostDmSent: boolean;
@@ -299,6 +314,7 @@ function CityActionsMenu({
   onSendPayment,
   onToggleScamFlag,
   onSendTgReminder,
+  onSendWalletReminder,
   onApproveCity,
   onReopen,
   canMarkPaid,
@@ -306,12 +322,14 @@ function CityActionsMenu({
   canSendPayment,
   canToggleScamFlag,
   canSendTgReminder,
+  canSendWalletReminder,
   canApproveCity,
   canReopen,
   markPaidLabel,
   isFlaggedScam,
   scamFlagBusy,
   tgReminderBusy,
+  walletReminderBusy,
   reopenBusy,
   approveBusy,
   receiptsReminderSentAt,
@@ -329,6 +347,11 @@ function CityActionsMenu({
    * Parent runs the API call and surfaces the toast.
    */
   onSendTgReminder?: () => void;
+  /**
+   * Fires after the second click on the Send wallet reminder menu item (same
+   * two-click confirm pattern as the receipts reminder).
+   */
+  onSendWalletReminder?: () => void;
   /** Approve city payment amount. Called with the amount to approve. */
   onApproveCity?: (amountUsd: number | null) => void;
   /** Reopen a closed city (undo the close). */
@@ -338,12 +361,14 @@ function CityActionsMenu({
   canSendPayment: boolean;
   canToggleScamFlag: boolean;
   canSendTgReminder: boolean;
+  canSendWalletReminder: boolean;
   canApproveCity: boolean;
   canReopen: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
   tgReminderBusy: boolean;
+  walletReminderBusy: boolean;
   reopenBusy: boolean;
   approveBusy: boolean;
   receiptsReminderSentAt?: string | null;
@@ -361,8 +386,15 @@ function CityActionsMenu({
   // within the open menu actually fires. Resetting whenever the menu closes
   // prevents a stale confirm state carrying over to the next open.
   const [confirmTgReminder, setConfirmTgReminder] = useState(false);
+  // Same two-click confirm, separate state so the wallet + receipts items
+  // don't share a confirm flag.
+  const [confirmWalletReminder, setConfirmWalletReminder] = useState(false);
   const hasMenuItems =
-    canAddExternal || canToggleScamFlag || canSendTgReminder || canReopen;
+    canAddExternal ||
+    canToggleScamFlag ||
+    canSendTgReminder ||
+    canSendWalletReminder ||
+    canReopen;
   // Nothing to show at all — render nothing.
   if (!canMarkPaid && !canSendPayment && !canApproveCity && !hasMenuItems) {
     return null;
@@ -448,7 +480,10 @@ function CityActionsMenu({
                 // crocchetta-92106: closing the menu resets the TG-reminder
                 // confirm state so a stale "Click again to confirm" doesn't
                 // carry over to the next open.
-                if (!next) setConfirmTgReminder(false);
+                if (!next) {
+                  setConfirmTgReminder(false);
+                  setConfirmWalletReminder(false);
+                }
                 return next;
               });
             }}
@@ -468,6 +503,7 @@ function CityActionsMenu({
                 onClick={() => {
                   setMenuOpen(false);
                   setConfirmTgReminder(false);
+                  setConfirmWalletReminder(false);
                 }}
               />
               <div
@@ -589,6 +625,45 @@ function CityActionsMenu({
                         </span>
                       )}
                     </span>
+                  </button>
+                )}
+                {/* Send wallet reminder — sibling of the receipts reminder.
+                    DMs the host + posts to the city group telling them to
+                    submit their payout wallet address. Same two-click confirm
+                    (DMs can't be unsent). No last-sent sub-label (not
+                    persisted). */}
+                {canSendWalletReminder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={walletReminderBusy}
+                    onClick={() => {
+                      if (!confirmWalletReminder) {
+                        setConfirmWalletReminder(true);
+                        return;
+                      }
+                      setMenuOpen(false);
+                      setConfirmWalletReminder(false);
+                      onSendWalletReminder?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {walletReminderBusy ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-theme-text-muted"
+                      />
+                    ) : (
+                      <Wallet
+                        size={14}
+                        className={
+                          confirmWalletReminder ? 'text-amber-400' : 'text-sky-400'
+                        }
+                      />
+                    )}
+                    {confirmWalletReminder
+                      ? 'Click again to confirm'
+                      : 'Send wallet reminder'}
                   </button>
                 )}
               </div>
@@ -2206,6 +2281,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onSendPayment,
   onScamFlagChanged,
   onTgReminderResult,
+  onTgWalletReminderResult,
   cityGroupChatIds,
   viewerRole = 'admin',
   busyRowId,
@@ -2225,6 +2301,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // crocchetta-92106: per-row busy spinner for the Send receipts reminder
   // action. Avoids double-firing the POST while the bot is dispatching.
   const [tgReminderBusyPartyId, setTgReminderBusyPartyId] = useState<string | null>(null);
+  // Per-row busy spinner for the Send wallet reminder action.
+  const [walletReminderBusyPartyId, setWalletReminderBusyPartyId] = useState<
+    string | null
+  >(null);
   // City-level approval busy spinner.
   const [approveBusyPartyId, setApproveBusyPartyId] = useState<string | null>(null);
   // Per-row busy spinner for the Reopen city action.
@@ -2242,6 +2322,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // requireAnyAdminOrPaymentAdmin server-side; the UI gate just hides the
   // menu item for underbosses so they don't see a button that 403s.
   const canSendTgReminder = viewerRole === 'admin';
+  // Wallet reminder shares the same admin-only gate as the receipts reminder.
+  const canSendWalletReminder = viewerRole === 'admin';
   // City-level approval is admin-only.
   const canApproveCity = viewerRole === 'admin';
   // Reopen (undo a close) is admin-only — the endpoint enforces
@@ -2366,6 +2448,28 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   }
 
   /**
+   * Sibling of {@link handleSendTgReminder}: dispatch the wallet reminder POST
+   * and forward the per-channel outcome via `onTgWalletReminderResult`. Same
+   * city→group chat_id resolution.
+   */
+  async function handleSendWalletReminder(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
+    const groupChatId = cityGroupChatIds?.get(cityKey);
+    setWalletReminderBusyPartyId(partyId);
+    try {
+      const result = await sendTgWalletReminder(partyId, groupChatId);
+      onTgWalletReminderResult?.(partyId, result);
+    } catch (err) {
+      onTgWalletReminderResult?.(partyId, {
+        error: (err as Error)?.message ?? 'Could not send reminder',
+      });
+    } finally {
+      setWalletReminderBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
    * City-level payment approval. Approves the receipts total as the payment
    * amount (or clears approval when amountUsd is null).
    */
@@ -2431,6 +2535,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
               const scamFlagBusy = scamBusyPartyId === row.party.id;
               const tgReminderBusy = tgReminderBusyPartyId === row.party.id;
+              const walletReminderBusy =
+                walletReminderBusyPartyId === row.party.id;
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
               // pinsa-92103: ALSO show the button when the city has paid
@@ -2652,12 +2758,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canSendPayment={canSendPayment}
                           canToggleScamFlag={canToggleScamFlag}
                           canSendTgReminder={canSendTgReminder}
+                          canSendWalletReminder={canSendWalletReminder}
                           canApproveCity={canApproveCity}
                           canReopen={isClosed && canReopenCap}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
                           tgReminderBusy={tgReminderBusy}
+                          walletReminderBusy={walletReminderBusy}
                           reopenBusy={reopenBusyPartyId === row.party.id}
                           approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
@@ -2696,6 +2804,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onSendTgReminder={
                             canSendTgReminder
                               ? () => handleSendTgReminder(row)
+                              : undefined
+                          }
+                          onSendWalletReminder={
+                            canSendWalletReminder
+                              ? () => handleSendWalletReminder(row)
                               : undefined
                           }
                           onReopen={
