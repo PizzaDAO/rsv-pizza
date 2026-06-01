@@ -80,7 +80,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       if (!isImage && !isVideo) continue;
 
       // Client-side size validation
-      if (isImage && file.size > 10 * 1024 * 1024) continue;
+      if (isImage && file.size > 25 * 1024 * 1024) continue;
       if (isVideo && file.size > 50 * 1024 * 1024) continue;
 
       // Client-side duration validation for videos
@@ -216,15 +216,19 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         onUploadComplete?.(result.photo);
       } catch (error) {
         console.error('Upload error:', error);
+        // Surface the 30-photo limit message verbatim (snax requested exact copy)
+        const message = error instanceof Error ? error.message : String(error);
         setFiles(prev => {
           const newFiles = [...prev];
           newFiles[fileIndex] = {
             ...newFiles[fileIndex],
             status: 'error',
-            error: error instanceof Error ? error.message : 'Upload failed',
+            error: message.includes('30 photo limit') ? message : (message || 'Upload failed'),
           };
           return newFiles;
         });
+        // If hit the per-user limit, stop trying further files (they'd all fail)
+        if (message.includes('30 photo limit')) break;
       }
     }
   };
@@ -276,7 +280,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <Upload className="w-10 h-10 text-theme-text-muted mx-auto mb-3" />
         <p className="text-theme-text-secondary mb-1">Drag and drop photos or videos here</p>
         <p className="text-theme-text-muted text-sm">or click to select files</p>
-        <p className="text-theme-text-faint text-xs mt-2">Max 10MB per photo, 50MB per video (5 min). JPEG, PNG, WebP, GIF, MP4, WebM, MOV</p>
+        <p className="text-theme-text-faint text-xs mt-2">Max 25 MB per photo, 50MB per video (5 min). JPEG, PNG, WebP, GIF, MP4, WebM, MOV</p>
       </div>
 
       {/* Caption Input */}

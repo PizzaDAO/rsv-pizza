@@ -450,8 +450,8 @@ export async function uploadEventPhoto(
       return null;
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validate file size (25MB max)
+    if (file.size > 25 * 1024 * 1024) {
       console.error('File too large:', file.size);
       return null;
     }
