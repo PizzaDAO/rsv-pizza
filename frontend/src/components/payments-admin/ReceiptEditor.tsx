@@ -492,11 +492,11 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           {(lineItemDrafts ?? []).length > 0 && (
             <div className="hidden sm:flex items-center gap-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-theme-text-faint sticky top-0 bg-theme-bg">
               <span className="flex-1 min-w-[120px]">Item</span>
-              <span className="w-14 text-right">Qty</span>
-              <span className="w-20 text-right">Unit</span>
-              <span className="w-20 text-right">Subtotal</span>
-              <span>Category</span>
-              <span>Eligible</span>
+              <span className="w-14 text-right pr-2">Qty</span>
+              <span className="w-20 text-right pr-2">Unit</span>
+              <span className="w-20 text-right pr-2">Subtotal</span>
+              <span className="w-24">Category</span>
+              <span className="w-[72px]">Eligible</span>
               <span className="w-[20px]" aria-hidden="true" />
             </div>
           )}
@@ -578,7 +578,7 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
                       category: e.target.value as ReceiptLineItemCategory,
                     })
                   }
-                  className="px-1 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
+                  className="w-24 shrink-0 px-1 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs"
                   title="Category — pizza-prices analytics filters on 'pizza'"
                 >
                   <option value="pizza">pizza</option>
@@ -599,7 +599,7 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
                     until admin says otherwise). Tooltip clarifies what
                     unchecking does. */}
                 <label
-                  className="inline-flex items-center gap-1 text-[10px] text-theme-text-muted px-1"
+                  className="inline-flex items-center gap-1 text-[10px] text-theme-text-muted px-1 w-[72px] shrink-0"
                   title="Uncheck to exclude this line from reimbursement (alcohol, tip, personal item, etc.)"
                 >
                   <input
