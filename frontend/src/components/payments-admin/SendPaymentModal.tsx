@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   DollarSign,
@@ -209,6 +209,16 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // soppressata-49320: persist the pending payout id created in step 1 across
+  // retries so a Send that fails at approve/execute (step 2/3) can re-drive the
+  // SAME row instead of creating a second orphaned `pending` row on the next
+  // click. Re-driving is safe: approve on a `pending` row is the normal
+  // transition, and the backend executePayout accepts an `approved` OR
+  // previously-`failed` row and excludes the row's own id from the party-cap
+  // check, so it never double-sends or double-counts. Reset to null on full
+  // success and whenever the form inputs that define the row change (below).
+  const createdPayoutIdRef = useRef<string | null>(null);
+
   // Cap-override ack (salame-92103 pattern). Reset when amount or party
   // changes so a stale ack doesn't carry across edits.
   const [overridePartyCap, setOverridePartyCap] = useState(false);
@@ -226,6 +236,15 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   }, [onClose]);
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
+
+  // soppressata-49320 correctness guard: if the admin EDITS any input that
+  // defines the payout row after a failed attempt, invalidate the persisted
+  // id so the next submit creates a FRESH row matching the new inputs. Without
+  // this, a retry after an edit would re-drive the stale row with the OLD
+  // amount/recipient/method/destination — paying the wrong thing.
+  useEffect(() => {
+    createdPayoutIdRef.current = null;
+  }, [recipientUserId, method, amountNum, walletAddress, bankEmail, mercuryCardLast4]);
 
   // Cap math (salame-92103 mirror). Cap remaining = cap - already-paid. We
   // also include this in-flight amount in `wouldExceed` so the warning fires
@@ -293,25 +312,35 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       // Step 1: create a pending payout via the host-side endpoint with the
       // admin `recipientHostUserId` override so the row is credited to the
       // chosen cohost, not the admin clicking Send.
-      const created = await createPayout(partyId, {
-        pizzaPhotos: [],
-        receiptPhotos: [],
-        payoutMethod: method,
-        payoutWalletAddress:
-          method === 'usdc_base' ? walletAddress.trim() : undefined,
-        payoutBankDetails:
-          method === 'wire' && bankEmail.trim()
-            ? { email: bankEmail.trim() }
-            : undefined,
-        mercuryCardLast4:
-          method === 'mercury_card' ? mercuryCardLast4.trim() : undefined,
-        finalAmountUsd: amountNum,
-        recipientHostUserId: selectedCandidate.userId,
-        adminNotes:
-          note.trim() ||
-          `Send payment via ${method} from admin /payments by-city action`,
-        hostNotes: 'Payment sent by admin (salame-92106)',
-      });
+      //
+      // soppressata-49320: only create on the FIRST attempt. If a prior submit
+      // got past create but failed at approve/execute, `createdPayoutIdRef`
+      // already holds the pending row's id — reuse it instead of creating a
+      // second orphan. The invalidation effect above clears the ref whenever
+      // the defining inputs change, so a reused id always matches the form.
+      if (!createdPayoutIdRef.current) {
+        const created = await createPayout(partyId, {
+          pizzaPhotos: [],
+          receiptPhotos: [],
+          payoutMethod: method,
+          payoutWalletAddress:
+            method === 'usdc_base' ? walletAddress.trim() : undefined,
+          payoutBankDetails:
+            method === 'wire' && bankEmail.trim()
+              ? { email: bankEmail.trim() }
+              : undefined,
+          mercuryCardLast4:
+            method === 'mercury_card' ? mercuryCardLast4.trim() : undefined,
+          finalAmountUsd: amountNum,
+          recipientHostUserId: selectedCandidate.userId,
+          adminNotes:
+            note.trim() ||
+            `Send payment via ${method} from admin /payments by-city action`,
+          hostNotes: 'Payment sent by admin (salame-92106)',
+        });
+        createdPayoutIdRef.current = created.id;
+      }
+      const payoutId = createdPayoutIdRef.current;
 
       // Step 2 + 3: approve, and for USDC autoExecute via Privy server-wallet.
       // For wire / mercury, the approve call won't execute — we follow up
@@ -325,7 +354,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       // call so the bocconcini-49102 recheck is skipped consistently.
       const allowOverPartyCap = partyWouldExceedCap ? overridePartyCap : undefined;
       if (method === 'usdc_base') {
-        await approveAdminPayout(created.id, {
+        await approveAdminPayout(payoutId, {
           autoExecute: true,
           note: note.trim() || undefined,
           allowOverPartyCap,
@@ -334,11 +363,11 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
         // failure flips the row to `failed` and surfaces here via the API
         // error message.
       } else {
-        await approveAdminPayout(created.id, {
+        await approveAdminPayout(payoutId, {
           note: note.trim() || undefined,
           allowOverPartyCap,
         });
-        await executeAdminPayout(created.id, {
+        await executeAdminPayout(payoutId, {
           wireReference:
             method === 'wire' ? wireReference.trim() : undefined,
           mercuryCardLast4:
@@ -355,6 +384,10 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
         });
       }
 
+      // soppressata-49320: full success — clear the persisted id so any future
+      // submit (e.g. modal reused) creates a fresh row rather than re-driving
+      // this now-completed one.
+      createdPayoutIdRef.current = null;
       onSent({ partyName: cleanName, method, amountUsd: amountNum });
       onClose();
     } catch (err: any) {
