@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, TaxForm, TaxFormType, TaxFormStatus } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -5811,4 +5811,86 @@ export async function getSurveyResults(partyId: string): Promise<SurveyResults> 
     method: 'GET',
     requireAuth: true,
   });
+}
+
+// ============================================
+// Tax forms (salame-92110)
+// ============================================
+
+export async function getMyTaxForms(): Promise<TaxForm[]> {
+  const res = await apiRequest<{ taxForms: TaxForm[] }>(`/api/tax-forms/me`, {
+    requireAuth: true,
+  });
+  return res.taxForms;
+}
+
+export async function saveTaxFormDraft(
+  formType: TaxFormType,
+  formData: Record<string, any>,
+): Promise<TaxForm> {
+  const res = await apiRequest<{ taxForm: TaxForm }>(`/api/tax-forms/draft`, {
+    method: 'POST',
+    body: { formType, formData },
+    requireAuth: true,
+  });
+  return res.taxForm;
+}
+
+export async function submitTaxForm(
+  formType: TaxFormType,
+  formData?: Record<string, any>,
+): Promise<TaxForm> {
+  const res = await apiRequest<{ taxForm: TaxForm }>(`/api/tax-forms/submit`, {
+    method: 'POST',
+    body: formData ? { formType, formData } : { formType },
+    requireAuth: true,
+  });
+  return res.taxForm;
+}
+
+export interface ListAdminTaxFormsFilters {
+  status?: TaxFormStatus;
+  formType?: TaxFormType;
+  userId?: string;
+  expiringWithinDays?: number;
+}
+
+export async function listAdminTaxForms(
+  filters: ListAdminTaxFormsFilters = {},
+): Promise<TaxForm[]> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.formType) params.set('formType', filters.formType);
+  if (filters.userId) params.set('userId', filters.userId);
+  if (filters.expiringWithinDays != null)
+    params.set('expiringWithinDays', String(filters.expiringWithinDays));
+  const qs = params.toString();
+  const res = await apiRequest<{ taxForms: TaxForm[] }>(
+    `/api/admin/tax-forms${qs ? `?${qs}` : ''}`,
+    { requireAuth: true },
+  );
+  return res.taxForms;
+}
+
+export async function getAdminTaxForm(id: string): Promise<TaxForm> {
+  const res = await apiRequest<{ taxForm: TaxForm }>(`/api/admin/tax-forms/${id}`, {
+    requireAuth: true,
+  });
+  return res.taxForm;
+}
+
+export async function verifyTaxForm(id: string): Promise<TaxForm> {
+  const res = await apiRequest<{ taxForm: TaxForm }>(
+    `/api/admin/tax-forms/${id}/verify`,
+    { method: 'POST', requireAuth: true },
+  );
+  return res.taxForm;
+}
+
+export async function rejectTaxForm(id: string, reason: string): Promise<TaxForm> {
+  const res = await apiRequest<{ taxForm: TaxForm }>(
+    `/api/admin/tax-forms/${id}/reject`,
+    { method: 'POST', body: { reason }, requireAuth: true },
+  );
+  return res.taxForm;
 }

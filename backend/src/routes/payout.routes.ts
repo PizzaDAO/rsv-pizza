@@ -26,6 +26,11 @@ import { convertToUSD } from '../services/fx.service.js';
 import { looksLikeEnsName, resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import {
+  getLatestSubmittedTaxFormForUser,
+  getYtdPayoutTotalUsd,
+  US_W9_YTD_THRESHOLD_USD,
+} from './tax-form.routes.js';
 
 const router = Router();
 
@@ -106,6 +111,9 @@ function serializePayout(p: any) {
     transactionHash: p.transactionHash ?? null,
     wireReference: p.wireReference ?? null,
     externalProofUrl: p.externalProofUrl ?? null,
+    // salame-92110: snapshot of the host's tax form at submission time.
+    // Null on pre-feature payouts and on shipping-coordinator receipts.
+    taxFormId: p.taxFormId ?? null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     documents: Array.isArray(p.documents) ? p.documents.map(serializeDocument) : undefined,
@@ -829,6 +837,54 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       await assertUserHasValidPayoutMethod(req.userId);
     }
 
+    // salame-92110: tax-form gate. We snapshot the recipient host's latest
+    // submitted/verified tax form onto the new payout. Phase 1 keeps the
+    // required-vs-not decision host-driven — the host picks the form type
+    // (W-9, W-8BEN, W-8BEN-E) from a 3-card picker on the payout form; we
+    // don't auto-infer US vs foreign from User / Party fields.
+    //
+    // Required when:
+    //   - any tax form has ever been submitted (host is in the system), OR
+    //   - projected YTD payout total is at or above the $600 W-9 floor.
+    //
+    // Skipped entirely when:
+    //   - purpose='shipping' (shipping coordinators don't take taxable income
+    //     via this flow), OR
+    //   - an admin is prepaying on behalf of a cohost.
+    //
+    // The recipient for the gate is the admin-overridden `recipientHostUserId`
+    // when applicable, else the authenticated submitter. We collapse the
+    // admin-override resolution here (a couple of lines below the same logic
+    // runs for `effectiveHostUserId`).
+    let taxFormSnapshotId: string | null = null;
+    const skipTaxFormGate = isShippingPurpose || adminPrepayingForCohost;
+    if (!skipTaxFormGate) {
+      const gateRecipientUserId =
+        recipientOverrideRequested && typeof recipientHostUserId === 'string'
+          ? recipientHostUserId.trim()
+          : req.userId;
+      if (gateRecipientUserId) {
+        const [latestForm, ytdTotal] = await Promise.all([
+          getLatestSubmittedTaxFormForUser(gateRecipientUserId),
+          getYtdPayoutTotalUsd(gateRecipientUserId),
+        ]);
+        const incomingAmount =
+          typeof finalAmountUsd === 'number' && finalAmountUsd > 0 ? finalAmountUsd : 0;
+        const projectedYtd = ytdTotal + incomingAmount;
+        const required = latestForm != null || projectedYtd >= US_W9_YTD_THRESHOLD_USD;
+        if (required && !latestForm) {
+          throw new AppError(
+            'A tax form (W-9, W-8BEN, or W-8BEN-E) is required before this payment can be submitted.',
+            400,
+            'TAX_FORM_REQUIRED',
+          );
+        }
+        if (latestForm) {
+          taxFormSnapshotId = latestForm.id;
+        }
+      }
+    }
+
     // Validate optional one-shot attendance setup. Only persisted to the party
     // below if the party's current expectedGuests is null (see updateMany call).
     let validatedAttendance: number | null = null;
@@ -1272,6 +1328,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
           // when an admin creates a prepayment on behalf of a cohost.
           adminNotes: initialAdminNotes,
+          // salame-92110: snapshot of the recipient host's tax form at submit
+          // time (W-9 / W-8BEN / W-8BEN-E). Null on shipping-purpose receipts
+          // and on admin-prepay rows where the gate is skipped.
+          taxFormId: taxFormSnapshotId,
           documents: { create: docsToCreateStamped },
         },
         include: {

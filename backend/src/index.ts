@@ -67,6 +67,7 @@ import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
 import reminderRoutes from './routes/reminder.routes.js';
+import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -139,6 +140,7 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
+app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
@@ -156,6 +158,7 @@ app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor/report/ai', partnerAiShareRouter);
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
+app.use('/api/tax-forms', taxFormRouter); // salame-92110: host tax-form upload (W-9 / W-8BEN / W-8BEN-E)
 app.use('/api/auth', authRoutes);
 app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos

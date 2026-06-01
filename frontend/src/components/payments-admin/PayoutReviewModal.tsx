@@ -18,6 +18,7 @@ import {
   ReceiptLightbox,
 } from '../payments-shared';
 import { ReceiptEditor } from './ReceiptEditor';
+import { TaxFormReviewPanel } from './TaxFormReviewPanel';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
@@ -2159,6 +2160,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
               </div>
             )}
+
+            {/* salame-92110: Tax form review panel (above Receipts). Shows the
+                W-9 / W-8BEN / W-8BEN-E snapshotted onto the payout, with
+                Verify / Reject. When `payout.taxFormId` is null we render an
+                amber "host has not submitted a tax form" banner. */}
+            <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />
 
             {/* Per-receipt OCR */}
             {receipts.length > 0 && (

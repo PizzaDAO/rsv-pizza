@@ -10,6 +10,8 @@ import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
+import { TaxFormSection } from './TaxFormSection';
+import { TaxFormType } from '../../types';
 
 /**
  * speck-89172: the $675 per-payment hard ceiling is still informative — USDC
@@ -131,6 +133,11 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // salame-92110: when the backend returns TAX_FORM_REQUIRED, we surface a
+  // pointer at the TaxFormSection above and (optionally) auto-open a form
+  // type if the host has indicated one. Phase 1 doesn't auto-infer US vs
+  // foreign, so we leave the type null and the host picks.
+  const [taxFormAutoOpen, setTaxFormAutoOpen] = useState<TaxFormType | null>(null);
 
   // mortadella-92103: exclude receipts whose currency couldn't be resolved
   // (the `$` ambiguity in non-USD countries) from the auto-sum. They keep
@@ -263,7 +270,24 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       });
       onCreated(created);
     } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit receipt');
+      // salame-92110: when the backend says a tax form is required, scroll
+      // the host up to the TaxFormSection instead of just showing a red error.
+      if (err?.code === 'TAX_FORM_REQUIRED') {
+        const requiredType: TaxFormType | null = err?.requiredFormType ?? null;
+        setTaxFormAutoOpen(requiredType);
+        setSubmitError(
+          'A tax form is required before this payment can be submitted. Please complete the tax form above.',
+        );
+        // Scroll to the section the next tick after state has propagated.
+        setTimeout(() => {
+          document.getElementById('tax-form-section')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 0);
+      } else {
+        setSubmitError(err?.message || 'Failed to submit receipt');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -410,6 +434,9 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           onOverrideChange={setOverrideAmount}
         />
       </div>
+
+      {/* 4b. Tax form (salame-92110). Required before admin approval. */}
+      <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
 
       {/* 5. Submit */}
       {submitError && (
