@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Calendar, TrendingUp, Inbox, CheckCircle2 } from 'lucide-react';
+import { DollarSign, TrendingUp, Inbox, CheckCircle2 } from 'lucide-react';
 import type { AdminPayoutTotals } from '../../types';
 import { formatUsd } from '../payments-shared';
 
@@ -51,9 +51,9 @@ export const PaymentsStatsCards: React.FC<PaymentsStatsCardsProps> = ({ totals, 
         tone="amber"
       />
       <StatCard
-        icon={<Calendar size={14} />}
-        label="Paid this month"
-        value={formatUsd(totals.totalUsdThisMonth)}
+        icon={<CheckCircle2 size={14} />}
+        label="Paid"
+        value={formatUsd(totals.totalUsdPaid)}
         tone="emerald"
       />
       <StatCard
