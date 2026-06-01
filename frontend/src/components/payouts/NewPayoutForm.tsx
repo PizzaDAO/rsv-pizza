@@ -231,6 +231,19 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             fileName: r.fileName,
             fileSize: r.fileSize,
             mimeType: r.mimeType,
+            // provolone-49301: forward the preview-OCR payload so the backend
+            // skips a second gpt-4o pass. These already reflect any host
+            // currency override (CurrencyOverrideSelect mutates r.ocr in
+            // place). USD amount/rate are intentionally NOT sent — the backend
+            // re-locks FX via convertToUSD. Include the CURRENCY_UNRESOLVED
+            // case too (originalAmount is still set) so the backend treats it
+            // as forwarded and doesn't re-OCR.
+            ocrOriginalAmount: r.ocr?.originalAmount,
+            ocrOriginalCurrency: r.ocr?.originalCurrency,
+            ocrConfidence: r.ocr?.confidence,
+            ocrLineItems: r.ocr?.lineItems,
+            ocrRaw: r.ocr?.ocrRaw,
+            ocrError: r.ocr?.ocrError,
           })),
         pizzaPhotos: pizzaPhotos
           .filter(p => p.status === 'done' && p.url)

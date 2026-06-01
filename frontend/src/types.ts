@@ -2193,6 +2193,18 @@ export interface PrepayQueueRow {
   partyPaidCount: number;
 }
 
+// provolone-49301: one structured receipt line item, as returned by the
+// backend OCR service. Kept intentionally loose — every field is optional so
+// it tolerates partial/legacy payloads. Forwarded verbatim back to the
+// backend at submit so it can be persisted without a second gpt-4o pass.
+export interface OcrLineItem {
+  name?: string;
+  qty?: number;
+  unitPrice?: number;
+  subtotal?: number;
+  category?: string;
+}
+
 export interface OcrPreviewResult {
   amount: number;             // USD-converted total (0 when ocrError='CURRENCY_UNRESOLVED')
   currency: 'USD';
@@ -2201,6 +2213,11 @@ export interface OcrPreviewResult {
   exchangeRate: number;
   confidence: number;
   items?: string[];
+  // provolone-49301: structured per-line items + raw OCR payload, exposed by
+  // ocr-preview (already computed in the same analyzeReceipt call). Forwarded
+  // at submit so POST /payouts can persist them and skip a second OCR pass.
+  lineItems?: OcrLineItem[];
+  ocrRaw?: unknown;
   // mortadella-92103: 'unresolved' is the new source for "OCR could not
   // determine currency and no country prior was strong enough to pick one
   // automatically". Host must override via CurrencyOverrideSelect.

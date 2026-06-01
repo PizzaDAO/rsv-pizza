@@ -578,6 +578,13 @@ router.post(
         exchangeRate: unresolved ? 0 : (fx.exchangeRate ?? 0),
         confidence: ocr.confidence,
         items: ocr.items,
+        // provolone-49301: expose the structured line items + raw OCR payload
+        // (already computed in this same analyzeReceipt call — zero extra
+        // compute) so the frontend can forward them at submit. POST /payouts
+        // then persists them and SKIPS a second gpt-4o pass, while still
+        // re-running the free convertToUSD to re-lock FX authoritatively.
+        lineItems: ocr.lineItems ?? null,
+        ocrRaw: ocr.raw ?? null,
         fxSource: fx.source,
         conversionNote: unresolved
           ? `Currency could not be determined automatically — please pick the correct currency to convert ${fx.originalAmount.toLocaleString()} to USD.`
@@ -678,6 +685,18 @@ interface IncomingDocument {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  // provolone-49301: optional preview-OCR payload forwarded from the host
+  // upload step (ocr-preview ran gpt-4o once already). When a valid
+  // ocrOriginalAmount is present we trust the original-currency OCR fields
+  // and SKIP a second analyzeReceipt pass, still re-running the free
+  // convertToUSD to re-lock FX server-side. We NEVER trust a client-supplied
+  // USD amount or exchange rate — those always come from convertToUSD.
+  ocrOriginalAmount?: number;
+  ocrOriginalCurrency?: string | null;
+  ocrConfidence?: number;
+  ocrLineItems?: unknown;
+  ocrRaw?: unknown;
+  ocrError?: string | null;
 }
 
 router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -917,6 +936,24 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       : await Promise.allSettled(
           (receiptPhotos as IncomingDocument[]).map(async (r) => {
             try {
+              // provolone-49301: when the frontend forwards the preview-OCR
+              // payload (gpt-4o already ran once on upload), trust the
+              // original-currency fields and SKIP a second analyzeReceipt
+              // pass. We still re-run the FREE convertToUSD below to re-lock
+              // FX authoritatively — the USD amount + exchange rate ALWAYS
+              // come from the server, never from the client.
+              if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
+                const ocr = {
+                  amount: r.ocrOriginalAmount as number,
+                  currency: (typeof r.ocrOriginalCurrency === 'string' && r.ocrOriginalCurrency.trim()) ? r.ocrOriginalCurrency.trim().slice(0, 8) : null,
+                  confidence: Math.min(1, Math.max(0, Number(r.ocrConfidence) || 0)),
+                  lineItems: Array.isArray(r.ocrLineItems) ? (r.ocrLineItems as any[]).slice(0, 100) : undefined,
+                  raw: r.ocrRaw ?? null,
+                };
+                const fx = await convertToUSD(ocr.amount, ocr.currency);
+                return { ok: true as const, doc: r, ocr, fx };
+              }
+              // Fallback (no forwarded payload, e.g. old clients): OCR here.
               // bocconcino-92104: PDFs are OCR'd via their `.thumb.png` sibling.
               const ocr = await analyzeReceipt({
                 imageUrl: deriveOcrUrl(r),
@@ -1675,6 +1712,21 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       : await Promise.allSettled(
           newReceipts.map(async (r) => {
             try {
+              // provolone-49301: trust the forwarded preview-OCR payload and
+              // skip a second analyzeReceipt pass when present (parity with
+              // POST /payouts). USD + rate still come from convertToUSD.
+              if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
+                const ocr = {
+                  amount: r.ocrOriginalAmount as number,
+                  currency: (typeof r.ocrOriginalCurrency === 'string' && r.ocrOriginalCurrency.trim()) ? r.ocrOriginalCurrency.trim().slice(0, 8) : null,
+                  confidence: Math.min(1, Math.max(0, Number(r.ocrConfidence) || 0)),
+                  lineItems: Array.isArray(r.ocrLineItems) ? (r.ocrLineItems as any[]).slice(0, 100) : undefined,
+                  raw: r.ocrRaw ?? null,
+                };
+                const fx = await convertToUSD(ocr.amount, ocr.currency);
+                return { ok: true as const, doc: r, ocr, fx };
+              }
+              // Fallback (no forwarded payload): OCR here.
               // bocconcino-92104: PDFs are OCR'd via their `.thumb.png` sibling.
               const ocr = await analyzeReceipt({
                 imageUrl: deriveOcrUrl(r),
