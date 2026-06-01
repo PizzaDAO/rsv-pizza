@@ -21,7 +21,7 @@ export const NEWSLETTER_OPTIN_FIELD: Record<
   'swcOptIn' | 'swcCaOptIn' | 'swcAuOptIn' | 'swcEuOptIn' | 'swcUkOptIn' | 'swcBrOptIn' | 'ethconfOptIn'
 > = {
   swc: 'swcOptIn',
-  swcca: 'swcCaOptIn',
+  swccanada: 'swcCaOptIn',
   swcau: 'swcAuOptIn',
   swceu: 'swcEuOptIn',
   swcuk: 'swcUkOptIn',

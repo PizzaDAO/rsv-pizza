@@ -1113,7 +1113,7 @@ sponsorDashboardRouter.get('/events/timeseries', requireAuth, requireSponsorAuth
 // Guest model. The consolidated report's "newsletter signups" tile counts only
 // these (never PizzaDAO's mailingListOptIn) and is hidden for any other tag.
 const NEWSLETTER_OPTIN_FIELD: Record<string, 'swcOptIn' | 'swcCaOptIn' | 'swcAuOptIn' | 'swcEuOptIn' | 'swcUkOptIn' | 'swcBrOptIn' | 'ethconfOptIn'> = {
-  swc: 'swcOptIn', swcca: 'swcCaOptIn', swcau: 'swcAuOptIn', swceu: 'swcEuOptIn', swcuk: 'swcUkOptIn', swcbr: 'swcBrOptIn', ethconf: 'ethconfOptIn',
+  swc: 'swcOptIn', swccanada: 'swcCaOptIn', swcau: 'swcAuOptIn', swceu: 'swcEuOptIn', swcuk: 'swcUkOptIn', swcbr: 'swcBrOptIn', ethconf: 'ethconfOptIn',
 };
 
 // scamorza-71819: per-partner AI-share token endpoints.
