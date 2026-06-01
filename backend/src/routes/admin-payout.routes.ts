@@ -3906,10 +3906,16 @@ async function executePayout(params: {
       );
     }
 
+    // guanciale-49342: hoist the send result so the catch can distinguish a
+    // genuine send failure (no txHash) from a post-send DB write failure
+    // (txHash present — money already left the wallet). Never mark a payout
+    // `failed` once the on-chain send has succeeded.
+    let sendResult: Awaited<ReturnType<typeof sendUsdcPayment>> | null = null;
     try {
-      const result = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd, {
+      sendResult = await sendUsdcPayment(existing.payoutWalletAddress, finalAmountUsd, {
         allowOverPerAddressCap: !!allowOverPerAddressCap,
       });
+      const result = sendResult;
 
       const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.payout.update({
@@ -3978,8 +3984,96 @@ async function executePayout(params: {
       });
       return updated;
     } catch (err: any) {
-      // Flip to failed + record the error so the admin UI shows what happened.
       const errMsg = err?.message || String(err);
+
+      // guanciale-49342: if the on-chain send already SUCCEEDED (we have a
+      // txHash) but the subsequent DB write threw, the money has already left
+      // the wallet. Marking the row `failed` here would record an on-chain
+      // payment as failed — a money-loss-of-record. Instead, recover by
+      // recording `paid` (best-effort), and NEVER mark it failed.
+      if (sendResult?.txHash) {
+        console.error(
+          `[admin-payout] CRITICAL: USDC sent (tx ${sendResult.txHash}) for payout ${existing.id} ` +
+            `but DB write failed — attempting recovery: ${errMsg}`,
+        );
+        try {
+          await prisma.payout.update({
+            where: { id: existing.id },
+            data: {
+              status: 'paid',
+              paidAt: new Date(),
+              transactionHash: sendResult.txHash,
+              ...(sendResult.resolvedFromEns
+                ? {
+                    payoutWalletAddress: sendResult.resolvedFromEns.address,
+                    payoutWalletInput: sendResult.resolvedFromEns.input,
+                  }
+                : {}),
+            },
+          });
+          await prisma.payoutAudit.create({
+            data: {
+              payoutId: existing.id,
+              action: 'mark_paid',
+              oldStatus: existing.status,
+              newStatus: 'paid',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: `USDC sent tx ${sendResult.txHash} — recorded on retry after DB write failure`,
+            },
+          });
+        } catch (recoveryErr: any) {
+          // Recovery write ALSO failed. The money is gone but we cannot record
+          // it. Log everything needed to reconcile by hand and surface a 500
+          // that names the txHash. Do NOT mark the row failed.
+          const recoveryMsg = recoveryErr?.message || String(recoveryErr);
+          console.error(
+            `[admin-payout] CRITICAL UNRECOVERABLE: USDC SENT (tx ${sendResult.txHash}) for payout ` +
+              `${existing.id} to wallet ${existing.payoutWalletAddress} for $${finalAmountUsd.toFixed(2)} ` +
+              `but BOTH the original DB write AND the recovery write failed — MANUAL RECONCILE REQUIRED. ` +
+              `original error: ${errMsg} | recovery error: ${recoveryMsg}`,
+          );
+          // Host should still hear 'paid' — the money went out.
+          void notifyHostOfPaymentExecution(existing.id, 'paid', {
+            txHash: sendResult.txHash,
+          });
+          void emailHostOfPaymentExecution(existing.id, 'paid', {
+            txHash: sendResult.txHash,
+          });
+          throw new AppError(
+            `USDC payment SENT (tx ${sendResult.txHash}) but could not be recorded — ` +
+              `MANUAL RECONCILE REQUIRED for payout ${existing.id}`,
+            500,
+            'USDC_SENT_RECORD_FAILED',
+          );
+        }
+
+        // Recovery succeeded — money went out and is now recorded as paid.
+        // Host should hear 'paid', not 'failed'.
+        void notifyHostOfPaymentExecution(existing.id, 'paid', {
+          txHash: sendResult.txHash,
+        });
+        void emailHostOfPaymentExecution(existing.id, 'paid', {
+          txHash: sendResult.txHash,
+        });
+        // Re-fetch with the same include shape the success path returns so the
+        // API responds 200 with the paid row.
+        return prisma.payout.findUniqueOrThrow({
+          where: { id: existing.id },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+      }
+
+      // Genuine send failure (no txHash) — keep the existing behavior exactly.
+      // Flip to failed + record the error so the admin UI shows what happened.
       console.error(`[admin-payout] USDC execute failed for ${existing.id}: ${errMsg}`);
       await prisma.$transaction(async (tx) => {
         await tx.payout.update({
