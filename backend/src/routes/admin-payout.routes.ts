@@ -1926,8 +1926,17 @@ router.get(
         // provolone-92103: terminal close-out status for "city paid in full"
         // mark-pending-complete flow. Tracked separately from 'paid' so the
         // admin UI can show "X paid + Y completed" distinct rollups.
+        // completedCount/completedUsd count ALL completed rows (proven or not)
+        // for backward compatibility with existing consumers.
         completedCount: number;
         completedUsd: number;
+        // bresaola-49340: subset of completed rows that lack per-row proof
+        // (the proofless mark_pending_complete close-outs). The Paid headline
+        // = completedUsd MINUS completedNoProofUsd, mirroring how paid rows are
+        // split into paidUsd / paidNoProofUsd. New fields are additive so old
+        // consumers reading completedUsd/completedCount don't change meaning.
+        completedNoProofCount: number;
+        completedNoProofUsd: number;
         flaggedReadyCount: number;
         lastActivityAt: Date;
         payouts: any[]; // raw Prisma rows; serialized below
@@ -1952,6 +1961,7 @@ router.get(
             failedCount: 0, failedUsd: 0,
             withdrawnCount: 0, withdrawnUsd: 0,
             completedCount: 0, completedUsd: 0,
+            completedNoProofCount: 0, completedNoProofUsd: 0,
             flaggedReadyCount: 0,
             lastActivityAt: row.updatedAt,
             payouts: [],
@@ -1982,7 +1992,15 @@ router.get(
             b.withdrawnCount += 1; b.withdrawnUsd += usd; break;
           case 'completed':
             // provolone-92103: terminal close-out — counted in its own bucket.
-            b.completedCount += 1; b.completedUsd += usd; break;
+            // bresaola-49340: split proof-gated vs proofless, mirroring the
+            // 'paid' / paidNoProof split above. completedCount/completedUsd
+            // still count ALL completed rows (backward compat); the proofless
+            // subset is ALSO tracked so the Paid headline can subtract it.
+            b.completedCount += 1; b.completedUsd += usd;
+            if (!paidRowHasProof(row as any)) {
+              b.completedNoProofCount += 1; b.completedNoProofUsd += usd;
+            }
+            break;
         }
         if (pageFlagged.has(row.id)) b.flaggedReadyCount += 1;
         b.payouts.push(row);
@@ -2074,6 +2092,11 @@ router.get(
             withdrawnUsd: b.withdrawnUsd,
             completedCount: b.completedCount,
             completedUsd: b.completedUsd,
+            // bresaola-49340: proofless completed subset. Paid headline =
+            // completedUsd - completedNoProofUsd. Additive fields; existing
+            // consumers of completedUsd/completedCount keep their meaning.
+            completedNoProofCount: b.completedNoProofCount,
+            completedNoProofUsd: b.completedNoProofUsd,
             totalReceiptCount: receiptCounts.get(partyId) ?? 0,
             lastActivityAt: b.lastActivityAt.toISOString(),
             flaggedReadyCount: b.flaggedReadyCount,

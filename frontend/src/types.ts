@@ -2287,6 +2287,15 @@ export interface PartyPayoutsRow {
      */
     completedCount?: number;
     completedUsd?: number;
+    /**
+     * bresaola-49340: subset of `completed` rows lacking per-row proof
+     * (tx hash / wire ref / mercury card / external proof). The proof-gated
+     * Paid headline = completedUsd - completedNoProofUsd. completedUsd/
+     * completedCount still count ALL completed rows for backward compat.
+     * Optional for cached payloads pre-bresaola.
+     */
+    completedNoProofCount?: number;
+    completedNoProofUsd?: number;
     /** payout_documents rows where kind='receipt' for this party. */
     totalReceiptCount: number;
     /** ISO timestamp — max(updated_at) across this party's payouts. */

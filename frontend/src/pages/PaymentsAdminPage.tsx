@@ -1149,12 +1149,19 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             // primary host id pre-loaded so the admin can confirm-and-send.
             // Admin-only via the viewerRole gate on the menu.
             onSendPayment={(row) => {
+              // bresaola-49340: proof-gate the completed contribution so the
+              // Send-payment modal's paid/outstanding defaults match the
+              // by-city Paid column. Proofless completed close-outs (never
+              // actually sent) drop out of both sums; completedUsd still counts
+              // all completed, so we subtract the proofless subset here.
+              const completedProvenUsd =
+                (row.aggregates.completedUsd ?? 0)
+                - (row.aggregates.completedNoProofUsd ?? 0);
               const approvedSumUsd =
                 row.aggregates.approvedUsd
                 + row.aggregates.paidUsd
-                + (row.aggregates.completedUsd ?? 0);
-              const paidSumUsd =
-                row.aggregates.paidUsd + (row.aggregates.completedUsd ?? 0);
+                + completedProvenUsd;
+              const paidSumUsd = row.aggregates.paidUsd + completedProvenUsd;
               const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
               // gnocchi-92105: tally non-duplicate, eligible receipt OCR USD
               // across every payout on the party. Matches the coppa-92105 +
