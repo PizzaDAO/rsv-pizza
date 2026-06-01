@@ -256,9 +256,12 @@ function isPaidStatus(s: PayoutStatus): boolean {
  * prosciutto-92106: a paid payout is "proven" iff the per-method proof field
  * is set. Keep in sync with backend `paidRowHasProof` / `PAID_HAS_PROOF_WHERE`.
  *
- * 'completed' rows are always treated as proven for display purposes — they
- * are the intentional `mark_pending_complete` bookkeeping close-out
- * (provolone-92103) which by design has no per-row proof.
+ * bresaola-49340: 'completed' rows are NO LONGER auto-treated as proven. They
+ * go through the same per-method proof check as 'paid'. Never-sent rows swept
+ * to 'completed' by "Mark city paid" (provolone-92103 / mark_pending_complete)
+ * were inflating the Paid total because they short-circuited here. Proofless
+ * completed close-outs now fall out of the Paid $ figure (they still appear in
+ * their own completed count via the API aggregates).
  */
 function payoutHasProof(p: {
   status?: PayoutStatus | string | null;
@@ -269,7 +272,6 @@ function payoutHasProof(p: {
   mercuryCardId?: string | null;
   externalProofUrl?: string | null;
 }): boolean {
-  if (p.status === 'completed') return true;
   if (p.externalProofUrl && String(p.externalProofUrl).trim()) return true;
   if (p.payoutMethod === 'usdc_base') {
     return !!(p.transactionHash && String(p.transactionHash).trim());
@@ -2709,12 +2711,20 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                   receiptUsdTotal += Number(amt) || 0;
                 }
               }
+              // bresaola-49340: proof-gate the completed contribution. Proofless
+              // completed rows (never-sent close-outs) are excluded from BOTH
+              // the committed and paid sums — mirroring how the per-row rollup
+              // drops proofless rows from approved AND paid, leaving outstanding
+              // unchanged. completedUsd still counts ALL completed; we subtract
+              // the proofless subset here for the money math.
+              const completedProvenUsd =
+                (row.aggregates.completedUsd ?? 0)
+                - (row.aggregates.completedNoProofUsd ?? 0);
               const approvedSumUsd =
                 row.aggregates.approvedUsd
                 + row.aggregates.paidUsd
-                + (row.aggregates.completedUsd ?? 0);
-              const paidSumUsd =
-                row.aggregates.paidUsd + (row.aggregates.completedUsd ?? 0);
+                + completedProvenUsd;
+              const paidSumUsd = row.aggregates.paidUsd + completedProvenUsd;
               const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
 
               return (
