@@ -5172,6 +5172,17 @@ export interface CreatePayoutPhotoInput {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  // provolone-49301: optional forwarded preview-OCR payload for receipts.
+  // ocr-preview already ran gpt-4o once on upload; forwarding the
+  // original-currency result lets the backend SKIP a second pass while still
+  // re-locking FX server-side. USD amount/rate are never sent — the server
+  // recomputes them via convertToUSD. Ignored for pizza photos.
+  ocrOriginalAmount?: number;
+  ocrOriginalCurrency?: string | null;
+  ocrConfidence?: number;
+  ocrLineItems?: unknown;
+  ocrRaw?: unknown;
+  ocrError?: string | null;
 }
 
 export interface CreatePayoutData {
@@ -5273,6 +5284,15 @@ export interface UpdatePayoutData {
     fileName: string;
     fileSize: number;
     mimeType: string;
+    // provolone-49301: optional forwarded preview-OCR payload (parity with
+    // createPayout). When present the backend skips a second analyzeReceipt
+    // pass and re-locks FX via convertToUSD.
+    ocrOriginalAmount?: number;
+    ocrOriginalCurrency?: string | null;
+    ocrConfidence?: number;
+    ocrLineItems?: unknown;
+    ocrRaw?: unknown;
+    ocrError?: string | null;
   }>;
   pizzaPhotos?: Array<{
     url: string;
