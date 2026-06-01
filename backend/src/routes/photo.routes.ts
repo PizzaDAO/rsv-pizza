@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
@@ -489,11 +490,11 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
 
     const isVideo = allowedVideoTypes.includes(mimeType);
 
-    // Validate file size: 10MB for images, 50MB for videos
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Validate file size: 25MB for images, 50MB for videos
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
     if (fileSize > maxSize) {
       throw new AppError(
-        isVideo ? 'File too large. Maximum video size is 50MB' : 'File too large. Maximum size is 10MB',
+        isVideo ? 'File too large. Maximum video size is 50MB' : 'File too large. Maximum size is 25MB',
         400,
         'FILE_TOO_LARGE'
       );
@@ -548,6 +549,38 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
           include: { guest: { select: { id: true, name: true } } },
         });
         return res.status(200).json({ photo: dedupedPhoto, deduped: true });
+      }
+    }
+
+    // nduja-58296: per-user 30-photo cap per event. Identify the uploader by
+    // userId, guestId, or lowercased email — any match counts. Pending +
+    // approved count; rejected photos do not (so a host can clean up bad
+    // uploads to make room). If we can't identify the uploader at all, skip
+    // the check rather than reject an otherwise valid upload.
+    const PHOTO_LIMIT_PER_USER_PER_EVENT = 30;
+    const uploaderUserId = req.userId || null;
+    const uploaderGuestId = verifiedGuestId || null;
+    const uploaderEmailLower = (uploaderEmail || '').toLowerCase() || null;
+
+    const uploaderClauses: Prisma.PhotoWhereInput[] = [];
+    if (uploaderUserId) uploaderClauses.push({ reviewedBy: uploaderUserId });
+    if (uploaderGuestId) uploaderClauses.push({ uploadedBy: uploaderGuestId });
+    if (uploaderEmailLower) uploaderClauses.push({ uploaderEmail: uploaderEmailLower });
+
+    if (uploaderClauses.length > 0) {
+      const existingCount = await prisma.photo.count({
+        where: {
+          partyId,
+          status: { not: 'rejected' },
+          OR: uploaderClauses,
+        },
+      });
+      if (existingCount >= PHOTO_LIMIT_PER_USER_PER_EVENT) {
+        throw new AppError(
+          '30 photo limit per user. Remove photos to make room',
+          400,
+          'PHOTO_LIMIT_REACHED'
+        );
       }
     }
 
