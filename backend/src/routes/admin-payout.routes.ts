@@ -6266,6 +6266,15 @@ partyMarkPaidRouter.post(
           adminNotes: true,
           payoutMethod: true,
           finalAmountUsd: true,
+          // pancetta-49350: proof fields surface so paidRowHasProof(p) can be
+          // evaluated per in-flight row. Rows WITHOUT payment proof are closed
+          // out as 'withdrawn' (not 'completed') so never-sent claims don't
+          // inflate a city's Paid total.
+          transactionHash: true,
+          wireReference: true,
+          mercuryCardLast4: true,
+          mercuryCardId: true,
+          externalProofUrl: true,
         },
       });
 
@@ -6376,9 +6385,20 @@ partyMarkPaidRouter.post(
           // so the audit trail makes clear *why* a pending row was closed
           // out (vs a host self-withdraw via ravioli-82931's DELETE
           // endpoint).
+          // pancetta-49350: "without an associated transaction" is interpreted
+          // as "without any payment proof" — using the SAME definition as the
+          // paidRowHasProof() helper (transaction_hash OR wire_reference OR
+          // mercury_card_last4/id OR external_proof_url, keyed on payoutMethod).
+          // So a genuinely wire/mercury/usdc/externally-paid in-flight row is
+          // closed out as 'completed' (counts as Paid), while a never-sent row
+          // is set to 'withdrawn' (does NOT count as Paid). Receipts
+          // (payout_documents) are NEVER touched in either branch.
+          const hasProof = paidRowHasProof(p);
+
           let nextAdminNotes: string | null | undefined = undefined;
-          const noteBody =
-            resolvedMode === 'mark_pending_complete'
+          const noteBody = !hasProof
+            ? `Marked-complete sweep: no payment proof — withdrawn (not counted as paid). Receipts retained.${note ? `; ${note}` : ''}`
+            : resolvedMode === 'mark_pending_complete'
               ? `Marked complete via Mark Party Paid; city fully paid${note ? `; ${note}` : ''}`
               : note;
           if (noteBody) {
@@ -6389,7 +6409,46 @@ partyMarkPaidRouter.post(
               : appended;
           }
 
-          if (resolvedMode === 'mark_paid') {
+          if (!hasProof) {
+            // pancetta-49350: no payment proof on this in-flight row. The city
+            // is being marked complete, but money was never actually sent for
+            // this claim — so close it out as 'withdrawn' instead of
+            // 'completed'. 'withdrawn' is excluded from Paid totals (see the
+            // status bucketing earlier in this file), preventing never-sent
+            // rows from inflating a city's Paid figure.
+            //
+            // Do NOT touch paid_at, payout_method, or any payout_documents —
+            // the host's uploaded receipts stay attached and visible in the
+            // receipts library.
+            const data: any = {
+              status: 'withdrawn',
+            };
+            if (nextAdminNotes !== undefined) {
+              data.adminNotes = nextAdminNotes;
+            }
+
+            await tx.payout.update({
+              where: { id: p.id },
+              data,
+            });
+
+            // 'cancel' is the valid payout_audit action for a -> 'withdrawn'
+            // transition: the host self-withdraw flow (ravioli-82931, in
+            // payout.routes.ts) documents that 'withdraw' is NOT in the action
+            // CHECK constraint and uses 'cancel' for exactly this transition.
+            // newStatus carries the real target ('withdrawn').
+            await tx.payoutAudit.create({
+              data: {
+                payoutId: p.id,
+                action: 'cancel',
+                oldStatus: p.status,
+                newStatus: 'withdrawn',
+                actorEmail: actor.email,
+                actorKind: actor.actorKind,
+                note: noteBody,
+              },
+            });
+          } else if (resolvedMode === 'mark_paid') {
             // Only stamp payoutMethod when (a) admin supplied one AND (b) the
             // row currently has none. Preserves the truth of how routed rows
             // were originally configured.
