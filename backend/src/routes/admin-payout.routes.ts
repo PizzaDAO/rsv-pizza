@@ -2521,6 +2521,227 @@ router.get(
 );
 
 // ============================================
+// GET /api/admin/payouts/usdc-daily-cap-remaining
+//   - Used by the UI to show "Daily cap remaining: $Y" before USDC execute.
+//   - MUST be declared BEFORE the parametric GET /:id route. Express matches
+//     routes in declaration order, so if this literal GET sits after GET /:id
+//     then "usdc-daily-cap-remaining" is captured as an :id param and the
+//     detail handler 500s. Keep it up here alongside the other literal GETs.
+// ============================================
+router.get(
+  '/usdc-daily-cap-remaining',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const status = await getUsdcDailyCapStatus();
+      res.json(status);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// GET /api/admin/payouts/pizza-prices
+//
+// formaggi-89172: returns per-row pizza items extracted from payout-document
+// OCR (`payout_documents.ocr_line_items`) plus a simple by-country aggregate,
+// converted to USD via each payout's recorded `exchangeRate`. Backs future
+// analytics; no frontend UI in this PR — admins can `curl` it for spot data.
+//
+// Optional query params:
+//   - country?: string  — filter to a single Party.country (case-sensitive,
+//     matches how the column is stored).
+//   - currency?: string — filter to a single Payout.originalCurrency
+//     (post-fetch, since the FX field lives on the payout, not the doc).
+//   - since?: ISO date  — only payouts created on/after this timestamp.
+// ============================================
+router.get(
+  '/pizza-prices',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const country = typeof req.query.country === 'string' && req.query.country.trim()
+        ? req.query.country.trim()
+        : null;
+      const currency = typeof req.query.currency === 'string' && req.query.currency.trim()
+        ? req.query.currency.trim().toUpperCase()
+        : null;
+      const sinceRaw = typeof req.query.since === 'string' && req.query.since.trim()
+        ? req.query.since.trim()
+        : null;
+
+      let since: Date | null = null;
+      if (sinceRaw) {
+        const parsed = new Date(sinceRaw);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new AppError(`Invalid \`since\` parameter: ${sinceRaw}`, 400, 'BAD_SINCE');
+        }
+        since = parsed;
+      }
+
+      // Build the payout filter — country lives on `payout.party.country`,
+      // since on `payout.createdAt`. We can't filter `originalCurrency` at the
+      // payout-document level (it's on the parent Payout), so we do that
+      // post-fetch in-app.
+      const payoutFilter: Prisma.PayoutWhereInput = {};
+      if (country) payoutFilter.party = { country };
+      if (since) payoutFilter.createdAt = { gte: since };
+
+      const rows = await prisma.payoutDocument.findMany({
+        where: {
+          // Only receipts with a non-null line-items JSONB. `Prisma.DbNull` is
+          // the SQL-NULL marker for JSON columns; without this filter we'd
+          // pull every payout document ever inserted.
+          ocrLineItems: { not: Prisma.DbNull },
+          // Receipts without a parent payout (orphaned via Payout delete +
+          // SetNull) can't be priced — skip them.
+          payout: { is: payoutFilter },
+          // culatello-92104: admin-marked duplicates aren't real prices —
+          // exclude them from the analytics aggregate so the by-country
+          // averages don't double-count the same purchase.
+          isDuplicate: false,
+          // provola-92106: admin-marked ineligible receipts (alcohol, tips,
+          // personal items) aren't pizza prices either — same exclusion
+          // pattern. The aggregate should reflect what hosts actually paid
+          // for reimbursable items.
+          ineligible: false,
+        },
+        select: {
+          id: true,
+          ocrLineItems: true,
+          ocrCurrency: true,
+          payout: {
+            select: {
+              originalCurrency: true,
+              exchangeRate: true,
+              createdAt: true,
+              party: { select: { id: true, name: true, country: true, city: true } },
+            },
+          },
+        },
+      });
+
+      type PizzaPriceRow = {
+        documentId: string;
+        partyId: string;
+        partyName: string;
+        country: string | null;
+        city: string | null;
+        itemName: string;
+        qty: number;
+        unitPriceOriginal: number;
+        subtotalOriginal: number;
+        currency: string;
+        // formaggi-89172: exchangeRate on `payouts` is stored as
+        // (USD amount) / (original amount). So multiplying an original-currency
+        // unit price by exchangeRate yields USD.
+        unitPriceUsd: number;
+        subtotalUsd: number;
+        payoutCreatedAt: string;
+      };
+
+      const pizzaPrices: PizzaPriceRow[] = [];
+      for (const r of rows) {
+        // `payout` is `is: payoutFilter`-narrowed but still typed nullable —
+        // guard so TS knows we have a payout below.
+        if (!r.payout) continue;
+
+        const items = Array.isArray(r.ocrLineItems) ? (r.ocrLineItems as any[]) : [];
+        if (items.length === 0) continue;
+
+        const payoutCurrency = r.payout.originalCurrency ?? r.ocrCurrency ?? 'USD';
+        if (currency && payoutCurrency.toUpperCase() !== currency) continue;
+
+        const fx = Number(r.payout.exchangeRate?.toString() ?? '1');
+        const safeFx = Number.isFinite(fx) && fx > 0 ? fx : 1;
+
+        for (const it of items) {
+          if (!it || typeof it !== 'object') continue;
+          if (it.category !== 'pizza') continue;
+
+          const qty = Number.isFinite(Number(it.qty)) && Number(it.qty) >= 0 ? Number(it.qty) : 1;
+          const unitOrig = Number.isFinite(Number(it.unitPrice)) && Number(it.unitPrice) >= 0
+            ? Number(it.unitPrice)
+            : 0;
+          const subOrig = Number.isFinite(Number(it.subtotal)) && Number(it.subtotal) >= 0
+            ? Number(it.subtotal)
+            : qty * unitOrig;
+
+          pizzaPrices.push({
+            documentId: r.id,
+            partyId: r.payout.party.id,
+            partyName: r.payout.party.name,
+            country: r.payout.party.country,
+            city: r.payout.party.city,
+            itemName: typeof it.name === 'string' ? it.name : '',
+            qty,
+            unitPriceOriginal: unitOrig,
+            subtotalOriginal: subOrig,
+            currency: payoutCurrency,
+            unitPriceUsd: unitOrig * safeFx,
+            subtotalUsd: subOrig * safeFx,
+            payoutCreatedAt: r.payout.createdAt.toISOString(),
+          });
+        }
+      }
+
+      // Group by country, compute count + USD min/avg/max on unit price.
+      // Zero-priced rows ([illegible] lines etc.) are excluded from the
+      // aggregate so they don't drag the average down; the raw row is still
+      // returned in `pizzaPrices` for completeness.
+      type CountryAgg = {
+        country: string;
+        count: number;
+        avgUnitPriceUsd: number;
+        minUnitPriceUsd: number;
+        maxUnitPriceUsd: number;
+      };
+      const byCountryMap = new Map<string, { sum: number; n: number; min: number; max: number }>();
+      for (const p of pizzaPrices) {
+        if (!p.country) continue;
+        if (p.unitPriceUsd <= 0) continue;
+        const key = p.country;
+        const cur = byCountryMap.get(key);
+        if (cur) {
+          cur.sum += p.unitPriceUsd;
+          cur.n += 1;
+          if (p.unitPriceUsd < cur.min) cur.min = p.unitPriceUsd;
+          if (p.unitPriceUsd > cur.max) cur.max = p.unitPriceUsd;
+        } else {
+          byCountryMap.set(key, {
+            sum: p.unitPriceUsd,
+            n: 1,
+            min: p.unitPriceUsd,
+            max: p.unitPriceUsd,
+          });
+        }
+      }
+      const byCountry: CountryAgg[] = Array.from(byCountryMap.entries())
+        .map(([country, agg]) => ({
+          country,
+          count: agg.n,
+          avgUnitPriceUsd: agg.sum / agg.n,
+          minUnitPriceUsd: agg.min,
+          maxUnitPriceUsd: agg.max,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      res.json({
+        filters: { country, currency, since: since?.toISOString() ?? null },
+        totalRows: pizzaPrices.length,
+        pizzaPrices,
+        byCountry,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
 // GET /api/admin/payouts/:id — full detail incl. audit history
 // ============================================
 router.get(
@@ -3777,27 +3998,6 @@ router.post(
       });
 
       res.json({ payout: serializePayout(updated) });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-// ============================================
-// GET /api/admin/payouts/usdc-daily-cap-remaining
-//   - Used by the UI to show "Daily cap remaining: $Y" before USDC execute.
-//   - Must be declared BEFORE POST /:id/execute (literal path) but it's a GET
-//     so route order doesn't actually collide; declaring it here keeps the
-//     "USDC execution" section coherent.
-// ============================================
-router.get(
-  '/usdc-daily-cap-remaining',
-  requireAuth,
-  requireAnyAdminOrPaymentAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const status = await getUsdcDailyCapStatus();
-      res.json(status);
     } catch (error) {
       next(error);
     }
@@ -5082,205 +5282,6 @@ router.patch(
       });
     } catch (error) {
       next(error);
-    }
-  },
-);
-
-// ============================================
-// GET /api/admin/payouts/pizza-prices
-//
-// formaggi-89172: returns per-row pizza items extracted from payout-document
-// OCR (`payout_documents.ocr_line_items`) plus a simple by-country aggregate,
-// converted to USD via each payout's recorded `exchangeRate`. Backs future
-// analytics; no frontend UI in this PR — admins can `curl` it for spot data.
-//
-// Optional query params:
-//   - country?: string  — filter to a single Party.country (case-sensitive,
-//     matches how the column is stored).
-//   - currency?: string — filter to a single Payout.originalCurrency
-//     (post-fetch, since the FX field lives on the payout, not the doc).
-//   - since?: ISO date  — only payouts created on/after this timestamp.
-// ============================================
-router.get(
-  '/pizza-prices',
-  requireAuth,
-  requireAnyAdminOrPaymentAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const country = typeof req.query.country === 'string' && req.query.country.trim()
-        ? req.query.country.trim()
-        : null;
-      const currency = typeof req.query.currency === 'string' && req.query.currency.trim()
-        ? req.query.currency.trim().toUpperCase()
-        : null;
-      const sinceRaw = typeof req.query.since === 'string' && req.query.since.trim()
-        ? req.query.since.trim()
-        : null;
-
-      let since: Date | null = null;
-      if (sinceRaw) {
-        const parsed = new Date(sinceRaw);
-        if (Number.isNaN(parsed.getTime())) {
-          throw new AppError(`Invalid \`since\` parameter: ${sinceRaw}`, 400, 'BAD_SINCE');
-        }
-        since = parsed;
-      }
-
-      // Build the payout filter — country lives on `payout.party.country`,
-      // since on `payout.createdAt`. We can't filter `originalCurrency` at the
-      // payout-document level (it's on the parent Payout), so we do that
-      // post-fetch in-app.
-      const payoutFilter: Prisma.PayoutWhereInput = {};
-      if (country) payoutFilter.party = { country };
-      if (since) payoutFilter.createdAt = { gte: since };
-
-      const rows = await prisma.payoutDocument.findMany({
-        where: {
-          // Only receipts with a non-null line-items JSONB. `Prisma.DbNull` is
-          // the SQL-NULL marker for JSON columns; without this filter we'd
-          // pull every payout document ever inserted.
-          ocrLineItems: { not: Prisma.DbNull },
-          // Receipts without a parent payout (orphaned via Payout delete +
-          // SetNull) can't be priced — skip them.
-          payout: { is: payoutFilter },
-          // culatello-92104: admin-marked duplicates aren't real prices —
-          // exclude them from the analytics aggregate so the by-country
-          // averages don't double-count the same purchase.
-          isDuplicate: false,
-          // provola-92106: admin-marked ineligible receipts (alcohol, tips,
-          // personal items) aren't pizza prices either — same exclusion
-          // pattern. The aggregate should reflect what hosts actually paid
-          // for reimbursable items.
-          ineligible: false,
-        },
-        select: {
-          id: true,
-          ocrLineItems: true,
-          ocrCurrency: true,
-          payout: {
-            select: {
-              originalCurrency: true,
-              exchangeRate: true,
-              createdAt: true,
-              party: { select: { id: true, name: true, country: true, city: true } },
-            },
-          },
-        },
-      });
-
-      type PizzaPriceRow = {
-        documentId: string;
-        partyId: string;
-        partyName: string;
-        country: string | null;
-        city: string | null;
-        itemName: string;
-        qty: number;
-        unitPriceOriginal: number;
-        subtotalOriginal: number;
-        currency: string;
-        // formaggi-89172: exchangeRate on `payouts` is stored as
-        // (USD amount) / (original amount). So multiplying an original-currency
-        // unit price by exchangeRate yields USD.
-        unitPriceUsd: number;
-        subtotalUsd: number;
-        payoutCreatedAt: string;
-      };
-
-      const pizzaPrices: PizzaPriceRow[] = [];
-      for (const r of rows) {
-        // `payout` is `is: payoutFilter`-narrowed but still typed nullable —
-        // guard so TS knows we have a payout below.
-        if (!r.payout) continue;
-
-        const items = Array.isArray(r.ocrLineItems) ? (r.ocrLineItems as any[]) : [];
-        if (items.length === 0) continue;
-
-        const payoutCurrency = r.payout.originalCurrency ?? r.ocrCurrency ?? 'USD';
-        if (currency && payoutCurrency.toUpperCase() !== currency) continue;
-
-        const fx = Number(r.payout.exchangeRate?.toString() ?? '1');
-        const safeFx = Number.isFinite(fx) && fx > 0 ? fx : 1;
-
-        for (const it of items) {
-          if (!it || typeof it !== 'object') continue;
-          if (it.category !== 'pizza') continue;
-
-          const qty = Number.isFinite(Number(it.qty)) && Number(it.qty) >= 0 ? Number(it.qty) : 1;
-          const unitOrig = Number.isFinite(Number(it.unitPrice)) && Number(it.unitPrice) >= 0
-            ? Number(it.unitPrice)
-            : 0;
-          const subOrig = Number.isFinite(Number(it.subtotal)) && Number(it.subtotal) >= 0
-            ? Number(it.subtotal)
-            : qty * unitOrig;
-
-          pizzaPrices.push({
-            documentId: r.id,
-            partyId: r.payout.party.id,
-            partyName: r.payout.party.name,
-            country: r.payout.party.country,
-            city: r.payout.party.city,
-            itemName: typeof it.name === 'string' ? it.name : '',
-            qty,
-            unitPriceOriginal: unitOrig,
-            subtotalOriginal: subOrig,
-            currency: payoutCurrency,
-            unitPriceUsd: unitOrig * safeFx,
-            subtotalUsd: subOrig * safeFx,
-            payoutCreatedAt: r.payout.createdAt.toISOString(),
-          });
-        }
-      }
-
-      // Group by country, compute count + USD min/avg/max on unit price.
-      // Zero-priced rows ([illegible] lines etc.) are excluded from the
-      // aggregate so they don't drag the average down; the raw row is still
-      // returned in `pizzaPrices` for completeness.
-      type CountryAgg = {
-        country: string;
-        count: number;
-        avgUnitPriceUsd: number;
-        minUnitPriceUsd: number;
-        maxUnitPriceUsd: number;
-      };
-      const byCountryMap = new Map<string, { sum: number; n: number; min: number; max: number }>();
-      for (const p of pizzaPrices) {
-        if (!p.country) continue;
-        if (p.unitPriceUsd <= 0) continue;
-        const key = p.country;
-        const cur = byCountryMap.get(key);
-        if (cur) {
-          cur.sum += p.unitPriceUsd;
-          cur.n += 1;
-          if (p.unitPriceUsd < cur.min) cur.min = p.unitPriceUsd;
-          if (p.unitPriceUsd > cur.max) cur.max = p.unitPriceUsd;
-        } else {
-          byCountryMap.set(key, {
-            sum: p.unitPriceUsd,
-            n: 1,
-            min: p.unitPriceUsd,
-            max: p.unitPriceUsd,
-          });
-        }
-      }
-      const byCountry: CountryAgg[] = Array.from(byCountryMap.entries())
-        .map(([country, agg]) => ({
-          country,
-          count: agg.n,
-          avgUnitPriceUsd: agg.sum / agg.n,
-          minUnitPriceUsd: agg.min,
-          maxUnitPriceUsd: agg.max,
-        }))
-        .sort((a, b) => b.count - a.count);
-
-      res.json({
-        filters: { country, currency, since: since?.toISOString() ?? null },
-        totalRows: pizzaPrices.length,
-        pizzaPrices,
-        byCountry,
-      });
-    } catch (err) {
-      next(err);
     }
   },
 );
