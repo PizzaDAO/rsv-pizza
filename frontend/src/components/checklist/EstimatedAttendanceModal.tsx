@@ -9,7 +9,6 @@ interface EstimatedAttendanceModalProps {
   open: boolean;
   onClose: () => void;
   partyId: string;
-  inviteCode: string;
   currentEstimate: number | null;
   onSaved?: () => void;
 }
@@ -18,12 +17,11 @@ export const EstimatedAttendanceModal: React.FC<EstimatedAttendanceModalProps> =
   open,
   onClose,
   partyId,
-  inviteCode,
   currentEstimate,
   onSaved,
 }) => {
   const { t } = useTranslation('host');
-  const { loadParty } = usePizza();
+  const { mergeParty } = usePizza();
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +49,7 @@ export const EstimatedAttendanceModal: React.FC<EstimatedAttendanceModalProps> =
     const success = await updateParty(partyId, { estimated_attendance: num });
     setSaving(false);
     if (success) {
-      await loadParty(inviteCode);
+      mergeParty({ estimatedAttendance: num });
       onSaved?.();
       onClose();
     } else {

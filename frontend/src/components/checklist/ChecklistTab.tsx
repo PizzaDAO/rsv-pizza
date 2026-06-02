@@ -233,7 +233,6 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
         open={attendanceModalOpen}
         onClose={() => setAttendanceModalOpen(false)}
         partyId={partyId}
-        inviteCode={inviteCode ?? ''}
         currentEstimate={party?.estimatedAttendance ?? null}
         onSaved={loadChecklist}
       />
