@@ -839,7 +839,7 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
         _count: {
           select: {
             guests: true,
-            photos: true,
+            photos: { where: { deletedAt: null } }, // provolone-58931
             // quattro-12847: count of unreviewed appeals → `hasOpenAppeal`.
             reimbursementCapAppeals: { where: { reviewedAt: null } },
           },
@@ -939,7 +939,7 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
           _count: {
             select: {
               guests: true,
-              photos: true,
+              photos: { where: { deletedAt: null } }, // provolone-58931
               // quattro-12847: count of unreviewed appeals → `hasOpenAppeal`.
               reimbursementCapAppeals: { where: { reviewedAt: null } },
             },
@@ -1025,13 +1025,17 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
           orderBy: { createdAt: 'desc' },
         },
         budgetItems: {
+          // provolone-58931: exclude soft-deleted budget items from the UB detail view.
+          where: { deletedAt: null },
           select: { id: true, name: true, category: true, cost: true, status: true },
           orderBy: { createdAt: 'desc' },
         },
         _count: {
           select: {
             guests: true,
-            photos: true,
+            // provolone-58931: filtered relation count (supported since Prisma 4.3;
+            // installed @prisma/client ^6.8.2). Excludes soft-deleted photos.
+            photos: { where: { deletedAt: null } },
             // quattro-12847: feed `hasOpenAppeal` on the detail view too.
             reimbursementCapAppeals: { where: { reviewedAt: null } },
           },
@@ -1097,7 +1101,7 @@ router.get('/:region/stats', requireAuth, requireUnderbossAuth, async (req: Unde
             select: { id: true, approved: true, checkedInAt: true, status: true },
           },
           partyKit: { select: { status: true } },
-          _count: { select: { guests: true, photos: true } },
+          _count: { select: { guests: true, photos: { where: { deletedAt: null } } } }, // provolone-58931
         },
       }),
       prisma.underboss.findMany({

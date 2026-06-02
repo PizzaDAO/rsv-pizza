@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, isSuperAdmin, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
@@ -79,6 +79,15 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
     } else {
       // Default: only show approved photos
       where.status = 'approved';
+    }
+
+    // provolone-58931: soft-delete visibility. By default exclude soft-deleted
+    // photos from EVERY caller. Super-admins are the only exception — they get
+    // deleted rows too (carrying deletedAt) so the gallery can render them
+    // greyed with a Restore action.
+    const viewerIsSuperAdmin = await isSuperAdmin(req.userEmail);
+    if (!viewerIsSuperAdmin) {
+      where.deletedAt = null;
     }
 
     // napoletana-58210: payout pizza photos are included ONLY when the request
@@ -358,13 +367,15 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    const totalPhotos = await prisma.photo.count({ where: { partyId, status: 'approved' } });
-    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true, status: 'approved' } });
-    const pendingPhotos = await prisma.photo.count({ where: { partyId, status: 'pending' } });
+    // provolone-58931: stats always exclude soft-deleted photos (even for
+    // super-admins — deleted items shouldn't inflate the displayed counts).
+    const totalPhotos = await prisma.photo.count({ where: { partyId, status: 'approved', deletedAt: null } });
+    const starredPhotos = await prisma.photo.count({ where: { partyId, starred: true, status: 'approved', deletedAt: null } });
+    const pendingPhotos = await prisma.photo.count({ where: { partyId, status: 'pending', deletedAt: null } });
 
     // Get unique tags
     const photos = await prisma.photo.findMany({
-      where: { partyId },
+      where: { partyId, deletedAt: null },
       select: { tags: true },
     });
     const allTags = photos.flatMap(p => p.tags);
@@ -373,7 +384,7 @@ router.get('/:partyId/photos/stats', async (req: AuthRequest, res: Response, nex
     // Get unique uploaders count
     const uniqueUploaders = await prisma.photo.groupBy({
       by: ['uploaderEmail'],
-      where: { partyId, uploaderEmail: { not: null } },
+      where: { partyId, uploaderEmail: { not: null }, deletedAt: null },
     });
 
     res.json({
@@ -421,6 +432,7 @@ router.post('/:partyId/photos/batch-review', requireAuth, async (req: AuthReques
       where: {
         id: { in: photoIds },
         partyId,
+        deletedAt: null, // provolone-58931: never re-review soft-deleted photos
       },
       data: {
         status,
@@ -540,7 +552,7 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
     // auto-approve on the dedup hit.
     if (fileSize && mimeType) {
       const existing = await prisma.photo.findFirst({
-        where: { partyId, fileSize, mimeType },
+        where: { partyId, fileSize, mimeType, deletedAt: null }, // provolone-58931: a deleted dup shouldn't block a fresh re-upload
         select: { id: true },
       });
       if (existing) {
@@ -572,6 +584,7 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
         where: {
           partyId,
           status: { not: 'rejected' },
+          deletedAt: null, // provolone-58931: deleted photos free up room under the cap
           OR: uploaderClauses,
         },
       });
@@ -665,8 +678,10 @@ router.get('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, r
       }
     }
 
+    // provolone-58931: hide soft-deleted photos from everyone except super-admins.
+    const viewerIsSuperAdmin = await isSuperAdmin(req.userEmail);
     const photo = await prisma.photo.findFirst({
-      where: { id: photoId, partyId },
+      where: { id: photoId, partyId, ...(viewerIsSuperAdmin ? {} : { deletedAt: null }) },
       include: {
         guest: { select: { id: true, name: true } },
         // salame-58195
@@ -710,9 +725,10 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
       throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    // Check if photo exists
+    // Check if photo exists. provolone-58931: soft-deleted photos can't be
+    // edited via PATCH — they must be restored first.
     const existingPhoto = await prisma.photo.findFirst({
-      where: { id: photoId, partyId },
+      where: { id: photoId, partyId, deletedAt: null },
     });
 
     if (!existingPhoto) {
@@ -760,9 +776,10 @@ router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest,
   try {
     const { partyId, photoId } = req.params;
 
-    // Get the photo first
+    // Get the photo first. provolone-58931: a soft-deleted photo is treated as
+    // gone for the delete path (idempotent — already deleted = not found).
     const photo = await prisma.photo.findFirst({
-      where: { id: photoId, partyId },
+      where: { id: photoId, partyId, deletedAt: null },
     });
 
     if (!photo) {
@@ -789,8 +806,32 @@ router.delete('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest,
       }
     }
 
-    await prisma.photo.delete({
+    // provolone-58931: soft delete instead of a hard delete so super-admins can
+    // still see (and restore) host/uploader-deleted photos.
+    await prisma.photo.update({
       where: { id: photoId },
+      data: { deletedAt: new Date() },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/parties/:partyId/photos/:photoId/restore - Restore a soft-deleted
+// photo (super-admin only). provolone-58931.
+router.post('/:partyId/photos/:photoId/restore', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { photoId } = req.params;
+
+    if (!(await isSuperAdmin(req.userEmail))) {
+      throw new AppError('Forbidden', 403, 'FORBIDDEN');
+    }
+
+    await prisma.photo.update({
+      where: { id: photoId },
+      data: { deletedAt: null },
     });
 
     res.json({ success: true });
@@ -811,8 +852,9 @@ router.post('/:partyId/photos/:photoId/vote', requireAuth, async (req: AuthReque
     }
 
     // Verify the photo exists and belongs to this party.
+    // provolone-58931: can't vote on a soft-deleted photo.
     const photo = await prisma.photo.findFirst({
-      where: { id: photoId, partyId },
+      where: { id: photoId, partyId, deletedAt: null },
       select: { id: true },
     });
     if (!photo) {

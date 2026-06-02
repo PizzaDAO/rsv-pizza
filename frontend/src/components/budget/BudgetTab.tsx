@@ -14,12 +14,14 @@ import {
   createBudgetItem,
   updateBudgetItem,
   deleteBudgetItem,
+  restoreBudgetItem,
   toggleBudgetItemStatus,
 } from '../../lib/api';
 import { BudgetOverview } from './BudgetOverview';
 import { BudgetCategorySection } from './BudgetCategorySection';
 import { BudgetItemForm } from './BudgetItemForm';
 import { BudgetSettings } from './BudgetSettings';
+import { useIsSuperAdmin } from '../../hooks/useIsSuperAdmin';
 
 interface BudgetTabProps {
   partyId: string;
@@ -27,6 +29,9 @@ interface BudgetTabProps {
 
 export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
   const { t } = useTranslation('host');
+  // provolone-58931: super-admins see soft-deleted budget items (appended to the
+  // feed by the backend only for them) greyed with a Restore action.
+  const isSuperAdmin = useIsSuperAdmin();
   const [budget, setBudget] = useState<BudgetOverviewType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +113,14 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
       await loadBudget(); // Reload to get updated totals
     }
     setShowDeleteConfirm(null);
+  };
+
+  // provolone-58931: super-admin restore of a soft-deleted budget item.
+  const handleRestoreItem = async (itemId: string) => {
+    const success = await restoreBudgetItem(partyId, itemId);
+    if (success) {
+      await loadBudget(); // Reload to get updated totals
+    }
   };
 
   const handleEdit = (item: BudgetItem) => {
@@ -214,6 +227,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({ partyId }) => {
                   onToggleStatus={handleToggleStatus}
                   onEdit={handleEdit}
                   onDelete={(itemId) => setShowDeleteConfirm(itemId)}
+                  onRestore={isSuperAdmin ? handleRestoreItem : undefined}
                 />
               );
             })}

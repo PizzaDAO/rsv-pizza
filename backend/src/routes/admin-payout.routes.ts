@@ -1863,7 +1863,7 @@ router.get(
       const eventPhotosByParty = new Map<string, any[]>();
       if (uniquePartyIds.length > 0) {
         const photoRows = await prisma.photo.findMany({
-          where: { partyId: { in: uniquePartyIds } },
+          where: { partyId: { in: uniquePartyIds }, deletedAt: null }, // provolone-58931
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
@@ -2825,7 +2825,7 @@ router.get(
       // into "Pizza photos" (tagged Pizza / pizza-selfie) vs "Event photos"
       // (everything else) in PayoutReviewModal's photo grids.
       const eventPhotos = await prisma.photo.findMany({
-        where: { partyId: row.partyId },
+        where: { partyId: row.partyId, deletedAt: null }, // provolone-58931
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,

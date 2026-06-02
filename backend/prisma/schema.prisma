@@ -801,9 +801,14 @@ model Photo {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  // provolone-58931: soft delete. Hosts/public never see rows where this is set;
+  // super-admins see them greyed and can restore (clear deletedAt).
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
   @@index([partyId, createdAt])
   @@index([partyId, starred])
   @@index([partyId, status])
+  @@index([partyId, deletedAt])
   // margherita-43821: composite index supporting GET /api/photos/feed
   @@index([starred, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("photos")
@@ -1216,7 +1221,11 @@ model BudgetItem {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  // provolone-58931: soft delete (see Photo model).
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
   @@index([partyId, category])
+  @@index([partyId, deletedAt])
   @@map("budget_items")
 }
 

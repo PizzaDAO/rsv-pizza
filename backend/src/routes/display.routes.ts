@@ -330,6 +330,7 @@ router.get('/view/:partyId/:slug', async (req: AuthRequest, res: Response, next:
       photos = await prisma.photo.findMany({
         where: {
           partyId: display.partyId,
+          deletedAt: null, // provolone-58931: never show soft-deleted photos
           ...(config?.filter === 'starred' && { starred: true }),
         },
         orderBy: { createdAt: 'desc' },
@@ -374,6 +375,7 @@ router.get('/view/:partyId/:slug/photos', async (req: AuthRequest, res: Response
     const config = display.contentConfig as any;
     const where: any = {
       partyId: display.partyId,
+      deletedAt: null, // provolone-58931: never show soft-deleted photos
       ...(config?.filter === 'starred' && { starred: true }),
     };
 

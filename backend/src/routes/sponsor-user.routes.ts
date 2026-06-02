@@ -583,6 +583,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           },
         },
         budgetItems: {
+          where: { deletedAt: null }, // provolone-58931: exclude soft-deleted from sponsor budget totals
           select: { id: true, cost: true, status: true },
         },
         sponsors: {
@@ -606,7 +607,7 @@ sponsorDashboardRouter.get('/events', requireAuth, requireSponsorAuth, async (re
           select: { notes: true },
           take: 1,
         },
-        _count: { select: { guests: true, photos: true } },
+        _count: { select: { guests: true, photos: { where: { deletedAt: null } } } }, // provolone-58931
       },
       orderBy: { date: 'asc' },
     });

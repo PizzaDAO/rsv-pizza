@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, Clock, MoreVertical, Pencil, Trash2, Receipt, FileText, User } from 'lucide-react';
+import { CheckCircle, Clock, MoreVertical, Pencil, Trash2, Receipt, FileText, User, RotateCcw } from 'lucide-react';
 import { BudgetItem, BUDGET_CATEGORIES } from '../../types';
 
 interface BudgetItemRowProps {
@@ -8,6 +8,8 @@ interface BudgetItemRowProps {
   onToggleStatus: (itemId: string) => void;
   onEdit: (item: BudgetItem) => void;
   onDelete: (itemId: string) => void;
+  // provolone-58931: super-admin-only restore of a soft-deleted item.
+  onRestore?: (itemId: string) => void;
 }
 
 export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
@@ -15,7 +17,11 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
   onToggleStatus,
   onEdit,
   onDelete,
+  onRestore,
 }) => {
+  // provolone-58931: only super-admins ever receive soft-deleted items, so the
+  // presence of deletedAt is sufficient to render the deleted-row UI.
+  const isDeleted = Boolean(item.deletedAt);
   const { t } = useTranslation('host');
   const [showMenu, setShowMenu] = useState(false);
 
@@ -33,32 +39,43 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
   const categoryInfo = BUDGET_CATEGORIES.find(c => c.id === item.category);
 
   return (
-    <div className="group flex items-center gap-3 p-3 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors">
-      {/* Status Toggle */}
-      <button
-        onClick={() => onToggleStatus(item.id)}
-        className={`flex-shrink-0 p-1 rounded-full transition-colors ${
-          item.status === 'paid'
-            ? 'text-green-400 hover:text-green-300'
-            : 'text-theme-text-faint hover:text-theme-text-muted'
-        }`}
-        title={item.status === 'paid' ? t('budget.markAsPending') : t('budget.markAsPaid')}
-      >
-        {item.status === 'paid' ? (
-          <CheckCircle size={20} />
-        ) : (
-          <Clock size={20} />
-        )}
-      </button>
+    <div className={`group flex items-center gap-3 p-3 bg-theme-surface hover:bg-theme-surface-hover border border-theme-stroke rounded-xl transition-colors ${
+      isDeleted ? 'opacity-60 ring-1 ring-red-500/30' : ''
+    }`}>
+      {/* Status Toggle — hidden for soft-deleted rows (provolone-58931) */}
+      {!isDeleted && (
+        <button
+          onClick={() => onToggleStatus(item.id)}
+          className={`flex-shrink-0 p-1 rounded-full transition-colors ${
+            item.status === 'paid'
+              ? 'text-green-400 hover:text-green-300'
+              : 'text-theme-text-faint hover:text-theme-text-muted'
+          }`}
+          title={item.status === 'paid' ? t('budget.markAsPending') : t('budget.markAsPaid')}
+        >
+          {item.status === 'paid' ? (
+            <CheckCircle size={20} />
+          ) : (
+            <Clock size={20} />
+          )}
+        </button>
+      )}
 
       {/* Item Details */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className={`text-sm font-medium truncate ${
+            isDeleted ? 'text-theme-text-secondary line-through' :
             item.status === 'paid' ? 'text-theme-text-secondary line-through' : 'text-theme-text'
           }`}>
             {item.name}
           </p>
+          {isDeleted && (
+            <span className="flex-shrink-0 flex items-center gap-1 bg-red-600/90 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+              <Trash2 size={10} />
+              Deleted by host
+            </span>
+          )}
           {item.receiptUrl && (
             <a
               href={item.receiptUrl}
@@ -98,7 +115,21 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
         <p className="text-sm font-semibold">{formatCurrency(item.cost)}</p>
       </div>
 
-      {/* Actions Menu */}
+      {/* provolone-58931: soft-deleted rows show a Restore button (super-admins
+          only — only they receive deleted rows) instead of the actions menu. */}
+      {isDeleted ? (
+        onRestore && (
+          <button
+            onClick={() => onRestore(item.id)}
+            className="flex-shrink-0 flex items-center gap-1 bg-green-600/90 hover:bg-green-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+            title="Restore item"
+          >
+            <RotateCcw size={14} />
+            Restore
+          </button>
+        )
+      ) : (
+      /* Actions Menu */
       <div className="relative">
         <button
           onClick={() => setShowMenu(!showMenu)}
@@ -138,6 +169,7 @@ export const BudgetItemRow: React.FC<BudgetItemRowProps> = ({
           </>
         )}
       </div>
+      )}
     </div>
   );
 };

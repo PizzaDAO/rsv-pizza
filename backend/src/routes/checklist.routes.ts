@@ -47,7 +47,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
 
     // 3. budget_submitted: budget_items has items for this party
     const budgetItemCount = await prisma.budgetItem.count({
-      where: { partyId },
+      where: { partyId, deletedAt: null }, // provolone-58931: ignore soft-deleted
     });
 
     // 4. team_built: has co-hosts beyond PizzaDAO, the host, and their region's underboss
