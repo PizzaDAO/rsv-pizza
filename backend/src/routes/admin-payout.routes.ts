@@ -2116,9 +2116,12 @@ router.get(
       // (vs. in the table component) keeps row counts honest and is cheap —
       // grouping has already happened and the bucket meta has the flag.
       const hideClosed = req.query.hideClosed === 'true' || req.query.hideClosed === '1';
-      const filteredRows = hideClosed
-        ? rows.filter((r) => !r.party.paymentsClosedAt)
-        : rows;
+      // stracchino-92108: also hide cities flagged with the `possible-scam` tag.
+      const hideScams = req.query.hideScams === 'true' || req.query.hideScams === '1';
+      const filteredRows = rows.filter((r) =>
+        (!hideClosed || !r.party.paymentsClosedAt) &&
+        (!hideScams || !(r.party.eventTags ?? []).includes('possible-scam'))
+      );
 
       // 6. Sort outer rows. Default: most recent activity desc. The same
       //    `sort` query param shape is supported as the LIST endpoint for
