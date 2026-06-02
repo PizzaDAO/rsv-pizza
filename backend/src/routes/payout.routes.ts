@@ -875,8 +875,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (receiptPhotos.length > 10) {
       throw new AppError('Max 10 receipt photos', 400, 'TOO_MANY_RECEIPTS');
     }
-    if (pizzaPhotos.length > 10) {
-      throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
+    if (pizzaPhotos.length > 30) {
+      throw new AppError('Max 30 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
     }
     // When zero receipts are supplied, finalAmountUsd MUST be a positive number.
     if (
@@ -1674,8 +1674,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (newReceipts.length > 10) {
       throw new AppError('Max 10 receipt photos', 400, 'TOO_MANY_RECEIPTS');
     }
-    if (newPizza.length > 10) {
-      throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
+    if (newPizza.length > 30) {
+      throw new AppError('Max 30 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
     }
 
     // Verify each new URL points into the bucket scoped to this party.

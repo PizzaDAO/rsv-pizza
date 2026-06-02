@@ -28,7 +28,7 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
   payoutTempId,
   items,
   onChange,
-  maxItems = 10,
+  maxItems = 30,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);

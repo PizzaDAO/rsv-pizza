@@ -774,7 +774,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                   payoutTempId={payout.id}
                   items={newPizzaPhotos}
                   onChange={setNewPizzaPhotos}
-                  maxItems={10}
+                  maxItems={30}
                 />
               </div>
 
