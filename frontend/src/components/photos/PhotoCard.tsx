@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play, ThumbsUp } from 'lucide-react';
+import { Star, Trash2, User, CheckCircle2, XCircle, Clock, Play, ThumbsUp, RotateCcw } from 'lucide-react';
 import { Photo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { togglePhotoVote, togglePayoutPhotoVote } from '../../lib/api';
@@ -12,6 +12,8 @@ interface PhotoCardProps {
   onDelete?: (photoId: string) => void;
   onApprove?: (photoId: string) => void;
   onReject?: (photoId: string) => void;
+  // provolone-58931: super-admin-only restore of a soft-deleted photo.
+  onRestore?: (photoId: string) => void;
   // salame-58195: thumbs-up vote toggled — parent updates local list.
   onVoteChange?: (photoId: string, next: { voteCount: number; votedByMe: boolean }) => void;
 }
@@ -31,11 +33,15 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onDelete,
   onApprove,
   onReject,
+  onRestore,
   onVoteChange,
 }) => {
   const uploaderDisplayName = photo.guest?.name || photo.uploaderName || 'Anonymous';
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
+  // provolone-58931: only super-admins ever receive soft-deleted photos from the
+  // backend, so the presence of deletedAt is sufficient to render the deleted UI.
+  const isDeleted = Boolean(photo.deletedAt);
   const isVideo = photo.mimeType?.startsWith('video/');
   // napoletana-58210: payout-sourced rows are uncurated — hide star / delete /
   // tag-edit affordances. The source field is optional for back-compat.
@@ -76,7 +82,13 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   return (
     <div
       className={`group relative aspect-square rounded-xl overflow-hidden bg-theme-surface cursor-pointer ${
-        isPending ? 'ring-2 ring-amber-500/50' : isRejected ? 'ring-2 ring-red-500/30 opacity-60' : ''
+        isDeleted
+          ? 'ring-2 ring-red-500/40 opacity-50 grayscale'
+          : isPending
+          ? 'ring-2 ring-amber-500/50'
+          : isRejected
+          ? 'ring-2 ring-red-500/30 opacity-60'
+          : ''
       }`}
       onClick={onClick}
     >
@@ -138,6 +150,34 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
       )}
 
+      {/* provolone-58931: soft-deleted badge + restore (super-admins only — only
+          they receive deleted rows). Shown top-left; restore button top-right. */}
+      {isDeleted && (
+        <>
+          <div className="absolute top-2 left-2 z-20">
+            <div className="flex items-center gap-1 bg-red-600/90 text-white text-xs font-medium px-2 py-1 rounded-full">
+              <Trash2 size={12} />
+              Deleted by host
+            </div>
+          </div>
+          {onRestore && (
+            <div className="absolute top-2 right-2 z-20">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore(photo.id);
+                }}
+                className="flex items-center gap-1 bg-green-600/90 hover:bg-green-600 text-white text-xs font-medium px-2 py-1 rounded-full transition-colors"
+                title="Restore photo"
+              >
+                <RotateCcw size={12} />
+                Restore
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Star Badge (if starred and not pending/rejected) — napoletana-58210:
           hidden for payout-sourced rows because we set starred=true
           synthetically and don't want to imply host curation. */}
@@ -148,7 +188,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       )}
 
       {/* Approve/Reject Buttons for pending photos */}
-      {isPending && onApprove && onReject && (
+      {isPending && !isDeleted && onApprove && onReject && (
         <div className="absolute bottom-2 left-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <button
             onClick={(e) => {
@@ -175,7 +215,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
 
       {/* Host Controls (for approved photos) — napoletana-58210: hidden for
           payout-sourced photos because star/delete don't apply to payout docs. */}
-      {isHost && !isPending && !isPayoutSource && (
+      {isHost && !isPending && !isPayoutSource && !isDeleted && (
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => {
@@ -240,7 +280,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       )}
 
       {/* salame-58195: thumbs-up vote (approved photos only) — napoletana-58197: icon-only, white, drop-shadow */}
-      {!isPending && !isRejected && (
+      {!isPending && !isRejected && !isDeleted && (
         <button
           type="button"
           onClick={handleVote}

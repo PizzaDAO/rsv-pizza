@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag, Video } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
-import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
+import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, restorePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
 import { PhotoCard } from './PhotoCard';
 import { PhotoModal } from './PhotoModal';
 import { PhotoUpload } from './PhotoUpload';
+import { useIsSuperAdmin } from '../../hooks/useIsSuperAdmin';
 
 interface PhotoGalleryProps {
   partyId: string;
@@ -42,6 +43,9 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   canUpload = true,
   triggerUploadRef,
 }) => {
+  // provolone-58931: super-admins see soft-deleted photos (returned by the
+  // backend only for them) greyed with a Restore action.
+  const isSuperAdmin = useIsSuperAdmin();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [stats, setStats] = useState<PhotoStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,6 +168,16 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     const success = await deletePhoto(partyId, photoId, uploaderEmail);
     if (success) {
       setPhotos(prev => prev.filter(p => p.id !== photoId));
+      loadStats();
+    }
+  };
+
+  // provolone-58931: super-admin restore of a soft-deleted photo. Reload the
+  // list so the restored photo re-renders in its normal (non-deleted) state.
+  const handleRestore = async (photoId: string) => {
+    const success = await restorePhoto(partyId, photoId);
+    if (success) {
+      loadPhotos(true);
       loadStats();
     }
   };
@@ -518,6 +532,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                 onClick={() => setSelectedPhoto(photo)}
                 onStar={handleStar}
                 onDelete={handleDelete}
+                onRestore={isSuperAdmin ? handleRestore : undefined}
                 onApprove={isHost && photo.status === 'pending' ? handleApprove : undefined}
                 onReject={isHost && photo.status === 'pending' ? handleReject : undefined}
                 onVoteChange={handleVoteChange}

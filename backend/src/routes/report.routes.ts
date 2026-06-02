@@ -88,7 +88,7 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
           },
         },
         photos: {
-          where: { starred: true },
+          where: { starred: true, deletedAt: null }, // provolone-58931
           orderBy: { starredAt: 'desc' },
           take: 10,
         },
@@ -449,7 +449,7 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
           },
         },
         photos: {
-          where: { starred: true },
+          where: { starred: true, deletedAt: null }, // provolone-58931
           orderBy: { starredAt: 'desc' },
           take: 10,
         },

@@ -187,6 +187,7 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     const photoWhere: any = {
       status: 'approved',
       starred: true,
+      deletedAt: null, // provolone-58931: never surface soft-deleted photos in the public feed
       // nduja-58291: column-level prior-year exclusion.
       OR: [
         { photoYear: null },
@@ -470,6 +471,7 @@ async function handleRandomFeed(
     JOIN parties pa ON pa.id = p.party_id
     WHERE p.starred = true
       AND p.status = 'approved'
+      AND p.deleted_at IS NULL -- provolone-58931: exclude soft-deleted photos
       AND pa.underboss_status = 'approved'
       AND pa.photos_public = true
       AND pa.photos_enabled = true
@@ -496,7 +498,8 @@ async function handleRandomFeed(
   // select shape as newest mode so the response is identical apart from order.
   const photos = ids.length > 0
     ? await prisma.photo.findMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, deletedAt: null }, // provolone-58931
+
         select: {
           id: true,
           url: true,
@@ -579,6 +582,7 @@ router.get('/feed/facets', async (_req: Request, res: Response, next: NextFuncti
       by: ['partyId'],
       where: {
         status: 'approved',
+        deletedAt: null, // provolone-58931
         party: {
           is: {
             underbossStatus: 'approved',
@@ -675,6 +679,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     const photoWhere: Prisma.PhotoWhereInput = {
       status: 'approved',
       starred: true,
+      deletedAt: null, // provolone-58931: never surface soft-deleted photos in the public feed
       OR: [
         { photoYear: null },
         { photoYear: { gte: 2026 } },

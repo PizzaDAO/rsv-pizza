@@ -1066,6 +1066,20 @@ export async function deletePhoto(
   }
 }
 
+// Restore a soft-deleted photo (super-admin only). provolone-58931.
+export async function restorePhoto(partyId: string, photoId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/photos/${photoId}/restore`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error restoring photo:', error);
+    return false;
+  }
+}
+
 // Get photo statistics
 export async function getPhotoStats(partyId: string): Promise<PhotoStats | null> {
   try {
@@ -2615,6 +2629,20 @@ export async function deleteBudgetItem(partyId: string, itemId: string): Promise
     return true;
   } catch (error) {
     console.error('Error deleting budget item:', error);
+    return false;
+  }
+}
+
+// Restore a soft-deleted budget item (super-admin only). provolone-58931.
+export async function restoreBudgetItem(partyId: string, itemId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/budget/items/${itemId}/restore`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error restoring budget item:', error);
     return false;
   }
 }

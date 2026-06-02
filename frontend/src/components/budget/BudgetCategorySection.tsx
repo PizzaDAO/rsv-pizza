@@ -11,6 +11,8 @@ interface BudgetCategorySectionProps {
   onToggleStatus: (itemId: string) => void;
   onEdit: (item: BudgetItem) => void;
   onDelete: (itemId: string) => void;
+  // provolone-58931: super-admin-only restore of a soft-deleted item.
+  onRestore?: (itemId: string) => void;
 }
 
 const categoryIcons: Record<BudgetCategory, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -30,6 +32,7 @@ export const BudgetCategorySection: React.FC<BudgetCategorySectionProps> = ({
   onToggleStatus,
   onEdit,
   onDelete,
+  onRestore,
 }) => {
   const { t } = useTranslation('host');
   const [isExpanded, setIsExpanded] = useState(items.length > 0);
@@ -85,6 +88,7 @@ export const BudgetCategorySection: React.FC<BudgetCategorySectionProps> = ({
               onToggleStatus={onToggleStatus}
               onEdit={onEdit}
               onDelete={onDelete}
+              onRestore={onRestore}
             />
           ))}
         </div>

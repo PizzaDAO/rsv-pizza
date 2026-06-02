@@ -518,6 +518,9 @@ export interface Photo {
   // payout-sourced rows in the v1 gallery.
   source?: 'photo' | 'payout';
   payoutId?: string | null;
+  // provolone-58931: set when the photo has been soft-deleted. Only super-admins
+  // ever receive deleted rows; everyone else's list excludes them server-side.
+  deletedAt?: string | null;
 }
 
 export interface PhotoStats {
@@ -894,6 +897,8 @@ export interface BudgetItem {
   receiptUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  // provolone-58931: set when soft-deleted. Only super-admins receive deleted rows.
+  deletedAt?: string | null;
 }
 
 export interface BudgetCategoryTotal {
