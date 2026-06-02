@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -391,8 +391,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     return () => { cancelled = true; };
   }, [regions]);
 
+  // risotto-58931: monotonic request id — only the latest loadPage call is
+  // allowed to write state.
+  const loadSeqRef = useRef(0);
+
   const loadPage = useCallback(
     async (f: AdminPayoutFilters, append = false) => {
+      // risotto-58931: monotonic request id — only the latest loadPage call is
+      // allowed to write state, so a slow initial unfiltered fetch can't clobber
+      // a faster filtered fetch fired by the first search keystroke.
+      const myReq = ++loadSeqRef.current;
       if (append) setLoadingMore(true);
       else setLoading(true);
       setErrorMsg(null);
@@ -408,6 +416,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         // append (load-more) only applies to the per-payment list; by-city
         // returns all matching parties in one go (v1).
         const listRes = await listAdminPayouts(merged);
+        if (myReq !== loadSeqRef.current) return; // superseded by a newer load
         setPayouts((prev) => (append ? [...prev, ...listRes.payouts] : listRes.payouts));
         setTotals(listRes.totals);
         setNextCursor(listRes.nextCursor);
@@ -423,13 +432,18 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // accurate for every shown city.
           const { status: _byCityStatus, ...byCityFilters } = merged;
           const grouped = await fetchPayoutsByParty(byCityFilters);
+          if (myReq !== loadSeqRef.current) return; // superseded by a newer load
           setByPartyRows(grouped.rows);
         }
       } catch (err: any) {
-        setErrorMsg(err.message || 'Failed to load payments');
+        if (myReq === loadSeqRef.current) setErrorMsg(err.message || 'Failed to load payments');
       } finally {
-        if (append) setLoadingMore(false);
-        else setLoading(false);
+        // Only the live request resets the loading flag; a superseded request
+        // returns early above and skips this, leaving the flag to its owner.
+        if (myReq === loadSeqRef.current) {
+          if (append) setLoadingMore(false);
+          else setLoading(false);
+        }
       }
     },
     [regions, viewMode],
