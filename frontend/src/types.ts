@@ -2056,7 +2056,13 @@ export interface WalletPaidTotal {
 }
 
 export interface AdminPayoutFilters {
-  status?: PayoutStatus | 'all';
+  /**
+   * Single PayoutStatus, `'all'` (no filter), or a comma-separated list of
+   * statuses for the new Payments-ledger view (coppa-92106). The backend
+   * accepts either shape on `?status=`; the by-city status-tab strip only
+   * sets single values so the existing membership check keeps working.
+   */
+  status?: PayoutStatus | 'all' | string;
   payoutMethod?: PayoutMethod | 'all';
   partyId?: string;
   /** salame-83472: unified search — host email|name OR party name (case-insensitive contains). */
@@ -2104,7 +2110,19 @@ export interface AdminPayoutFilters {
     | 'amount_desc'
     | 'amount_asc'
     | 'activity_desc'
-    | 'activity_asc';
+    | 'activity_asc'
+    // coppa-92106: order by actual paid_at timestamp for the Payments-ledger
+    // view ("show me every payment that actually went out, newest first").
+    | 'paid_at_desc'
+    | 'paid_at_asc';
+  /**
+   * coppa-92106: when true, the backend applies the prosciutto-92106
+   * "has proof of send" predicate so only proven payments
+   * (transactionHash / wireReference / mercuryCardLast4 / externalProofUrl
+   * populated for their method) appear in the result set. Used by the new
+   * Payments-ledger view so the row list matches the KPI totals.
+   */
+  provenOnly?: boolean;
   cursor?: string;
   limit?: number;
   /**

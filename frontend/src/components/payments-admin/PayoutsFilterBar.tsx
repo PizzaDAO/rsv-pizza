@@ -40,6 +40,13 @@ interface PayoutsFilterBarProps {
    * hard-scoped by their `regionFilter` prop). Defaults to false.
    */
   showRegionsFilter?: boolean;
+  /**
+   * coppa-92106: when false, the status tab strip + sort dropdown are
+   * hidden. Used by the new Payments-ledger view mode, which forces
+   * `status=paid,completed` + `sort=paid_at_desc` server-side. Defaults to
+   * true (existing behavior).
+   */
+  showStatusTabs?: boolean;
 }
 
 const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
@@ -88,6 +95,10 @@ const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: 'amount_asc', label: 'Lowest amount' },
   { value: 'activity_desc', label: 'Most recently active' },
   { value: 'activity_asc', label: 'Least recently active' },
+  // coppa-92106: Payments-ledger sort (forced in Payments view, available
+  // here as a manual pick on the other views for completeness).
+  { value: 'paid_at_desc', label: 'Most recently paid' },
+  { value: 'paid_at_asc', label: 'Oldest payment first' },
 ];
 const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
@@ -145,6 +156,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showHideClosedToggle,
   showHideScamsToggle,
   showRegionsFilter,
+  showStatusTabs = true,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const activeCount = countActiveFilters(filters);
@@ -196,26 +208,29 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
 
   return (
     <div className="sticky top-0 z-20 bg-theme-surface/95 backdrop-blur-sm border border-theme-stroke rounded-xl p-4 mb-4 shadow-sm">
-      {/* Status tab strip — always visible (mobile + desktop). */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {STATUS_TABS.map((tab) => {
-          const active = (filters.status ?? 'all') === tab.value;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => update({ status: tab.value })}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-[#E52828] text-white'
-                  : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-stroke'
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Status tab strip — always visible (mobile + desktop). Hidden in the
+          coppa-92106 Payments-ledger view, which forces status server-side. */}
+      {showStatusTabs && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {STATUS_TABS.map((tab) => {
+            const active = (filters.status ?? 'all') === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => update({ status: tab.value })}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-[#E52828] text-white'
+                    : 'bg-theme-surface-hover text-theme-text-secondary hover:bg-theme-stroke'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* regina-89172: mobile-only collapse toggle. Hidden on sm:+ via `sm:hidden`. */}
       <div className="sm:hidden mb-3">
