@@ -76,6 +76,7 @@ export const COMMON_CURRENCIES: CurrencyOption[] = [
   { code: 'USD', label: 'USD — US Dollar', symbol: '$' },
   { code: 'VND', label: 'VND — Vietnamese Dong', symbol: '₫' },
   { code: 'ZAR', label: 'ZAR — South African Rand', symbol: 'R' },
+  { code: 'ZMW', label: 'ZMW — Zambian Kwacha', symbol: 'K' },
 ];
 
 /**

@@ -73,6 +73,7 @@ export const SUPPORTED_CURRENCIES: CurrencyOption[] = [
   { code: 'MAD', name: 'Moroccan Dirham', country: 'Morocco', flag: '🇲🇦' },
   { code: 'ETB', name: 'Ethiopian Birr', country: 'Ethiopia', flag: '🇪🇹' },
   { code: 'MWK', name: 'Malawian Kwacha', country: 'Malawi', flag: '🇲🇼' },
+  { code: 'ZMW', name: 'Zambian Kwacha', country: 'Zambia', flag: '🇿🇲' },
   {
     code: 'XOF',
     name: 'West African CFA franc',
