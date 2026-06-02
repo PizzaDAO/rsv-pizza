@@ -498,7 +498,6 @@ export const GPPDashboardTab: React.FC = () => {
         open={attendanceModalOpen}
         onClose={() => setAttendanceModalOpen(false)}
         partyId={party.id}
-        inviteCode={inviteCode!}
         currentEstimate={party.estimatedAttendance ?? null}
         onSaved={loadChecklist}
       />
