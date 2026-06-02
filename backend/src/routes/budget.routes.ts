@@ -362,7 +362,7 @@ router.post('/:partyId/budget/items/:itemId/toggle-status', async (req: AuthRequ
     const newStatus = existing.status === 'paid' ? 'pending' : 'paid';
 
     const item = await prisma.budgetItem.update({
-      where: { id: itemId, partyId },
+      where: { id: itemId, partyId, deletedAt: null },
       data: { status: newStatus },
     });
 
