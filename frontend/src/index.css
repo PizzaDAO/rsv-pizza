@@ -324,6 +324,7 @@ body {
 
 #root {
   min-height: 100vh;
+  overflow-x: clip;
 }
 
 /* Modal scroll lock - prevents body scroll when modal is open */
