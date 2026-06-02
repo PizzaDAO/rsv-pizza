@@ -99,6 +99,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   purpose: 'all',
   // caciotta-92105: hide payments-closed cities (pinsa-92103) by default.
   hideClosed: true,
+  // stracchino-92108: hide possible-scam-flagged cities (bottarga-92104) by default.
+  hideScams: true,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -1015,6 +1017,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // view (paymentsClosedAt is a party-level signal). The per-payment
           // view has no party-row, so the toggle would be confusing there.
           showHideClosedToggle={viewMode === 'by-city'}
+          // stracchino-92108: Hide possible scams, by-city view only (same as above).
+          showHideScamsToggle={viewMode === 'by-city'}
           // pancetta-92103: Regions multi-select is the admin /payments tool;
           // regional sub-portals (`/payments/latam` etc.) are hard-scoped by
           // their `regionFilter` prop and shouldn't show a second region

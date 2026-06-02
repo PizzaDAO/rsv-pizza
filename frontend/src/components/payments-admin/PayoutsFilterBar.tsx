@@ -30,6 +30,11 @@ interface PayoutsFilterBarProps {
    */
   showHideClosedToggle?: boolean;
   /**
+   * stracchino-92108: when true, render the "Hide possible scams" checkbox.
+   * By-city view only, mirroring showHideClosedToggle. Defaults to false.
+   */
+  showHideScamsToggle?: boolean;
+  /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
    * hard-scoped by their `regionFilter` prop). Defaults to false.
@@ -114,6 +119,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.sort && filters.sort !== 'created_desc') n += 1;
   // pinsa-92103: count Hide closed cities so admins see they've hidden rows.
   if (filters.hideClosed) n += 1;
+  // stracchino-92108: count Hide possible scams alongside Hide closed cities.
+  if (filters.hideScams) n += 1;
   return n;
 }
 
@@ -136,6 +143,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   availableCurrencies,
   availableTags,
   showHideClosedToggle,
+  showHideScamsToggle,
   showRegionsFilter,
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -424,6 +432,17 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.hideClosed}
                 onChange={() => update({ hideClosed: !filters.hideClosed })}
                 label="Hide closed cities"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* stracchino-92108: Hide possible-scam-flagged cities. By-city view only,
+                same as Hide closed cities. */}
+            {showHideScamsToggle && (
+              <Checkbox
+                checked={!!filters.hideScams}
+                onChange={() => update({ hideScams: !filters.hideScams })}
+                label="Hide possible scams"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />

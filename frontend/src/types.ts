@@ -2109,6 +2109,11 @@ export interface AdminPayoutFilters {
    * closed cities (with the ✓ Closed pill).
    */
   hideClosed?: boolean;
+  /**
+   * stracchino-92108: hide cities flagged with the `possible-scam` event tag
+   * (bottarga-92104). By-city endpoint only, like hideClosed. Default true.
+   */
+  hideScams?: boolean;
 }
 
 export interface AdminPayoutTotals {

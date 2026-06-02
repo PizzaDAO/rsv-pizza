@@ -4319,6 +4319,10 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.hideClosed) {
     params.set('hideClosed', 'true');
   }
+  // stracchino-92108: hide possible-scam-flagged cities on the by-city view.
+  if (filters.hideScams) {
+    params.set('hideScams', 'true');
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
