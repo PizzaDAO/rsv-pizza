@@ -1,13 +1,16 @@
 /**
- * focaccia-89172: ISO 4217 currency options for the receipt-row currency
- * override dropdown. OCR sometimes misreads `₹` as `$` (or similar) and the
- * FX conversion is then off by ~80x — hosts pick the correct code from this
- * list to re-trigger the conversion.
+ * focaccia-89172 / pomodoro-58219: ISO 4217 currency options for the
+ * receipt-row currency override dropdown. OCR sometimes misreads `₹` as `$`
+ * (or similar) and the FX conversion is then off by ~80x — hosts pick the
+ * correct code from this list to re-trigger the conversion.
  *
- * The list is intentionally finite (~40 codes) — covers the major fiat
- * currencies + the ones we see most in GPP receipts (Africa, LATAM, MENA,
- * APAC). All five "Common" entries are popular OCR-misread targets.
+ * As of pomodoro-58219 the list derives from the canonical `./iso4217`
+ * dataset (full active ISO 4217 fiat set, ~157 codes) instead of a separate
+ * hand-curated ~40-code list. The exported API is unchanged so
+ * `CurrencyOverrideSelect.tsx` needs no edits. `COMMON_CURRENCY_CODES` still
+ * drives the small "Common" optgroup; the full set fills the "All" optgroup.
  */
+import { ISO_4217 } from './iso4217';
 
 export interface CurrencyOption {
   code: string;
@@ -28,55 +31,68 @@ export const COMMON_CURRENCY_CODES: readonly string[] = [
 ];
 
 /**
- * Full ~40-code list. Sorted alphabetically by label for the "All" optgroup.
- * Symbols are informational only — the FX lookup uses the ISO code.
+ * Curated currency symbols, retained for the codes we historically displayed
+ * with one. Symbols are informational only — the FX lookup uses the ISO code,
+ * and codes not in this map simply render without a symbol.
  */
-export const COMMON_CURRENCIES: CurrencyOption[] = [
-  { code: 'AED', label: 'AED — UAE Dirham', symbol: 'د.إ' },
-  { code: 'ARS', label: 'ARS — Argentine Peso', symbol: '$' },
-  { code: 'AUD', label: 'AUD — Australian Dollar', symbol: 'A$' },
-  { code: 'BRL', label: 'BRL — Brazilian Real', symbol: 'R$' },
-  { code: 'CAD', label: 'CAD — Canadian Dollar', symbol: 'C$' },
-  { code: 'CHF', label: 'CHF — Swiss Franc', symbol: 'CHF' },
-  { code: 'CLP', label: 'CLP — Chilean Peso', symbol: '$' },
-  { code: 'CNY', label: 'CNY — Chinese Yuan', symbol: '¥' },
-  { code: 'COP', label: 'COP — Colombian Peso', symbol: '$' },
-  { code: 'CZK', label: 'CZK — Czech Koruna', symbol: 'Kč' },
-  { code: 'DKK', label: 'DKK — Danish Krone', symbol: 'kr' },
-  { code: 'EGP', label: 'EGP — Egyptian Pound', symbol: 'E£' },
-  { code: 'EUR', label: 'EUR — Euro', symbol: '€' },
-  { code: 'GBP', label: 'GBP — British Pound', symbol: '£' },
-  { code: 'GHS', label: 'GHS — Ghanaian Cedi', symbol: '₵' },
-  { code: 'HKD', label: 'HKD — Hong Kong Dollar', symbol: 'HK$' },
-  { code: 'HUF', label: 'HUF — Hungarian Forint', symbol: 'Ft' },
-  { code: 'IDR', label: 'IDR — Indonesian Rupiah', symbol: 'Rp' },
-  { code: 'ILS', label: 'ILS — Israeli Shekel', symbol: '₪' },
-  { code: 'INR', label: 'INR — Indian Rupee', symbol: '₹' },
-  { code: 'JPY', label: 'JPY — Japanese Yen', symbol: '¥' },
-  { code: 'KES', label: 'KES — Kenyan Shilling', symbol: 'KSh' },
-  { code: 'KRW', label: 'KRW — South Korean Won', symbol: '₩' },
-  { code: 'MAD', label: 'MAD — Moroccan Dirham', symbol: 'د.م.' },
-  { code: 'MXN', label: 'MXN — Mexican Peso', symbol: '$' },
-  { code: 'MYR', label: 'MYR — Malaysian Ringgit', symbol: 'RM' },
-  { code: 'NGN', label: 'NGN — Nigerian Naira', symbol: '₦' },
-  { code: 'NOK', label: 'NOK — Norwegian Krone', symbol: 'kr' },
-  { code: 'NZD', label: 'NZD — New Zealand Dollar', symbol: 'NZ$' },
-  { code: 'PEN', label: 'PEN — Peruvian Sol', symbol: 'S/' },
-  { code: 'PHP', label: 'PHP — Philippine Peso', symbol: '₱' },
-  { code: 'PLN', label: 'PLN — Polish Złoty', symbol: 'zł' },
-  { code: 'QAR', label: 'QAR — Qatari Riyal', symbol: 'ر.ق' },
-  { code: 'RON', label: 'RON — Romanian Leu', symbol: 'lei' },
-  { code: 'RUB', label: 'RUB — Russian Ruble', symbol: '₽' },
-  { code: 'SAR', label: 'SAR — Saudi Riyal', symbol: 'ر.س' },
-  { code: 'SEK', label: 'SEK — Swedish Krona', symbol: 'kr' },
-  { code: 'SGD', label: 'SGD — Singapore Dollar', symbol: 'S$' },
-  { code: 'THB', label: 'THB — Thai Baht', symbol: '฿' },
-  { code: 'TRY', label: 'TRY — Turkish Lira', symbol: '₺' },
-  { code: 'TWD', label: 'TWD — Taiwan Dollar', symbol: 'NT$' },
-  { code: 'USD', label: 'USD — US Dollar', symbol: '$' },
-  { code: 'VND', label: 'VND — Vietnamese Dong', symbol: '₫' },
-  { code: 'ZAR', label: 'ZAR — South African Rand', symbol: 'R' },
-];
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  AED: 'د.إ',
+  ARS: '$',
+  AUD: 'A$',
+  BRL: 'R$',
+  CAD: 'C$',
+  CHF: 'CHF',
+  CLP: '$',
+  CNY: '¥',
+  COP: '$',
+  CZK: 'Kč',
+  DKK: 'kr',
+  EGP: 'E£',
+  EUR: '€',
+  GBP: '£',
+  GHS: '₵',
+  HKD: 'HK$',
+  HUF: 'Ft',
+  IDR: 'Rp',
+  ILS: '₪',
+  INR: '₹',
+  JPY: '¥',
+  KES: 'KSh',
+  KRW: '₩',
+  MAD: 'د.م.',
+  MXN: '$',
+  MYR: 'RM',
+  NGN: '₦',
+  NOK: 'kr',
+  NZD: 'NZ$',
+  PEN: 'S/',
+  PHP: '₱',
+  PLN: 'zł',
+  QAR: 'ر.ق',
+  RON: 'lei',
+  RUB: '₽',
+  SAR: 'ر.س',
+  SEK: 'kr',
+  SGD: 'S$',
+  THB: '฿',
+  TRY: '₺',
+  TWD: 'NT$',
+  USD: '$',
+  VND: '₫',
+  ZAR: 'R',
+};
+
+/**
+ * The FULL ISO 4217 fiat set (despite the legacy "COMMON" name, kept for
+ * API compatibility). `label` is "CODE — Name"; `symbol` is present only for
+ * the curated codes above. `CurrencyOverrideSelect` filters this with
+ * `COMMON_CURRENCY_CODE_SET` for its "All" optgroup and sorts by label.
+ */
+export const COMMON_CURRENCIES: CurrencyOption[] = ISO_4217.map((e) => ({
+  code: e.code,
+  label: `${e.code} — ${e.name}`,
+  ...(CURRENCY_SYMBOLS[e.code] ? { symbol: CURRENCY_SYMBOLS[e.code] } : {}),
+}));
 
 /**
  * The set of codes that count as "common" — used by the dropdown to render
@@ -86,9 +102,8 @@ export const COMMON_CURRENCY_CODE_SET: ReadonlySet<string> = new Set(COMMON_CURR
 
 /**
  * Look up a CurrencyOption by code (case-insensitive). Returns undefined when
- * the code isn't in our pre-populated list (which is fine — the dropdown
- * still renders the unknown code as a fallback option so the OCR-detected
- * value isn't lost).
+ * the code isn't in the set (the dropdown still renders the unknown code as a
+ * fallback option so the OCR-detected value isn't lost).
  */
 export function findCurrency(code: string | null | undefined): CurrencyOption | undefined {
   if (!code) return undefined;
