@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Star, Download, Trash2, User, Calendar, Tag, CheckCircle2, XCircle, Clock, MessageSquare, ThumbsUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
@@ -88,6 +88,29 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
     }
   }, [hasNext, currentIndex, photos, onNavigate]);
 
+  // nduja-58297: swipe-to-navigate on the photo container (mobile).
+  // Threshold: 50px horizontal AND horizontal dominant over vertical so
+  // info-panel vertical scrolling doesn't get hijacked.
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) { touchStartXRef.current = null; return; }
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+    const dy = e.changedTouches[0].clientY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx > 0 && hasPrev) navigatePrev();
+    else if (dx < 0 && hasNext) navigateNext();
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -173,9 +196,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
+        aria-label="Close"
+        className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors z-20"
+        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
       >
-        <X size={24} />
+        <X size={28} strokeWidth={2.5} />
       </button>
 
       {/* Navigation Arrows */}
@@ -185,9 +210,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             e.stopPropagation();
             navigatePrev();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
+          aria-label="Previous photo"
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors z-20"
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ChevronLeft size={32} />
+          <ChevronLeft size={32} strokeWidth={2.5} />
         </button>
       )}
 
@@ -197,9 +224,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
             e.stopPropagation();
             navigateNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-theme-text-secondary hover:text-theme-text p-2 rounded-full bg-theme-surface-hover hover:bg-theme-surface-hover transition-colors z-10"
+          aria-label="Next photo"
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors z-20"
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
         >
-          <ChevronRight size={32} />
+          <ChevronRight size={32} strokeWidth={2.5} />
         </button>
       )}
 
@@ -209,7 +238,11 @@ export const PhotoModal: React.FC<PhotoModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Photo/Video */}
-        <div className="flex-1 flex items-center justify-center min-h-0">
+        <div
+          className="flex-1 flex items-center justify-center min-h-0"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <MediaThumb
             key={photo.id}
             src={photo.url}
