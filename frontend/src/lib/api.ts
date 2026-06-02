@@ -4635,6 +4635,31 @@ export async function unapproveAdminPayout(
 }
 
 /**
+ * brie-92108: revert a `rejected` payout back to `pending`. Rejection was a
+ * one-way terminal state with no undo. This lets admins flip rejected ->
+ * pending so they can re-review.
+ *
+ * Backend validates the current status is 'rejected' (400 NOT_REJECTED
+ * otherwise) and writes a payout_audit row with action='unreject'.
+ */
+export async function unrejectAdminPayout(
+  id: string,
+  noteOrOpts?: string | { note?: string; regions?: string[] },
+): Promise<AdminPayout> {
+  // Backward-compat: callers passing a bare `note` string still work.
+  const note = typeof noteOrOpts === 'string' ? noteOrOpts : noteOrOpts?.note;
+  const regions = typeof noteOrOpts === 'string' ? undefined : noteOrOpts?.regions;
+  const res = await apiRequest<{ payout: AdminPayout }>(
+    `/api/admin/payouts/${id}/unreject${regionsQuery(regions)}`,
+    {
+      method: 'POST',
+      body: { note },
+    },
+  );
+  return res.payout;
+}
+
+/**
  * culatello-92103: revert a `paid` payout back to `approved`. The previous
  * "Revert to Pending" affordance only worked for `approved` rows — there
  * was no way to undo an out-of-band `mark-paid` (wire, mercury_card,

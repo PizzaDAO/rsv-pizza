@@ -3373,6 +3373,102 @@ router.post(
 );
 
 // ============================================
+// POST /api/admin/payouts/:id/unreject
+//
+// brie-92108: revert a `rejected` payout back to `pending` so the admin can
+// re-review. Mirrors `unapprove` (approved -> pending) one step over for the
+// rejected terminal state — rejection was previously a one-way door.
+//
+// Atomic via prisma.$transaction:
+//   1. Lookup payout (404 if missing).
+//   2. Validate status === 'rejected' (400 NOT_REJECTED otherwise).
+//   3. status -> 'pending'; clear rejectionReason + reviewedAt + reviewedBy.
+//   4. Write payout_audit row with action='unreject'.
+// ============================================
+router.post(
+  '/:id/unreject',
+  requireAuth,
+  // argentina-92103: regional underbosses can REVERT rejected payouts on
+  // parties in their region (via `?regions=`). Per-row scope check below.
+  requireAdminOrRegionalUnderboss(),
+  async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const actor = await loadActor(req);
+      const existing = await prisma.payout.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true, hostUserId: true, partyId: true },
+      });
+
+      if (!existing) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+      if (existing.status !== 'rejected') {
+        throw new AppError(
+          `Cannot unreject a payout in status '${existing.status}'`,
+          400,
+          'NOT_REJECTED',
+        );
+      }
+
+      assertNotSelfPayout(actor, existing.hostUserId);
+
+      // argentina-92103: underboss-scope gate.
+      if (req.viewerRole === 'underboss') {
+        const regionsFromQuery = parseRegionsQuery(req.query.regions) ?? [];
+        const party = await prisma.party.findUnique({
+          where: { id: existing.partyId },
+          select: { region: true },
+        });
+        if (!party?.region || !regionsFromQuery.includes(party.region)) {
+          throw new AppError('This event is outside your region scope.', 403, 'OUT_OF_SCOPE');
+        }
+      }
+
+      const { note } = req.body || {};
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.payout.update({
+          where: { id: existing.id },
+          data: {
+            status: 'pending',
+            rejectionReason: null,
+            reviewedAt: null,
+            reviewedBy: null,
+          },
+          include: {
+            party: { select: PAYOUT_PARTY_SELECT },
+            host: { select: { id: true, name: true, email: true } },
+            documents: {
+              orderBy: { sortOrder: 'asc' },
+              include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+            },
+            audits: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: existing.id,
+            action: 'unreject',
+            oldStatus: 'rejected',
+            newStatus: 'pending',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: typeof note === 'string' ? note : null,
+          },
+        });
+
+        return row;
+      });
+
+      res.json({ payout: serializePayout(updated) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
 // POST /api/admin/payouts/:id/reject
 // ============================================
 router.post(
