@@ -991,7 +991,7 @@ export function EventPage() {
                     <GPPBadge community={event.underbossStatus === 'listed'} />
                   </div>
                 )}
-                <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0" data-testid="event-name" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
+                <h1 className="text-4xl md:text-5xl font-bold text-theme-text mb-0 break-words" data-testid="event-name" style={{ fontFamily: "'Rubik', sans-serif" }}>{event.name}</h1>
               </div>
 
               {/* Mobile: Host Info */}
@@ -1066,9 +1066,9 @@ export function EventPage() {
                         </div>
                         <div>
                           {event.venueName && (
-                            <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                            <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors break-words">{event.venueName}</p>
                           )}
-                          <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                          <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'} break-words`}>{event.address}</p>
                         </div>
                       </a>
                     )}
@@ -1210,9 +1210,9 @@ export function EventPage() {
                     </div>
                     <div>
                       {event.venueName && (
-                        <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors">{event.venueName}</p>
+                        <p className="text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors break-words">{event.venueName}</p>
                       )}
-                      <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'}`}>{event.address}</p>
+                      <p className={`${event.venueName ? 'text-base text-theme-text-secondary' : 'text-lg font-medium text-theme-text group-hover:text-[#ff393a] transition-colors'} break-words`}>{event.address}</p>
                     </div>
                   </a>
                 )}
@@ -1356,7 +1356,7 @@ export function EventPage() {
                 {/* Description + Sponsor Blurbs */}
                 {(event.description || (event.sponsors && event.sponsors.filter(s => s.brandDescription).length > 0)) && (
                   <div className="border-y border-theme-stroke/50 py-4 mt-4">
-                    <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none">
+                    <div className="text-theme-text leading-relaxed prose prose-invert prose-lg max-w-none break-words [overflow-wrap:anywhere]">
                       {event.description && (() => {
                         const isDefaultGpp = event.description!.startsWith('On May 22, 2010, two pizzas changed the world');
                         const displayDescription = (isDefaultGpp && i18n.language !== 'en') ? t('gppDefaultDescription') : event.description!;
@@ -1474,9 +1474,9 @@ export function EventPage() {
                 {event.address && (
                   <div className="md:hidden border-t border-theme-stroke pt-6 mt-6">
                     {event.venueName && (
-                      <p className="text-theme-text font-medium mb-1">{event.venueName}</p>
+                      <p className="text-theme-text font-medium mb-1 break-words">{event.venueName}</p>
                     )}
-                    <a href={googleMapsUrl!} target="_blank" rel="noopener noreferrer" className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3 block hover:underline`}>{event.address}</a>
+                    <a href={googleMapsUrl!} target="_blank" rel="noopener noreferrer" className={`${event.venueName ? 'text-theme-text-secondary text-sm' : 'text-theme-text font-medium'} mb-3 block hover:underline break-words`}>{event.address}</a>
                     {/* Interactive venue map */}
                     <div className="block w-full h-48 bg-theme-surface rounded-lg overflow-hidden relative">
                       <VenueMap
