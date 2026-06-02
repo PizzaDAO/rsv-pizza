@@ -1219,58 +1219,64 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // an orphan payout_documents row.
     const payout = await prisma.$transaction(async (tx) => {
       const now = new Date();
-      const docsToCreateStamped = await Promise.all(
-        docsToCreate.map(async (d) => {
-          let photoId: string | null = d.photoId;
-          if (d.kind === 'pizza') {
-            // sicilian-58196: dedup pre-check. If a photo with the same
-            // (partyId, fileSize, mimeType) already exists, reuse its id
-            // instead of inserting a new row. Same bytes uploaded a second
-            // time via the payout flow should NOT create a duplicate row in
-            // the canonical `photos` table.
-            const dup = await tx.photo.findFirst({
-              where: {
+      // guanciale-92108: sequential (not Promise.all) — concurrent queries on the interactive tx client + the default 5s timeout blew up on large multi-photo submissions ("Transaction already closed" 500). Serial also makes the sicilian-58196 dedup catch intra-submission duplicates.
+      const docsToCreateStamped: Array<
+        (typeof docsToCreate)[number] & {
+          partyId: string;
+          uploadedByUserId: string | null;
+          uploadedByEmail: string | null;
+        }
+      > = [];
+      for (const d of docsToCreate) {
+        let photoId: string | null = d.photoId;
+        if (d.kind === 'pizza') {
+          // sicilian-58196: dedup pre-check. If a photo with the same
+          // (partyId, fileSize, mimeType) already exists, reuse its id
+          // instead of inserting a new row. Same bytes uploaded a second
+          // time via the payout flow should NOT create a duplicate row in
+          // the canonical `photos` table.
+          const dup = await tx.photo.findFirst({
+            where: {
+              partyId,
+              fileSize: d.fileSize,
+              mimeType: d.mimeType,
+            },
+            select: { id: true },
+          });
+          if (dup) {
+            photoId = dup.id;
+          } else {
+            const photo = await tx.photo.create({
+              data: {
                 partyId,
+                url: d.url,
+                fileName: d.fileName,
                 fileSize: d.fileSize,
                 mimeType: d.mimeType,
+                // uploadedBy is a Guest FK; payout submitters are Users.
+                // Leave null and rely on uploaderEmail for attribution.
+                uploadedBy: null,
+                uploaderName: null,
+                uploaderEmail: uploaderEmail,
+                status: 'approved',
+                starred: true,
+                starredAt: now,
+                reviewedAt: now,
+                reviewedBy: uploaderUserId,
               },
               select: { id: true },
             });
-            if (dup) {
-              photoId = dup.id;
-            } else {
-              const photo = await tx.photo.create({
-                data: {
-                  partyId,
-                  url: d.url,
-                  fileName: d.fileName,
-                  fileSize: d.fileSize,
-                  mimeType: d.mimeType,
-                  // uploadedBy is a Guest FK; payout submitters are Users.
-                  // Leave null and rely on uploaderEmail for attribution.
-                  uploadedBy: null,
-                  uploaderName: null,
-                  uploaderEmail: uploaderEmail,
-                  status: 'approved',
-                  starred: true,
-                  starredAt: now,
-                  reviewedAt: now,
-                  reviewedBy: uploaderUserId,
-                },
-                select: { id: true },
-              });
-              photoId = photo.id;
-            }
+            photoId = photo.id;
           }
-          return {
-            ...d,
-            partyId,
-            uploadedByUserId: uploaderUserId,
-            uploadedByEmail: uploaderEmail,
-            photoId,
-          };
-        }),
-      );
+        }
+        docsToCreateStamped.push({
+          ...d,
+          partyId,
+          uploadedByUserId: uploaderUserId,
+          uploadedByEmail: uploaderEmail,
+          photoId,
+        });
+      }
 
       return tx.payout.create({
         data: {
@@ -1319,7 +1325,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           },
         },
       });
-    });
+    }, { timeout: 20000, maxWait: 10000 });
 
     // One-shot: persist the host's attendance estimate to the party, but only
     // if it hasn't already been set. updateMany no-ops gracefully when the row
