@@ -207,6 +207,43 @@ function stripGppPrefix(name: string): string {
   return name.replace(/^Global Pizza Party\s+/i, '');
 }
 
+// Receipt overrides applied locally after an inline receipt edit, before the
+// by-party feed is re-fetched. Keyed by docId within a party. Hoisted to
+// module scope so the Send-payment merge helper and the in-component state can
+// share one type.
+type ParentReceiptOverride = {
+  ocrAmount: number | null;
+  isDuplicate?: boolean;
+  ineligible?: boolean;
+};
+
+// mascarpone-49118: merge a party's in-memory receipt overrides into the row's
+// receipt documents so the Send-payment modal's default amount reflects unsaved
+// receipt edits without a full page refresh. Mirrors the by-city Receipt total
+// cell's `ov?.x ?? d.x` precedence.
+function applyReceiptOverridesToRow(
+  row: PartyPayoutsRow,
+  overrides: Record<string, ParentReceiptOverride> | undefined,
+): PartyPayoutsRow {
+  if (!overrides || Object.keys(overrides).length === 0) return row;
+  return {
+    ...row,
+    payouts: row.payouts.map((p) => ({
+      ...p,
+      documents: (p.documents ?? []).map((d) => {
+        const ov = overrides[d.id];
+        if (!ov) return d;
+        return {
+          ...d,
+          ocrAmount: ov.ocrAmount ?? d.ocrAmount,
+          isDuplicate: ov.isDuplicate ?? d.isDuplicate,
+          ineligible: ov.ineligible ?? d.ineligible,
+        };
+      }),
+    })),
+  };
+}
+
 function relativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
   const min = Math.floor(diff / 60000);
@@ -2407,11 +2444,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const [tagOverrides, setTagOverrides] = useState<Record<string, string[]>>({});
   // Receipt overrides state lifted to parent so both the collapsed row and
   // expanded panel see the same data. Keyed by partyId then docId.
-  type ParentReceiptOverride = {
-    ocrAmount: number | null;
-    isDuplicate?: boolean;
-    ineligible?: boolean;
-  };
+  // (`ParentReceiptOverride` is declared at module scope.)
   const [receiptOverridesByParty, setReceiptOverridesByParty] = useState<
     Record<string, Record<string, ParentReceiptOverride>>
   >({});
@@ -2922,7 +2955,13 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           }
                           onSendPayment={
                             canSendPayment && onSendPayment
-                              ? () => onSendPayment(row)
+                              ? () =>
+                                  onSendPayment(
+                                    applyReceiptOverridesToRow(
+                                      row,
+                                      partyOverrides,
+                                    ),
+                                  )
                               : undefined
                           }
                           onToggleScamFlag={
