@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2, Play } from 'lucide-react';
 import { Payout, PayoutStatus } from '../../types';
 import { cancelPayout, getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
@@ -61,6 +62,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   onWithdrawn,
 }) => {
   const { user } = useAuth();
+  const { t } = useTranslation('host');
   const [payout, setPayout] = useState<Payout | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,11 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     open: false,
     initialIndex: 0,
   });
+  // soppressata-92110: the lightbox owns its own index internally; mirror the
+  // currently-displayed index here so we can paint the read-only DUPLICATE /
+  // INELIGIBLE banners on the matching doc (admin viewers get the editor, but
+  // hosts only see these flags — no toggle).
+  const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState(0);
 
   // New uploads since edit-mode was opened (existing docs aren't re-uploaded).
   const [newReceipts, setNewReceipts] = useState<ReceiptItem[]>([]);
@@ -169,17 +176,26 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     () => (payout?.documents ?? []).filter(d => d.kind === 'pizza'),
     [payout]
   );
+  // soppressata-92110: keep the doc list parallel to `lightboxImages` so we can
+  // look up the flags for whatever index the lightbox is currently showing.
+  const lightboxDocs = useMemo(
+    () => [...viewReceipts, ...viewPizzaPhotos],
+    [viewReceipts, viewPizzaPhotos]
+  );
   const lightboxImages = useMemo(
     () =>
-      [...viewReceipts, ...viewPizzaPhotos].map(d => ({
+      lightboxDocs.map(d => ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
       })),
-    [viewReceipts, viewPizzaPhotos]
+    [lightboxDocs]
   );
   const receiptsLightboxOffset = 0;
   const pizzasLightboxOffset = viewReceipts.length;
+  // soppressata-92110: the doc currently shown in the lightbox (receipts only
+  // carry the flags; pizza photos never do).
+  const lightboxCurrentDoc = lightboxDocs[lightboxCurrentIndex] ?? null;
 
   const isProcessingUploads =
     newReceipts.some(r => r.status === 'uploading' || r.status === 'ocring') ||
@@ -482,8 +498,20 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 <div>
                   <p className="text-xs text-theme-text-muted mb-2">Receipts</p>
                   <ul className="space-y-2">
-                    {viewReceipts.map((d, idx) => (
-                      <li key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover">
+                    {viewReceipts.map((d, idx) => {
+                      // soppressata-92110: surface (read-only) the admin
+                      // exclusion flags. Duplicate wins when both are set —
+                      // mirrors the admin grid convention. Hosts can't toggle.
+                      const isDup = d.isDuplicate === true;
+                      const isIne = d.ineligible === true && !isDup;
+                      const flagged = isDup || isIne;
+                      return (
+                      <li
+                        key={d.id}
+                        className={`flex items-center gap-3 p-2 rounded-lg bg-theme-surface-hover ${
+                          flagged ? 'opacity-60' : ''
+                        }`}
+                      >
                         {/* bresaola-89172: thumbnail opens the shared lightbox
                             instead of popping the raw URL in a new tab.
                             bocconcino-92104: PDFs render via their sibling
@@ -492,7 +520,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setLightboxState({ open: true, initialIndex: receiptsLightboxOffset + idx })}
-                          className="flex-shrink-0 rounded overflow-hidden hover:opacity-80 transition-opacity"
+                          className="relative flex-shrink-0 rounded overflow-hidden hover:opacity-80 transition-opacity"
                           aria-label={`Open ${d.fileName}`}
                           title={d.fileName}
                         >
@@ -501,6 +529,19 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                             alt={d.fileName}
                             className="w-14 h-14 object-cover block"
                           />
+                          {/* soppressata-92110: diagonal-stripe overlay echoes
+                              the lightbox banner so flagged receipts read as
+                              "excluded" even at thumbnail size. */}
+                          {flagged && (
+                            <span
+                              className="absolute inset-0 pointer-events-none"
+                              style={{
+                                backgroundImage: isDup
+                                  ? 'repeating-linear-gradient(45deg, rgba(239,68,68,0.30) 0 4px, transparent 4px 8px)'
+                                  : 'repeating-linear-gradient(135deg, rgba(245,158,11,0.30) 0 4px, transparent 4px 8px)',
+                              }}
+                            />
+                          )}
                         </button>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-theme-text truncate">{d.fileName}</p>
@@ -522,12 +563,34 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                             </p>
                           )}
                         </div>
+                        {/* soppressata-92110: read-only exclusion pill. Explicit
+                            text colors (not theme vars) — this modal portals
+                            outside `.gpp-theme` so theme vars don't resolve. */}
+                        {isDup && (
+                          <span className="flex-shrink-0 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-[#ffffff]">
+                            {t('payouts.duplicatePill')}
+                          </span>
+                        )}
+                        {isIne && (
+                          <span className="flex-shrink-0 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-[#ffffff]">
+                            {t('payouts.ineligiblePill')}
+                          </span>
+                        )}
                         <a href={d.url} target="_blank" rel="noreferrer" className="p-1 text-theme-text-muted hover:text-theme-text" title="Open raw file">
                           <ExternalLink size={14} />
                         </a>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
+                  {/* soppressata-92110: explain why a flagged receipt's amount
+                      doesn't count toward the host's reimbursement total. Only
+                      shown when at least one receipt is flagged. */}
+                  {viewReceipts.some(d => d.isDuplicate === true || d.ineligible === true) && (
+                    <p className="text-xs text-theme-text-muted mt-2 italic">
+                      {t('payouts.excludedNote')}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -853,6 +916,17 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
         images={lightboxImages}
         initialIndex={lightboxState.initialIndex}
         onClose={() => setLightboxState({ open: false, initialIndex: 0 })}
+        onIndexChange={setLightboxCurrentIndex}
+        /* soppressata-92110: READ-ONLY duplicate / ineligible banners so hosts
+           can see which receipts an admin excluded from their total. No
+           onDuplicateShortcut / editorPane — hosts can't toggle these flags.
+           Duplicate wins when both are set (pass ineligible only when NOT a
+           duplicate), matching the admin convention. */
+        isDuplicate={lightboxCurrentDoc?.isDuplicate === true}
+        isIneligible={
+          lightboxCurrentDoc?.ineligible === true
+          && lightboxCurrentDoc?.isDuplicate !== true
+        }
       />
     </div>
   );

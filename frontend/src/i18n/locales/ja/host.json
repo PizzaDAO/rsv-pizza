@@ -814,5 +814,11 @@
       "daysAgo": "{{count}}日前",
       "recentRsvps": "最近のRSVP"
     }
+  },
+  "payouts": {
+    "excludedNote": "「重複」または「対象外」とマークされたレシートや項目は、払い戻し合計から除外されます。",
+    "duplicatePill": "重複",
+    "ineligiblePill": "対象外",
+    "ineligibleLineTag": "対象外"
   }
 }

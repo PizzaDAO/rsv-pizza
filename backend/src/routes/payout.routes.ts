@@ -131,6 +131,11 @@ function serializeDocument(d: any) {
     exchangeRate: d.exchangeRate != null ? numberFromDecimal(d.exchangeRate) : null,
     ocrError: d.ocrError ?? null,
     sortOrder: d.sortOrder,
+    // soppressata-92110: surface admin exclusion flags read-only so hosts can
+    // see which receipts / OCR line items were excluded from their total.
+    isDuplicate: d.isDuplicate ?? false,
+    ineligible: d.ineligible ?? false,
+    ocrLineItems: d.ocrLineItems ?? null,
     // pancetta-37195: surface the per-doc uploader so cohosts can tell who
     // attached each receipt/photo. Live name from the join; cached email is
     // the fallback if the User row is later deleted.
@@ -1457,6 +1462,10 @@ router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: R
         ocrAmount: d.ocrAmount != null ? numberFromDecimal(d.ocrAmount) : null,
         ocrCurrency: d.ocrCurrency ?? null,
         ocrConfidence: d.ocrConfidence != null ? numberFromDecimal(d.ocrConfidence) : null,
+        // soppressata-92110: admin exclusion flags (read-only) so the library
+        // can dim + pill receipts excluded from the host's reimbursement total.
+        isDuplicate: d.isDuplicate ?? false,
+        ineligible: d.ineligible ?? false,
         // agnolotti-58291: uploader attribution. Falls back to cached email
         // if the User row is later deleted.
         uploadedByUserId: d.uploadedByUserId ?? null,

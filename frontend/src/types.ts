@@ -1662,6 +1662,11 @@ export interface ReceiptLibraryEntry {
   uploadedByUserId: string | null;
   uploadedByName: string | null;
   uploadedByEmail: string | null;
+  // soppressata-92110: admin exclusion flags (read-only) so the host receipts
+  // library can dim + pill receipts excluded from the reimbursement total.
+  // Optional on the wire so older cached payloads still type-check.
+  isDuplicate?: boolean;
+  ineligible?: boolean;
   createdAt: string;
 }
 export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
