@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2, Play } from 'lucide-react';
-import { Payout, PayoutStatus } from '../../types';
+import { X, Loader2, AlertCircle, ExternalLink, Pencil, StickyNote, DollarSign, Trash2, Play, ChevronDown, ChevronRight } from 'lucide-react';
+import { Payout, PayoutStatus, ReceiptLineItem } from '../../types';
 import { cancelPayout, getPayout, updatePayout, fetchAdminMe } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { methodIcon, methodLabel } from './PayoutListRow';
@@ -47,6 +47,89 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   paid: 'Paid',
   failed: 'Failed',
   withdrawn: 'Withdrawn',
+};
+
+/**
+ * capocollo-92111: read-only, expandable per-line-item breakdown rendered
+ * under a receipt row in the host payout modal. Self-contained so its
+ * open/closed `useState` lives BELOW its own (single, unconditional) hooks —
+ * keeping it out of the parent modal, which has early returns and would crash
+ * if a hook were declared below them.
+ *
+ * Display-only: lines an admin marked `ineligible` show struck-through + an
+ * amber tag (mirroring the receipt-level ineligible pill in this file). When
+ * the receipt has ≥1 ineligible line we render a per-receipt eligible
+ * subtotal (sum of the non-ineligible line subtotals); otherwise the subtotal
+ * would just duplicate the receipt's `ocrAmount`, so we omit it. Hosts cannot
+ * toggle anything here.
+ */
+const ReceiptLineItems: React.FC<{ items: ReceiptLineItem[] }> = ({ items }) => {
+  const { t } = useTranslation('host');
+  const [open, setOpen] = useState(false);
+
+  // Eligible total = sum of subtotals for lines NOT marked ineligible. Guard
+  // missing/null subtotal by falling back to unitPrice * qty (same fallback as
+  // the per-line amount below). Older payloads may omit `ineligible` entirely
+  // — treat absent as eligible.
+  const lineAmount = (li: ReceiptLineItem): number => {
+    if (li.subtotal != null && Number.isFinite(li.subtotal)) return li.subtotal;
+    const qty = li.qty && Number.isFinite(li.qty) ? li.qty : 0;
+    const unit = li.unitPrice && Number.isFinite(li.unitPrice) ? li.unitPrice : 0;
+    return unit * qty;
+  };
+  const hasIneligible = items.some(li => li.ineligible === true);
+  const eligibleTotal = items
+    .filter(li => li.ineligible !== true)
+    .reduce((sum, li) => sum + lineAmount(li), 0);
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-[10px] text-theme-text-muted hover:text-theme-text transition-colors"
+        aria-expanded={open}
+        aria-label={t('payouts.lineItemsToggle')}
+        title={t('payouts.lineItemsToggle')}
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span>{t('payouts.lineItemsToggle')} ({items.length})</span>
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 pl-4">
+          {items.map((li, i) => {
+            const ine = li.ineligible === true;
+            const qty = li.qty && Number.isFinite(li.qty) ? li.qty : 0;
+            const label = qty > 1 ? `${qty}x ${li.name}` : li.name;
+            const amount = lineAmount(li);
+            return (
+              <li key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                <span className={`min-w-0 truncate ${ine ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>
+                  {label}
+                </span>
+                <span className="flex items-center gap-1.5 flex-shrink-0">
+                  {ine && (
+                    <span className="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-amber-500 text-[#ffffff]">
+                      {t('payouts.ineligibleLineTag')}
+                    </span>
+                  )}
+                  <span className={ine ? 'line-through text-theme-text-muted' : 'text-theme-text-muted'}>
+                    ${amount.toFixed(2)}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+          {hasIneligible && (
+            <li className="flex items-center justify-between gap-2 text-[11px] font-medium border-t border-theme-border mt-1 pt-1">
+              <span className="text-theme-text">{t('payouts.eligibleLineTotal')}</span>
+              <span className="text-theme-text">${eligibleTotal.toFixed(2)}</span>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
 };
 
 /**
@@ -561,6 +644,14 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                             <p className="text-[10px] text-theme-text-muted truncate">
                               Uploaded by {d.uploadedByName ?? d.uploadedByEmail ?? 'Unknown'}
                             </p>
+                          )}
+                          {/* capocollo-92111: expandable per-line-item breakdown
+                              (read-only). Only rendered when the receipt carries
+                              structured OCR line items. Ineligible lines show
+                              struck-through + an amber tag; a per-receipt eligible
+                              subtotal appears when ≥1 line is ineligible. */}
+                          {d.ocrLineItems && d.ocrLineItems.length > 0 && (
+                            <ReceiptLineItems items={d.ocrLineItems} />
                           )}
                         </div>
                         {/* soppressata-92110: read-only exclusion pill. Explicit

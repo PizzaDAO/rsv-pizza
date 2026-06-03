@@ -819,6 +819,8 @@
     "excludedNote": "Belege oder Positionen, die als Duplikat oder Nicht erstattungsfähig markiert sind, werden von deiner Erstattungssumme ausgeschlossen.",
     "duplicatePill": "Duplikat",
     "ineligiblePill": "Nicht erstattungsfähig",
-    "ineligibleLineTag": "nicht erstattungsfähig"
+    "ineligibleLineTag": "nicht erstattungsfähig",
+    "lineItemsToggle": "Positionen",
+    "eligibleLineTotal": "Erstattungsfähige Summe"
   }
 }
