@@ -130,6 +130,7 @@ export function PrintTab() {
   const eventTags = party?.eventTags || [];
   return (
     <div className="space-y-8">
+      <PrintHeader />
       {party?.eventType === 'gpp' && (
         <>
           <section>
@@ -142,36 +143,41 @@ export function PrintTab() {
           </section>
         </>
       )}
-      <PrintContent eventTags={eventTags} />
+      <PrintContent eventTags={eventTags} showHeader={false} />
     </div>
   );
 }
 
-function PrintContent({ eventTags = [], showAllSwc = false }: { eventTags?: string[]; showAllSwc?: boolean }) {
+function PrintHeader() {
+  return (
+    <div className="text-center">
+      <h2 className="text-xl font-bold text-theme-text">Print Materials</h2>
+      <p className="text-sm text-theme-text-secondary mt-1">
+        Download print-ready materials for your event
+      </p>
+      <p className="text-sm text-theme-text-secondary mt-1">
+        Need something custom?{' '}
+        <a
+          href="https://www.figma.com/design/itTDjW8plqdUiEGIXlwBP8/PizzaDAO---Marketing?node-id=588-1909&t=gkFsmruefaXmimZs-1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#ff393a] hover:underline font-medium"
+        >
+          Browse the PizzaDAO Figma →
+        </a>
+      </p>
+    </div>
+  );
+}
+
+function PrintContent({ eventTags = [], showAllSwc = false, showHeader = true }: { eventTags?: string[]; showAllSwc?: boolean; showHeader?: boolean }) {
   const visibleSwcAssets = showAllSwc
     ? SWC_ASSETS
     : SWC_ASSETS.filter((s) => eventTags.includes(s.requireTag!));
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <h2 className="text-xl font-bold text-theme-text">Print Materials</h2>
-        <p className="text-sm text-theme-text-secondary mt-1">
-          Download print-ready materials for your event
-        </p>
-        <p className="text-sm text-theme-text-secondary mt-1">
-          Need something custom?{' '}
-          <a
-            href="https://www.figma.com/design/itTDjW8plqdUiEGIXlwBP8/PizzaDAO---Marketing?node-id=588-1909&t=gkFsmruefaXmimZs-1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#ff393a] hover:underline font-medium"
-          >
-            Browse the PizzaDAO Figma →
-          </a>
-        </p>
-      </div>
+      {showHeader && <PrintHeader />}
 
       {/* Stickers Section */}
       <section>
