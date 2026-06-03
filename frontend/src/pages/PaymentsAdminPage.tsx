@@ -129,6 +129,25 @@ function matchesPrepaySearch(row: PrepayQueueRow, q: string): boolean {
   return false;
 }
 
+/**
+ * bocconcini-92110: tally a city row's receipt OCR USD total — non-duplicate,
+ * eligible `kind='receipt'` documents across every payout. Mirrors the by-city
+ * Receipt total cell + the Mark-paid modal default so the amount sorts order
+ * cities by exactly what the admin sees in that column.
+ */
+function computeReceiptsTotalUsd(row: PartyPayoutsRow): number {
+  let total = 0;
+  for (const p of row.payouts) {
+    for (const d of p.documents || []) {
+      if (d.kind !== 'receipt') continue;
+      if (d.isDuplicate === true) continue;
+      if (d.ineligible === true) continue;
+      total += Number(d.ocrAmount) || 0;
+    }
+  }
+  return total;
+}
+
 export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPageProps = {}) {
   // argentina-92103: stable region list to thread into API calls + filter
   // defaults. `undefined` when running as the unscoped /payments dashboard.
@@ -567,6 +586,15 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       return [...filtered].sort((a, b) =>
         sort === 'created_asc' ? earliest(a) - earliest(b) : latest(b) - latest(a),
       );
+    }
+    // bocconcini-92110: "Highest/Lowest amount" should order cities by the
+    // Receipt total column the admin sees, not the backend by-party
+    // payout-sum order they'd otherwise fall through to.
+    if (sort === 'amount_desc' || sort === 'amount_asc') {
+      return [...filtered].sort((a, b) => {
+        const cmp = computeReceiptsTotalUsd(a) - computeReceiptsTotalUsd(b);
+        return sort === 'amount_asc' ? cmp : -cmp;
+      });
     }
     return filtered;
   }, [byPartyRows, filters.status, filters.sort]);
@@ -1233,15 +1261,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               // across every payout on the party. Matches the coppa-92105 +
               // provola-92106 semantics used by the by-city Receipt total
               // cell so the modal default lines up with what the admin sees.
-              let receiptsTotalUsd = 0;
-              for (const p of row.payouts) {
-                for (const d of p.documents || []) {
-                  if (d.kind !== 'receipt') continue;
-                  if (d.isDuplicate === true) continue;
-                  if (d.ineligible === true) continue;
-                  receiptsTotalUsd += Number(d.ocrAmount) || 0;
-                }
-              }
+              const receiptsTotalUsd = computeReceiptsTotalUsd(row);
               // Pull in each host's submitted USDC wallet so the modal can
               // pre-fill it per recipient. Walk payouts newest-first (ISO
               // createdAt sorts lexically) and keep the first non-empty wallet
