@@ -8,7 +8,7 @@ import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { buildScopedWhereClause, partyMatchesScope, UnderbossScope } from '../helpers/underbossScope.js';
 import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
-import { scoreEvent, buildSybilWalletSet } from '../lib/fakeDetection.js';
+import { scorePartiesByIds, buildSybilWalletSetFromDb } from '../lib/fakeDetectionScan.js';
 
 // Re-export the request type under the local name used throughout this file
 type UnderbossRequest = UnderbossAuthRequest;
@@ -399,126 +399,10 @@ router.get('/fake-detection', requireAuth, requireUnderbossAuth, async (req: Und
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    // Admin-only: see all GPP events.
-    const whereClause: { eventType: 'gpp' } = { eventType: 'gpp' };
-
-    // Cross-event wallet pre-pass — one raw query, then Set lookup per event.
-    // A wallet is "sybil" when it appears on ≥4 distinct events under ≥2 distinct trimmed-lower names.
-    const sybilRows = await prisma.$queryRaw<
-      Array<{ ethereum_address: string; party_ids: string[]; names: string[] }>
-    >`
-      SELECT
-        lower(ethereum_address) AS ethereum_address,
-        array_agg(DISTINCT party_id::text) AS party_ids,
-        array_agg(DISTINCT lower(trim(name))) AS names
-      FROM guests
-      WHERE ethereum_address IS NOT NULL
-        AND submitted_via IN ('link','rsvp','api')
-      GROUP BY lower(ethereum_address)
-      HAVING COUNT(DISTINCT party_id) >= 4
-    `;
-    const sybilWallets = buildSybilWalletSet(
-      sybilRows.map(r => ({
-        ethereumAddress: r.ethereum_address,
-        partyIds: r.party_ids,
-        names: r.names,
-      })),
-    );
-
-    const parties = await prisma.party.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        name: true,
-        customUrl: true,
-        country: true,
-        region: true,
-        timezone: true,
-        maxGuests: true,
-        createdAt: true,
-        underbossStatus: true,
-        coHosts: true,
-        user: { select: { id: true, name: true, email: true } },
-        guests: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            ethereumAddress: true,
-            submittedAt: true,
-            submittedVia: true,
-            waitlistPosition: true,
-            walletSource: true,
-            likedToppings: true,
-            dislikedToppings: true,
-            likedBeverages: true,
-            dislikedBeverages: true,
-            dietaryRestrictions: true,
-            roles: true,
-            pizzeriaRankings: true,
-            suggestedPizzerias: true,
-            mailingListOptIn: true,
-            visitorSessionId: true,
-            emailStatus: true,
-          },
-        },
-        linkClicks: {
-          select: { clickedAt: true },
-        },
-        rsvpFunnelEvents: {
-          select: { visitorHash: true, step: true, createdAt: true },
-        },
-      },
-    });
-
-    const rows: ReturnType<typeof scoreEvent>[] = parties.map(p =>
-      scoreEvent(
-        {
-          id: p.id,
-          name: p.name,
-          customUrl: p.customUrl,
-          country: p.country,
-          region: p.region,
-          timezone: p.timezone,
-          maxGuests: p.maxGuests,
-          createdAt: p.createdAt ?? new Date(0),
-          underbossStatus: p.underbossStatus ?? null,
-          user: p.user
-            ? { id: p.user.id, name: p.user.name, email: p.user.email }
-            : null,
-          coHosts: p.coHosts,
-        },
-        p.guests.map(g => ({
-          id: g.id,
-          name: g.name,
-          email: g.email,
-          ethereumAddress: g.ethereumAddress,
-          submittedAt: g.submittedAt,
-          submittedVia: g.submittedVia,
-          waitlistPosition: g.waitlistPosition,
-          walletSource: g.walletSource,
-          likedToppings: g.likedToppings,
-          dislikedToppings: g.dislikedToppings,
-          likedBeverages: g.likedBeverages,
-          dislikedBeverages: g.dislikedBeverages,
-          dietaryRestrictions: g.dietaryRestrictions,
-          roles: g.roles,
-          pizzeriaRankings: g.pizzeriaRankings,
-          suggestedPizzerias: g.suggestedPizzerias,
-          mailingListOptIn: g.mailingListOptIn,
-          visitorSessionId: g.visitorSessionId,
-          emailStatus: g.emailStatus,
-        })),
-        p.linkClicks.map(c => ({ clickedAt: c.clickedAt })),
-        sybilWallets,
-        p.maxGuests,
-        p.rsvpFunnelEvents.map(e => ({
-          visitorHash: e.visitorHash,
-          step: e.step,
-          createdAt: e.createdAt,
-        })),
-      ),
-    );
+    // Admin-only: score all GPP events via the shared scan helper.
+    // Compute the sybil set once so we can still report its count in meta.
+    const sybilWallets = await buildSybilWalletSetFromDb();
+    const rows = await scorePartiesByIds(undefined, sybilWallets);
 
     rows.sort((a, b) => b.score - a.score);
 

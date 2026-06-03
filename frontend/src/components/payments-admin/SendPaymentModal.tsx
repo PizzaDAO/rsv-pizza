@@ -82,6 +82,15 @@ interface SendPaymentModalProps {
    * admin doesn't have to re-type the address the host already gave us.
    */
   hostWalletByUserId?: Record<string, string>;
+  /**
+   * bufalina-60733: fake-detection risk for this party (looked up by the
+   * parent from the by-city score map at open time). When `fakeTier` is
+   * `medium`/`high`, the modal shows a caution card and gates "Send" behind
+   * an extra ack. Undefined / clean / low = no gate.
+   */
+  fakeScore?: number;
+  fakeTier?: string;
+  fakeTopFlags?: string[];
   onClose: () => void;
   /**
    * Called on a successful send. Receives the city name + method + amount so
@@ -107,6 +116,9 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   paidTotalUsd,
   primaryHostUserId,
   hostWalletByUserId,
+  fakeScore,
+  fakeTier,
+  fakeTopFlags,
   onClose,
   onSent,
 }) => {
@@ -226,6 +238,11 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   // SWC Hub ack — controlled, surfaced via the shared SwcHubWarning component.
   const [swcAck, setSwcAck] = useState(false);
 
+  // bufalina-60733: fake-detection ack. Required before sending when this party
+  // scored medium/high. Reset on recipient/amount change like the other acks.
+  const [fakeAck, setFakeAck] = useState(false);
+  const isFlagged = fakeTier === 'medium' || fakeTier === 'high';
+
   // Close on Escape.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -245,6 +262,13 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   useEffect(() => {
     createdPayoutIdRef.current = null;
   }, [recipientUserId, method, amountNum, walletAddress, bankEmail, mercuryCardLast4]);
+
+  // bufalina-60733: reset the fake-detection ack whenever the recipient or
+  // amount changes, so an ack made for one recipient/amount can't carry over
+  // to a different one (mirrors the cap/SWC ack-reset intent).
+  useEffect(() => {
+    setFakeAck(false);
+  }, [recipientUserId, amountNum]);
 
   // Cap math (salame-92103 mirror). Cap remaining = cap - already-paid. We
   // also include this in-flight amount in `wouldExceed` so the warning fires
@@ -298,6 +322,8 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
     (!partyWouldExceedCap || overridePartyCap) &&
     // parmigiana-92104: SWC Hub requires explicit ack.
     (!swcHub || swcAck) &&
+    // bufalina-60733: flagged (medium/high fake-detection) requires explicit ack.
+    (!isFlagged || fakeAck) &&
     !submitting &&
     !candidatesLoading;
 
@@ -649,6 +675,47 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
                       checked={overridePartyCap}
                       onChange={() => setOverridePartyCap((v) => !v)}
                       label="I acknowledge — proceed anyway"
+                      labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* bufalina-60733: fake-detection risk warning + ack. Shows when
+              this party scored medium/high; gates Send behind an explicit
+              acknowledgement (mirrors the cap-override ack card above). */}
+          {isFlagged && (
+            <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0"
+                  size={16}
+                />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                    Fake-detection risk on {cleanName}
+                  </div>
+                  <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                    This event scored{' '}
+                    <b>
+                      Risk {fakeScore ?? 0} ({fakeTier})
+                    </b>{' '}
+                    in fake-event detection. Review its flags before sending.
+                  </div>
+                  {fakeTopFlags && fakeTopFlags.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs text-theme-text-secondary [.gpp-theme_&]:text-amber-900 list-disc list-inside">
+                      {fakeTopFlags.map((f, i) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={fakeAck}
+                      onChange={() => setFakeAck((v) => !v)}
+                      label="I've reviewed this event's fake-detection flags"
                       labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
                     />
                   </div>

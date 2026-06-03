@@ -46,6 +46,7 @@ import {
   parseRegionsQuery,
   type RegionalAuthRequest,
 } from '../middleware/regionalUnderboss.js';
+import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 
 const router = Router();
 
@@ -2191,6 +2192,77 @@ router.get(
       });
 
       res.json({ rows: filteredRows, total: filteredRows.length });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ============================================
+// bufalina-60733: POST /api/admin/payouts/fake-detection-scores
+//
+// Surfaces each GPP party's existing fake-detection risk score (the same
+// scorer that backs /underboss's review queue) as a compact map for the
+// payments-admin by-city table badges + the send-payment confirmation gate.
+//
+// Body: { partyIds: string[] }  (string array, capped at 500).
+// Response: { scores: Record<partyId, { score, tier, topFlags }> }
+//   - `topFlags` = up to 3 fired-flag `detail` strings, highest weight first.
+//   - tier `clean` entries (score < 10) are OMITTED to keep the payload small;
+//     the frontend badge self-hides for anything below `medium` anyway.
+//
+// Auth: `requireAdminOrRegionalUnderboss()` — the SAME guard the by-party feed
+// uses — NOT the underboss `__admin__`-only gate, so regional underbosses who
+// drive the regional payment portals don't 403. This is a pure-read endpoint.
+//
+// Literal `/fake-detection-scores` MUST be declared before `/:id`.
+// ============================================
+router.post(
+  '/fake-detection-scores',
+  requireAuth,
+  requireAdminOrRegionalUnderboss(),
+  async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as { partyIds?: unknown };
+      const partyIds = body?.partyIds;
+      if (
+        !Array.isArray(partyIds) ||
+        !partyIds.every(id => typeof id === 'string')
+      ) {
+        throw new AppError(
+          'partyIds must be an array of strings',
+          400,
+          'INVALID_PARTY_IDS',
+        );
+      }
+      if (partyIds.length > 500) {
+        throw new AppError(
+          'partyIds may contain at most 500 ids',
+          400,
+          'TOO_MANY_PARTY_IDS',
+        );
+      }
+
+      const scores: Record<
+        string,
+        { score: number; tier: string; topFlags: string[] }
+      > = {};
+
+      if (partyIds.length > 0) {
+        const rows = await scorePartiesByIds(partyIds);
+        for (const r of rows) {
+          // Omit clean events to keep the payload small.
+          if (r.tier === 'clean') continue;
+          const topFlags = r.flags
+            .filter(f => f.fired)
+            .sort((a, b) => b.weight - a.weight)
+            .slice(0, 3)
+            .map(f => f.detail);
+          scores[r.id] = { score: r.score, tier: r.tier, topFlags };
+        }
+      }
+
+      res.json({ scores });
     } catch (error) {
       next(error);
     }
