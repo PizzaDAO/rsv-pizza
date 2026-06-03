@@ -67,15 +67,15 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
 
     await Promise.all(fileArr.map(async (file, i) => {
       const itemId = newItems[i].id;
-      const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, kind);
-      if (!uploaded) {
-        nextItems = nextItems.map(it => it.id === itemId
-          ? { ...it, status: 'error' as const, error: 'Upload failed' } : it);
-      } else {
+      try {
+        const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, kind);
         nextItems = nextItems.map(it => it.id === itemId
           ? { ...it, status: 'done' as const, url: uploaded.url,
               fileName: uploaded.fileName, fileSize: uploaded.fileSize, mimeType: uploaded.mimeType }
           : it);
+      } catch (err) {
+        nextItems = nextItems.map(it => it.id === itemId
+          ? { ...it, status: 'error' as const, error: err instanceof Error ? err.message : 'Upload failed' } : it);
       }
       onChange(nextItems);
     }));
