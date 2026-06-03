@@ -4185,6 +4185,8 @@ export interface ScorecardItem {
   metadata: Record<string, any>;
   createdAt: string;
   updatedAt: string;
+  /** panzerotti-58931: game category, derived server-side. */
+  category?: 'mission' | 'photo';
 }
 
 export interface ScorecardResponse {
@@ -4212,6 +4214,46 @@ export async function completeScorecardItem(
   return apiRequest<CompleteScorecardResponse>(`/api/scorecard/${inviteCode}/complete`, {
     method: 'POST',
     body: { itemKey, proofUrl, proofType },
+  });
+}
+
+// panzerotti-58931: party check-in game — leaderboard + superlatives
+
+export interface LeaderboardEntry {
+  guestId: string;
+  name: string;
+  score: number;
+  isCurrentUser: boolean;
+}
+
+export interface LeaderboardResponse {
+  leaderboard: LeaderboardEntry[];
+}
+
+export async function getPartyLeaderboard(inviteCode: string): Promise<LeaderboardResponse> {
+  return apiRequest<LeaderboardResponse>(`/api/scorecard/${inviteCode}/leaderboard`);
+}
+
+export interface SuperlativeSubmission {
+  id: string;
+  guestId: string;
+  partyId: string;
+  superlativeKey: string;
+  photoUrl: string;
+  numericValue: number | null;
+  status: string;
+  judgedBy: string | null;
+  judgedAt: string | null;
+  createdAt: string;
+}
+
+export async function submitSuperlative(
+  inviteCode: string,
+  body: { superlativeKey: string; photoUrl: string; numericValue?: number | null }
+): Promise<{ submission: SuperlativeSubmission }> {
+  return apiRequest<{ submission: SuperlativeSubmission }>(`/api/scorecard/${inviteCode}/superlative`, {
+    method: 'POST',
+    body,
   });
 }
 

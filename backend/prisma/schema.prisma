@@ -281,6 +281,7 @@ model Party {
   quizQuestions           QuizQuestion[]
   slugAliases             SlugAlias[]
   scorecardItems          GuestScorecardItem[]
+  superlativeSubmissions  SuperlativeSubmission[]
   payouts                 Payout[]
   // agnolotti-58291: receipts are now party-level (PayoutDocument.partyId);
   // payout association is optional. Inverse relation lives here so cascading
@@ -474,6 +475,7 @@ model Guest {
   notableAttendees NotableAttendee[]
   quizAnswers      QuizAnswer[]
   scorecardItems   GuestScorecardItem[]
+  superlativeSubmissions SuperlativeSubmission[]
 
   // provolone-39042: peer/host/self attestations for check-in attribution
   attestationsReceived GuestAttestation[] @relation("AttestationsOfGuest")
@@ -1686,6 +1688,30 @@ model GuestScorecardItem {
   @@index([guestId, partyId])
   @@index([partyId])
   @@map("guest_scorecard_items")
+}
+
+// panzerotti-58931: superlative submissions (judged after the event in Phase 2).
+// Separate from scorecard items; worth 0 points until judged.
+model SuperlativeSubmission {
+  id      String @id @default(uuid()) @db.Uuid
+  guestId String @map("guest_id") @db.Uuid
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  partyId String @map("party_id") @db.Uuid
+  party   Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  superlativeKey String  @map("superlative_key") @db.VarChar
+  photoUrl       String  @map("photo_url")
+  numericValue   Int?    @map("numeric_value")
+  status         String  @default("pending") @db.VarChar
+  judgedBy       String? @map("judged_by")
+  judgedAt       DateTime? @map("judged_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([guestId, partyId, superlativeKey])
+  @@index([partyId])
+  @@index([superlativeKey, status])
+  @@map("superlative_submissions")
 }
 
 // ============================================

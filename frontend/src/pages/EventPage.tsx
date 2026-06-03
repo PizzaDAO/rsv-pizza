@@ -1305,6 +1305,8 @@ export function EventPage() {
                     eventUrl={eventUrl}
                     partnerHandles={partnerHandles}
                     telegramUrl={telegramLink}
+                    hostName={event.hostName}
+                    sponsors={event.sponsors}
                   />
                 )}
 
