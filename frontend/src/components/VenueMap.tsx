@@ -123,6 +123,15 @@ export default function VenueMap({
   // Lat/lng URL is cacheable (the address-string form is not, per Google's
   // Static Maps caching rules).
   const center = `${location.lat},${location.lng}`;
+  // Custom Molto Benny pizza pin (128x128 PNG, ~11KB — well under Static
+  // Maps' icon-size limit). Served from /public, so the URL resolves to the
+  // current origin (rsv.pizza in prod, the preview subdomain in previews) and
+  // is reachable by Google's servers. `anchor:bottom` puts the tip of the
+  // icon on the venue lat/lng, matching the Dynamic-Maps anchor convention
+  // (see GPPEventsMap.tsx).
+  const iconOrigin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://rsv.pizza';
+  const iconUrl = `${iconOrigin}/molto-benny-pin.png`;
   const staticMapUrl =
     `https://maps.googleapis.com/maps/api/staticmap` +
     `?center=${center}` +
@@ -130,7 +139,7 @@ export default function VenueMap({
     `&size=${STATIC_MAP_WIDTH}x${STATIC_MAP_HEIGHT}` +
     `&scale=2` +
     `&maptype=roadmap` +
-    `&markers=color:red%7C${center}` +
+    `&markers=anchor:bottom%7Cicon:${encodeURIComponent(iconUrl)}%7C${center}` +
     `&key=${apiKey}`;
 
   // Canonical Google Maps place card. We don't have a `ChIJ…` placeId in
