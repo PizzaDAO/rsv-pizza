@@ -586,18 +586,16 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
                   }
                   className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
                 />
-                {/* crescenza-92112: subtotal is calculated (qty × unit), not
-                    entered. Read-only, derived live from the row. */}
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={computeLineSubtotal(d).toFixed(2)}
-                  readOnly
-                  tabIndex={-1}
-                  placeholder="subtotal"
+                {/* crescenza-92112/92113: subtotal is calculated (qty × unit),
+                    not entered — render as a plain computed value, not a field,
+                    so it's visually distinct from the editable inputs. */}
+                <div
+                  className="w-20 px-2 py-1 text-xs text-right tabular-nums text-theme-text-muted select-none"
                   title="Auto-calculated (qty × unit price)"
-                  className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-bg text-theme-text-muted text-xs text-right cursor-not-allowed"
-                />
+                  aria-label="Subtotal (auto-calculated)"
+                >
+                  {computeLineSubtotal(d).toFixed(2)}
+                </div>
                 <select
                   value={d.category}
                   onChange={(e) =>

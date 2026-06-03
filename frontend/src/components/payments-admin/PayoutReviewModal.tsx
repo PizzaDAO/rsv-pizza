@@ -2685,18 +2685,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                         }
                                         className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
                                       />
-                                      {/* crescenza-92112: subtotal is
-                                          calculated (qty × unit), read-only. */}
-                                      <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        value={computeLineSubtotal(d).toFixed(2)}
-                                        readOnly
-                                        tabIndex={-1}
-                                        placeholder="subtotal"
+                                      {/* crescenza-92112/92113: subtotal is
+                                          calculated (qty × unit) — plain
+                                          computed value, not an editable field. */}
+                                      <div
+                                        className="w-20 px-2 py-1 text-xs text-right tabular-nums text-theme-text-muted select-none"
                                         title="Auto-calculated (qty × unit price)"
-                                        className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-bg text-theme-text-muted text-xs text-right cursor-not-allowed"
-                                      />
+                                        aria-label="Subtotal (auto-calculated)"
+                                      >
+                                        {computeLineSubtotal(d).toFixed(2)}
+                                      </div>
                                       <select
                                         value={d.category}
                                         onChange={(e) =>
