@@ -837,17 +837,21 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       await assertUserHasValidPayoutMethod(req.userId);
     }
 
-    // salame-92110: tax-form gate. We snapshot the recipient host's latest
-    // submitted/verified tax form onto the new payout. Phase 1 keeps the
-    // required-vs-not decision host-driven — the host picks the form type
-    // (W-9, W-8BEN, W-8BEN-E) from a 3-card picker on the payout form; we
-    // don't auto-infer US vs foreign from User / Party fields.
+    // salame-92110 + culatello-92106: tax-form gate.
     //
-    // Required when:
-    //   - any tax form has ever been submitted (host is in the system), OR
-    //   - projected YTD payout total is at or above the $600 W-9 floor.
+    // culatello-92106 moved the required-vs-not decision behind a per-event
+    // admin-controlled flag (`parties.tax_form_required`). When the flag is
+    // false (the default) the gate is skipped entirely — the host can submit
+    // payouts without a tax form. When admin has flipped the flag to true on
+    // /payments, the salame-92110 logic runs: a W-9 / W-8BEN / W-8BEN-E must
+    // exist before the receipt can be submitted, and the latest form is
+    // snapshotted onto the resulting payout.
     //
-    // Skipped entirely when:
+    // Inside the flagged-on branch, the salame-92110 required-vs-not logic
+    // still applies (latest form OR projected YTD ≥ $600), but in practice
+    // both reduce to "form must exist" because the flag itself is the gate.
+    //
+    // Skipped entirely (regardless of party flag) when:
     //   - purpose='shipping' (shipping coordinators don't take taxable income
     //     via this flow), OR
     //   - an admin is prepaying on behalf of a cohost.
@@ -859,28 +863,49 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     let taxFormSnapshotId: string | null = null;
     const skipTaxFormGate = isShippingPurpose || adminPrepayingForCohost;
     if (!skipTaxFormGate) {
+      // culatello-92106: read the per-event flag before doing anything else.
+      // We always still snapshot the latest form onto the payout when one
+      // exists (so admin can review historical submissions even if the flag
+      // later flips off), but we only THROW when the flag is on.
+      const partyForTaxGate = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { taxFormRequired: true },
+      });
+      const partyTaxFormRequired = partyForTaxGate?.taxFormRequired === true;
       const gateRecipientUserId =
         recipientOverrideRequested && typeof recipientHostUserId === 'string'
           ? recipientHostUserId.trim()
           : req.userId;
       if (gateRecipientUserId) {
-        const [latestForm, ytdTotal] = await Promise.all([
-          getLatestSubmittedTaxFormForUser(gateRecipientUserId),
-          getYtdPayoutTotalUsd(gateRecipientUserId),
-        ]);
-        const incomingAmount =
-          typeof finalAmountUsd === 'number' && finalAmountUsd > 0 ? finalAmountUsd : 0;
-        const projectedYtd = ytdTotal + incomingAmount;
-        const required = latestForm != null || projectedYtd >= US_W9_YTD_THRESHOLD_USD;
-        if (required && !latestForm) {
-          throw new AppError(
-            'A tax form (W-9, W-8BEN, or W-8BEN-E) is required before this payment can be submitted.',
-            400,
-            'TAX_FORM_REQUIRED',
-          );
-        }
-        if (latestForm) {
-          taxFormSnapshotId = latestForm.id;
+        if (partyTaxFormRequired) {
+          // Per-event flag is ON — enforce salame-92110 gate.
+          const [latestForm, ytdTotal] = await Promise.all([
+            getLatestSubmittedTaxFormForUser(gateRecipientUserId),
+            getYtdPayoutTotalUsd(gateRecipientUserId),
+          ]);
+          const incomingAmount =
+            typeof finalAmountUsd === 'number' && finalAmountUsd > 0 ? finalAmountUsd : 0;
+          const projectedYtd = ytdTotal + incomingAmount;
+          const required = latestForm != null || projectedYtd >= US_W9_YTD_THRESHOLD_USD;
+          if (required && !latestForm) {
+            throw new AppError(
+              'A tax form (W-9, W-8BEN, or W-8BEN-E) is required before this payment can be submitted.',
+              400,
+              'TAX_FORM_REQUIRED',
+            );
+          }
+          if (latestForm) {
+            taxFormSnapshotId = latestForm.id;
+          }
+        } else {
+          // Per-event flag is OFF — skip the throw, but still snapshot the
+          // form when the host has one on file so admin's TaxFormReviewPanel
+          // keeps working (and so flipping the flag on later doesn't lose the
+          // attribution to past payouts).
+          const latestForm = await getLatestSubmittedTaxFormForUser(gateRecipientUserId);
+          if (latestForm) {
+            taxFormSnapshotId = latestForm.id;
+          }
         }
       }
     }

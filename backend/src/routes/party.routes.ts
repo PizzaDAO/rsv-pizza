@@ -500,6 +500,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       wifiInfo,
       parkingNotes,
       reimbursementCapUsd,
+      // culatello-92106: admin-only per-event tax-form gate. Hosts who
+      // attempt to PATCH this field get silently dropped from the update
+      // (rather than 403'd) so the rest of their save still succeeds.
+      taxFormRequired,
       // quattro-71244: gamified dashboard goals (JSONB) — per-KPI host targets.
       hostGoals,
       // porchetta-81402: host can edit the free-text cancellation reason
@@ -653,6 +657,20 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // culatello-92106: taxFormRequired is admin-only (admin / super_admin /
+    // payment_admin via isPaymentAdmin — same gate used for the 'go' tag
+    // above). Hosts who try to set it via this generic PATCH get silently
+    // dropped from the update (rather than 403'd) so the rest of their save
+    // still succeeds. We coerce to a strict boolean so a stray "true" / 0 /
+    // null doesn't write garbage into a NOT NULL column.
+    let taxFormRequiredToWrite: boolean | undefined = undefined;
+    if (taxFormRequired !== undefined) {
+      const allowed = await isPaymentAdmin(req.userEmail);
+      if (allowed) {
+        taxFormRequiredToWrite = taxFormRequired === true || taxFormRequired === 'true';
+      }
+    }
+
     // fennel-49102: snapshot the prior cap value so we can log only real
     // changes to reimbursement_cap_audit. Skipped when the request doesn't
     // touch the cap (either field omitted or caller wasn't authorized to
@@ -762,6 +780,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(wifiInfo !== undefined && { wifiInfo: wifiInfo || null }),
         ...(parkingNotes !== undefined && { parkingNotes: parkingNotes || null }),
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
+        ...(taxFormRequiredToWrite !== undefined && { taxFormRequired: taxFormRequiredToWrite }),
         ...(hostGoalsToWrite !== undefined && { hostGoals: hostGoalsToWrite }),
         // porchetta-81402: allow editing the cancellation reason (truncated to
         // 500 chars to match the cancel-handler limit). Empty string clears it.

@@ -435,8 +435,15 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         />
       </div>
 
-      {/* 4b. Tax form (salame-92110). Required before admin approval. */}
-      <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
+      {/* 4b. Tax form (salame-92110).
+          culatello-92106: only rendered when admin has flipped the per-event
+          `taxFormRequired` flag. When the flag is off (default for all events)
+          the section is hidden and the host can submit payouts without a form.
+          When the flag is on, the section is required + backend enforces
+          TAX_FORM_REQUIRED before the payout is accepted. */}
+      {party?.taxFormRequired === true && (
+        <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
+      )}
 
       {/* 5. Submit */}
       {submitError && (

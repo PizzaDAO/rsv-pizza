@@ -240,6 +240,9 @@ export interface UpdatePartyData {
   // margherita-58471: T-4h reminder opt-out at the party level.
   remindersEnabled?: boolean;
   reimbursementCapUsd?: number | null;
+  // culatello-92106: admin-only per-event gate for the salame-92110 tax-form
+  // requirement. Hosts who PATCH this get silently dropped (backend gate).
+  taxFormRequired?: boolean;
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
   parkingNotes?: string | null;
@@ -365,6 +368,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       surveyEnabled: data.surveyEnabled,
       remindersEnabled: data.remindersEnabled,
       reimbursementCapUsd: data.reimbursementCapUsd,
+      taxFormRequired: data.taxFormRequired,
       // Day-of logistics (pepperoni-58341)
       wifiInfo: data.wifiInfo,
       parkingNotes: data.parkingNotes,

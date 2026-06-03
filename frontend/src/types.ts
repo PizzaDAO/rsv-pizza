@@ -353,6 +353,10 @@ export interface Party {
   effectiveReimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
+  // culatello-92106: per-event tax-form gate. Admin-only flag; when true the
+  // host-side TaxFormSection renders + backend payout submission enforces
+  // the salame-92110 TAX_FORM_REQUIRED check. Default false.
+  taxFormRequired?: boolean;
   // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
   // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
   hostGoals?: HostGoals | null;
@@ -2022,6 +2026,14 @@ export interface AdminPayout extends Payout, FlaggedReadyFields {
      * for backward-compat with cached payloads during a rolling deploy.
      */
     paymentsClosedAt?: string | null;
+    /**
+     * culatello-92106: per-event tax-form gate. When true, hosts must submit
+     * a W-9 / W-8BEN / W-8BEN-E (salame-92110) before they can submit a
+     * payout. Toggled by admins via PATCH /api/parties/:id with
+     * `taxFormRequired: boolean`. Optional for backward-compat with cached
+     * payloads during a rolling deploy.
+     */
+    taxFormRequired?: boolean;
   };
   host: {
     id: string;
@@ -2279,6 +2291,14 @@ export interface PartyPayoutsRow {
      * cached payloads during a rolling deploy.
      */
     paymentsClosedAt?: string | null;
+    /**
+     * culatello-92106: per-event tax-form gate. When true, hosts must submit
+     * a W-9 / W-8BEN / W-8BEN-E (salame-92110) before they can submit a
+     * payout. Toggled from the by-city expansion or PayoutReviewModal.
+     * Optional for backward-compat with cached payloads during a rolling
+     * deploy.
+     */
+    taxFormRequired?: boolean;
     /**
      * mortadella-92106: admin-only city notes. Free-text scratchpad on the
      * by-city expansion. Always `null` for underboss viewers (server-side

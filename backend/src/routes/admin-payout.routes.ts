@@ -267,6 +267,10 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // ✓ Closed pill on the by-city table + hides the Mark Paid affordance for
   // already-closed parties.
   paymentsClosedAt: true,
+  // culatello-92106: per-event tax-form gate. Surfaced on /payments so admin
+  // can flip it via the PayoutReviewModal checkbox + the city-expansion
+  // pill — drives whether the host-side TaxFormSection renders.
+  taxFormRequired: true,
   // mortadella-92106: admin-only city notes. Surfaced in the by-city
   // expansion for admin viewers and stripped from the response for
   // underbosses (see serializer below).
@@ -833,6 +837,9 @@ function serializePayout(row: any): any {
           paymentsClosedAt: row.party.paymentsClosedAt
             ? row.party.paymentsClosedAt.toISOString()
             : null,
+          // culatello-92106: per-event tax-form gate. Drives the admin
+          // checkbox in PayoutReviewModal + the pill in PayoutsByPartyTable.
+          taxFormRequired: row.party.taxFormRequired === true,
         }
       : undefined,
     host: row.host
@@ -2034,6 +2041,10 @@ router.get(
             paymentsClosedAt: b.partyMeta.paymentsClosedAt
               ? b.partyMeta.paymentsClosedAt.toISOString()
               : null,
+            // culatello-92106: per-event tax-form gate. Surfaced on the
+            // outer city row so PayoutsByPartyTable can render the pill
+            // before the admin expands the row.
+            taxFormRequired: b.partyMeta.taxFormRequired === true,
             // mortadella-92106: admin-only city notes. Stripped to null for
             // underboss viewers so they never see the text — both the input
             // and the gating on the frontend are belt-and-braces but this

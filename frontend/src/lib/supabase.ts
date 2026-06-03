@@ -835,6 +835,9 @@ export interface DbParty {
   reimbursement_cap_usd?: number | null;
   reimbursement_cap_appeal_note?: string | null;
   reimbursement_cap_appealed_at?: string | null;
+  // culatello-92106: per-event tax-form gate. When true the host-side
+  // TaxFormSection renders + backend payout submission enforces salame-92110.
+  tax_form_required?: boolean;
   // quattro-71244: gamified-dashboard goal targets (JSONB on parties).
   host_goals?: HostGoals | null;
   // porchetta-81402: soft-cancel columns. cancelledAt null = active event.
@@ -913,6 +916,7 @@ export const SAFE_PARTY_COLUMNS = `
   poster_image_url, poster_generated_at,
   rollup_image_url, rollup_generated_at,
   reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at,
+  tax_form_required,
   cancelled_at, cancelled_by, cancellation_reason
 `;
 
@@ -1997,6 +2001,8 @@ export async function updateParty(
     survey_enabled?: boolean;
     reminders_enabled?: boolean;
     reimbursement_cap_usd?: number | null;
+    // culatello-92106: admin-only per-event tax-form gate.
+    tax_form_required?: boolean;
     // quattro-71244: gamified-dashboard goal targets.
     host_goals?: HostGoals | null;
     // porchetta-81402: edit cancellation reason via PATCH. Cancel/reinstate
@@ -2082,6 +2088,7 @@ export async function updateParty(
         surveyEnabled: updates.survey_enabled,
         remindersEnabled: updates.reminders_enabled,
         reimbursementCapUsd: updates.reimbursement_cap_usd,
+        taxFormRequired: updates.tax_form_required,
         // Day-of logistics (pepperoni-58341)
         wifiInfo: updates.wifi_info,
         parkingNotes: updates.parking_notes,

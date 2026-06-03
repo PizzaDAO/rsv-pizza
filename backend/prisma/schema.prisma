@@ -236,6 +236,13 @@ model Party {
   // events. Cron worker skips parties where this is false.
   remindersEnabled Boolean @default(true) @map("reminders_enabled")
 
+  // culatello-92106: per-event gate for the salame-92110 host tax-form
+  // requirement. When false (default) the host-side TaxFormSection is hidden
+  // and the backend TAX_FORM_REQUIRED 400 is skipped. Flipped per-event by an
+  // admin on /payments (PayoutReviewModal + PayoutsByPartyTable city
+  // expansion). Hosts cannot toggle this flag.
+  taxFormRequired Boolean @default(false) @map("tax_form_required")
+
   // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
   // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
   reimbursementCapUsd        Decimal?  @map("reimbursement_cap_usd") @db.Decimal(10, 2)

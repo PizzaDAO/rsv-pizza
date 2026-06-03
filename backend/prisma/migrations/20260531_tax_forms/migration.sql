@@ -59,3 +59,13 @@ GRANT SELECT (
 ) ON "tax_forms" TO authenticated;
 
 GRANT SELECT ("tax_form_id") ON "payouts" TO anon, authenticated;
+
+-- culatello-92106: per-event admin-controlled gate for the tax-form
+-- requirement. The salame-92110 host-side TaxFormSection only renders + the
+-- backend TAX_FORM_REQUIRED 400 only fires when this flag is true. Default
+-- false so existing events do NOT regress into requiring a form — admin
+-- explicitly flips the flag for events that should be gated. Hosts cannot
+-- toggle this; the admin checkbox lives on /payments (PayoutReviewModal +
+-- PayoutsByPartyTable city expansion).
+ALTER TABLE parties ADD COLUMN tax_form_required boolean NOT NULL DEFAULT false;
+GRANT SELECT (tax_form_required) ON parties TO anon, authenticated;
