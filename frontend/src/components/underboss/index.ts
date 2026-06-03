@@ -9,6 +9,7 @@ export { PartnerManager } from './PartnerManager';
 export { FunnelTab } from './FunnelTab';
 export { CityScopePicker } from './CityScopePicker';
 export { FakeDetectionTable } from './FakeDetectionTable';
+export { SuperlativesTab } from './SuperlativesTab';
 export { OutreachTab } from './OutreachTab';
 export { ReimbursementCapCell } from './ReimbursementCapCell';
 export { AppealHistoryModal } from './AppealHistoryModal';
