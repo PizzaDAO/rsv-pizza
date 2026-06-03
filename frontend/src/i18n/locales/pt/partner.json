@@ -35,7 +35,8 @@
     "budget": "Orçamento",
     "partners": "Parceiros",
     "social": "Social",
-    "thrown": "Realizado"
+    "thrown": "Realizado",
+    "estimate": "Estimativa"
   },
   "eventCard": {
     "hostedBy": "Organizado por {{name}}",

@@ -63,6 +63,7 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
     hasPrepared: false, // manual step — always false for now
     hasSocialPosts: !!(party.xPostUrl || party.farcasterPostUrl),
     hasThrown: eventPassed && checkedInCount > 0,
+    hasEstimatedAttendance: party.estimatedAttendance != null,
   };
 }
 

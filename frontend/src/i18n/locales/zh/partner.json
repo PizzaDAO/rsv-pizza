@@ -35,7 +35,8 @@
     "budget": "预算",
     "partners": "合作伙伴",
     "social": "社交",
-    "thrown": "已举办"
+    "thrown": "已举办",
+    "estimate": "预估人数"
   },
   "eventCard": {
     "hostedBy": "由 {{name}} 主办",

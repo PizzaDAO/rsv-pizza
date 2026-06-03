@@ -35,7 +35,8 @@
     "budget": "Budget",
     "partners": "Partners",
     "social": "Social",
-    "thrown": "Thrown"
+    "thrown": "Thrown",
+    "estimate": "Estimate"
   },
   "eventCard": {
     "hostedBy": "Hosted by {{name}}",
