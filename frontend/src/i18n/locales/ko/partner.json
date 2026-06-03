@@ -35,7 +35,8 @@
     "budget": "예산",
     "partners": "파트너",
     "social": "소셜",
-    "thrown": "개최됨"
+    "thrown": "개최됨",
+    "estimate": "예상 인원"
   },
   "eventCard": {
     "hostedBy": "{{name}} 주최",

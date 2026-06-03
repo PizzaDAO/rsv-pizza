@@ -1102,6 +1102,7 @@ export interface UnderbossEventProgress {
   hasPrepared: boolean;
   hasSocialPosts: boolean;
   hasThrown: boolean;
+  hasEstimatedAttendance: boolean;
 }
 
 export interface UnderbossEvent {
