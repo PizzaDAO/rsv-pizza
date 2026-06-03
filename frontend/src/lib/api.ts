@@ -4557,6 +4557,7 @@ export async function retryPayoutDocumentOcr(
     ocrError: string | null;
     ocrAttemptedAt: string | null;
     ocrAttemptCount: number;
+    ocrLineItems: ReceiptLineItem[] | null;
     sortOrder: number;
   } | null;
   ranInline: boolean;
