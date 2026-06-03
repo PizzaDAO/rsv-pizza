@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
@@ -462,6 +463,44 @@ function CityActionsMenu({
   // Same two-click confirm, separate state so the wallet + receipts items
   // don't share a confirm flag.
   const [confirmWalletReminder, setConfirmWalletReminder] = useState(false);
+  // stracciatella-49112: the dropdown panel is portaled to <body> with fixed
+  // positioning so the table's overflow-hidden / overflow-x-auto wrapper can't
+  // clip it (single-row tables have no scroll room). We anchor off the kebab
+  // button's bounding rect and flip the panel ABOVE the button when there
+  // isn't enough room below.
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{
+    top: number;
+    left: number;
+    placement: 'above' | 'below';
+  } | null>(null);
+  const computeMenuPos = useCallback(() => {
+    const MENU_W = 224; // matches w-56
+    const MENU_MAX_H = 320; // estimate — used only to decide above/below
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const placement: 'above' | 'below' =
+      spaceBelow >= MENU_MAX_H || spaceBelow >= spaceAbove ? 'below' : 'above';
+    let left = rect.right - MENU_W;
+    left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8));
+    const top = placement === 'below' ? rect.bottom + 4 : rect.top - 4;
+    setMenuPos({ top, left, placement });
+  }, []);
+  // Reposition (not close) the panel while it's open and an ancestor scrolls
+  // or the window resizes. Capture phase so scrolling containers between the
+  // button and <body> are caught too.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const reposition = () => computeMenuPos();
+    window.addEventListener('scroll', reposition, { capture: true });
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, { capture: true } as EventListenerOptions);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [menuOpen, computeMenuPos]);
   const hasMenuItems =
     canAddExternal ||
     canToggleScamFlag ||
@@ -544,8 +583,9 @@ function CityActionsMenu({
           payment) and Flag/Unflag possible scam. Hidden entirely when
           neither is available. */}
       {hasMenuItems && (
-        <div className="relative">
+        <div>
           <button
+            ref={buttonRef}
             type="button"
             onClick={() => {
               setMenuOpen((v) => {
@@ -553,9 +593,14 @@ function CityActionsMenu({
                 // crocchetta-92106: closing the menu resets the TG-reminder
                 // confirm state so a stale "Click again to confirm" doesn't
                 // carry over to the next open.
-                if (!next) {
+                if (next) {
+                  // stracciatella-49112: compute the fixed-position anchor as
+                  // we open so the portaled panel lands on the button.
+                  computeMenuPos();
+                } else {
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
+                  setMenuPos(null);
                 }
                 return next;
               });
@@ -568,20 +613,30 @@ function CityActionsMenu({
           >
             <MoreVertical size={14} />
           </button>
-          {menuOpen && (
+          {menuOpen && menuPos && createPortal(
             <>
               {/* click-out overlay */}
               <div
-                className="fixed inset-0 z-40"
+                style={{ position: 'fixed', inset: 0, zIndex: 50 }}
                 onClick={() => {
                   setMenuOpen(false);
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
+                  setMenuPos(null);
                 }}
               />
               <div
-                className="absolute right-0 mt-1 w-56 z-50 rounded-lg border border-theme-stroke bg-[#1a1a2e] shadow-xl py-1"
+                className="w-56 rounded-lg border border-theme-stroke bg-[#1a1a2e] shadow-xl py-1"
                 role="menu"
+                style={{
+                  position: 'fixed',
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  zIndex: 60,
+                  ...(menuPos.placement === 'above'
+                    ? { transform: 'translateY(-100%)' }
+                    : null),
+                }}
               >
                 {/* Reopen a city that was closed by mistake. Reverts the
                     payouts the close flipped to completed + clears the close
@@ -740,7 +795,8 @@ function CityActionsMenu({
                   </button>
                 )}
               </div>
-            </>
+            </>,
+            document.body,
           )}
         </div>
       )}
