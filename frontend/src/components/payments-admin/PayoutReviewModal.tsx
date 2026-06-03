@@ -162,7 +162,7 @@ interface PayoutReviewModalProps {
    * warning panel before the admin clicks Send. Returns null if unavailable.
    */
   fetchWalletPaidTotal?: (address: string, amount: number) => Promise<WalletPaidTotal | null>;
-  /** Re-open (clear rejected/failed) — uses mark-paid plumbing or a future endpoint. */
+  /** brie-92108: un-reject a `rejected` payout back to `pending` (clears rejection) so the admin can re-review. */
   onReopen?: () => Promise<void> | void;
   /**
    * tiramisu-49102: "Pay again to this wallet" — only surfaced when this
@@ -3489,7 +3489,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-theme-surface-hover hover:bg-theme-stroke text-theme-text text-sm font-medium disabled:opacity-50"
             >
               <RefreshCw size={14} />
-              Re-open
+              Unreject
             </button>
           )}
           {/* culatello-92103: revert paid -> approved. Surfaced for ANY

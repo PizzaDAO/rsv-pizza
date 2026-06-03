@@ -12,6 +12,7 @@ import {
   approveAdminPayout,
   rejectAdminPayout,
   unapproveAdminPayout,
+  unrejectAdminPayout,
   revertPaidAdminPayout,
   markPayoutQueued,
   unmarkPayoutQueued,
@@ -1401,6 +1402,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 return;
               } catch (err: any) {
                 return err?.message || 'Revert failed';
+              } finally {
+                setModalBusy(false);
+              }
+            }}
+            // brie-92108: un-reject -> pending. Stays open + refreshes both
+            // lists like unapprove so the admin sees the new pending state.
+            onReopen={async () => {
+              setModalBusy(true);
+              try {
+                await unrejectAdminPayout(detail.id, regions ? { regions } : undefined);
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
+                setDetail(fresh);
+                await Promise.all([refresh(), loadPrepayQueue()]);
+              } catch (err: any) {
+                setErrorMsg(err.message || 'Unreject failed');
               } finally {
                 setModalBusy(false);
               }
