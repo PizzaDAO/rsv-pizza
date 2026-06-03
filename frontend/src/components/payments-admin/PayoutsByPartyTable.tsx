@@ -9,7 +9,6 @@ import {
   Flag,
   CheckCircle2,
   MoreVertical,
-  Coins,
   DollarSign,
   XCircle,
   Plus,
@@ -436,7 +435,6 @@ function CityActionsMenu({
   tagBusy,
   receiptsReminderSentAt,
   paymentsApprovedUsd,
-  paymentsApprovedAt,
   receiptsTotalUsd,
 }: {
   onMarkPartyPaid?: () => void;
@@ -2561,21 +2559,6 @@ function RollupTile({
       <div className={`text-lg font-semibold ${accent}`}>{value}</div>
       {sub && (
         <div className="text-xs text-theme-text-muted mt-0.5">{sub}</div>
-      )}
-
-      {/* gnocchi-92104: queued row gets a single Mark paid (settled) button.
-          Approved -> queued / queued -> approved transitions live in the
-          modal so the admin can leave a confirmation note. */}
-      {status === 'queued' && (
-        <button
-          type="button"
-          onClick={() => onMarkPaid(payout)}
-          disabled={busy}
-          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 disabled:opacity-50"
-          title="Mark paid (wire settled)"
-        >
-          <DollarSign size={15} />
-        </button>
       )}
     </div>
   );
