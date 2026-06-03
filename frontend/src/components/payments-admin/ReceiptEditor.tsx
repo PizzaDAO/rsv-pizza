@@ -434,55 +434,68 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
         )}
       </div>
 
-      {/* OCR retry — only visible when the doc errored. Keeps parity with
-          the right-pane row's per-row retry affordance (pancetta-92104). */}
+      {/* OCR error notice — only the amber message when the doc errored. The
+          re-run trigger itself lives next to the Line items header below
+          (crescenza-92110) so there's a single always-available button. */}
       {hasOcrError && onRetryOcr && (
-        <div className="rounded-lg border border-theme-stroke p-3 bg-theme-bg space-y-2">
+        <div className="rounded-lg border border-theme-stroke p-3 bg-theme-bg">
           <div className="text-xs text-amber-500 flex items-start gap-1.5">
             <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
             <span>{doc.ocrError || 'OCR failed for this receipt.'}</span>
           </div>
-          <button
-            type="button"
-            onClick={onRetryOcr}
-            disabled={retrying}
-            className="px-3 py-1.5 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center gap-1.5"
-          >
-            {retrying ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <RefreshCw size={12} />
-            )}
-            Retry OCR
-          </button>
-          {retryError && (
-            <div className="text-xs text-red-300">{retryError}</div>
-          )}
         </div>
       )}
 
       {/* Line items */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h4 className="text-sm font-semibold">
             Line items ({lineItemDrafts?.length ?? 0})
           </h4>
-          <span className="text-xs text-theme-text-muted">
-            Sum: {sumCurrency} {lineSum.toFixed(2)}
-            {/* provola-92106: when ineligible lines exist, note how many
-                were excluded from the live sum so admins see the math is
-                doing what they expect. */}
-            {(() => {
-              const ineligibleCount = (lineItemDrafts ?? []).filter(
-                (li) => li.ineligible === true,
-              ).length;
-              return ineligibleCount > 0 ? (
-                <span className="ml-1 text-amber-400">
-                  ({ineligibleCount} ineligible excluded)
-                </span>
-              ) : null;
-            })()}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              {/* crescenza-92110: always-available full re-read (amount +
+                  currency + line items). Triggers analyzeReceipt fresh even on
+                  a successfully-OCR'd receipt that came back with 0 line
+                  items. */}
+              {onRetryOcr && (
+                <button
+                  type="button"
+                  onClick={onRetryOcr}
+                  disabled={retrying}
+                  className="px-2.5 py-1 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center gap-1.5 flex-shrink-0"
+                >
+                  {retrying ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={12} />
+                  )}
+                  Re-run OCR
+                </button>
+              )}
+              <span className="text-xs text-theme-text-muted">
+                Sum: {sumCurrency} {lineSum.toFixed(2)}
+                {/* provola-92106: when ineligible lines exist, note how many
+                    were excluded from the live sum so admins see the math is
+                    doing what they expect. */}
+                {(() => {
+                  const ineligibleCount = (lineItemDrafts ?? []).filter(
+                    (li) => li.ineligible === true,
+                  ).length;
+                  return ineligibleCount > 0 ? (
+                    <span className="ml-1 text-amber-400">
+                      ({ineligibleCount} ineligible excluded)
+                    </span>
+                  ) : null;
+                })()}
+              </span>
+            </div>
+            {onRetryOcr && retryError && (
+              <div className="text-xs text-red-300 text-right max-w-[240px]">
+                {retryError}
+              </div>
+            )}
+          </div>
         </div>
         <div className="rounded-lg border border-theme-stroke bg-theme-bg p-2 space-y-1.5 max-h-80 overflow-y-auto">
           {/* Column headers. Widths mirror the input row below so each label

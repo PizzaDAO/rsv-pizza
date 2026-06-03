@@ -66,8 +66,12 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
   onCapUpdated,
 }) => {
   const admin = payout as AdminPayout;
-  const firstPizza = (payout.documents || []).find((d) => d.kind === 'pizza');
-  const thumbUrl = firstPizza?.url || null;
+  // pomodoro-92110: thumbnail fallback order pizza → event → receipt.
+  const firstThumbDoc =
+    (payout.documents || []).find((d) => d.kind === 'pizza')
+    ?? (payout.documents || []).find((d) => d.kind === 'event')
+    ?? (payout.documents || []).find((d) => d.kind === 'receipt');
+  const thumbUrl = firstThumbDoc?.url || null;
 
   const submittedAbs = new Date(payout.createdAt).toLocaleString();
   const submittedRel = relativeTime(new Date(payout.createdAt));

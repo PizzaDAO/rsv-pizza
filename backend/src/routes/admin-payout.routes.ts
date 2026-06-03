@@ -16,6 +16,7 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
 import {
   requireAuth,
@@ -5764,15 +5765,32 @@ router.post(
 
       if (runNow && existing.kind === 'receipt' && existing.url) {
         const { analyzeReceipt } = await import('../services/ocr.service.js');
+        const { convertToUSD } = await import('../services/fx.service.js');
         try {
+          // crescenza-92110: a full fresh re-read — amount + currency + line
+          // items — not just line items. Mirror the ocr-preview FX pattern in
+          // payout.routes.ts so the unresolved-currency case is handled
+          // identically (CURRENCY_UNRESOLVED, no synthetic USD value).
           const result = await analyzeReceipt(existing.url);
+          const fx = await convertToUSD(result.amount, result.currency);
+          const unresolved = fx.source === 'unresolved';
           await prisma.payoutDocument.update({
             where: { id: docId },
             data: {
               ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              ocrConfidence: new Decimal(result.confidence),
+              ocrRaw: { ocr: result.raw, fx: { source: fx.source, rate: fx.exchangeRate } } as Prisma.InputJsonValue,
+              // Even unresolved rows keep originalAmount — the admin needs to
+              // see what the receipt said so they can pick the right currency.
+              originalAmount: new Decimal(fx.originalAmount),
+              ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
+              ocrCurrency: unresolved ? null : fx.originalCurrency,
+              exchangeRate: unresolved
+                ? null
+                : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
+              ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
-              ocrError: null,
             },
           });
           ranInline = true;
@@ -5805,6 +5823,7 @@ router.post(
           ocrError: true,
           ocrAttemptedAt: true,
           ocrAttemptCount: true,
+          ocrLineItems: true,
           sortOrder: true,
         },
       });
@@ -5829,6 +5848,9 @@ router.post(
             ? updated.ocrAttemptedAt.toISOString()
             : null,
           ocrAttemptCount: updated.ocrAttemptCount,
+          ocrLineItems: Array.isArray(updated.ocrLineItems)
+            ? updated.ocrLineItems
+            : null,
           sortOrder: updated.sortOrder,
         },
         ranInline,
