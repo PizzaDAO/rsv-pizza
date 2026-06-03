@@ -5,7 +5,7 @@ import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
 import { PayoutMethodIcon } from './PayoutMethodIcon';
-import { formatPayoutAmount } from './formatPayoutAmount';
+import { formatPayoutAmount, formatOriginalCurrency } from './formatPayoutAmount';
 import { CapInlineEditor } from './CapInlineEditor';
 
 /**
@@ -226,6 +226,7 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
             Number(payout.finalAmountUsd),
             Number(payout.originalAmount),
             payout.originalCurrency,
+            Number(payout.exchangeRate),
           )}
           {/* speck-89172: amber AlertTriangle when the payout's final amount
               exceeds the party's effective reimbursement cap. Additive to
@@ -243,6 +244,35 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
               </span>
             )}
         </div>
+        {/* marinara-62104: when the OCR receipt total (uncapped) exceeds the
+            displayed final amount, the headline USD is a cap-clamped sum — and
+            the FX parenthetical was suppressed above. Surface the hidden truth
+            so admins see how much was claimed before the reimbursement cap.
+            Inline IIFE (no hooks) so it doesn't affect rules-of-hooks. */}
+        {(() => {
+          const final = Number(payout.finalAmountUsd);
+          const claimed = Number(payout.extractedAmountUsd);
+          const isCapped = Number.isFinite(claimed) && claimed > final + 0.005;
+          if (!isCapped) return null;
+          let claimedNote = `$${claimed.toFixed(2)} claimed`;
+          const docs = payout.documents ?? [];
+          const fxDocs = docs.filter(
+            (d) => d.kind === 'receipt' && d.originalCurrency && d.originalAmount != null,
+          );
+          const currencies = [...new Set(fxDocs.map((d) => d.originalCurrency!.toUpperCase()))];
+          if (currencies.length === 1 && currencies[0] !== 'USD') {
+            const sum = fxDocs.reduce((a, d) => a + Number(d.originalAmount), 0);
+            claimedNote = `$${claimed.toFixed(2)} (${formatOriginalCurrency(sum, currencies[0])}) claimed`;
+          }
+          return (
+            <div
+              className="text-xs text-theme-text-muted mt-0.5"
+              title="OCR receipt total before the party reimbursement cap was applied"
+            >
+              Capped from {claimedNote}
+            </div>
+          );
+        })()}
       </td>
 
       <td className="px-3 py-3">
