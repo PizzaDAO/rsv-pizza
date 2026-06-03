@@ -2481,13 +2481,6 @@ router.get(
         { partyId: string; partyName: string; country: string | null; totalPaidUsd: number; payoutCount: number }
       >();
 
-      // taleggio-92104: separate per-party rollup of *committed* USD
-      // (status IN paid+approved) used only to compute `avgUsd` as the
-      // average per-city total, not per-payout. Kept isolated from the
-      // parmigiana-58291 paid-only `partyTotals` Map so existing
-      // serialization semantics are unchanged.
-      const committedByParty = new Map<string, number>();
-
       // cotechino-92103: per-party status-breakdown for the PAID CITIES
       // KPI. A party is "paid/complete" when it has at least one payout
       // in `paid` OR `completed` AND zero payouts in `pending` OR
@@ -2550,25 +2543,6 @@ router.get(
           }
         }
 
-        // taleggio-92104: accumulate committed (paid + approved) totals per
-        // party for the AVG PAYMENT KPI. "Committed" matches fontina-92103's
-        // cap-check definition: USD that has either left the wallet (`paid`)
-        // or been queued to leave (`approved`). Pending/rejected/failed do
-        // not count.
-        // prosciutto-92106: only proven-paid rows count toward committed for
-        // the avg KPI — same reason as the totalUsdPaid gate above.
-        if (r.status === 'approved' && r.party) {
-          committedByParty.set(
-            r.party.id,
-            (committedByParty.get(r.party.id) ?? 0) + usd,
-          );
-        } else if (r.status === 'paid' && r.party && paidRowHasProof(r as any)) {
-          committedByParty.set(
-            r.party.id,
-            (committedByParty.get(r.party.id) ?? 0) + usd,
-          );
-        }
-
         // cotechino-92103: tally paid/completed vs pending/approved
         // counts per party for the PAID CITIES KPI below.
         if (r.party) {
@@ -2601,20 +2575,20 @@ router.get(
       // (payments_closed_at set) within the current filter window.
       const closedCitiesCount = closedPartyIds.size;
 
-      // taleggio-92104: AVG PAYMENT averages per-city committed totals
-      // (sum of each party's paid+approved finalAmountUsd, then average
-      // across parties with any committed total) instead of averaging
-      // finalAmountUsd per payout row. The per-row average over-weighted
-      // cities with one large payout and under-weighted cities with many
-      // smaller ones. Same filter-window scope as the rest of `totals`
-      // since both derive from `allFiltered`.
+      // caciotta-92108: AVG PAYMENT = average proof-backed paid total per
+      // closed-out city (payments_closed_at set). Numerator sums each closed
+      // city's parmigiana-58291 `totalPaidUsd` (proof-backed `paid` rows only);
+      // denominator is the count of closed cities, so a closed city with no
+      // paid rows still counts as $0. Keeps Avg payment × Closed cities ≈
+      // total paid to closed cities. Same filter-window scope (derives from
+      // `allFiltered`).
       let avgUsd = 0;
-      if (committedByParty.size > 0) {
-        let committedSum = 0;
-        for (const partyTotal of committedByParty.values()) {
-          committedSum += partyTotal;
+      if (closedPartyIds.size > 0) {
+        let closedPaidSum = 0;
+        for (const pid of closedPartyIds) {
+          closedPaidSum += partyTotals.get(pid)?.totalPaidUsd ?? 0;
         }
-        avgUsd = committedSum / committedByParty.size;
+        avgUsd = closedPaidSum / closedPartyIds.size;
       }
 
       // taleggio-49183: the parmigiana-58291 top-level `byParty` aggregate
