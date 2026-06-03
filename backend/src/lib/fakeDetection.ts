@@ -36,6 +36,13 @@ export interface FakeDetectionGuest {
   // | 'complained' | 'delivery_delayed' | 'failed' | 'suppressed'. Nullable
   // for legacy/non-email RSVPs; only populated rows are scored.
   emailStatus?: string | null;
+  // checkin-heuristics (marinara-60931): door check-in timestamp and the
+  // user/host who performed the check-in. Null for guests who never checked
+  // in. Used to detect attendance-fraud (one account marking the whole
+  // roster checked-in within minutes). Optional so existing construction
+  // sites keep compiling.
+  checkedInAt?: Date | null;
+  checkedInBy?: string | null;
 }
 
 export interface FakeDetectionCoHost {
@@ -124,6 +131,12 @@ export const WEIGHTS = {
   co_host_twitter_handles_missing: 12,
   repeat_session_rsvp_count: 20,
   high_bounce_rate: 25,
+  // checkin-heuristics (marinara-60931): attendance-fraud signals derived from
+  // guests.checked_in_at / checked_in_by.
+  checkin_velocity_superhuman: 20,
+  checkin_timestamp_collapse: 15,
+  single_checker_dominance: 10,
+  checkin_ratio_extreme: 12,
 } as const;
 
 // ============================================
@@ -1013,6 +1026,117 @@ export function checkHighBounceRate(guests: FakeDetectionGuest[]): FlagResult {
 }
 
 // ============================================
+// Check-in attendance-fraud heuristics (marinara-60931)
+//
+// Fraudulent events inflate attendance by having a single account mark the
+// entire RSVP roster `checked_in_at` within minutes (physically impossible).
+// These run over ALL guests (not just direct RSVPs) because fraud check-ins
+// can land on invite/host rows too.
+// ============================================
+
+/** Guests that have a non-null check-in timestamp. */
+function checkedInGuests(guests: FakeDetectionGuest[]): FakeDetectionGuest[] {
+  return guests.filter(g => g.checkedInAt != null);
+}
+
+/**
+ * checkin_velocity_superhuman — check-ins arrive faster than a human door can
+ * scan them. >10 check-ins/min sustained over the check-in window.
+ */
+export function checkCheckinVelocitySuperhuman(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'checkin_velocity_superhuman';
+  const checkedIn = checkedInGuests(guests);
+  const n = checkedIn.length;
+  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  const times = checkedIn.map(g => g.checkedInAt!.getTime());
+  const wMin = (Math.max(...times) - Math.min(...times)) / 60000;
+  // Floor the window at 1 second so an all-same-timestamp roster → very high rate.
+  const rate = n / Math.max(wMin, 1 / 60);
+  const fired = rate > 10;
+  return flag(
+    id,
+    fired,
+    `rate=${rate.toFixed(1)}/min over ${wMin.toFixed(1)}min, n=${n}`,
+    { n, windowMin: wMin, ratePerMin: rate },
+  );
+}
+
+/**
+ * checkin_timestamp_collapse — distinct check-in seconds collapse relative to
+ * the number of check-ins, i.e. many guests share the exact same second.
+ */
+export function checkCheckinTimestampCollapse(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'checkin_timestamp_collapse';
+  const checkedIn = checkedInGuests(guests);
+  const n = checkedIn.length;
+  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  const distinctSeconds = new Set(
+    checkedIn.map(g => Math.floor(g.checkedInAt!.getTime() / 1000)),
+  ).size;
+  const ratio = distinctSeconds / n;
+  const fired = ratio <= 0.6;
+  return flag(
+    id,
+    fired,
+    `distinctSeconds=${distinctSeconds}/${n} (ratio=${ratio.toFixed(2)})`,
+    { n, distinctSeconds, ratio },
+  );
+}
+
+/**
+ * single_checker_dominance — one account (`checked_in_by`) performed ≥95% of
+ * all check-ins. Null/undefined checkers bucket under the literal "__null__".
+ */
+export function checkSingleCheckerDominance(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'single_checker_dominance';
+  const checkedIn = checkedInGuests(guests);
+  const n = checkedIn.length;
+  if (n < 20) return flag(id, false, `n=${n} below 20`);
+  const counts = new Map<string, number>();
+  for (const g of checkedIn) {
+    const key = g.checkedInBy ?? '__null__';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let maxCount = 0;
+  let topKey = '';
+  for (const [key, c] of counts) {
+    if (c > maxCount) {
+      maxCount = c;
+      topKey = key;
+    }
+  }
+  const topShare = maxCount / n;
+  const distinctCheckers = counts.size;
+  const dominantIsNull = topKey === '__null__';
+  const fired = topShare >= 0.95;
+  return flag(
+    id,
+    fired,
+    `topShare=${(topShare * 100).toFixed(1)}%, distinctCheckers=${distinctCheckers}, dominantIsNull=${dominantIsNull}`,
+    { n, topShare, distinctCheckers, dominantIsNull },
+  );
+}
+
+/**
+ * checkin_ratio_extreme — ≥95% of the entire RSVP roster is marked checked-in.
+ * Real events have no-shows; a near-100% attendance rate is a fraud tell.
+ */
+export function checkCheckinRatioExtreme(guests: FakeDetectionGuest[]): FlagResult {
+  const id = 'checkin_ratio_extreme';
+  const rsvps = guests.length;
+  if (rsvps < 20) return flag(id, false, `n=${rsvps} below 20`);
+  const checkedIn = checkedInGuests(guests).length;
+  const ratio = checkedIn / rsvps;
+  const fired = ratio >= 0.95;
+  return flag(
+    id,
+    fired,
+    `${checkedIn}/${rsvps} = ${(ratio * 100).toFixed(0)}%`,
+    { rsvps, checkedIn, ratio },
+  );
+}
+
+// ============================================
 // Aggregator
 // ============================================
 
@@ -1057,6 +1181,12 @@ export function scoreEvent(
     checkCoHostTwitterHandlesMissing(party),
     checkRepeatSessionRsvpCount(guests),
     checkHighBounceRate(guests),
+    // checkin-heuristics (marinara-60931): run over ALL guests, since fraud
+    // check-ins can land on invite/host rows, not just direct RSVPs.
+    checkCheckinVelocitySuperhuman(allGuests),
+    checkCheckinTimestampCollapse(allGuests),
+    checkSingleCheckerDominance(allGuests),
+    checkCheckinRatioExtreme(allGuests),
   ];
 
   const score = Math.min(
