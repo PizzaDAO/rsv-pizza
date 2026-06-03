@@ -814,5 +814,11 @@
       "daysAgo": "há {{count}} d",
       "recentRsvps": "Confirmações recentes"
     }
+  },
+  "payouts": {
+    "excludedNote": "Recibos ou itens marcados como Duplicado ou Inelegível são excluídos do total do seu reembolso.",
+    "duplicatePill": "Duplicado",
+    "ineligiblePill": "Inelegível",
+    "ineligibleLineTag": "inelegível"
   }
 }

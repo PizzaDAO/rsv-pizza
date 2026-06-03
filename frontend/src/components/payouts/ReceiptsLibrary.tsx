@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink, Play } from 'lucide-react';
 import { fetchReceiptsLibrary } from '../../lib/api';
 import type { ReceiptLibraryEntry } from '../../types';
@@ -25,6 +26,7 @@ interface ReceiptsLibraryProps {
  * pending-only edit flow.
  */
 export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => {
+  const { t } = useTranslation('host');
   const [receipts, setReceipts] = useState<ReceiptLibraryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,10 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
     open: false,
     initialIndex: 0,
   });
+  // soppressata-92110: mirror the lightbox's current index so the read-only
+  // DUPLICATE / INELIGIBLE banners paint the matching receipt.
+  const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState(0);
+  const lightboxCurrentReceipt = receipts[lightboxCurrentIndex] ?? null;
 
   // Build the carousel list once per receipts array. Includes every entry —
   // non-image rows still get a fallback render inside the lightbox via the
@@ -129,8 +135,13 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
             // to the cached email when the User row has been deleted. Empty
             // when both are missing (historical pre-pancetta receipts).
             const uploader = r.uploadedByName || r.uploadedByEmail || null;
+            // soppressata-92110: read-only admin exclusion flags. Duplicate
+            // wins when both are set (same convention as the admin grid).
+            const isDup = r.isDuplicate === true;
+            const isIne = r.ineligible === true && !isDup;
+            const flagged = isDup || isIne;
             return (
-              <li key={r.id} className="flex items-center gap-3 py-3">
+              <li key={r.id} className={`flex items-center gap-3 py-3 ${flagged ? 'opacity-60' : ''}`}>
                 {/* bresaola-89172: thumbnail wrapped in a button so clicking
                     opens the shared lightbox carousel scrolled to this row.
                     Non-image rows (PDFs etc.) still open in a new tab via
@@ -138,7 +149,7 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                 <button
                   type="button"
                   onClick={() => setLightboxState({ open: true, initialIndex: idx })}
-                  className="flex-shrink-0 rounded border border-theme-stroke overflow-hidden hover:opacity-80 transition-opacity"
+                  className="relative flex-shrink-0 rounded border border-theme-stroke overflow-hidden hover:opacity-80 transition-opacity"
                   aria-label={`Open ${r.fileName}`}
                   title={r.fileName}
                 >
@@ -179,6 +190,19 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                       <FileText size={20} className="text-theme-text-secondary" />
                     </div>
                   )}
+                  {/* soppressata-92110: diagonal-stripe overlay marks flagged
+                      receipts as excluded at thumbnail size (red 45° for
+                      duplicate, amber 135° for ineligible). */}
+                  {flagged && (
+                    <span
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage: isDup
+                          ? 'repeating-linear-gradient(45deg, rgba(239,68,68,0.30) 0 4px, transparent 4px 8px)'
+                          : 'repeating-linear-gradient(135deg, rgba(245,158,11,0.30) 0 4px, transparent 4px 8px)',
+                      }}
+                    />
+                  )}
                 </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -186,6 +210,19 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                       {r.fileName}
                     </span>
                     {r.payoutStatus && <PayoutStatusPill status={r.payoutStatus} />}
+                    {/* soppressata-92110: read-only exclusion pill. Explicit
+                        white text (text-[#ffffff]) dodges the `.gpp-theme
+                        .text-white` override on GPP host pages. */}
+                    {isDup && (
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500 text-[#ffffff]">
+                        {t('payouts.duplicatePill')}
+                      </span>
+                    )}
+                    {isIne && (
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-[#ffffff]">
+                        {t('payouts.ineligiblePill')}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-white/40 mt-0.5">
                     Uploaded {formattedDate}
@@ -210,11 +247,26 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
         </ul>
       )}
 
+      {/* soppressata-92110: explain the exclusion when any receipt is flagged. */}
+      {!loading && !error && receipts.some(r => r.isDuplicate === true || r.ineligible === true) && (
+        <p className="text-xs text-theme-text-muted mt-3 italic">
+          {t('payouts.excludedNote')}
+        </p>
+      )}
+
       <ReceiptLightbox
         isOpen={lightboxState.open}
         images={lightboxImages}
         initialIndex={lightboxState.initialIndex}
         onClose={() => setLightboxState({ open: false, initialIndex: 0 })}
+        onIndexChange={setLightboxCurrentIndex}
+        /* soppressata-92110: READ-ONLY duplicate / ineligible banners. No
+           onDuplicateShortcut / editorPane — hosts can't toggle these. */
+        isDuplicate={lightboxCurrentReceipt?.isDuplicate === true}
+        isIneligible={
+          lightboxCurrentReceipt?.ineligible === true
+          && lightboxCurrentReceipt?.isDuplicate !== true
+        }
       />
     </div>
   );

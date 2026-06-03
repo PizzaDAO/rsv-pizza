@@ -814,5 +814,11 @@
       "daysAgo": "{{count}} 天前",
       "recentRsvps": "最近的 RSVP"
     }
+  },
+  "payouts": {
+    "excludedNote": "标记为重复或不符合条件的收据或项目将从您的报销总额中扣除。",
+    "duplicatePill": "重复",
+    "ineligiblePill": "不符合条件",
+    "ineligibleLineTag": "不符合条件"
   }
 }
