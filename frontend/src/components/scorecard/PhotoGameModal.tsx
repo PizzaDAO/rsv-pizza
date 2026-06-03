@@ -23,7 +23,7 @@ type PhotoChallengeKey = 'sign_pizza_box' | 'photo_box_stack' | 'photo_host' | '
 type SuperlativeKey = 'super_slices' | 'super_cheese_pull' | 'super_box_stack';
 
 const SUPERLATIVE_CONFIG: Record<SuperlativeKey, { label: string; emoji: string; numeric?: boolean }> = {
-  super_slices: { label: 'Most slices eaten', emoji: '🍕', numeric: true },
+  super_slices: { label: 'Most people with a slice', emoji: '🍕', numeric: true },
   super_cheese_pull: { label: 'Best cheese pull', emoji: '🧀' },
   super_box_stack: { label: 'Tallest box stack', emoji: '📦' },
 };
@@ -220,7 +220,7 @@ export function PhotoGameModal({
           {/* Superlatives */}
           <section>
             <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Superlatives
+              Best Of
             </h3>
             <p className="mb-2 text-xs text-gray-400">
               Submit your best shot — judged after the event.
@@ -269,7 +269,7 @@ export function PhotoGameModal({
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                             setNumericValues((prev) => ({ ...prev, [key]: e.target.value }))
                           }
-                          placeholder="How many slices?"
+                          placeholder="How many people?"
                           className="text-sm"
                         />
                       </div>
