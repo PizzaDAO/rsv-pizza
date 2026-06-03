@@ -130,6 +130,7 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
     try {
       await createPayout(party.id, {
         pizzaPhotos: [],
+        eventPhotos: [],
         receiptPhotos: [],
         payoutMethod: selectedCandidate.method,
         payoutWalletAddress:

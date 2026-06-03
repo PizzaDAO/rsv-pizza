@@ -5248,6 +5248,9 @@ export interface CreatePayoutPhotoInput {
 
 export interface CreatePayoutData {
   pizzaPhotos: CreatePayoutPhotoInput[];
+  // pomodoro-92110: event photos (cap 30) persist as kind:'event' payout docs
+  // and mirror to the public gallery just like pizza photos.
+  eventPhotos: CreatePayoutPhotoInput[];
   receiptPhotos: CreatePayoutPhotoInput[];
   hostNotes?: string;
   /**
@@ -5356,6 +5359,14 @@ export interface UpdatePayoutData {
     ocrError?: string | null;
   }>;
   pizzaPhotos?: Array<{
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  }>;
+  // pomodoro-92110: event photos (cap 30) on edit. Append-only, mirror to the
+  // gallery; total cap is enforced server-side against surviving docs.
+  eventPhotos?: Array<{
     url: string;
     fileName: string;
     fileSize: number;

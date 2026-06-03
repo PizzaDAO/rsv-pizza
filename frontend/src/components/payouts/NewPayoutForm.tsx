@@ -87,6 +87,9 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
 
   const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
   const [pizzaPhotos, setPizzaPhotos] = useState<PizzaPhotoItem[]>([]);
+  // pomodoro-92110: event photos are a separate dropzone (cap 30) persisted as
+  // kind:'event' payout documents.
+  const [eventPhotos, setEventPhotos] = useState<PizzaPhotoItem[]>([]);
   const [notes, setNotes] = useState('');
   const [overrideAmount, setOverrideAmount] = useState<number | null>(null);
 
@@ -155,7 +158,8 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const finalAmount = overrideAmount != null ? overrideAmount : ocrSum;
 
   const isProcessing = receipts.some(r => r.status === 'uploading' || r.status === 'ocring')
-    || pizzaPhotos.some(p => p.status === 'uploading');
+    || pizzaPhotos.some(p => p.status === 'uploading')
+    || eventPhotos.some(p => p.status === 'uploading');
 
   // When the attendance section is shown, require a positive integer before submit.
   const attendanceValid = !askForAttendance
@@ -246,6 +250,15 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             ocrError: r.ocr?.ocrError,
           })),
         pizzaPhotos: pizzaPhotos
+          .filter(p => p.status === 'done' && p.url)
+          .map(p => ({
+            url: p.url!,
+            fileName: p.fileName,
+            fileSize: p.fileSize,
+            mimeType: p.mimeType,
+          })),
+        // pomodoro-92110: event photos persist as kind:'event' payout docs.
+        eventPhotos: eventPhotos
           .filter(p => p.status === 'done' && p.url)
           .map(p => ({
             url: p.url!,
@@ -379,19 +392,39 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         />
       </div>
 
-      {/* 2. Pizza photos */}
+      {/* 2. Pizza photos (pomodoro-92110: cap 10) */}
       <div className="card p-6">
         <div className="mb-3">
-          <h3 className="text-base font-semibold text-theme-text">Pizza or event photos</h3>
+          <h3 className="text-base font-semibold text-theme-text">Pizza photos</h3>
           <p className="text-xs text-theme-text-muted mt-0.5">
-            Proof-of-event photos help your reviewer.
+            Photos of the pizza help your reviewer.
           </p>
         </div>
         <PizzaPhotoUpload
           partyId={partyId}
           payoutTempId={payoutTempId}
+          kind="pizza"
+          maxItems={10}
           items={pizzaPhotos}
           onChange={setPizzaPhotos}
+        />
+      </div>
+
+      {/* 2b. Event photos (pomodoro-92110: cap 30) */}
+      <div className="card p-6">
+        <div className="mb-3">
+          <h3 className="text-base font-semibold text-theme-text">Event photos</h3>
+          <p className="text-xs text-theme-text-muted mt-0.5">
+            Photos from the event help your reviewer.
+          </p>
+        </div>
+        <PizzaPhotoUpload
+          partyId={partyId}
+          payoutTempId={payoutTempId}
+          kind="event"
+          maxItems={30}
+          items={eventPhotos}
+          onChange={setEventPhotos}
         />
       </div>
 

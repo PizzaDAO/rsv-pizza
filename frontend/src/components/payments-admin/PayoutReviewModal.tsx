@@ -562,6 +562,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     () => payout.documents.filter((d) => d.kind === 'pizza'),
     [payout.documents],
   );
+  // pomodoro-92110: host-uploaded event photos persist as kind:'event' payout
+  // documents — surfaced here as an "Event proof" section. Distinct from the
+  // gallery `eventPhotos` below (which comes from party.photos / the wire's
+  // AdminPayoutDetail.eventPhotos). NEVER conflate the two.
+  const eventDocs = useMemo(
+    () => payout.documents.filter((d) => d.kind === 'event'),
+    [payout.documents],
+  );
   // bottarga-92103: event-level photos from the party's Photos tab. Separate
   // from payment-app photos (`payout.documents`). Optional on the wire — older
   // cached responses simply render an empty section.
@@ -593,13 +601,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     ),
     [allEventPhotos],
   );
-  // Unified lightbox carousel order (focaccia-92104):
-  //   pizzas (payment-app) → receipts → pizzaPhotos → eventPhotos
+  // Unified lightbox carousel order (focaccia-92104; pomodoro-92110 inserts
+  // eventDocs right after pizzas):
+  //   pizzas (payment-app) → eventDocs (Event proof) → receipts → pizzaPhotos
+  //   → eventPhotos
   // Order matters so each thumbnail grid's offset into `allPhotos` resolves
   // to the right starting image.
   const allPhotos = useMemo(
     () => [
       ...pizzas.map((d) => ({
+        url: d.url,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+      })),
+      ...eventDocs.map((d) => ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
@@ -620,7 +635,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         mimeType: p.mimeType,
       })),
     ],
-    [pizzas, receipts, pizzaPhotos, eventPhotos],
+    [pizzas, eventDocs, receipts, pizzaPhotos, eventPhotos],
   );
 
   // robiola-92110: single source of truth for "what the persisted receipt draft
@@ -1142,16 +1157,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   }, [onClose, lightboxIndex]);
 
   // pesto-92104: derive the receipt that's currently in the lightbox (if
-  // any). The unified carousel order is pizzas → receipts → pizzaPhotos →
-  // eventPhotos (see `allPhotos` above), so the receipt slice starts at
-  // `pizzas.length` and runs through `pizzas.length + receipts.length`.
+  // any). The unified carousel order is pizzas → eventDocs → receipts →
+  // pizzaPhotos → eventPhotos (see `allPhotos` above; pomodoro-92110 inserted
+  // eventDocs), so the receipt slice starts at `pizzas.length +
+  // eventDocs.length` and runs through `... + receipts.length`.
   const lightboxReceipt = useMemo(() => {
     if (lightboxCurrentIndex == null) return null;
-    const offset = pizzas.length;
+    const offset = pizzas.length + eventDocs.length;
     const idx = lightboxCurrentIndex - offset;
     if (idx < 0 || idx >= receipts.length) return null;
     return receipts[idx];
-  }, [lightboxCurrentIndex, pizzas.length, receipts]);
+  }, [lightboxCurrentIndex, pizzas.length, eventDocs.length, receipts]);
 
   // pesto-92104: "is the editor dirty?" — used by the navigation prompt
   // (Save / Discard / Cancel) so admins don't accidentally lose in-flight
@@ -1643,9 +1659,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {eventPhotos.map((p, idx) => {
                     // focaccia-92104: event photos sit at the END of the
-                    // merged carousel.
+                    // merged carousel. pomodoro-92110: + eventDocs.length for
+                    // the Event-proof payout docs inserted after pizzas.
                     const carouselIdx =
-                      pizzas.length + receipts.length + pizzaPhotos.length + idx;
+                      pizzas.length + eventDocs.length + receipts.length + pizzaPhotos.length + idx;
                     const isHidden = p.status !== 'approved';
                     return (
                       <button
@@ -1714,8 +1731,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {pizzaPhotos.map((p, idx) => {
                     // focaccia-92104: pizza photos sit between receipts and
-                    // event photos in the merged carousel.
-                    const carouselIdx = pizzas.length + receipts.length + idx;
+                    // event photos in the merged carousel. pomodoro-92110:
+                    // + eventDocs.length for the Event-proof payout docs.
+                    const carouselIdx = pizzas.length + eventDocs.length + receipts.length + idx;
                     const isHidden = p.status !== 'approved';
                     return (
                       <button
@@ -1781,8 +1799,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {receipts.map((doc, idx) => {
                     // focaccia-92104: receipt thumbnails sit after the
-                    // payment-app pizzas in the merged carousel.
-                    const carouselIdx = pizzas.length + idx;
+                    // payment-app pizzas in the merged carousel. pomodoro-92110:
+                    // + eventDocs.length for the Event-proof payout docs.
+                    const carouselIdx = pizzas.length + eventDocs.length + idx;
                     const isDup = doc.isDuplicate === true;
                     // provola-92106: ineligible-but-not-duplicate gets its
                     // own amber treatment. When BOTH flags are true, the
@@ -2772,6 +2791,51 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       )}
                       <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white">
                         pizza
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* pomodoro-92110: Event proof — host-uploaded kind=event payout
+                documents. Sits right after Payment proof; the carousel order is
+                pizzas → eventDocs → receipts → ... so the lightbox index is
+                `pizzas.length + idx`. */}
+            {eventDocs.length > 0 && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
+                <h3 className="text-sm font-semibold text-theme-text mb-2">
+                  Event proof ({eventDocs.length})
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {eventDocs.map((doc, idx) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => setLightboxIndex(pizzas.length + idx)}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                      title={doc.fileName}
+                    >
+                      {isVideoFile(doc) ? (
+                        <>
+                          <video
+                            src={doc.url}
+                            preload="metadata"
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-black/50 rounded-full p-3">
+                              <Play className="text-white" size={20} fill="white" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                      <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+                        event
                       </span>
                     </button>
                   ))}

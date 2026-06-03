@@ -1797,7 +1797,7 @@ model PayoutDocument {
   party            Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
   payoutId         String?   @map("payout_id") @db.Uuid
   payout           Payout?   @relation(fields: [payoutId], references: [id], onDelete: SetNull)
-  kind             String // 'pizza' | 'receipt'
+  kind             String // 'pizza' | 'receipt' | 'event'
   url              String
   fileName         String    @map("file_name")
   fileSize         Int       @map("file_size")

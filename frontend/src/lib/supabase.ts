@@ -335,13 +335,15 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
  * @param file       The image file (JPEG / PNG / WebP / HEIC) or PDF (receipt only)
  * @param partyId    The party we're submitting a payout against
  * @param payoutTempId  A client-generated id to group files for one in-progress submission
- * @param kind       'pizza' or 'receipt' — drives OCR behavior server-side
+ * @param kind       'pizza', 'event', or 'receipt' — drives OCR behavior
+ *                   server-side. 'pizza' and 'event' are image-only; only
+ *                   'receipt' accepts application/pdf.
  */
 export async function uploadPayoutPhoto(
   file: File,
   partyId: string,
   payoutTempId: string,
-  kind: 'pizza' | 'receipt'
+  kind: 'pizza' | 'receipt' | 'event'
 ): Promise<{
   url: string;
   fileName: string;

@@ -704,6 +704,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     const { partyId } = req.params;
     const {
       pizzaPhotos = [],
+      // pomodoro-92110: event photos (cap 30) persist as kind:'event' docs and
+      // mirror to the gallery exactly like pizza photos.
+      eventPhotos = [],
       receiptPhotos = [],
       hostNotes,
       payoutMethod,
@@ -878,6 +881,13 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (pizzaPhotos.length > 10) {
       throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
     }
+    // pomodoro-92110: event photos validated with a higher cap (30).
+    if (!Array.isArray(eventPhotos)) {
+      throw new AppError('eventPhotos must be an array', 400, 'INVALID_EVENT_PHOTOS');
+    }
+    if (eventPhotos.length > 30) {
+      throw new AppError('Max 30 event photos', 400, 'TOO_MANY_EVENT_PHOTOS');
+    }
     // When zero receipts are supplied, finalAmountUsd MUST be a positive number.
     if (
       receiptPhotos.length === 0
@@ -911,6 +921,13 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     for (const p of pizzaPhotos as IncomingDocument[]) {
       if (!p || typeof p.url !== 'string') {
         throw new AppError('Each pizzaPhoto must have a url', 400, 'INVALID_PIZZA_PHOTO');
+      }
+      assertSupabasePayoutUrl(p.url, partyId);
+    }
+    // pomodoro-92110: same bucket-scope validation for event photos.
+    for (const p of eventPhotos as IncomingDocument[]) {
+      if (!p || typeof p.url !== 'string') {
+        throw new AppError('Each eventPhoto must have a url', 400, 'INVALID_EVENT_PHOTO');
       }
       assertSupabasePayoutUrl(p.url, partyId);
     }
@@ -1099,6 +1116,29 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       });
     });
 
+    // pomodoro-92110: event photos persist as kind:'event' docs. Same shape as
+    // pizza (no FX detail); they mirror to the gallery in the transaction below.
+    (eventPhotos as IncomingDocument[]).forEach((p, i) => {
+      docsToCreate.push({
+        kind: 'event',
+        url: p.url,
+        fileName: p.fileName || extractFileName(p.url),
+        fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
+        mimeType: p.mimeType || 'image/jpeg',
+        ocrAmount: null,
+        ocrCurrency: null,
+        ocrConfidence: null,
+        originalAmount: null,
+        originalCurrency: null,
+        exchangeRate: null,
+        ocrRaw: null,
+        ocrLineItems: null,
+        ocrError: null,
+        sortOrder: i,
+        photoId: null,
+      });
+    });
+
     // Final amount: host override (if provided) or OCR sum
     const hasExplicitAmount = typeof finalAmountUsd === 'number' && finalAmountUsd > 0;
     let finalUsd = hasExplicitAmount
@@ -1229,7 +1269,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       > = [];
       for (const d of docsToCreate) {
         let photoId: string | null = d.photoId;
-        if (d.kind === 'pizza') {
+        // pomodoro-92110: event docs mirror to the gallery identically to pizza.
+        if (d.kind === 'pizza' || d.kind === 'event') {
           // sicilian-58196: dedup pre-check. If a photo with the same
           // (partyId, fileSize, mimeType) already exists, reuse its id
           // instead of inserting a new row. Same bytes uploaded a second
@@ -1520,6 +1561,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       // are applied transactionally below.
       receiptPhotos,
       pizzaPhotos,
+      // pomodoro-92110: event photos (cap 30) on edit.
+      eventPhotos,
       removeDocumentIds,
     } = req.body || {};
 
@@ -1661,12 +1704,16 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (pizzaPhotos !== undefined && !Array.isArray(pizzaPhotos)) {
       throw new AppError('pizzaPhotos must be an array', 400, 'INVALID_PIZZA_PHOTOS');
     }
+    if (eventPhotos !== undefined && !Array.isArray(eventPhotos)) {
+      throw new AppError('eventPhotos must be an array', 400, 'INVALID_EVENT_PHOTOS');
+    }
     if (removeDocumentIds !== undefined && !Array.isArray(removeDocumentIds)) {
       throw new AppError('removeDocumentIds must be an array', 400, 'INVALID_REMOVE_IDS');
     }
 
     const newReceipts: IncomingDocument[] = Array.isArray(receiptPhotos) ? receiptPhotos : [];
     const newPizza: IncomingDocument[] = Array.isArray(pizzaPhotos) ? pizzaPhotos : [];
+    const newEvent: IncomingDocument[] = Array.isArray(eventPhotos) ? eventPhotos : [];
     const removeIds: string[] = Array.isArray(removeDocumentIds)
       ? removeDocumentIds.filter((s: unknown): s is string => typeof s === 'string')
       : [];
@@ -1674,8 +1721,21 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     if (newReceipts.length > 10) {
       throw new AppError('Max 10 receipt photos', 400, 'TOO_MANY_RECEIPTS');
     }
-    if (newPizza.length > 10) {
+    // pomodoro-92110: caps enforced as a TOTAL (surviving existing + new), not
+    // per-batch. `removeIds` is already filtered above; survivors = existing
+    // docs of that kind that aren't being removed in this same PATCH.
+    const removedSet = new Set(removeIds);
+    const survivingPizza = existing.documents.filter(
+      d => d.kind === 'pizza' && !removedSet.has(d.id)
+    ).length;
+    const survivingEvent = existing.documents.filter(
+      d => d.kind === 'event' && !removedSet.has(d.id)
+    ).length;
+    if (survivingPizza + newPizza.length > 10) {
       throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
+    }
+    if (survivingEvent + newEvent.length > 30) {
+      throw new AppError('Max 30 event photos', 400, 'TOO_MANY_EVENT_PHOTOS');
     }
 
     // Verify each new URL points into the bucket scoped to this party.
@@ -1688,6 +1748,13 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     for (const p of newPizza) {
       if (!p || typeof p.url !== 'string') {
         throw new AppError('Each pizzaPhoto must have a url', 400, 'INVALID_PIZZA_PHOTO');
+      }
+      assertSupabasePayoutUrl(p.url, partyId);
+    }
+    // pomodoro-92110: same bucket-scope validation for event photos.
+    for (const p of newEvent) {
+      if (!p || typeof p.url !== 'string') {
+        throw new AppError('Each eventPhoto must have a url', 400, 'INVALID_EVENT_PHOTO');
       }
       assertSupabasePayoutUrl(p.url, partyId);
     }
@@ -1862,7 +1929,28 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       photoId: null as string | null,
     }));
 
-    const documentsChanged = newReceiptDocs.length > 0 || newPizzaDocs.length > 0 || removeIds.length > 0;
+    // pomodoro-92110: event photos — same shape as newPizzaDocs (kind:'event'),
+    // mirrored to the gallery in the transaction below.
+    const newEventDocs = newEvent.map((p, i) => ({
+      kind: 'event',
+      url: p.url,
+      fileName: p.fileName || extractFileName(p.url),
+      fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
+      mimeType: p.mimeType || 'image/jpeg',
+      ocrAmount: null,
+      ocrCurrency: null,
+      ocrConfidence: null,
+      originalAmount: null as Decimal | null,
+      originalCurrency: null as string | null,
+      exchangeRate: null as Decimal | null,
+      ocrRaw: null,
+      ocrLineItems: null,
+      ocrError: null,
+      sortOrder: i,
+      photoId: null as string | null,
+    }));
+
+    const documentsChanged = newReceiptDocs.length > 0 || newPizzaDocs.length > 0 || newEventDocs.length > 0 || removeIds.length > 0;
     const explicitAmount = data.finalAmountUsd !== undefined;
 
     // If receipts changed AND host didn't pass finalAmountUsd, recompute from
@@ -1885,7 +1973,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     const allowRecompute = existing.status === 'pending';
 
     if (receiptsChanged && allowRecompute) {
-      const removedSet = new Set(removeIds);
+      // pomodoro-92110: reuse the hoisted `removedSet` declared above (total-cap
+      // check) instead of re-declaring it here.
       const survivingReceipts = existing.documents.filter(
         d => d.kind === 'receipt' && !removedSet.has(d.id)
       );
@@ -1963,7 +2052,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           where: { id: { in: removeIds }, payoutId: existing.id },
         });
       }
-      if (newReceiptDocs.length > 0 || newPizzaDocs.length > 0) {
+      if (newReceiptDocs.length > 0 || newPizzaDocs.length > 0 || newEventDocs.length > 0) {
         // pancetta-37195: stamp the editing user on every new document so
         // the per-receipt "Uploaded by X" line shows the cohost who added it,
         // not the original payout submitter.
@@ -1975,12 +2064,14 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         // payout_documents row links to the canonical photos record. If any
         // photos.create fails, the surrounding transaction aborts and the
         // patch is rolled back. Receipts skip this step (photoId stays null).
+        // pomodoro-92110: event docs mirror to the gallery exactly like pizza,
+        // so iterate both arrays here.
         //
         // sicilian-58196: dedup pre-check before insert — if a photo already
         // exists with the same (partyId, fileSize, mimeType), reuse it
         // instead of creating a duplicate row.
         const now = new Date();
-        for (const d of newPizzaDocs) {
+        for (const d of [...newPizzaDocs, ...newEventDocs]) {
           const dup = await tx.photo.findFirst({
             where: {
               partyId,
@@ -2015,7 +2106,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         }
 
         await tx.payoutDocument.createMany({
-          data: [...newReceiptDocs, ...newPizzaDocs].map(d => ({
+          data: [...newReceiptDocs, ...newPizzaDocs, ...newEventDocs].map(d => ({
             ...d,
             // agnolotti-58291: stamp partyId on every new doc — the FK is now
             // NOT NULL party-side, optional payout-side.
@@ -2083,7 +2174,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
             actorEmail: auditActorEmail,
             actorKind: 'host',
             note: documentsChanged
-              ? `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new photo(s), ${removeIds.length} removed)`
+              ? `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new pizza photo(s), ${newEventDocs.length} new event photo(s), ${removeIds.length} removed)`
               : 'Host edit',
           },
         });
@@ -2094,7 +2185,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
             action: 'edit_documents',
             actorEmail: auditActorEmail,
             actorKind: 'host',
-            note: `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new photo(s), ${removeIds.length} removed)`,
+            note: `Host edit (${newReceiptDocs.length} new receipt(s), ${newPizzaDocs.length} new pizza photo(s), ${newEventDocs.length} new event photo(s), ${removeIds.length} removed)`,
           },
         });
       }
