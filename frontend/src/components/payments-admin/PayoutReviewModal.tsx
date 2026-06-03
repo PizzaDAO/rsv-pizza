@@ -17,7 +17,7 @@ import {
   formatOriginalCurrency,
   ReceiptLightbox,
 } from '../payments-shared';
-import { ReceiptEditor } from './ReceiptEditor';
+import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
 
 /**
@@ -973,8 +973,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       // shared ReceiptEditor's `draftSubtotalSum` helper so the live total
       // shown in the right-pane editor matches the lightbox editor.
       if (d.ineligible === true) continue;
-      const n = Number(d.subtotal);
-      if (Number.isFinite(n) && n >= 0) sum += n;
+      sum += computeLineSubtotal(d);
     }
     return sum;
   }
@@ -1014,16 +1013,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       const items: ReceiptLineItem[] = drafts.map((d, idx) => {
         const qty = Number(d.qty);
         const unitPrice = Number(d.unitPrice);
-        const subtotal = Number(d.subtotal);
         if (!Number.isFinite(qty) || qty < 0) {
           throw new Error(`Line ${idx + 1}: qty must be a non-negative number`);
         }
         if (!Number.isFinite(unitPrice) || unitPrice < 0) {
           throw new Error(`Line ${idx + 1}: unit price must be a non-negative number`);
         }
-        if (!Number.isFinite(subtotal) || subtotal < 0) {
-          throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
-        }
+        // crescenza-92112: subtotal is calculated, not entered.
+        const subtotal = computeLineSubtotal(d);
         // provola-92106: persist the per-line ineligible flag only when
         // true so existing items + items the admin never touched don't
         // sprout a `false` field. Backend sanitizer matches this stance.
@@ -2688,17 +2685,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                         }
                                         className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
                                       />
+                                      {/* crescenza-92112: subtotal is
+                                          calculated (qty × unit), read-only. */}
                                       <input
                                         type="number"
-                                        step="0.01"
-                                        min="0"
                                         inputMode="decimal"
-                                        value={d.subtotal}
+                                        value={computeLineSubtotal(d).toFixed(2)}
+                                        readOnly
+                                        tabIndex={-1}
                                         placeholder="subtotal"
-                                        onChange={(e) =>
-                                          updateLineItemDraft(r.id, idx, { subtotal: e.target.value })
-                                        }
-                                        className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                                        title="Auto-calculated (qty × unit price)"
+                                        className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-bg text-theme-text-muted text-xs text-right cursor-not-allowed"
                                       />
                                       <select
                                         value={d.category}

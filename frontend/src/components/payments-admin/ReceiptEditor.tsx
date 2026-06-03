@@ -111,6 +111,21 @@ interface ReceiptEditorProps {
   isDirty: boolean;
 }
 
+/**
+ * crescenza-92112: the line-item subtotal is a CALCULATED field — always
+ * qty × unitPrice. The subtotal input is read-only; this helper is the single
+ * source of truth used by the live sum, the "Use line sum" amount, and the
+ * value persisted on save. Returns 0 for blank/invalid qty or unitPrice.
+ */
+export function computeLineSubtotal(d: Pick<LineItemDraft, 'qty' | 'unitPrice'>): number {
+  const qty = Number(d.qty);
+  const unitPrice = Number(d.unitPrice);
+  if (!Number.isFinite(qty) || qty < 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
+    return 0;
+  }
+  return qty * unitPrice;
+}
+
 function draftSubtotalSum(drafts: LineItemDraft[] | undefined): number {
   if (!drafts) return 0;
   let sum = 0;
@@ -119,8 +134,7 @@ function draftSubtotalSum(drafts: LineItemDraft[] | undefined): number {
     // personal items). The live sum + "Use line sum" button both rely on
     // this helper so the receipt total reflects only reimbursable items.
     if (d.ineligible === true) continue;
-    const n = Number(d.subtotal);
-    if (Number.isFinite(n) && n >= 0) sum += n;
+    sum += computeLineSubtotal(d);
   }
   return sum;
 }
@@ -572,17 +586,17 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
                   }
                   className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
                 />
+                {/* crescenza-92112: subtotal is calculated (qty × unit), not
+                    entered. Read-only, derived live from the row. */}
                 <input
                   type="number"
-                  step="0.01"
-                  min="0"
                   inputMode="decimal"
-                  value={d.subtotal}
+                  value={computeLineSubtotal(d).toFixed(2)}
+                  readOnly
+                  tabIndex={-1}
                   placeholder="subtotal"
-                  onChange={(e) =>
-                    onLineItemDraftChange(idx, { subtotal: e.target.value })
-                  }
-                  className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-surface text-theme-text text-xs text-right"
+                  title="Auto-calculated (qty × unit price)"
+                  className="w-20 px-2 py-1 rounded border border-theme-stroke bg-theme-bg text-theme-text-muted text-xs text-right cursor-not-allowed"
                 />
                 <select
                   value={d.category}
