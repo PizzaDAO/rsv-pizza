@@ -349,7 +349,7 @@ export async function uploadPayoutPhoto(
   fileName: string;
   fileSize: number;
   mimeType: string;
-} | null> {
+}> {
   // bocconcino-92104: receipts accept PDF in addition to image MIMEs. Pizza
   // photos remain image-only (PDFs make no sense as a pizza shot).
   const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -358,12 +358,12 @@ export async function uploadPayoutPhoto(
     : allowedImageTypes;
   if (!allowedTypes.includes(file.type)) {
     console.error('Invalid file type for payout photo:', file.type);
-    return null;
+    throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: JPEG, PNG, WebP, HEIC, PDF.`);
   }
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     console.error('Payout photo too large:', file.size);
-    return null;
+    throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 10MB.`);
   }
 
   try {
@@ -378,7 +378,7 @@ export async function uploadPayoutPhoto(
 
     if (error) {
       console.error('Error uploading payout photo:', error);
-      return null;
+      throw new Error(error.message);
     }
 
     const { data: urlData } = supabase.storage
@@ -423,7 +423,7 @@ export async function uploadPayoutPhoto(
     };
   } catch (err) {
     console.error('Error uploading payout photo:', err);
-    return null;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 

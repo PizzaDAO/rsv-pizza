@@ -261,10 +261,6 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
       // still matches `payouts/{partyId}/{group}/{kind}/...`.
       const groupId = `external-${Date.now()}`;
       const result = await uploadPayoutPhoto(file, partyId.trim(), groupId, 'receipt');
-      if (!result) {
-        setUploadError('Upload failed — check the file type (jpg/png/webp/heic) and size (<10MB).');
-        return;
-      }
       setUploadedProofUrl(result.url);
     } catch (err: any) {
       setUploadError(err?.message || 'Upload failed');

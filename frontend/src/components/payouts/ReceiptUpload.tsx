@@ -61,9 +61,14 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     // Upload each file in parallel, then run OCR.
     await Promise.all(fileArr.map(async (file, i) => {
       const itemId = newItems[i].id;
-      const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, 'receipt');
-      if (!uploaded) {
-        nextItems = updateItem(nextItems, itemId, { status: 'error', error: 'Upload failed' });
+      let uploaded: Awaited<ReturnType<typeof uploadPayoutPhoto>>;
+      try {
+        uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, 'receipt');
+      } catch (err) {
+        nextItems = updateItem(nextItems, itemId, {
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Upload failed',
+        });
         onChange(nextItems);
         return;
       }
