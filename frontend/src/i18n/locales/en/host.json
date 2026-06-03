@@ -870,6 +870,8 @@
     "excludedNote": "Receipts or items marked Duplicate or Ineligible are excluded from your reimbursement total.",
     "duplicatePill": "Duplicate",
     "ineligiblePill": "Ineligible",
-    "ineligibleLineTag": "ineligible"
+    "ineligibleLineTag": "ineligible",
+    "lineItemsToggle": "Line items",
+    "eligibleLineTotal": "Eligible total"
   }
 }

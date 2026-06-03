@@ -819,6 +819,8 @@
     "excludedNote": "Los recibos o artículos marcados como Duplicado o No elegible se excluyen del total de tu reembolso.",
     "duplicatePill": "Duplicado",
     "ineligiblePill": "No elegible",
-    "ineligibleLineTag": "no elegible"
+    "ineligibleLineTag": "no elegible",
+    "lineItemsToggle": "Artículos",
+    "eligibleLineTotal": "Total elegible"
   }
 }

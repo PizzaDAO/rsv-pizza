@@ -819,6 +819,8 @@
     "excludedNote": "Les reçus ou articles marqués comme Doublon ou Non éligible sont exclus du total de votre remboursement.",
     "duplicatePill": "Doublon",
     "ineligiblePill": "Non éligible",
-    "ineligibleLineTag": "non éligible"
+    "ineligibleLineTag": "non éligible",
+    "lineItemsToggle": "Articles",
+    "eligibleLineTotal": "Total éligible"
   }
 }

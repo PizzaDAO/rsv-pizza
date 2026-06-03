@@ -775,6 +775,8 @@
     "excludedNote": "중복 또는 부적격으로 표시된 영수증이나 항목은 환급 합계에서 제외됩니다.",
     "duplicatePill": "중복",
     "ineligiblePill": "부적격",
-    "ineligibleLineTag": "부적격"
+    "ineligibleLineTag": "부적격",
+    "lineItemsToggle": "항목",
+    "eligibleLineTotal": "적격 합계"
   }
 }

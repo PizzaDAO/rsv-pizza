@@ -819,6 +819,8 @@
     "excludedNote": "标记为重复或不符合条件的收据或项目将从您的报销总额中扣除。",
     "duplicatePill": "重复",
     "ineligiblePill": "不符合条件",
-    "ineligibleLineTag": "不符合条件"
+    "ineligibleLineTag": "不符合条件",
+    "lineItemsToggle": "明细项目",
+    "eligibleLineTotal": "符合条件总额"
   }
 }
