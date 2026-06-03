@@ -15,9 +15,38 @@ const SCORECARD_ITEMS = [
   'join_telegram',
   'follow_pizzadao',
   'signup_pizzadao',
+  // panzerotti-58931: Photo Game challenges
+  'photo_box_stack',
+  'photo_host',
+  'photo_partner',
 ] as const;
 
 type ScorecardItemKey = typeof SCORECARD_ITEMS[number];
+
+// panzerotti-58931: map each item key to a game category. Used by the frontend
+// hub to split items between the "Missions" and "Photo Game" surfaces. No
+// schema change — category is derived server-side and attached to responses.
+const CATEGORY: Record<ScorecardItemKey, 'mission' | 'photo'> = {
+  post: 'mission',
+  vouch: 'mission',
+  join_telegram: 'mission',
+  follow_pizzadao: 'mission',
+  signup_pizzadao: 'mission',
+  photo: 'photo',
+  pizza_selfie: 'photo',
+  sign_pizza_box: 'photo',
+  photo_box_stack: 'photo',
+  photo_host: 'photo',
+  photo_partner: 'photo',
+};
+
+function categoryFor(itemKey: string): 'mission' | 'photo' | undefined {
+  return CATEGORY[itemKey as ScorecardItemKey];
+}
+
+// panzerotti-58931: superlative submission keys (separate table, not scorecard items)
+const SUPERLATIVE_KEYS = ['super_slices', 'super_cheese_pull', 'super_box_stack'] as const;
+type SuperlativeKey = typeof SUPERLATIVE_KEYS[number];
 
 // Helper: find party by inviteCode or customUrl
 async function findPartyByCode(inviteCode: string) {
@@ -126,7 +155,7 @@ router.get('/:inviteCode', requireAuth, async (req: AuthRequest, res: Response, 
     const completedCount = items.filter((item) => item.completed).length;
 
     res.json({
-      items,
+      items: items.map((item) => ({ ...item, category: categoryFor(item.itemKey) })),
       pizzaChefScore: completedCount,
       totalItems: SCORECARD_ITEMS.length,
     });
@@ -190,10 +219,141 @@ router.post('/:inviteCode/complete', requireAuth, async (req: AuthRequest, res: 
     const completedCount = allItems.filter((i) => i.completed).length;
 
     res.json({
-      item,
+      item: { ...item, category: categoryFor(item.itemKey) },
       pizzaChefScore: completedCount,
       totalItems: SCORECARD_ITEMS.length,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/scorecard/:inviteCode/leaderboard — checked-in guests ranked by
+// completed-item count. panzerotti-58931.
+router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    // Checked-in guests with their completed-item count. Rejected guests
+    // (approved=false) are excluded to mirror findGuestForUser.
+    const guests = await prisma.guest.findMany({
+      where: {
+        partyId: party.id,
+        checkedInAt: { not: null },
+        OR: [{ approved: true }, { approved: null }],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        scorecardItems: {
+          where: { completed: true },
+          select: { id: true },
+        },
+      },
+    });
+
+    const callerEmail = req.userEmail?.toLowerCase();
+
+    const privacyName = (raw: string | null | undefined): string => {
+      const trimmed = (raw || '').trim();
+      if (!trimmed) return 'Guest';
+      const parts = trimmed.split(/\s+/);
+      const first = parts[0];
+      const lastInitial = parts.length > 1 ? parts[parts.length - 1][0] : '';
+      return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
+    };
+
+    const leaderboard = guests
+      .map((g) => ({
+        guestId: g.id,
+        name: privacyName(g.name),
+        score: g.scorecardItems.length,
+        isCurrentUser: !!callerEmail && g.email?.toLowerCase() === callerEmail,
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.name.localeCompare(b.name);
+      });
+
+    res.json({ leaderboard });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/scorecard/:inviteCode/superlative — submit a superlative entry for
+// later judging. Worth 0 points until judged (Phase 2). panzerotti-58931.
+router.post('/:inviteCode/superlative', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { inviteCode } = req.params;
+    const { superlativeKey, photoUrl, numericValue } = req.body;
+
+    if (!superlativeKey || !SUPERLATIVE_KEYS.includes(superlativeKey as SuperlativeKey)) {
+      throw new AppError(
+        `Invalid superlativeKey. Must be one of: ${SUPERLATIVE_KEYS.join(', ')}`,
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    if (!photoUrl || typeof photoUrl !== 'string') {
+      throw new AppError('photoUrl is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const party = await findPartyByCode(inviteCode);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const guest = await findGuestForUser(party.id, req.userEmail);
+    if (!guest) {
+      throw new AppError('You must be an RSVPd guest to submit a superlative', 403, 'NOT_A_GUEST');
+    }
+
+    if (!guest.checkedInAt) {
+      throw new AppError('You must be checked in to submit a superlative', 403, 'NOT_CHECKED_IN');
+    }
+
+    let numeric: number | null = null;
+    if (numericValue !== undefined && numericValue !== null && numericValue !== '') {
+      const parsed = Number(numericValue);
+      numeric = Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+    }
+
+    // UPSERT one row per (guestId, partyId, superlativeKey). Re-submit replaces
+    // the prior entry and resets status to 'pending'.
+    const row = await prisma.superlativeSubmission.upsert({
+      where: {
+        guestId_partyId_superlativeKey: {
+          guestId: guest.id,
+          partyId: party.id,
+          superlativeKey,
+        },
+      },
+      create: {
+        guestId: guest.id,
+        partyId: party.id,
+        superlativeKey,
+        photoUrl,
+        numericValue: numeric,
+        status: 'pending',
+      },
+      update: {
+        photoUrl,
+        numericValue: numeric,
+        status: 'pending',
+        judgedBy: null,
+        judgedAt: null,
+      },
+    });
+
+    res.json({ submission: row });
   } catch (error) {
     next(error);
   }

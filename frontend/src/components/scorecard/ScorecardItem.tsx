@@ -13,7 +13,12 @@ export type ScorecardItemKey =
   | 'sign_pizza_box'
   | 'join_telegram'
   | 'follow_pizzadao'
-  | 'signup_pizzadao';
+  | 'signup_pizzadao'
+  // panzerotti-58931: Photo Game challenge keys (rendered by PhotoGameModal,
+  // not by ScorecardItem — included here so onComplete callers type-check).
+  | 'photo_box_stack'
+  | 'photo_host'
+  | 'photo_partner';
 
 interface ScorecardItemProps {
   itemKey: ScorecardItemKey;
@@ -40,6 +45,11 @@ const ITEM_CONFIG: Record<ScorecardItemKey, { label: string; emoji: string }> = 
   join_telegram: { label: "Join your city's PizzaDAO Telegram", emoji: 'tg' },
   follow_pizzadao: { label: 'Follow @pizza_dao', emoji: '🐦' },
   signup_pizzadao: { label: 'Sign up on pizzadao.org', emoji: '🌐' },
+  // panzerotti-58931: Photo Game challenges are rendered by PhotoGameModal, but
+  // configs are kept here so the Record type stays exhaustive.
+  photo_box_stack: { label: 'Photo with the box stack', emoji: '📦' },
+  photo_host: { label: 'Photo with the host', emoji: '🧑‍🍳' },
+  photo_partner: { label: 'Photo with a partner', emoji: '🤝' },
 };
 
 export function ScorecardItem({
