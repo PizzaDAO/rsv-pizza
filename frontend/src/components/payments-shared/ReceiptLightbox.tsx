@@ -191,11 +191,47 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose, goPrev, goNext, hasMultiple, onDuplicateShortcut]);
 
-  if (!isOpen || count === 0) return null;
-
   const current = images[index];
-  if (!current) return null;
   const heic = isHeic(current);
+
+  // stracciatella-71042: HEIC receipts can't render in an <img> natively, so
+  // decode them to a JPEG blob in-browser via heic2any (lazy-loaded so the WASM
+  // codec stays off the main bundle). Hook MUST live above the early return so
+  // the hook order stays stable (adding a hook below a conditional return has
+  // black-screened this app before).
+  const [heicState, setHeicState] = React.useState<
+    { status: 'idle' | 'loading' | 'ready' | 'error'; url?: string }
+  >({ status: 'idle' });
+
+  useEffect(() => {
+    if (!isOpen || !heic || !current) { setHeicState({ status: 'idle' }); return; }
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setHeicState({ status: 'loading' });
+    (async () => {
+      try {
+        const res = await fetch(current.url);
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        const blob = await res.blob();
+        const heic2any = (await import('heic2any')).default;
+        const out = await heic2any({ blob, toType: 'image/jpeg', quality: 0.92 });
+        const outBlob = Array.isArray(out) ? out[0] : out;
+        objectUrl = URL.createObjectURL(outBlob);
+        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
+        setHeicState({ status: 'ready', url: objectUrl });
+      } catch {
+        if (!cancelled) setHeicState({ status: 'error' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, heic, current?.url]);
+
+  if (!isOpen || count === 0 || !current) return null;
+
   // melanzane-92103: when the focused item is a video, render a <video> with
   // controls + autoplay so admins can scrub. `muted` is required for autoplay
   // under browser policy; `playsInline` keeps mobile from kicking into the
@@ -328,22 +364,38 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             </>
           )}
           {heic ? (
-            <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
-              <p className="text-sm font-semibold">Can't preview HEIC files</p>
-              <p className="text-xs text-theme-text-muted">
-                Your browser doesn't render <span className="font-mono">.heic</span>{' '}
-                images natively. Open the file in a new tab to download or view it.
-              </p>
-              <a
-                href={current.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
-              >
-                Open in new tab <ExternalLink size={14} />
-              </a>
-              <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
-            </div>
+            heicState.status === 'ready' && heicState.url ? (
+              /* stracciatella-71042: decoded HEIC -> JPEG blob URL, shown inline. */
+              <img
+                src={heicState.url}
+                alt={current.fileName}
+                className={`${mediaSizing} object-contain`}
+              />
+            ) : heicState.status === 'loading' ? (
+              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                <div className="mx-auto h-8 w-8 rounded-full border-2 border-theme-stroke border-t-[#ff393a] animate-spin" />
+                <p className="text-sm font-semibold">Converting HEIC…</p>
+                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+              </div>
+            ) : (
+              /* error / idle — fall back to the original open-in-new-tab card. */
+              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                <p className="text-sm font-semibold">Can't preview HEIC files</p>
+                <p className="text-xs text-theme-text-muted">
+                  Your browser doesn't render <span className="font-mono">.heic</span>{' '}
+                  images natively. Open the file in a new tab to download or view it.
+                </p>
+                <a
+                  href={current.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
+                >
+                  Open in new tab <ExternalLink size={14} />
+                </a>
+                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+              </div>
+            )
           ) : video ? (
             /* melanzane-92103: keying on src so swapping between videos via
                arrow nav cleanly remounts the <video> with the new source. */
