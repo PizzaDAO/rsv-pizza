@@ -1357,6 +1357,18 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 'success',
               );
             }}
+            // panuozzo-58217: custom-tag add/remove — patch the row's eventTags
+            // in place (mirrors the scam-flag handler) and flash a toast.
+            onTagsChanged={(partyId, nextTags) => {
+              setByPartyRows((prev) =>
+                prev.map((r) =>
+                  r.party.id === partyId
+                    ? { ...r, party: { ...r.party, eventTags: nextTags } }
+                    : r,
+                ),
+              );
+              pushToast('Custom tags updated', 'success');
+            }}
             // crocchetta-92106: Send-receipts-reminder result toast. The
             // backend returns per-channel success + skip reason; we render
             // each channel as a "✓"/"–" so the admin can see at a glance
