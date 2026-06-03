@@ -540,6 +540,34 @@ export async function approveCity(
 }
 
 /**
+ * bufalina-60733: Fake-detection risk scores for a set of GPP parties, used to
+ * badge the payments-admin by-city table + gate the send-payment confirm.
+ *
+ * Compact map keyed by party id; `clean`/sub-10 parties are omitted server-side
+ * so the badge self-hides for them. Best-effort — callers should `.catch(()=>{})`.
+ */
+export interface FakeDetectionScoreEntry {
+  score: number;
+  tier: string;
+  topFlags: string[];
+}
+
+export type FakeDetectionScoreMap = Record<string, FakeDetectionScoreEntry>;
+
+export async function fetchFakeDetectionScores(
+  partyIds: string[],
+): Promise<{ scores: FakeDetectionScoreMap }> {
+  return apiRequest<{ scores: FakeDetectionScoreMap }>(
+    '/api/admin/payouts/fake-detection-scores',
+    {
+      method: 'POST',
+      requireAuth: true,
+      body: { partyIds },
+    },
+  );
+}
+
+/**
  * quattro-71244: Fetches this party's rank against peer GPP events.
  * Returns null on 401/403/404/network failure so callers (the LeaderboardPill)
  * can gracefully hide instead of crashing the dashboard.

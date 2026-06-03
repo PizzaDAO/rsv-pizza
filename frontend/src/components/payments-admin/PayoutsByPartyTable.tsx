@@ -70,6 +70,7 @@ import {
   type ReceiptDraft,
   type LineItemDraft,
 } from './ReceiptEditor';
+import { FakeDetectionBadge } from './FakeDetectionBadge';
 
 /**
  * ricotta-92104: split party.photos into "Pizza photos" (tag === 'Pizza' —
@@ -203,6 +204,12 @@ interface PayoutsByPartyTableProps {
    * skipped server-side with `groupReason: 'no city TG group set'`.
    */
   cityGroupChatIds?: Map<string, string>;
+  /**
+   * bufalina-60733: fake-detection risk scores keyed by party id. Only
+   * medium/high (≥30) parties are present; an absent key means "no badge".
+   * Rendered as a caution pill in the city header strip.
+   */
+  fakeScores?: Record<string, { score: number; tier: string; topFlags: string[] }>;
   viewerRole?: 'admin' | 'underboss';
   busyRowId?: string | null;
   loading?: boolean;
@@ -2487,6 +2494,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onTgReminderResult,
   onTgWalletReminderResult,
   cityGroupChatIds,
+  fakeScores,
   viewerRole = 'admin',
   busyRowId,
   loading,
@@ -2920,6 +2928,17 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             SWC Hub
                           </span>
                         )}
+                        {/* bufalina-60733: fake-detection risk badge. Self-hides
+                            unless the party scored medium (amber ≥30) or high
+                            (red ≥60). Tooltip lists the top fired flags. */}
+                        <FakeDetectionBadge
+                          {...(fakeScores?.[row.party.id] ?? {
+                            score: 0,
+                            tier: 'clean' as const,
+                            topFlags: [],
+                          })}
+                          customUrl={row.party.customUrl}
+                        />
                         {row.aggregates.flaggedReadyCount > 0 && (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] text-emerald-500"

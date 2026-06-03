@@ -24,7 +24,9 @@ import {
   exportAdminPayoutsCsv,
   fetchPrepayQueue,
   flagReadyForPayment,
+  fetchFakeDetectionScores,
 } from '../lib/api';
+import type { FakeDetectionScoreMap } from '../lib/api';
 import type {
   AdminPayout,
   AdminPayoutDetail,
@@ -207,6 +209,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // same loader (`loadPage`) so the rest of the page can read from whichever
   // is active.
   const [byPartyRows, setByPartyRows] = useState<PartyPayoutsRow[]>([]);
+  // bufalina-60733: fake-detection risk scores for the loaded by-city parties.
+  // Keyed by party id; only medium/high (≥30) parties are returned, so an
+  // absent key means "no badge". Fetched best-effort after byPartyRows loads.
+  const [fakeScores, setFakeScores] = useState<FakeDetectionScoreMap>({});
   const [totals, setTotals] = useState<AdminPayoutTotals | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -273,6 +279,12 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         // over the resolved 0x). Lets SendPaymentModal pre-fill the wallet
         // field per selected recipient instead of making the admin re-type it.
         hostWalletByUserId: Record<string, string>;
+        // bufalina-60733: fake-detection risk for this party, looked up from
+        // `fakeScores` at open time so the modal can gate "Send" behind an ack
+        // when the event is flagged (medium/high). Undefined = no flag.
+        fakeScore?: number;
+        fakeTier?: string;
+        fakeTopFlags?: string[];
       }
     | null
   >(null);
@@ -419,6 +431,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // allowed to write state.
   const loadSeqRef = useRef(0);
 
+  // bufalina-60733: separate monotonic id for the best-effort fake-detection
+  // score fetch so a slow score response can't clobber a newer filter's scores.
+  const fakeScoresSeqRef = useRef(0);
+
   const loadPage = useCallback(
     async (f: AdminPayoutFilters, append = false) => {
       // risotto-58931: monotonic request id — only the latest loadPage call is
@@ -500,6 +516,28 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     if (role.kind !== 'allowed') return;
     loadPrepayQueue();
   }, [role.kind, loadPrepayQueue]);
+
+  // bufalina-60733: best-effort fake-detection score fetch for the loaded
+  // by-city parties. Non-blocking — failures are swallowed and just leave the
+  // badges hidden. Guarded by `fakeScoresSeqRef` so a slow response from an
+  // older filter can't overwrite a newer one's scores.
+  useEffect(() => {
+    if (role.kind !== 'allowed') return;
+    const ids = byPartyRows.map((r) => r.party.id);
+    if (ids.length === 0) {
+      setFakeScores({});
+      return;
+    }
+    const myReq = ++fakeScoresSeqRef.current;
+    fetchFakeDetectionScores(ids)
+      .then((res) => {
+        if (myReq !== fakeScoresSeqRef.current) return;
+        setFakeScores(res.scores);
+      })
+      .catch(() => {
+        /* best-effort: leave badges hidden on failure */
+      });
+  }, [byPartyRows, role.kind]);
 
   // lardo-58294: apply the substring filter. When the search is empty this
   // is identity-equal to prepayQueue.
@@ -1185,6 +1223,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
             rows={displayedByPartyRows}
+            fakeScores={fakeScores}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onRowClick={openDetail}
@@ -1277,6 +1316,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 const wallet = (p.payoutWalletInput || p.payoutWalletAddress || '').trim();
                 if (wallet) hostWalletByUserId[p.hostUserId] = wallet;
               }
+              // bufalina-60733: attach the looked-up fake-detection risk for
+              // this party so the modal can gate the send behind an ack.
+              const fake = fakeScores[row.party.id];
               setSendPaymentTarget({
                 partyId: row.party.id,
                 partyName: row.party.name,
@@ -1288,6 +1330,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 paidTotalUsd: paidSumUsd,
                 primaryHostUserId: row.party.userId ?? null,
                 hostWalletByUserId,
+                fakeScore: fake?.score,
+                fakeTier: fake?.tier,
+                fakeTopFlags: fake?.topFlags,
               });
             }}
             // bottarga-92104: after the table toggles the `possible-scam` tag,
@@ -1741,6 +1786,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             paidTotalUsd={sendPaymentTarget.paidTotalUsd}
             primaryHostUserId={sendPaymentTarget.primaryHostUserId}
             hostWalletByUserId={sendPaymentTarget.hostWalletByUserId}
+            fakeScore={sendPaymentTarget.fakeScore}
+            fakeTier={sendPaymentTarget.fakeTier}
+            fakeTopFlags={sendPaymentTarget.fakeTopFlags}
             onClose={() => setSendPaymentTarget(null)}
             onSent={async ({ partyName: sentTo, method, amountUsd }) => {
               const methodLabel =
