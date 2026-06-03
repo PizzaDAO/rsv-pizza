@@ -64,6 +64,7 @@ import {
 } from '../../lib/api';
 import {
   ReceiptEditor,
+  computeLineSubtotal,
   lineItemToDraft,
   emptyLineItemDraft,
   type ReceiptDraft,
@@ -1443,8 +1444,7 @@ function CityExpansion({
     for (const d of drafts) {
       // provola-92106: ineligible lines stay out of the rolled-up amount.
       if (d.ineligible === true) continue;
-      const n = Number(d.subtotal);
-      if (Number.isFinite(n) && n >= 0) sum += n;
+      sum += computeLineSubtotal(d);
     }
     // caprino-92104: line items are in the receipt's ORIGINAL currency, so
     // the line sum maps to the originalAmount draft, not USD.
@@ -1473,16 +1473,14 @@ function CityExpansion({
       const items: ReceiptLineItem[] = drafts.map((d, idx) => {
         const qty = Number(d.qty);
         const unitPrice = Number(d.unitPrice);
-        const subtotal = Number(d.subtotal);
         if (!Number.isFinite(qty) || qty < 0) {
           throw new Error(`Line ${idx + 1}: qty must be a non-negative number`);
         }
         if (!Number.isFinite(unitPrice) || unitPrice < 0) {
           throw new Error(`Line ${idx + 1}: unit price must be a non-negative number`);
         }
-        if (!Number.isFinite(subtotal) || subtotal < 0) {
-          throw new Error(`Line ${idx + 1}: subtotal must be a non-negative number`);
-        }
+        // crescenza-92112: subtotal is calculated, not entered.
+        const subtotal = computeLineSubtotal(d);
         // provola-92106: persist per-line ineligible only when true.
         const out: ReceiptLineItem = {
           name: d.name,
