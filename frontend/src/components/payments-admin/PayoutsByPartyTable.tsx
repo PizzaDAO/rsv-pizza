@@ -53,6 +53,11 @@ import {
   retryPayoutDocumentOcr,
   flagPartyAsScam,
   POSSIBLE_SCAM_TAG,
+  addCustomTag,
+  removeCustomTag,
+  getCustomTagLabels,
+  normalizeCustomTagLabel,
+  CUSTOM_TAG_PREFIX,
   sendTgReceiptsReminder,
   sendTgWalletReminder,
   setCityAdminNotes,
@@ -165,6 +170,13 @@ interface PayoutsByPartyTableProps {
    * the viewerRole gate on the menu.
    */
   onScamFlagChanged?: (partyId: string, nextTags: string[]) => void;
+  /**
+   * panuozzo-58217: parent-supplied refresh hook called after a custom tag is
+   * added or removed. The add/remove happens locally via `addCustomTag` /
+   * `removeCustomTag`; the parent patches its row state + flashes a toast.
+   * Available to admins + underbosses (wider than the scam flag).
+   */
+  onTagsChanged?: (partyId: string, nextTags: string[]) => void;
   /**
    * crocchetta-92106: toast callback used by the Send receipts reminder
    * action. Called after the backend POST resolves; the menu owns the API
@@ -395,6 +407,8 @@ function CityActionsMenu({
   onSendWalletReminder,
   onApproveCity,
   onReopen,
+  onAddCustomTag,
+  onRemoveCustomTag,
   canMarkPaid,
   canAddExternal,
   canSendPayment,
@@ -403,6 +417,7 @@ function CityActionsMenu({
   canSendWalletReminder,
   canApproveCity,
   canReopen,
+  canManageTags,
   markPaidLabel,
   isFlaggedScam,
   scamFlagBusy,
@@ -410,6 +425,8 @@ function CityActionsMenu({
   walletReminderBusy,
   reopenBusy,
   approveBusy,
+  customTags,
+  tagBusy,
   receiptsReminderSentAt,
   paymentsApprovedUsd,
   paymentsApprovedAt,
@@ -434,6 +451,10 @@ function CityActionsMenu({
   onApproveCity?: (amountUsd: number | null) => void;
   /** Reopen a closed city (undo the close). */
   onReopen?: () => void;
+  /** panuozzo-58217: add a free-text custom tag (label only, no prefix). */
+  onAddCustomTag?: (label: string) => void;
+  /** panuozzo-58217: remove a custom tag by its display label. */
+  onRemoveCustomTag?: (label: string) => void;
   canMarkPaid: boolean;
   canAddExternal: boolean;
   canSendPayment: boolean;
@@ -442,6 +463,8 @@ function CityActionsMenu({
   canSendWalletReminder: boolean;
   canApproveCity: boolean;
   canReopen: boolean;
+  /** panuozzo-58217: admins + underbosses may add/view/remove custom tags. */
+  canManageTags: boolean;
   markPaidLabel: string;
   isFlaggedScam: boolean;
   scamFlagBusy: boolean;
@@ -449,6 +472,10 @@ function CityActionsMenu({
   walletReminderBusy: boolean;
   reopenBusy: boolean;
   approveBusy: boolean;
+  /** panuozzo-58217: current custom-tag display labels (no `custom:` prefix). */
+  customTags: string[];
+  /** panuozzo-58217: an add/remove is in flight for this party. */
+  tagBusy: boolean;
   receiptsReminderSentAt?: string | null;
   paymentsApprovedUsd?: number | null;
   paymentsApprovedAt?: string | null;
@@ -467,6 +494,9 @@ function CityActionsMenu({
   // Same two-click confirm, separate state so the wallet + receipts items
   // don't share a confirm flag.
   const [confirmWalletReminder, setConfirmWalletReminder] = useState(false);
+  // panuozzo-58217: the custom-tag add field. Declared above the no-actions
+  // early return so the conditional return can't reorder hooks.
+  const [tagDraft, setTagDraft] = useState('');
   // stracciatella-49112: the dropdown panel is portaled to <body> with fixed
   // positioning so the table's overflow-hidden / overflow-x-auto wrapper can't
   // clip it (single-row tables have no scroll room). We anchor off the kebab
@@ -510,11 +540,18 @@ function CityActionsMenu({
     canToggleScamFlag ||
     canSendTgReminder ||
     canSendWalletReminder ||
-    canReopen;
+    canReopen ||
+    canManageTags;
   // Nothing to show at all — render nothing.
   if (!canMarkPaid && !canSendPayment && !canApproveCity && !hasMenuItems) {
     return null;
   }
+
+  const handleAddTag = () => {
+    const v = tagDraft;
+    setTagDraft('');
+    onAddCustomTag?.(v);
+  };
 
   const isApproved = paymentsApprovedUsd != null;
 
@@ -797,6 +834,72 @@ function CityActionsMenu({
                       ? 'Click again to confirm'
                       : 'Send wallet reminder'}
                   </button>
+                )}
+                {/* panuozzo-58217: free-text custom tags. Admins + underbosses
+                    may add/view/remove. Stored `custom:`-prefixed in
+                    event_tags. Reversible → no confirm; keep the menu open on
+                    add/remove. stopPropagation so clicks on the input/chips
+                    don't reach the click-out overlay. */}
+                {canManageTags && (
+                  <div
+                    className="border-t border-theme-stroke mt-1 pt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-1 text-xs text-theme-text-muted px-3 pt-2">
+                      <Tag size={12} />
+                      <span>Custom tags</span>
+                      {tagBusy && (
+                        <Loader2 size={12} className="animate-spin ml-1" />
+                      )}
+                    </div>
+                    {customTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 px-3 pt-1.5">
+                        {customTags.map((label) => (
+                          <span
+                            key={label}
+                            className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
+                          >
+                            {label}
+                            <button
+                              type="button"
+                              aria-label={`Remove tag ${label}`}
+                              disabled={tagBusy}
+                              onClick={() => onRemoveCustomTag?.(label)}
+                              className="text-indigo-300/70 hover:text-indigo-200 disabled:opacity-50"
+                            >
+                              <XCircle size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1 px-3 py-2">
+                      <div className="flex-1">
+                        <IconInput
+                          icon={Plus}
+                          value={tagDraft}
+                          onChange={(e) => setTagDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          placeholder="Add a tag"
+                          maxLength={40}
+                          disabled={tagBusy}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={tagBusy || !tagDraft.trim()}
+                        onClick={handleAddTag}
+                        className="px-2 py-1.5 text-xs rounded-md border border-theme-stroke text-theme-text hover:bg-theme-surface-hover disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </>,
@@ -2484,6 +2587,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
+  onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
   cityGroupChatIds,
@@ -2508,6 +2612,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // Per-row busy spinner state for the scam-flag toggle. Avoids double-clicks
   // during the PATCH round-trip.
   const [scamBusyPartyId, setScamBusyPartyId] = useState<string | null>(null);
+  // panuozzo-58217: per-row busy spinner for custom-tag add/remove. Mirrors
+  // scamBusyPartyId. tagOverrides (above) is reused for optimistic rendering.
+  const [tagBusyPartyId, setTagBusyPartyId] = useState<string | null>(null);
   // culatello-92106: optimistic-override map for `taxFormRequired` so the pill
   // flips immediately on click without waiting for a parent refetch. Keyed on
   // partyId; mirrors the `tagOverrides` pattern. Cleared on a parent refresh.
@@ -2538,6 +2645,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // bottarga-92104: same admin gate as the other two menu items. Underbosses
   // never see the scam-flag action.
   const canToggleScamFlag = viewerRole === 'admin';
+  // panuozzo-58217: custom tags are intentionally WIDER than the admin-only
+  // scam flag — both admins and (scoped) underbosses may add/view/remove them.
+  // The PATCH endpoint already grants the same set via canUserEditParty.
+  const canManageTags = viewerRole === 'admin' || viewerRole === 'underboss';
   // crocchetta-92106: TG reminder is admin-only. The endpoint itself enforces
   // requireAnyAdminOrPaymentAdmin server-side; the UI gate just hides the
   // menu item for underbosses so they don't see a button that 403s.
@@ -2617,6 +2728,73 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
       );
     } finally {
       setScamBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
+   * panuozzo-58217: add a free-text custom tag to a city. Optimistic — patches
+   * `tagOverrides` so the chip appears immediately; reconciles with the server
+   * `eventTags` on success and rolls back on error. Reversible → no confirm.
+   */
+  async function handleAddCustomTag(row: PartyPayoutsRow, rawLabel: string) {
+    const partyId = row.party.id;
+    const currentTags = tagOverrides[partyId] ?? row.party.eventTags ?? [];
+    const label = normalizeCustomTagLabel(rawLabel);
+    if (!label) return;
+    const alreadyHas = getCustomTagLabels(currentTags)
+      .map((l) => l.toLowerCase())
+      .includes(label.toLowerCase());
+    const optimisticTags = alreadyHas
+      ? [...currentTags]
+      : [...currentTags, `${CUSTOM_TAG_PREFIX}${label}`];
+    setTagOverrides((m) => ({ ...m, [partyId]: optimisticTags }));
+    setTagBusyPartyId(partyId);
+    try {
+      const { eventTags } = await addCustomTag(partyId, currentTags, rawLabel);
+      setTagOverrides((m) => ({ ...m, [partyId]: eventTags }));
+      onTagsChanged?.(partyId, eventTags);
+    } catch (err) {
+      setTagOverrides((m) => {
+        const next = { ...m };
+        delete next[partyId];
+        return next;
+      });
+      // eslint-disable-next-line no-alert
+      window.alert(
+        `Could not add tag "${label}": ${(err as Error)?.message ?? 'unknown error'}`,
+      );
+    } finally {
+      setTagBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
+   * panuozzo-58217: remove a custom tag from a city by its display label.
+   * Optimistic + reconcile, mirroring the add path. Reversible → no confirm.
+   */
+  async function handleRemoveCustomTag(row: PartyPayoutsRow, label: string) {
+    const partyId = row.party.id;
+    const currentTags = tagOverrides[partyId] ?? row.party.eventTags ?? [];
+    const full = `${CUSTOM_TAG_PREFIX}${label}`;
+    const optimisticTags = currentTags.filter((t) => t !== full);
+    setTagOverrides((m) => ({ ...m, [partyId]: optimisticTags }));
+    setTagBusyPartyId(partyId);
+    try {
+      const { eventTags } = await removeCustomTag(partyId, currentTags, label);
+      setTagOverrides((m) => ({ ...m, [partyId]: eventTags }));
+      onTagsChanged?.(partyId, eventTags);
+    } catch (err) {
+      setTagOverrides((m) => {
+        const next = { ...m };
+        delete next[partyId];
+        return next;
+      });
+      // eslint-disable-next-line no-alert
+      window.alert(
+        `Could not remove tag "${label}": ${(err as Error)?.message ?? 'unknown error'}`,
+      );
+    } finally {
+      setTagBusyPartyId((id) => (id === partyId ? null : id));
     }
   }
 
@@ -2795,6 +2973,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 tagOverrides[row.party.id] ?? row.party.eventTags ?? [];
               const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
               const scamFlagBusy = scamBusyPartyId === row.party.id;
+              // panuozzo-58217: custom-tag display labels derived from the same
+              // (optimistic-aware) effective tag list.
+              const customTags = getCustomTagLabels(effectiveTags);
+              const tagBusy = tagBusyPartyId === row.party.id;
               // culatello-92106: same optimistic-override pattern as the scam
               // tag — when present the override wins so the pill reflects the
               // user's last click without waiting for the parent to refetch.
@@ -3003,6 +3185,19 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             Possible scam
                           </button>
                         )}
+                        {/* panuozzo-58217: read-only custom-tag pills. Add /
+                            remove happens only in the ⋮ menu; here they're
+                            purely informational. */}
+                        {customTags.map((label) => (
+                          <span
+                            key={`custom-${label}`}
+                            className="inline-flex items-center gap-1 text-[11px] text-indigo-300 px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30"
+                            title={`Custom tag: ${label}`}
+                          >
+                            <Tag size={11} />
+                            {label}
+                          </span>
+                        ))}
                         {row.aggregates.pendingCount > 0 && (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] text-amber-400"
@@ -3081,6 +3276,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canSendWalletReminder={canSendWalletReminder}
                           canApproveCity={canApproveCity}
                           canReopen={isClosed && canReopenCap}
+                          canManageTags={canManageTags}
+                          customTags={customTags}
+                          tagBusy={tagBusy}
                           markPaidLabel={markPaidLabel}
                           isFlaggedScam={isFlaggedScam}
                           scamFlagBusy={scamFlagBusy}
@@ -3140,6 +3338,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onReopen={
                             isClosed && canReopenCap
                               ? () => handleReopen(row)
+                              : undefined
+                          }
+                          onAddCustomTag={
+                            canManageTags
+                              ? (label) => handleAddCustomTag(row, label)
+                              : undefined
+                          }
+                          onRemoveCustomTag={
+                            canManageTags
+                              ? (label) => handleRemoveCustomTag(row, label)
                               : undefined
                           }
                         />

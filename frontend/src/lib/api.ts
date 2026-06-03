@@ -431,6 +431,52 @@ export async function flagPartyAsScam(
 }
 
 /**
+ * panuozzo-58217: free-text "custom tags" managed from the /payments by-city ⋮
+ * menu by admins + underbosses. Stored in `parties.event_tags` namespaced with
+ * a `custom:` prefix so they never collide with functional tags (`go`,
+ * `possible-scam`, SWC/GPP filters). Add/remove both go through the same
+ * `updatePartyApi` → PATCH /api/parties/:id pass-through used by the scam flag,
+ * so permissions (admins + scoped underbosses) come for free. Reversible, so no
+ * confirm modal.
+ */
+export const CUSTOM_TAG_PREFIX = 'custom:';
+
+export function getCustomTagLabels(tags?: string[] | null): string[] {
+  return (tags ?? [])
+    .filter((t) => t.startsWith(CUSTOM_TAG_PREFIX))
+    .map((t) => t.slice(CUSTOM_TAG_PREFIX.length))
+    .filter(Boolean);
+}
+
+export function normalizeCustomTagLabel(raw: string): string {
+  let s = (raw ?? '').trim().replace(/\s+/g, ' ');
+  while (s.toLowerCase().startsWith(CUSTOM_TAG_PREFIX)) s = s.slice(CUSTOM_TAG_PREFIX.length).trim();
+  return s.slice(0, 40);
+}
+
+export async function addCustomTag(
+  partyId: string, currentTags: string[], rawLabel: string,
+): Promise<{ eventTags: string[] }> {
+  const label = normalizeCustomTagLabel(rawLabel);
+  if (!label) return { eventTags: currentTags ?? [] };
+  const existing = getCustomTagLabels(currentTags).map((l) => l.toLowerCase());
+  const nextTags = existing.includes(label.toLowerCase())
+    ? [...(currentTags ?? [])]
+    : [...(currentTags ?? []), `${CUSTOM_TAG_PREFIX}${label}`];
+  await updatePartyApi(partyId, { eventTags: nextTags });
+  return { eventTags: nextTags };
+}
+
+export async function removeCustomTag(
+  partyId: string, currentTags: string[], label: string,
+): Promise<{ eventTags: string[] }> {
+  const full = `${CUSTOM_TAG_PREFIX}${label}`;
+  const nextTags = (currentTags ?? []).filter((t) => t !== full);
+  await updatePartyApi(partyId, { eventTags: nextTags });
+  return { eventTags: nextTags };
+}
+
+/**
  * crocchetta-92106 + crocchetta-92107: Send the "Make sure you've uploaded
  * receipts and photos to rsv.pizza/<custom_url>" reminder via the Molto
  * Benny Telegram bot.
