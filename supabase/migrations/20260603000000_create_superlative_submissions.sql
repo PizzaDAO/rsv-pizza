@@ -5,10 +5,12 @@ CREATE TABLE superlative_submissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   guest_id uuid NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
   party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-  superlative_key varchar NOT NULL, -- 'super_slices', 'super_cheese_pull', 'super_box_stack'
+  -- superlative_key: 'super_slices' | 'super_cheese_pull' | 'super_box_stack'
+  superlative_key varchar NOT NULL,
   photo_url text NOT NULL,
   numeric_value int,
-  status varchar NOT NULL DEFAULT 'pending', -- 'pending', 'winner', 'rejected'
+  -- status: 'pending' | 'winner' | 'rejected'
+  status varchar NOT NULL DEFAULT 'pending',
   judged_by text,
   judged_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
