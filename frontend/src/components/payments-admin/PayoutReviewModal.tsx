@@ -794,8 +794,41 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       const res = await retryPayoutDocumentOcr(docId, { runNow: true });
       if (res.inlineError) {
         setRetryErrors((m) => ({ ...m, [docId]: res.inlineError ?? 'OCR failed' }));
+      } else if (res.ranInline && res.document) {
+        // crescenza-92110: the inline re-run is now a FULL re-read (amount +
+        // currency + line items). Mirror the saveLineItemsEdit success path so
+        // the panel reflects the fresh OCR result in place without a parent
+        // refetch.
+        const fresh = res.document;
+        setReceiptOverrides((m) => ({
+          ...m,
+          [docId]: {
+            ...m[docId],
+            ocrAmount: fresh.ocrAmount,
+            ocrCurrency: fresh.ocrCurrency,
+            ocrLineItems: fresh.ocrLineItems,
+            originalAmount: fresh.originalAmount,
+            originalCurrency: fresh.originalCurrency,
+            exchangeRate: fresh.exchangeRate,
+          },
+        }));
+        // Re-seed line item drafts from the fresh array.
+        setLineItemDrafts((m) => ({
+          ...m,
+          [docId]: (fresh.ocrLineItems ?? []).map(lineItemToDraft),
+        }));
+        // Drop the stale amount/currency draft so the inputs reseed from the
+        // new override on the next render.
+        setReceiptDrafts((m) => {
+          const next = { ...m };
+          delete next[docId];
+          return next;
+        });
+        // Locally suppress any stale ocrError from payout.documents.
+        setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
       } else if (res.ranInline) {
-        // Success — locally suppress the stale ocrError from payout.documents.
+        // Ran inline but no document payload (shouldn't happen) — at least
+        // clear the stale error.
         setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
       }
     } catch (err: any) {
