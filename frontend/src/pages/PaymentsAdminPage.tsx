@@ -156,13 +156,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // view available as a fallback. The choice persists in localStorage so an
   // admin's preference sticks across reloads. Falls back to `by-city` on
   // first visit OR if the stored value is corrupted.
-  type ViewMode = 'by-city' | 'by-payment';
+  // coppa-92106: third mode `payments` = the actual-payments ledger — one row
+  // per status=paid|completed payment, proof-gated (prosciutto-92106), sorted
+  // by paid_at DESC. Distinct from `by-payment` which shows every payout
+  // regardless of status.
+  type ViewMode = 'by-city' | 'by-payment' | 'payments';
   const VIEW_MODE_LS_KEY = 'paymentsAdminViewMode';
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'by-city';
     try {
       const stored = window.localStorage.getItem(VIEW_MODE_LS_KEY);
-      if (stored === 'by-city' || stored === 'by-payment') return stored;
+      if (stored === 'by-city' || stored === 'by-payment' || stored === 'payments') return stored;
     } catch {
       /* localStorage disabled (Safari private etc.) — fall through */
     }
@@ -408,7 +412,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       try {
         // argentina-92103: always re-inject the portal's region scope so a
         // user clearing filters can't accidentally fetch the global queue.
-        const merged = regions ? { ...f, regions } : f;
+        const baseMerged = regions ? { ...f, regions } : f;
+        // coppa-92106: in Payments view, override status/sort/provenOnly +
+        // bump page size to 50 (the proven-paid set is small, ~600-1000 rows).
+        // The filter chips for status/sort are hidden in PaymentsFilterBar so
+        // these can't be changed by the user mid-session. Other filters
+        // (country, region, method, currency, search) still apply.
+        const merged: AdminPayoutFilters = viewMode === 'payments'
+          ? {
+              ...baseMerged,
+              status: 'paid,completed',
+              sort: 'paid_at_desc',
+              provenOnly: true,
+              limit: baseMerged.limit ?? 50,
+            }
+          : baseMerged;
         // etruria-92103: when by-city is active, ALSO fetch the grouped
         // shape from /by-party so the new table can render. The per-payment
         // list is still fetched so:
@@ -1039,12 +1057,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // their `regionFilter` prop and shouldn't show a second region
           // picker on top of that.
           showRegionsFilter={!isRegionalPortal}
+          // coppa-92106: hide the status tab strip in the Payments-ledger
+          // view (status + sort are forced server-side; user can't override).
+          showStatusTabs={viewMode !== 'payments'}
         />
 
         {/* etruria-92103: by-city / by-payment view toggle. by-city is the
             default; the choice persists in localStorage. Lives on its own
             row above the bulk-actions bar so it doesn't fight the filter
-            bar's sticky position. */}
+            bar's sticky position.
+            coppa-92106: third "Payments" tab shows the actual payments ledger
+            (status=paid|completed, proven-only, sorted by paid_at DESC). */}
         <div className="flex items-center justify-end gap-2 mb-3">
           <span className="text-xs uppercase tracking-wide text-theme-text-muted">View:</span>
           <div
@@ -1078,8 +1101,30 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             >
               By payment
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'payments'}
+              onClick={() => setViewMode('payments')}
+              className={`px-3 py-1.5 text-sm font-medium ${
+                viewMode === 'payments'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
+              }`}
+            >
+              Payments
+            </button>
           </div>
         </div>
+
+        {/* coppa-92106: breadcrumb under the toggle when the Payments-ledger
+            view is active. Surfaces the forced status + sort so the admin
+            knows why the status tab strip + KPI tiles don't drive this view. */}
+        {viewMode === 'payments' && (
+          <div className="mb-3 text-xs text-theme-text-muted">
+            Showing all paid payments • Newest first
+          </div>
+        )}
 
         <BulkActionsBar
           selectedCount={selectedIds.size}
@@ -1106,7 +1151,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             admins who prefer the flat list. Both share the same handlers /
             selection state. Bulk-action selection still operates on per-
             payment ids — selecting a whole party doesn't make sense as a
-            bulk-action concept, so selection lives inside the expansion. */}
+            bulk-action concept, so selection lives inside the expansion.
+            coppa-92106: the Payments-ledger view reuses PayoutsTable below
+            with the loadPage-applied status=paid|completed filter. */}
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
             rows={displayedByPartyRows}

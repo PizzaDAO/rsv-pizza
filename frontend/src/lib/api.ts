@@ -4351,6 +4351,10 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.hideScams) {
     params.set('hideScams', 'true');
   }
+  // coppa-92106: opt-in proven-paid predicate for the Payments-ledger view.
+  if (filters.provenOnly) {
+    params.set('provenOnly', 'true');
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }

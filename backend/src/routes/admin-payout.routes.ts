@@ -528,9 +528,34 @@ async function assertWithinPartyCap(
 function buildPayoutWhere(query: Request['query']): any {
   const where: any = {};
 
+  // coppa-92106: status accepts either a single status or a comma-separated
+  // list (e.g. `paid,completed`) so the new Payments-ledger view can fetch
+  // both terminal "money sent / row closed-out" buckets in one query. Unknown
+  // entries are dropped; an empty resulting list = no filter (same as 'all').
   const status = query.status;
-  if (typeof status === 'string' && status !== 'all' && ALLOWED_PAYOUT_STATUSES.includes(status as any)) {
-    where.status = status;
+  if (typeof status === 'string' && status !== 'all' && status.trim().length > 0) {
+    const parts = status
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => ALLOWED_PAYOUT_STATUSES.includes(s as any));
+    if (parts.length === 1) {
+      where.status = parts[0];
+    } else if (parts.length > 1) {
+      where.status = { in: parts };
+    }
+  }
+
+  // coppa-92106: opt-in `provenOnly=true` applies the prosciutto-92106
+  // "has proof of send" predicate so the Payments-ledger view excludes
+  // zombie status='paid' rows (no transaction_hash / wire_reference /
+  // mercury_card_last4 / external_proof_url) from the result set. Used by the
+  // new Payments view — totals already filter zombies out, this aligns the
+  // row list with those totals.
+  if (query.provenOnly === 'true' || query.provenOnly === '1') {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      PAID_HAS_PROOF_WHERE,
+    ];
   }
 
   const method = query.payoutMethod;
@@ -2265,6 +2290,11 @@ router.get(
         amount_asc: { finalAmountUsd: 'asc' },
         activity_desc: { updatedAt: 'desc' },
         activity_asc: { updatedAt: 'asc' },
+        // coppa-92106: order by actual paid_at timestamp for the new
+        // Payments-ledger view. Rows with null paid_at (rare in proven set)
+        // sort to the end via Prisma's default NULLS LAST.
+        paid_at_desc: { paidAt: { sort: 'desc', nulls: 'last' } },
+        paid_at_asc: { paidAt: { sort: 'asc', nulls: 'last' } },
       };
       const sortKey = typeof req.query.sort === 'string' && sortMap[req.query.sort]
         ? (req.query.sort as keyof typeof sortMap)
