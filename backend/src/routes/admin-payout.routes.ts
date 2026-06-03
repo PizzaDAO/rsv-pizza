@@ -5754,7 +5754,7 @@ router.post(
 
       const existing = await prisma.payoutDocument.findUnique({
         where: { id: docId },
-        select: { id: true, url: true, kind: true },
+        select: { id: true, url: true, kind: true, party: { select: { country: true } } },
       });
       if (!existing) {
         throw new AppError('Document not found', 404, 'NOT_FOUND');
@@ -5782,7 +5782,13 @@ router.post(
           // items — not just line items. Mirror the ocr-preview FX pattern in
           // payout.routes.ts so the unresolved-currency case is handled
           // identically (CURRENCY_UNRESOLVED, no synthetic USD value).
-          const result = await analyzeReceipt(existing.url);
+          // crescenza-92110: pass the party country prior (same as ocr-preview)
+          // so ambiguous-currency receipts (e.g. EGP) resolve instead of
+          // nulling the amount with CURRENCY_UNRESOLVED.
+          const result = await analyzeReceipt({
+            imageUrl: existing.url,
+            partyCountry: existing.party?.country ?? null,
+          });
           const fx = await convertToUSD(result.amount, result.currency);
           const unresolved = fx.source === 'unresolved';
           await prisma.payoutDocument.update({
