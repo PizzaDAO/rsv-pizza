@@ -98,6 +98,8 @@ export async function scorePartiesByIds(
           mailingListOptIn: true,
           visitorSessionId: true,
           emailStatus: true,
+          checkedInAt: true,
+          checkedInBy: true,
         },
       },
       linkClicks: {
@@ -146,6 +148,8 @@ export async function scorePartiesByIds(
         mailingListOptIn: g.mailingListOptIn,
         visitorSessionId: g.visitorSessionId,
         emailStatus: g.emailStatus,
+        checkedInAt: g.checkedInAt,
+        checkedInBy: g.checkedInBy,
       })),
       p.linkClicks.map(c => ({ clickedAt: c.clickedAt })),
       sybilWallets,

@@ -31,6 +31,10 @@ import {
   checkCoHostTwitterHandlesMissing,
   checkRepeatSessionRsvpCount,
   checkHighBounceRate,
+  checkCheckinVelocitySuperhuman,
+  checkCheckinTimestampCollapse,
+  checkSingleCheckerDominance,
+  checkCheckinRatioExtreme,
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
@@ -1230,5 +1234,161 @@ describe('scoreEvent — integration fixtures', () => {
     expect(firedIds).not.toContain('name_token_zscore');
     expect(firedIds).not.toContain('lsh_field_sig_cluster');
     expect(firedIds).not.toContain('email_digit_benford');
+  });
+});
+
+// ============================================
+// Check-in attendance-fraud heuristics (marinara-60931)
+// ============================================
+
+/** Build a roster of `n` guests all checked in within `windowSec` by one checker. */
+function fraudCheckinRoster(
+  n: number,
+  windowSec: number,
+  checkedInBy: string | null = 'host-1',
+): FakeDetectionGuest[] {
+  const base = new Date('2026-04-01T19:00:00Z').getTime();
+  return Array.from({ length: n }, (_, i) =>
+    makeGuest({
+      name: `Guest ${i}`,
+      email: `guest${i}@example.com`,
+      submittedVia: i % 2 === 0 ? 'link' : 'invite',
+      // Spread evenly across the (tiny) window → many collisions per second.
+      checkedInAt: new Date(base + Math.floor((i / n) * windowSec * 1000)),
+      checkedInBy,
+    }),
+  );
+}
+
+/** Build a healthy roster: check-ins spread over hours, multiple checkers. */
+function healthyCheckinRoster(n: number, checkedInCount: number): FakeDetectionGuest[] {
+  const base = new Date('2026-04-01T18:00:00Z').getTime();
+  const checkers = ['door-1', 'door-2', 'door-3', 'door-4'];
+  return Array.from({ length: n }, (_, i) =>
+    makeGuest({
+      name: `Guest ${i}`,
+      email: `guest${i}@example.com`,
+      // First `checkedInCount` guests checked in, spread over ~4 hours.
+      checkedInAt:
+        i < checkedInCount
+          ? new Date(base + Math.floor((i / checkedInCount) * 4 * 3600 * 1000))
+          : null,
+      checkedInBy: i < checkedInCount ? checkers[i % checkers.length] : null,
+    }),
+  );
+}
+
+describe('checkCheckinVelocitySuperhuman', () => {
+  it('fires when an entire roster is checked in within ~1 minute', () => {
+    const guests = fraudCheckinRoster(60, 60); // 60 check-ins over 60s
+    const r = checkCheckinVelocitySuperhuman(guests);
+    expect(r.fired).toBe(true);
+    expect(r.weight).toBe(WEIGHTS.checkin_velocity_superhuman);
+  });
+
+  it('collapses (not fired) below n=20', () => {
+    const guests = fraudCheckinRoster(19, 60);
+    expect(checkCheckinVelocitySuperhuman(guests).fired).toBe(false);
+  });
+
+  it('does not fire when check-ins are spread over hours', () => {
+    const guests = healthyCheckinRoster(50, 30); // 30 check-ins over 4h → <0.2/min
+    expect(checkCheckinVelocitySuperhuman(guests).fired).toBe(false);
+  });
+});
+
+describe('checkCheckinTimestampCollapse', () => {
+  it('fires when many guests share the same check-in second', () => {
+    // 78 guests, all within 30 seconds → far fewer distinct seconds than guests.
+    const guests = fraudCheckinRoster(78, 30);
+    const r = checkCheckinTimestampCollapse(guests);
+    expect(r.fired).toBe(true);
+  });
+
+  it('collapses (not fired) below n=20', () => {
+    const guests = fraudCheckinRoster(19, 5);
+    expect(checkCheckinTimestampCollapse(guests).fired).toBe(false);
+  });
+
+  it('does not fire when each check-in lands on a distinct second', () => {
+    const guests = healthyCheckinRoster(40, 40); // spread over 4h → all distinct seconds
+    expect(checkCheckinTimestampCollapse(guests).fired).toBe(false);
+  });
+});
+
+describe('checkSingleCheckerDominance', () => {
+  it('fires when one checker performed ≥95% of check-ins', () => {
+    const guests = fraudCheckinRoster(40, 3600, 'host-1');
+    const r = checkSingleCheckerDominance(guests);
+    expect(r.fired).toBe(true);
+    expect((r.evidence as { distinctCheckers: number }).distinctCheckers).toBe(1);
+  });
+
+  it('treats null checker as a single dominant bucket', () => {
+    const guests = fraudCheckinRoster(40, 3600, null);
+    const r = checkSingleCheckerDominance(guests);
+    expect(r.fired).toBe(true);
+    expect((r.evidence as { dominantIsNull: boolean }).dominantIsNull).toBe(true);
+  });
+
+  it('collapses (not fired) below n=20', () => {
+    const guests = fraudCheckinRoster(19, 3600, 'host-1');
+    expect(checkSingleCheckerDominance(guests).fired).toBe(false);
+  });
+
+  it('does not fire with multiple distinct checkers', () => {
+    const guests = healthyCheckinRoster(40, 40); // 4 rotating checkers → topShare 25%
+    expect(checkSingleCheckerDominance(guests).fired).toBe(false);
+  });
+});
+
+describe('checkCheckinRatioExtreme', () => {
+  it('fires when ≥95% of the roster is checked in', () => {
+    // 78 checked in + 3 not = 81 total → 96%.
+    const checkedIn = fraudCheckinRoster(78, 3600);
+    const notCheckedIn = Array.from({ length: 3 }, (_, i) =>
+      makeGuest({ name: `NoShow ${i}`, checkedInAt: null }),
+    );
+    const guests = [...checkedIn, ...notCheckedIn];
+    const r = checkCheckinRatioExtreme(guests);
+    expect(r.fired).toBe(true);
+  });
+
+  it('collapses (not fired) below n=20 total guests', () => {
+    const guests = fraudCheckinRoster(19, 3600);
+    expect(checkCheckinRatioExtreme(guests).fired).toBe(false);
+  });
+
+  it('does not fire on a healthy ~60% attendance rate', () => {
+    const guests = healthyCheckinRoster(50, 30); // 30/50 = 60%
+    expect(checkCheckinRatioExtreme(guests).fired).toBe(false);
+  });
+});
+
+describe('scoreEvent — check-in heuristics integration', () => {
+  it('attendance-fraud roster fires all four check-in flags and scores high', () => {
+    const party = makeParty();
+    // 60 guests all checked in within ~30s by one host → ratio 100%.
+    const guests = fraudCheckinRoster(60, 30, 'host-1');
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
+    expect(firedIds).toContain('checkin_velocity_superhuman');
+    expect(firedIds).toContain('checkin_timestamp_collapse');
+    expect(firedIds).toContain('single_checker_dominance');
+    expect(firedIds).toContain('checkin_ratio_extreme');
+    expect(row.score).toBeGreaterThanOrEqual(
+      WEIGHTS.checkin_velocity_superhuman + WEIGHTS.checkin_ratio_extreme,
+    );
+  });
+
+  it('healthy roster fires none of the check-in flags', () => {
+    const party = makeParty();
+    const guests = healthyCheckinRoster(50, 30);
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
+    expect(firedIds).not.toContain('checkin_velocity_superhuman');
+    expect(firedIds).not.toContain('checkin_timestamp_collapse');
+    expect(firedIds).not.toContain('single_checker_dominance');
+    expect(firedIds).not.toContain('checkin_ratio_extreme');
   });
 });
