@@ -17,13 +17,23 @@ import {
   LeaderboardPartyRow,
   LeaderboardCountryRow,
   LeaderboardWindow,
+  getScorecardGlobalLeaderboard,
+  ScorecardGlobalLeaderboardResponse,
+  ScorecardPartyRow,
+  ScorecardCountryRow,
 } from '../lib/api';
 
 // stromboli-71593: public leaderboard page rendered at both `/leaderboard`
 // and `/gpp/leaderboard`. Single data fetch hydrates both tabs (parties +
 // countries) — no realtime subscriptions, fetched on mount + tab change.
+//
+// panzerotti-58931 Phase 2.2: metric toggle — Engagement (default, existing
+// composite) vs Pizza Chef (scorecard-based, global/unwindowed). Pizza Chef
+// reuses the same party/country board layout but drops the engagement-only
+// breakdown columns.
 
 type TabKey = 'parties' | 'countries';
+type MetricKey = 'engagement' | 'chef';
 
 const PAGE_SIZE = 50;
 const MAX_LIMIT = 200;
@@ -181,12 +191,87 @@ function LeaderboardCountryRowView({ row }: { row: LeaderboardCountryRow }) {
   );
 }
 
+// panzerotti-58931 Phase 2.2: Pizza Chef (scorecard) row views. Same layout as
+// the engagement rows above, minus the engagement-only breakdown chips (the
+// scorecard board has no linkRsvps / inviteRsvps / checkIns / photos split).
+function ScorecardPartyRowView({ row }: { row: ScorecardPartyRow }) {
+  return (
+    <Link
+      to={`/${row.slug}`}
+      className="flex items-center gap-3 px-4 py-3 border-b border-black/[0.06] hover:bg-black/[0.03] transition-colors last:border-b-0"
+    >
+      <div className="flex-shrink-0 w-8 text-center text-base font-bold tabular-nums" style={{ color: C.red }}>
+        {row.rank}
+      </div>
+      <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+        <Trophy size={18} className="text-gray-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-[#1a1a1a] truncate">
+            {row.name}
+          </span>
+          <CountryFlag code={row.countryCode} />
+        </div>
+        <div className="flex items-center gap-2 text-[12px] text-[#555] mt-0.5 truncate">
+          {row.city && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin size={11} />
+              {row.city}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex-shrink-0 text-right">
+        <div className="text-base font-bold tabular-nums" style={{ color: C.red }}>
+          {row.score.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+        </div>
+        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+          score
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ScorecardCountryRowView({ row }: { row: ScorecardCountryRow }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-black/[0.06] last:border-b-0">
+      <div className="flex-shrink-0 w-8 text-center text-base font-bold tabular-nums" style={{ color: C.red }}>
+        {row.rank}
+      </div>
+      <CountryFlag code={row.countryCode} />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-[#1a1a1a] truncate">
+          {row.country}
+        </div>
+        <div className="text-[12px] text-[#555]">
+          {row.partyCount.toLocaleString()}{' '}
+          {row.partyCount === 1 ? 'party' : 'parties'}
+        </div>
+      </div>
+      <div className="flex-shrink-0 text-right">
+        <div className="text-base font-bold tabular-nums" style={{ color: C.red }}>
+          {row.score.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+        </div>
+        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+          score
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LeaderboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = (searchParams.get('tab') === 'countries' ? 'countries' : 'parties') as TabKey;
   const windowParam = (searchParams.get('window') === 'year' ? 'year' : 'all') as LeaderboardWindow;
+  const metricParam = (searchParams.get('metric') === 'chef' ? 'chef' : 'engagement') as MetricKey;
 
+  // Engagement (existing) data path — byte-for-byte unchanged from before.
   const [data, setData] = useState<LeaderboardResponse | null>(null);
+  // Pizza Chef (scorecard) data path — global/unwindowed.
+  const [chefData, setChefData] = useState<ScorecardGlobalLeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState<number>(PAGE_SIZE);
@@ -209,9 +294,28 @@ export function LeaderboardPage() {
     [],
   );
 
+  const loadChef = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    getScorecardGlobalLeaderboard()
+      .then((res) => {
+        setChefData(res);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch Pizza Chef leaderboard:', err);
+        setError(err?.message || 'Failed to load leaderboard');
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
-    load(windowParam, limit);
-  }, [load, windowParam, limit]);
+    if (metricParam === 'chef') {
+      loadChef();
+    } else {
+      load(windowParam, limit);
+    }
+  }, [metricParam, load, loadChef, windowParam, limit]);
 
   const setTab = useCallback(
     (next: TabKey) => {
@@ -235,24 +339,49 @@ export function LeaderboardPage() {
     [searchParams, setSearchParams],
   );
 
+  const setMetric = useCallback(
+    (next: MetricKey) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === 'engagement') params.delete('metric');
+      else params.set('metric', next);
+      // Reset page size on metric switch (Pizza Chef is unpaginated/global).
+      setLimit(PAGE_SIZE);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const showMore = useCallback(() => {
     setLimit((cur) => Math.min(cur + PAGE_SIZE, MAX_LIMIT));
   }, []);
 
   // Derived values — all hooks declared BEFORE any early return, per
   // feedback_hooks_above_early_returns.md.
+  const isChef = metricParam === 'chef';
+
+  // Engagement (existing) derived values.
   const partyRows = data?.parties.rows ?? [];
   const countryRows = data?.countries.rows ?? [];
   const partyTotal = data?.parties.total ?? 0;
   const countryTotal = data?.countries.total ?? 0;
-  const hasMore = partyRows.length < partyTotal && limit < MAX_LIMIT;
+  // "Show more" pagination only applies to the windowed engagement board.
+  const hasMore = !isChef && partyRows.length < partyTotal && limit < MAX_LIMIT;
+
+  // Pizza Chef (scorecard) derived values — global, unpaginated.
+  const chefPartyRows = chefData?.parties ?? [];
+  const chefCountryRows = chefData?.countries ?? [];
+
+  // What's actually displayed, per metric.
+  const displayPartyCount = isChef ? chefPartyRows.length : partyTotal;
+  const displayCountryCount = isChef ? chefCountryRows.length : countryTotal;
+  const hasData = isChef ? !!chefData : !!data;
 
   const headline = useMemo(() => {
     if (tabParam === 'countries') {
-      return `${countryTotal.toLocaleString()} ${countryTotal === 1 ? 'country' : 'countries'}`;
+      return `${displayCountryCount.toLocaleString()} ${displayCountryCount === 1 ? 'country' : 'countries'}`;
     }
-    return `${partyTotal.toLocaleString()} ${partyTotal === 1 ? 'party' : 'parties'}`;
-  }, [tabParam, partyTotal, countryTotal]);
+    return `${displayPartyCount.toLocaleString()} ${displayPartyCount === 1 ? 'party' : 'parties'}`;
+  }, [tabParam, displayPartyCount, displayCountryCount]);
 
   // Segmented-control button helper for consistent styling.
   const segBtn = (active: boolean) =>
@@ -311,6 +440,26 @@ export function LeaderboardPage() {
               Approved Global Pizza Party events ranked by guest engagement.
             </p>
 
+            {/* Metric segmented control — Engagement (default) vs Pizza Chef */}
+            <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm mb-3">
+              <button
+                type="button"
+                onClick={() => setMetric('engagement')}
+                className={segBtn(metricParam === 'engagement')}
+                style={segBtnStyle(metricParam === 'engagement')}
+              >
+                Engagement
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetric('chef')}
+                className={segBtn(metricParam === 'chef')}
+                style={segBtnStyle(metricParam === 'chef')}
+              >
+                Pizza Chef
+              </button>
+            </div>
+
             {/* Tab + window segmented controls */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm">
@@ -331,24 +480,28 @@ export function LeaderboardPage() {
                   Countries
                 </button>
               </div>
-              <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setWindow('all')}
-                  className={segBtn(windowParam === 'all')}
-                  style={segBtnStyle(windowParam === 'all')}
-                >
-                  All-time
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWindow('year')}
-                  className={segBtn(windowParam === 'year')}
-                  style={segBtnStyle(windowParam === 'year')}
-                >
-                  2026
-                </button>
-              </div>
+              {/* Window selector is engagement-only — the Pizza Chef endpoint is
+                  global/unwindowed, so hide it when Pizza Chef is active. */}
+              {!isChef && (
+                <div className="inline-flex items-center rounded-xl border border-black/[0.08] bg-white/90 backdrop-blur-sm p-1 self-start shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setWindow('all')}
+                    className={segBtn(windowParam === 'all')}
+                    style={segBtnStyle(windowParam === 'all')}
+                  >
+                    All-time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWindow('year')}
+                    className={segBtn(windowParam === 'year')}
+                    style={segBtnStyle(windowParam === 'year')}
+                  >
+                    2026
+                  </button>
+                </div>
+              )}
             </div>
 
             {loading && (
@@ -362,7 +515,7 @@ export function LeaderboardPage() {
                 <span>{error}</span>
                 <button
                   type="button"
-                  onClick={() => load(windowParam, limit)}
+                  onClick={() => (isChef ? loadChef() : load(windowParam, limit))}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:-translate-y-0.5 self-start"
                   style={{ background: C.red }}
                   onMouseEnter={(e) => {
@@ -377,20 +530,40 @@ export function LeaderboardPage() {
               </div>
             )}
 
-            {!loading && !error && data && (
+            {!loading && !error && hasData && (
               <>
                 <div className="text-xs text-white/80 mb-2 tabular-nums">
                   {headline}
                 </div>
                 <div className="rounded-2xl border border-black/[0.08] bg-white/90 backdrop-blur-sm shadow-lg overflow-hidden">
                   {tabParam === 'parties' ? (
-                    partyRows.length === 0 ? (
+                    isChef ? (
+                      chefPartyRows.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-[#555]">
+                          No parties yet.
+                        </div>
+                      ) : (
+                        chefPartyRows.map((row) => (
+                          <ScorecardPartyRowView key={row.partyId} row={row} />
+                        ))
+                      )
+                    ) : partyRows.length === 0 ? (
                       <div className="px-4 py-8 text-center text-sm text-[#555]">
                         No parties yet for this window.
                       </div>
                     ) : (
                       partyRows.map((row) => (
                         <LeaderboardPartyRowView key={row.id} row={row} />
+                      ))
+                    )
+                  ) : isChef ? (
+                    chefCountryRows.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-[#555]">
+                        No countries yet.
+                      </div>
+                    ) : (
+                      chefCountryRows.map((row) => (
+                        <ScorecardCountryRowView key={row.country} row={row} />
                       ))
                     )
                   ) : countryRows.length === 0 ? (
@@ -424,8 +597,9 @@ export function LeaderboardPage() {
                 )}
 
                 <div className="text-[11px] text-white/70 mt-6 text-center">
-                  Score = link RSVPs + 0.3 invite RSVPs + 2 check-ins + 0.5 photos
-                  (max 100 photos).
+                  {isChef
+                    ? 'Score = sum of Pizza Chef scorecard points across guests at each party.'
+                    : 'Score = link RSVPs + 0.3 invite RSVPs + 2 check-ins + 0.5 photos (max 100 photos).'}
                 </div>
               </>
             )}
