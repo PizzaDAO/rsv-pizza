@@ -1668,7 +1668,9 @@ export type PayoutMethod = 'mercury_card' | 'wire' | 'usdc_base';
 
 export interface PayoutDocument {
   id: string;
-  kind: 'pizza' | 'receipt';
+  // pomodoro-92110: 'event' added — host-uploaded event photos persist as
+  // payout documents and mirror to the gallery like 'pizza'.
+  kind: 'pizza' | 'receipt' | 'event';
   url: string;
   fileName: string;
   fileSize: number;

@@ -18,10 +18,23 @@ interface PizzaPhotoUploadProps {
   items: PizzaPhotoItem[];
   onChange: (items: PizzaPhotoItem[]) => void;
   maxItems?: number;
+  /**
+   * pomodoro-92110: which kind of payout document these uploads become.
+   * 'pizza' and 'event' are both image-only and mirror to the gallery; the
+   * value flows into both the storage path and `uploadPayoutPhoto`.
+   */
+  kind: 'pizza' | 'event';
+  /**
+   * pomodoro-92110: count of already-persisted documents of this kind on the
+   * payout (edit mode). The cap is enforced as a TOTAL (existing + new), so
+   * `remaining` subtracts both this and the in-flight items.
+   */
+  existingCount?: number;
 }
 
 /**
- * Multi-image dropzone for pizza/event photos (no OCR). Max 10 by default.
+ * Multi-image dropzone for pizza OR event photos (no OCR). Max 10 by default;
+ * callers pass `maxItems={30}` for event photos.
  */
 export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
   partyId,
@@ -29,11 +42,14 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
   items,
   onChange,
   maxItems = 10,
+  kind,
+  existingCount = 0,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const remaining = maxItems - items.length;
+  const noun = kind === 'event' ? 'event' : 'pizza';
+  const remaining = Math.max(0, maxItems - existingCount - items.length);
 
   const handleFiles = async (files: FileList | File[]) => {
     const fileArr = Array.from(files).slice(0, remaining);
@@ -51,7 +67,7 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
 
     await Promise.all(fileArr.map(async (file, i) => {
       const itemId = newItems[i].id;
-      const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, 'pizza');
+      const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, kind);
       if (!uploaded) {
         nextItems = nextItems.map(it => it.id === itemId
           ? { ...it, status: 'error' as const, error: 'Upload failed' } : it);
@@ -107,8 +123,8 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
         <Upload className="mx-auto mb-2 text-theme-text-muted" size={28} />
         <p className="text-sm text-theme-text">
           {remaining === 0
-            ? `Maximum ${maxItems} photos uploaded`
-            : 'Drop pizza / event photos here, or click to choose files'}
+            ? `Maximum ${maxItems} ${noun} photos reached — remove a photo to add another.`
+            : `Drop ${noun} photos here, or click to choose files`}
         </p>
         <p className="text-xs text-theme-text-muted mt-1">
           {remaining > 0 && `Up to ${remaining} more.`}
