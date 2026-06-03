@@ -46,6 +46,7 @@ model User {
   uploadedPayoutDocuments          PayoutDocument[]         @relation("PayoutDocumentUploadedBy")
   reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
   reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
+  taxForms                         TaxForm[]
 }
 
 model Party {
@@ -234,6 +235,13 @@ model Party {
   // Host toggles in EventDetailsTab; defaults to true for all new + existing
   // events. Cron worker skips parties where this is false.
   remindersEnabled Boolean @default(true) @map("reminders_enabled")
+
+  // culatello-92106: per-event gate for the salame-92110 host tax-form
+  // requirement. When false (default) the host-side TaxFormSection is hidden
+  // and the backend TAX_FORM_REQUIRED 400 is skipped. Flipped per-event by an
+  // admin on /payments (PayoutReviewModal + PayoutsByPartyTable city
+  // expansion). Hosts cannot toggle this flag.
+  taxFormRequired Boolean @default(false) @map("tax_form_required")
 
   // Reimbursement cap (arugula-38633 v2) — set by underboss after validating
   // the city-tier × RSVP heuristic. NULL = not yet validated (banner hidden).
@@ -1773,6 +1781,14 @@ model Payout {
   wireReference    String? @map("wire_reference")
   externalProofUrl String? @map("external_proof_url")
 
+  // salame-92110: snapshot of the host's tax form at the time this payout was
+  // submitted. Set on POST when the host has a `status='submitted'` form on
+  // file. NULL on payouts created before the tax-form feature shipped, and on
+  // shipping-coordinator receipts that don't require a form. ON DELETE SET
+  // NULL — historical payouts survive a form being deleted.
+  taxFormId String?  @map("tax_form_id") @db.Uuid
+  taxForm   TaxForm? @relation(fields: [taxFormId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1783,7 +1799,49 @@ model Payout {
   @@index([hostUserId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
+  @@index([taxFormId])
   @@map("payouts")
+}
+
+// ============================================
+// Host tax forms (salame-92110)
+// ============================================
+// Per-user W-9 (US individuals/entities), W-8BEN (foreign individuals), or
+// W-8BEN-E (foreign entities). `form_data` is a JSONB blob holding the
+// per-form fields used to render the PDF; the canonical PDF lives in
+// Supabase Storage (`event-images` bucket) and `pdf_url` references it.
+//
+// One submitted form per user per type is the typical case; we store all
+// historical drafts/submissions so admins can audit changes. The form used
+// at payout time is snapshotted onto `payouts.tax_form_id`.
+model TaxForm {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 'w9' | 'w8ben' | 'w8bene' — enforced by DB CHECK constraint.
+  formType       String    @map("form_type")
+  // 'draft' | 'submitted' | 'verified' | 'rejected' — enforced by DB CHECK.
+  status         String    @default("draft")
+  formData       Json      @default("{}") @map("form_data")
+  pdfUrl         String?   @map("pdf_url")
+  pdfThumbUrl    String?   @map("pdf_thumb_url")
+  signedAt       DateTime? @map("signed_at") @db.Timestamptz
+  // W-9: NULL (no expiry). W-8 forms: signed_at + 3 years and last day of the
+  // third calendar year per IRS rules — we use a simpler "signed_at + 3y11m"
+  // for now (re-validated by the phase-2 expiry cron).
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz
+  verifiedBy     String?   @map("verified_by")
+  rejectedReason String?   @map("rejected_reason")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  payouts Payout[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("tax_forms")
 }
 
 // ============================================

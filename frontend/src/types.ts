@@ -353,6 +353,10 @@ export interface Party {
   effectiveReimbursementCapUsd?: number | null;
   reimbursementCapAppealNote?: string | null;
   reimbursementCapAppealedAt?: string | null;
+  // culatello-92106: per-event tax-form gate. Admin-only flag; when true the
+  // host-side TaxFormSection renders + backend payout submission enforces
+  // the salame-92110 TAX_FORM_REQUIRED check. Default false.
+  taxFormRequired?: boolean;
   // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
   // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
   hostGoals?: HostGoals | null;
@@ -1844,6 +1848,40 @@ export interface Payout {
   createdAt: string;
   updatedAt: string;
   documents: PayoutDocument[];
+  /**
+   * salame-92110: snapshot of the host's tax form (W-9 / W-8BEN / W-8BEN-E)
+   * captured at submission time. Null on payouts created before the tax-form
+   * feature shipped and on shipping-coordinator receipts.
+   */
+  taxFormId?: string | null;
+}
+
+// ============================================
+// Tax forms (salame-92110)
+// ============================================
+
+export type TaxFormType = 'w9' | 'w8ben' | 'w8bene';
+export type TaxFormStatus = 'draft' | 'submitted' | 'verified' | 'rejected';
+
+export interface TaxForm {
+  id: string;
+  userId: string;
+  formType: TaxFormType;
+  status: TaxFormStatus;
+  pdfUrl: string | null;
+  pdfThumbUrl: string | null;
+  signedAt: string | null;
+  /** Null for W-9, set for W-8BEN/W-8BEN-E (signed_at + ~3y11m). */
+  expiresAt: string | null;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  rejectedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Only present for drafts + the host's own /me endpoint + admin detail. */
+  formData?: Record<string, any>;
+  /** Hydrated on admin endpoints. */
+  user?: { id: string; name: string | null; email: string | null };
 }
 
 /**
@@ -2001,6 +2039,14 @@ export interface AdminPayout extends Payout, FlaggedReadyFields {
      * for backward-compat with cached payloads during a rolling deploy.
      */
     paymentsClosedAt?: string | null;
+    /**
+     * culatello-92106: per-event tax-form gate. When true, hosts must submit
+     * a W-9 / W-8BEN / W-8BEN-E (salame-92110) before they can submit a
+     * payout. Toggled by admins via PATCH /api/parties/:id with
+     * `taxFormRequired: boolean`. Optional for backward-compat with cached
+     * payloads during a rolling deploy.
+     */
+    taxFormRequired?: boolean;
   };
   host: {
     id: string;
@@ -2298,6 +2344,14 @@ export interface PartyPayoutsRow {
      * cached payloads during a rolling deploy.
      */
     paymentsClosedAt?: string | null;
+    /**
+     * culatello-92106: per-event tax-form gate. When true, hosts must submit
+     * a W-9 / W-8BEN / W-8BEN-E (salame-92110) before they can submit a
+     * payout. Toggled from the by-city expansion or PayoutReviewModal.
+     * Optional for backward-compat with cached payloads during a rolling
+     * deploy.
+     */
+    taxFormRequired?: boolean;
     /**
      * mortadella-92106: admin-only city notes. Free-text scratchpad on the
      * by-city expansion. Always `null` for underboss viewers (server-side

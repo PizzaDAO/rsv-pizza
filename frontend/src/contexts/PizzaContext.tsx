@@ -184,6 +184,9 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     }),
     reimbursementCapAppealNote: dbParty.reimbursement_cap_appeal_note ?? null,
     reimbursementCapAppealedAt: dbParty.reimbursement_cap_appealed_at ?? null,
+    // culatello-92106: per-event tax-form gate. Default false so existing
+    // events without the column don't accidentally enforce the gate.
+    taxFormRequired: dbParty.tax_form_required === true,
     // Day-of logistics (pepperoni-58341)
     wifiInfo: dbParty.wifi_info ?? null,
     parkingNotes: dbParty.parking_notes ?? null,

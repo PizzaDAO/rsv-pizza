@@ -18,6 +18,7 @@ import {
   ReceiptLightbox,
 } from '../payments-shared';
 import { ReceiptEditor } from './ReceiptEditor';
+import { TaxFormReviewPanel } from './TaxFormReviewPanel';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
@@ -297,6 +298,40 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   async function handleRemoveTag(tag: string) {
     const nextTags = tags.filter((t) => t !== tag);
     await saveTags(nextTags);
+  }
+
+  // culatello-92106: per-event tax-form gate. Full admins (admin / super_admin
+  // / payment_admin — same gate as the backend) can flip the
+  // `parties.tax_form_required` boolean. Optimistic local state; on failure we
+  // revert + surface the error inline. Hooks declared above any early return
+  // per project convention.
+  const canEditTaxFormRequired =
+    adminRole === 'admin' || adminRole === 'super_admin' || adminRole === 'payment_admin';
+  const [taxFormRequired, setTaxFormRequired] = useState<boolean>(
+    payout.party.taxFormRequired === true,
+  );
+  const [taxFormRequiredSaving, setTaxFormRequiredSaving] = useState(false);
+  const [taxFormRequiredError, setTaxFormRequiredError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTaxFormRequired(payout.party.taxFormRequired === true);
+  }, [payout.id, payout.party.taxFormRequired]);
+
+  async function handleToggleTaxFormRequired(next: boolean) {
+    if (!canEditTaxFormRequired) return;
+    const prev = taxFormRequired;
+    setTaxFormRequired(next);
+    setTaxFormRequiredSaving(true);
+    setTaxFormRequiredError(null);
+    try {
+      await updatePartyApi(payout.partyId, { taxFormRequired: next });
+    } catch (err: any) {
+      // Roll back the optimistic flip.
+      setTaxFormRequired(prev);
+      setTaxFormRequiredError(err?.message || 'Failed to update tax-form gate');
+    } finally {
+      setTaxFormRequiredSaving(false);
+    }
   }
 
   const [editingAmount, setEditingAmount] = useState(false);
@@ -2218,6 +2253,41 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
               </div>
             )}
+
+            {/* culatello-92106: per-event tax-form gate.
+                Admin checkbox flips `parties.tax_form_required`. When OFF
+                (default) the host's NewPayoutForm hides TaxFormSection and
+                the backend skips the TAX_FORM_REQUIRED 400. When ON, hosts
+                see TaxFormSection and must submit a W-9 / W-8BEN / W-8BEN-E
+                before they can submit a payout. The TaxFormReviewPanel
+                below still surfaces any historical snapshot regardless of
+                this flag. */}
+            {(canEditTaxFormRequired || taxFormRequired) && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
+                <Checkbox
+                  checked={taxFormRequired}
+                  onChange={() => handleToggleTaxFormRequired(!taxFormRequired)}
+                  disabled={!canEditTaxFormRequired || taxFormRequiredSaving}
+                  label="Tax forms required for this event"
+                />
+                <p className="mt-1 ml-7 text-xs text-theme-text-muted">
+                  When checked, the host must submit a tax form (W-9, W-8BEN,
+                  or W-8BEN-E) before any payout on this event can be
+                  submitted.
+                </p>
+                {taxFormRequiredError && (
+                  <div className="mt-2 ml-7 text-xs text-red-300">
+                    {taxFormRequiredError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* salame-92110: Tax form review panel (above Receipts). Shows the
+                W-9 / W-8BEN / W-8BEN-E snapshotted onto the payout, with
+                Verify / Reject. When `payout.taxFormId` is null we render an
+                amber "host has not submitted a tax form" banner. */}
+            <TaxFormReviewPanel taxFormId={payout.taxFormId ?? null} />
 
             {/* Per-receipt OCR */}
             {receipts.length > 0 && (

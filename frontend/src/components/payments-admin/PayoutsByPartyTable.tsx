@@ -58,6 +58,9 @@ import {
   setCityAdminNotes,
   approveCity,
   reopenParty,
+  // culatello-92106: per-event tax-form gate toggle. Same PATCH backend uses
+  // for tags + reimbursement cap; whitelisted with admin-only gating server-side.
+  updatePartyApi,
 } from '../../lib/api';
 import {
   ReceiptEditor,
@@ -2507,6 +2510,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // Per-row busy spinner state for the scam-flag toggle. Avoids double-clicks
   // during the PATCH round-trip.
   const [scamBusyPartyId, setScamBusyPartyId] = useState<string | null>(null);
+  // culatello-92106: optimistic-override map for `taxFormRequired` so the pill
+  // flips immediately on click without waiting for a parent refetch. Keyed on
+  // partyId; mirrors the `tagOverrides` pattern. Cleared on a parent refresh.
+  const [taxFormRequiredOverrides, setTaxFormRequiredOverrides] = useState<
+    Record<string, boolean>
+  >({});
+  // Per-row busy spinner so we don't double-click the pill mid-PATCH.
+  const [taxFormRequiredBusyPartyId, setTaxFormRequiredBusyPartyId] = useState<
+    string | null
+  >(null);
   // crocchetta-92106: per-row busy spinner for the Send receipts reminder
   // action. Avoids double-firing the POST while the bot is dispatching.
   const [tgReminderBusyPartyId, setTgReminderBusyPartyId] = useState<string | null>(null);
@@ -2531,6 +2544,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   // requireAnyAdminOrPaymentAdmin server-side; the UI gate just hides the
   // menu item for underbosses so they don't see a button that 403s.
   const canSendTgReminder = viewerRole === 'admin';
+  // culatello-92106: tax-form gate toggle — admin-only. Backend gate is
+  // payment_admin / admin / super_admin (isPaymentAdmin); UI mirrors the same
+  // "admin" viewer role used by the rest of this table for underboss hiding.
+  const canToggleTaxFormRequired = viewerRole === 'admin';
   // Wallet reminder shares the same admin-only gate as the receipts reminder.
   const canSendWalletReminder = viewerRole === 'admin';
   // City-level approval is admin-only.
@@ -2602,6 +2619,43 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
       );
     } finally {
       setScamBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
+   * culatello-92106: toggle `parties.tax_form_required` for a city.
+   * Optimistic — flips the override map immediately so the pill state updates
+   * without waiting for the PATCH. Reversible (one click flips back) so no
+   * confirm step per project convention. Failures roll the override back and
+   * surface via a minimal alert, matching the scam-flag path.
+   */
+  async function handleToggleTaxFormRequired(row: PartyPayoutsRow) {
+    if (!canToggleTaxFormRequired) return;
+    const partyId = row.party.id;
+    const current =
+      taxFormRequiredOverrides[partyId] !== undefined
+        ? taxFormRequiredOverrides[partyId]
+        : row.party.taxFormRequired === true;
+    const next = !current;
+    setTaxFormRequiredOverrides((m) => ({ ...m, [partyId]: next }));
+    setTaxFormRequiredBusyPartyId(partyId);
+    try {
+      await updatePartyApi(partyId, { taxFormRequired: next });
+    } catch (err) {
+      // Roll back the optimistic flip.
+      setTaxFormRequiredOverrides((m) => {
+        const nextMap = { ...m };
+        delete nextMap[partyId];
+        return nextMap;
+      });
+      // eslint-disable-next-line no-alert
+      window.alert(
+        `Could not ${next ? 'require' : 'un-require'} tax forms for this city: ${
+          (err as Error)?.message ?? 'unknown error'
+        }`,
+      );
+    } finally {
+      setTaxFormRequiredBusyPartyId((id) => (id === partyId ? null : id));
     }
   }
 
@@ -2743,6 +2797,15 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 tagOverrides[row.party.id] ?? row.party.eventTags ?? [];
               const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
               const scamFlagBusy = scamBusyPartyId === row.party.id;
+              // culatello-92106: same optimistic-override pattern as the scam
+              // tag — when present the override wins so the pill reflects the
+              // user's last click without waiting for the parent to refetch.
+              const effectiveTaxFormRequired =
+                taxFormRequiredOverrides[row.party.id] !== undefined
+                  ? taxFormRequiredOverrides[row.party.id]
+                  : row.party.taxFormRequired === true;
+              const taxFormRequiredBusy =
+                taxFormRequiredBusyPartyId === row.party.id;
               const tgReminderBusy = tgReminderBusyPartyId === row.party.id;
               const walletReminderBusy =
                 walletReminderBusyPartyId === row.party.id;
@@ -2876,6 +2939,42 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             <CheckCircle2 size={11} />
                             Closed
                           </span>
+                        )}
+                        {/* culatello-92106: tax-form gate pill. Visible
+                            whenever the gate is ON for the city; admins can
+                            also see + click an off-state pill via the same
+                            optimistic toggle pattern as the scam flag. Hidden
+                            entirely for non-admin viewers when the gate is
+                            off (no useful info). */}
+                        {(effectiveTaxFormRequired || canToggleTaxFormRequired) && (
+                          <button
+                            type="button"
+                            disabled={taxFormRequiredBusy || !canToggleTaxFormRequired}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canToggleTaxFormRequired) return;
+                              handleToggleTaxFormRequired(row);
+                            }}
+                            className={
+                              effectiveTaxFormRequired
+                                ? 'inline-flex items-center gap-1 text-[11px] text-sky-300 px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 disabled:opacity-60 disabled:cursor-not-allowed'
+                                : 'inline-flex items-center gap-1 text-[11px] text-theme-text-muted px-1.5 py-0.5 rounded-full border border-theme-stroke hover:bg-theme-surface-hover disabled:opacity-60 disabled:cursor-not-allowed'
+                            }
+                            title={
+                              !canToggleTaxFormRequired
+                                ? 'Tax forms required for this event'
+                                : effectiveTaxFormRequired
+                                ? 'Click to stop requiring tax forms for this event'
+                                : 'Click to require tax forms for this event'
+                            }
+                          >
+                            {taxFormRequiredBusy ? (
+                              <Loader2 size={11} className="animate-spin" />
+                            ) : null}
+                            {effectiveTaxFormRequired
+                              ? 'Tax forms required'
+                              : 'Tax forms: off'}
+                          </button>
                         )}
                         {/* bottarga-92104: red "Possible scam" pill — visible
                             in the city header next to other status pills when
