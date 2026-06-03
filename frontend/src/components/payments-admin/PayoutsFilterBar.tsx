@@ -49,7 +49,9 @@ interface PayoutsFilterBarProps {
   showStatusTabs?: boolean;
 }
 
-const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
+// ciabatta-92110: `'closed'` is a party-level pseudo-status (filters on
+// parties.payments_closed_at), so the tab value type widens beyond PayoutStatus.
+const STATUS_TABS: Array<{ value: PayoutStatus | 'all' | 'closed'; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
@@ -66,6 +68,10 @@ const STATUS_TABS: Array<{ value: PayoutStatus | 'all'; label: string }> = [
   // by Mark-Party-Paid's "mark pending complete" mode. Distinct from 'paid'
   // (a direct payment record) but treated like paid for cap math.
   { value: 'completed', label: 'Completed' },
+  // ciabatta-92110: party-level pseudo-status — filters the queue (list AND
+  // by-city) to cities the admin has explicitly closed out
+  // (parties.payments_closed_at set), not on payout.status.
+  { value: 'closed', label: 'Closed' },
 ];
 
 const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [

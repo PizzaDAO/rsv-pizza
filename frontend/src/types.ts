@@ -2116,7 +2116,9 @@ export interface AdminPayoutFilters {
    * accepts either shape on `?status=`; the by-city status-tab strip only
    * sets single values so the existing membership check keeps working.
    */
-  status?: PayoutStatus | 'all' | string;
+  // ciabatta-92110: `'closed'` is a pseudo-status accepted by the status tab
+  // strip — the backend filters on `party.paymentsClosedAt` (not payout.status).
+  status?: PayoutStatus | 'all' | 'closed' | string;
   payoutMethod?: PayoutMethod | 'all';
   partyId?: string;
   /** salame-83472: unified search — host email|name OR party name (case-insensitive contains). */
@@ -2208,6 +2210,14 @@ export interface AdminPayoutTotals {
    * scope as the other KPI fields.
    */
   paidCitiesCount: number;
+  /**
+   * ciabatta-92110: count of distinct cities (parties) the admin has
+   * explicitly closed out (`parties.payments_closed_at` set), within the
+   * current filter window. Distinct from the paidCitiesCount heuristic.
+   * Optional for graceful degradation: an old backend (deploys only from
+   * master) won't return this field on preview branches.
+   */
+  closedCitiesCount?: number;
 }
 
 export interface AdminPayoutsResponse {
