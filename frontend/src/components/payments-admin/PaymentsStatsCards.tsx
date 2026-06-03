@@ -61,12 +61,13 @@ export const PaymentsStatsCards: React.FC<PaymentsStatsCardsProps> = ({ totals, 
         label="Avg payment"
         value={formatUsd(totals.avgUsd)}
       />
-      {/* cotechino-92103: cities (parties) with at least one paid/completed
-          payout and no in-flight pending/approved payouts. */}
+      {/* ciabatta-92110: cities the admin has explicitly closed out
+          (parties.payments_closed_at set), within the current filter window.
+          Distinct from the cotechino-92103 paidCitiesCount heuristic. */}
       <StatCard
         icon={<CheckCircle2 size={14} />}
-        label="Paid cities"
-        value={String(totals.paidCitiesCount)}
+        label="Closed cities"
+        value={String(totals.closedCitiesCount ?? 0)}
         tone="emerald"
       />
       <StatCard

@@ -641,6 +641,11 @@ function buildPayoutWhere(query: Request['query']): any {
     ? { region: { in: regionsFromQuery } }
     : {};
 
+  // ciabatta-92110: the "Closed" status tab is a party-level pseudo-status —
+  // filters on cities the admin has closed out (payments_closed_at set), not payout.status.
+  const closedClause =
+    query.status === 'closed' ? { paymentsClosedAt: { not: null } } : {};
+
   // tartufo-58291: hide payouts from unapproved parties from the admin queue
   // + CSV export. Existing rows from before the bresaola-49185 backend gate
   // shouldn't surface in routine review. Stats/totals reuse this same `where`
@@ -653,6 +658,7 @@ function buildPayoutWhere(query: Request['query']): any {
     ...countryClause,
     ...tagClause,
     ...regionClause,
+    ...closedClause,
   };
 
   return where;
@@ -2381,6 +2387,8 @@ router.get(
               id: true,
               name: true,
               country: true,
+              // ciabatta-92110: needed to compute closedCitiesCount KPI.
+              paymentsClosedAt: true,
             },
           },
         },
@@ -2418,6 +2426,9 @@ router.get(
         string,
         { paidOrCompletedCount: number; pendingOrApprovedCount: number }
       >();
+
+      // ciabatta-92110: distinct closed-out cities within the current filter window.
+      const closedPartyIds = new Set<string>();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2500,6 +2511,9 @@ router.get(
           }
           byPartyStatusCounts.set(r.party.id, existing);
         }
+
+        // ciabatta-92110: collect distinct closed-out cities for the KPI.
+        if (r.party?.paymentsClosedAt) closedPartyIds.add(r.party.id);
       }
 
       // cotechino-92103: count cities whose payouts are all "settled" —
@@ -2510,6 +2524,10 @@ router.get(
           paidCitiesCount++;
         }
       }
+
+      // ciabatta-92110: count of cities the admin has explicitly closed out
+      // (payments_closed_at set) within the current filter window.
+      const closedCitiesCount = closedPartyIds.size;
 
       // taleggio-92104: AVG PAYMENT averages per-city committed totals
       // (sum of each party's paid+approved finalAmountUsd, then average
@@ -2580,6 +2598,7 @@ router.get(
           avgUsd,
           awaitingReview,
           paidCitiesCount,
+          closedCitiesCount,
         },
       });
     } catch (error) {
