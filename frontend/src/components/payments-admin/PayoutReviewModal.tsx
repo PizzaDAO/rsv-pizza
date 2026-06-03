@@ -623,6 +623,28 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     [pizzas, receipts, pizzaPhotos, eventPhotos],
   );
 
+  // robiola-92110: single source of truth for "what the persisted receipt draft
+  // looks like". Used by the three dirty-check/seed sites AND the post-save reset
+  // so a successful save can never read back as dirty. Mirrors the FX fallback
+  // chain (originalAmount/originalCurrency preferred, ocrAmount/ocrCurrency legacy
+  // fallback) the editor seeds from.
+  function seedReceiptDraft(doc: {
+    originalAmount?: number | null;
+    ocrAmount?: number | null;
+    originalCurrency?: string | null;
+    ocrCurrency?: string | null;
+  }): { originalAmount: string; currency: string } {
+    return {
+      originalAmount:
+        doc.originalAmount != null
+          ? String(doc.originalAmount)
+          : doc.ocrAmount != null
+            ? String(doc.ocrAmount)
+            : '',
+      currency: doc.originalCurrency ?? doc.ocrCurrency ?? '',
+    };
+  }
+
   async function saveReceiptEdit(docId: string) {
     const draft = receiptDrafts[docId];
     if (!draft) return;
@@ -726,12 +748,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       // are now persisted as the canonical state).
       setReceiptDrafts((m) => ({
         ...m,
-        [docId]: {
-          originalAmount: updated.originalAmount == null
-            ? ''
-            : String(updated.originalAmount),
-          currency: updated.ocrCurrency ?? '',
-        },
+        [docId]: seedReceiptDraft(updated),
       }));
     } catch (err: any) {
       setReceiptSaveErrors((m) => ({
@@ -1148,13 +1165,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       // caprino-92104: compare against the originalAmount column (the field
       // the editor binds to) and the originalCurrency (falling back to
       // ocrCurrency when the FX detail isn't persisted yet).
-      const seededOriginal =
-        r.originalAmount != null
-          ? String(r.originalAmount)
-          : r.ocrAmount != null
-            ? String(r.ocrAmount)
-            : '';
-      const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+      const { originalAmount: seededOriginal, currency: seededCurrency } =
+        seedReceiptDraft(r);
       if (
         draft.originalAmount !== seededOriginal
         || draft.currency !== seededCurrency
@@ -1225,13 +1237,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // the receipt's `originalAmount` column (mortadella-92103+) and fall back
     // to `ocrAmount` for legacy rows (treats the stored value as the original-
     // currency amount on first edit — backend mirrors this fallback).
-    const seededOriginal =
-      r.originalAmount != null
-        ? String(r.originalAmount)
-        : r.ocrAmount != null
-          ? String(r.ocrAmount)
-          : '';
-    const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+    const { originalAmount: seededOriginal, currency: seededCurrency } =
+      seedReceiptDraft(r);
     const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
       originalAmount: seededOriginal,
       currency: seededCurrency,
@@ -2222,13 +2229,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           ? String(rawDoc.ocrAmount)
                           : null;
                     const placeholderCur = rawDoc?.originalCurrency ?? rawDoc?.ocrCurrency ?? null;
-                    const seededOriginalAmt =
-                      r.originalAmount != null
-                        ? String(r.originalAmount)
-                        : r.ocrAmount != null
-                          ? String(r.ocrAmount)
-                          : '';
-                    const seededCur = r.originalCurrency ?? r.ocrCurrency ?? '';
+                    const { originalAmount: seededOriginalAmt, currency: seededCur } =
+                      seedReceiptDraft(r);
                     const draft = receiptDrafts[r.id];
                     const draftAmt = draft?.originalAmount ?? seededOriginalAmt;
                     const draftCur = draft?.currency ?? seededCur;
