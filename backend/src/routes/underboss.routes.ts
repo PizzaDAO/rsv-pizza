@@ -782,6 +782,109 @@ router.get('/outreach/parties-search', requireAuth, requireUnderbossAuth, async 
   }
 });
 
+// ============================================
+// Best Of / superlative judging queue (panzerotti-58931 Phase 2.1)
+// NOTE: literal routes — MUST be registered BEFORE the /:region catch-all
+// so 'superlatives' isn't captured as a region param.
+// ============================================
+
+// Human labels for the three superlative keys (mirror scorecard.routes.ts).
+const SUPERLATIVE_LABELS: Record<string, string> = {
+  super_slices: 'Most people with a slice',
+  super_cheese_pull: 'Best cheese pull',
+  super_box_stack: 'Tallest box stack',
+};
+const SUPERLATIVE_STATUSES = new Set(['winner', 'rejected', 'pending']);
+
+// GET /api/underboss/superlatives - all submissions grouped by key (admin only)
+router.get('/superlatives', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const isAdminUser = req.underboss!.regions.includes('__admin__');
+    if (!isAdminUser) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const submissions = await prisma.superlativeSubmission.findMany({
+      select: {
+        id: true,
+        superlativeKey: true,
+        photoUrl: true,
+        numericValue: true,
+        status: true,
+        guest: { select: { name: true } },
+        party: { select: { name: true, city: true, country: true } },
+      },
+      orderBy: [{ superlativeKey: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const rows = submissions.map((s) => ({
+      id: s.id,
+      superlativeKey: s.superlativeKey,
+      guestName: s.guest?.name || 'Guest',
+      partyName: s.party?.name || 'Untitled',
+      city: s.party?.city || null,
+      country: s.party?.country || null,
+      photoUrl: s.photoUrl,
+      numericValue: s.numericValue,
+      status: s.status,
+    }));
+
+    // Group by superlative_key, preserving label for the UI.
+    const groupMap = new Map<string, { superlativeKey: string; label: string; submissions: typeof rows }>();
+    for (const r of rows) {
+      let g = groupMap.get(r.superlativeKey);
+      if (!g) {
+        g = {
+          superlativeKey: r.superlativeKey,
+          label: SUPERLATIVE_LABELS[r.superlativeKey] ?? r.superlativeKey,
+          submissions: [],
+        };
+        groupMap.set(r.superlativeKey, g);
+      }
+      g.submissions.push(r);
+    }
+
+    res.json({ groups: Array.from(groupMap.values()) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/underboss/superlatives/:id - judge a submission (admin only)
+router.patch('/superlatives/:id', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const isAdminUser = req.underboss!.regions.includes('__admin__');
+    if (!isAdminUser) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: string };
+
+    if (!status || !SUPERLATIVE_STATUSES.has(status)) {
+      throw new AppError(
+        "status must be one of: winner, rejected, pending",
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    const updated = await prisma.superlativeSubmission.update({
+      where: { id },
+      data: {
+        status,
+        judgedBy: req.userEmail || null,
+        judgedAt: new Date(),
+      },
+      select: { id: true, status: true, judgedBy: true, judgedAt: true },
+    });
+
+    res.json({ submission: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/underboss/:region - Main dashboard data
 router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {

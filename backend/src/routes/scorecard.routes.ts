@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { BEST_OF_BONUS } from './scorecardLeaderboard.routes.js';
 
 const router = Router();
 
@@ -47,6 +48,19 @@ function categoryFor(itemKey: string): 'mission' | 'photo' | undefined {
 // panzerotti-58931: superlative submission keys (separate table, not scorecard items)
 const SUPERLATIVE_KEYS = ['super_slices', 'super_cheese_pull', 'super_box_stack'] as const;
 type SuperlativeKey = typeof SUPERLATIVE_KEYS[number];
+
+// panzerotti-58931 Phase 2.1: human labels for "Best Of" superlatives. Used on
+// the guest scorecard to show which wins a guest earned, and on the admin
+// judging queue. Keep in sync with SUPERLATIVE_KEYS.
+const SUPERLATIVE_LABELS: Record<string, string> = {
+  super_slices: 'Most people with a slice',
+  super_cheese_pull: 'Best cheese pull',
+  super_box_stack: 'Tallest box stack',
+};
+
+function superlativeLabel(key: string): string {
+  return SUPERLATIVE_LABELS[key] ?? key;
+}
 
 // Helper: find party by inviteCode or customUrl
 async function findPartyByCode(inviteCode: string) {
@@ -154,10 +168,21 @@ router.get('/:inviteCode', requireAuth, async (req: AuthRequest, res: Response, 
     // Compute Pizza Chef score (number of completed items)
     const completedCount = items.filter((item) => item.completed).length;
 
+    // panzerotti-58931 Phase 2.1: the calling guest's judged "Best Of" wins.
+    const winnerRows = await prisma.superlativeSubmission.findMany({
+      where: { guestId: guest.id, partyId: party.id, status: 'winner' },
+      select: { superlativeKey: true },
+    });
+    const bestOfWins = winnerRows.map((r) => ({
+      superlativeKey: r.superlativeKey,
+      label: superlativeLabel(r.superlativeKey),
+    }));
+
     res.json({
       items: items.map((item) => ({ ...item, category: categoryFor(item.itemKey) })),
       pizzaChefScore: completedCount,
       totalItems: SCORECARD_ITEMS.length,
+      bestOfWins,
     });
   } catch (error) {
     next(error);
@@ -255,6 +280,11 @@ router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res
           where: { completed: true },
           select: { id: true },
         },
+        // panzerotti-58931 Phase 2.1: Best Of wins add BEST_OF_BONUS each.
+        superlativeSubmissions: {
+          where: { status: 'winner' },
+          select: { id: true },
+        },
       },
     });
 
@@ -273,7 +303,7 @@ router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res
       .map((g) => ({
         guestId: g.id,
         name: privacyName(g.name),
-        score: g.scorecardItems.length,
+        score: g.scorecardItems.length + g.superlativeSubmissions.length * BEST_OF_BONUS,
         isCurrentUser: !!callerEmail && g.email?.toLowerCase() === callerEmail,
       }))
       .sort((a, b) => {

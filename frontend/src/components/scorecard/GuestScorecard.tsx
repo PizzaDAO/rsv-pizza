@@ -55,6 +55,8 @@ export function GuestScorecard({
   const [items, setItems] = useState<ScorecardItemType[]>([]);
   const [pizzaChefScore, setPizzaChefScore] = useState(0);
   const [totalItems, setTotalItems] = useState(11);
+  // panzerotti-58931 Phase 2.1: the guest's judged "Best Of" wins.
+  const [bestOfWins, setBestOfWins] = useState<{ superlativeKey: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [completingItem, setCompletingItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export function GuestScorecard({
       setItems(data.items);
       setPizzaChefScore(data.pizzaChefScore);
       setTotalItems(data.totalItems);
+      setBestOfWins(data.bestOfWins ?? []);
       setError(null);
     } catch (err: any) {
       // If guest isn't checked in yet or not a guest, just hide quietly
@@ -146,6 +149,15 @@ export function GuestScorecard({
           </span>
         </div>
       </div>
+
+      {/* panzerotti-58931 Phase 2.1: Best Of wins */}
+      {bestOfWins.length > 0 && (
+        <div className="px-4 pt-2">
+          <p className="text-xs font-medium text-yellow-400">
+            🏆 Best Of winner: {bestOfWins.map((w) => w.label).join(', ')}
+          </p>
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="px-4 pt-3">

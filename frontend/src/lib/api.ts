@@ -4197,6 +4197,8 @@ export interface ScorecardResponse {
   items: ScorecardItem[];
   pizzaChefScore: number;
   totalItems: number;
+  /** panzerotti-58931 Phase 2.1: the calling guest's judged "Best Of" wins. */
+  bestOfWins?: { superlativeKey: string; label: string }[];
 }
 
 export interface CompleteScorecardResponse {
@@ -4236,6 +4238,81 @@ export interface LeaderboardResponse {
 
 export async function getPartyLeaderboard(inviteCode: string): Promise<LeaderboardResponse> {
   return apiRequest<LeaderboardResponse>(`/api/scorecard/${inviteCode}/leaderboard`);
+}
+
+// panzerotti-58931 Phase 2.1: worldwide game leaderboard (guests / parties / countries)
+
+export interface ScorecardGuestRow {
+  rank: number;
+  name: string;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
+  score: number;
+}
+
+export interface ScorecardPartyRow {
+  rank: number;
+  partyId: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
+  slug: string;
+  score: number;
+}
+
+export interface ScorecardCountryRow {
+  rank: number;
+  country: string;
+  countryCode: string | null;
+  partyCount: number;
+  score: number;
+}
+
+export interface ScorecardGlobalLeaderboardResponse {
+  guests: ScorecardGuestRow[];
+  parties: ScorecardPartyRow[];
+  countries: ScorecardCountryRow[];
+  computedAt: string;
+}
+
+export async function getScorecardGlobalLeaderboard(): Promise<ScorecardGlobalLeaderboardResponse> {
+  return apiRequest<ScorecardGlobalLeaderboardResponse>('/api/scorecard-leaderboard');
+}
+
+// panzerotti-58931 Phase 2.1: admin Best Of judging queue
+
+export interface UnderbossSuperlativeRow {
+  id: string;
+  superlativeKey: string;
+  guestName: string;
+  partyName: string;
+  city: string | null;
+  country: string | null;
+  photoUrl: string;
+  numericValue: number | null;
+  status: string;
+}
+
+export interface UnderbossSuperlativeGroup {
+  superlativeKey: string;
+  label: string;
+  submissions: UnderbossSuperlativeRow[];
+}
+
+export async function getUnderbossSuperlatives(): Promise<{ groups: UnderbossSuperlativeGroup[] }> {
+  return apiRequest<{ groups: UnderbossSuperlativeGroup[] }>('/api/underboss/superlatives');
+}
+
+export async function markSuperlative(
+  id: string,
+  status: 'winner' | 'rejected' | 'pending'
+): Promise<{ submission: { id: string; status: string } }> {
+  return apiRequest<{ submission: { id: string; status: string } }>(
+    `/api/underboss/superlatives/${id}`,
+    { method: 'PATCH', body: { status } }
+  );
 }
 
 export interface SuperlativeSubmission {
