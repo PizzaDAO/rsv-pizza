@@ -321,6 +321,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       if (!createdPayoutIdRef.current) {
         const created = await createPayout(partyId, {
           pizzaPhotos: [],
+          eventPhotos: [],
           receiptPhotos: [],
           payoutMethod: method,
           payoutWalletAddress:

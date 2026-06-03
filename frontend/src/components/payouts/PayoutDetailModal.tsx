@@ -103,6 +103,8 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   // New uploads since edit-mode was opened (existing docs aren't re-uploaded).
   const [newReceipts, setNewReceipts] = useState<ReceiptItem[]>([]);
   const [newPizzaPhotos, setNewPizzaPhotos] = useState<PizzaPhotoItem[]>([]);
+  // pomodoro-92110: separate dropzone for event photos (cap 30).
+  const [newEventPhotos, setNewEventPhotos] = useState<PizzaPhotoItem[]>([]);
   // IDs of existing documents the host has clicked X on (deferred until save).
   const [removedDocIds, setRemovedDocIds] = useState<Set<string>>(new Set());
   const [editNotes, setEditNotes] = useState('');
@@ -137,6 +139,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     setSaveError(null);
     setNewReceipts([]);
     setNewPizzaPhotos([]);
+    setNewEventPhotos([]);
     setRemovedDocIds(new Set());
     setDocFxOverrides({});
     setEditNotes(payout.hostNotes ?? '');
@@ -150,6 +153,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     setSaveError(null);
     setNewReceipts([]);
     setNewPizzaPhotos([]);
+    setNewEventPhotos([]);
     setRemovedDocIds(new Set());
     setDocFxOverrides({});
   };
@@ -164,6 +168,12 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     () => (payout?.documents ?? []).filter(d => d.kind === 'pizza' && !removedDocIds.has(d.id)),
     [payout, removedDocIds]
   );
+  // pomodoro-92110: surviving event photos drive both the edit-mode existing
+  // grid and the total-cap `existingCount` for the event dropzone.
+  const survivingEventPhotos = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'event' && !removedDocIds.has(d.id)),
+    [payout, removedDocIds]
+  );
 
   // bresaola-89172: unified lightbox list across receipts + pizza photos so
   // arrow-key nav walks the whole set. Receipts listed first (matches the
@@ -176,11 +186,18 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
     () => (payout?.documents ?? []).filter(d => d.kind === 'pizza'),
     [payout]
   );
+  // pomodoro-92110: event photos listed after pizza in the carousel.
+  const viewEventPhotos = useMemo(
+    () => (payout?.documents ?? []).filter(d => d.kind === 'event'),
+    [payout]
+  );
   // soppressata-92110: keep the doc list parallel to `lightboxImages` so we can
   // look up the flags for whatever index the lightbox is currently showing.
+  // pomodoro-92110: event photos included so indices stay aligned across the
+  // full receipts → pizza → event carousel.
   const lightboxDocs = useMemo(
-    () => [...viewReceipts, ...viewPizzaPhotos],
-    [viewReceipts, viewPizzaPhotos]
+    () => [...viewReceipts, ...viewPizzaPhotos, ...viewEventPhotos],
+    [viewReceipts, viewPizzaPhotos, viewEventPhotos]
   );
   const lightboxImages = useMemo(
     () =>
@@ -193,13 +210,15 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
   );
   const receiptsLightboxOffset = 0;
   const pizzasLightboxOffset = viewReceipts.length;
+  const eventsLightboxOffset = viewReceipts.length + viewPizzaPhotos.length;
   // soppressata-92110: the doc currently shown in the lightbox (receipts only
   // carry the flags; pizza photos never do).
   const lightboxCurrentDoc = lightboxDocs[lightboxCurrentIndex] ?? null;
 
   const isProcessingUploads =
     newReceipts.some(r => r.status === 'uploading' || r.status === 'ocring') ||
-    newPizzaPhotos.some(p => p.status === 'uploading');
+    newPizzaPhotos.some(p => p.status === 'uploading') ||
+    newEventPhotos.some(p => p.status === 'uploading');
 
   // gouda-83912: only the submitter (or any admin) may edit / cancel a payout.
   // Other cohosts on the same party can still see the row but the affordances
@@ -275,6 +294,18 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
       if (newPizzaPayload.length > 0) {
         patch.pizzaPhotos = newPizzaPayload;
       }
+      // pomodoro-92110: event photos (kind:'event') — append-only on edit.
+      const newEventPayload = newEventPhotos
+        .filter(p => p.status === 'done' && p.url)
+        .map(p => ({
+          url: p.url!,
+          fileName: p.fileName,
+          fileSize: p.fileSize,
+          mimeType: p.mimeType,
+        }));
+      if (newEventPayload.length > 0) {
+        patch.eventPhotos = newEventPayload;
+      }
 
       if (removedDocIds.size > 0) {
         patch.removeDocumentIds = Array.from(removedDocIds);
@@ -292,6 +323,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
       setEditing(false);
       setNewReceipts([]);
       setNewPizzaPhotos([]);
+      setNewEventPhotos([]);
       setRemovedDocIds(new Set());
       onUpdated?.();
     } catch (err: any) {
@@ -597,7 +629,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
               {/* Pizza photos */}
               {viewPizzaPhotos.length > 0 && (
                 <div>
-                  <p className="text-xs text-theme-text-muted mb-2">Pizza / event photos</p>
+                  <p className="text-xs text-theme-text-muted mb-2">Pizza photos</p>
                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {viewPizzaPhotos.map((d, idx) => (
                       <div key={d.id} className="space-y-1">
@@ -635,6 +667,50 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                         </button>
                         {/* pancetta-37195: per-photo uploader attribution.
                             Hidden for historical rows (null uploadedByUserId). */}
+                        {d.uploadedByUserId && (
+                          <p className="text-[10px] text-theme-text-muted truncate">
+                            Uploaded by {d.uploadedByName ?? d.uploadedByEmail ?? 'Unknown'}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Event photos (pomodoro-92110) */}
+              {viewEventPhotos.length > 0 && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Event photos</p>
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                    {viewEventPhotos.map((d, idx) => (
+                      <div key={d.id} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setLightboxState({ open: true, initialIndex: eventsLightboxOffset + idx })}
+                          className="relative block w-full aspect-square rounded-lg overflow-hidden bg-theme-surface hover:opacity-90 transition-opacity"
+                          aria-label={`Open ${d.fileName}`}
+                          title={d.fileName}
+                        >
+                          {isVideoFile(d) ? (
+                            <>
+                              <video
+                                src={d.url}
+                                preload="metadata"
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="bg-black/50 rounded-full p-3">
+                                  <Play className="text-white" size={20} fill="white" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <img src={d.url} alt={d.fileName} className="w-full h-full object-cover" />
+                          )}
+                        </button>
                         {d.uploadedByUserId && (
                           <p className="text-[10px] text-theme-text-muted truncate">
                             Uploaded by {d.uploadedByName ?? d.uploadedByEmail ?? 'Unknown'}
@@ -790,7 +866,7 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
               {/* Existing pizza photos — host can click X to mark for removal */}
               {survivingPizzaPhotos.length > 0 && (
                 <div>
-                  <p className="text-xs text-theme-text-muted mb-2">Existing pizza / event photos</p>
+                  <p className="text-xs text-theme-text-muted mb-2">Existing pizza photos</p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                     {survivingPizzaPhotos.map(d => (
                       <div key={d.id} className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface group">
@@ -829,15 +905,70 @@ export const PayoutDetailModal: React.FC<PayoutDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Add pizza photos */}
+              {/* Add pizza photos (pomodoro-92110: cap 10, total enforced) */}
               <div>
-                <p className="text-xs text-theme-text-muted mb-2">Add pizza / event photos</p>
+                <p className="text-xs text-theme-text-muted mb-2">Add pizza photos</p>
                 <PizzaPhotoUpload
                   partyId={partyId}
                   payoutTempId={payout.id}
+                  kind="pizza"
                   items={newPizzaPhotos}
                   onChange={setNewPizzaPhotos}
                   maxItems={10}
+                  existingCount={survivingPizzaPhotos.length}
+                />
+              </div>
+
+              {/* Existing event photos — host can click X to mark for removal */}
+              {survivingEventPhotos.length > 0 && (
+                <div>
+                  <p className="text-xs text-theme-text-muted mb-2">Existing event photos</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {survivingEventPhotos.map(d => (
+                      <div key={d.id} className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface group">
+                        {isVideoFile(d) ? (
+                          <>
+                            <video
+                              src={d.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/50 rounded-full p-3">
+                                <Play className="text-white" size={20} fill="white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img src={d.url} alt="" className="w-full h-full object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setRemovedDocIds(prev => new Set(prev).add(d.id))}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add event photos (pomodoro-92110: cap 30, total enforced) */}
+              <div>
+                <p className="text-xs text-theme-text-muted mb-2">Add event photos</p>
+                <PizzaPhotoUpload
+                  partyId={partyId}
+                  payoutTempId={payout.id}
+                  kind="event"
+                  items={newEventPhotos}
+                  onChange={setNewEventPhotos}
+                  maxItems={30}
+                  existingCount={survivingEventPhotos.length}
                 />
               </div>
 

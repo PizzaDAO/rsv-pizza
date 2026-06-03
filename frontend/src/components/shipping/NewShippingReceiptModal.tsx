@@ -122,6 +122,7 @@ export const NewShippingReceiptModal: React.FC<NewShippingReceiptModalProps> = (
           })),
         // Shipping receipts don't carry pizza/event proof photos.
         pizzaPhotos: [],
+        eventPhotos: [],
         hostNotes: notes.trim() || undefined,
         purpose: 'shipping',
         partyKitId: selectedKit.id,

@@ -562,6 +562,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     () => payout.documents.filter((d) => d.kind === 'pizza'),
     [payout.documents],
   );
+  // pomodoro-92110: host-uploaded event photos persist as kind:'event' payout
+  // documents — surfaced here as an "Event proof" section. Distinct from the
+  // gallery `eventPhotos` below (which comes from party.photos / the wire's
+  // AdminPayoutDetail.eventPhotos). NEVER conflate the two.
+  const eventDocs = useMemo(
+    () => payout.documents.filter((d) => d.kind === 'event'),
+    [payout.documents],
+  );
   // bottarga-92103: event-level photos from the party's Photos tab. Separate
   // from payment-app photos (`payout.documents`). Optional on the wire — older
   // cached responses simply render an empty section.
@@ -593,13 +601,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     ),
     [allEventPhotos],
   );
-  // Unified lightbox carousel order (focaccia-92104):
-  //   pizzas (payment-app) → receipts → pizzaPhotos → eventPhotos
+  // Unified lightbox carousel order (focaccia-92104; pomodoro-92110 inserts
+  // eventDocs right after pizzas):
+  //   pizzas (payment-app) → eventDocs (Event proof) → receipts → pizzaPhotos
+  //   → eventPhotos
   // Order matters so each thumbnail grid's offset into `allPhotos` resolves
   // to the right starting image.
   const allPhotos = useMemo(
     () => [
       ...pizzas.map((d) => ({
+        url: d.url,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+      })),
+      ...eventDocs.map((d) => ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
@@ -620,8 +635,30 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         mimeType: p.mimeType,
       })),
     ],
-    [pizzas, receipts, pizzaPhotos, eventPhotos],
+    [pizzas, eventDocs, receipts, pizzaPhotos, eventPhotos],
   );
+
+  // robiola-92110: single source of truth for "what the persisted receipt draft
+  // looks like". Used by the three dirty-check/seed sites AND the post-save reset
+  // so a successful save can never read back as dirty. Mirrors the FX fallback
+  // chain (originalAmount/originalCurrency preferred, ocrAmount/ocrCurrency legacy
+  // fallback) the editor seeds from.
+  function seedReceiptDraft(doc: {
+    originalAmount?: number | null;
+    ocrAmount?: number | null;
+    originalCurrency?: string | null;
+    ocrCurrency?: string | null;
+  }): { originalAmount: string; currency: string } {
+    return {
+      originalAmount:
+        doc.originalAmount != null
+          ? String(doc.originalAmount)
+          : doc.ocrAmount != null
+            ? String(doc.ocrAmount)
+            : '',
+      currency: doc.originalCurrency ?? doc.ocrCurrency ?? '',
+    };
+  }
 
   async function saveReceiptEdit(docId: string) {
     const draft = receiptDrafts[docId];
@@ -726,12 +763,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       // are now persisted as the canonical state).
       setReceiptDrafts((m) => ({
         ...m,
-        [docId]: {
-          originalAmount: updated.originalAmount == null
-            ? ''
-            : String(updated.originalAmount),
-          currency: updated.ocrCurrency ?? '',
-        },
+        [docId]: seedReceiptDraft(updated),
       }));
     } catch (err: any) {
       setReceiptSaveErrors((m) => ({
@@ -762,8 +794,41 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       const res = await retryPayoutDocumentOcr(docId, { runNow: true });
       if (res.inlineError) {
         setRetryErrors((m) => ({ ...m, [docId]: res.inlineError ?? 'OCR failed' }));
+      } else if (res.ranInline && res.document) {
+        // crescenza-92110: the inline re-run is now a FULL re-read (amount +
+        // currency + line items). Mirror the saveLineItemsEdit success path so
+        // the panel reflects the fresh OCR result in place without a parent
+        // refetch.
+        const fresh = res.document;
+        setReceiptOverrides((m) => ({
+          ...m,
+          [docId]: {
+            ...m[docId],
+            ocrAmount: fresh.ocrAmount,
+            ocrCurrency: fresh.ocrCurrency,
+            ocrLineItems: fresh.ocrLineItems,
+            originalAmount: fresh.originalAmount,
+            originalCurrency: fresh.originalCurrency,
+            exchangeRate: fresh.exchangeRate,
+          },
+        }));
+        // Re-seed line item drafts from the fresh array.
+        setLineItemDrafts((m) => ({
+          ...m,
+          [docId]: (fresh.ocrLineItems ?? []).map(lineItemToDraft),
+        }));
+        // Drop the stale amount/currency draft so the inputs reseed from the
+        // new override on the next render.
+        setReceiptDrafts((m) => {
+          const next = { ...m };
+          delete next[docId];
+          return next;
+        });
+        // Locally suppress any stale ocrError from payout.documents.
+        setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
       } else if (res.ranInline) {
-        // Success — locally suppress the stale ocrError from payout.documents.
+        // Ran inline but no document payload (shouldn't happen) — at least
+        // clear the stale error.
         setRetryClearedErrors((m) => ({ ...m, [docId]: true }));
       }
     } catch (err: any) {
@@ -1125,16 +1190,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   }, [onClose, lightboxIndex]);
 
   // pesto-92104: derive the receipt that's currently in the lightbox (if
-  // any). The unified carousel order is pizzas → receipts → pizzaPhotos →
-  // eventPhotos (see `allPhotos` above), so the receipt slice starts at
-  // `pizzas.length` and runs through `pizzas.length + receipts.length`.
+  // any). The unified carousel order is pizzas → eventDocs → receipts →
+  // pizzaPhotos → eventPhotos (see `allPhotos` above; pomodoro-92110 inserted
+  // eventDocs), so the receipt slice starts at `pizzas.length +
+  // eventDocs.length` and runs through `... + receipts.length`.
   const lightboxReceipt = useMemo(() => {
     if (lightboxCurrentIndex == null) return null;
-    const offset = pizzas.length;
+    const offset = pizzas.length + eventDocs.length;
     const idx = lightboxCurrentIndex - offset;
     if (idx < 0 || idx >= receipts.length) return null;
     return receipts[idx];
-  }, [lightboxCurrentIndex, pizzas.length, receipts]);
+  }, [lightboxCurrentIndex, pizzas.length, eventDocs.length, receipts]);
 
   // pesto-92104: "is the editor dirty?" — used by the navigation prompt
   // (Save / Discard / Cancel) so admins don't accidentally lose in-flight
@@ -1148,13 +1214,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       // caprino-92104: compare against the originalAmount column (the field
       // the editor binds to) and the originalCurrency (falling back to
       // ocrCurrency when the FX detail isn't persisted yet).
-      const seededOriginal =
-        r.originalAmount != null
-          ? String(r.originalAmount)
-          : r.ocrAmount != null
-            ? String(r.ocrAmount)
-            : '';
-      const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+      const { originalAmount: seededOriginal, currency: seededCurrency } =
+        seedReceiptDraft(r);
       if (
         draft.originalAmount !== seededOriginal
         || draft.currency !== seededCurrency
@@ -1225,13 +1286,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // the receipt's `originalAmount` column (mortadella-92103+) and fall back
     // to `ocrAmount` for legacy rows (treats the stored value as the original-
     // currency amount on first edit — backend mirrors this fallback).
-    const seededOriginal =
-      r.originalAmount != null
-        ? String(r.originalAmount)
-        : r.ocrAmount != null
-          ? String(r.ocrAmount)
-          : '';
-    const seededCurrency = r.originalCurrency ?? r.ocrCurrency ?? '';
+    const { originalAmount: seededOriginal, currency: seededCurrency } =
+      seedReceiptDraft(r);
     const draft: ReceiptDraft = receiptDrafts[r.id] ?? {
       originalAmount: seededOriginal,
       currency: seededCurrency,
@@ -1636,9 +1692,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {eventPhotos.map((p, idx) => {
                     // focaccia-92104: event photos sit at the END of the
-                    // merged carousel.
+                    // merged carousel. pomodoro-92110: + eventDocs.length for
+                    // the Event-proof payout docs inserted after pizzas.
                     const carouselIdx =
-                      pizzas.length + receipts.length + pizzaPhotos.length + idx;
+                      pizzas.length + eventDocs.length + receipts.length + pizzaPhotos.length + idx;
                     const isHidden = p.status !== 'approved';
                     return (
                       <button
@@ -1707,8 +1764,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {pizzaPhotos.map((p, idx) => {
                     // focaccia-92104: pizza photos sit between receipts and
-                    // event photos in the merged carousel.
-                    const carouselIdx = pizzas.length + receipts.length + idx;
+                    // event photos in the merged carousel. pomodoro-92110:
+                    // + eventDocs.length for the Event-proof payout docs.
+                    const carouselIdx = pizzas.length + eventDocs.length + receipts.length + idx;
                     const isHidden = p.status !== 'approved';
                     return (
                       <button
@@ -1774,8 +1832,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {receipts.map((doc, idx) => {
                     // focaccia-92104: receipt thumbnails sit after the
-                    // payment-app pizzas in the merged carousel.
-                    const carouselIdx = pizzas.length + idx;
+                    // payment-app pizzas in the merged carousel. pomodoro-92110:
+                    // + eventDocs.length for the Event-proof payout docs.
+                    const carouselIdx = pizzas.length + eventDocs.length + idx;
                     const isDup = doc.isDuplicate === true;
                     // provola-92106: ineligible-but-not-duplicate gets its
                     // own amber treatment. When BOTH flags are true, the
@@ -2222,13 +2281,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           ? String(rawDoc.ocrAmount)
                           : null;
                     const placeholderCur = rawDoc?.originalCurrency ?? rawDoc?.ocrCurrency ?? null;
-                    const seededOriginalAmt =
-                      r.originalAmount != null
-                        ? String(r.originalAmount)
-                        : r.ocrAmount != null
-                          ? String(r.ocrAmount)
-                          : '';
-                    const seededCur = r.originalCurrency ?? r.ocrCurrency ?? '';
+                    const { originalAmount: seededOriginalAmt, currency: seededCur } =
+                      seedReceiptDraft(r);
                     const draft = receiptDrafts[r.id];
                     const draftAmt = draft?.originalAmount ?? seededOriginalAmt;
                     const draftCur = draft?.currency ?? seededCur;
@@ -2770,6 +2824,51 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       )}
                       <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white">
                         pizza
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* pomodoro-92110: Event proof — host-uploaded kind=event payout
+                documents. Sits right after Payment proof; the carousel order is
+                pizzas → eventDocs → receipts → ... so the lightbox index is
+                `pizzas.length + idx`. */}
+            {eventDocs.length > 0 && (
+              <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">
+                <h3 className="text-sm font-semibold text-theme-text mb-2">
+                  Event proof ({eventDocs.length})
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {eventDocs.map((doc, idx) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => setLightboxIndex(pizzas.length + idx)}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
+                      title={doc.fileName}
+                    >
+                      {isVideoFile(doc) ? (
+                        <>
+                          <video
+                            src={doc.url}
+                            preload="metadata"
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-black/50 rounded-full p-3">
+                              <Play className="text-white" size={20} fill="white" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={doc.url} alt={doc.fileName} className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                      <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+                        event
                       </span>
                     </button>
                   ))}

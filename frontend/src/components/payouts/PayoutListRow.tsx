@@ -97,8 +97,10 @@ export const PayoutListRow: React.FC<PayoutListRowProps> = ({
   // record). `paid`, `rejected`, `failed` remain terminal.
   const canWithdraw = payout.status === 'pending' || payout.status === 'approved';
 
-  // First pizza photo, or first receipt as a fallback thumbnail
+  // First pizza photo, then event photo, then receipt as a fallback thumbnail
+  // (pomodoro-92110).
   const thumb = payout.documents.find(d => d.kind === 'pizza')
+    ?? payout.documents.find(d => d.kind === 'event')
     ?? payout.documents.find(d => d.kind === 'receipt');
 
   const handleWithdraw = async (e: React.MouseEvent) => {
