@@ -120,6 +120,23 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
 }
 
 /**
+ * Submit a free-text site suggestion (optionally with an image) into the
+ * `suggestions` table via a direct anon insert. Throws on failure.
+ */
+export async function submitSuggestion(input: {
+  body: string; name?: string; email?: string; imageUrl?: string; pageUrl?: string;
+}): Promise<void> {
+  const { error } = await supabase.from('suggestions').insert({
+    body: input.body,
+    name: input.name || null,
+    email: input.email || null,
+    image_url: input.imageUrl || null,
+    page_url: input.pageUrl || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Upload a sponsor logo to Supabase Storage and return the public URL
  * @param file The image file to upload
  * @returns The public URL of the uploaded logo, or null if upload failed
