@@ -22,10 +22,11 @@ import {
   approveAdminPayout,
   createPayout,
   executeAdminPayout,
+  fetchWalletPaidTotal,
   searchApprovedParties,
   type ApprovedPartySearchResult,
 } from '../../lib/api';
-import type { PayoutMethod } from '../../types';
+import type { PayoutMethod, WalletPaidTotal } from '../../types';
 
 /**
  * salame-92106: admin modal to ACTIVELY SEND a payment from rsv.pizza's
@@ -235,6 +236,15 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   // changes so a stale ack doesn't carry across edits.
   const [overridePartyCap, setOverridePartyCap] = useState(false);
 
+  // guanciale-49340: per-address $676 cap warning state (mirrors bianco-89172
+  // in PayoutReviewModal). `walletPaidTotal` holds the recipient wallet's
+  // cumulative paid-USDC total + would-exceed check for the in-flight amount;
+  // `overridePerAddressCap` is the admin's ack, required to enable Send when
+  // `wouldExceed === true`. Only relevant for the usdc_base method.
+  const [walletPaidTotal, setWalletPaidTotal] = useState<WalletPaidTotal | null>(null);
+  const [walletPaidLoading, setWalletPaidLoading] = useState(false);
+  const [overridePerAddressCap, setOverridePerAddressCap] = useState(false);
+
   // SWC Hub ack — controlled, surfaced via the shared SwcHubWarning component.
   const [swcAck, setSwcAck] = useState(false);
 
@@ -269,6 +279,48 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   useEffect(() => {
     setFakeAck(false);
   }, [recipientUserId, amountNum]);
+
+  // guanciale-49340: reset the per-address cap ack whenever the amount /
+  // recipient / wallet / method changes (mirrors the per-party + fake acks),
+  // so a stale acknowledgement can't carry across edits to a different send.
+  useEffect(() => {
+    setOverridePerAddressCap(false);
+  }, [amountNum, recipientUserId, walletAddress, method]);
+
+  // guanciale-49340: debounced per-address paid-total fetch (bianco-89172
+  // pattern). When sending USDC to a syntactically-valid 0x wallet with a
+  // finite positive amount, look up that wallet's cumulative paid total +
+  // would-exceed check so we can warn before the backend rejects at the
+  // $676 hard cap. Clears the warning state whenever it isn't applicable.
+  useEffect(() => {
+    const wallet = walletAddress.trim();
+    if (
+      method !== 'usdc_base' ||
+      !/^0x[0-9a-fA-F]{40}$/.test(wallet) ||
+      !Number.isFinite(amountNum) ||
+      amountNum <= 0
+    ) {
+      setWalletPaidTotal(null);
+      setWalletPaidLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWalletPaidLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const total = await fetchWalletPaidTotal(wallet, amountNum);
+        if (!cancelled) setWalletPaidTotal(total);
+      } catch {
+        if (!cancelled) setWalletPaidTotal(null);
+      } finally {
+        if (!cancelled) setWalletPaidLoading(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [method, walletAddress, amountNum]);
 
   // Cap math (salame-92103 mirror). Cap remaining = cap - already-paid. We
   // also include this in-flight amount in `wouldExceed` so the warning fires
@@ -320,6 +372,8 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
     !(method === 'mercury_card' && mercuryBlocked) &&
     // salame-92103: cap-exceed requires explicit ack.
     (!partyWouldExceedCap || overridePartyCap) &&
+    // guanciale-49340: per-address $676 cap-exceed requires explicit ack.
+    (!(walletPaidTotal?.wouldExceed) || overridePerAddressCap) &&
     // parmigiana-92104: SWC Hub requires explicit ack.
     (!swcHub || swcAck) &&
     // bufalina-60733: flagged (medium/high fake-detection) requires explicit ack.
@@ -380,15 +434,32 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       // with the ack ticked. Forward `allowOverPartyCap` on every approve
       // call so the bocconcini-49102 recheck is skipped consistently.
       const allowOverPartyCap = partyWouldExceedCap ? overridePartyCap : undefined;
+      // guanciale-49340: forward the per-address ($676) cap ack to BOTH the
+      // approve (usdc autoExecute) and execute (wire/mercury) branches.
+      const allowOverPerAddressCap = walletPaidTotal?.wouldExceed
+        ? overridePerAddressCap
+        : undefined;
       if (method === 'usdc_base') {
-        await approveAdminPayout(payoutId, {
+        // guanciale-49340: the approve handler runs executePayout server-side
+        // for USDC and keeps the HTTP 200 contract even when the on-chain send
+        // FAILS (the row is flipped to `failed`). Previously we ignored the
+        // response, so a failed transfer surfaced as a false "Sent" toast.
+        // Inspect `autoExecuted` and throw with the skip reason so the catch
+        // below shows the error AND skips onSent()/onClose(). The throw happens
+        // BEFORE the createdPayoutIdRef reset so a retry re-drives the failed
+        // row rather than orphaning a second one.
+        const res = await approveAdminPayout(payoutId, {
           autoExecute: true,
           note: note.trim() || undefined,
           allowOverPartyCap,
+          allowOverPerAddressCap,
         });
-        // The approve handler runs executePayout server-side for USDC; any
-        // failure flips the row to `failed` and surfaces here via the API
-        // error message.
+        if (res.autoExecuted !== true) {
+          throw new Error(
+            res.autoExecuteSkippedReason ||
+              'USDC transfer failed — the payout was marked failed and no funds moved.',
+          );
+        }
       } else {
         await approveAdminPayout(payoutId, {
           note: note.trim() || undefined,
@@ -408,6 +479,9 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
           // server bypasses its own check + appends `[override: party cap]`
           // to the audit row's note.
           allowOverPartyCap,
+          // guanciale-49340: forward the per-address ($676) cap ack so the
+          // wire/mercury execute path bypasses the per-address hard cap too.
+          allowOverPerAddressCap,
         });
       }
 
@@ -682,6 +756,55 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* guanciale-49340: per-address $676 cap warning + ack (bianco-89172
+              pattern from PayoutReviewModal). Only the usdc_base path resolves
+              a 0x destination wallet, so the warning is USDC-only. Surfaces
+              when the recipient wallet's cumulative paid total + this send
+              would push past the per-address cap; Send is gated until acked. */}
+          {method === 'usdc_base' && walletPaidLoading && (
+            <div className="text-xs text-theme-text-muted inline-flex items-center gap-1">
+              <Loader2 size={10} className="animate-spin" /> Checking per-address total…
+            </div>
+          )}
+          {method === 'usdc_base' &&
+            !walletPaidLoading &&
+            walletPaidTotal?.wouldExceed && (
+              <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle
+                    className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0"
+                    size={16}
+                  />
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                      Per-address cap warning
+                    </div>
+                    <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                      Wallet{' '}
+                      <code className="font-mono text-[11px]">
+                        {walletAddress.trim().slice(0, 6)}…{walletAddress.trim().slice(-4)}
+                      </code>{' '}
+                      has already received{' '}
+                      <b>${walletPaidTotal.paidUsd.toFixed(2)}</b>{' '}
+                      across {walletPaidTotal.paidCount} payout
+                      {walletPaidTotal.paidCount === 1 ? '' : 's'}. Sending{' '}
+                      <b>${amountNum.toFixed(2)}</b> would push the total to{' '}
+                      <b>${(walletPaidTotal.paidUsd + amountNum).toFixed(2)}</b>
+                      , exceeding the ${walletPaidTotal.capUsd} per-address cap.
+                    </div>
+                    <div className="mt-3">
+                      <Checkbox
+                        checked={overridePerAddressCap}
+                        onChange={() => setOverridePerAddressCap((v) => !v)}
+                        label="I acknowledge — proceed anyway"
+                        labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
           {/* bufalina-60733: fake-detection risk warning + ack. Shows when
               this party scored medium/high; gates Send behind an explicit
