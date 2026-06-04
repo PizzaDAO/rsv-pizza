@@ -1,7 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { captureTelegramGroup } from '../services/telegramGroupCapture.js';
 
 const router = Router();
+
+const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 /**
  * Telegram webhook handler — receives inbound updates from the Telegram Bot API.
@@ -63,6 +66,42 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
     }
 
     const update = req.body || {};
+
+    // ── tonda-58293 Phase 2: auto-capture group chat ids ──────────────────
+    // The bot learns a group's chat_id only from updates it receives.
+    //   - `my_chat_member` fires when the bot is added/promoted regardless of
+    //     privacy mode → PRIMARY capture path.
+    //   - A group `message` only arrives when privacy mode is off, or it's a
+    //     command/mention/reply → BONUS path.
+    // Capture happens before the private-DM logic below; group updates never
+    // reach that path (it requires chat.type === 'private').
+    try {
+      const memberChat = update.my_chat_member?.chat;
+      if (memberChat && GROUP_TYPES.has(memberChat.type) && typeof memberChat.id === 'number') {
+        await captureTelegramGroup({
+          chatId: memberChat.id,
+          title: memberChat.title ?? null,
+          chatType: memberChat.type,
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      const msgChat = update.message?.chat;
+      if (msgChat && GROUP_TYPES.has(msgChat.type) && typeof msgChat.id === 'number') {
+        await captureTelegramGroup({
+          chatId: msgChat.id,
+          title: msgChat.title ?? null,
+          chatType: msgChat.type,
+        });
+        return res.status(200).json({ ok: true });
+      }
+    } catch (captureErr: any) {
+      console.error('[Telegram Webhook] group capture failed:', captureErr?.message || captureErr);
+      // Fall through — always 200, never block.
+      return res.status(200).json({ ok: true });
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     const message = update.message;
     if (!message) {
       // No message in this update (could be an edit, channel post, etc.) — ignore.

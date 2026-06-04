@@ -563,6 +563,76 @@ export async function fetchCityTelegramGroups(): Promise<CityTelegramGroupRow[]>
 }
 
 /**
+ * tonda-58293 Phase 2: Telegram Groups gap report. Returns every GPP city
+ * (the universe) LEFT JOINed against `city_telegram_groups`, plus the pending
+ * (unassigned) bot captures. chatIds are strings (BigInt-safe).
+ * Mounted at `/api/underboss/telegram/groups/status` (underboss-scoped auth).
+ */
+export interface TelegramGroupCityStatus {
+  cityKey: string;
+  hasChatId: boolean;
+  isSupergroup: boolean;
+  source: string | null;
+  lastVerifiedAt: string | null;
+  chatUrl: string | null;
+  region: string | null;
+  country: string | null;
+}
+
+export interface TelegramPendingCapture {
+  chatId: string;
+  title: string | null;
+  chatType: string | null;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface TelegramGroupsStatus {
+  cities: TelegramGroupCityStatus[];
+  pendingCaptures: TelegramPendingCapture[];
+}
+
+export async function fetchTelegramGroupsStatus(): Promise<TelegramGroupsStatus> {
+  return apiRequest<TelegramGroupsStatus>(
+    `/api/underboss/telegram/groups/status`,
+    { method: 'GET', requireAuth: true },
+  );
+}
+
+/**
+ * Assign a pending capture (by chatId) to a city. Writes through to
+ * `city_telegram_groups` so reminders/broadcasts can use it immediately.
+ */
+export async function assignTelegramGroup(
+  chatId: string,
+  cityKey: string,
+): Promise<{ ok: boolean; cityKey: string; chatId: string }> {
+  return apiRequest(
+    `/api/underboss/telegram/groups/assign`,
+    { method: 'POST', requireAuth: true, body: { chatId, cityKey } },
+  );
+}
+
+export interface TelegramGroupTestResult {
+  cityKey: string;
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  chatId?: string;
+  migratedTo?: string;
+}
+
+/** Send a one-off test message to a city's Telegram group. */
+export async function testCityTelegramGroup(
+  cityKey: string,
+): Promise<TelegramGroupTestResult> {
+  return apiRequest<TelegramGroupTestResult>(
+    `/api/underboss/telegram/groups/${encodeURIComponent(cityKey)}/test`,
+    { method: 'POST', requireAuth: true },
+  );
+}
+
+/**
  * mortadella-92106: set admin-only city notes on a party. Backed by the
  * dedicated `PATCH /api/admin/parties/:partyId/admin-notes` endpoint so
  * the generic host-accessible PATCH whitelist doesn't have to gate this

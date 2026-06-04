@@ -3,6 +3,8 @@ import { prisma } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
+import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
+import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -581,6 +583,236 @@ router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAu
         lastVerifiedAt: r.lastVerifiedAt,
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── tonda-58293 Phase 2: Telegram Groups gap report + assign + test ───────
+
+/**
+ * Scope helper shared by the Phase 2 endpoints. Returns the caller's effective
+ * access derived from `req.underboss`:
+ *   - admin: graphics-admin/admin (regions includes '__admin__')
+ *   - regionOnly: region-scoped UB with no explicit cities
+ *   - cityKeys: normalized lower(trim) city keys the UB is explicitly scoped to
+ *   - regions: the UB's assigned regions (trimmed)
+ */
+function callerScope(ub: { regions: string[]; cities?: string[] }) {
+  const admin = ub.regions.includes('__admin__');
+  const cityKeys = (ub.cities || []).map((c) => c.toLowerCase().trim()).filter(Boolean);
+  const regions = (ub.regions || []).map((r) => r.trim()).filter(Boolean);
+  const regionOnly = !admin && regions.length > 0 && cityKeys.length === 0;
+  return { admin, regionOnly, cityKeys, regions };
+}
+
+/**
+ * Whether the caller may act on a specific cityKey (assign / test).
+ *   - admin → always
+ *   - city-scoped UB → cityKey must be one of their cities
+ *   - region-scoped UB (no cities) → cityKey's `city_telegram_groups.region`
+ *     must match one of their regions. (Cities with no row yet aren't region-
+ *     resolvable here, so a region UB can only act on already-tagged cities;
+ *     this mirrors the GET /groups region behavior.)
+ */
+async function callerOwnsCity(
+  ub: { regions: string[]; cities?: string[] },
+  cityKey: string,
+): Promise<boolean> {
+  const key = (cityKey || '').toLowerCase().trim();
+  if (!key) return false;
+  const scope = callerScope(ub);
+  if (scope.admin) return true;
+  if (scope.cityKeys.length > 0) {
+    return scope.cityKeys.includes(key);
+  }
+  if (scope.regionOnly) {
+    const row = await prisma.cityTelegramGroup.findUnique({
+      where: { cityKey: key },
+      select: { region: true },
+    });
+    if (!row || !row.region) return false;
+    return scope.regions.map((r) => r.toLowerCase()).includes(row.region.toLowerCase());
+  }
+  return false;
+}
+
+// GET /groups/status — gap report: every GPP city (the universe) LEFT JOINed
+// against `city_telegram_groups`, plus the pending (unassigned) captures.
+router.get('/groups/status', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const scope = callerScope(ub);
+
+    // Universe = distinct city keys from non-cancelled GPP parties, scoped in
+    // the Prisma where (no JS post-filter).
+    type PartyWhere = {
+      eventType: string;
+      cancelledAt: null;
+      region?: { in: string[] };
+      city?: { in: string[]; mode: 'insensitive' };
+    };
+    const where: PartyWhere = {
+      eventType: 'gpp',
+      cancelledAt: null,
+    };
+    if (!scope.admin) {
+      if (scope.regionOnly) {
+        where.region = { in: scope.regions.length > 0 ? scope.regions : ['__no_match__'] };
+      } else if (scope.cityKeys.length > 0) {
+        where.city = { in: scope.cityKeys, mode: 'insensitive' };
+      } else {
+        // No access
+        where.region = { in: ['__no_match__'] };
+      }
+    }
+
+    const parties = await prisma.party.findMany({
+      where,
+      select: { name: true },
+    });
+
+    // Distinct city keys from party names.
+    const cityKeySet = new Set<string>();
+    for (const p of parties) {
+      const key = cityKeyFromPartyName(p.name);
+      if (key) cityKeySet.add(key);
+    }
+    const cityKeys = Array.from(cityKeySet);
+
+    // LEFT JOIN city_telegram_groups for the universe.
+    const tgRows = cityKeys.length > 0
+      ? await prisma.cityTelegramGroup.findMany({
+          where: { cityKey: { in: cityKeys } },
+        })
+      : [];
+    const tgByCity = new Map(tgRows.map((r) => [r.cityKey, r]));
+
+    // Region UBs should also see any tagged-in-region cities that exist in
+    // city_telegram_groups even if there is no GPP party (defensive). For
+    // admins/city UBs the party-derived universe is authoritative.
+    const cities = cityKeys
+      .sort()
+      .map((cityKey) => {
+        const r = tgByCity.get(cityKey);
+        return {
+          cityKey,
+          hasChatId: !!(r && r.chatId !== null),
+          isSupergroup: r?.isSupergroup ?? false,
+          source: r?.source ?? null,
+          lastVerifiedAt: r?.lastVerifiedAt ?? null,
+          chatUrl: r?.chatUrl ?? null,
+          region: r?.region ?? null,
+          country: r?.country ?? null,
+        };
+      });
+
+    // Pending captures (unassigned). Admins see all; scoped UBs see all
+    // pending captures too — they're unresolved by definition and assigning
+    // one is gated by callerOwnsCity on the chosen cityKey.
+    const pending = await prisma.telegramGroupCapture.findMany({
+      where: { assignedCityKey: null },
+      orderBy: { lastSeenAt: 'desc' },
+    });
+
+    res.json({
+      cities,
+      pendingCaptures: pending.map((c) => ({
+        chatId: c.chatId.toString(),
+        title: c.title,
+        chatType: c.chatType,
+        firstSeenAt: c.firstSeenAt,
+        lastSeenAt: c.lastSeenAt,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /groups/assign — assign a pending capture to a city. Stamps the capture
+// and writes through to city_telegram_groups (source='manual').
+router.post('/groups/assign', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const { chatId, cityKey } = req.body || {};
+
+    if (chatId === undefined || chatId === null || `${chatId}`.trim() === '') {
+      throw new AppError('chatId is required', 400, 'VALIDATION_ERROR');
+    }
+    const key = typeof cityKey === 'string' ? cityKey.toLowerCase().trim() : '';
+    if (!key) {
+      throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
+    }
+
+    let chatIdBig: bigint;
+    try {
+      chatIdBig = BigInt(`${chatId}`.trim());
+    } catch {
+      throw new AppError('chatId must be an integer', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!(await callerOwnsCity(ub, key))) {
+      throw new AppError('That city is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+
+    const capture = await prisma.telegramGroupCapture.findUnique({
+      where: { chatId: chatIdBig },
+    });
+    if (!capture) {
+      throw new AppError('Capture not found', 404, 'NOT_FOUND');
+    }
+
+    const isSupergroup = capture.chatType === 'supergroup';
+
+    await prisma.telegramGroupCapture.update({
+      where: { chatId: chatIdBig },
+      data: { assignedCityKey: key, autoMatched: false },
+    });
+
+    await prisma.cityTelegramGroup.upsert({
+      where: { cityKey: key },
+      create: {
+        cityKey: key,
+        chatId: chatIdBig,
+        title: capture.title,
+        isSupergroup,
+        source: 'manual',
+        lastVerifiedAt: new Date(),
+      },
+      update: {
+        chatId: chatIdBig,
+        title: capture.title,
+        isSupergroup,
+        source: 'manual',
+        lastVerifiedAt: new Date(),
+      },
+    });
+
+    res.json({ ok: true, cityKey: key, chatId: chatIdBig.toString() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /groups/:cityKey/test — send a one-off test to the city's group.
+router.post('/groups/:cityKey/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const key = (req.params.cityKey || '').toLowerCase().trim();
+    if (!key) {
+      throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
+    }
+    if (!(await callerOwnsCity(ub, key))) {
+      throw new AppError('That city is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+
+    const result = await sendToCityGroup(
+      key,
+      '✅ PizzaDAO test — this city group is connected for reminders.',
+    );
+
+    res.json({ cityKey: key, ...result });
   } catch (error) {
     next(error);
   }
