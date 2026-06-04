@@ -3248,6 +3248,15 @@ router.post(
         actor.actorKind !== 'underboss' &&
         !!(req.body && req.body.allowOverPartyCap);
 
+      // guanciale-49340: admin-class can also opt to bypass the per-address
+      // ($676) hard cap in the inline autoExecute usdc_base branch via
+      // `allowOverPerAddressCap`. The by-city SendPaymentModal sets this when
+      // the amber per-address cap warning's ack has been ticked. The flag is
+      // forwarded to executePayout (which already accepts/forwards it to
+      // sendUsdcPayment); it is a no-op for wire/mercury (which execute via the
+      // separate /execute call that carries its own ack).
+      const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
+
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // approve time so rows created/edited BEFORE the cap rules landed (or
       // rows whose party's cap was tightened after creation) can't be pushed
@@ -3336,6 +3345,10 @@ router.post(
               // (salame-92103 already wired the override on /execute; we just
               // forward it here).
               allowOverPartyCap,
+              // guanciale-49340: forward the per-address cap override so the
+              // inline USDC send can bypass the $676 hard cap when the admin
+              // acked the by-city Send modal's per-address warning.
+              allowOverPerAddressCap,
             });
             autoExecuted = true;
           } catch (err: any) {

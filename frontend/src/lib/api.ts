@@ -4838,14 +4838,28 @@ export async function approveAdminPayout(
      * through to the autoExecute branch as well.
      */
     allowOverPartyCap?: boolean;
+    /**
+     * guanciale-49340: admin-class only. When true, the backend skips the
+     * per-address ($676) hard-cap recheck in the autoExecute usdc_base branch.
+     * Mirrors `executeAdminPayout`'s per-address override. The by-city
+     * SendPaymentModal sets this when the amber per-address cap warning's ack
+     * Checkbox has been ticked.
+     */
+    allowOverPerAddressCap?: boolean;
   },
-): Promise<{ payout: AdminPayout; autoExecuteDeferred: boolean }> {
+): Promise<{
+  payout: AdminPayout;
+  autoExecuteDeferred: boolean;
+  autoExecuted?: boolean;
+  autoExecuteSkippedReason?: string | null;
+}> {
   return apiRequest(`/api/admin/payouts/${id}/approve${regionsQuery(opts?.regions)}`, {
     method: 'POST',
     body: {
       note: opts?.note,
       autoExecute: opts?.autoExecute,
       allowOverPartyCap: opts?.allowOverPartyCap,
+      allowOverPerAddressCap: opts?.allowOverPerAddressCap,
     },
   });
 }
