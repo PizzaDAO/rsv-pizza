@@ -8,7 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats } from '../lib/api';
 import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
@@ -19,11 +19,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
+import { DonorHighlights } from '../components/DonorHighlights';
 import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { MusicWidget } from '../components/music';
-import { PhotoStats } from '../types';
+import { PhotoStats, DonationPublicStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
@@ -91,6 +92,7 @@ export function EventPage() {
   const [userHasRSVPd, setUserHasRSVPd] = useState(false);
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
+  const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
@@ -233,6 +235,19 @@ export function EventPage() {
             if (stats.totalPhotos && stats.totalPhotos > 0) {
               setShowPhotos(true);
             }
+          }
+
+          // Load public donor stats for the "Supporters" highlight.
+          if (foundEvent.donationEnabled) {
+            const dStats = await getDonationStats(foundEvent.id);
+            // Guard for the { enabled: false } shape.
+            if (dStats && dStats.enabled) {
+              setDonationStats(dStats);
+            } else {
+              setDonationStats(null);
+            }
+          } else {
+            setDonationStats(null);
           }
         } else {
           setError('Event not found. The link may be invalid or expired.');
@@ -881,6 +896,7 @@ export function EventPage() {
                       <>{ t('buyPizzaFor', { recipient: '' }) }{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                     ) : t('buyPizzaForEvent', { eventName: event.name })}
                   </p>
+                  {donationStats && <DonorHighlights stats={donationStats} />}
                 </div>
               )}
 
@@ -1507,6 +1523,7 @@ export function EventPage() {
                         <>{t('supportingRecipient', { recipient: '' })}{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                       ) : t('supportingEvent', { eventName: event.name })}
                     </p>
+                    {donationStats && <DonorHighlights stats={donationStats} />}
                   </div>
                 )}
 

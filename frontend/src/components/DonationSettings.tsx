@@ -14,6 +14,7 @@ export const DonationSettings: React.FC = () => {
   const [donationRecipient, setDonationRecipient] = useState('');
   const [donationRecipientUrl, setDonationRecipientUrl] = useState('');
   const [donationEthAddress, setDonationEthAddress] = useState('');
+  const [donationAmountsPublic, setDonationAmountsPublic] = useState(true);
   const [walletValidation, setWalletValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [suggestedAmounts, setSuggestedAmounts] = useState<number[]>([500, 1000, 2500, 5000]);
   const [newAmount, setNewAmount] = useState('');
@@ -28,6 +29,7 @@ export const DonationSettings: React.FC = () => {
       setDonationRecipient(party.donationRecipient || '');
       setDonationRecipientUrl(party.donationRecipientUrl || '');
       setDonationEthAddress(party.donationEthAddress || '');
+      setDonationAmountsPublic(party.donationAmountsPublic ?? true);
       if (party.donationEthAddress) {
         validateWalletAddress(party.donationEthAddress);
       }
@@ -106,6 +108,12 @@ export const DonationSettings: React.FC = () => {
 
   const handleEthAddressBlur = async () => {
     await saveField('donationEthAddress', { donation_eth_address: donationEthAddress || null });
+  };
+
+  const handleToggleAmountsPublic = async () => {
+    const newValue = !donationAmountsPublic;
+    setDonationAmountsPublic(newValue);
+    await saveField('donationAmountsPublic', { donation_amounts_public: newValue });
   };
 
   const addSuggestedAmount = async () => {
@@ -264,6 +272,20 @@ export const DonationSettings: React.FC = () => {
                 <Plus size={18} />
               </button>
             </div>
+          </div>
+
+          {/* Show donation amounts publicly */}
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-sm font-medium text-theme-text">Show donation amounts publicly</p>
+            {savingField === 'donationAmountsPublic' ? (
+              <Loader2 size={18} className="animate-spin text-[#ff393a]" />
+            ) : (
+              <Checkbox
+                checked={donationAmountsPublic}
+                onChange={handleToggleAmountsPublic}
+                label=""
+              />
+            )}
           </div>
         </div>
       )}

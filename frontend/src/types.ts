@@ -316,6 +316,7 @@ export interface Party {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  donationAmountsPublic?: boolean;
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
@@ -402,10 +403,18 @@ export interface DonationPublicStats {
   recipientUrl?: string | null;
   suggestedAmounts?: number[];
   donationEthAddress?: string | null;
+  amountsPublic?: boolean;
   recentDonors?: {
     name: string | null;
     message: string | null;
     createdAt: string;
+  }[];
+  topDonors?: {
+    name: string | null;
+    amount: number | null;
+    message: string | null;
+    isAnonymous: boolean;
+    avatarUrl: string | null;
   }[];
 }
 

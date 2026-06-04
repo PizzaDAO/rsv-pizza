@@ -147,6 +147,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationRecipient: dbParty.donation_recipient || null,
     donationRecipientUrl: dbParty.donation_recipient_url || null,
     donationEthAddress: dbParty.donation_eth_address || null,
+    donationAmountsPublic: dbParty.donation_amounts_public ?? true,
     pinnedApps: (dbParty.pinned_apps as string[]) ?? [],
     region: dbParty.region || null,
     flyerGeneratedAt: dbParty.flyer_generated_at || null,
