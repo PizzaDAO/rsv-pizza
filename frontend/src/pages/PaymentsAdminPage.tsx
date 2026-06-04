@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -60,6 +61,13 @@ import {
   MarkPartyPaidModal,
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
+// panuozzo-92114: URL <-> filter/view-mode (de)serializer so a refresh / shared
+// link restores the exact filtered view.
+import {
+  filtersToSearchParams,
+  searchParamsToFilters,
+  type ViewMode as PaymentsViewMode,
+} from '../components/payments-admin/paymentsUrlState';
 
 /**
  * argentina-92103: viewer-role state. The full /payments dashboard accepts
@@ -169,9 +177,30 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const isRegionalPortal = !!regions;
 
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
-  const [filters, setFilters] = useState<AdminPayoutFilters>(() =>
-    regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS,
-  );
+
+  // panuozzo-92114: the URL query string is the source of restore-on-load state
+  // for filters + view mode. We parse it ONCE in the lazy useState initialisers
+  // below; after mount, `filters`/`viewMode` state is the single source of truth
+  // that PUSHES to the URL via the sync effect. We never read searchParams back
+  // into state on re-render (that would oscillate).
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Capture the initial parse once so both lazy initialisers agree even though
+  // useState runs them in declaration order. (searchParams is stable on mount.)
+  const initialUrlStateRef = useRef<ReturnType<typeof searchParamsToFilters> | null>(null);
+  if (initialUrlStateRef.current === null) {
+    initialUrlStateRef.current = searchParamsToFilters(searchParams, regions);
+  }
+
+  const [filters, setFilters] = useState<AdminPayoutFilters>(() => {
+    const parsed = initialUrlStateRef.current!;
+    // searchParamsToFilters already merged in `regions` when present, so this is
+    // a complete filters object equivalent to {...DEFAULT_FILTERS, ...url, regions}.
+    // Keep any DEFAULT_FILTERS-only fields (currency etc.) the serializer doesn't
+    // model by layering it underneath.
+    return regions
+      ? { ...DEFAULT_FILTERS, ...parsed.filters, regions }
+      : { ...DEFAULT_FILTERS, ...parsed.filters };
+  });
 
   // etruria-92103: primary view is `by-city` (one row per party with status
   // aggregates, click to expand). `by-payment` keeps the existing per-row
@@ -182,9 +211,15 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // per status=paid|completed payment, proof-gated (prosciutto-92106), sorted
   // by paid_at DESC. Distinct from `by-payment` which shows every payout
   // regardless of status.
-  type ViewMode = 'by-city' | 'by-payment' | 'payments';
+  // panuozzo-92114: keep this local alias equal to the exported ViewMode so the
+  // (de)serializer and this component never drift.
+  type ViewMode = PaymentsViewMode;
   const VIEW_MODE_LS_KEY = 'paymentsAdminViewMode';
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // panuozzo-92114: URL `?view=` wins (shared/refreshed link), then the
+    // admin's sticky localStorage default, then the by-city fallback.
+    const fromUrl = initialUrlStateRef.current?.viewMode;
+    if (fromUrl) return fromUrl;
     if (typeof window === 'undefined') return 'by-city';
     try {
       const stored = window.localStorage.getItem(VIEW_MODE_LS_KEY);
@@ -203,6 +238,19 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       /* ignore */
     }
   }, [viewMode]);
+
+  // panuozzo-92114: push filters + view mode into the URL query string so a
+  // refresh / shared link restores the exact view. Uses replace:true (matches
+  // LeaderboardPage) so filter tweaks don't flood the back-stack. Guarded so we
+  // only call setSearchParams when the serialized string actually changes,
+  // avoiding redundant churn / render loops.
+  useEffect(() => {
+    const next = filtersToSearchParams(filters, viewMode);
+    const nextStr = next.toString();
+    if (nextStr !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [filters, viewMode, searchParams, setSearchParams]);
 
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
   // etruria-92103: by-city grouped rows from /by-party. Empty when viewing
@@ -1102,7 +1150,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         <PayoutsFilterBar
           filters={filters}
           onChange={setFilters}
-          onReset={() => setFilters(DEFAULT_FILTERS)}
+          // panuozzo-92114: re-inject the hard `regions` scope on regional
+          // portals so Reset can't silently widen a regional underboss's view.
+          // The URL sync effect then clears the query string automatically.
+          onReset={() => setFilters(regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS)}
           availableTags={availableTags}
           // pinsa-92103: Hide closed cities only makes sense on the by-city
           // view (paymentsClosedAt is a party-level signal). The per-payment
