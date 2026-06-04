@@ -17,7 +17,7 @@ export interface SurveyQuestion {
   allowOther?: boolean; // for type 'multiple' — when true and user picks "Other", a sibling `${id}_other` free-text field is persisted
 }
 
-export const SURVEY_QUESTION_SET_VERSION = 2;
+export const SURVEY_QUESTION_SET_VERSION = 3;
 
 export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
   {
@@ -36,6 +36,11 @@ export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
     type: 'rating',
     scale: 5,
     text: 'How was the pizza?',
+  },
+  {
+    id: 'enough_pizza',
+    type: 'yesno',
+    text: 'Was there enough pizza?',
   },
   {
     id: 'recommend',
