@@ -15,12 +15,10 @@ interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
   onChange: (next: AdminPayoutFilters) => void;
   onReset: () => void;
-  availableCurrencies: string[];
   /**
    * mascarpone-49102: distinct event-tag values across the currently-loaded
-   * payouts (flattened from each `party.eventTags` array). Mirrors the
-   * `availableCurrencies` pattern — derived in `PaymentsAdminPage`. Sorted
-   * ascending.
+   * payouts (flattened from each `party.eventTags` array). Derived in
+   * `PaymentsAdminPage`. Sorted ascending.
    */
   availableTags: string[];
   /**
@@ -122,7 +120,6 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.search && filters.search.trim()) n += 1;
   if (filters.partyId && filters.partyId.trim()) n += 1;
   if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
-  if (filters.currency && filters.currency !== 'all') n += 1;
   if (filters.country && filters.country !== 'all') n += 1;
   // pancetta-92103: regions multi-select counts as a single active filter
   // when at least one portal is selected (regardless of how many).
@@ -157,7 +154,6 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   filters,
   onChange,
   onReset,
-  availableCurrencies,
   availableTags,
   showHideClosedToggle,
   showHideScamsToggle,
@@ -297,21 +293,6 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             </select>
           </div>
 
-          {/* Currency dropdown */}
-          <div>
-            <select
-              value={filters.currency ?? 'all'}
-              onChange={(e) => update({ currency: e.target.value })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by currency"
-            >
-              <option value="all">All currencies</option>
-              {availableCurrencies.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
           {/* pancetta-92103: Regions multi-select — replaces the prior
               bruschetta-58291 single-country dropdown. Each region maps to a
               fixed list of `parties.region` slugs (PAYMENTS_REGION_SCOPES);
@@ -369,8 +350,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
           )}
 
           {/* mascarpone-49102: Tag dropdown — populated from event_tags
-              flattened across the loaded payout set (parallels
-              availableCurrencies/availableCountries). Backend filters
+              flattened across the loaded payout set. Backend filters
               `party.eventTags` via Prisma `{ has: tag }`. */}
           <div>
             <select

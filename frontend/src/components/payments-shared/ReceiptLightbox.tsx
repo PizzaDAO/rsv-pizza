@@ -160,28 +160,33 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
 
   // Keyboard nav — Esc closes, arrows cycle (when more than one image).
   // pesto-92104: `D` fires onDuplicateShortcut (admin only — guarded by the
-  // prop being supplied). Ignore D when focus is inside an editable input
-  // so typing the letter in a text field doesn't accidentally toggle.
+  // prop being supplied). Ignore arrows + D when focus is inside an editable
+  // input so the caret moves / the letter types in a text field (e.g. a
+  // receipt note) instead of changing receipts or toggling duplicate.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      // When focus is inside an editable field, let arrow keys move the caret
+      // and `D` type normally instead of hijacking them for nav/shortcuts.
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const editable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        (target?.isContentEditable ?? false);
       if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
       } else if (e.key === 'ArrowLeft' && hasMultiple) {
+        if (editable) return;
         e.preventDefault();
         void goPrev();
       } else if (e.key === 'ArrowRight' && hasMultiple) {
+        if (editable) return;
         e.preventDefault();
         void goNext();
       } else if ((e.key === 'd' || e.key === 'D') && onDuplicateShortcut) {
-        const target = e.target as HTMLElement | null;
-        const tag = target?.tagName?.toLowerCase();
-        const editable =
-          tag === 'input' ||
-          tag === 'textarea' ||
-          tag === 'select' ||
-          (target?.isContentEditable ?? false);
         if (editable) return;
         e.preventDefault();
         onDuplicateShortcut();
