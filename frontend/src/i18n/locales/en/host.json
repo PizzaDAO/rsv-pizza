@@ -583,6 +583,20 @@
     "modalCta": "Save estimate",
     "modalError": "Couldn't save. Enter a whole number."
   },
+  "gpp27": {
+    "setupTitle": "Event Setup",
+    "targetStepTitle": "Set your target attendance",
+    "targetPlaceholder": "How many guests are you aiming for?",
+    "targetHelper": "Your planning goal — this shapes the kind of venue you'll want.",
+    "venueStepTitle": "Find your venue",
+    "venueLockedHint": "Enter your target attendance first to see venue recommendations.",
+    "venueGuidanceSmall": "Under 25 people? A pizzeria or bar is perfect.",
+    "venueGuidanceMedium": "25–60 people? Look at an office, coworking space, or public space.",
+    "venueGuidanceLarge": "60+ people? Consider renting a venue.",
+    "chooseVenue": "Choose your venue",
+    "changeVenue": "Change venue",
+    "savedVenue": "Your venue"
+  },
   "checklist": {
     "addTask": "Add Task",
     "taskNamePlaceholder": "Task name",
