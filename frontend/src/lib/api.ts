@@ -204,6 +204,7 @@ export interface UpdatePartyData {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  donationAmountsPublic?: boolean;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
   photoModeration?: boolean;
@@ -333,6 +334,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       donationRecipient: data.donationRecipient,
       donationRecipientUrl: data.donationRecipientUrl,
       donationEthAddress: data.donationEthAddress,
+      donationAmountsPublic: data.donationAmountsPublic,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
       photoModeration: data.photoModeration,

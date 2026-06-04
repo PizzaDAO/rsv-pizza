@@ -845,6 +845,7 @@ export interface DbParty {
   donation_recipient?: string | null;
   donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
+  donation_amounts_public?: boolean;
   venue_report_published?: boolean;
   venue_report_slug?: string | null;
   venue_report_title?: string | null;
@@ -940,7 +941,7 @@ export const SAFE_PARTY_COLUMNS = `
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, latitude, longitude, country, city, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
-  donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
+  donation_recipient_url, donation_eth_address, donation_amounts_public, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
   photos_enabled, photos_public, photo_moderation,
   event_type, event_tags, budget_total, budget_enabled,
@@ -2023,6 +2024,7 @@ export async function updateParty(
     donation_recipient?: string | null;
     donation_recipient_url?: string | null;
     donation_eth_address?: string | null;
+    donation_amounts_public?: boolean;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
     photo_moderation?: boolean;
@@ -2110,6 +2112,7 @@ export async function updateParty(
         donationRecipient: updates.donation_recipient,
         donationRecipientUrl: updates.donation_recipient_url,
         donationEthAddress: updates.donation_eth_address,
+        donationAmountsPublic: updates.donation_amounts_public,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
         photoModeration: updates.photo_moderation,
