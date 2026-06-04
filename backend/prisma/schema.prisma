@@ -1430,6 +1430,9 @@ model CityTelegramGroup {
   chatId         BigInt?   @map("chat_id")
   chatUrl        String?   @map("chat_url") @db.VarChar
   title          String?
+  country        String?
+  region         String?
+  underboss      String?
   isSupergroup   Boolean   @default(false) @map("is_supergroup")
   source         String    @default("manual") // sheet | webhook | migration | manual
   lastVerifiedAt DateTime? @map("last_verified_at") @db.Timestamptz

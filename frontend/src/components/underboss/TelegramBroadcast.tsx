@@ -170,17 +170,17 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
       try {
         // tonda-58293: source the city → group chat_id map from the DB
         // (`/api/underboss/telegram/groups`) instead of the Google Sheet. The
-        // endpoint is already scoped to the caller's cities. The legacy
-        // country/underboss/region columns aren't stored in the DB, so they
-        // render blank here — only city + chat_id are needed for sends.
+        // endpoint is already scoped to the caller's cities/regions, and the
+        // follow-up persists the legacy country/underboss/region metadata so
+        // those columns + the region filter render again.
         const rows = await fetchCityTelegramGroups();
         const data: TelegramGroup[] = rows
           .filter((r) => r.chatId && r.cityKey)
           .map((r) => ({
-            country: '',
+            country: r.country || '',
             city: r.cityKey,
-            underboss: '',
-            region: '',
+            underboss: r.underboss || '',
+            region: r.region || '',
             chatUrl: r.chatUrl || '',
             groupId: r.chatId as string,
           }));

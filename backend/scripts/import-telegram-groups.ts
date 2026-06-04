@@ -14,7 +14,10 @@
  * `source` is set to 'sheet' for every imported row.
  *
  * Sheet source: same gviz JSON URL the frontend `fetchTelegramGroups()` uses.
+ *   col 4  = country
  *   col 5  = city
+ *   col 6  = underboss
+ *   col 7  = region
  *   col 8  = chatUrl
  *   col 10 = groupId (chat_id)
  */
@@ -26,7 +29,10 @@ const SHEET_ID = '16T3_iXywToXQqxTyDIniWIA4SUI8Wj0a5LKHSAJL_9Q';
 const GID = '811297100';
 
 interface SheetRow {
+  country: string;
   city: string;
+  underboss: string;
+  region: string;
   chatUrl: string;
   groupId: string;
 }
@@ -40,7 +46,10 @@ async function fetchSheetRows(): Promise<SheetRow[]> {
 
   return (json.table.rows as any[])
     .map((row: any): SheetRow => ({
+      country: String(row.c?.[4]?.v ?? '').trim(),
       city: String(row.c?.[5]?.v ?? '').trim(),
+      underboss: String(row.c?.[6]?.v ?? '').trim(),
+      region: String(row.c?.[7]?.v ?? '').trim(),
       chatUrl: String(row.c?.[8]?.v ?? '').trim(),
       groupId: String(row.c?.[10]?.v ?? '').replace('#', '').trim(),
     }))
@@ -74,12 +83,19 @@ async function main() {
       continue;
     }
 
+    const country = r.country || null;
+    const underboss = r.underboss || null;
+    const region = r.region || null;
+
     await prisma.cityTelegramGroup.upsert({
       where: { cityKey },
       create: {
         cityKey,
         chatId,
         chatUrl: r.chatUrl || null,
+        country,
+        underboss,
+        region,
         isSupergroup,
         source: 'sheet',
         lastVerifiedAt: new Date(),
@@ -87,6 +103,9 @@ async function main() {
       update: {
         chatId,
         chatUrl: r.chatUrl || null,
+        country,
+        underboss,
+        region,
         isSupergroup,
         source: 'sheet',
         lastVerifiedAt: new Date(),

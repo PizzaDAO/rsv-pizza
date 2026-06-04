@@ -526,8 +526,10 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAut
 // tonda-58293: replaces the client-side Google Sheet fetch. Returns the
 // `city_telegram_groups` rows the caller is allowed to see:
 //   - Admin / graphics-admin (regions includes '__admin__') → all rows.
-//   - Region-scoped UB with no explicit cities → all rows (the city→region
-//     map lives in the sheet, not the backend; mirrors groupInBroadcastScope).
+//   - Region-scoped UB with no explicit cities → rows whose `region` matches
+//     one of the caller's assigned regions (case-insensitive). Now that the
+//     region metadata lives in the DB we can push this predicate into the
+//     query instead of returning everything.
 //   - City-scoped UB → only rows whose city_key is in their assigned cities.
 // Scoping is pushed into the Prisma `where` (never JS-filtered after a query).
 // chatId is serialized to string because BigInt is not JSON-safe.
@@ -538,10 +540,18 @@ router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAu
     const hasCities = (ub.cities?.length ?? 0) > 0;
     const regionOnly = !isAdminScope && ub.regions.length > 0 && !hasCities;
 
-    let where: { cityKey?: { in: string[] } } | undefined;
-    if (isAdminScope || regionOnly) {
-      // Full visibility for admins and region-only UBs.
+    type GroupWhere = {
+      cityKey?: { in: string[] };
+      region?: { in: string[]; mode: 'insensitive' };
+    };
+    let where: GroupWhere | undefined;
+    if (isAdminScope) {
+      // Full visibility for admins.
       where = undefined;
+    } else if (regionOnly) {
+      // Region-scoped UB: restrict to rows tagged with one of their regions.
+      const regions = (ub.regions || []).map((r) => r.trim()).filter(Boolean);
+      where = { region: { in: regions.length > 0 ? regions : ['__no_match__'], mode: 'insensitive' } };
     } else if (hasCities) {
       const cityKeys = (ub.cities || []).map((c) => c.toLowerCase().trim()).filter(Boolean);
       // Empty after normalization → return nothing.
@@ -563,6 +573,9 @@ router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAu
         chatId: r.chatId !== null ? r.chatId.toString() : null,
         chatUrl: r.chatUrl,
         title: r.title,
+        country: r.country,
+        region: r.region,
+        underboss: r.underboss,
         isSupergroup: r.isSupergroup,
         source: r.source,
         lastVerifiedAt: r.lastVerifiedAt,

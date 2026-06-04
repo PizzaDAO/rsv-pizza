@@ -546,6 +546,9 @@ export interface CityTelegramGroupRow {
   chatId: string | null;
   chatUrl: string | null;
   title: string | null;
+  country: string | null;
+  region: string | null;
+  underboss: string | null;
   isSupergroup: boolean;
   source: string;
   lastVerifiedAt: string | null;
