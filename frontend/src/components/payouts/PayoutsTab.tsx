@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Info, BadgeDollarSign } from 'lucide-react';
-import { Payout } from '../../types';
+import { Payout, TaxFormType } from '../../types';
 import { listPayouts } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
@@ -13,6 +13,7 @@ import { PrepayCheckbox } from './PrepayCheckbox';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { AppealCapModal } from './AppealCapModal';
 import { ReceiptsLibrary } from './ReceiptsLibrary';
+import { TaxFormSection } from './TaxFormSection';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -62,6 +63,12 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [detailPayoutId, setDetailPayoutId] = useState<string | null>(null);
   // mascarpone-58927: inline appeal trigger in the green reimburse banner.
   const [showAppealModal, setShowAppealModal] = useState(false);
+  // bottarga-92106: TaxFormSection now lives on this tab (between
+  // PaymentDetailsCard and the receipts list) instead of inside NewPayoutForm
+  // so hosts can pre-fill the form before any payout exists. When
+  // NewPayoutForm's submit hits TAX_FORM_REQUIRED it forwards the requested
+  // form type up so the section auto-opens to the right editor.
+  const [taxFormAutoOpen, setTaxFormAutoOpen] = useState<TaxFormType | null>(null);
 
   const loadPayouts = useCallback(async () => {
     setLoading(true);
@@ -229,6 +236,18 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       */}
       <PaymentDetailsCard />
 
+      {/*
+        bottarga-92106: Tax-form section moved out of NewPayoutForm so hosts
+        can see and pre-fill the form before opening a payout request. Only
+        renders when the per-event admin flag is on (default off). The
+        cross-component scroll target id="tax-form-section" inside the
+        component is reused by NewPayoutForm's TAX_FORM_REQUIRED error
+        handler — both live in this tab so scrollIntoView reaches it.
+      */}
+      {party?.taxFormRequired === true && (
+        <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
+      )}
+
       {view === 'list' && (
         <>
           <div className="card p-6">
@@ -285,6 +304,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             reimbursementCapAppealedAt={reimbursementCapAppealedAt}
             totalPaidUsd={totalPaidUsd}
             expectedGuests={expectedGuests}
+            onTaxFormRequired={(t) => setTaxFormAutoOpen(t)}
           />
         </>
       )}
