@@ -5,3 +5,5 @@ export { CapInlineEditor } from './CapInlineEditor';
 export { formatPayoutAmount, formatUsd, formatOriginalCurrency } from './formatPayoutAmount';
 export { ReceiptLightbox } from './ReceiptLightbox';
 export type { ReceiptLightboxImage } from './ReceiptLightbox';
+export { AuthenticityPanel } from './AuthenticityPanel';
+export type { AuthenticityPanelProps } from './AuthenticityPanel';

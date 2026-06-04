@@ -373,7 +373,16 @@ export async function uploadPayoutPhoto(
   const allowedTypes = kind === 'receipt'
     ? [...allowedImageTypes, 'application/pdf']
     : allowedImageTypes;
-  if (!allowedTypes.includes(file.type)) {
+  // schiacciata-71042: some browsers report an empty file.type for HEIC, so the
+  // MIME allowlist would reject a valid .heic/.heif upload. Detect HEIC by mime
+  // OR filename extension and let an empty-type HEIC file through validation.
+  const lowerName = file.name.toLowerCase();
+  const isHeic =
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    lowerName.endsWith('.heic') ||
+    lowerName.endsWith('.heif');
+  if (!allowedTypes.includes(file.type) && !(isHeic && !file.type)) {
     console.error('Invalid file type for payout photo:', file.type);
     throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: JPEG, PNG, WebP, HEIC, PDF.`);
   }
@@ -383,15 +392,38 @@ export async function uploadPayoutPhoto(
     throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 10MB.`);
   }
 
+  // schiacciata-71042: convert HEIC->JPEG client-side before upload. iPhone
+  // hosts upload .heic receipts, and OpenAI gpt-4o vision (the OCR backend)
+  // can't decode HEIC, so analyzeReceipt threw -> 500 on the ocr-preview
+  // endpoint. Reuse the existing heic2any dep so OCR receives a readable JPEG.
+  let uploadBlob: Blob = file;
+  let uploadName = file.name;
+  let uploadMime = file.type || 'application/octet-stream';
+  let uploadExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  if (isHeic) {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+      const jpegBlob = Array.isArray(out) ? out[0] : out;
+      uploadBlob = jpegBlob;
+      uploadMime = 'image/jpeg';
+      uploadExt = 'jpg';
+      uploadName = file.name.replace(/\.(heic|heif)$/i, '') + '.jpg';
+    } catch (convErr) {
+      console.error('HEIC→JPEG conversion failed:', convErr);
+      throw new Error('Could not process HEIC image — please convert it to JPEG and retry.');
+    }
+  }
+
   try {
-    const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileExt = uploadExt;
     const timestamp = Date.now();
     const rand = Math.random().toString(36).substring(7);
     const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('event-images')
-      .upload(path, file, { cacheControl: '3600', upsert: false });
+      .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
 
     if (error) {
       console.error('Error uploading payout photo:', error);
@@ -434,9 +466,9 @@ export async function uploadPayoutPhoto(
 
     return {
       url: urlData.publicUrl,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
+      fileName: uploadName,
+      fileSize: uploadBlob.size,
+      mimeType: uploadMime,
     };
   } catch (err) {
     console.error('Error uploading payout photo:', err);

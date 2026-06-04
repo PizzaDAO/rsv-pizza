@@ -21,6 +21,7 @@
     "@wagmi/connectors": "^5.11.2",
     "connectkit": "^1.9.1",
     "date-fns": "^4.1.0",
+    "heic2any": "^0.0.4",
     "html5-qrcode": "^2.3.8",
     "i18next": "^26.0.8",
     "i18next-browser-languagedetector": "^8.2.1",

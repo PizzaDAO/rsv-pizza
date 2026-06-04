@@ -546,14 +546,6 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     [prepayQueue, prepaySearch],
   );
 
-  const availableCurrencies = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of payouts) {
-      if (p.originalCurrency) set.add(p.originalCurrency.toUpperCase());
-    }
-    return Array.from(set).sort();
-  }, [payouts]);
-
   // pancetta-92103: the prior `availableCountries` derivation was removed
   // alongside the single-country dropdown. The new Regions multi-select is
   // sourced from PAYMENTS_REGION_SCOPES (a static map) — no per-load derivation
@@ -1110,7 +1102,6 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           filters={filters}
           onChange={setFilters}
           onReset={() => setFilters(DEFAULT_FILTERS)}
-          availableCurrencies={availableCurrencies}
           availableTags={availableTags}
           // pinsa-92103: Hide closed cities only makes sense on the by-city
           // view (paymentsClosedAt is a party-level signal). The per-payment

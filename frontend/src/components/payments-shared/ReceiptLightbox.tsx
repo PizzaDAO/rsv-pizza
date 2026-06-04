@@ -69,6 +69,12 @@ interface ReceiptLightboxProps {
    */
   onDuplicateShortcut?: () => void;
   /**
+   * marinara-61455: `V` keypress handler. Wired by PayoutReviewModal to run the
+   * image-authenticity check for the current receipt. Only fires when admin
+   * context provides this prop (same guard pattern as onDuplicateShortcut).
+   */
+  onVerifyShortcut?: () => void;
+  /**
    * coppa-92105: when true, render a heavy DUPLICATE banner across the top
    * of the photo + diagonal-stripe overlay across the image so admins can't
    * confuse a duplicate receipt for a valid one while reviewing it
@@ -83,6 +89,15 @@ interface ReceiptLightboxProps {
    * as false when also passing `isDuplicate=true`). Pure visual.
    */
   isIneligible?: boolean;
+  /**
+   * marinara-61455: when the current receipt's image is flagged AI-generated /
+   * doctored ('suspicious' | 'likely_fake'), paint the photo pane with a purple
+   * banner + 90° purple stripe overlay (distinct from duplicate red/45° and
+   * ineligible amber/135°). 'authentic' / undefined render nothing. Pure visual
+   * + advisory — never gates anything. Rendered alongside (not instead of) the
+   * duplicate / ineligible overlays since they're orthogonal signals.
+   */
+  authenticityVerdict?: 'authentic' | 'suspicious' | 'likely_fake' | null;
 }
 
 /** Some HEIC files come through with non-image/heic MIME types or no MIME at
@@ -105,9 +120,14 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   onIndexChange,
   onBeforeNavigate,
   onDuplicateShortcut,
+  onVerifyShortcut,
   isDuplicate = false,
   isIneligible = false,
+  authenticityVerdict = null,
 }) => {
+  // marinara-61455: only paint when the verdict actually flags the image.
+  const authFlagged =
+    authenticityVerdict === 'suspicious' || authenticityVerdict === 'likely_fake';
   // Index lives in this component so callers only need to pass the starting
   // image. Reset whenever the lightbox is (re-)opened so each open starts
   // from `initialIndex`.
@@ -160,42 +180,88 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
 
   // Keyboard nav — Esc closes, arrows cycle (when more than one image).
   // pesto-92104: `D` fires onDuplicateShortcut (admin only — guarded by the
-  // prop being supplied). Ignore D when focus is inside an editable input
-  // so typing the letter in a text field doesn't accidentally toggle.
+  // prop being supplied). Ignore arrows + D when focus is inside an editable
+  // input so the caret moves / the letter types in a text field (e.g. a
+  // receipt note) instead of changing receipts or toggling duplicate.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      // When focus is inside an editable field, let arrow keys move the caret
+      // and `D` type normally instead of hijacking them for nav/shortcuts.
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const editable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        (target?.isContentEditable ?? false);
       if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
       } else if (e.key === 'ArrowLeft' && hasMultiple) {
+        if (editable) return;
         e.preventDefault();
         void goPrev();
       } else if (e.key === 'ArrowRight' && hasMultiple) {
+        if (editable) return;
         e.preventDefault();
         void goNext();
       } else if ((e.key === 'd' || e.key === 'D') && onDuplicateShortcut) {
-        const target = e.target as HTMLElement | null;
-        const tag = target?.tagName?.toLowerCase();
-        const editable =
-          tag === 'input' ||
-          tag === 'textarea' ||
-          tag === 'select' ||
-          (target?.isContentEditable ?? false);
         if (editable) return;
         e.preventDefault();
         onDuplicateShortcut();
+      } else if ((e.key === 'v' || e.key === 'V') && onVerifyShortcut) {
+        // marinara-61455: V = run image-authenticity check on the current receipt.
+        if (editable) return;
+        e.preventDefault();
+        onVerifyShortcut();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, goPrev, goNext, hasMultiple, onDuplicateShortcut]);
-
-  if (!isOpen || count === 0) return null;
+  }, [isOpen, onClose, goPrev, goNext, hasMultiple, onDuplicateShortcut, onVerifyShortcut]);
 
   const current = images[index];
-  if (!current) return null;
   const heic = isHeic(current);
+
+  // stracciatella-71042: HEIC receipts can't render in an <img> natively, so
+  // decode them to a JPEG blob in-browser via heic2any (lazy-loaded so the WASM
+  // codec stays off the main bundle). Hook MUST live above the early return so
+  // the hook order stays stable (adding a hook below a conditional return has
+  // black-screened this app before).
+  const [heicState, setHeicState] = React.useState<
+    { status: 'idle' | 'loading' | 'ready' | 'error'; url?: string }
+  >({ status: 'idle' });
+
+  useEffect(() => {
+    if (!isOpen || !heic || !current) { setHeicState({ status: 'idle' }); return; }
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setHeicState({ status: 'loading' });
+    (async () => {
+      try {
+        const res = await fetch(current.url);
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        const blob = await res.blob();
+        const heic2any = (await import('heic2any')).default;
+        const out = await heic2any({ blob, toType: 'image/jpeg', quality: 0.92 });
+        const outBlob = Array.isArray(out) ? out[0] : out;
+        objectUrl = URL.createObjectURL(outBlob);
+        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
+        setHeicState({ status: 'ready', url: objectUrl });
+      } catch {
+        if (!cancelled) setHeicState({ status: 'error' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, heic, current?.url]);
+
+  if (!isOpen || count === 0 || !current) return null;
+
   // melanzane-92103: when the focused item is a video, render a <video> with
   // controls + autoplay so admins can scrub. `muted` is required for autoplay
   // under browser policy; `playsInline` keeps mobile from kicking into the
@@ -327,23 +393,64 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
               />
             </>
           )}
-          {heic ? (
-            <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
-              <p className="text-sm font-semibold">Can't preview HEIC files</p>
-              <p className="text-xs text-theme-text-muted">
-                Your browser doesn't render <span className="font-mono">.heic</span>{' '}
-                images natively. Open the file in a new tab to download or view it.
-              </p>
-              <a
-                href={current.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
+          {/* marinara-61455: purple AUTHENTICITY banner + 90° stripe overlay
+              when the focused receipt image is flagged AI-generated / doctored.
+              Orthogonal to duplicate / ineligible — can co-exist; offset the
+              banner down a row so it doesn't overlap the duplicate/ineligible
+              pill when multiple flags are on. Pointer-events-none. */}
+          {authFlagged && (
+            <>
+              <div
+                className={`absolute ${
+                  isDuplicate || isIneligible ? 'top-10' : 'top-2'
+                } left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-bold uppercase tracking-wide shadow-lg pointer-events-none`}
               >
-                Open in new tab <ExternalLink size={14} />
-              </a>
-              <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
-            </div>
+                {authenticityVerdict === 'likely_fake'
+                  ? 'Likely AI / doctored'
+                  : 'Authenticity — needs review'}
+              </div>
+              <div
+                className="absolute inset-0 z-10 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(90deg, rgba(168,85,247,0.16) 0 6px, transparent 6px 14px)',
+                }}
+              />
+            </>
+          )}
+          {heic ? (
+            heicState.status === 'ready' && heicState.url ? (
+              /* stracciatella-71042: decoded HEIC -> JPEG blob URL, shown inline. */
+              <img
+                src={heicState.url}
+                alt={current.fileName}
+                className={`${mediaSizing} object-contain`}
+              />
+            ) : heicState.status === 'loading' ? (
+              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                <div className="mx-auto h-8 w-8 rounded-full border-2 border-theme-stroke border-t-[#ff393a] animate-spin" />
+                <p className="text-sm font-semibold">Converting HEIC…</p>
+                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+              </div>
+            ) : (
+              /* error / idle — fall back to the original open-in-new-tab card. */
+              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                <p className="text-sm font-semibold">Can't preview HEIC files</p>
+                <p className="text-xs text-theme-text-muted">
+                  Your browser doesn't render <span className="font-mono">.heic</span>{' '}
+                  images natively. Open the file in a new tab to download or view it.
+                </p>
+                <a
+                  href={current.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
+                >
+                  Open in new tab <ExternalLink size={14} />
+                </a>
+                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+              </div>
+            )
           ) : video ? (
             /* melanzane-92103: keying on src so swapping between videos via
                arrow nav cleanly remounts the <video> with the new source. */

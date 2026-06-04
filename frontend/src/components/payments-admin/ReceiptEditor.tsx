@@ -109,6 +109,17 @@ interface ReceiptEditorProps {
 
   /** Whether the draft differs from persisted values (drives Save button). */
   isDirty: boolean;
+
+  /**
+   * marinara-61455: image-authenticity (AI-generated / doctored) check. The
+   * panel itself (button + verdict + reasons) is rendered by the parent and
+   * passed in as a node so the editor stays presentational. `authenticityVerdict`
+   * drives the editor-pane purple banner + diagonal-stripe overlay (distinct
+   * from duplicate's red / ineligible's amber). Advisory only — never gates the
+   * editor. Both optional so non-receipt / non-admin callsites omit them.
+   */
+  authenticityPanel?: React.ReactNode;
+  authenticityVerdict?: 'authentic' | 'suspicious' | 'likely_fake' | null;
 }
 
 /**
@@ -168,7 +179,15 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   retryError,
   onRetryOcr,
   isDirty,
+  authenticityPanel,
+  authenticityVerdict,
 }) => {
+  // marinara-61455: only paint the purple authenticity treatment when the
+  // verdict actually flags the image (suspicious / likely_fake). 'authentic'
+  // and null leave the editor unstyled so it doesn't compete with the
+  // duplicate / ineligible signals.
+  const authFlagged =
+    authenticityVerdict === 'suspicious' || authenticityVerdict === 'likely_fake';
   const conf = doc.ocrConfidence ?? 0;
   const lowConf = conf > 0 && conf < 0.8;
   const lineSum = draftSubtotalSum(lineItemDrafts);
@@ -233,6 +252,21 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           aria-hidden="true"
         />
       )}
+      {/* marinara-61455: purple authenticity overlay when the receipt image is
+          flagged AI-generated / doctored. 90° purple stripes — distinct from
+          duplicate (45° red) and ineligible (135° amber). Only when the image
+          isn't already duplicate/ineligible-painted so the patterns don't fight;
+          the authenticity panel below carries the detail in all cases. */}
+      {authFlagged && !isDuplicate && !isIneligible && (
+        <span
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(90deg, rgba(168,85,247,0.08) 0 6px, transparent 6px 14px)',
+          }}
+          aria-hidden="true"
+        />
+      )}
       {/* coppa-92105: DUPLICATE banner across the top of the editor when
           marked. Heavier than the per-row pill so it can't be missed even on
           a quick scan. */}
@@ -274,6 +308,12 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           </span>
         )}
       </div>
+
+      {/* marinara-61455: image-authenticity panel (AI-generated / doctored
+          check). Rendered by the parent so the editor stays presentational.
+          Sits above the relative stripe overlay (z-10) so its buttons stay
+          clickable. */}
+      {authenticityPanel && <div className="relative z-10">{authenticityPanel}</div>}
 
       {/* caprino-92104: Amount + currency split into two visible rows.
           Top row = "Original amount" (the local-currency value the admin
