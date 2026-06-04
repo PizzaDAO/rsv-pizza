@@ -1,7 +1,8 @@
-import React from 'react';
-import { User, Globe, MapPin, Hash, FileSignature, CalendarDays } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { User, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, Info } from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
+import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
 
 export interface W8BENFormData {
   name?: string;
@@ -21,6 +22,12 @@ export interface W8BENFormData {
   withholdingRate?: string;
   incomeType?: string;
   treatyExplanation?: string;
+  /**
+   * mortadella-92107: tracks the last country we ran auto-fill against so we
+   * don't re-overwrite host edits after the host typed over a suggested value.
+   * Stored in the saved form data so draft round-trips behave the same.
+   */
+  treatyAutoFilledFor?: string;
   certify?: boolean;
   signature?: string;
   date?: string;
@@ -33,8 +40,62 @@ interface W8BENFormProps {
 }
 
 export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled }) => {
+  // ----- hooks (must stay above any early returns per react-hooks rules) -----
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // The treaty-claim country defaults to permanentCountry (typical case:
+  // host is claiming benefits under their country of residence's treaty).
+  // We watch that field and auto-suggest article + rate + income type.
+  const treatyKey = (value.treatyCountry?.trim() || value.permanentCountry?.trim() || '').trim();
+  const treatyEntry = useMemo(() => lookupTreaty(treatyKey), [treatyKey]);
+  const treatyCode = useMemo(() => normalizeCountryCode(treatyKey), [treatyKey]);
+
+  useEffect(() => {
+    if (disabled) return;
+    if (!treatyKey) return;
+    // Identify the country canonically (ISO-2) so retyping the same country
+    // in a different form doesn't re-trigger auto-fill.
+    const cacheKey = treatyCode || treatyKey.toLowerCase();
+    const v = valueRef.current;
+    if (v.treatyAutoFilledFor === cacheKey) return;
+    if (!treatyEntry) {
+      // Unknown country — mark cache so we don't loop, but don't touch fields.
+      onChangeRef.current({ ...v, treatyAutoFilledFor: cacheKey });
+      return;
+    }
+    if (!treatyEntry.hasTreaty) {
+      // No treaty — clear any auto-filled values; surface the amber note via render.
+      onChangeRef.current({
+        ...v,
+        treatyCountry: v.treatyCountry ?? v.permanentCountry ?? '',
+        articleParagraph: '',
+        withholdingRate: '',
+        incomeType: '',
+        treatyAutoFilledFor: cacheKey,
+      });
+      return;
+    }
+    onChangeRef.current({
+      ...v,
+      treatyCountry: v.treatyCountry || v.permanentCountry || '',
+      articleParagraph: treatyEntry.article ?? '',
+      withholdingRate: String(treatyEntry.otherIncomeRate),
+      incomeType: 'Other income',
+      treatyAutoFilledFor: cacheKey,
+    });
+  }, [treatyKey, treatyCode, treatyEntry, disabled]);
+
   const set = <K extends keyof W8BENFormData>(key: K, v: W8BENFormData[K]) =>
     onChange({ ...value, [key]: v });
+
+  // When the host edits the treaty-claim country directly, reset the cache so
+  // the effect re-runs against the new country.
+  const setTreatyCountry = (v: string) => {
+    onChange({ ...value, treatyCountry: v, treatyAutoFilledFor: undefined });
+  };
 
   return (
     <div className="space-y-4">
@@ -83,7 +144,11 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled 
             type="text"
             placeholder="Country"
             value={value.permanentCountry ?? ''}
-            onChange={(e) => set('permanentCountry', e.target.value)}
+            onChange={(e) => {
+              // Clearing the cache lets the effect re-evaluate against the
+              // new country if treatyCountry hasn't been overridden.
+              onChange({ ...value, permanentCountry: e.target.value, treatyAutoFilledFor: undefined });
+            }}
             disabled={disabled}
             required
           />
@@ -161,14 +226,40 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled 
 
       <div className="space-y-2">
         <p className="text-xs text-theme-text-muted">Tax treaty claim (optional)</p>
+        <p className="text-[11px] text-theme-text-muted/80 leading-relaxed">
+          This is general guidance based on IRS Publication 901, not tax advice. Consult a tax
+          professional if you're unsure.
+        </p>
         <IconInput
           icon={Globe}
           type="text"
           placeholder="Country for tax treaty claim"
           value={value.treatyCountry ?? ''}
-          onChange={(e) => set('treatyCountry', e.target.value)}
+          onChange={(e) => setTreatyCountry(e.target.value)}
           disabled={disabled}
         />
+        {treatyKey && treatyEntry?.hasTreaty && (
+          <div className="flex items-start gap-1.5 text-[11px] text-theme-text-muted">
+            <Info size={12} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Auto-filled based on {treatyKey}'s US tax treaty (Other income at{' '}
+              {treatyEntry.otherIncomeRate}% under {treatyEntry.article}). Edit if needed.
+              {treatyEntry.notes ? ` ${treatyEntry.notes}` : ''}
+            </span>
+          </div>
+        )}
+        {treatyKey && treatyEntry && !treatyEntry.hasTreaty && (
+          <div className="card p-2.5 border-l-4 border-l-amber-500 bg-amber-500/10">
+            <div className="flex items-start gap-2 text-[11px] text-amber-100">
+              <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+              <span>
+                No US tax treaty in force with {treatyKey} — leave the treaty fields blank; default
+                30% withholding applies if classified as US-source income.
+                {treatyEntry.notes ? ` ${treatyEntry.notes}` : ''}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <IconInput
             icon={Hash}
