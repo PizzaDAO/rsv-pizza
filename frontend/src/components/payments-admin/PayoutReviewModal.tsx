@@ -3204,21 +3204,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     agnostic; the server-side check fires for usdc / wire /
                     mercury_card alike. */}
                 {partyWouldExceedCap && partyCap != null && (
-                  // ricotta-92103: amber values (text-amber-200/100/300) read
-                  // fine on dark `.card` backgrounds but wash out on gpp-theme,
-                  // where `.gpp-theme .card { background: rgba(255,255,255,.92)
-                  // !important }` repaints the panel white. Override to dark
-                  // amber under `.gpp-theme` via Tailwind arbitrary variants.
-                  // See architecture_gpp_theme_text_white_override + screenshot
-                  // 2026-05-29 (/payments/latam cap-warning unreadable).
+                  // ricotta-92103 / fix: this warning is rendered inside the
+                  // Execute payout form, which is ALWAYS a light panel
+                  // (`bg-emerald-50`), so the `[.gpp-theme_&]` dark override
+                  // never fired and the light-amber base classes washed out on
+                  // the light panel. Use solid dark amber shades that read in
+                  // both themes. (The footer Approve warning below sits on
+                  // `bg-theme-surface` and correctly keeps the theme variant.)
                   <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
                     <div className="flex items-start gap-2.5">
-                      <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                      <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
                       <div className="flex-1 text-sm">
-                        <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                        <div className="font-medium text-amber-900 mb-1">
                           Per-party cap warning
                         </div>
-                        <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                        <div className="text-amber-800 text-xs">
                           This payment exceeds the party's ${partyCap.toFixed(2)} cap by{' '}
                           <b>${partyOverBy.toFixed(2)}</b>{' '}
                           (remaining: ${(partyCapRemaining ?? 0).toFixed(2)}).
@@ -3228,7 +3228,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             checked={overridePartyCap}
                             onChange={() => setOverridePartyCap((v) => !v)}
                             label="I acknowledge — proceed anyway"
-                            labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                            labelClassName="text-sm text-amber-900"
                           />
                         </div>
                       </div>
@@ -3277,17 +3277,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       </div>
                     )}
                     {!walletPaidLoading && walletPaidTotal?.wouldExceed && payout.payoutWalletAddress && (
-                      // ricotta-92103: same gpp-theme contrast fix as the
-                      // per-party warning above. Bumps amber text to dark
-                      // shades under `.gpp-theme` where the panel paints white.
+                      // ricotta-92103 / fix: this warning lives inside the
+                      // Execute payout form, which is ALWAYS a light panel
+                      // (`bg-emerald-50`), not just under `.gpp-theme`. The old
+                      // light-amber base classes washed out here because the
+                      // `[.gpp-theme_&]` dark override never fired. Use solid
+                      // dark amber shades that read on the light panel in both
+                      // themes.
                       <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
                         <div className="flex items-start gap-2.5">
-                          <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                          <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
                           <div className="flex-1 text-sm">
-                            <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                            <div className="font-medium text-amber-900 mb-1">
                               Per-address cap warning
                             </div>
-                            <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                            <div className="text-amber-800 text-xs">
                               Wallet{' '}
                               <code className="font-mono text-[11px]">
                                 {payout.payoutWalletAddress.slice(0, 6)}…{payout.payoutWalletAddress.slice(-4)}
@@ -3307,7 +3311,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                 checked={overrideCap}
                                 onChange={() => setOverrideCap((v) => !v)}
                                 label="I acknowledge — proceed anyway"
-                                labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                                labelClassName="text-sm text-amber-900"
                               />
                             </div>
                           </div>
