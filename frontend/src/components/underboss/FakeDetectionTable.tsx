@@ -5,6 +5,7 @@ import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { fetchFakeDetection, updateUnderbossStatus } from '../../lib/api';
 import type { FakeDetectionResponse, FakeDetectionRow, FakeDetectionTier } from '../../types';
+import { normalizeText } from '../../lib/normalizeText';
 
 type ActionStatus = 'pending' | 'approved' | 'rejected';
 
@@ -217,15 +218,15 @@ export function FakeDetectionTable() {
     let rows = data.rows;
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = normalizeText(search);
       rows = rows.filter(
         (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.customUrl?.toLowerCase().includes(q) ||
-          r.country?.toLowerCase().includes(q) ||
-          r.region?.toLowerCase().includes(q) ||
-          r.hostName?.toLowerCase().includes(q) ||
-          r.hostEmail?.toLowerCase().includes(q),
+          normalizeText(r.name).includes(q) ||
+          normalizeText(r.customUrl).includes(q) ||
+          normalizeText(r.country).includes(q) ||
+          normalizeText(r.region).includes(q) ||
+          normalizeText(r.hostName).includes(q) ||
+          normalizeText(r.hostEmail).includes(q),
       );
     }
 

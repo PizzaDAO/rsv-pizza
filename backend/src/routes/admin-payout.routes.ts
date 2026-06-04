@@ -18,6 +18,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
 import {
   requireAuth,
   AuthRequest,
@@ -531,7 +532,7 @@ async function assertWithinPartyCap(
 }
 
 /** Build a Prisma `where` clause from query-string filters. */
-function buildPayoutWhere(query: Request['query']): any {
+async function buildPayoutWhere(query: Request['query']): Promise<any> {
   const where: any = {};
 
   // coppa-92106: status accepts either a single status or a comma-separated
@@ -590,10 +591,16 @@ function buildPayoutWhere(query: Request['query']): any {
   const search = query.search;
   if (typeof search === 'string' && search.trim().length > 0) {
     const needle = search.trim();
+    // diavola-83147: accent-insensitive search. Prefilter party + host ids via
+    // the `unaccent` extension, then fold the FK `in` clauses into where.OR so
+    // `jose` matches `José`, `munchen` matches `München`, etc.
+    const [partyIds, hostIds] = await Promise.all([
+      unaccentMatchIds(prisma, 'parties', ['name'], needle),
+      unaccentMatchIds(prisma, 'User', ['name', 'email'], needle),
+    ]);
     where.OR = [
-      { host: { email: { contains: needle, mode: 'insensitive' as const } } },
-      { host: { name: { contains: needle, mode: 'insensitive' as const } } },
-      { party: { name: { contains: needle, mode: 'insensitive' as const } } },
+      { partyId: { in: partyIds } },
+      { hostUserId: { in: hostIds } },
     ];
   }
 
@@ -987,14 +994,12 @@ router.get(
       // Pull approved parties matching name / customUrl / inviteCode. Cap at 20.
       // Sorted createdAt DESC so the most recent approved events show first —
       // matches how admins typically remember "the event that was just approved".
+      // diavola-83147: accent-insensitive prefilter via the `unaccent` extension.
+      const ids = await unaccentMatchIds(prisma, 'parties', ['name', 'custom_url', 'invite_code'], rawQ);
       const parties = await prisma.party.findMany({
         where: {
           underbossStatus: 'approved',
-          OR: [
-            { name: { contains: rawQ, mode: 'insensitive' } },
-            { customUrl: { contains: rawQ, mode: 'insensitive' } },
-            { inviteCode: { contains: rawQ, mode: 'insensitive' } },
-          ],
+          id: { in: ids },
         },
         select: {
           id: true,
@@ -1110,7 +1115,7 @@ router.get(
   requireAnyAdminOrPaymentAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
       const rows = await prisma.payout.findMany({
         where,
         include: {
@@ -1846,7 +1851,7 @@ router.get(
   requireAdminOrRegionalUnderboss(),
   async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
 
       // 1. Fetch every payout matching the filter set — no skip cursor in v1.
       //    Same include shape as the LIST endpoint so `serializePayout` returns
@@ -2352,7 +2357,7 @@ router.get(
   requireAdminOrRegionalUnderboss(),
   async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
 
       const rawLimit = parseInt(String(req.query.limit ?? '50'), 10);
       const limit = Math.min(

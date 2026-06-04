@@ -10,6 +10,7 @@ import { RejectedGuestsModal } from './RejectedGuestsModal';
 import { InvitedGuestsModal } from './InvitedGuestsModal';
 import { ImportGuestsModal } from './ImportGuestsModal';
 import { checkInGuest, getNotableGuestIds, addNotableAttendee, deleteNotableAttendeeByGuestId } from '../lib/api';
+import { normalizeText } from '../lib/normalizeText';
 
 export const GuestList: React.FC = () => {
   const { t } = useTranslation('host');
@@ -142,10 +143,10 @@ export const GuestList: React.FC = () => {
 
   const filteredGuests = useMemo(() => {
     if (!searchQuery.trim()) return guests;
-    const query = searchQuery.toLowerCase().trim();
+    const query = normalizeText(searchQuery.trim());
     return guests.filter(guest =>
-      guest.name.toLowerCase().includes(query) ||
-      (guest.email && guest.email.toLowerCase().includes(query))
+      normalizeText(guest.name).includes(query) ||
+      (guest.email && normalizeText(guest.email).includes(query))
     );
   }, [guests, searchQuery]);
 
