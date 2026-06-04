@@ -2048,6 +2048,21 @@ model OutreachAttempt {
   @@map("outreach_attempts")
 }
 
+model Suggestion {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  body      String
+  imageUrl  String?  @map("image_url")
+  name      String?
+  email     String?
+  pageUrl   String?  @map("page_url")
+  status    String   @default("new")
+  aiSummary String?  @map("ai_summary")
+  aiTags    String[] @map("ai_tags")
+
+  @@map("suggestions")
+}
+
 // marinara-61455: cached verdict of a manual, admin-triggered image-authenticity
 // check (AI-generated / doctored detection) on a payment-receipt image or a
 // host event-cover image. SEPARATE table — does NOT widen payout_documents or
