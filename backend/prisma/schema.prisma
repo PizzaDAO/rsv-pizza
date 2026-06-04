@@ -2047,3 +2047,41 @@ model OutreachAttempt {
   @@index([sentAt(sort: Desc)])
   @@map("outreach_attempts")
 }
+
+// marinara-61455: cached verdict of a manual, admin-triggered image-authenticity
+// check (AI-generated / doctored detection) on a payment-receipt image or a
+// host event-cover image. SEPARATE table — does NOT widen payout_documents or
+// Party. Advisory only; never auto-rejects. Keyed by `imageUrl` for the cache
+// lookup ("return the cached row unless force").
+//
+// `partyId` / `payoutDocumentId` are intentionally PLAIN columns (no Prisma
+// `@relation`) so we don't have to add back-relations to Party / PayoutDocument.
+// The DB-level FKs (ON DELETE SET NULL) live in the SQL migration instead.
+//
+// ⚠️ No Prisma auto-migration in this repo — the live DDL is the matching file
+// supabase/migrations/20260604_marinara_61455_image_authenticity_checks.sql,
+// applied to prod manually before merge.
+model ImageAuthenticityCheck {
+  id               String   @id @default(uuid()) @db.Uuid
+  imageUrl         String   @map("image_url")
+  // 'receipt' | 'event_image'
+  sourceKind       String   @map("source_kind")
+  partyId          String?  @map("party_id") @db.Uuid
+  payoutDocumentId String?  @map("payout_document_id") @db.Uuid
+  // 'authentic' | 'suspicious' | 'likely_fake'
+  verdict          String
+  score            Int      @default(0)
+  // Per-signal flags + the vision model's structured observations.
+  reasons          Json     @default("[]")
+  // 'openai' | 'anthropic' | 'sightengine'
+  provider         String   @default("openai")
+  // Phase 2 ELA overlay artifact (downloadable PNG in event-images bucket).
+  elaArtifactUrl   String?  @map("ela_artifact_url")
+  checkedAt        DateTime @default(now()) @map("checked_at") @db.Timestamptz
+  // Admin email that triggered the check.
+  checkedBy        String?  @map("checked_by")
+
+  @@index([imageUrl])
+  @@index([partyId])
+  @@map("image_authenticity_checks")
+}
