@@ -1419,6 +1419,26 @@ model CityStatus {
   @@map("city_statuses")
 }
 
+// tonda-58293: durable per-city Telegram group chat store. Previously the
+// city → group chat_id mapping lived ONLY in a Google Sheet and was fetched
+// client-side; supergroup migrations (Telegram's `migrate_to_chat_id`) were
+// never persisted, so broadcasts silently drifted. Keyed by `cityKey`
+// (`lower(trim(city))`, same convention as `CityStatus.city_key`).
+model CityTelegramGroup {
+  id             String    @id @default(uuid()) @db.Uuid
+  cityKey        String    @unique @map("city_key")
+  chatId         BigInt?   @map("chat_id")
+  chatUrl        String?   @map("chat_url") @db.VarChar
+  title          String?
+  isSupergroup   Boolean   @default(false) @map("is_supergroup")
+  source         String    @default("manual") // sheet | webhook | migration | manual
+  lastVerifiedAt DateTime? @map("last_verified_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("city_telegram_groups")
+}
+
 // ============================================
 // Shipping Coordinator Models
 // ============================================

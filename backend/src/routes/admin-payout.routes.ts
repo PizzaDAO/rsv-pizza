@@ -47,6 +47,8 @@ import {
   type RegionalAuthRequest,
 } from '../middleware/regionalUnderboss.js';
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
+import { sendToCityGroup } from '../services/cityTelegramGroup.js';
+import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 
 const router = Router();
 
@@ -6059,17 +6061,15 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      // Group chat — per-city chat_id supplied by the caller. The frontend
-      // resolves it from the GPP sheet (`SheetCity.groupId`) using the same
-      // city→chat_id map that /underboss uses for its broadcast tooling. We
-      // intentionally don't fetch the sheet from the backend; mirrors the
-      // `/api/telegram/broadcast` contract where the client supplies chatIds.
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
+      // Group chat — tonda-58293: the backend now resolves the per-city group
+      // chat_id from `city_telegram_groups` (keyed by cityKey from the party
+      // name) via `sendToCityGroup`, which also persists supergroup migrations.
+      // The client no longer supplies `groupChatId`.
+      const cityKey = cityKeyFromPartyName(party.name);
       let groupSent = false;
       let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
+      if (cityKey) {
+        const result = await sendToCityGroup(cityKey, text);
         if (result.ok) {
           groupSent = true;
         } else {
@@ -6156,12 +6156,14 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
+      // Group chat — tonda-58293: resolved server-side from
+      // `city_telegram_groups` via `sendToCityGroup` (adds the migration
+      // retry+persist this endpoint previously lacked). No client groupChatId.
+      const cityKey = cityKeyFromPartyName(party.name);
       let groupSent = false;
       let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
+      if (cityKey) {
+        const result = await sendToCityGroup(cityKey, text);
         if (result.ok) {
           groupSent = true;
         } else {

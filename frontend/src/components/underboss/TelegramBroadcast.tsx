@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
+import { TelegramGroup } from '../../lib/telegram';
 import {
   sendTelegramBroadcast,
   sendTelegramTest,
   sendHostTelegramBroadcast,
   sendHostTelegramTest,
+  fetchCityTelegramGroups,
   BroadcastResult,
 } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
@@ -167,7 +168,22 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchTelegramGroups();
+        // tonda-58293: source the city → group chat_id map from the DB
+        // (`/api/underboss/telegram/groups`) instead of the Google Sheet. The
+        // endpoint is already scoped to the caller's cities. The legacy
+        // country/underboss/region columns aren't stored in the DB, so they
+        // render blank here — only city + chat_id are needed for sends.
+        const rows = await fetchCityTelegramGroups();
+        const data: TelegramGroup[] = rows
+          .filter((r) => r.chatId && r.cityKey)
+          .map((r) => ({
+            country: '',
+            city: r.cityKey,
+            underboss: '',
+            region: '',
+            chatUrl: r.chatUrl || '',
+            groupId: r.chatId as string,
+          }));
         setGroups(data);
         // Auto-select groups matching pre-selected cities (fuzzy match)
         if (preSelectedCities && preSelectedCities.length > 0) {

@@ -130,7 +130,32 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           );
           telegramResult = await retryResponse.json();
           if (telegramResult.ok) {
-            results.push({ chatId, city: city || '', success: true, error: `Migrated: update sheet to ${newChatId}` });
+            // tonda-58293: persist the new supergroup id to city_telegram_groups
+            // so the mapping no longer drifts. cityKey = lower(trim(city)).
+            const cityKey = (city || '').toLowerCase().trim();
+            if (cityKey) {
+              try {
+                await prisma.cityTelegramGroup.upsert({
+                  where: { cityKey },
+                  create: {
+                    cityKey,
+                    chatId: BigInt(newChatId),
+                    isSupergroup: true,
+                    source: 'migration',
+                    lastVerifiedAt: new Date(),
+                  },
+                  update: {
+                    chatId: BigInt(newChatId),
+                    isSupergroup: true,
+                    source: 'migration',
+                    lastVerifiedAt: new Date(),
+                  },
+                });
+              } catch (persistErr: any) {
+                console.error(`[tonda-58293][broadcast] failed to persist migration for ${cityKey}:`, persistErr?.message || persistErr);
+              }
+            }
+            results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)` });
           } else {
             results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
           }
@@ -491,6 +516,58 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAut
         error: err.message || 'Network error',
       });
     }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /groups — DB-first read of the city → Telegram group mapping.
+//
+// tonda-58293: replaces the client-side Google Sheet fetch. Returns the
+// `city_telegram_groups` rows the caller is allowed to see:
+//   - Admin / graphics-admin (regions includes '__admin__') → all rows.
+//   - Region-scoped UB with no explicit cities → all rows (the city→region
+//     map lives in the sheet, not the backend; mirrors groupInBroadcastScope).
+//   - City-scoped UB → only rows whose city_key is in their assigned cities.
+// Scoping is pushed into the Prisma `where` (never JS-filtered after a query).
+// chatId is serialized to string because BigInt is not JSON-safe.
+router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const isAdminScope = ub.regions.includes('__admin__');
+    const hasCities = (ub.cities?.length ?? 0) > 0;
+    const regionOnly = !isAdminScope && ub.regions.length > 0 && !hasCities;
+
+    let where: { cityKey?: { in: string[] } } | undefined;
+    if (isAdminScope || regionOnly) {
+      // Full visibility for admins and region-only UBs.
+      where = undefined;
+    } else if (hasCities) {
+      const cityKeys = (ub.cities || []).map((c) => c.toLowerCase().trim()).filter(Boolean);
+      // Empty after normalization → return nothing.
+      where = { cityKey: { in: cityKeys.length > 0 ? cityKeys : ['__no_match__'] } };
+    } else {
+      // Neither admin, nor region, nor cities → no access.
+      where = { cityKey: { in: ['__no_match__'] } };
+    }
+
+    const rows = await prisma.cityTelegramGroup.findMany({
+      where,
+      orderBy: { cityKey: 'asc' },
+    });
+
+    res.json({
+      groups: rows.map((r) => ({
+        id: r.id,
+        cityKey: r.cityKey,
+        chatId: r.chatId !== null ? r.chatId.toString() : null,
+        chatUrl: r.chatUrl,
+        title: r.title,
+        isSupergroup: r.isSupergroup,
+        source: r.source,
+        lastVerifiedAt: r.lastVerifiedAt,
+      })),
+    });
   } catch (error) {
     next(error);
   }

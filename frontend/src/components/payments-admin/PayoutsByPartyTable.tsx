@@ -207,15 +207,6 @@ interface PayoutsByPartyTableProps {
     } | { error: string },
   ) => void;
   /**
-   * crocchetta-92107: per-city Telegram group chat_id map keyed by the
-   * lower-cased, trimmed city name (with the "Global Pizza Party " prefix
-   * stripped). Populated by the parent from `fetchSheetCities()` —
-   * `SheetCity.groupId` — the same source /underboss uses for its broadcast
-   * tooling. When a row's city is missing from the map, the group post is
-   * skipped server-side with `groupReason: 'no city TG group set'`.
-   */
-  cityGroupChatIds?: Map<string, string>;
-  /**
    * bufalina-60733: fake-detection risk scores keyed by party id. Only
    * medium/high (≥30) parties are present; an absent key means "no badge".
    * Rendered as a caution pill in the city header strip.
@@ -2580,7 +2571,6 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
-  cityGroupChatIds,
   fakeScores,
   viewerRole = 'admin',
   busyRowId,
@@ -2853,20 +2843,17 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
    * crocchetta-92106 + crocchetta-92107: dispatch the Send-receipts-reminder
    * POST and surface the per-channel outcome to the parent via
    * `onTgReminderResult` so the page-level toast stack renders the right
-   * message. The per-city Telegram group chat_id is resolved from
-   * `cityGroupChatIds` (a sheet-derived map keyed by the stripped,
-   * lower-cased city name); when the map has no entry the request omits the
-   * field and the backend marks the group post skipped. Errors are caught
-   * and forwarded with an `error` shape so the parent can flash a failure
-   * toast without the table needing its own alert path.
+   * message. tonda-58293: the per-city Telegram group chat_id is now resolved
+   * server-side from `city_telegram_groups` (the backend derives the city from
+   * the party name); the client no longer passes a groupChatId. Errors are
+   * caught and forwarded with an `error` shape so the parent can flash a
+   * failure toast without the table needing its own alert path.
    */
   async function handleSendTgReminder(row: PartyPayoutsRow) {
     const partyId = row.party.id;
-    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
-    const groupChatId = cityGroupChatIds?.get(cityKey);
     setTgReminderBusyPartyId(partyId);
     try {
-      const result = await sendTgReceiptsReminder(partyId, groupChatId);
+      const result = await sendTgReceiptsReminder(partyId);
       onTgReminderResult?.(partyId, result);
     } catch (err) {
       onTgReminderResult?.(partyId, {
@@ -2879,16 +2866,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
 
   /**
    * Sibling of {@link handleSendTgReminder}: dispatch the wallet reminder POST
-   * and forward the per-channel outcome via `onTgWalletReminderResult`. Same
-   * city→group chat_id resolution.
+   * and forward the per-channel outcome via `onTgWalletReminderResult`. Group
+   * chat_id resolved server-side (tonda-58293) — no client groupChatId.
    */
   async function handleSendWalletReminder(row: PartyPayoutsRow) {
     const partyId = row.party.id;
-    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
-    const groupChatId = cityGroupChatIds?.get(cityKey);
     setWalletReminderBusyPartyId(partyId);
     try {
-      const result = await sendTgWalletReminder(partyId, groupChatId);
+      const result = await sendTgWalletReminder(partyId);
       onTgWalletReminderResult?.(partyId, result);
     } catch (err) {
       onTgWalletReminderResult?.(partyId, {

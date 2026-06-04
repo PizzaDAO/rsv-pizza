@@ -484,11 +484,11 @@ export async function removeCustomTag(
  * Two messages, same body:
  *   1. DM to the primary host (uses `parties.host_telegram_chat_id`; skipped
  *      with a reason when the host hasn't linked Telegram).
- *   2. Post to the **city's** Telegram group chat. The caller resolves the
- *      chat_id from the GPP sheet (same `SheetCity.groupId` field that
- *      powers /underboss broadcasts) and passes it in `groupChatId`. When
- *      omitted/empty, the backend skips with `groupReason: 'no city TG
- *      group set'` (per-party, not a global env var).
+ *   2. Post to the **city's** Telegram group chat. tonda-58293: the backend
+ *      now resolves the group chat_id from `city_telegram_groups` (keyed by
+ *      the city derived from the party name) — the client no longer passes a
+ *      `groupChatId`. When no group is on file the backend skips with
+ *      `groupReason: 'no city TG group set'`.
  *
  * Backend returns per-channel success + skip reason so the UI can render an
  * accurate partial-success toast. Triggered from the /payments by-city ⋮
@@ -503,14 +503,12 @@ export interface SendTgReceiptsReminderResponse {
 
 export async function sendTgReceiptsReminder(
   partyId: string,
-  groupChatId?: string | null,
 ): Promise<SendTgReceiptsReminderResponse> {
   return apiRequest<SendTgReceiptsReminderResponse>(
     `/api/admin/payouts/${partyId}/tg-receipts-reminder`,
     {
       method: 'POST',
       requireAuth: true,
-      body: groupChatId ? { groupChatId } : undefined,
     },
   );
 }
@@ -520,20 +518,45 @@ export async function sendTgReceiptsReminder(
  * address at rsv.pizza/host/<slug>/payments" reminder via the Molto Benny
  * Telegram bot — DM to the primary host + post to the city's group chat. Same
  * per-channel success + skip-reason contract. Unlike the receipts reminder this
- * does NOT persist a sent-at timestamp.
+ * does NOT persist a sent-at timestamp. tonda-58293: group chat_id resolved
+ * server-side; no `groupChatId` arg.
  */
 export async function sendTgWalletReminder(
   partyId: string,
-  groupChatId?: string | null,
 ): Promise<SendTgReceiptsReminderResponse> {
   return apiRequest<SendTgReceiptsReminderResponse>(
     `/api/admin/payouts/${partyId}/tg-wallet-reminder`,
     {
       method: 'POST',
       requireAuth: true,
-      body: groupChatId ? { groupChatId } : undefined,
     },
   );
+}
+
+/**
+ * tonda-58293: DB-first read of the city → Telegram group mapping. Replaces
+ * the client-side Google Sheet fetch (`fetchTelegramGroups()`) for sends.
+ * Returns rows from `city_telegram_groups` scoped to the caller's cities
+ * (admins/region-only UBs get all). `chatId` is a string (BigInt-safe).
+ * Mounted at `/api/underboss/telegram/groups` (underboss-scoped auth).
+ */
+export interface CityTelegramGroupRow {
+  id: string;
+  cityKey: string;
+  chatId: string | null;
+  chatUrl: string | null;
+  title: string | null;
+  isSupergroup: boolean;
+  source: string;
+  lastVerifiedAt: string | null;
+}
+
+export async function fetchCityTelegramGroups(): Promise<CityTelegramGroupRow[]> {
+  const res = await apiRequest<{ groups: CityTelegramGroupRow[] }>(
+    `/api/underboss/telegram/groups`,
+    { method: 'GET', requireAuth: true },
+  );
+  return res.groups;
 }
 
 /**
