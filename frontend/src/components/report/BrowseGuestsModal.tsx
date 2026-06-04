@@ -6,6 +6,7 @@ import { Guest } from '../../types';
 import { IconInput } from '../IconInput';
 import { addNotableAttendee, deleteNotableAttendeeByGuestId, getNotableGuestIds } from '../../lib/api';
 import { extractEmailDomain, getDomainFaviconUrl, isEmailProvider } from '../../utils/emailUtils';
+import { normalizeText } from '../../lib/normalizeText';
 
 interface BrowseGuestsModalProps {
   isOpen: boolean;
@@ -85,10 +86,10 @@ export function BrowseGuestsModal({ isOpen, onClose, guests, partyId, onChanged 
 
   const filteredDomains = useMemo(() => {
     if (!searchQuery.trim()) return domainGroups;
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeText(searchQuery.trim());
     return domainGroups.filter(g =>
-      g.domain.toLowerCase().includes(q) ||
-      g.guests.some(guest => guest.name.toLowerCase().includes(q))
+      normalizeText(g.domain).includes(q) ||
+      g.guests.some(guest => normalizeText(guest.name).includes(q))
     );
   }, [domainGroups, searchQuery]);
 

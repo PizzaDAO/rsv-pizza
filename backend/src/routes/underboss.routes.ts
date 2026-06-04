@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
@@ -643,12 +644,11 @@ router.get('/outreach/parties-search', requireAuth, requireUnderbossAuth, async 
       return res.json({ parties: [] });
     }
 
+    // diavola-83147: accent-insensitive prefilter via the `unaccent` extension.
+    const ids = await unaccentMatchIds(prisma, 'parties', ['name', 'custom_url'], q);
     const parties = await prisma.party.findMany({
       where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { customUrl: { contains: q, mode: 'insensitive' } },
-        ],
+        id: { in: ids },
       },
       select: {
         id: true,

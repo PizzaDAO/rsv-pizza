@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
@@ -813,11 +814,21 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     if (!includeAllStatuses) {
       where.cancelledAt = null;
     }
-    if (city) {
-      where.name = { contains: city as string, mode: 'insensitive' };
-    }
-    if (country) {
-      where.country = { contains: country as string, mode: 'insensitive' };
+    // diavola-83147: accent-insensitive city/country filter via the `unaccent`
+    // extension. Prefilter party ids and fold into where.id so `sao` matches
+    // `São Paulo`, `munchen` matches `München`, etc. When BOTH are provided,
+    // intersect the two id sets so the filters compose (don't overwrite).
+    if (city && country) {
+      const [cityIds, countryIds] = await Promise.all([
+        unaccentMatchIds(prisma, 'parties', ['name'], city as string),
+        unaccentMatchIds(prisma, 'parties', ['country'], country as string),
+      ]);
+      const countrySet = new Set(countryIds);
+      where.id = { in: cityIds.filter((id) => countrySet.has(id)) };
+    } else if (city) {
+      where.id = { in: await unaccentMatchIds(prisma, 'parties', ['name'], city as string) };
+    } else if (country) {
+      where.id = { in: await unaccentMatchIds(prisma, 'parties', ['country'], country as string) };
     }
     if (region) {
       where.region = region as string;

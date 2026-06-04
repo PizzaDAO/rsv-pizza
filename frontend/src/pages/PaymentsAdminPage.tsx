@@ -40,6 +40,7 @@ import { formatUsd } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
 import { fetchSheetCities } from '../lib/cities';
+import { normalizeText } from '../lib/normalizeText';
 import {
   PayoutsFilterBar,
   PayoutsTable,
@@ -118,15 +119,15 @@ const SHOW_PREPAY_QUEUE = false;
 // so typing a city matches what's actually rendered in the table.
 function matchesPrepaySearch(row: PrepayQueueRow, q: string): boolean {
   if (!q) return true;
-  const needle = q.toLowerCase().trim();
+  const needle = normalizeText(q.trim());
   if (!needle) return true;
-  const nameStripped = row.party.name.replace(/^Global Pizza Party\s+/i, '').toLowerCase();
+  const nameStripped = normalizeText(row.party.name.replace(/^Global Pizza Party\s+/i, ''));
   if (nameStripped.includes(needle)) return true;
-  if (row.party.name.toLowerCase().includes(needle)) return true;
-  if (row.party.country?.toLowerCase().includes(needle)) return true;
+  if (normalizeText(row.party.name).includes(needle)) return true;
+  if (normalizeText(row.party.country).includes(needle)) return true;
   for (const c of row.candidates) {
-    if ((c.name ?? '').toLowerCase().includes(needle)) return true;
-    if (c.email.toLowerCase().includes(needle)) return true;
+    if (normalizeText(c.name).includes(needle)) return true;
+    if (normalizeText(c.email).includes(needle)) return true;
   }
   return false;
 }

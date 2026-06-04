@@ -10,6 +10,7 @@ import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
+import { normalizeText } from '../../lib/normalizeText';
 
 interface EventTableProps {
   events: UnderbossEvent[];
@@ -162,16 +163,16 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     let result = events;
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = normalizeText(search);
       result = result.filter(
         (e) =>
-          e.name.toLowerCase().includes(q) ||
-          e.host.name?.toLowerCase().includes(q) ||
-          e.host.email?.toLowerCase().includes(q) ||
-          e.address?.toLowerCase().includes(q) ||
-          e.venueName?.toLowerCase().includes(q) ||
-          e.country?.toLowerCase().includes(q) ||
-          e.region?.toLowerCase().includes(q)
+          normalizeText(e.name).includes(q) ||
+          normalizeText(e.host.name).includes(q) ||
+          normalizeText(e.host.email).includes(q) ||
+          normalizeText(e.address).includes(q) ||
+          normalizeText(e.venueName).includes(q) ||
+          normalizeText(e.country).includes(q) ||
+          normalizeText(e.region).includes(q)
       );
     }
 
