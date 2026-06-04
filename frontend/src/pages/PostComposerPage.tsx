@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, FileText, Search, Copy, Check } from 'lucide-react';
+import { Loader2, Shield, FileText, Search, Copy, Check, Twitter, Download } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
@@ -73,6 +73,17 @@ const POST_TEMPLATES: PostTemplate[] = [
       return lines.join('\n');
     },
   },
+  {
+    id: 'bpd-recap',
+    name: 'Bitcoin Pizza Day Recap',
+    description: 'Retrospective recap post',
+    compose: (event: DbParty) => {
+      const city = extractCity(event.name);
+      const flag = countryNameToFlag(event.country);
+      const place = event.country ? `${city}, ${event.country}` : city;
+      return `${flag}\u{1F355}\u{1F973}\nThis was ${place}'s party on Bitcoin Pizza Day 2026.`;
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -111,7 +122,7 @@ export function PostComposerPage() {
         // Load GPP events
         const allParties = await getAllParties();
         const gppEvents = allParties
-          .filter((p) => p.event_type === 'gpp')
+          .filter((p) => p.event_type === 'gpp' && p.underboss_status === 'approved')
           .sort((a, b) => a.name.localeCompare(b.name));
         setEvents(gppEvents);
 
@@ -154,6 +165,29 @@ export function PostComposerPage() {
       // Fallback: select text so user can Ctrl+C
     }
   };
+
+  /* ---- Post on X ---- */
+  function postOnX() {
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(composedText)}`;
+    window.open(url, '_blank', 'noopener');
+  }
+
+  /* ---- Force download (cross-origin Supabase URLs ignore <a download>) ---- */
+  async function downloadImage(url: string, filename: string) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(obj);
+  }
+
+  /* ---- Currently selected event ---- */
+  const selectedEvent = events.find((e) => e.id === selectedEventId);
 
   /* ---- Loading state ---- */
   if (loading) {
@@ -235,7 +269,7 @@ export function PostComposerPage() {
               const label = ev.country ? `${city} (${ev.country})` : city;
               return (
                 <option key={ev.id} value={ev.id}>
-                  {label}
+                  {countryNameToFlag(ev.country) + ' '}{label}
                 </option>
               );
             })}
@@ -253,24 +287,62 @@ export function PostComposerPage() {
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComposedText(e.target.value)}
         />
 
-        {/* Copy button */}
-        <button
-          onClick={handleCopy}
-          disabled={!composedText}
-          className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-colors bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {copied ? (
-            <>
-              <Check size={18} />
-              {t('postComposer.copied')}
-            </>
-          ) : (
-            <>
-              <Copy size={18} />
-              {t('postComposer.copyToClipboard')}
-            </>
-          )}
-        </button>
+        {/* Char counter */}
+        <p className={`text-xs text-right -mt-3 ${composedText.length > 280 ? 'text-red-500' : 'text-white/40'}`}>
+          {composedText.length}/280
+        </p>
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleCopy}
+            disabled={!composedText}
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-colors bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {copied ? (
+              <>
+                <Check size={18} />
+                {t('postComposer.copied')}
+              </>
+            ) : (
+              <>
+                <Copy size={18} />
+                {t('postComposer.copyToClipboard')}
+              </>
+            )}
+          </button>
+          <button
+            onClick={postOnX}
+            disabled={!composedText}
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-colors bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Twitter size={18} />
+            Post on X
+          </button>
+        </div>
+
+        {/* Event photo */}
+        {selectedEvent?.event_image_url && (
+          <div className="space-y-2">
+            <img
+              src={selectedEvent.event_image_url}
+              alt={extractCity(selectedEvent.name)}
+              className="rounded-lg max-h-64 w-full object-cover"
+            />
+            <button
+              onClick={() =>
+                downloadImage(
+                  selectedEvent.event_image_url as string,
+                  `${extractCity(selectedEvent.name)}-bpd-2026.jpg`,
+                )
+              }
+              className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-colors bg-sky-500 hover:bg-sky-600 text-white"
+            >
+              <Download size={18} />
+              Download
+            </button>
+          </div>
+        )}
       </div>
 
       <Footer />
