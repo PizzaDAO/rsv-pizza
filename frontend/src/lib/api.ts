@@ -6255,3 +6255,14 @@ export async function rejectTaxForm(id: string, reason: string): Promise<TaxForm
   );
   return res.taxForm;
 }
+
+// scarpetta-58472: site-wide suggestions list (admin / underboss view-only).
+export interface Suggestion {
+  id: string; createdAt: string; body: string;
+  imageUrl: string | null; name: string | null; email: string | null;
+  pageUrl: string | null; status: string;
+  aiSummary: string | null; aiTags: string[] | null;
+}
+export async function fetchSuggestions() {
+  return apiRequest<{ suggestions: Suggestion[] }>('/api/suggestions');
+}
