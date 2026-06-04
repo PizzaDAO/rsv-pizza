@@ -10,6 +10,9 @@ import {
   PAYMENTS_REGION_SCOPES,
   type PaymentsRegionPortal,
 } from '../../utils/regions';
+// panuozzo-92114: canonical filter VALUE lists live in the React-free options
+// module so PayoutsFilterBar and the URL (de)serializer can't drift.
+import type { SortValue, StatusTabValue } from './paymentsFilterOptions';
 
 interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
@@ -49,7 +52,10 @@ interface PayoutsFilterBarProps {
 
 // ciabatta-92110: `'closed'` is a party-level pseudo-status (filters on
 // parties.payments_closed_at), so the tab value type widens beyond PayoutStatus.
-const STATUS_TABS: Array<{ value: PayoutStatus | 'all' | 'closed'; label: string }> = [
+// panuozzo-92114: values are validated against STATUS_TAB_VALUES in
+// paymentsFilterOptions.ts (the URL serializer's source of truth) — keep this
+// list and that one in sync.
+const STATUS_TABS: Array<{ value: StatusTabValue; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
@@ -91,7 +97,6 @@ const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = 
 // lievito-92103: `activity_desc` / `activity_asc` expose the by-city default
 // (lastActivityAt) as an explicit picker entry, and also order the per-payout
 // view by `updatedAt`. Useful for surfacing stale cities first.
-type SortValue = NonNullable<AdminPayoutFilters['sort']>;
 const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: 'created_desc', label: 'Newest first' },
   { value: 'created_asc', label: 'Oldest first' },
