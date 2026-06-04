@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Check, AlertCircle, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
-import { BankDetails, PayoutMethod } from '../../types';
+import { PayoutMethod } from '../../types';
 import {
   updateUserMe,
   getPaymentOptIn,
@@ -10,12 +10,6 @@ import {
   removePaymentOptIn,
 } from '../../lib/api';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
-import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
-
-const EMPTY_BANK: BankDetails = {};
-
-// Loose email check — same shape used elsewhere in the app (e.g. invite forms).
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
@@ -41,14 +35,14 @@ export const PaymentDetailsCard: React.FC = () => {
   // Local mirrors of the user's persisted values. These drive PayoutMethodPicker
   // directly so the UI updates instantly; the debounced save flushes to the
   // backend ~1s after the host stops typing.
+  // casatiello-58291: usdc_base is the only host-facing payout method now, so
+  // we default to it (rather than null) when the user has no saved method —
+  // the debounced autosave will then persist usdc_base.
   const [method, setMethod] = useState<PayoutMethod | null>(
-    user?.preferredPayoutMethod ?? null
+    user?.preferredPayoutMethod ?? 'usdc_base'
   );
   const [walletAddress, setWalletAddress] = useState<string>(
     user?.payoutWalletAddress ?? ''
-  );
-  const [bankDetails, setBankDetails] = useState<BankDetails>(
-    user?.payoutBankDetails ?? EMPTY_BANK
   );
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -60,8 +54,10 @@ export const PaymentDetailsCard: React.FC = () => {
   // Only resync when the user-record value differs from local — otherwise we'd
   // clobber in-flight edits. Done per-field for clarity.
   useEffect(() => {
-    if (user?.preferredPayoutMethod !== undefined && method === null) {
-      setMethod(user.preferredPayoutMethod ?? null);
+    // casatiello-58291: when the user has no saved method we keep the
+    // usdc_base default; only adopt the persisted value if it exists.
+    if (user?.preferredPayoutMethod) {
+      setMethod(user.preferredPayoutMethod);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.preferredPayoutMethod]);
@@ -73,39 +69,17 @@ export const PaymentDetailsCard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.payoutWalletAddress]);
 
-  useEffect(() => {
-    if (
-      user?.payoutBankDetails !== undefined
-      && !bankDetails.email
-      && !bankDetails.accountHolderName
-      && !bankDetails.bankName
-    ) {
-      setBankDetails(user.payoutBankDetails ?? EMPTY_BANK);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.payoutBankDetails]);
-
-  // Validity mirror of NewPayoutForm's old methodValid — used to gate the
-  // debounced save (don't push half-typed wire details to the backend).
+  // casatiello-58291: usdc_base is the only host-facing method, so validity is
+  // just "is the wallet a valid hex/ENS value".
   const methodValid = useMemo(() => {
-    if (method == null) return false;
-    if (method === 'usdc_base') {
-      // nduja-92103: accept hex OR ENS (matches PayoutMethodPicker
-      // taleggio-30219). Strict 0x-only check silently grayed out
-      // the autosave for hosts typing puebla.eth-style names.
-      const trimmed = walletAddress.trim();
-      const isHex = /^0x[0-9a-fA-F]{40}$/.test(trimmed);
-      const isEns = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(trimmed);
-      return isHex || isEns;
-    }
-    if (method === 'wire') {
-      // arugula-38633 (follow-up): wire is now a single email field —
-      // our bank emails the host to complete the transaction.
-      const email = bankDetails.email?.trim() ?? '';
-      return EMAIL_REGEX.test(email);
-    }
-    return true; // mercury_card has no extra required fields
-  }, [method, walletAddress, bankDetails]);
+    // nduja-92103: accept hex OR ENS (matches PayoutMethodPicker
+    // taleggio-30219). Strict 0x-only check silently grayed out
+    // the autosave for hosts typing puebla.eth-style names.
+    const trimmed = walletAddress.trim();
+    const isHex = /^0x[0-9a-fA-F]{40}$/.test(trimmed);
+    const isEns = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(trimmed);
+    return isHex || isEns;
+  }, [walletAddress]);
 
   // Debounced auto-save. We track the "intended" payload in a ref so the
   // timeout callback always reads the latest values without re-creating the
@@ -121,38 +95,25 @@ export const PaymentDetailsCard: React.FC = () => {
     if (method == null) return null;
     return {
       preferredPayoutMethod: method,
-      payoutWalletAddress: method === 'usdc_base' ? walletAddress.trim() : null,
-      payoutBankDetails: method === 'wire' ? bankDetails : null,
+      payoutWalletAddress: walletAddress.trim(),
+      payoutBankDetails: null,
     };
   };
 
   // Track previous values so the auto-save only fires on actual change (not
   // on the initial setState from hydration).
   const prevSnapshot = useRef<string>(JSON.stringify({
-    method: user?.preferredPayoutMethod ?? null,
+    method: user?.preferredPayoutMethod ?? 'usdc_base',
     walletAddress: user?.payoutWalletAddress ?? '',
-    bankDetails: user?.payoutBankDetails ?? EMPTY_BANK,
   }));
 
   useEffect(() => {
-    const snapshot = JSON.stringify({ method, walletAddress, bankDetails });
+    const snapshot = JSON.stringify({ method, walletAddress });
     if (snapshot === prevSnapshot.current) return;
     prevSnapshot.current = snapshot;
     isDirty.current = true;
 
-    // pepperoni-47301: never autosave `mercury_card` when the party's country
-    // is on Mercury's restricted list — the per-party payout submission would
-    // be rejected by the backend anyway. Surface the reason locally so the
-    // host knows to pick another method.
-    if (method === 'mercury_card' && isMercuryBlocked(party?.country)) {
-      setSaveStatus('error');
-      setSaveError(
-        `Mercury cards are unavailable in ${party?.country ?? 'your country'}. Pick another method.`
-      );
-      return;
-    }
-
-    // Don't fire the save until the method-specific fields are valid.
+    // Don't fire the save until the wallet field is valid.
     if (!methodValid) {
       setSaveStatus('pending');
       return;
@@ -205,11 +166,11 @@ export const PaymentDetailsCard: React.FC = () => {
     // We intentionally exclude buildPayload from deps — it closes over the
     // latest values via the surrounding effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, walletAddress, bankDetails, methodValid]);
+  }, [method, walletAddress, methodValid]);
 
-  // PayoutMethodPicker requires non-null method. For the empty state we let
-  // the user pick a method first; the picker still renders all three radios.
-  const pickerMethod: PayoutMethod = method ?? 'mercury_card';
+  // casatiello-58291: PayoutMethodPicker requires non-null method; usdc_base is
+  // the only host-facing method now.
+  const pickerMethod: PayoutMethod = method ?? 'usdc_base';
 
   // ============================================
   // bufala-83291: per-event payment opt-in
@@ -220,6 +181,12 @@ export const PaymentDetailsCard: React.FC = () => {
   // Submitting on event X does not opt the host in on event Y.
   const partyId = party?.id ?? null;
   const partyName = party?.name ?? 'this event';
+
+  // casatiello-58291: US events bypass the USDC picker entirely and use the
+  // SWC Hub login flow instead. `parties.country` is the full English name
+  // (not ISO-2), and the Hub-readiness flag is the literal `'hub'` event tag.
+  const isUS = party?.country === 'United States';
+  const hasHubTag = (party?.eventTags ?? []).includes('hub');
   const [optInLoaded, setOptInLoaded] = useState(false);
   const [optedIn, setOptedIn] = useState(false);
   const [optedInAt, setOptedInAt] = useState<string | null>(null);
@@ -333,108 +300,149 @@ export const PaymentDetailsCard: React.FC = () => {
             Payment details
           </h3>
         </div>
-        <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-          {saveStatus === 'saving' && (
-            <>
-              <Loader2 size={12} className="animate-spin text-theme-text-muted" />
-              <span className="text-theme-text-muted">Saving…</span>
-            </>
-          )}
-          {saveStatus === 'saved' && (
-            <>
-              <Check size={12} className="text-emerald-500" />
-              <span className="text-emerald-500">Saved</span>
-            </>
-          )}
-          {saveStatus === 'pending' && method != null && (
-            <span className="text-theme-text-muted">Editing…</span>
-          )}
-          {saveStatus === 'error' && (
-            <>
-              <AlertCircle size={12} className="text-[#ff393a]" />
-              <span className="text-[#ff393a]">Save failed</span>
-            </>
-          )}
-        </div>
+        {!isUS && (
+          <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+            {saveStatus === 'saving' && (
+              <>
+                <Loader2 size={12} className="animate-spin text-theme-text-muted" />
+                <span className="text-theme-text-muted">Saving…</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <Check size={12} className="text-emerald-500" />
+                <span className="text-emerald-500">Saved</span>
+              </>
+            )}
+            {saveStatus === 'pending' && method != null && (
+              <span className="text-theme-text-muted">Editing…</span>
+            )}
+            {saveStatus === 'error' && (
+              <>
+                <AlertCircle size={12} className="text-[#ff393a]" />
+                <span className="text-[#ff393a]">Save failed</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      <PayoutMethodPicker
-        method={pickerMethod}
-        onMethodChange={(next) => {
-          setMethod(next);
-          // When switching methods we DON'T wipe the other method's stored
-          // details — they stay so the host can swap back without retyping.
-        }}
-        walletAddress={walletAddress}
-        onWalletAddressChange={setWalletAddress}
-        bankDetails={bankDetails}
-        onBankDetailsChange={setBankDetails}
-        userEmail={user?.email}
-        reimbursementCapUsd={party?.effectiveReimbursementCapUsd ?? null}
-      />
-
-      {saveError && (
-        <p className="text-xs text-[#ff393a] mt-2">{saveError}</p>
-      )}
-
-      {/*
-        bufala-83291: per-event Submit. The autosave above keeps the user's
-        global default in sync; this section ALSO opts them in for THIS event.
-        Without an opt-in row the host won't appear on /payments as a prepay
-        candidate even if their global payment method is set.
-      */}
-      {partyId && optInLoaded && (
-        <div className="mt-5 border-t border-white/10 pt-4">
-          {!optedIn ? (
-            <div>
-              <button
-                type="button"
-                onClick={handleSubmitOptIn}
-                disabled={submitDisabled}
-                className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {optInPending ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Submitting…
-                  </>
-                ) : (
-                  'Submit my payment details for this event'
-                )}
-              </button>
-              <p className="text-xs text-white/40 mt-2">
-                Submitting opts you in to receive payment for {partyName}. You'll
-                only be paid for events you submit for.
-              </p>
-              {!methodValid && (
-                <p className="text-xs text-white/40 mt-1">
-                  Choose a payout method above before submitting.
-                </p>
-              )}
-            </div>
+      {isUS ? (
+        /*
+          casatiello-58291: US events are reimbursed through the SWC Hub, not
+          the USDC picker. Hosts log in to the Hub to manage payment there.
+          The Hub link is only enabled once the event carries the `hub` tag
+          (i.e. it's been added to the Hub); otherwise we show a Pending state.
+        */
+        <div>
+          {hasHubTag ? (
+            <a
+              href="https://www.swchub.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2"
+            >
+              <ExternalLink size={14} />
+              {user?.email ? `Login to SWC Hub with ${user.email}` : 'Login to SWC Hub'}
+            </a>
           ) : (
             <div>
-              <div className="flex items-center gap-2 text-sm text-emerald-500">
-                <Check size={16} />
-                <span>
-                  Submitted for {partyName}
-                  {optedInLabel ? ` on ${optedInLabel}` : ''}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled
+                  className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 opacity-50 cursor-not-allowed"
+                >
+                  <ExternalLink size={14} />
+                  {user?.email ? `Login to SWC Hub with ${user.email}` : 'Login to SWC Hub'}
+                </button>
+                <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-300 bg-amber-300/10 rounded-full px-2 py-0.5">
+                  Pending
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={handleRemoveOptIn}
-                disabled={optInPending}
-                className="mt-2 text-xs text-white/50 hover:text-white/80 underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {optInPending ? 'Removing…' : "Remove me from this event's payments"}
-              </button>
+              <p className="text-xs text-white/40 mt-2">
+                Your event hasn't been added to the SWC Hub yet — check back soon.
+              </p>
             </div>
           )}
-          {optInError && (
-            <p className="text-xs text-[#ff393a] mt-2">{optInError}</p>
-          )}
         </div>
+      ) : (
+        <>
+          <PayoutMethodPicker
+            method={pickerMethod}
+            onMethodChange={(next) => {
+              setMethod(next);
+              // When switching methods we DON'T wipe the other method's stored
+              // details — they stay so the host can swap back without retyping.
+            }}
+            walletAddress={walletAddress}
+            onWalletAddressChange={setWalletAddress}
+          />
+
+          {saveError && (
+            <p className="text-xs text-[#ff393a] mt-2">{saveError}</p>
+          )}
+
+          {/*
+            bufala-83291: per-event Submit. The autosave above keeps the user's
+            global default in sync; this section ALSO opts them in for THIS event.
+            Without an opt-in row the host won't appear on /payments as a prepay
+            candidate even if their global payment method is set.
+          */}
+          {partyId && optInLoaded && (
+            <div className="mt-5 border-t border-white/10 pt-4">
+              {!optedIn ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleSubmitOptIn}
+                    disabled={submitDisabled}
+                    className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {optInPending ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Submitting…
+                      </>
+                    ) : (
+                      'Submit my payment details for this event'
+                    )}
+                  </button>
+                  <p className="text-xs text-white/40 mt-2">
+                    Submitting opts you in to receive payment for {partyName}. You'll
+                    only be paid for events you submit for.
+                  </p>
+                  {!methodValid && (
+                    <p className="text-xs text-white/40 mt-1">
+                      Choose a payout method above before submitting.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-emerald-500">
+                    <Check size={16} />
+                    <span>
+                      Submitted for {partyName}
+                      {optedInLabel ? ` on ${optedInLabel}` : ''}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveOptIn}
+                    disabled={optInPending}
+                    className="mt-2 text-xs text-white/50 hover:text-white/80 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {optInPending ? 'Removing…' : "Remove me from this event's payments"}
+                  </button>
+                </div>
+              )}
+              {optInError && (
+                <p className="text-xs text-[#ff393a] mt-2">{optInError}</p>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
