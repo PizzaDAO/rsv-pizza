@@ -4726,6 +4726,63 @@ export async function markReceiptIneligible(
 }
 
 /**
+ * marinara-61455: image-authenticity (AI-generated / doctored) admin check.
+ *
+ * Manual, on-demand tool that judges whether a payment-receipt image or a host
+ * event-cover image is AI-generated or doctored. Returns a cached verdict +
+ * confidence + reasons. Advisory only — the verdict flags for human review, it
+ * never auto-rejects. Mirrors the `markReceiptDuplicate` thin-wrapper pattern.
+ */
+export type ImageAuthenticityVerdict = 'authentic' | 'suspicious' | 'likely_fake';
+
+export interface ImageAuthenticityCheck {
+  id: string;
+  imageUrl: string;
+  sourceKind: 'receipt' | 'event_image';
+  partyId: string | null;
+  payoutDocumentId: string | null;
+  verdict: ImageAuthenticityVerdict;
+  score: number;
+  reasons: unknown;
+  provider: string;
+  elaArtifactUrl: string | null;
+  checkedAt: string;
+  checkedBy: string | null;
+}
+
+/**
+ * Run (or return the cached) authenticity check for an image. Pass `force:true`
+ * to bypass the cache and re-run the scorer (costs an API call). Returns the
+ * persisted check row plus whether it came from cache.
+ */
+export async function verifyImageAuthenticity(params: {
+  imageUrl: string;
+  sourceKind: 'receipt' | 'event_image';
+  partyId?: string | null;
+  payoutDocumentId?: string | null;
+  force?: boolean;
+}): Promise<{ check: ImageAuthenticityCheck; cached: boolean }> {
+  return apiRequest<{ check: ImageAuthenticityCheck; cached: boolean }>(
+    '/api/admin/image-authenticity',
+    { method: 'POST', body: params },
+  );
+}
+
+/**
+ * Fetch the most recent cached authenticity check for an image, or `null` when
+ * none exists yet. Used to render a prior verdict on lightbox open without
+ * spending an API call.
+ */
+export async function getImageAuthenticityCheck(
+  imageUrl: string,
+): Promise<ImageAuthenticityCheck | null> {
+  const res = await apiRequest<{ check: ImageAuthenticityCheck | null }>(
+    `/api/admin/image-authenticity?imageUrl=${encodeURIComponent(imageUrl)}`,
+  );
+  return res.check;
+}
+
+/**
  * pancetta-92104: reset a single doc's OCR retry counter so the next backfill
  * call (or this call's inline run) re-attempts `analyzeReceipt` against the
  * receipt. Used to un-stick docs that hit the 3-attempt cap once the

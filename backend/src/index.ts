@@ -54,6 +54,7 @@ import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import adminPayoutRoutes, { payoutWalletRouter, partyMarkPaidRouter } from './routes/admin-payout.routes.js';
 import adminPartyRoutes from './routes/admin-party.routes.js';
+import imageAuthenticityRoutes from './routes/imageAuthenticity.routes.js'; // marinara-61455: admin image-authenticity check
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter, partnerAiShareRouter } from './routes/sponsor-user.routes.js';
@@ -146,6 +147,7 @@ app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboar
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
 app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-management routes (transfer ownership) — before /api/admin catch-all
+app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-61455: image-authenticity check — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
