@@ -578,7 +578,7 @@
     "tryAgain": "Try Again"
   },
   "attendance": {
-    "modalTitle": "How many people do you expect?",
+    "modalTitle": "How many people attended?",
     "modalPlaceholder": "Estimated number of guests",
     "modalCta": "Save estimate",
     "modalError": "Couldn't save. Enter a whole number."
