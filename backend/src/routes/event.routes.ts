@@ -4,19 +4,56 @@ import { AppError } from '../middleware/error.js';
 import { isAdmin } from '../middleware/auth.js';
 import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
+import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
 const router = Router();
 
 // GET /api/events/:slug - Get public event details with host profile (public)
-router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
+// soppressata-50927: optionalAuth so the pre-launch GPP27 gate can recognize
+// admins / in-scope underbosses and let them preview 2027 events.
+router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const slug = req.params.slug.toLowerCase();
 
+    // soppressata-50927: year-aware GPP resolution. When a `?year=YYYY` query
+    // param is present (or for a bare city slug that has multiple GPP editions),
+    // resolve the GPP party by (citySlug, year-from-date). Bare slug => latest
+    // year. This is PURELY ADDITIVE: when no GPP candidate matches we fall
+    // through to the exact inviteCode/customUrl lookup below, so every existing
+    // (non-GPP and 2026) link keeps resolving unchanged.
+    const yearParam = typeof req.query.year === 'string' ? parseInt(req.query.year, 10) : NaN;
+    const requestedYear = Number.isInteger(yearParam) && yearParam > 1900 && yearParam < 3000 ? yearParam : null;
+    // Perf + safety guard: only invoke the (GPP-only) year resolver when there's
+    // a `?year=` param OR the slug carries a trailing 2-digit suffix (the only
+    // shape a raw year-suffixed GPP customUrl like `austin27` takes). This keeps
+    // the common bare-slug path (every non-GPP + 2026 link) on the exact lookup
+    // with zero extra queries, while still ENFORCING the pre-launch 2027 gate
+    // both for `/{city}?year=2027` and for direct `/{city}27` access. Post-
+    // launch, drop this guard to enable "bare /{city} => latest year".
+    const slugHasYearSuffix = /^(.+?)\d{2}$/.test(slug);
+    let resolvedSlugOverride: string | null = null;
+    if (requestedYear != null || slugHasYearSuffix) {
+      const yearMatch = await resolveGppByYear(slug, requestedYear);
+      if (yearMatch) {
+        // Pre-launch gate: hide 2027 events from out-of-scope viewers (treat as 404).
+        const hidden = await isGpp27Hidden(yearMatch, req.userEmail);
+        if (hidden) {
+          throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
+        }
+        // Look the resolved party up via its canonical slug, reusing the exact
+        // existing select shape below.
+        resolvedSlugOverride = (yearMatch.customUrl || yearMatch.inviteCode || '').toLowerCase();
+      }
+    }
+
+    const lookupSlug = resolvedSlugOverride || slug;
+
     // Find party by invite code OR custom URL
     let party = await prisma.party.findUnique({
-      where: { inviteCode: slug },
+      where: { inviteCode: lookupSlug },
       select: {
         id: true,
         name: true,
@@ -37,6 +74,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
         venueName: true,
         country: true,
         city: true,
+        region: true, // soppressata-50927: needed for the GPP27 pre-launch scope gate
         maxGuests: true,
         hideGuests: true,
         eventImageUrl: true,
@@ -97,7 +135,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
     // If not found by invite code, try custom URL
     if (!party) {
       party = await prisma.party.findUnique({
-        where: { customUrl: slug },
+        where: { customUrl: lookupSlug },
         select: {
           id: true,
           name: true,
@@ -118,6 +156,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
           venueName: true,
           country: true,
           city: true,
+          region: true, // soppressata-50927: needed for the GPP27 pre-launch scope gate
           maxGuests: true,
           hideGuests: true,
           eventImageUrl: true,
@@ -188,6 +227,26 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 
     if (!party) {
       throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
+    }
+
+    // soppressata-50927: pre-launch safety net. Even when the year resolver was
+    // skipped (e.g. a brand-new 2027 city whose customUrl is the bare slug, with
+    // no `?year=`), gate the resolved party here so a gated 2027 GPP event can
+    // never leak to an out-of-scope viewer via a direct customUrl/inviteCode hit.
+    if (party.eventType === 'gpp') {
+      const partyYear = party.date ? new Date(party.date).getFullYear() : 0;
+      const hidden = await isGpp27Hidden(
+        {
+          year: partyYear,
+          eventTags: (party.eventTags as string[]) || [],
+          region: party.region ?? null,
+          city: party.city ?? null,
+        },
+        req.userEmail,
+      );
+      if (hidden) {
+        throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
+      }
     }
 
     // Fetch confirmed sponsors with descriptions or logos for public display

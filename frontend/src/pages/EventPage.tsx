@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -71,6 +71,9 @@ function normalizeTelegramUrl(raw: string | null | undefined): string | null {
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  // soppressata-50927: optional ?year=YYYY threaded to the year-aware resolver.
+  const yearParam = searchParams.get('year');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, i18n } = useTranslation('event');
@@ -148,7 +151,7 @@ export function EventPage() {
   useEffect(() => {
     async function loadEvent() {
       if (slug) {
-        const result = await getEventBySlug(slug);
+        const result = await getEventBySlug(slug, yearParam);
 
         // Handle redirect from old slug alias
         if (result && 'redirect' in result) {
@@ -256,7 +259,7 @@ export function EventPage() {
       setLoading(false);
     }
     loadEvent();
-  }, [slug, user?.email]);
+  }, [slug, user?.email, yearParam]);
 
   // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
   useEffect(() => {
@@ -379,7 +382,29 @@ export function EventPage() {
       return true;
     });
   }, [event?.sponsors]);
-  const eventUrl = event ? `https://rsv.pizza/${event.customUrl || event.inviteCode || ''}` : '';
+  // soppressata-50927: canonical event URL is year-aware. The 2027 GPP edition
+  // shares as `/{city}?year=2027` (and any explicitly-requested ?year= is
+  // preserved). The internal customUrl may be year-suffixed (e.g. `austin27`);
+  // we strip that suffix for the public slug and express the year via ?year=.
+  const eventYear = useMemo(() => {
+    if (!event?.date) return null;
+    const y = new Date(event.date).getFullYear();
+    return Number.isInteger(y) ? y : null;
+  }, [event?.date]);
+  const eventUrl = useMemo(() => {
+    if (!event) return '';
+    const rawSlug = event.customUrl || event.inviteCode || '';
+    // Strip a trailing 2-digit year suffix from a GPP customUrl for the public slug.
+    const publicSlug = event.eventType === 'gpp'
+      ? rawSlug.replace(/^(.+?)\d{2}$/, '$1')
+      : rawSlug;
+    // Emit ?year= for the 2027 edition or whenever a non-default year is in play.
+    const needsYear = event.eventType === 'gpp' && (eventYear === 2027 || (yearParam != null && `${yearParam}`.length > 0));
+    const yearForUrl = yearParam && `${yearParam}`.length > 0 ? yearParam : eventYear;
+    return needsYear && yearForUrl
+      ? `https://rsv.pizza/${publicSlug}?year=${yearForUrl}`
+      : `https://rsv.pizza/${publicSlug}`;
+  }, [event, eventYear, yearParam]);
 
   if (loading) {
     return (
