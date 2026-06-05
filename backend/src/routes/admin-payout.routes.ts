@@ -19,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
 import { unaccentMatchIds } from '../lib/accentSearch.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 import {
   requireAuth,
   AuthRequest,
@@ -6010,7 +6011,7 @@ async function sendTelegramMessage(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
+        text: withBennySignature(text),
         disable_web_page_preview: true,
       }),
     });
