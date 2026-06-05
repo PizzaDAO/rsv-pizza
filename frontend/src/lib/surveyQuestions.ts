@@ -52,7 +52,7 @@ export const SURVEY_QUESTION_SET: SurveyQuestion[] = [
     type: 'multiple',
     multi: false,
     text: 'How did you hear about this event?',
-    options: ['A friend', 'Twitter/X', 'The organizer', 'Brave Browser', 'Other'],
+    options: ['A friend', 'Twitter/X', 'WhatsApp', 'The organizer', 'Brave Browser', 'Other'],
     allowOther: true,
   },
   {
