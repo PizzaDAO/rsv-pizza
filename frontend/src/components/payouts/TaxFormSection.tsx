@@ -132,11 +132,27 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
     );
   }
 
+  // culatello-92107: When a host filling out a W-9 realizes they're foreign,
+  // jump them to the right W-8 form. Discard partial W-9 data — the SSN /
+  // EIN / exempt-code fields don't translate to W-8BEN(-E), and the parent
+  // banner is explicit that they picked the wrong form.
+  const handleSwitchFromW9 = (target: 'w8ben' | 'w8bene') => {
+    setDraftData({});
+    setEditingType(target);
+    setPickerOpen(false);
+    setError(null);
+    setStatusMessage(null);
+  };
+
   const renderEditor = () => {
     if (!editingType) return null;
     const editorBody =
       editingType === 'w9' ? (
-        <W9Form value={draftData as W9FormData} onChange={(v) => setDraftData(v)} />
+        <W9Form
+          value={draftData as W9FormData}
+          onChange={(v) => setDraftData(v)}
+          onSwitchFormType={handleSwitchFromW9}
+        />
       ) : editingType === 'w8ben' ? (
         <W8BENForm value={draftData as W8BENFormData} onChange={(v) => setDraftData(v)} />
       ) : (
