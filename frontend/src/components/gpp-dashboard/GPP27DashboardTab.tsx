@@ -1,30 +1,48 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, MapPin, Lock, Loader2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  Users,
+  MapPin,
+  Lock,
+  Loader2,
+  CheckCircle,
+  Circle,
+  ArrowRight,
+  Sparkles,
+} from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { updateParty } from '../../lib/supabase';
 import { IconInput } from '../IconInput';
 import { FindVenueModal } from '../checklist/FindVenueModal';
+import {
+  GPP27_STEPS,
+  stepUnlocked,
+  manualDoneKey,
+  type Gpp27Step,
+  type Gpp27StepCtx,
+} from './gpp27Steps';
 
 /**
- * diavola-49271: GPP27 host dashboard — slice 2 (preview, flag-gated).
+ * diavola-49271: GPP27 host dashboard — slice 3 (preview, flag-gated).
  *
  * Lives ALONGSIDE the existing GPPDashboardTab and is only rendered when the
  * `?dash=gpp27` opt-in flag is active (see HostPage.tsx). The live 2026
  * dashboard is untouched.
  *
- * Slice 1 feature: a guided flow where the host must enter a TARGET attendance
- * number before the venue picker unlocks, and the venue step shows size-tier
- * guidance based on that number.
- *
- * Slice 2 adds:
- *   - Persistence of the target attendance to `parties.target_attendance`.
- *   - An "Expected attendance" section, driven by the live RSVP count, with a
- *     host override persisted to `parties.expected_attendance` (null = auto).
- *     Only shown within ~2 weeks of the event.
+ * Slice 1: guided flow where the host enters a TARGET attendance before the
+ *   venue picker unlocks; venue step shows size-tier guidance.
+ * Slice 2: persistence of target attendance + an "Expected attendance" section
+ *   (live RSVP count with a host override), shown within ~2 weeks of the event.
+ * Slice 3 (this): wraps the above into a full guided, ordered, dependency-aware
+ *   checklist driven by the frontend-defined `gpp27Steps` config, plus a
+ *   prominent "Next Up" call-to-action card. Manual steps (no derivable signal)
+ *   are host-toggled and persisted in localStorage — frontend-only by design.
  */
 export const GPP27DashboardTab: React.FC = () => {
   const { t } = useTranslation('host');
+  const { inviteCode } = useParams<{ inviteCode: string }>();
+  const navigate = useNavigate();
   const { party, guests, mergeParty } = usePizza();
 
   // Local target attendance, seeded from the persisted target (falling back to
@@ -38,6 +56,13 @@ export const GPP27DashboardTab: React.FC = () => {
   const [expectedInput, setExpectedInput] = useState('');
   const [savingExpected, setSavingExpected] = useState(false);
 
+  // Manual step completion (localStorage-backed). Keyed by step id; seeded from
+  // localStorage on party change. `manualVersion` bumps to force re-derivation.
+  const [manualDone, setManualDone] = useState<Record<string, boolean>>({});
+
+  // Ref to the target input so the `target` step's action can focus/scroll it.
+  const targetInputRef = useRef<HTMLDivElement | null>(null);
+
   // Seed the local target from the persisted value (falling back to the
   // existing estimate) on mount / when the party changes.
   useEffect(() => {
@@ -49,6 +74,24 @@ export const GPP27DashboardTab: React.FC = () => {
     setExpectedInput(party?.expectedAttendance != null ? String(party.expectedAttendance) : '');
   }, [party?.id, party?.expectedAttendance]);
 
+  // Seed manual completion flags from localStorage when the party changes.
+  useEffect(() => {
+    if (!party?.id) {
+      setManualDone({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const step of GPP27_STEPS) {
+      if (!step.manual) continue;
+      try {
+        next[step.id] = localStorage.getItem(manualDoneKey(party.id, step.id)) === '1';
+      } catch {
+        next[step.id] = false;
+      }
+    }
+    setManualDone(next);
+  }, [party?.id]);
+
   // Days until the event — mirrors GPPDashboardTab's computation.
   const daysUntil = useMemo(() => {
     if (!party?.date) return null;
@@ -59,6 +102,90 @@ export const GPP27DashboardTab: React.FC = () => {
     if (diff < 0) return null;
     return Math.round(diff / (1000 * 60 * 60 * 24));
   }, [party?.date]);
+
+  const toggleManual = useCallback(
+    (stepId: string) => {
+      if (!party?.id) return;
+      setManualDone((prev) => {
+        const nextVal = !prev[stepId];
+        try {
+          if (nextVal) {
+            localStorage.setItem(manualDoneKey(party.id, stepId), '1');
+          } else {
+            localStorage.removeItem(manualDoneKey(party.id, stepId));
+          }
+        } catch {
+          /* localStorage unavailable — keep in-memory state only */
+        }
+        return { ...prev, [stepId]: nextVal };
+      });
+    },
+    [party?.id],
+  );
+
+  const goToTab = useCallback(
+    (tab: string) => {
+      if (!inviteCode) return;
+      if (tab === 'details') {
+        navigate(`/host/${inviteCode}`);
+      } else {
+        navigate(`/host/${inviteCode}/${tab}`);
+      }
+    },
+    [inviteCode, navigate],
+  );
+
+  const focusTarget = useCallback(() => {
+    const node = targetInputRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const input = node.querySelector('input');
+    if (input) input.focus();
+  }, []);
+
+  // Per-step click action. `manual` steps fall back to a toggle (handled in the
+  // checklist row), but partners/budget also navigate to their tab.
+  const runStepAction = useCallback(
+    (step: Gpp27Step) => {
+      switch (step.id) {
+        case 'createEvent':
+          goToTab('details');
+          break;
+        case 'target':
+          focusTarget();
+          break;
+        case 'venue':
+          setFindVenueOpen(true);
+          break;
+        case 'team':
+          // Host team UI lives on the dashboard (HostsManager) in the 2026
+          // dashboard; the standalone team surface here is the Settings tab.
+          goToTab('details');
+          break;
+        case 'partners':
+          goToTab('partners');
+          break;
+        case 'pizzeria':
+          goToTab('apps');
+          break;
+        case 'budget':
+          goToTab('budget');
+          break;
+        case 'funding':
+          goToTab('payments');
+          break;
+        case 'socials':
+          goToTab('promo');
+          break;
+        case 'throwParty':
+          // No tab — purely a manual checkpoint.
+          break;
+        default:
+          break;
+      }
+    },
+    [goToTab, focusTarget],
+  );
 
   if (!party) return null;
 
@@ -125,6 +252,28 @@ export const GPP27DashboardTab: React.FC = () => {
     await saveExpectedOverride(null);
   };
 
+  // ---- Derive step state -------------------------------------------------
+  const ctx: Gpp27StepCtx = { party, guests: guests ?? [], manualDone };
+
+  const stepStates = GPP27_STEPS.map((step) => {
+    const done = step.isDone(ctx);
+    const unlocked = stepUnlocked(step, ctx);
+    return { step, done, unlocked };
+  });
+
+  const doneCount = stepStates.filter((s) => s.done).length;
+  const totalCount = stepStates.length;
+  const progressPct = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+
+  // First not-done, unlocked step is the "Next Up" CTA.
+  const nextUp = stepStates.find((s) => !s.done && s.unlocked) ?? null;
+
+  // Label of a step id, for the "Complete X first" locked hint.
+  const labelOf = (id: string) => {
+    const s = GPP27_STEPS.find((x) => x.id === id);
+    return s ? t(s.labelKey) : id;
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -133,15 +282,161 @@ export const GPP27DashboardTab: React.FC = () => {
         </h2>
       </div>
 
-      {/* Step 1: Target attendance */}
-      <div className="card p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-surface text-xs font-semibold text-theme-text">
-            1
-          </span>
-          <h3 className="text-lg font-semibold text-theme-text">
-            {t('gpp27.targetStepTitle')}
+      {/* Next Up card */}
+      {nextUp ? (
+        <div className="card p-6 border border-[#ff393a]/40 bg-[#ff393a]/5">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles size={16} className="text-[#ff393a] shrink-0" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#ff393a]">
+              {t('gpp27.nextUp.title')}
+            </span>
+          </div>
+          <h3 className="text-lg font-semibold text-theme-text mb-1">
+            {t(nextUp.step.labelKey)}
           </h3>
+          {nextUp.step.coachKey && (
+            <p className="text-sm text-theme-text-muted mb-4">
+              {t(nextUp.step.coachKey)}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              nextUp.step.manual ? toggleManual(nextUp.step.id) : runStepAction(nextUp.step)
+            }
+            className="btn-primary inline-flex items-center gap-2"
+          >
+            {nextUp.step.manual ? t('gpp27.markDone') : t(nextUp.step.labelKey)}
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      ) : (
+        <div className="card p-6 border border-green-500/30 bg-green-500/5 flex items-center gap-3">
+          <CheckCircle size={22} className="text-green-500 shrink-0" />
+          <div>
+            <h3 className="text-lg font-semibold text-theme-text">
+              {t('gpp27.nextUp.title')}
+            </h3>
+            <p className="text-sm text-green-400">{t('gpp27.nextUp.allDone')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Guided checklist */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-theme-text">{t('gpp27.setupTitle')}</h3>
+          <span className="text-sm text-theme-text-muted">
+            {doneCount}/{totalCount}
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-2 bg-theme-surface-hover rounded-full mb-6 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progressPct}%`,
+              background: progressPct === 100 ? '#22c55e' : '#ff393a',
+            }}
+          />
+        </div>
+
+        <div className="space-y-1">
+          {stepStates.map(({ step, done, unlocked }) => {
+            const Icon = step.icon;
+            const locked = !done && !unlocked;
+            const lockedHint =
+              locked && step.prereqs?.length
+                ? t('gpp27.locked', { step: labelOf(step.prereqs[0]) })
+                : null;
+            const rowClickable = !locked;
+            const handleRow = () => {
+              if (locked) return;
+              if (step.manual) {
+                toggleManual(step.id);
+              } else {
+                runStepAction(step);
+              }
+            };
+            return (
+              <div
+                key={step.id}
+                onClick={rowClickable ? handleRow : undefined}
+                onKeyDown={
+                  rowClickable
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRow();
+                        }
+                      }
+                    : undefined
+                }
+                role={rowClickable ? 'button' : undefined}
+                tabIndex={rowClickable ? 0 : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group ${
+                  locked ? 'opacity-50' : 'hover:bg-theme-surface cursor-pointer'
+                }`}
+              >
+                {/* Completion affordance */}
+                {step.manual && !locked ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleManual(step.id);
+                    }}
+                    aria-label={done ? t('gpp27.markNotDone') : t('gpp27.markDone')}
+                    className="shrink-0 hover:opacity-70 transition-opacity"
+                  >
+                    {done ? (
+                      <CheckCircle size={18} className="text-green-500" />
+                    ) : (
+                      <Circle size={18} className="text-theme-text-faint" />
+                    )}
+                  </button>
+                ) : done ? (
+                  <CheckCircle size={18} className="text-green-500 shrink-0" />
+                ) : locked ? (
+                  <Lock size={18} className="text-theme-text-faint shrink-0" />
+                ) : (
+                  <Circle size={18} className="text-theme-text-faint shrink-0" />
+                )}
+
+                <Icon
+                  size={16}
+                  className={done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'}
+                />
+                <span
+                  className={`text-sm ${done ? 'text-theme-text-muted line-through' : 'text-theme-text'}`}
+                >
+                  {t(step.labelKey)}
+                </span>
+
+                {lockedHint && (
+                  <span className="text-xs text-theme-text-faint ml-2 inline-flex items-center gap-1">
+                    <Lock size={11} className="shrink-0" />
+                    {lockedHint}
+                  </span>
+                )}
+
+                {!locked && (
+                  <span className="ml-auto text-xs text-theme-text-faint group-hover:text-theme-text-muted transition-colors">
+                    {step.manual ? (done ? t('gpp27.markNotDone') : t('gpp27.markDone')) : 'Go →'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Target attendance input — the `target` step focuses/scrolls here. */}
+      <div ref={targetInputRef} className="card p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Users size={18} className="text-theme-text-secondary shrink-0" />
+          <h3 className="text-lg font-semibold text-theme-text">{t('gpp27.targetStepTitle')}</h3>
         </div>
         <IconInput
           icon={Users}
@@ -159,27 +454,19 @@ export const GPP27DashboardTab: React.FC = () => {
           onBlur={commitTarget}
         />
         <div className="flex items-center gap-2 mt-2">
-          <p className="text-xs text-theme-text-muted">
-            {t('gpp27.targetHelper')}
-          </p>
-          {savingTarget && (
-            <Loader2 size={12} className="animate-spin text-theme-text-muted" />
-          )}
+          <p className="text-xs text-theme-text-muted">{t('gpp27.targetHelper')}</p>
+          {savingTarget && <Loader2 size={12} className="animate-spin text-theme-text-muted" />}
           {targetSaved && !savingTarget && (
             <span className="text-xs text-emerald-400">{t('gpp27.targetSaved')}</span>
           )}
         </div>
       </div>
 
-      {/* Step 2: Venue — locked until a target is entered */}
+      {/* Venue tier guidance — surfaced once a target is set. */}
       <div className={`card p-6 ${venueUnlocked ? '' : 'opacity-60'}`}>
         <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-surface text-xs font-semibold text-theme-text">
-            2
-          </span>
-          <h3 className="text-lg font-semibold text-theme-text">
-            {t('gpp27.venueStepTitle')}
-          </h3>
+          <MapPin size={18} className="text-theme-text-secondary shrink-0" />
+          <h3 className="text-lg font-semibold text-theme-text">{t('gpp27.venueStepTitle')}</h3>
         </div>
 
         {!venueUnlocked ? (
@@ -200,27 +487,15 @@ export const GPP27DashboardTab: React.FC = () => {
             {savedVenue ? (
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <div className="text-xs text-theme-text-muted">
-                    {t('gpp27.savedVenue')}
-                  </div>
-                  <div className="text-sm font-medium text-theme-text">
-                    {savedVenue}
-                  </div>
+                  <div className="text-xs text-theme-text-muted">{t('gpp27.savedVenue')}</div>
+                  <div className="text-sm font-medium text-theme-text">{savedVenue}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFindVenueOpen(true)}
-                  className="btn-secondary"
-                >
+                <button type="button" onClick={() => setFindVenueOpen(true)} className="btn-secondary">
                   {t('gpp27.changeVenue')}
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setFindVenueOpen(true)}
-                className="btn-primary"
-              >
+              <button type="button" onClick={() => setFindVenueOpen(true)} className="btn-primary">
                 {t('gpp27.chooseVenue')}
               </button>
             )}
@@ -228,13 +503,11 @@ export const GPP27DashboardTab: React.FC = () => {
         )}
       </div>
 
-      {/* Step 3: Expected attendance — only within ~2 weeks of the event */}
+      {/* Expected attendance — only within ~2 weeks of the event. */}
       {showExpected && (
         <div className="card p-6">
           <div className="flex items-center gap-2 mb-3">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-surface text-xs font-semibold text-theme-text">
-              3
-            </span>
+            <Users size={18} className="text-theme-text-secondary shrink-0" />
             <h3 className="text-lg font-semibold text-theme-text">
               {t('gpp27.expectedStepTitle')}
             </h3>
@@ -279,10 +552,7 @@ export const GPP27DashboardTab: React.FC = () => {
         </div>
       )}
 
-      <FindVenueModal
-        open={findVenueOpen}
-        onClose={() => setFindVenueOpen(false)}
-      />
+      <FindVenueModal open={findVenueOpen} onClose={() => setFindVenueOpen(false)} />
     </div>
   );
 };

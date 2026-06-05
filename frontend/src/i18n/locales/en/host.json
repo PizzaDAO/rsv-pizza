@@ -602,7 +602,38 @@
     "expectedOverridden": "Set by you",
     "expectedResetAuto": "Reset to auto",
     "expectedPlaceholder": "Override expected attendance",
-    "expectedHelper": "Tracks your live RSVP count. Override it if you have a firmer number."
+    "expectedHelper": "Tracks your live RSVP count. Override it if you have a firmer number.",
+    "nextUp": {
+      "title": "Next up",
+      "allDone": "You're all set — nice work!"
+    },
+    "locked": "Complete {{step}} first",
+    "markDone": "Mark done",
+    "markNotDone": "Mark not done",
+    "steps": {
+      "createEvent": "Create your event",
+      "target": "Set your target attendance",
+      "venue": "Find your venue",
+      "team": "Build your team",
+      "partners": "Find partners",
+      "pizzeria": "Choose a pizzeria",
+      "budget": "Set up your budget",
+      "funding": "Get reviewed for funding",
+      "socials": "Post to socials",
+      "throwParty": "Throw the party"
+    },
+    "coach": {
+      "createEvent": "Your event is live — let's get it ready for the big day.",
+      "target": "Pick a headcount goal. It shapes the venue and supplies you'll need.",
+      "venue": "Lock in a space that fits your target crowd.",
+      "team": "Add co-hosts to share the load and unlock dashboard access.",
+      "partners": "Line up local partners and sponsors to support your event.",
+      "pizzeria": "Pick the pizzeria that'll feed your guests.",
+      "budget": "Plan what you'll spend so reimbursement goes smoothly.",
+      "funding": "Submit your event for underboss review to unlock funding.",
+      "socials": "Spread the word — post your event across your channels.",
+      "throwParty": "Everything's ready. Go throw an amazing party!"
+    }
   },
   "checklist": {
     "addTask": "Add Task",
