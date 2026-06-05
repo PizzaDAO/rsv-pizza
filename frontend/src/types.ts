@@ -1116,6 +1116,8 @@ export interface UnderbossEventProgress {
   hasSocialPosts: boolean;
   hasThrown: boolean;
   hasEstimatedAttendance: boolean;
+  hasSubmittedReceipt: boolean;
+  hasSubmittedPaymentInfo: boolean;
 }
 
 export interface UnderbossEvent {

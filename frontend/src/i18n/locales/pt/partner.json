@@ -36,7 +36,9 @@
     "partners": "Parceiros",
     "social": "Social",
     "thrown": "Realizado",
-    "estimate": "Estimativa"
+    "estimate": "Estimativa",
+    "receipt": "Recibo",
+    "payment": "Dados de pagamento"
   },
   "eventCard": {
     "hostedBy": "Organizado por {{name}}",

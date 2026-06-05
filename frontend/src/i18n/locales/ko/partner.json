@@ -36,7 +36,9 @@
     "partners": "파트너",
     "social": "소셜",
     "thrown": "개최됨",
-    "estimate": "예상 인원"
+    "estimate": "예상 인원",
+    "receipt": "영수증",
+    "payment": "결제 정보"
   },
   "eventCard": {
     "hostedBy": "{{name}} 주최",
