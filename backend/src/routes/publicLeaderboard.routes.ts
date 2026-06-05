@@ -1,9 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { getCountryCode } from '../lib/countryCode.js';
+import { BEST_OF_BONUS, SCORECARD_LEADERBOARD_ITEMS } from '../lib/scorecardScore.js';
 
 /**
- * stromboli-71593: public leaderboard for GPP parties + countries.
+ * stromboli-71593 + panzerotti-58931: unified public leaderboard for GPP
+ * parties, countries, and guests.
  *
  * Mounted at `/api/leaderboard` so the full path is
  *   GET /api/leaderboard?window=all|year&limit=&offset=
@@ -12,15 +14,25 @@ import { getCountryCode } from '../lib/countryCode.js';
  *   - underbossStatus='approved'
  *   - eventType='gpp'
  *
- * Composite party score (per stromboli-71593 plan + Snax review):
+ * Unified party score (engagement composite + de-duped scorecard points):
  *   1.0 * link_rsvps   (submittedVia in {'link','rsvp','api'}, status != 'INVITED', approved != false)
  * + 0.3 * invite_rsvps (submittedVia = 'invite' that converted: status != 'INVITED', approved != false)
  * + 2.0 * check_ins    (checkedInAt IS NOT NULL)
  * + 0.5 * photos       (photos.status='approved', capped at 100 per party)
+ * + 1.0 * Σ guestScore over checked-in guests, where
+ *     guestScore = count(completed scorecard items in SCORECARD_LEADERBOARD_ITEMS)
+ *                + BEST_OF_BONUS * winCount  (superlative_submissions status='winner')
+ *
+ * panzerotti-58931 de-duped the scorecard contribution: the generic `photo` and
+ * `pizza_selfie` item keys are excluded (they overlap engagement's approved-photo
+ * count). See `backend/src/lib/scorecardScore.ts`.
  *
  * Country score = SUM(party.score) over parties grouped by case-insensitive,
  * trimmed `parties.country`. Parties with NULL country are excluded from the
  * country board but still appear on the party board.
+ *
+ * Guests board = top 100 in-scope checked-in guests by per-guest de-duped
+ * scorecard score (privacy "First L.").
  *
  * NOT to be confused with the quattro-71244 private "where am I ranked" pill
  * at /api/parties/:partyId/leaderboard-rank (see leaderboard.routes.ts).
@@ -61,6 +73,9 @@ export interface LeaderboardPartyRow {
     inviteRsvps: number;
     checkIns: number;
     photos: number;
+    /** panzerotti-58931: de-duped scorecard points contributed by this party's
+     *  checked-in guests (added to `score`). */
+    scorecard: number;
   };
 }
 
@@ -69,6 +84,16 @@ export interface LeaderboardCountryRow {
   country: string;
   countryCode: string | null;
   partyCount: number;
+  score: number;
+}
+
+export interface LeaderboardGuestRow {
+  rank: number;
+  /** privacy "First L." */
+  name: string;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
   score: number;
 }
 
@@ -85,6 +110,10 @@ export interface LeaderboardResponse {
     rows: LeaderboardCountryRow[];
     total: number;
   };
+  guests: {
+    rows: LeaderboardGuestRow[];
+    total: number;
+  };
 }
 
 // ---- cache ----
@@ -97,6 +126,7 @@ interface CacheEntry {
     computedAt: string;
     parties: LeaderboardPartyRow[];
     countries: LeaderboardCountryRow[];
+    guests: LeaderboardGuestRow[];
   };
 }
 const cache = new Map<WindowKey, CacheEntry>();
@@ -112,6 +142,20 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * Privacy-preserving display name: "First L." (copied from scorecard.routes.ts /
+ * the deleted scorecardLeaderboard.routes.ts so the guests board never leaks a
+ * full last name). Empty → "Guest".
+ */
+function privacyName(raw: string | null | undefined): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return 'Guest';
+  const parts = trimmed.split(/\s+/);
+  const first = parts[0];
+  const lastInitial = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
+}
+
 interface PartyShape {
   id: string;
   name: string;
@@ -125,10 +169,15 @@ interface PartyShape {
   coHosts: any; // JSON
   user: { name: string | null } | null;
   guests: Array<{
+    id: string;
+    name: string | null;
     submittedVia: string;
     status: string;
     approved: boolean | null;
     checkedInAt: Date | null;
+    /** panzerotti-58931: de-duped scorecard score for this guest (merged in
+     *  from the scorecard $queryRaw before scoring). 0 when absent. */
+    scorecardScore?: number;
   }>;
   photos: Array<{ id: string }>;
 }
@@ -158,16 +207,22 @@ function resolveHostName(party: PartyShape): string | null {
   return null;
 }
 
-/** Compute the composite score + breakdown for a single party. */
+/** Compute the unified score + breakdown for a single party. */
 export function scoreParty(party: PartyShape): {
   score: number;
-  breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number };
+  breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number; scorecard: number };
 } {
   let linkRsvps = 0;
   let inviteRsvps = 0;
   let checkIns = 0;
+  let scorecard = 0;
   for (const g of party.guests) {
-    if (g.checkedInAt) checkIns += 1;
+    if (g.checkedInAt) {
+      checkIns += 1;
+      // panzerotti-58931: de-duped scorecard points only count for checked-in
+      // guests (mirrors the per-guest board scope).
+      scorecard += g.scorecardScore ?? 0;
+    }
     // Reject hard-declined and INVITED-but-not-yet-converted rows. `approved`
     // can be null (pending) — we count those as link RSVPs since they're real
     // form submissions.
@@ -184,10 +239,11 @@ export function scoreParty(party: PartyShape): {
     W_LINK * linkRsvps +
     W_INVITE * inviteRsvps +
     W_CHECKIN * checkIns +
-    W_PHOTO * photos;
+    W_PHOTO * photos +
+    scorecard;
   return {
     score: round1(score),
-    breakdown: { linkRsvps, inviteRsvps, checkIns, photos },
+    breakdown: { linkRsvps, inviteRsvps, checkIns, photos, scorecard },
   };
 }
 
@@ -279,21 +335,41 @@ function partyUrl(customUrl: string | null, inviteCode: string): { slug: string;
 
 // ---- core computation ----
 
+/**
+ * Raw row shape for the de-duped scorecard aggregate. One row per
+ * (party, checked-in guest) that has at least one matching scorecard item or a
+ * winning superlative. Guests with no scorecard activity simply don't appear and
+ * default to a score of 0 when merged.
+ */
+interface ScorecardAggRow {
+  party_id: string;
+  guest_id: string;
+  item_count: bigint | number;
+  win_count: bigint | number;
+}
+
+function toNum(v: bigint | number): number {
+  return typeof v === 'bigint' ? Number(v) : v;
+}
+
 export async function computeLeaderboard(windowKey: WindowKey): Promise<{
   window: WindowKey;
   computedAt: string;
   parties: LeaderboardPartyRow[];
   countries: LeaderboardCountryRow[];
+  guests: LeaderboardGuestRow[];
 }> {
   const where: any = {
     underbossStatus: 'approved',
     eventType: 'gpp',
   };
+  const yearStart = new Date(Date.UTC(2026, 0, 1));
+  const yearEnd = new Date(Date.UTC(2027, 0, 1));
   if (windowKey === 'year') {
     // calendar 2026 by parties.date — un-dated GPP events drop from year view.
     where.date = {
-      gte: new Date(Date.UTC(2026, 0, 1)),
-      lt: new Date(Date.UTC(2027, 0, 1)),
+      gte: yearStart,
+      lt: yearEnd,
     };
   }
 
@@ -313,6 +389,8 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
       user: { select: { name: true } },
       guests: {
         select: {
+          id: true,
+          name: true,
           submittedVia: true,
           status: true,
           approved: true,
@@ -326,11 +404,50 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
     },
   })) as unknown as PartyShape[];
 
+  // panzerotti-58931: de-duped scorecard points per (party, checked-in guest).
+  // Single aggregate pass over the in-scope approved-GPP parties; COUNT(DISTINCT)
+  // FILTER avoids join fan-out between scorecard items and superlatives. The
+  // window/scope predicates mirror the Prisma `where` above so the two passes
+  // operate on the same party set. Merged into each guest as `scorecardScore`.
+  const isYear = windowKey === 'year';
+  const scorecardRows = await prisma.$queryRaw<ScorecardAggRow[]>`
+    SELECT
+      g.party_id                                                        AS party_id,
+      g.id                                                              AS guest_id,
+      COUNT(DISTINCT i.id) FILTER (
+        WHERE i.completed AND i.item_key = ANY(${SCORECARD_LEADERBOARD_ITEMS as unknown as string[]})
+      )                                                                 AS item_count,
+      COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'winner')           AS win_count
+    FROM guests g
+    JOIN parties p ON p.id = g.party_id
+    LEFT JOIN guest_scorecard_items i ON i.guest_id = g.id
+    LEFT JOIN superlative_submissions s ON s.guest_id = g.id
+    WHERE p.underboss_status = 'approved'
+      AND p.event_type = 'gpp'
+      AND g.checked_in_at IS NOT NULL
+      AND (g.approved IS TRUE OR g.approved IS NULL)
+      AND (${isYear}::boolean = false
+           OR (p.date >= ${yearStart} AND p.date < ${yearEnd}))
+    GROUP BY g.party_id, g.id
+  `;
+
+  // (party_id → (guest_id → de-duped score)).
+  const scorecardByGuest = new Map<string, number>();
+  for (const r of scorecardRows) {
+    const guestScore = toNum(r.item_count) + toNum(r.win_count) * BEST_OF_BONUS;
+    if (guestScore > 0) scorecardByGuest.set(r.guest_id, guestScore);
+  }
+  for (const party of parties) {
+    for (const g of party.guests) {
+      g.scorecardScore = scorecardByGuest.get(g.id) ?? 0;
+    }
+  }
+
   // Score every party, then drop score-0.
   const scored: Array<{
     party: PartyShape;
     score: number;
-    breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number };
+    breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number; scorecard: number };
   }> = [];
   for (const party of parties) {
     const { score, breakdown } = scoreParty(party);
@@ -365,11 +482,48 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
 
   const countryRows = aggregateCountries(partyRows);
 
+  // panzerotti-58931: top-100 in-scope checked-in guests by per-guest de-duped
+  // scorecard score. City/country are inherited from the guest's party (guests
+  // have no own location). Score > 0 only; tiebreak score DESC then name ASC.
+  interface GuestAcc {
+    name: string;
+    city: string | null;
+    country: string | null;
+    score: number;
+  }
+  const guestAccs: GuestAcc[] = [];
+  for (const party of parties) {
+    for (const g of party.guests) {
+      if (!g.checkedInAt) continue;
+      const score = g.scorecardScore ?? 0;
+      if (score <= 0) continue;
+      guestAccs.push({
+        name: privacyName(g.name),
+        city: party.city,
+        country: party.country,
+        score,
+      });
+    }
+  }
+  guestAccs.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.name.localeCompare(b.name);
+  });
+  const guestRows: LeaderboardGuestRow[] = guestAccs.slice(0, 100).map((g, i) => ({
+    rank: i + 1,
+    name: g.name,
+    city: g.city,
+    country: g.country,
+    countryCode: getCountryCode(g.country),
+    score: g.score,
+  }));
+
   return {
     window: windowKey,
     computedAt: new Date().toISOString(),
     parties: partyRows,
     countries: countryRows,
+    guests: guestRows,
   };
 }
 
@@ -417,6 +571,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       countries: {
         rows: data.countries,
         total: data.countries.length,
+      },
+      guests: {
+        rows: data.guests,
+        total: data.guests.length,
       },
     };
 
