@@ -268,6 +268,8 @@ export interface Party {
   maxGuests: number | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;

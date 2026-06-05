@@ -40,7 +40,7 @@ import { FlyerTab } from '../components/flyer';
 import { PrintTab } from '../components/print';
 import { PreviousYearPhotos } from '../components/PreviousYearPhotos';
 import { PINNABLE_APPS } from '../lib/appDefinitions';
-import { GPPDashboardTab } from '../components/gpp-dashboard';
+import { GPPDashboardTab, GPP27DashboardTab } from '../components/gpp-dashboard';
 import { PayoutsTab } from '../components/payouts';
 import { DayOfTab } from '../components/day-of';
 
@@ -113,6 +113,20 @@ function HostPageContent() {
   }, [isOwnerOrAdmin, party?.allowedTabs]);
 
   const isGPP = party?.eventType === 'gpp';
+  // diavola-49271: opt-in flag for the parallel GPP27 host dashboard (slice 1,
+  // preview). On when `?dash=gpp27` is in the URL; we persist it to
+  // localStorage so it survives in-app navigation that drops the query string.
+  // Read window globals directly to avoid pulling in extra router hooks.
+  const useGpp27Dashboard = useMemo(() => {
+    const queryFlag =
+      new URLSearchParams(window.location.search).get('dash') === 'gpp27';
+    if (queryFlag) {
+      try { window.localStorage.setItem('gpp27', '1'); } catch { /* ignore */ }
+    }
+    let stored = false;
+    try { stored = window.localStorage.getItem('gpp27') === '1'; } catch { /* ignore */ }
+    return queryFlag || stored;
+  }, []);
   // bresaola-49185: gate the Payments app behind party approval. Unapproved
   // parties never see Payments in the tab bar, in /apps, or via direct URL.
   // Derived at component scope (above any early return) per the React Rules
@@ -331,7 +345,7 @@ function HostPageContent() {
         </div>
 
         {activeTab === 'dashboard' && party ? (
-          <GPPDashboardTab />
+          useGpp27Dashboard ? <GPP27DashboardTab /> : <GPPDashboardTab />
         ) : activeTab === 'party-guide' && party ? (
           <DayOfTab party={party} />
         ) : activeTab === 'apps' && party ? (
