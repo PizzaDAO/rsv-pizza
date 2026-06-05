@@ -22,9 +22,10 @@ type FeedSort = 'newest' | 'random';
 // The filename-year term takes precedence over the event date (so a file like
 // "Poster Pizza Party 2024.png" reads as 2024 even on a 2026 event) but NOT
 // over the explicit photo_year override. The regex captures a single 4-digit
-// year 20[1-2][0-9] bounded by a non-digit or string edge, so it pulls 2024
-// from "IMG_20240523" and 2026 from "WhatsApp Image 2026-06-05" without
-// matching inside longer digit runs. substring(... from pattern) returns the
+// year 20[1-2][0-9] preceded by a non-digit or string edge, so it pulls 2024
+// from "IMG_20240523-WA0069.jpg" and 2026 from "WhatsApp Image 2026-06-05"
+// without matching inside longer digit runs (e.g. "12024" still won't match,
+// since the leading boundary fails). substring(... from pattern) returns the
 // captured group or NULL, so COALESCE falls through when the name has no year.
 // For payout_documents (no photo_year / file_name columns) it is dropped.
 //
@@ -56,7 +57,7 @@ function parseYear(raw: unknown): number {
 // no file_name and keep their own (untouched) COALESCE.
 const PHOTO_EFFECTIVE_YEAR = Prisma.sql`COALESCE(
         p.photo_year,
-        NULLIF(substring(p.file_name from '(?:^|[^0-9])(20[1-2][0-9])(?:[^0-9]|$)'), '')::int,
+        NULLIF(substring(p.file_name from '(?:^|[^0-9])(20[1-2][0-9])'), '')::int,
         EXTRACT(YEAR FROM pa.date)::int,
         EXTRACT(YEAR FROM p.created_at)::int
       )`;
