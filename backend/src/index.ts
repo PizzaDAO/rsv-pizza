@@ -36,6 +36,7 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
+import eventAssistantRoutes from './routes/eventAssistant.routes.js';
 import payoutDocumentVoteRoutes from './routes/payout-document-vote.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
@@ -183,6 +184,7 @@ app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake fo
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
+app.use('/api/parties', eventAssistantRoutes); // arancini-58492: NL event assistant (path-scoped auth, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', leaderboardRoutes); // quattro-71244: gamified dashboard leaderboard (host only, before partyRoutes)

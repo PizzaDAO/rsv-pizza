@@ -395,6 +395,45 @@ export async function updateHostGoals(partyId: string, hostGoals: HostGoals) {
   return updatePartyApi(partyId, { hostGoals });
 }
 
+// arancini-58492: Natural-language Event Assistant.
+export interface AssistantProposedChange {
+  /** snake_case field key understood by `updateParty`. */
+  key: string;
+  /** The proposed value to apply when accepted. */
+  value: unknown;
+  label: string;
+  currentDisplay: string;
+  proposedDisplay: string;
+  reason?: string;
+}
+
+export interface EventAssistantResponse {
+  assistantMessage: string;
+  clarifyingQuestion?: string;
+  proposedChanges: AssistantProposedChange[];
+}
+
+export interface AssistantHistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Ask the Event Assistant to turn a plain-English instruction into a structured
+ * diff of editable event fields. The backend NEVER writes — it only proposes;
+ * the caller applies the host-accepted subset via `updateParty`.
+ */
+export async function eventAssistant(
+  partyId: string,
+  instruction: string,
+  history: AssistantHistoryTurn[] = [],
+): Promise<EventAssistantResponse> {
+  return apiRequest<EventAssistantResponse>(`/api/parties/${partyId}/assistant`, {
+    method: 'POST',
+    body: { instruction, conversationHistory: history },
+  });
+}
+
 /**
  * bottarga-92104: shared constant for the "possible scam" manual flag. Stored
  * as a value in `parties.event_tags` (alongside other tags) so existing tag

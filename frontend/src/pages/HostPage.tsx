@@ -13,6 +13,7 @@ import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
 import { DietarySettings } from '../components/DietarySettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
+import { EventAssistant } from '../components/EventAssistant';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
@@ -320,6 +321,9 @@ function HostPageContent() {
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
+
+        {/* arancini-58492: natural-language event assistant, above the tabs */}
+        {canEdit && <EventAssistant />}
 
         <div className="host-tabs border-b border-theme-stroke mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {
