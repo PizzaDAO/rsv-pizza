@@ -36,7 +36,9 @@
     "partners": "合作伙伴",
     "social": "社交",
     "thrown": "已举办",
-    "estimate": "预估人数"
+    "estimate": "预估人数",
+    "receipt": "收据",
+    "payment": "付款信息"
   },
   "eventCard": {
     "hostedBy": "由 {{name}} 主办",

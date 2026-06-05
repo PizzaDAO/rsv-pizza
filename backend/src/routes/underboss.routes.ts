@@ -65,6 +65,14 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
     hasSocialPosts: !!(party.xPostUrl || party.farcasterPostUrl),
     hasThrown: eventPassed && checkedInCount > 0,
     hasEstimatedAttendance: party.estimatedAttendance != null,
+    hasSubmittedReceipt:
+      Array.isArray(party.payouts) &&
+      party.payouts.some((p: any) =>
+        Array.isArray(p.documents) &&
+        p.documents.some((d: any) => d.kind === 'receipt')),
+    hasSubmittedPaymentInfo:
+      Array.isArray(party.payouts) &&
+      party.payouts.some((p: any) => p.payoutMethod != null),
   };
 }
 
@@ -824,6 +832,12 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
         },
         partyKit: { select: { status: true } },
         sponsors: { select: { status: true, amount: true } },
+        payouts: {
+          select: {
+            payoutMethod: true,
+            documents: { select: { kind: true } },
+          },
+        },
         _count: {
           select: {
             guests: true,
@@ -924,6 +938,12 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
           },
           partyKit: { select: { status: true } },
           sponsors: { select: { status: true, amount: true } },
+          payouts: {
+            select: {
+              payoutMethod: true,
+              documents: { select: { kind: true } },
+            },
+          },
           _count: {
             select: {
               guests: true,
@@ -1011,6 +1031,12 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
         sponsors: {
           select: { id: true, name: true, status: true, amount: true, sponsorshipType: true },
           orderBy: { createdAt: 'desc' },
+        },
+        payouts: {
+          select: {
+            payoutMethod: true,
+            documents: { select: { kind: true } },
+          },
         },
         budgetItems: {
           // provolone-58931: exclude soft-deleted budget items from the UB detail view.

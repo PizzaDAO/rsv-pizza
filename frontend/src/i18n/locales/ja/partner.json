@@ -36,7 +36,9 @@
     "partners": "パートナー",
     "social": "ソーシャル",
     "thrown": "開催済み",
-    "estimate": "予想人数"
+    "estimate": "予想人数",
+    "receipt": "領収書",
+    "payment": "支払情報"
   },
   "eventCard": {
     "hostedBy": "主催：{{name}}",

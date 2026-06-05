@@ -37,6 +37,8 @@ const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; labelKey: strin
   { key: 'hasSocialPosts', labelKey: 'progress.social' },
   { key: 'hasThrown', labelKey: 'progress.thrown' },
   { key: 'hasEstimatedAttendance', labelKey: 'progress.estimate' },
+  { key: 'hasSubmittedReceipt', labelKey: 'progress.receipt' },
+  { key: 'hasSubmittedPaymentInfo', labelKey: 'progress.payment' },
 ];
 
 function countProgress(event: UnderbossEvent): number {
