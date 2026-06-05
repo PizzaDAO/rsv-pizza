@@ -8,6 +8,7 @@ import { HostResources } from './HostResources';
 import { HostsManager } from '../HostsManager';
 import { FindVenueModal } from '../checklist/FindVenueModal';
 import { EstimatedAttendanceModal } from '../checklist/EstimatedAttendanceModal';
+import { SocialPostModal } from '../checklist/SocialPostModal';
 import { DashboardKPIs } from './DashboardKPIs';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 
@@ -24,6 +25,7 @@ export const GPPDashboardTab: React.FC = () => {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
   const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
+  const [socialModalOpen, setSocialModalOpen] = useState(false);
   // polpetta-49102: surface latest payouts on the dashboard so hosts don't
   // need to switch to the Payments tab to confirm a prepayment landed.
   const [recentPayouts, setRecentPayouts] = useState<Payout[]>([]);
@@ -88,6 +90,7 @@ export const GPPDashboardTab: React.FC = () => {
     'Select Pizzeria': MapPin,
     'Prepare for the Party': ClipboardCheck,
     'Post to Socials': Megaphone,
+    'Post about the party on socials': Megaphone,
     'Throw the Party': Rocket,
     'Get reviewed for funding': ShieldCheck,
     'Estimated Attendance': Users,
@@ -139,7 +142,8 @@ export const GPPDashboardTab: React.FC = () => {
         onClick: item.name === 'Build a Team' ? () => setHostsExpanded(prev => !prev) :
                  item.name === 'Find Partners' ? () => goToTab('partners') :
                  item.name === 'Find a Venue' ? () => setFindVenueOpen(true) :
-                 item.name === 'Estimated Attendance' ? () => setAttendanceModalOpen(true) : undefined,
+                 item.name === 'Estimated Attendance' ? () => setAttendanceModalOpen(true) :
+                 item.name === 'Post about the party on socials' ? () => setSocialModalOpen(true) : undefined,
         icon: ICON_MAP[item.name] ?? ClipboardCheck,
         dueDate: item.dueDate ? item.dueDate.split('T')[0] : null,
       };
@@ -507,6 +511,12 @@ export const GPPDashboardTab: React.FC = () => {
         partyId={party.id}
         currentEstimate={party.estimatedAttendance ?? null}
         onSaved={loadChecklist}
+      />
+
+      <SocialPostModal
+        open={socialModalOpen}
+        onClose={() => setSocialModalOpen(false)}
+        party={party}
       />
 
       {/* Host Resources */}

@@ -14,6 +14,7 @@ import { ChecklistItemRow } from './ChecklistItemRow';
 import { ChecklistItemForm } from './ChecklistItemForm';
 import { FindVenueModal } from './FindVenueModal';
 import { EstimatedAttendanceModal } from './EstimatedAttendanceModal';
+import { SocialPostModal } from './SocialPostModal';
 import { usePizza } from '../../contexts/PizzaContext';
 
 interface ChecklistTabProps {
@@ -38,6 +39,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [findVenueOpen, setFindVenueOpen] = useState(false);
   const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
+  const [socialModalOpen, setSocialModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -103,6 +105,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
   };
 
   const handleNavigate = (tab: string) => {
+    if (tab === 'social-post') { setSocialModalOpen(true); return; }
     if (tab === 'attendance') { setAttendanceModalOpen(true); return; }
     if (tab === 'venue') {
       setFindVenueOpen(true);
@@ -236,6 +239,14 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
         currentEstimate={party?.estimatedAttendance ?? null}
         onSaved={loadChecklist}
       />
+
+      {party && (
+        <SocialPostModal
+          open={socialModalOpen}
+          onClose={() => setSocialModalOpen(false)}
+          party={party}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
