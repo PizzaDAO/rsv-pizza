@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { X, Download, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
-import { getCityTier } from '../../utils/sponsorshipPricing';
+import { getCityTier, type CityTiers } from '../../utils/sponsorshipPricing';
+import { usePricingConfig } from '../../hooks/usePricingConfig';
 
 interface PartnerCitiesFlyerProps {
   partner: SponsorUser;
@@ -201,18 +202,26 @@ async function renderCitiesFlyer(
   return canvas;
 }
 
-/** Sort cities by tier (1 first) then alphabetical by name */
-function sortCitiesByTier(cities: CityEntry[]): CityEntry[] {
+/**
+ * Sort cities by tier (1 first) then alphabetical by name. When `cityTiers` is
+ * null (pricing config still loading), fall back to plain alphabetical order so
+ * the flyer renders immediately rather than blocking on the config fetch.
+ */
+function sortCitiesByTier(cities: CityEntry[], cityTiers: CityTiers | null): CityEntry[] {
   return [...cities].sort((a, b) => {
-    const tierA = getCityTier(a.name);
-    const tierB = getCityTier(b.name);
-    if (tierA !== tierB) return tierA - tierB;
+    if (cityTiers) {
+      const tierA = getCityTier(a.name, cityTiers);
+      const tierB = getCityTier(b.name, cityTiers);
+      if (tierA !== tierB) return tierA - tierB;
+    }
     return a.name.localeCompare(b.name);
   });
 }
 
 export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFlyerProps) {
   const { t } = useTranslation('partner');
+  // City-tier lists for tier-ordering the city list (marinara-71630 P5).
+  const { config: pricingConfig } = usePricingConfig();
   const [logoPos, setLogoPos] = useState(DEFAULT_LOGO_POS);
   const [logoSize, setLogoSize] = useState(DEFAULT_LOGO_SIZE);
   const [containerWidth, setContainerWidth] = useState(500);
@@ -237,8 +246,8 @@ export function PartnerCitiesFlyer({ partner, events, onClose }: PartnerCitiesFl
       seen.add(key);
       entries.push({ name, country: e.country ?? null });
     }
-    return sortCitiesByTier(entries);
-  }, [events, partner.tag]);
+    return sortCitiesByTier(entries, pricingConfig?.cityTiers ?? null);
+  }, [events, partner.tag, pricingConfig]);
 
   // Editable city list — initialized from events
   const [editCities, setEditCities] = useState<CityEntry[]>(defaultCities);
