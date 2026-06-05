@@ -19,6 +19,7 @@
  * block an approve/flag action.
  */
 import { prisma } from '../config/database.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 
 type NotifyKind = 'approved' | 'flag_ready';
 
@@ -62,7 +63,7 @@ export async function notifyPaymentsTeam(opts: {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           chat_id: tgChat,
-          text,
+          text: withBennySignature(text),
           parse_mode: 'Markdown',
           disable_web_page_preview: true,
         }),

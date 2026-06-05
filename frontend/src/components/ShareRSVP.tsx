@@ -20,7 +20,7 @@ const XIcon: React.FC<{ size: number }> = ({ size }) => (
 );
 
 /** Normalize a twitter handle: strip @, strip full URL prefixes */
-function normalizeHandle(raw: string): string {
+export function normalizeHandle(raw: string): string {
   return raw
     .replace(/^https?:\/\/(www\.)?(twitter\.com|x\.com)\//i, '')
     .replace(/^@/, '')

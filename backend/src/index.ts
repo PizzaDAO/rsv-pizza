@@ -22,6 +22,7 @@ import photoRoutes from './routes/photo.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
+import gpp27Routes from './routes/gpp27.routes.js'; // soppressata-50927: admin-gated GPP27 (2027) create flow
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
@@ -70,6 +71,7 @@ import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
+import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -150,6 +152,7 @@ app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-m
 app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-61455: image-authenticity check — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
+app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
@@ -197,6 +200,7 @@ app.use('/api/events', onesheetRoutes); // One Sheet interest form (public, befo
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
+app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-gated create flow, budget, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)

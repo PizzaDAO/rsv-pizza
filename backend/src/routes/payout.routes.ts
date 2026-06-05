@@ -23,6 +23,7 @@ import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
+import { sanitizeForPg, sanitizePgString } from '../lib/sanitizePg.js';
 import { looksLikeEnsName, resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
@@ -1148,9 +1149,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           originalAmount: new Decimal(fx.originalAmount),
           originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
           exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
-          ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
           // formaggi-89172: structured per-line items for pizza-price analytics.
-          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
           ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
           sortOrder: idx,
           photoId: null,
@@ -1312,7 +1313,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     const adminNotesRaw = (req.body || {}).adminNotes;
     const initialAdminNotes =
       callerIsAdmin && typeof adminNotesRaw === 'string' && adminNotesRaw.trim().length > 0
-        ? adminNotesRaw.trim()
+        ? sanitizePgString(adminNotesRaw.trim())
         : null;
 
     // taleggio-30219: resolve the wallet input once, BEFORE the create, so
@@ -1439,7 +1440,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
             ? mercuryCardLast4.slice(-4)
             : null,
           hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
-            ? hostNotes.trim()
+            ? sanitizePgString(hostNotes.trim())
             : null,
           // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
           // when an admin creates a prepayment on behalf of a cohost.
@@ -1776,7 +1777,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     }
     if (hostNotes !== undefined) {
       data.hostNotes = typeof hostNotes === 'string' && hostNotes.trim().length > 0
-        ? hostNotes.trim()
+        ? sanitizePgString(hostNotes.trim())
         : null;
     }
     if (finalAmountUsd !== undefined) {
@@ -1973,9 +1974,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           originalAmount: new Decimal(fx.originalAmount),
           originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
           exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
-          ocrRaw: { ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } },
+          ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
           // formaggi-89172: structured per-line items for pizza-price analytics.
-          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? ocr.lineItems : null,
+          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
           ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
           sortOrder: i,
           photoId: null,

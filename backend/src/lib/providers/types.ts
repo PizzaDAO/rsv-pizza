@@ -54,6 +54,8 @@ Look for concrete tells:
 
 Be calibrated: heavy compression, scanner artifacts, dark restaurant lighting, and screenshots are NOT by themselves evidence of fakery. Only flag concrete, image-grounded tells. When unsure, prefer "suspicious" over "likely_fake".
 
+Ignore the receipt's printed date, time, and any timestamps entirely — they are NOT evidence of fakery. Never flag a date for being recent, old, or in the future; date plausibility is out of scope. Judge authenticity only from image-forensic tells.
+
 Return ONLY a JSON object:
 {
   "verdict": "authentic" | "suspicious" | "likely_fake",
@@ -63,7 +65,7 @@ Return ONLY a JSON object:
 
 export function visionUserPrompt(ctx: VisionContext): string {
   return ctx.sourceKind === 'receipt'
-    ? 'Judge whether this receipt image is AI-generated or doctored. Pay special attention to the legibility and consistency of the printed text and the total/amount fields.'
+    ? 'Judge whether this receipt image is AI-generated or doctored. Pay special attention to the legibility and consistency of the printed text and the total/amount fields. Disregard the printed date and any timestamps — they are not a forgery signal.'
     : 'Judge whether this event-cover image is AI-generated or doctored.';
 }
 

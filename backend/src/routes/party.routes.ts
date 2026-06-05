@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin, isAdmin, isUnderboss, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
@@ -2074,7 +2075,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: party.hostTelegramChatId.toString(),
-              text: message,
+              text: withBennySignature(message),
               parse_mode: 'Markdown',
             }),
           });

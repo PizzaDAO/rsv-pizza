@@ -646,7 +646,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.addTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'add' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {['review', 'swc', 'Global Pizza Party'].map((tag) => (
                           <button
                             key={tag}
@@ -725,7 +725,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.removeTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'remove' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {/* Show tags that exist on selected events */}
                         {(() => {
                           const selectedEvents = events.filter(e => selectedIds.has(e.id));
@@ -804,7 +804,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   } catch (err) { console.error('Bulk delete failed', err); }
                   setBulkLoading(false);
                 }}
-                className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
+                className="px-4 py-2 text-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-500/30 transition-colors"
               >
                 {t('eventTable.deleteEvents', { count: selectedIds.size })}
               </button>
