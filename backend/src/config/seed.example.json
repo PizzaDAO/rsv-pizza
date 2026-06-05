@@ -21,9 +21,12 @@
   },
 
   "private.fraud_weights": {
-    "_note": "SECRET in production (backend-only, never shipped to frontend). Placeholder here is empty/zero.",
-    "weights": {},
-    "tiers": { "high": 0, "medium": 0, "low": 0 }
+    "_note": "SECRET in production (backend-only, never shipped to frontend; publishing the real values is an evasion roadmap). These are PLACEHOLDER example values documenting SHAPE only — the real, full heuristic weight table + tuned risk-tier thresholds are seeded to prod separately and never committed. `weights` keys are heuristic ids (see WEIGHTS in src/lib/fakeDetection.ts); `tiers` are score cutoffs for high/medium/low. Config is merged over an all-zero placeholder, so any omitted heuristic id resolves to 0.",
+    "weights": {
+      "cap_fill_no_waitlist": 11,
+      "high_bounce_rate": 22
+    },
+    "tiers": { "high": 99, "medium": 50, "low": 9 }
   },
 
   "private.sponsors": {

@@ -104,40 +104,122 @@ export interface FakeDetectionRow {
 }
 
 // ============================================
-// Weights (tunable without code surgery)
+// Weights + risk tiers (marinara-71630 P3)
+//
+// SECURITY: the real, tuned heuristic weights and risk-tier thresholds are
+// SECRET — publishing them is an evasion roadmap for an attacker. They live
+// ONLY in the private `app_config` row `private.fraud_weights` (seeded to
+// production out-of-band) and are resolved at the async scorer entry point
+// (`scorePartiesByIds`) via `getFraudWeights()`, then injected DOWN into the
+// synchronous scoring path (see `scoreEvent` / `tierFromScore`).
+//
+// The map committed below is a NON-SENSITIVE PLACEHOLDER. The KEY NAMES are
+// not secret (they document the heuristic set); only the tuned VALUES are.
+// Every weight is `0` so that, if the config row is briefly absent, the scorer
+// returns ~clean/placeholder scores and never throws (no divide-by-weight
+// anywhere — weights are only summed). Config is merged OVER this placeholder,
+// so any key missing from config still resolves to a (placeholder) `0`.
+//
+// `WEIGHTS` keeps the `keyof typeof WEIGHTS` shape used by `flag()` and the
+// test suite. Resolved weights override the per-flag `weight` inside
+// `scoreEvent`; the placeholder value here is only a fallback.
 // ============================================
 
 export const WEIGHTS = {
-  cap_fill_no_waitlist: 15,
-  low_domain_entropy: 10,
-  wallet_too_low: 8,
-  wallet_too_high_reuse: 8,
-  wallet_reuse: 10,
-  host_self_rsvp_mismatch: 20,
-  pizzeria_fields_blank: 5,
-  wallet_source_all_null: 5,
-  one_word_name: 5,
-  firstname_digits_email: 5,
-  day_gap_pattern: 7,
-  low_hour_entropy: 7,
-  rapid_intersubmission: 8,
-  cross_event_wallet: 15,
-  low_funnel_coverage: 10,
-  high_per_visitor_rsvp_saturation: 20,
-  mailing_list_opt_in_extreme: 7,
-  name_token_zscore: 8,
-  lsh_field_sig_cluster: 10,
-  email_digit_benford: 5,
-  co_host_twitter_handles_missing: 12,
-  repeat_session_rsvp_count: 20,
-  high_bounce_rate: 25,
+  cap_fill_no_waitlist: 0,
+  low_domain_entropy: 0,
+  wallet_too_low: 0,
+  wallet_too_high_reuse: 0,
+  wallet_reuse: 0,
+  host_self_rsvp_mismatch: 0,
+  pizzeria_fields_blank: 0,
+  wallet_source_all_null: 0,
+  one_word_name: 0,
+  firstname_digits_email: 0,
+  day_gap_pattern: 0,
+  low_hour_entropy: 0,
+  rapid_intersubmission: 0,
+  cross_event_wallet: 0,
+  low_funnel_coverage: 0,
+  high_per_visitor_rsvp_saturation: 0,
+  mailing_list_opt_in_extreme: 0,
+  name_token_zscore: 0,
+  lsh_field_sig_cluster: 0,
+  email_digit_benford: 0,
+  co_host_twitter_handles_missing: 0,
+  repeat_session_rsvp_count: 0,
+  high_bounce_rate: 0,
   // checkin-heuristics (marinara-60931): attendance-fraud signals derived from
   // guests.checked_in_at / checked_in_by.
-  checkin_velocity_superhuman: 20,
-  checkin_timestamp_collapse: 15,
-  single_checker_dominance: 10,
-  checkin_ratio_extreme: 12,
+  checkin_velocity_superhuman: 0,
+  checkin_timestamp_collapse: 0,
+  single_checker_dominance: 0,
+  checkin_ratio_extreme: 0,
 } as const;
+
+/** Heuristic id → weight. Real values resolved from private config at runtime. */
+export type WeightTable = Record<keyof typeof WEIGHTS, number>;
+
+/** Risk-tier score thresholds. Real values resolved from private config. */
+export interface RiskTiers {
+  high: number;
+  medium: number;
+  low: number;
+}
+
+/**
+ * Resolved scoring config injected into the synchronous scorer. `weights` is
+ * the placeholder `WEIGHTS` merged with the private-config overrides; `tiers`
+ * are the resolved risk-tier thresholds.
+ */
+export interface ResolvedScoring {
+  weights: WeightTable;
+  tiers: RiskTiers;
+}
+
+/**
+ * Placeholder tier thresholds. All-zero means "config not seeded": with a
+ * `high` of 0 every nonzero score tiers as 'high', but since placeholder
+ * weights are all 0 too, scores are 0 → 'clean'. The real thresholds
+ * (committed nowhere) are seeded to `app_config`.
+ */
+export const PLACEHOLDER_TIERS: RiskTiers = { high: 0, medium: 0, low: 0 };
+
+/**
+ * Merge a (possibly partial) private-config weight map over the committed
+ * placeholder so every heuristic id always resolves to a number. Unknown keys
+ * in `configWeights` are ignored; missing keys fall back to the placeholder.
+ */
+export function resolveWeights(configWeights?: Record<string, number>): WeightTable {
+  const merged = { ...WEIGHTS } as WeightTable;
+  if (configWeights) {
+    for (const key of Object.keys(WEIGHTS) as Array<keyof typeof WEIGHTS>) {
+      const v = configWeights[key];
+      if (typeof v === 'number' && Number.isFinite(v)) merged[key] = v;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Build the {@link ResolvedScoring} bundle from a raw `getFraudWeights()`
+ * payload (or any `{ weights?, tiers? }`-shaped object). Weights are merged
+ * over the placeholder; tiers fall back to {@link PLACEHOLDER_TIERS} when
+ * absent. Never throws — a missing/empty config yields placeholder scoring.
+ */
+export function resolveScoring(config?: {
+  weights?: Record<string, number>;
+  tiers?: Partial<RiskTiers>;
+}): ResolvedScoring {
+  return {
+    weights: resolveWeights(config?.weights),
+    tiers: {
+      high: config?.tiers?.high ?? PLACEHOLDER_TIERS.high,
+      medium: config?.tiers?.medium ?? PLACEHOLDER_TIERS.medium,
+      low: config?.tiers?.low ?? PLACEHOLDER_TIERS.low,
+    },
+  };
+}
 
 // ============================================
 // Helpers
@@ -1140,10 +1222,20 @@ export function checkCheckinRatioExtreme(guests: FakeDetectionGuest[]): FlagResu
 // Aggregator
 // ============================================
 
-export function tierFromScore(score: number): Tier {
-  if (score >= 60) return 'high';
-  if (score >= 30) return 'medium';
-  if (score >= 10) return 'low';
+/**
+ * Map a composite score to a risk tier using the resolved thresholds. Tiers
+ * are resolved from private config and injected here; the default
+ * {@link PLACEHOLDER_TIERS} keeps existing call-sites/tests compiling and makes
+ * an unseeded config tier everything as 'clean' (placeholder weights → score 0).
+ */
+export function tierFromScore(score: number, tiers: RiskTiers = PLACEHOLDER_TIERS): Tier {
+  // A non-positive threshold means "unconfigured" (placeholder); skip it so an
+  // absent config row tiers everything as 'clean' rather than matching score 0
+  // against a 0 threshold. With the real positive thresholds seeded this is
+  // identical to plain `>=` comparisons.
+  if (tiers.high > 0 && score >= tiers.high) return 'high';
+  if (tiers.medium > 0 && score >= tiers.medium) return 'medium';
+  if (tiers.low > 0 && score >= tiers.low) return 'low';
   return 'clean';
 }
 
@@ -1154,10 +1246,14 @@ export function scoreEvent(
   sybilWallets: Set<string>,
   maxGuests: number | null,
   funnelEvents: FakeDetectionFunnelEvent[] = [],
+  // marinara-71630 P3: resolved weights + tiers, injected from the async entry
+  // point (`scorePartiesByIds`). Defaults to the committed placeholder so
+  // existing call-sites and per-heuristic tests keep working without config.
+  scoring: ResolvedScoring = { weights: { ...WEIGHTS } as WeightTable, tiers: PLACEHOLDER_TIERS },
 ): FakeDetectionRow {
   const guests = filterDirectRsvps(allGuests);
 
-  const flags: FlagResult[] = [
+  const rawFlags: FlagResult[] = [
     checkCapFillNoWaitlist(guests, maxGuests),
     checkLowDomainEntropy(guests),
     checkWalletTooLow(guests),
@@ -1189,6 +1285,16 @@ export function scoreEvent(
     checkCheckinRatioExtreme(allGuests),
   ];
 
+  // marinara-71630 P3: override each flag's placeholder weight with the
+  // resolved weight for its heuristic id. The per-heuristic `checkX` functions
+  // (and the tests that call them directly) keep emitting placeholder weights
+  // via `flag()`; the authoritative weight is applied here, once, from config.
+  const flags: FlagResult[] = rawFlags.map(f =>
+    f.id in scoring.weights
+      ? { ...f, weight: scoring.weights[f.id as keyof typeof WEIGHTS] }
+      : f,
+  );
+
   const score = Math.min(
     100,
     flags.filter(f => f.fired).reduce((sum, f) => sum + f.weight, 0),
@@ -1206,7 +1312,7 @@ export function scoreEvent(
     rsvpCount: guests.length,
     maxGuests,
     score,
-    tier: tierFromScore(score),
+    tier: tierFromScore(score, scoring.tiers),
     flags,
   };
 }

@@ -19,8 +19,10 @@ import { prisma } from '../config/database.js';
 import {
   scoreEvent,
   buildSybilWalletSet,
+  resolveScoring,
   type FakeDetectionRow,
 } from './fakeDetection.js';
+import { getFraudWeights } from './privateConfig.js';
 
 /**
  * Cross-event sybil-wallet pre-pass. A wallet is "sybil" when it appears on ≥4
@@ -57,6 +59,14 @@ export async function scorePartiesByIds(
 ): Promise<FakeDetectionRow[]> {
   const sybilWallets =
     precomputedSybilWallets ?? (await buildSybilWalletSetFromDb());
+
+  // marinara-71630 P3: resolve the SECRET fraud weights + risk tiers ONCE here,
+  // at the async entry point, then inject the resolved values down into the
+  // synchronous `scoreEvent` calls below. The weights/tiers are backend-only
+  // and are NEVER serialized into the FakeDetectionRow response (only per-party
+  // scores, tiers and per-flag results are). A missing/empty config row yields
+  // placeholder (all-zero) weights → clean scores, never an error.
+  const scoring = resolveScoring(await getFraudWeights());
 
   const whereClause =
     partyIds && partyIds.length > 0
@@ -159,6 +169,7 @@ export async function scorePartiesByIds(
         step: e.step,
         createdAt: e.createdAt,
       })),
+      scoring,
     ),
   );
 }
