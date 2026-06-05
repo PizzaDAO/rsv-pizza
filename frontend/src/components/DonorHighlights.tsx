@@ -26,7 +26,6 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
 
   const donors = stats.donors;
   const donorCount = stats.donorCount ?? donors.length;
-  const recipient = stats.recipient || t('thisEvent');
   const showAmounts = stats.amountsPublic === true;
 
   const inlineDonors = donors.slice(0, INLINE_DONORS);
@@ -34,10 +33,6 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
 
   return (
     <div className="mt-4 pt-4 border-t border-theme-stroke">
-      <p className="text-theme-text-muted text-xs font-medium mb-2">
-        {t('supportersOf', { recipient })}
-      </p>
-
       <button
         type="button"
         onClick={() => setOpen(true)}
