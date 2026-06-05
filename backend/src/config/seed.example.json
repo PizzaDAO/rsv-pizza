@@ -2,12 +2,18 @@
   "_readme": "marinara-71630 P0 private-config seed template. These are NON-SENSITIVE PLACEHOLDER values that only document the SHAPE of each app_config entry. To seed real values: (1) copy this file to seed.private.json (gitignored), (2) fill in the real production values, (3) run `npm run seed:private-config` from the backend dir. If seed.private.json is absent the runner falls back to THIS file and seeds placeholders (with a loud warning). Keys map 1:1 to app_config rows; each value is stored JSON-stringified in the `value` column.",
 
   "private.reimbursement_rules": {
+    "_note": "PLACEHOLDER reimbursement rules documenting SHAPE only. Real method ids (usdc_base/mercury_card/wire), the real SWC-hub copy + URL, and the real country/tag rules are seeded separately and NOT committed. `kind:'method'` = selectable payout method; `kind:'external'` = informational card (non-selectable, optional `url`). countryRules match when party.country === match.country OR match.tag is in party.eventTags; `visible` restricts to exactly those ids, `disable` greys out an id with a reason.",
     "methods": [
-      { "id": "example_usdc", "label": "Example USDC payout" },
-      { "id": "example_paypal", "label": "Example PayPal payout" }
+      { "id": "usdc_base", "label": "Example USDC payout", "description": "Onchain payment to your wallet.", "kind": "method" },
+      { "id": "mercury_card", "label": "Example virtual card", "description": "We issue you a debit card.", "kind": "method" },
+      { "id": "wire", "label": "Example bank wire", "description": "We send a wire to your bank.", "kind": "method" },
+      { "id": "swc_hub", "label": "Example regional hub", "description": "Your regional hub coordinates reimbursement for events here.", "kind": "external", "url": "" }
     ],
+    "default": ["usdc_base", "mercury_card", "wire"],
     "countryRules": [
-      { "match": { "country": "Exampleland" }, "allow": ["example_usdc"] }
+      { "match": { "country": "Exampleland" }, "visible": ["swc_hub"] },
+      { "match": { "tag": "example-hub" }, "visible": ["swc_hub"] },
+      { "match": { "country": "Blockistan" }, "disable": [{ "id": "mercury_card", "reason": "Virtual cards are unavailable in Blockistan due to compliance restrictions." }] }
     ]
   },
 

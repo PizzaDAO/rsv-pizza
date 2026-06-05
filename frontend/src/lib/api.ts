@@ -5990,6 +5990,39 @@ export async function removePaymentOptIn(
   );
 }
 
+// ============================================
+// marinara-71630 P1: backend-decided reimbursement options
+// ============================================
+// The backend resolves which payout options a host may see (from private
+// app_config country/tag rules); the frontend just renders them. Mirror of the
+// backend `ResolvedOption` shape (backend/src/lib/reimbursementOptions.ts) —
+// keep in sync.
+
+export interface ResolvedReimbursementOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** 'method' → selectable payout method; 'external' → informational card only. */
+  kind: 'method' | 'external';
+  url?: string;
+  enabled: boolean;
+  disabledReason?: string;
+}
+
+/**
+ * Fetch the server-decided reimbursement options for a party. Host-only
+ * (requires edit access). Returns `[]` when config is unseeded — callers
+ * should fall back to a built-in default so the picker never renders empty.
+ */
+export async function fetchReimbursementOptions(
+  partyId: string
+): Promise<ResolvedReimbursementOption[]> {
+  const res = await apiRequest<{ options: ResolvedReimbursementOption[] }>(
+    `/api/parties/${partyId}/reimbursement-options`
+  );
+  return res.options ?? [];
+}
+
 /**
  * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
  * via the backend's mainnet-resolver utility endpoint. Returns null on any
