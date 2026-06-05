@@ -67,14 +67,21 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
 
     const update = req.body || {};
 
-    // ── tonda-58293 Phase 2: auto-capture group chat ids ──────────────────
-    // The bot learns a group's chat_id only from updates it receives.
+    // ── tonda-58293 Phase 2: discrete group chat-id capture ───────────────
+    // The bot learns a group's chat_id only from updates it receives. Capture
+    // is intentionally limited to DISCRETE events (not every group message —
+    // the bot sits in ~466+ groups with privacy mode OFF, so an upsert per
+    // message is a needless write firehose; a group's chat_id is immutable
+    // except on supergroup migration, which is auto-handled on send).
     //   - `my_chat_member` fires when the bot is added/promoted regardless of
-    //     privacy mode → PRIMARY capture path.
-    //   - A group `message` only arrives when privacy mode is off, or it's a
-    //     command/mention/reply → BONUS path.
-    // Capture happens before the private-DM logic below; group updates never
-    // reach that path (it requires chat.type === 'private').
+    //     privacy mode → AUTOMATIC capture path for NEW groups.
+    //   - `/register` (or `/register@<botusername>`) posted in a group →
+    //     MANUAL capture path for groups the bot was already sitting in.
+    // Both run BEFORE the private-DM logic below; group updates never reach
+    // that path (it requires chat.type === 'private'). Non-command group
+    // messages are ignored (no upsert) and just 200.
+
+    // Automatic path: bot added/promoted to a group/supergroup.
     try {
       const memberChat = update.my_chat_member?.chat;
       if (memberChat && GROUP_TYPES.has(memberChat.type) && typeof memberChat.id === 'number') {
@@ -85,20 +92,42 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
         });
         return res.status(200).json({ ok: true });
       }
+    } catch (captureErr: any) {
+      console.error('[Telegram Webhook] my_chat_member capture failed:', captureErr?.message || captureErr);
+      // Always 200, never block.
+      return res.status(200).json({ ok: true });
+    }
 
+    // Manual path: `/register` command in a group/supergroup.
+    {
       const msgChat = update.message?.chat;
+      const msgText: string = typeof update.message?.text === 'string' ? update.message.text : '';
       if (msgChat && GROUP_TYPES.has(msgChat.type) && typeof msgChat.id === 'number') {
-        await captureTelegramGroup({
-          chatId: msgChat.id,
-          title: msgChat.title ?? null,
-          chatType: msgChat.type,
-        });
+        // Only act on the /register command. Telegram delivers commands as
+        // `/register` or `/register@BotUsername` (group disambiguation). Take
+        // the first whitespace-delimited token, strip any `@mention` suffix,
+        // and compare case-insensitively. Everything else in a group is ignored.
+        const firstToken = msgText.trim().split(/\s+/)[0] || '';
+        const command = firstToken.split('@')[0].toLowerCase();
+        if (command === '/register') {
+          try {
+            const result = await captureTelegramGroup({
+              chatId: msgChat.id,
+              title: msgChat.title ?? null,
+              chatType: msgChat.type,
+            });
+            const confirmation = result.matchedCityKey
+              ? `✅ Captured this group for ${result.matchedCityKey} — reminders are now wired up.`
+              : '✅ Got it — this group is captured. An admin can assign it to a city in /underboss.';
+            await sendMessage(botToken, msgChat.id, confirmation);
+          } catch (captureErr: any) {
+            console.error('[Telegram Webhook] /register capture failed:', captureErr?.message || captureErr);
+          }
+        }
+        // Group message handled (command or ignored non-command) — always 200,
+        // never fall through to the private-DM path.
         return res.status(200).json({ ok: true });
       }
-    } catch (captureErr: any) {
-      console.error('[Telegram Webhook] group capture failed:', captureErr?.message || captureErr);
-      // Fall through — always 200, never block.
-      return res.status(200).json({ ok: true });
     }
     // ──────────────────────────────────────────────────────────────────────
 

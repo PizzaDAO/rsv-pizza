@@ -632,6 +632,30 @@ export async function testCityTelegramGroup(
   );
 }
 
+export interface TelegramGroupRefreshResult {
+  cityKey: string;
+  ok: boolean;
+  migrated?: boolean;
+  reason?: string;
+  /** chatId echoed on failure (string, BigInt-safe). */
+  chatId?: string;
+  group?: TelegramGroupCityStatus & { id: string; chatId: string | null };
+}
+
+/**
+ * tonda-58293 Phase 2: re-verify a city's KNOWN Telegram group via getChat.
+ * Updates title / is_supergroup / last_verified_at, and persists the new id if
+ * the group migrated to a supergroup. 400 if the city has no chat_id yet.
+ */
+export async function refreshCityTelegramGroup(
+  cityKey: string,
+): Promise<TelegramGroupRefreshResult> {
+  return apiRequest<TelegramGroupRefreshResult>(
+    `/api/underboss/telegram/groups/${encodeURIComponent(cityKey)}/refresh`,
+    { method: 'POST', requireAuth: true },
+  );
+}
+
 /**
  * mortadella-92106: set admin-only city notes on a party. Backed by the
  * dedicated `PATCH /api/admin/parties/:partyId/admin-notes` endpoint so

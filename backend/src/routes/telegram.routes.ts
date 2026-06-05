@@ -818,4 +818,117 @@ router.post('/groups/:cityKey/test', requireAuth, requireUnderbossAuth, async (r
   }
 });
 
+// POST /groups/:cityKey/refresh — re-verify a city's KNOWN group via getChat.
+//
+// tonda-58293 Phase 2 rework: capture is now discrete (my_chat_member +
+// /register). This endpoint lets an underboss re-verify an already-captured
+// group on demand: call Telegram getChat(chatId), then update title /
+// is_supergroup / last_verified_at. If getChat reports the chat migrated to a
+// supergroup (`migrate_to_chat_id` / parameters.migrate_to_chat_id), persist
+// the new id + is_supergroup=true — mirroring the migration-persist logic in
+// sendToCityGroup. Scope-checked. If the city has no chat_id on file, 400.
+router.post('/groups/:cityKey/refresh', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const key = (req.params.cityKey || '').toLowerCase().trim();
+    if (!key) {
+      throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
+    }
+    if (!(await callerOwnsCity(ub, key))) {
+      throw new AppError('That city is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      throw new AppError('Telegram bot token not configured', 500, 'CONFIG_ERROR');
+    }
+
+    const row = await prisma.cityTelegramGroup.findUnique({
+      where: { cityKey: key },
+      select: { chatId: true },
+    });
+    if (!row || row.chatId === null) {
+      // No id to refresh — make the skip explicit for the UI.
+      return res.status(400).json({
+        error: 'NO_CHAT_ID',
+        message: 'This city has no Telegram group on file yet — nothing to refresh.',
+        cityKey: key,
+      });
+    }
+
+    const getChat = async (chatId: string) => {
+      const resp = await fetch(`https://api.telegram.org/bot${botToken}/getChat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId }),
+      });
+      return resp.json() as Promise<any>;
+    };
+
+    const originalChatId = row.chatId.toString();
+    let result = await getChat(originalChatId);
+
+    // Handle supergroup migration: getChat on the old id reports the new one.
+    // (Telegram surfaces it via parameters.migrate_to_chat_id; some clients
+    // also see chat.migrate_to_chat_id once migrated.)
+    const migratedTo =
+      result?.parameters?.migrate_to_chat_id ?? result?.result?.migrate_to_chat_id ?? null;
+    let effectiveChatId = originalChatId;
+    let migrated = false;
+    if (!result.ok && migratedTo) {
+      effectiveChatId = String(migratedTo);
+      migrated = true;
+      console.log(`[tonda-58293][refresh] ${key} migrated ${originalChatId} -> ${effectiveChatId}, re-fetching...`);
+      result = await getChat(effectiveChatId);
+    }
+
+    if (!result.ok) {
+      return res.status(200).json({
+        cityKey: key,
+        ok: false,
+        reason: result.description || 'getChat failed',
+        chatId: originalChatId,
+      });
+    }
+
+    const chat = result.result || {};
+    const newChatId =
+      typeof chat.id === 'number' || typeof chat.id === 'string' ? String(chat.id) : effectiveChatId;
+    const isSupergroup = migrated ? true : chat.type === 'supergroup';
+    const title: string | null = typeof chat.title === 'string' ? chat.title : null;
+
+    const updated = await prisma.cityTelegramGroup.update({
+      where: { cityKey: key },
+      data: {
+        chatId: BigInt(newChatId),
+        title,
+        isSupergroup,
+        source: migrated ? 'migration' : undefined,
+        lastVerifiedAt: new Date(),
+      },
+    });
+
+    res.json({
+      cityKey: key,
+      ok: true,
+      migrated,
+      group: {
+        id: updated.id,
+        cityKey: updated.cityKey,
+        chatId: updated.chatId !== null ? updated.chatId.toString() : null,
+        chatUrl: updated.chatUrl,
+        title: updated.title,
+        country: updated.country,
+        region: updated.region,
+        underboss: updated.underboss,
+        isSupergroup: updated.isSupergroup,
+        source: updated.source,
+        lastVerifiedAt: updated.lastVerifiedAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

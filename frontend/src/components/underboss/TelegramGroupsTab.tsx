@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2, Send, AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Loader2, Send, AlertTriangle, XCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import {
   fetchTelegramGroupsStatus,
   assignTelegramGroup,
   testCityTelegramGroup,
+  refreshCityTelegramGroup,
   type TelegramGroupCityStatus,
   type TelegramPendingCapture,
   type TelegramGroupTestResult,
+  type TelegramGroupRefreshResult,
 } from '../../lib/api';
 
 /**
@@ -28,6 +30,10 @@ export function TelegramGroupsTab() {
   // Per-city test state (cityKey -> result/loading)
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, TelegramGroupTestResult>>({});
+
+  // Per-city refresh state (cityKey -> result/loading)
+  const [refreshing, setRefreshing] = useState<Record<string, boolean>>({});
+  const [refreshResults, setRefreshResults] = useState<Record<string, TelegramGroupRefreshResult>>({});
 
   // Per-capture assign state (chatId -> selected cityKey / loading)
   const [assignSel, setAssignSel] = useState<Record<string, string>>({});
@@ -99,6 +105,29 @@ export function TelegramGroupsTab() {
       }));
     } finally {
       setTesting((t) => ({ ...t, [cityKey]: false }));
+    }
+  }
+
+  async function handleRefresh(cityKey: string) {
+    setRefreshing((t) => ({ ...t, [cityKey]: true }));
+    setRefreshResults((r) => {
+      const next = { ...r };
+      delete next[cityKey];
+      return next;
+    });
+    try {
+      const result = await refreshCityTelegramGroup(cityKey);
+      setRefreshResults((r) => ({ ...r, [cityKey]: result }));
+      // On success, reload so title / supergroup / last-verified reflect the
+      // re-fetched values (and any migration-persisted new id).
+      if (result.ok) await load();
+    } catch (err: any) {
+      setRefreshResults((r) => ({
+        ...r,
+        [cityKey]: { cityKey, ok: false, reason: err?.message || 'Refresh failed' },
+      }));
+    } finally {
+      setRefreshing((t) => ({ ...t, [cityKey]: false }));
     }
   }
 
@@ -195,7 +224,7 @@ export function TelegramGroupsTab() {
           )}
         </div>
         <p className="text-xs text-theme-text-muted mb-4">
-          To add a missing city, add the bot to its Telegram group — the ID is captured automatically.
+          To add a missing city: add @MoltoBeneBot to its Telegram group, or post /register in the group — the ID is captured automatically.
         </p>
 
         <div className="overflow-x-auto border border-theme-stroke rounded-xl">
@@ -207,12 +236,13 @@ export function TelegramGroupsTab() {
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Last verified</th>
                 <th className="px-3 py-2 font-medium">Chat</th>
-                <th className="px-3 py-2 font-medium text-right">Test</th>
+                <th className="px-3 py-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {sortedCities.map((c) => {
                 const result = testResults[c.cityKey];
+                const refreshResult = refreshResults[c.cityKey];
                 return (
                   <tr key={c.cityKey} className="border-b border-theme-stroke/60 last:border-0">
                     <td className="px-3 py-2 text-theme-text capitalize">{c.cityKey}</td>
@@ -249,6 +279,29 @@ export function TelegramGroupsTab() {
                                 : result.reason || 'Failed'}
                             </span>
                           )}
+                          {refreshResult && (
+                            <span
+                              className={`text-xs ${refreshResult.ok ? 'text-emerald-400' : 'text-red-400'}`}
+                            >
+                              {refreshResult.ok
+                                ? refreshResult.migrated
+                                  ? 'Refreshed (migrated)'
+                                  : 'Refreshed ✓'
+                                : refreshResult.reason || 'Failed'}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleRefresh(c.cityKey)}
+                            disabled={refreshing[c.cityKey]}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-theme-card border border-theme-stroke text-xs text-theme-text hover:bg-theme-surface disabled:opacity-50"
+                          >
+                            {refreshing[c.cityKey] ? (
+                              <Loader2 className="animate-spin" size={12} />
+                            ) : (
+                              <RefreshCw size={12} />
+                            )}
+                            Refresh
+                          </button>
                           <button
                             onClick={() => handleTest(c.cityKey)}
                             disabled={testing[c.cityKey]}
