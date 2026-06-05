@@ -166,6 +166,9 @@ router.post('/events', requireAuth, async (req: AuthRequest, res: Response, next
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       throw new AppError('Valid email is required', 400, 'VALIDATION_ERROR');
     }
+    if (!telegram || typeof telegram !== 'string' || telegram.trim().length === 0) {
+      throw new AppError('Telegram is required', 400, 'VALIDATION_ERROR');
+    }
 
     const normalizedCity = city.trim();
 

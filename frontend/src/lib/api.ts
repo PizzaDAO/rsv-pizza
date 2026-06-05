@@ -6383,7 +6383,7 @@ export interface Gpp27CreateEventInput {
   city: string;
   hostName: string;
   email: string;
-  telegram?: string;
+  telegram: string;
   country?: string;
   countryCode?: string;
   cityFormattedName?: string;

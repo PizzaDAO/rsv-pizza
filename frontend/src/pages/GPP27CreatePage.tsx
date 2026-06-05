@@ -110,8 +110,8 @@ export function GPP27CreatePage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
-    if (!city.trim() || !hostName.trim() || !email.trim()) {
-      setCreateError('City, host name, and email are required.');
+    if (!city.trim() || !hostName.trim() || !email.trim() || !telegram.trim()) {
+      setCreateError('City, host name, email, and Telegram are required.');
       return;
     }
     setSubmitting(true);
@@ -120,7 +120,7 @@ export function GPP27CreatePage() {
         city: city.trim(),
         hostName: hostName.trim(),
         email: email.trim(),
-        telegram: telegram.trim() || undefined,
+        telegram: telegram.trim(),
         timezone: timezone || undefined,
         ...(cityData && {
           country: cityData.country,
@@ -271,7 +271,7 @@ export function GPP27CreatePage() {
                 icon={Send}
                 value={telegram}
                 onChange={(e) => setTelegram(e.target.value)}
-                placeholder="Host Telegram (optional)"
+                placeholder="Host Telegram"
               />
 
               {createError && (
