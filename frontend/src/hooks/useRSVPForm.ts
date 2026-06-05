@@ -201,6 +201,24 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // lasagna-49278: generic setter used by the DB-driven RsvpCheckboxList
+  // renderer. Switch on field-name string and call the corresponding
+  // existing setter. Unknown fields are logged and ignored.
+  const setOptInByField = useCallback((field: string, value: boolean) => {
+    switch (field) {
+      case 'mailingListOptIn': setMailingListOptIn(value); break;
+      case 'swcOptIn':         setSwcOptIn(value); break;
+      case 'swcCaOptIn':       setSwcCaOptIn(value); break;
+      case 'swcAuOptIn':       setSwcAuOptIn(value); break;
+      case 'swcEuOptIn':       setSwcEuOptIn(value); break;
+      case 'swcUkOptIn':       setSwcUkOptIn(value); break;
+      case 'swcBrOptIn':       setSwcBrOptIn(value); break;
+      case 'ethconfOptIn':     setEthconfOptIn(value); break;
+      default:
+        console.warn('[useRSVPForm] setOptInByField: unknown field', field);
+    }
+  }, []);
+
   const setCombinedOptIn = useCallback((v: boolean) => {
     setMailingListOptIn(v);
     if (isEthconfEvent) setEthconfOptIn(v);
@@ -600,6 +618,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setShowSwcBrInfoModal,
     ethconfOptIn,
     setEthconfOptIn,
+    setOptInByField,
     optinAbVariant,
     combinedOptIn,
     setCombinedOptIn,
@@ -686,6 +705,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     availableToppings: eventData.availableToppings,
     availableDietaryOptions: eventData.availableDietaryOptions,
     showToppingsOnRsvp: eventData.showToppingsOnRsvp ?? false,
+    // lasagna-49278: exposed for RsvpCheckboxList renderer.
+    eventId: eventData.id,
+    eventTags: eventData.eventTags || [],
 
     // Reset
     resetForm,

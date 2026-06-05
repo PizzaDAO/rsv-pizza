@@ -8,6 +8,7 @@ import { IconInput } from '../components/IconInput';
 import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
 import { OptinABTab } from '../components/underboss/OptinABTab';
+import { RsvpCheckboxesTab } from '../components/admin/RsvpCheckboxesTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight,
@@ -122,7 +123,7 @@ export function AdminPage() {
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'admin' | 'experiments'>('admin');
+  const [activeTab, setActiveTab] = useState<'admin' | 'experiments' | 'rsvpCheckboxes'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
 
@@ -620,6 +621,19 @@ export function AdminPage() {
             >
               Experiments
               {activeTab === 'experiments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('rsvpCheckboxes')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'rsvpCheckboxes'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              RSVP Checkboxes
+              {activeTab === 'rsvpCheckboxes' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
@@ -1483,6 +1497,12 @@ export function AdminPage() {
           {activeTab === 'experiments' && (
             <section className="mb-10">
               <OptinABTab />
+            </section>
+          )}
+
+          {activeTab === 'rsvpCheckboxes' && (
+            <section className="mb-10">
+              <RsvpCheckboxesTab />
             </section>
           )}
         </div>

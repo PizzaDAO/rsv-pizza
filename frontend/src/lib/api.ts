@@ -4287,6 +4287,68 @@ export async function setExperimentFlag(key: string, enabled: boolean): Promise<
   }
 }
 
+// ── lasagna-49278: RSVP opt-in checkbox config admin ──
+// Same row shape as the renderer hook (frontend/src/hooks/useRsvpCheckboxConfig.ts).
+export interface RsvpCheckboxAdminRow {
+  id: string;
+  party_id: string | null;
+  position: number;
+  active: boolean;
+  required_tags: string[];
+  excluded_tags: string[];
+  always_show: boolean;
+  opt_in_fields: string[];
+  combined_group: string | null;
+  label_i18n_key: string | null;
+  label_default: string | null;
+  label_overrides: Record<string, string>;
+  info_modal_i18n_ns: string | null;
+  info_modal_privacy_url: string | null;
+  info_modal_terms_url: string | null;
+  info_modal_terms_key: string | null;
+  modal_overrides: Record<string, unknown>;
+  accent_color: string;
+  updated_at?: string;
+  updated_by?: string | null;
+}
+
+export type RsvpCheckboxAdminInput = Partial<Omit<RsvpCheckboxAdminRow, 'updated_at' | 'updated_by'>> & { id?: string };
+
+export async function listRsvpCheckboxes(partyId?: string): Promise<RsvpCheckboxAdminRow[]> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  const res = await apiRequest<{ checkboxes: RsvpCheckboxAdminRow[] }>(`/api/admin/rsvp-checkboxes${qs}`);
+  return res.checkboxes;
+}
+
+export async function createRsvpCheckbox(body: RsvpCheckboxAdminInput): Promise<RsvpCheckboxAdminRow> {
+  const res = await apiRequest<{ checkbox: RsvpCheckboxAdminRow }>('/api/admin/rsvp-checkboxes', {
+    method: 'POST',
+    body,
+  });
+  return res.checkbox;
+}
+
+export async function updateRsvpCheckbox(
+  id: string,
+  partyId: string | null,
+  body: RsvpCheckboxAdminInput,
+): Promise<RsvpCheckboxAdminRow> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  const res = await apiRequest<{ checkbox: RsvpCheckboxAdminRow }>(
+    `/api/admin/rsvp-checkboxes/${encodeURIComponent(id)}${qs}`,
+    { method: 'PATCH', body },
+  );
+  return res.checkbox;
+}
+
+export async function deleteRsvpCheckbox(id: string, partyId?: string): Promise<void> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  await apiRequest<{ deleted: boolean }>(
+    `/api/admin/rsvp-checkboxes/${encodeURIComponent(id)}${qs}`,
+    { method: 'DELETE' },
+  );
+}
+
 // ── Guest Scorecard ──
 
 export interface ScorecardItem {
