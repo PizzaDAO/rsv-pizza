@@ -1,0 +1,95 @@
+{
+  "_readme": "marinara-71630 P0 private-config seed template. These are NON-SENSITIVE PLACEHOLDER values that only document the SHAPE of each app_config entry. To seed real values: (1) copy this file to seed.private.json (gitignored), (2) fill in the real production values, (3) run `npm run seed:private-config` from the backend dir. If seed.private.json is absent the runner falls back to THIS file and seeds placeholders (with a loud warning). Keys map 1:1 to app_config rows; each value is stored JSON-stringified in the `value` column.",
+
+  "private.reimbursement_rules": {
+    "_note": "PLACEHOLDER reimbursement rules documenting SHAPE only. Real method ids (usdc_base/mercury_card/wire), the real SWC-hub copy + URL, and the real country/tag rules are seeded separately and NOT committed. `kind:'method'` = selectable payout method; `kind:'external'` = informational card (non-selectable, optional `url`). countryRules match when party.country === match.country OR match.tag is in party.eventTags; `visible` restricts to exactly those ids, `disable` greys out an id with a reason.",
+    "methods": [
+      { "id": "usdc_base", "label": "Example USDC payout", "description": "Onchain payment to your wallet.", "kind": "method" },
+      { "id": "mercury_card", "label": "Example virtual card", "description": "We issue you a debit card.", "kind": "method" },
+      { "id": "wire", "label": "Example bank wire", "description": "We send a wire to your bank.", "kind": "method" },
+      { "id": "swc_hub", "label": "Example regional hub", "description": "Your regional hub coordinates reimbursement for events here.", "kind": "external", "url": "" }
+    ],
+    "default": ["usdc_base", "mercury_card", "wire"],
+    "countryRules": [
+      { "match": { "country": "Exampleland" }, "visible": ["swc_hub"] },
+      { "match": { "tag": "example-hub" }, "visible": ["swc_hub"] },
+      { "match": { "country": "Blockistan" }, "disable": [{ "id": "mercury_card", "reason": "Virtual cards are unavailable in Blockistan due to compliance restrictions." }] }
+    ]
+  },
+
+  "private.payout_caps": {
+    "_note": "OBVIOUSLY-FAKE placeholder caps documenting shape only. Real production caps are seeded separately (marinara-71630 P2) and are NOT committed. perAddressHardCapUsd should sit just above hardPerTxCeilingUsd; hardPerTxCeilingUsd is the over-everything per-tx ceiling.",
+    "perSubmissionMaxUsd": 111,
+    "perAddressHardCapUsd": 444,
+    "perTxCapUsd": 222,
+    "dailyCapUsd": 555,
+    "w9ThresholdUsd": 333,
+    "hardPerTxCeilingUsd": 444
+  },
+
+  "private.fraud_weights": {
+    "_note": "SECRET in production (backend-only, never shipped to frontend; publishing the real values is an evasion roadmap). These are PLACEHOLDER example values documenting SHAPE only — the real, full heuristic weight table + tuned risk-tier thresholds are seeded to prod separately and never committed. `weights` keys are heuristic ids (see WEIGHTS in src/lib/fakeDetection.ts); `tiers` are score cutoffs for high/medium/low. Config is merged over an all-zero placeholder, so any omitted heuristic id resolves to 0.",
+    "weights": {
+      "cap_fill_no_waitlist": 11,
+      "high_bounce_rate": 22
+    },
+    "tiers": { "high": 99, "medium": 50, "low": 9 }
+  },
+
+  "private.sponsors": {
+    "sponsors": [
+      { "name": "Example Sponsor One", "tier": "gold", "logoUrl": "https://example.com/logo1.png", "url": "https://example.com" },
+      { "name": "Example Sponsor Two", "tier": "silver", "logoUrl": "https://example.com/logo2.png", "url": "https://example.com" }
+    ]
+  },
+
+  "private.city_tiers": {
+    "_note": "PLACEHOLDER tier-1/tier-2 city name lists documenting SHAPE only — OBVIOUSLY FAKE city names. Real lists are seeded separately and NOT committed. Anything not matched (including empty lists) resolves to tier 3. Matching is case-insensitive substring after stripping spaces/hyphens (see cityTierFrom in src/helpers/gpp27.ts).",
+    "tier1": ["exampleburg", "placeholder city"],
+    "tier2": ["sampletown", "demo metropolis"]
+  },
+
+  "private.reimbursement_tiers": {
+    "_note": "PLACEHOLDER GPP27 reimbursement config documenting SHAPE only — OBVIOUSLY FAKE numbers. Real per-head rates, ceiling, and coefficient are seeded separately and NOT committed. perHeadRates keyed by tier ('1'/'2'/'3') = per-attendee USD; ceilingUsd = absolute per-event cap the suggestion clamps to; attendanceRsvpCoefficient = coefficient on current RSVP count in expectedAttendance = max(lastYear, coeff*rsvp).",
+    "perHeadRates": { "1": 9, "2": 9, "3": 9 },
+    "ceilingUsd": 999,
+    "attendanceRsvpCoefficient": 0.99
+  },
+
+  "private.reimbursement_cap_bands": {
+    "_note": "PLACEHOLDER underboss 'suggested reimbursement cap' bands documenting SHAPE only — OBVIOUSLY FAKE numbers. This is the ORIGINAL arugula-38633 band heuristic (distinct from private.reimbursement_tiers' GPP27 per-head formula). Real per-tier dollar bands are seeded separately and NOT committed. bands keyed by tier ('1'/'2'/'3'); suggestion = round( minUsd + ((clamp(expectedGuests,guestFloor,guestCeiling) - guestFloor)/(guestCeiling - guestFloor))*(maxUsd - minUsd), roundingIncrementUsd ). An unseeded/missing band → no suggestion (not $0). roundingIncrementUsd must be non-zero (divisor).",
+    "bands": {
+      "1": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 99 },
+      "2": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 88 },
+      "3": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 77 }
+    },
+    "roundingIncrementUsd": 25
+  },
+
+  "private.sponsorship_pricing": {
+    "_note": "PLACEHOLDER sponsorship pricing tiers documenting SHAPE only — OBVIOUSLY FAKE numbers. Real floor/ceiling/max bands, base, and roundTo are seeded separately and NOT committed. tierConfig keyed by tier ('1'/'2'/'3'); price = base + ((clamp(guests,floor,ceiling) - floor)/(ceiling - floor))*(max - base), rounded to nearest roundTo. roundTo must be non-zero (divisor).",
+    "tierConfig": {
+      "1": { "floor": 9, "ceiling": 99, "max": 999 },
+      "2": { "floor": 9, "ceiling": 99, "max": 888 },
+      "3": { "floor": 9, "ceiling": 99, "max": 777 }
+    },
+    "base": 999,
+    "roundTo": 50
+  },
+
+  "private.scoring_weights": {
+    "_note": "PLACEHOLDER scoring weights — OBVIOUSLY FAKE numbers documenting shape only. Real production weights are seeded separately and are NOT committed. leaderboard.{link,invite,checkin,photo}=composite GPP board weights; photoCap=max photos counted per party; bestOfBonus=points per scorecard Best-Of win. pizzeria.{topLimit=max pizzerias surfaced per event on the /gpp/pizzerias map, distanceWeightPerMile=miles penalty per mile from venue}.",
+    "leaderboard": {
+      "link": 9.9,
+      "invite": 9.9,
+      "checkin": 9.9,
+      "photo": 9.9,
+      "photoCap": 9999,
+      "bestOfBonus": 99
+    },
+    "pizzeria": {
+      "topLimit": 99,
+      "distanceWeightPerMile": 9.9
+    }
+  }
+}

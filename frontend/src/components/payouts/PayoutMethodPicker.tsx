@@ -1,9 +1,12 @@
 import React from 'react';
-import { CreditCard, Banknote, Coins, Mail, Wallet } from 'lucide-react';
+import { CreditCard, Banknote, Coins, Mail, Wallet, ExternalLink, Loader2 } from 'lucide-react';
 import { PayoutMethod, BankDetails } from '../../types';
 import { IconInput } from '../IconInput';
-import { resolveEnsName } from '../../lib/api';
-import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
+import {
+  resolveEnsName,
+  fetchReimbursementOptions,
+  ResolvedReimbursementOption,
+} from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 
 // taleggio-30219: mirror of backend `looksLikeEnsName` — accepts dotted
@@ -14,6 +17,25 @@ function looksLikeEnsName(input: string): boolean {
   if (!trimmed || trimmed.startsWith('0x')) return false;
   return ENS_NAME_RE.test(trimmed);
 }
+
+// marinara-71630 P1: the backend decides which options the host sees. This
+// array is a FALLBACK ONLY — used when the reimbursement-options fetch fails
+// or returns [] (config not seeded yet, e.g. on preview before prod is
+// seeded), so the picker never renders empty. The three built-in methods are
+// shown all-enabled. Once config is seeded these come from the server instead.
+const FALLBACK_OPTIONS: ResolvedReimbursementOption[] = [
+  { id: 'usdc_base', label: 'USDC on Base', description: 'Onchain payment to your wallet.', kind: 'method', enabled: true },
+  { id: 'mercury_card', label: 'Mercury virtual card', description: 'We issue you a debit card for the exact amount.', kind: 'method', enabled: true },
+  { id: 'wire', label: 'Bank wire', description: 'We send a wire to your bank account.', kind: 'method', enabled: true },
+];
+
+// Icon per known method id. Unknown ids (future config-driven methods) get a
+// neutral default so the picker stays robust.
+const METHOD_ICONS: Record<string, React.ReactNode> = {
+  usdc_base: <Coins size={18} />,
+  mercury_card: <CreditCard size={18} />,
+  wire: <Banknote size={18} />,
+};
 
 type EnsPreviewState =
   | { kind: 'idle' }
@@ -39,14 +61,27 @@ interface PayoutMethodPickerProps {
    * per-receipt amount. When null, we omit the dollar amount entirely.
    */
   reimbursementCapUsd?: number | null;
+  /**
+   * marinara-71630 P1: optional pre-resolved options. When provided, the picker
+   * uses these instead of fetching (lets a parent — e.g. PaymentDetailsCard —
+   * share a single fetch for both the picker UI and its save-guard). When
+   * omitted, the picker fetches them itself.
+   */
+  options?: ResolvedReimbursementOption[] | null;
 }
 
 /**
  * Radio picker for payout method, with method-specific sub-form.
  *
+ * marinara-71630 P1: the BACKEND now decides which options the host sees
+ * (country/tag-driven private config); this component just renders them.
+ *
  *   mercury_card → just a confirmation that we'll email a virtual card
  *   wire         → single email field (our bank emails the host to complete)
  *   usdc_base    → wallet address IconInput
+ *
+ * Options with `kind:'external'` (e.g. an SWC-hub card) are rendered as
+ * non-selectable informational cards and never set `method`.
  */
 export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
   method,
@@ -57,7 +92,56 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
   onBankDetailsChange,
   userEmail,
   reimbursementCapUsd,
+  options: optionsProp,
 }) => {
+  const { party } = usePizza();
+  const partyId = party?.id ?? null;
+
+  // marinara-71630 P1: fetch server-decided options (unless a parent passed
+  // them in). Falls back to the three built-in methods on failure/empty.
+  const [fetchedOptions, setFetchedOptions] = React.useState<ResolvedReimbursementOption[] | null>(null);
+  const [optionsLoading, setOptionsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (optionsProp !== undefined && optionsProp !== null) {
+      // Parent supplies options; don't fetch.
+      return;
+    }
+    if (!partyId) {
+      setFetchedOptions(null);
+      return;
+    }
+    let cancelled = false;
+    setOptionsLoading(true);
+    fetchReimbursementOptions(partyId)
+      .then((opts) => {
+        if (cancelled) return;
+        // Empty (unseeded config) → fall back to the three built-in methods.
+        setFetchedOptions(opts.length > 0 ? opts : FALLBACK_OPTIONS);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFetchedOptions(FALLBACK_OPTIONS);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setOptionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId, optionsProp]);
+
+  // Resolve the options to render: parent-provided (fall back when empty) →
+  // self-fetched → still loading.
+  const options: ResolvedReimbursementOption[] | null =
+    optionsProp !== undefined && optionsProp !== null
+      ? (optionsProp.length > 0 ? optionsProp : FALLBACK_OPTIONS)
+      : fetchedOptions;
+
+  const methodOptions = (options ?? []).filter((o) => o.kind === 'method');
+  const externalOptions = (options ?? []).filter((o) => o.kind === 'external');
+
   // taleggio-30219: debounced ENS preview state for the USDC sub-form.
   const [ensPreview, setEnsPreview] = React.useState<EnsPreviewState>({ kind: 'idle' });
   React.useEffect(() => {
@@ -100,16 +184,6 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     // intentionally exclude bankDetails/onBankDetailsChange so we don't loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, userEmail]);
-
-  // pepperoni-47301: Mercury card payout is unavailable in sanctioned/restricted
-  // countries. We read the party's country from PizzaContext and gate the
-  // Mercury Option below. Falls back to false when there's no party (e.g.
-  // unlikely render outside an event context).
-  const { party } = usePizza();
-  const mercuryBlocked = isMercuryBlocked(party?.country);
-  const mercuryDisabledReason = mercuryBlocked
-    ? `Mercury cards are unavailable in ${party?.country ?? 'your country'} due to compliance restrictions.`
-    : undefined;
 
   const Option: React.FC<{
     value: PayoutMethod;
@@ -160,30 +234,72 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     );
   };
 
+  if (options === null) {
+    // Still loading the server-decided options.
+    return (
+      <div className="flex items-center gap-2 text-sm text-theme-text-muted py-4">
+        <Loader2 size={16} className="animate-spin" />
+        <span>Loading payout options…</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="grid sm:grid-cols-3 gap-3">
-        <Option
-          value="usdc_base"
-          icon={<Coins size={18} />}
-          title="USDC on Base"
-          description="Onchain payment to your wallet."
-        />
-        <Option
-          value="mercury_card"
-          icon={<CreditCard size={18} />}
-          title="Mercury virtual card"
-          description="We issue you a debit card for the exact amount."
-          disabled={mercuryBlocked}
-          disabledReason={mercuryDisabledReason}
-        />
-        <Option
-          value="wire"
-          icon={<Banknote size={18} />}
-          title="Bank wire"
-          description="We send a wire to your bank account."
-        />
-      </div>
+      {methodOptions.length > 0 && (
+        <div
+          className={`grid gap-3 ${
+            methodOptions.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+          }`}
+        >
+          {methodOptions.map((opt) => (
+            <Option
+              key={opt.id}
+              value={opt.id as PayoutMethod}
+              icon={METHOD_ICONS[opt.id] ?? <Coins size={18} />}
+              title={opt.label}
+              description={opt.description ?? ''}
+              disabled={!opt.enabled}
+              disabledReason={opt.disabledReason}
+            />
+          ))}
+        </div>
+      )}
+
+      {/*
+        marinara-71630 P1: external (informational) options — e.g. an SWC-hub
+        card. NOT selectable payout methods: they never set `method`. Render
+        label + description, plus an external link when a url is configured.
+      */}
+      {externalOptions.map((opt) => (
+        <div
+          key={opt.id}
+          className="rounded-xl border border-theme-stroke bg-theme-surface p-4"
+        >
+          <div className="text-sm font-semibold text-theme-text">{opt.label}</div>
+          {opt.description && (
+            <div className="text-xs text-theme-text-muted mt-1">{opt.description}</div>
+          )}
+          {opt.url && (
+            <a
+              href={opt.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[#ff393a] hover:underline"
+            >
+              Learn more
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+      ))}
+
+      {optionsLoading && (
+        <div className="flex items-center gap-2 text-xs text-theme-text-muted">
+          <Loader2 size={12} className="animate-spin" />
+          <span>Updating options…</span>
+        </div>
+      )}
 
       {method === 'mercury_card' && (
         <div className="rounded-xl border border-theme-stroke bg-theme-surface p-4 text-sm text-theme-text-secondary">

@@ -10,6 +10,7 @@ import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
+import { usePricingConfig } from '../../hooks/usePricingConfig';
 import { normalizeText } from '../../lib/normalizeText';
 
 interface EventTableProps {
@@ -96,6 +97,8 @@ function FilterPill({
 
 export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange, isAdmin }: EventTableProps) {
   const { t } = useTranslation('partner');
+  // Private pricing config for the sponsorship-suggestion banner (marinara-71630 P5).
+  const { config: pricingConfig } = usePricingConfig();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -283,8 +286,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
   const sponsorshipSuggestion = useMemo(() => {
     if (tagFilter === 'all' || filteredEvents.length === 0) return null;
-    return calculateTagSponsorshipTotal(filteredEvents);
-  }, [tagFilter, filteredEvents]);
+    // Hold the banner until the pricing config loads — avoids flashing a $0 total.
+    if (!pricingConfig) return null;
+    return calculateTagSponsorshipTotal(filteredEvents, pricingConfig);
+  }, [tagFilter, filteredEvents, pricingConfig]);
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {

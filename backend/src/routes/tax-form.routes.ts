@@ -434,8 +434,10 @@ export async function getLatestSubmittedTaxFormForUser(userId: string) {
   });
 }
 
-// US YTD payout threshold — W-9 required at or above this.
-export const US_W9_YTD_THRESHOLD_USD = 600;
+// marinara-71630 P2: the US YTD W-9 threshold (W-9 required at or above this)
+// moved to app_config — read it via `getPayoutCaps().w9ThresholdUsd` (see
+// backend/src/lib/privateConfig.ts) so the real value stays out of committed
+// source. Consumers resolve the caps at their async entry point.
 
 /**
  * Sum paid + approved + queued payouts for a user in the current calendar

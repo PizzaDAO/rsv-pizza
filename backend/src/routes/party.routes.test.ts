@@ -66,6 +66,17 @@ vi.mock('./rsvp.routes.js', () => ({
   sendPromotionEmail: vi.fn(),
 }));
 
+// marinara-71630: mock the private-config resolver source so the
+// reimbursement-options endpoint test controls the rules without seeding
+// `app_config`. We deliberately return rules where mercury_card is ENABLED
+// (no config-level Mercury disable) so the test proves the endpoint-level
+// isMercuryBlocked layering is what disables it. The real (un-mocked)
+// isMercuryBlocked / normalizeCountry is exercised so normalization is tested.
+const mockGetReimbursementRules = vi.hoisted(() => vi.fn());
+vi.mock('../lib/privateConfig.js', () => ({
+  getReimbursementRules: mockGetReimbursementRules,
+}));
+
 const parseAuth = (req: any) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
@@ -730,6 +741,101 @@ describe('Party Routes', () => {
         count: 3,
         source: 'eventbrite',
       });
+    });
+  });
+
+  describe('GET /api/parties/:id/reimbursement-options - Mercury gating (marinara-71630)', () => {
+    // Rules where mercury_card is visible AND enabled at the config level — no
+    // country rule disables it. Any disabling must come from the endpoint's
+    // isMercuryBlocked layer, which normalizes the country string.
+    const RULES_MERCURY_ENABLED = {
+      methods: [
+        { id: 'usdc_base', label: 'USDC on Base', kind: 'method' as const },
+        { id: 'mercury_card', label: 'Mercury virtual card', kind: 'method' as const },
+        { id: 'wire', label: 'Bank wire', kind: 'method' as const },
+      ],
+      default: ['usdc_base', 'mercury_card', 'wire'],
+      countryRules: [],
+    };
+
+    // canUserEditParty does its own findUnique (owner match) then the endpoint
+    // does a second findUnique for { country, eventTags }. Queue both.
+    function mockPartyForCountry(country: string) {
+      mockPrisma.party.findUnique
+        .mockResolvedValueOnce({ id: PARTY_ID, userId: HOST_USER_ID, coHosts: [] })
+        .mockResolvedValueOnce({ country, eventTags: [] });
+    }
+
+    async function getOptions(country: string) {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      mockGetReimbursementRules.mockResolvedValue(RULES_MERCURY_ENABLED);
+      mockPartyForCountry(country);
+      const res = await request(app)
+        .get(`/api/parties/${PARTY_ID}/reimbursement-options`)
+        .set('Authorization', `Bearer ${token}`);
+      return res;
+    }
+
+    it('disables mercury_card for an exact-match blocked country', async () => {
+      const res = await getOptions('Iran');
+      expect(res.status).toBe(200);
+      const mercury = res.body.options.find((o: any) => o.id === 'mercury_card');
+      expect(mercury.enabled).toBe(false);
+      expect(mercury.disabledReason).toBe(
+        'Mercury cards are unavailable in Iran due to compliance restrictions.'
+      );
+      // other options untouched
+      expect(res.body.options.find((o: any) => o.id === 'usdc_base').enabled).toBe(true);
+      expect(res.body.options.find((o: any) => o.id === 'wire').enabled).toBe(true);
+    });
+
+    it('disables mercury_card for a parenthetical variant (normalization)', async () => {
+      // Exact-match config rules would NOT catch this; isMercuryBlocked normalizes
+      // "Iran (Islamic Republic of Iran)" → "iran".
+      const res = await getOptions('Iran (Islamic Republic of Iran)');
+      expect(res.status).toBe(200);
+      const mercury = res.body.options.find((o: any) => o.id === 'mercury_card');
+      expect(mercury.enabled).toBe(false);
+      expect(mercury.disabledReason).toBe(
+        'Mercury cards are unavailable in Iran (Islamic Republic of Iran) due to compliance restrictions.'
+      );
+    });
+
+    it('disables mercury_card for a lowercase variant (normalization)', async () => {
+      const res = await getOptions('north korea');
+      expect(res.status).toBe(200);
+      const mercury = res.body.options.find((o: any) => o.id === 'mercury_card');
+      expect(mercury.enabled).toBe(false);
+      expect(mercury.disabledReason).toBe(
+        'Mercury cards are unavailable in north korea due to compliance restrictions.'
+      );
+    });
+
+    it('leaves mercury_card enabled for a non-blocked country', async () => {
+      const res = await getOptions('United States');
+      expect(res.status).toBe(200);
+      const mercury = res.body.options.find((o: any) => o.id === 'mercury_card');
+      expect(mercury.enabled).toBe(true);
+      expect(mercury.disabledReason).toBeUndefined();
+    });
+
+    it('does nothing when mercury_card is not among the resolved options', async () => {
+      const app = createTestApp();
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      // Rules without mercury_card at all.
+      mockGetReimbursementRules.mockResolvedValue({
+        methods: [{ id: 'usdc_base', label: 'USDC on Base', kind: 'method' as const }],
+        default: ['usdc_base'],
+        countryRules: [],
+      });
+      mockPartyForCountry('Iran');
+      const res = await request(app)
+        .get(`/api/parties/${PARTY_ID}/reimbursement-options`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.options.map((o: any) => o.id)).toEqual(['usdc_base']);
+      expect(res.body.options[0].enabled).toBe(true);
     });
   });
 });

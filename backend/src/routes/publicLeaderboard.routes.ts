@@ -1,7 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { getCountryCode } from '../lib/countryCode.js';
-import { BEST_OF_BONUS, SCORECARD_LEADERBOARD_ITEMS } from '../lib/scorecardScore.js';
+import { getScoringWeights } from '../lib/privateConfig.js';
+// marinara-71630: BEST_OF_BONUS is config-sourced via getBestOfBonus().
+// SCORECARD_LEADERBOARD_ITEMS is a non-sensitive public item-key list (stays in source).
+import { getBestOfBonus, SCORECARD_LEADERBOARD_ITEMS } from '../lib/scorecardScore.js';
 
 /**
  * stromboli-71593 + panzerotti-58931: unified public leaderboard for GPP
@@ -41,11 +44,41 @@ import { BEST_OF_BONUS, SCORECARD_LEADERBOARD_ITEMS } from '../lib/scorecardScor
  */
 
 // ---- scoring weights ----
-const W_LINK = 1.0;
-const W_INVITE = 0.3;
-const W_CHECKIN = 2.0;
-const W_PHOTO = 0.5;
-const PHOTO_CAP = 100;
+// Real weights are seeded to `app_config` (private.scoring_weights → leaderboard)
+// and resolved per request via getScoringWeights(). Committed source carries
+// only NON-SENSITIVE placeholders: neutral/identity-ish values that keep the
+// math well-defined (no NaN, no divide-by-zero) without revealing the real
+// production tuning. Behavior is identical once the real values are seeded.
+interface LeaderboardWeights {
+  link: number;
+  invite: number;
+  checkin: number;
+  photo: number;
+  photoCap: number;
+}
+
+// Placeholder fallback — NOT the production weights. Used only when the
+// `private.scoring_weights` row is absent (e.g. briefly before seeding).
+const LEADERBOARD_WEIGHTS_PLACEHOLDER: LeaderboardWeights = {
+  link: 1,
+  invite: 1,
+  checkin: 1,
+  photo: 1,
+  photoCap: 1000,
+};
+
+/** Merge the (possibly partial) seeded leaderboard weights over placeholders. */
+function resolveLeaderboardWeights(raw: Record<string, number>): LeaderboardWeights {
+  const num = (v: unknown, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+  return {
+    link: num(raw.link, LEADERBOARD_WEIGHTS_PLACEHOLDER.link),
+    invite: num(raw.invite, LEADERBOARD_WEIGHTS_PLACEHOLDER.invite),
+    checkin: num(raw.checkin, LEADERBOARD_WEIGHTS_PLACEHOLDER.checkin),
+    photo: num(raw.photo, LEADERBOARD_WEIGHTS_PLACEHOLDER.photo),
+    photoCap: num(raw.photoCap, LEADERBOARD_WEIGHTS_PLACEHOLDER.photoCap),
+  };
+}
 
 // Link-like submittedVia values count as "real RSVPs". `host` and `host-checkin`
 // are excluded (auto-self-RSVP + host-side flows). See
@@ -207,8 +240,20 @@ function resolveHostName(party: PartyShape): string | null {
   return null;
 }
 
-/** Compute the unified score + breakdown for a single party. */
-export function scoreParty(party: PartyShape): {
+/**
+ * Compute the unified composite score + breakdown for a single party.
+ *
+ * `weights` are resolved from `app_config` (private.scoring_weights → leaderboard)
+ * by the caller. Defaults to the placeholder set so test/standalone callers
+ * still get a well-defined (non-production) result.
+ *
+ * panzerotti-58931: the de-duped per-guest scorecard points (`scorecardScore`,
+ * pre-aggregated by the caller for checked-in guests) are added to the composite.
+ */
+export function scoreParty(
+  party: PartyShape,
+  weights: LeaderboardWeights = LEADERBOARD_WEIGHTS_PLACEHOLDER,
+): {
   score: number;
   breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number; scorecard: number };
 } {
@@ -234,12 +279,12 @@ export function scoreParty(party: PartyShape): {
       inviteRsvps += 1;
     }
   }
-  const photos = Math.min(party.photos.length, PHOTO_CAP);
+  const photos = Math.min(party.photos.length, weights.photoCap);
   const score =
-    W_LINK * linkRsvps +
-    W_INVITE * inviteRsvps +
-    W_CHECKIN * checkIns +
-    W_PHOTO * photos +
+    weights.link * linkRsvps +
+    weights.invite * inviteRsvps +
+    weights.checkin * checkIns +
+    weights.photo * photos +
     scorecard;
   return {
     score: round1(score),
@@ -373,6 +418,12 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
     };
   }
 
+  // Resolve scoring weights at the handler entry (per request; cached 60s in
+  // privateConfig). Real values seeded to prod; placeholder used if absent.
+  const weights = resolveLeaderboardWeights((await getScoringWeights()).leaderboard);
+  // marinara-71630: Best Of bonus is config-sourced (resolved once at entry).
+  const bestOfBonus = await getBestOfBonus();
+
   const parties = (await prisma.party.findMany({
     where,
     select: {
@@ -434,7 +485,7 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
   // (party_id → (guest_id → de-duped score)).
   const scorecardByGuest = new Map<string, number>();
   for (const r of scorecardRows) {
-    const guestScore = toNum(r.item_count) + toNum(r.win_count) * BEST_OF_BONUS;
+    const guestScore = toNum(r.item_count) + toNum(r.win_count) * bestOfBonus;
     if (guestScore > 0) scorecardByGuest.set(r.guest_id, guestScore);
   }
   for (const party of parties) {
@@ -450,7 +501,7 @@ export async function computeLeaderboard(windowKey: WindowKey): Promise<{
     breakdown: { linkRsvps: number; inviteRsvps: number; checkIns: number; photos: number; scorecard: number };
   }> = [];
   for (const party of parties) {
-    const { score, breakdown } = scoreParty(party);
+    const { score, breakdown } = scoreParty(party, weights);
     if (score <= 0) continue;
     scored.push({ party, score, breakdown });
   }

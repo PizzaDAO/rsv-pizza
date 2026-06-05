@@ -188,80 +188,78 @@ export async function assertGpp27Authorized(
 }
 
 /**
- * Per-person reimbursement rate by city tier (backend mirror of the frontend
- * `getCityTier`). Tier 1 -> $10, tier 2 -> $8, tier 3 -> $6.
+ * City-tier reimbursement logic (marinara-71630 P5).
  *
- * NOTE: kept in sync with frontend/src/utils/sponsorshipPricing.ts. If the tier
- * lists there change, update them here too.
+ * The real tier-1/tier-2 city lists and the per-head rates / ceiling / formula
+ * coefficient now live in `app_config` (keys `private.city_tiers` and
+ * `private.reimbursement_tiers`), NOT in committed source. The helpers below
+ * are PURE — they accept the resolved config as a parameter. The route layer
+ * (`gpp27.routes.ts`) resolves config once at handler entry (60s-cached) and
+ * passes it in, so behavior is identical to the old hardcoded values once the
+ * matching config is seeded, and fail-safe ($0 / tier 3) when it isn't.
  */
-const TIER_1_CITIES = [
-  'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami',
-  'london', 'paris', 'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney',
-  'dubai', 'shanghai', 'beijing', 'shenzhen', 'istanbul', 'İstanbul',
-  'delhi', 'new delhi', 'mumbai',
-];
-const TIER_2_CITIES = [
-  'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston',
-  'atlanta', 'philadelphia', 'san diego', 'las vegas', 'phoenix', 'nashville',
-  'minneapolis', 'detroit', 'portland', 'kansas city', 'st. louis',
-  'salt lake city', 'pittsburgh', 'san juan', 'honolulu', 'raleigh',
-  'cleveland', 'cincinnati', 'milwaukee', 'memphis', 'jacksonville', 'omaha',
-  'toronto', 'vancouver', 'calgary', 'edmonton', 'ottawa', 'montreal',
-  'winnipeg', 'mexico city', 'monterrey', 'sao paulo', 'rio de janeiro',
-  'buenos aires', 'bogota', 'bogotá', 'lima', 'santiago', 'medellin',
-  'medellín', 'caracas', 'quito', 'berlin', 'amsterdam', 'barcelona',
-  'lisbon', 'milan', 'munich', 'hamburg', 'rome', 'roma', 'vienna', 'wien',
-  'prague', 'warsaw', 'warszawa', 'budapest', 'dublin', 'copenhagen',
-  'stockholm', 'oslo', 'zurich', 'brussels', 'athens', 'helsinki',
-  'bucharest', 'zagreb', 'ljubljana', 'gothenburg', 'tallinn', 'naples',
-  'moscow', 'melbourne', 'bangkok', 'kuala lumpur', 'ho chi minh', 'hanoi',
-  'doha', 'beirut', 'chennai', 'kolkata', 'hyderabad', 'bangalore', 'pune',
-  'colombo', 'kathmandu', 'lagos', 'nairobi', 'johannesburg', 'kampala',
-  'dar es salaam', 'accra', 'addis ababa', 'kigali', 'cape town', 'perth',
-  'gold coast', 'auckland', 'wellington',
-];
 
+/** Normalize + substring-match a city name against a list (drops spaces/hyphens). */
 function matchesList(cityName: string, list: string[]): boolean {
   const normalized = cityName.toLowerCase().replace(/[-\s]/g, '');
   return list.some((c) => normalized.includes(c.replace(/[-\s]/g, '')));
 }
 
-export function getCityTier(cityName: string): 1 | 2 | 3 {
+/**
+ * Resolve a city's tier from the configured tier-1/tier-2 lists. Anything not
+ * matched (including an empty city or empty lists) is tier 3.
+ */
+export function cityTierFrom(
+  cityName: string,
+  tiers: { tier1: string[]; tier2: string[] },
+): 1 | 2 | 3 {
   if (!cityName) return 3;
-  if (matchesList(cityName, TIER_1_CITIES)) return 1;
-  if (matchesList(cityName, TIER_2_CITIES)) return 2;
+  if (matchesList(cityName, tiers.tier1)) return 1;
+  if (matchesList(cityName, tiers.tier2)) return 2;
   return 3;
 }
 
-export function perHeadRate(cityName: string): number {
-  const tier = getCityTier(cityName);
-  return tier === 1 ? 10 : tier === 2 ? 8 : 6;
+/**
+ * Per-head USD rate for a tier from the configured rate table. A missing tier
+ * key resolves to 0 (fail-safe — suggests nothing rather than over-suggesting).
+ */
+export function perHeadFrom(tier: 1 | 2 | 3, rates: Record<string, number>): number {
+  const r = rates[String(tier)];
+  return typeof r === 'number' && Number.isFinite(r) ? r : 0;
 }
 
-/** Absolute per-event reimbursement ceiling communicated in the agreement. */
-export const REIMBURSEMENT_CEILING_USD = 625;
-
 /**
- * Compute the suggested reimbursement cap for a city, clamped to the $625
- * ceiling. expectedAttendance = max(lastYearEstimatedAttendance, 0.40 * rsvp).
+ * Compute the suggested reimbursement cap for a city, clamped to the configured
+ * ceiling. expectedAttendance = max(lastYearEstimatedAttendance, coefficient * rsvp).
+ *
+ * Pure: all tier/rate/ceiling/coefficient inputs come from `cfg` (resolved from
+ * `app_config` at the route layer).
  */
-export function suggestReimbursementCap(args: {
-  cityName: string;
-  lastYearEstimatedAttendance: number | null;
-  currentRsvpCount: number;
-}): {
+export function computeReimbursementCap(
+  args: {
+    cityName: string;
+    lastYearEstimatedAttendance: number | null;
+    currentRsvpCount: number;
+  },
+  cfg: {
+    tiers: { tier1: string[]; tier2: string[] };
+    rates: Record<string, number>;
+    ceilingUsd: number;
+    coefficient: number;
+  },
+): {
   tier: 1 | 2 | 3;
   perHead: number;
   expectedAttendance: number;
   rawSuggested: number;
   cappedSuggested: number;
 } {
-  const tier = getCityTier(args.cityName);
-  const perHead = perHeadRate(args.cityName);
+  const tier = cityTierFrom(args.cityName, cfg.tiers);
+  const perHead = perHeadFrom(tier, cfg.rates);
   const lastYear = args.lastYearEstimatedAttendance ?? 0;
-  const fromRsvp = 0.4 * (args.currentRsvpCount ?? 0);
+  const fromRsvp = cfg.coefficient * (args.currentRsvpCount ?? 0);
   const expectedAttendance = Math.max(lastYear, fromRsvp);
   const rawSuggested = Math.round(perHead * expectedAttendance);
-  const cappedSuggested = Math.min(rawSuggested, REIMBURSEMENT_CEILING_USD);
+  const cappedSuggested = Math.min(rawSuggested, cfg.ceilingUsd);
   return { tier, perHead, expectedAttendance, rawSuggested, cappedSuggested };
 }

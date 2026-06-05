@@ -14,6 +14,22 @@ const mockPrisma = vi.hoisted(() => ({
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
+// marinara-71630 P4: scoring weights now come from app_config via
+// getScoringWeights(). The committed fallback in privateConfig is a NON-real
+// placeholder, so these behavior tests pin the *documented production* weights
+// here (the same values that get seeded to prod). This keeps the score
+// assertions meaningful without committing the real numbers to route source.
+vi.mock('../lib/privateConfig.js', () => ({
+  getScoringWeights: vi.fn(async () => ({
+    // bestOfBonus is read by getBestOfBonus() (scorecardScore.ts) so the unified
+    // board's superlative-win contribution is pinned to the documented production
+    // value here, mirroring the link/invite/checkin/photo weights above. The
+    // route + scorecardScore source stay config-driven (no real number committed).
+    leaderboard: { link: 1.0, invite: 0.3, checkin: 2.0, photo: 0.5, photoCap: 100, bestOfBonus: 5 },
+    pizzeria: {},
+  })),
+}));
+
 import publicLeaderboardRouter, {
   __testing,
 } from './publicLeaderboard.routes.js';
@@ -541,6 +557,34 @@ describe('Public leaderboard route — stromboli-71593', () => {
 
   describe('scoreParty helper', () => {
     it('counts a checked-in guest with submittedVia=link as both linkRsvps and checkIns', () => {
+      const { score, breakdown } = __testing.scoreParty(
+        {
+          id: 'a',
+          name: '',
+          customUrl: null,
+          inviteCode: '',
+          city: null,
+          country: null,
+          eventImageUrl: null,
+          createdAt: new Date(),
+          date: null,
+          coHosts: [],
+          user: null,
+          guests: [{ submittedVia: 'link', status: 'CONFIRMED', approved: null, checkedInAt: new Date() }],
+          photos: [],
+        } as any,
+        // Pass the documented production weights explicitly (the route resolves
+        // these from app_config at request time).
+        { link: 1.0, invite: 0.3, checkin: 2.0, photo: 0.5, photoCap: 100 },
+      );
+      // 1 link + 1 check-in = 1.0 + 2.0 = 3.0 (no scorecard activity)
+      expect(breakdown).toEqual({ linkRsvps: 1, inviteRsvps: 0, checkIns: 1, photos: 0, scorecard: 0 });
+      expect(score).toBe(3);
+    });
+
+    it('falls back to neutral placeholder weights when none are passed (no real numbers in source)', () => {
+      // The committed fallback is link=invite=checkin=photo=1, photoCap=1000 —
+      // deliberately NOT the production weights. 1 link + 1 check-in = 1 + 1 = 2.
       const { score, breakdown } = __testing.scoreParty({
         id: 'a',
         name: '',
@@ -556,9 +600,9 @@ describe('Public leaderboard route — stromboli-71593', () => {
         guests: [{ submittedVia: 'link', status: 'CONFIRMED', approved: null, checkedInAt: new Date() }],
         photos: [],
       } as any);
-      // 1 link + 1 check-in = 1.0 + 2.0 = 3.0 (no scorecard activity)
+      // Placeholder weights all = 1, no scorecard activity: 1 link + 1 check-in = 2.
       expect(breakdown).toEqual({ linkRsvps: 1, inviteRsvps: 0, checkIns: 1, photos: 0, scorecard: 0 });
-      expect(score).toBe(3);
+      expect(score).toBe(2);
     });
   });
 });

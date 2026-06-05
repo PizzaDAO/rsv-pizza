@@ -65,6 +65,7 @@ import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
+import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admin/UB-gated private-config read endpoint
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
@@ -201,6 +202,7 @@ app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-gated create flow, budget, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
+app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe

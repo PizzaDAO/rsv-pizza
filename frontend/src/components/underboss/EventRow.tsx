@@ -10,6 +10,7 @@ import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, updateExpe
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import { calculateEventPrice } from '../../utils/sponsorshipPricing';
+import { usePricingConfig } from '../../hooks/usePricingConfig';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
 interface DisplayPhoto {
@@ -335,6 +336,9 @@ function PhotoLightbox({
 
 export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggleSelect, partnerTags = [] }: EventRowProps) {
   const { t } = useTranslation('partner');
+  // Private pricing config (city tiers + sponsorship dollars), loaded once and
+  // shared across all rows via the module-cached hook (marinara-71630 P5).
+  const { config: pricingConfig } = usePricingConfig();
   // Read tag/status directly from props — parent setAllData drives optimistic
   // re-render, so local mirrors would just shadow bulk updates until reload.
   const [notesOpen, setNotesOpen] = useState(false);
@@ -475,7 +479,8 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
 
   const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
   const priceGuests = event.expectedGuests ?? event.guestCount ?? 30;
-  const price = calculateEventPrice(priceGuests, cityName);
+  // Null while the pricing config is loading → render a placeholder rather than $0.
+  const price = pricingConfig ? calculateEventPrice(priceGuests, cityName, pricingConfig) : null;
 
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
@@ -564,10 +569,10 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
                 <span className={`text-xs ${relTime.isPast ? 'text-red-400' : 'text-theme-text-muted'}`}>
                   {relTime.text}
                 </span>
-                <span className="text-xs font-medium text-green-400 ml-1">&middot; ${price.toLocaleString()}</span>
+                <span className="text-xs font-medium text-green-400 ml-1">&middot; {price != null ? `$${price.toLocaleString()}` : '—'}</span>
               </div>
               {/* Reimbursement cap controls (arugula-38633 v2) */}
-              <ReimbursementCapCell event={event} onUpdate={onEventUpdate} />
+              <ReimbursementCapCell event={event} onUpdate={onEventUpdate} pricingConfig={pricingConfig} />
               {/* Inline notes editor */}
               {notesOpen && (
                 <div className="mt-1.5">

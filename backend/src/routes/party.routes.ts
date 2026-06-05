@@ -16,6 +16,9 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
+import { getReimbursementRules } from '../lib/privateConfig.js';
+import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
+import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2330,6 +2333,53 @@ router.delete('/:partyId/payment-opt-in', async (req: AuthRequest, res: Response
     });
 
     res.json({ optedIn: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:id/reimbursement-options
+// marinara-71630 P1: the BACKEND decides which payout options the host sees,
+// driven by private `app_config` rules (country/tag scoped). The host-facing
+// picker renders whatever this returns. On a config miss the rules fallback is
+// empty → `{ options: [] }`; the frontend falls back to its three built-in
+// methods so the picker never renders empty. Never 500s on missing config.
+router.get('/:id/reimbursement-options', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    if (!req.userId) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const party = await prisma.party.findUnique({
+      where: { id },
+      select: { country: true, eventTags: true },
+    });
+    if (!party) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const rules = await getReimbursementRules();
+    const options = resolveReimbursementOptions(
+      { country: party.country, eventTags: party.eventTags },
+      rules
+    );
+
+    // marinara-71630: the config resolver matches country EXACTLY, but the
+    // Mercury sanctions gate must NORMALIZE (lowercase / strip parentheticals)
+    // so casing/parenthetical variants of a blocked country are still blocked.
+    // The sanctions list is compliance, not a private business secret, so it
+    // stays in code (`isMercuryBlocked`) and is layered over the config-resolved
+    // options here rather than encoded into `app_config`. Only mutate the
+    // mercury_card entry if it's present; leave everything else untouched.
+    if (isMercuryBlocked(party.country)) {
+      const mercury = options.find((o) => o.id === 'mercury_card');
+      if (mercury) {
+        mercury.enabled = false;
+        mercury.disabledReason = `Mercury cards are unavailable in ${party.country ?? 'your country'} due to compliance restrictions.`;
+      }
+    }
+
+    res.json({ options });
   } catch (error) {
     next(error);
   }
