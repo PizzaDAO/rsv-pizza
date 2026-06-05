@@ -6059,6 +6059,10 @@ export interface PricingConfig {
     ceilingUsd: number;
     attendanceRsvpCoefficient: number;
   };
+  reimbursementCapBands: {
+    bands: Record<string, { guestFloor: number; guestCeiling: number; minUsd: number; maxUsd: number }>;
+    roundingIncrementUsd: number;
+  };
 }
 
 /**

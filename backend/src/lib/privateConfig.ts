@@ -31,6 +31,7 @@ const KEYS = {
   scoringWeights: 'private.scoring_weights',
   cityTiers: 'private.city_tiers',
   reimbursementTiers: 'private.reimbursement_tiers',
+  reimbursementCapBands: 'private.reimbursement_cap_bands',
   sponsorshipPricing: 'private.sponsorship_pricing',
 } as const;
 
@@ -279,6 +280,46 @@ export function getReimbursementTiers(): Promise<ReimbursementTiers> {
     perHeadRates: { '1': 0, '2': 0, '3': 0 },
     ceilingUsd: 0,
     attendanceRsvpCoefficient: 0,
+  });
+}
+
+export interface ReimbursementCapBand {
+  /** Floor expected-guests count — anything ≤ this gets the floor amount. */
+  guestFloor: number;
+  /** Ceiling expected-guests count — anything ≥ this gets the max amount. */
+  guestCeiling: number;
+  /** Minimum suggested cap (at or below guestFloor). */
+  minUsd: number;
+  /** Maximum suggested cap (at or above guestCeiling). */
+  maxUsd: number;
+}
+
+export interface ReimbursementCapBands {
+  /** Per-tier dollar band keyed by tier ('1' | '2' | '3'). */
+  bands: Record<string, ReimbursementCapBand>;
+  /** Round the interpolated suggestion to the nearest this-many USD. */
+  roundingIncrementUsd: number;
+}
+
+/**
+ * Underboss "suggested reimbursement cap" bands (the heuristic shown in
+ * ReimbursementCapCell). For each tier the suggestion linearly interpolates a
+ * dollar amount between `minUsd` (at `guestFloor` expected guests) and `maxUsd`
+ * (at `guestCeiling`), then rounds to `roundingIncrementUsd`. These per-tier
+ * dollar bands are the ORIGINAL arugula-38633 band math (distinct from the
+ * GPP27 per-head reimbursement formula); the real numbers are seeded to
+ * `app_config` and are NOT committed.
+ *
+ * Fallback = empty `bands` + `roundingIncrementUsd: 25`. With no band for the
+ * resolved tier the frontend util returns NO suggestion (suggestedUsd: null) —
+ * a safe "cap config unavailable" state rather than a bogus $0 cap. The
+ * rounding increment is kept non-zero (and equal to the original 25) so the
+ * util never divides by zero even on an unseeded config.
+ */
+export function getReimbursementCapBands(): Promise<ReimbursementCapBands> {
+  return getConfig<ReimbursementCapBands>(KEYS.reimbursementCapBands, {
+    bands: {},
+    roundingIncrementUsd: 25,
   });
 }
 

@@ -6,13 +6,19 @@
  * underbosses validate or override before the cap takes effect on the
  * host-facing payout form.
  *
- * marinara-71630 P5: the private city-tier lists and the per-head reimbursement
- * rates + ceiling no longer live in committed source. They are sourced at
- * runtime from GET /api/config/pricing (see `usePricingConfig`) and passed in
- * via `config`. The (non-secret) FORMULA stays here and mirrors the backend's
- * `computeReimbursementCap`:
+ * marinara-71630 P5: the private city-tier lists and the per-tier dollar BANDS
+ * no longer live in committed source. They are sourced at runtime from
+ * GET /api/config/pricing (see `usePricingConfig`) and passed in via `config`.
+ * The (non-secret) FORMULA stays here and reproduces the ORIGINAL band math
+ * EXACTLY given the seeded numbers:
  *
- *   suggested = round(perHeadRate[tier] * expectedGuests), clamped to ceiling.
+ *   clamped = clamp(expectedGuests, guestFloor, guestCeiling)
+ *   ratio   = (clamped - guestFloor) / (guestCeiling - guestFloor)
+ *   rawUsd  = minUsd + ratio * (maxUsd - minUsd)
+ *   suggested = round(rawUsd / roundingIncrementUsd) * roundingIncrementUsd
+ *
+ * This is the original per-tier dollar-band interpolation — NOT the GPP27
+ * per-head ($/head × attendance) formula, which is a separate concern.
  *
  * If `expectedGuests` is null/0 the heuristic returns null (no suggested cap).
  * It intentionally does NOT fall back to the live RSVP count — the underboss
@@ -24,7 +30,7 @@
 import { getCityTier, type CityTiers } from './sponsorshipPricing';
 import type { PricingConfig } from '../lib/api';
 
-export type ReimbursementConfig = PricingConfig['reimbursement'];
+export type ReimbursementCapBands = PricingConfig['reimbursementCapBands'];
 
 export interface ReimbursementCapInput {
   city?: string | null;
@@ -35,7 +41,7 @@ export interface ReimbursementCapInput {
 }
 
 export interface ReimbursementCapResult {
-  /** Null when expected_guests is null/0. */
+  /** Null when expected_guests is null/0, or when the cap config is unseeded. */
   suggestedUsd: number | null;
   /** Null when expected_guests is null/0. */
   tier: 1 | 2 | 3 | null;
@@ -52,20 +58,20 @@ function resolveTier(city: string | null | undefined, cityTiers: CityTiers): 1 |
   return getCityTier(trimmed, cityTiers);
 }
 
-function perHeadFor(tier: 1 | 2 | 3, rates: Record<string, number>): number {
-  const r = rates[String(tier)];
-  return typeof r === 'number' && Number.isFinite(r) ? r : 0;
+function roundToIncrement(value: number, increment: number): number {
+  return Math.round(value / increment) * increment;
 }
 
 /**
- * Compute the suggested per-event reimbursement cap from the resolved pricing
- * config. Returns no suggestion (`suggestedUsd: null`) when expected_guests is
- * null/0 OR when the config is unseeded (per-head rate 0 → a $0 suggestion is
- * meaningless, so we surface "not configured" rather than a bogus $0 cap).
+ * Compute the suggested per-event reimbursement cap by interpolating the
+ * resolved tier's dollar band against the host's expected-guests planning
+ * number. Returns no suggestion (`suggestedUsd: null`) when expected_guests is
+ * null/0, OR when the config has no band for the resolved tier (unseeded /
+ * partial config → a graceful "cap config unavailable" rather than a bogus $0).
  */
 export function computeSuggestedReimbursementCap(
   input: ReimbursementCapInput,
-  config: { cityTiers: CityTiers; reimbursement: ReimbursementConfig }
+  config: { cityTiers: CityTiers; reimbursementCapBands: ReimbursementCapBands }
 ): ReimbursementCapResult {
   const raw = input.expectedGuests;
   const expected = raw == null ? 0 : Math.max(0, Math.floor(raw));
@@ -78,19 +84,24 @@ export function computeSuggestedReimbursementCap(
   }
 
   const tier = resolveTier(input.city, config.cityTiers);
-  const perHead = perHeadFor(tier, config.reimbursement.perHeadRates);
-  if (perHead <= 0) {
-    // Unseeded / zero-rate config → no meaningful suggestion.
+  const band = config.reimbursementCapBands.bands[String(tier)];
+  if (!band) {
+    // Unseeded / missing band for this tier → no meaningful suggestion.
     return {
       suggestedUsd: null,
       tier,
-      formula: `Tier ${tier}, ${expected} expected guests → not configured`,
+      formula: 'cap config unavailable',
     };
   }
 
-  const ceiling = config.reimbursement.ceilingUsd;
-  const rawUsd = Math.round(perHead * expected);
-  const suggestedUsd = ceiling > 0 ? Math.min(rawUsd, ceiling) : rawUsd;
+  const { guestFloor, guestCeiling, minUsd, maxUsd } = band;
+  const increment = config.reimbursementCapBands.roundingIncrementUsd || 25;
+
+  const clamped = Math.max(guestFloor, Math.min(guestCeiling, expected));
+  const span = guestCeiling - guestFloor;
+  const ratio = span === 0 ? 0 : (clamped - guestFloor) / span;
+  const rawUsd = minUsd + ratio * (maxUsd - minUsd);
+  const suggestedUsd = roundToIncrement(rawUsd, increment);
 
   return {
     suggestedUsd,

@@ -14,6 +14,7 @@ import {
   getPayoutCaps,
   getCityTiers,
   getReimbursementTiers,
+  getReimbursementCapBands,
   getSponsorshipPricing,
   invalidateAll,
   PRIVATE_CONFIG_KEYS,
@@ -135,5 +136,33 @@ describe('getCityTiers / getReimbursementTiers / getSponsorshipPricing', () => {
     expect(pricing.tierConfig).toEqual({});
     expect(pricing.base).toBe(0);
     expect(pricing.roundTo).toBeGreaterThan(0);
+  });
+
+  it('reads reimbursement cap bands from app_config when present', async () => {
+    const seeded = {
+      bands: {
+        '1': { guestFloor: 25, guestCeiling: 150, minUsd: 100, maxUsd: 625 },
+        '2': { guestFloor: 25, guestCeiling: 100, minUsd: 75, maxUsd: 400 },
+        '3': { guestFloor: 35, guestCeiling: 150, minUsd: 50, maxUsd: 300 },
+      },
+      roundingIncrementUsd: 25,
+    };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const cap = await getReimbursementCapBands();
+
+    expect(cap).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.reimbursementCapBands },
+    });
+  });
+
+  it('reimbursement cap bands fall back to EMPTY bands (no suggestion) + non-zero increment', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    const cap = await getReimbursementCapBands();
+    // Empty bands → the frontend util surfaces NO suggestion (not $0).
+    expect(cap.bands).toEqual({});
+    // Increment is the original 25 and must be non-zero (it's a divisor).
+    expect(cap.roundingIncrementUsd).toBe(25);
   });
 });

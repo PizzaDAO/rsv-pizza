@@ -56,6 +56,16 @@
     "attendanceRsvpCoefficient": 0.99
   },
 
+  "private.reimbursement_cap_bands": {
+    "_note": "PLACEHOLDER underboss 'suggested reimbursement cap' bands documenting SHAPE only — OBVIOUSLY FAKE numbers. This is the ORIGINAL arugula-38633 band heuristic (distinct from private.reimbursement_tiers' GPP27 per-head formula). Real per-tier dollar bands are seeded separately and NOT committed. bands keyed by tier ('1'/'2'/'3'); suggestion = round( minUsd + ((clamp(expectedGuests,guestFloor,guestCeiling) - guestFloor)/(guestCeiling - guestFloor))*(maxUsd - minUsd), roundingIncrementUsd ). An unseeded/missing band → no suggestion (not $0). roundingIncrementUsd must be non-zero (divisor).",
+    "bands": {
+      "1": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 99 },
+      "2": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 88 },
+      "3": { "guestFloor": 9, "guestCeiling": 99, "minUsd": 9, "maxUsd": 77 }
+    },
+    "roundingIncrementUsd": 25
+  },
+
   "private.sponsorship_pricing": {
     "_note": "PLACEHOLDER sponsorship pricing tiers documenting SHAPE only — OBVIOUSLY FAKE numbers. Real floor/ceiling/max bands, base, and roundTo are seeded separately and NOT committed. tierConfig keyed by tier ('1'/'2'/'3'); price = base + ((clamp(guests,floor,ceiling) - floor)/(ceiling - floor))*(max - base), rounded to nearest roundTo. roundTo must be non-zero (divisor).",
     "tierConfig": {

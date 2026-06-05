@@ -37,7 +37,10 @@ export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ even
   const { suggestedUsd, formula } = pricingConfig
     ? computeSuggestedReimbursementCap(
         { city: cityName, expectedGuests: event.expectedGuests ?? null },
-        pricingConfig,
+        {
+          cityTiers: pricingConfig.cityTiers,
+          reimbursementCapBands: pricingConfig.reimbursementCapBands,
+        },
       )
     : { suggestedUsd: null, formula: 'loading pricing config…' };
   const hasSuggestion = suggestedUsd != null;

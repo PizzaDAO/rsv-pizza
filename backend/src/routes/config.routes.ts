@@ -8,6 +8,7 @@ import {
   getCityTiers,
   getSponsorshipPricing,
   getReimbursementTiers,
+  getReimbursementCapBands,
 } from '../lib/privateConfig.js';
 
 /**
@@ -30,7 +31,8 @@ const router = Router();
 
 // ---------------------------------------------------------------------------
 // GET /api/config/pricing — city tiers + sponsorship pricing + GPP27
-// reimbursement config. Admin/underboss-gated (drives admin UI).
+// reimbursement config + reimbursement-cap bands. Admin/underboss-gated
+// (drives admin UI).
 // ---------------------------------------------------------------------------
 router.get(
   '/pricing',
@@ -38,11 +40,13 @@ router.get(
   requireUnderbossAuth,
   async (_req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
     try {
-      const [cityTiers, sponsorshipPricing, reimbursement] = await Promise.all([
-        getCityTiers(),
-        getSponsorshipPricing(),
-        getReimbursementTiers(),
-      ]);
+      const [cityTiers, sponsorshipPricing, reimbursement, reimbursementCapBands] =
+        await Promise.all([
+          getCityTiers(),
+          getSponsorshipPricing(),
+          getReimbursementTiers(),
+          getReimbursementCapBands(),
+        ]);
 
       res.json({
         cityTiers,
@@ -51,6 +55,10 @@ router.get(
           perHeadRates: reimbursement.perHeadRates,
           ceilingUsd: reimbursement.ceilingUsd,
           attendanceRsvpCoefficient: reimbursement.attendanceRsvpCoefficient,
+        },
+        reimbursementCapBands: {
+          bands: reimbursementCapBands.bands,
+          roundingIncrementUsd: reimbursementCapBands.roundingIncrementUsd,
         },
       });
     } catch (error) {
