@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { getCountryCode } from '../lib/countryCode.js';
+import { getScoringWeights } from '../lib/privateConfig.js';
 
 /**
  * panzerotti-58931 (Phase 2.1): worldwide scorecard ("check-in game") leaderboard.
@@ -25,9 +26,23 @@ import { getCountryCode } from '../lib/countryCode.js';
  * Cache: in-memory, 5-minute TTL, plus `Cache-Control: public, max-age=300`.
  */
 
-// Single tunable bonus per Best Of win. Imported by scorecard.routes.ts so the
-// per-party board and the global board agree.
-export const BEST_OF_BONUS = 5;
+// Single tunable bonus per Best Of win, resolved from `app_config`
+// (private.scoring_weights → leaderboard.bestOfBonus). Imported by
+// scorecard.routes.ts so the per-party board and the global board agree.
+//
+// The real value is seeded to prod; committed source carries a NON-SENSITIVE
+// placeholder (1 = a Best Of win is worth one item, never NaN/zero-collapse)
+// so the math stays well-defined if the config row is briefly absent.
+export const BEST_OF_BONUS_PLACEHOLDER = 1;
+
+/**
+ * Resolve the Best Of bonus from the seeded leaderboard scoring weights.
+ * Call this at each handler's async entry, then use the returned number.
+ */
+export async function getBestOfBonus(): Promise<number> {
+  const raw = (await getScoringWeights()).leaderboard.bestOfBonus;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : BEST_OF_BONUS_PLACEHOLDER;
+}
 
 // ---- types ----
 
@@ -104,6 +119,9 @@ function toNum(v: bigint | number): number {
 }
 
 export async function computeScorecardLeaderboard(): Promise<ScorecardGlobalLeaderboardResponse> {
+  // Resolve the Best Of bonus once at entry (cached 60s in privateConfig).
+  const bestOfBonus = await getBestOfBonus();
+
   // One pass over checked-in guests. COUNT(DISTINCT ...) FILTER avoids join
   // fan-out between scorecard items and superlative submissions.
   const rows = await prisma.$queryRaw<RawGuestRow[]>`
@@ -140,7 +158,7 @@ export async function computeScorecardLeaderboard(): Promise<ScorecardGlobalLead
     name: privacyName(r.name),
     city: r.city,
     country: r.country,
-    score: toNum(r.item_count) + toNum(r.win_count) * BEST_OF_BONUS,
+    score: toNum(r.item_count) + toNum(r.win_count) * bestOfBonus,
   }));
 
   // ---- per-party aggregation ----
@@ -154,7 +172,7 @@ export async function computeScorecardLeaderboard(): Promise<ScorecardGlobalLead
   }
   const partyMap = new Map<string, PartyAcc>();
   for (const r of rows) {
-    const guestScore = toNum(r.item_count) + toNum(r.win_count) * BEST_OF_BONUS;
+    const guestScore = toNum(r.item_count) + toNum(r.win_count) * bestOfBonus;
     let acc = partyMap.get(r.party_id);
     if (!acc) {
       acc = {

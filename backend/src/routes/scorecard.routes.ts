@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { BEST_OF_BONUS } from './scorecardLeaderboard.routes.js';
+import { getBestOfBonus } from './scorecardLeaderboard.routes.js';
 
 const router = Router();
 
@@ -290,6 +290,10 @@ router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res
 
     const callerEmail = req.userEmail?.toLowerCase();
 
+    // Resolve the Best Of bonus from app_config (cached 60s). Placeholder used
+    // if the private.scoring_weights row is briefly absent.
+    const bestOfBonus = await getBestOfBonus();
+
     const privacyName = (raw: string | null | undefined): string => {
       const trimmed = (raw || '').trim();
       if (!trimmed) return 'Guest';
@@ -303,7 +307,7 @@ router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res
       .map((g) => ({
         guestId: g.id,
         name: privacyName(g.name),
-        score: g.scorecardItems.length + g.superlativeSubmissions.length * BEST_OF_BONUS,
+        score: g.scorecardItems.length + g.superlativeSubmissions.length * bestOfBonus,
         isCurrentUser: !!callerEmail && g.email?.toLowerCase() === callerEmail,
       }))
       .sort((a, b) => {

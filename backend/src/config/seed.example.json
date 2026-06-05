@@ -34,8 +34,18 @@
   },
 
   "private.scoring_weights": {
-    "_note": "PLACEHOLDER scoring weights documenting shape only.",
-    "leaderboard": { "exampleSignal": 0 },
-    "pizzeria": { "exampleSignal": 0 }
+    "_note": "PLACEHOLDER scoring weights — OBVIOUSLY FAKE numbers documenting shape only. Real production weights are seeded separately and are NOT committed. leaderboard.{link,invite,checkin,photo}=composite GPP board weights; photoCap=max photos counted per party; bestOfBonus=points per scorecard Best-Of win. pizzeria.{topLimit=max pizzerias surfaced per event on the /gpp/pizzerias map, distanceWeightPerMile=miles penalty per mile from venue}.",
+    "leaderboard": {
+      "link": 9.9,
+      "invite": 9.9,
+      "checkin": 9.9,
+      "photo": 9.9,
+      "photoCap": 9999,
+      "bestOfBonus": 99
+    },
+    "pizzeria": {
+      "topLimit": 99,
+      "distanceWeightPerMile": 9.9
+    }
   }
 }
