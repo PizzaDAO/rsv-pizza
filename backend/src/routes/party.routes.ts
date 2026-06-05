@@ -17,6 +17,7 @@ import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
 import { getReimbursementRules } from '../lib/privateConfig.js';
 import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
+import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2361,6 +2362,21 @@ router.get('/:id/reimbursement-options', async (req: AuthRequest, res: Response,
       { country: party.country, eventTags: party.eventTags },
       rules
     );
+
+    // marinara-71630: the config resolver matches country EXACTLY, but the
+    // Mercury sanctions gate must NORMALIZE (lowercase / strip parentheticals)
+    // so casing/parenthetical variants of a blocked country are still blocked.
+    // The sanctions list is compliance, not a private business secret, so it
+    // stays in code (`isMercuryBlocked`) and is layered over the config-resolved
+    // options here rather than encoded into `app_config`. Only mutate the
+    // mercury_card entry if it's present; leave everything else untouched.
+    if (isMercuryBlocked(party.country)) {
+      const mercury = options.find((o) => o.id === 'mercury_card');
+      if (mercury) {
+        mercury.enabled = false;
+        mercury.disabledReason = `Mercury cards are unavailable in ${party.country ?? 'your country'} due to compliance restrictions.`;
+      }
+    }
 
     res.json({ options });
   } catch (error) {
