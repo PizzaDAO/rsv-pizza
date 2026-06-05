@@ -15,10 +15,18 @@ type FeedSort = 'newest' | 'random';
 // cannoli-58292: the /photos feed is organized by EVENT YEAR. A photo's
 // "effective year" is:
 //   COALESCE(photo.photo_year,                       -- uploader override
+//            <year parsed from photo.file_name>,      -- e.g. "...2024.png" => 2024
 //            EXTRACT(YEAR FROM party.date)::int,      -- the event's year
 //            EXTRACT(YEAR FROM photo.created_at)::int -- fallback (no event date)
 //   )
-// For payout_documents (no photo_year column) the first term is dropped.
+// The filename-year term takes precedence over the event date (so a file like
+// "Poster Pizza Party 2024.png" reads as 2024 even on a 2026 event) but NOT
+// over the explicit photo_year override. The regex captures a single 4-digit
+// year 20[1-2][0-9] bounded by a non-digit or string edge, so it pulls 2024
+// from "IMG_20240523" and 2026 from "WhatsApp Image 2026-06-05" without
+// matching inside longer digit runs. substring(... from pattern) returns the
+// captured group or NULL, so COALESCE falls through when the name has no year.
+// For payout_documents (no photo_year / file_name columns) it is dropped.
 //
 // Two filters apply UNIFORMLY to every year view (newest, random, ZIP):
 //   1. effective_year = :year
@@ -38,6 +46,20 @@ function parseYear(raw: unknown): number {
   if (!Number.isFinite(n) || n < MIN_YEAR || n > cy + 1) return cy;
   return n;
 }
+
+// cannoli-58292: shared photos-side "effective year" SQL expression, kept in
+// ONE place so the four photo query paths (newest, random, ZIP, facets) can't
+// drift. Assumes the photos table is aliased `p` and the joined party `pa`.
+// The filename-year term (between photo_year and the event date) lets a file
+// like "Poster Pizza Party 2024.png" read as 2024 even on a 2026 event, while
+// still deferring to the explicit photo_year override. payout_documents have
+// no file_name and keep their own (untouched) COALESCE.
+const PHOTO_EFFECTIVE_YEAR = Prisma.sql`COALESCE(
+        p.photo_year,
+        NULLIF(substring(p.file_name from '(?:^|[^0-9])(20[1-2][0-9])(?:[^0-9]|$)'), '')::int,
+        EXTRACT(YEAR FROM pa.date)::int,
+        EXTRACT(YEAR FROM p.created_at)::int
+      )`;
 
 // napoletana-58210: cursor format extended to include the source discriminator
 // so the (createdAt, id) tuple is unambiguous when merging two tables. Format:
@@ -274,12 +296,9 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
           AND pa.underboss_status = 'approved'
           AND pa.photos_public = true
           AND pa.photos_enabled = true
-          -- cannoli-58292: effective_year = :year
-          AND COALESCE(
-                p.photo_year,
-                EXTRACT(YEAR FROM pa.date)::int,
-                EXTRACT(YEAR FROM p.created_at)::int
-              ) = ${year}
+          -- cannoli-58292: effective_year = :year (filename-year > event date,
+          -- but photo_year override wins; see PHOTO_EFFECTIVE_YEAR)
+          AND ${PHOTO_EFFECTIVE_YEAR} = ${year}
           -- cannoli-58292: after-event-start cutoff (no-op when event has no date)
           AND (pa.date IS NULL OR p.created_at >= pa.date)
           ${regionFilter}
@@ -441,11 +460,8 @@ async function handleRandomFeed(
       AND pa.photos_public = true
       AND pa.photos_enabled = true
       -- cannoli-58292: effective_year = :year (supersedes nduja-58291).
-      AND COALESCE(
-            p.photo_year,
-            EXTRACT(YEAR FROM pa.date)::int,
-            EXTRACT(YEAR FROM p.created_at)::int
-          ) = ${year}
+      -- filename-year > event date, photo_year override wins; see PHOTO_EFFECTIVE_YEAR.
+      AND ${PHOTO_EFFECTIVE_YEAR} = ${year}
       -- cannoli-58292: after-event-start cutoff (no-op when event has no date).
       AND (pa.date IS NULL OR p.created_at >= pa.date)
       ${regionFilter}
@@ -591,11 +607,8 @@ router.get('/feed/facets', async (_req: Request, res: Response, next: NextFuncti
     // year dropdown. Raw SQL because effective_year and the cutoff are
     // column-to-column expressions Prisma's typed query can't express.
     const yearRows = await prisma.$queryRaw<{ year: number }[]>(Prisma.sql`
-      SELECT DISTINCT COALESCE(
-               p.photo_year,
-               EXTRACT(YEAR FROM pa.date)::int,
-               EXTRACT(YEAR FROM p.created_at)::int
-             ) AS year
+      -- cannoli-58292: filename-year > event date, photo_year override wins.
+      SELECT DISTINCT ${PHOTO_EFFECTIVE_YEAR} AS year
       FROM photos p
       JOIN parties pa ON pa.id = p.party_id
       WHERE p.status = 'approved'
@@ -707,11 +720,8 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
         AND pa.underboss_status = 'approved'
         AND pa.photos_public = true
         AND pa.photos_enabled = true
-        AND COALESCE(
-              p.photo_year,
-              EXTRACT(YEAR FROM pa.date)::int,
-              EXTRACT(YEAR FROM p.created_at)::int
-            ) = ${year}
+        -- cannoli-58292: filename-year > event date, photo_year override wins.
+        AND ${PHOTO_EFFECTIVE_YEAR} = ${year}
         AND (pa.date IS NULL OR p.created_at >= pa.date)
         ${regionFilter}
         ${countryFilter}
