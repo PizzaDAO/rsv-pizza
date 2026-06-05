@@ -82,14 +82,31 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
     // messages are ignored (no upsert) and just 200.
 
     // Automatic path: bot added/promoted to a group/supergroup.
+    //
+    // tonda-58293 FIX #2: `my_chat_member` also fires when the bot is REMOVED
+    // (status 'left'/'kicked') or restricted. Capturing on those would keep a
+    // group looking "connected" after the bot was kicked. Only capture when the
+    // bot is an active member: status ∈ {member, administrator}, or 'restricted'
+    // with is_member === true. On left/kicked → do nothing (just 200); we do NOT
+    // delete the existing row ("safe auto-capture").
     try {
       const memberChat = update.my_chat_member?.chat;
+      const newStatus: string | undefined = update.my_chat_member?.new_chat_member?.status;
+      const isMember: boolean | undefined = update.my_chat_member?.new_chat_member?.is_member;
+      const botIsActiveMember =
+        newStatus === 'member' ||
+        newStatus === 'administrator' ||
+        (newStatus === 'restricted' && isMember === true);
       if (memberChat && GROUP_TYPES.has(memberChat.type) && typeof memberChat.id === 'number') {
-        await captureTelegramGroup({
-          chatId: memberChat.id,
-          title: memberChat.title ?? null,
-          chatType: memberChat.type,
-        });
+        if (botIsActiveMember) {
+          await captureTelegramGroup({
+            chatId: memberChat.id,
+            title: memberChat.title ?? null,
+            chatType: memberChat.type,
+          });
+        }
+        // Active-member → captured above. left/kicked/restricted-not-member →
+        // intentionally a no-op. Either way this update is fully handled.
         return res.status(200).json({ ok: true });
       }
     } catch (captureErr: any) {

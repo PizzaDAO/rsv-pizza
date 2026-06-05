@@ -3,8 +3,8 @@ import { prisma } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
-import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
-import { sendToCityGroup } from '../services/cityTelegramGroup.js';
+import { cityKeyFromPartyName, getGppRegionByCityKey } from '../helpers/underbossScope.js';
+import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -132,31 +132,11 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           );
           telegramResult = await retryResponse.json();
           if (telegramResult.ok) {
-            // tonda-58293: persist the new supergroup id to city_telegram_groups
-            // so the mapping no longer drifts. cityKey = lower(trim(city)).
-            const cityKey = (city || '').toLowerCase().trim();
-            if (cityKey) {
-              try {
-                await prisma.cityTelegramGroup.upsert({
-                  where: { cityKey },
-                  create: {
-                    cityKey,
-                    chatId: BigInt(newChatId),
-                    isSupergroup: true,
-                    source: 'migration',
-                    lastVerifiedAt: new Date(),
-                  },
-                  update: {
-                    chatId: BigInt(newChatId),
-                    isSupergroup: true,
-                    source: 'migration',
-                    lastVerifiedAt: new Date(),
-                  },
-                });
-              } catch (persistErr: any) {
-                console.error(`[tonda-58293][broadcast] failed to persist migration for ${cityKey}:`, persistErr?.message || persistErr);
-              }
-            }
+            // tonda-58293 FIX #6: persist the new supergroup id via the shared
+            // helper. cityKey = lower(trim(city)); the broadcast `city` field is
+            // the group's cityKey (already lowercased) so this updates the
+            // existing row rather than creating an orphan. region set in-helper.
+            await persistCityGroupMigration((city || '').toLowerCase().trim(), newChatId);
             results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)` });
           } else {
             results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
@@ -707,13 +687,17 @@ router.get('/groups/status', requireAuth, requireUnderbossAuth, async (req: Unde
         };
       });
 
-    // Pending captures (unassigned). Admins see all; scoped UBs see all
-    // pending captures too — they're unresolved by definition and assigning
-    // one is gated by callerOwnsCity on the chosen cityKey.
-    const pending = await prisma.telegramGroupCapture.findMany({
-      where: { assignedCityKey: null },
-      orderBy: { lastSeenAt: 'desc' },
-    });
+    // Pending captures (unassigned). tonda-58293 FIX #8: admins see all; scoped
+    // (region/city) UBs get an EMPTY list. An orphan capture's city is unknown
+    // by definition, so showing every pending capture to a scoped UB was a
+    // cross-region info leak (group titles from other regions). Assignment of an
+    // orphan is therefore an admin-only action via /groups/assign.
+    const pending = scope.admin
+      ? await prisma.telegramGroupCapture.findMany({
+          where: { assignedCityKey: null },
+          orderBy: { lastSeenAt: 'desc' },
+        })
+      : [];
 
     res.json({
       cities,
@@ -764,6 +748,10 @@ router.post('/groups/assign', requireAuth, requireUnderbossAuth, async (req: Und
     }
 
     const isSupergroup = capture.chatType === 'supergroup';
+    // tonda-58293 FIX #1: populate region (GPP slug) so the new row is visible
+    // to region-scoped underbosses. This is an explicit admin/scoped assign, so
+    // it intentionally overwrites any existing chat_id for the city.
+    const region = await getGppRegionByCityKey(key);
 
     await prisma.telegramGroupCapture.update({
       where: { chatId: chatIdBig },
@@ -778,6 +766,7 @@ router.post('/groups/assign', requireAuth, requireUnderbossAuth, async (req: Und
         title: capture.title,
         isSupergroup,
         source: 'manual',
+        region,
         lastVerifiedAt: new Date(),
       },
       update: {
@@ -785,6 +774,7 @@ router.post('/groups/assign', requireAuth, requireUnderbossAuth, async (req: Und
         title: capture.title,
         isSupergroup,
         source: 'manual',
+        ...(region ? { region } : {}),
         lastVerifiedAt: new Date(),
       },
     });
@@ -894,8 +884,24 @@ router.post('/groups/:cityKey/refresh', requireAuth, requireUnderbossAuth, async
     const chat = result.result || {};
     const newChatId =
       typeof chat.id === 'number' || typeof chat.id === 'string' ? String(chat.id) : effectiveChatId;
-    const isSupergroup = migrated ? true : chat.type === 'supergroup';
     const title: string | null = typeof chat.title === 'string' ? chat.title : null;
+
+    // tonda-58293 FIX #5: also treat a successful getChat whose returned chat.id
+    // differs from the stored id as a migration (Telegram sometimes returns the
+    // new supergroup id directly without an error). Combine with the existing
+    // !ok + migrate_to_chat_id path above.
+    if (!migrated && newChatId !== originalChatId) {
+      migrated = true;
+      console.log(`[tonda-58293][refresh] ${key} id changed ${originalChatId} -> ${newChatId} on getChat; treating as migration.`);
+    }
+    const isSupergroup = migrated ? true : chat.type === 'supergroup';
+
+    // tonda-58293 FIX #6: on migration, persist via the shared helper (sets
+    // chatId/isSupergroup/source='migration'/region/lastVerifiedAt) so all
+    // three call sites behave identically. Then refresh the display title.
+    if (migrated) {
+      await persistCityGroupMigration(key, newChatId);
+    }
 
     const updated = await prisma.cityTelegramGroup.update({
       where: { cityKey: key },

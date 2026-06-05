@@ -10,6 +10,13 @@ import {
   type TelegramGroupTestResult,
   type TelegramGroupRefreshResult,
 } from '../../lib/api';
+import { GPP_REGIONS } from '../../types';
+
+// tonda-58293 FIX #1: region values are GPP slugs; show the human label.
+const REGION_SLUG_TO_LABEL: Record<string, string> = Object.fromEntries(
+  GPP_REGIONS.map((r) => [r.id, r.label]),
+);
+const regionLabel = (slug: string): string => REGION_SLUG_TO_LABEL[slug] || slug;
 
 /**
  * tonda-58293 Phase 2: Telegram Groups gap report.
@@ -217,7 +224,7 @@ export function TelegramGroupsTab() {
               <option value="">All regions</option>
               {regions.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {regionLabel(r)}
                 </option>
               ))}
             </select>

@@ -14,16 +14,56 @@
  * `source` is set to 'sheet' for every imported row.
  *
  * Sheet source: same gviz JSON URL the frontend `fetchTelegramGroups()` uses.
- *   col 4  = country
+ *   col 4  = country   (display only)
  *   col 5  = city
- *   col 6  = underboss
- *   col 7  = region
+ *   col 6  = underboss (display only)
+ *   col 7  = region    (IGNORED for the DB region — see FIX #1 below)
  *   col 8  = chatUrl
  *   col 10 = groupId (chat_id)
+ *
+ * tonda-58293 FIX #1: `city_telegram_groups.region` stores the GPP region SLUG
+ * (e.g. `western-europe`) derived from the matching GPP party, not the sheet's
+ * free-text region name (e.g. "Western Europe"). The sheet name never matches
+ * `underbosses.regions`/`parties.region`, which are slugs.
  */
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+/**
+ * Mirror of `cityKeyFromPartyName` in src/helpers/underbossScope.ts — inlined so
+ * this standalone tsx script stays dependency-free (like the other scripts).
+ * Keep in sync: "Global Pizza Party {City}" → lower(trim(City)).
+ */
+function cityKeyFromPartyName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const match = name.match(/Global Pizza Party\s+(.+)/i);
+  if (!match) return null;
+  return match[1].trim().toLowerCase();
+}
+
+/**
+ * tonda-58293 FIX #1: build cityKey → GPP region-slug map from non-cancelled
+ * GPP parties. `city_telegram_groups.region` must hold the GPP slug (e.g.
+ * `western-europe`) — the same value as `parties.region` and `underbosses.regions`
+ * — NOT the sheet's free-text region name (e.g. "Western Europe"), or
+ * region-scoped underbosses never match. Single batched pass (no N+1).
+ */
+async function buildCityKeyToRegion(): Promise<Map<string, string>> {
+  const parties = await prisma.party.findMany({
+    where: { eventType: 'gpp', cancelledAt: null },
+    select: { name: true, region: true },
+  });
+  const map = new Map<string, string>();
+  for (const p of parties) {
+    const key = cityKeyFromPartyName(p.name);
+    if (!key) continue;
+    const region = (p.region ?? '').trim();
+    if (!region) continue;
+    if (!map.has(key)) map.set(key, region);
+  }
+  return map;
+}
 
 const SHEET_ID = '16T3_iXywToXQqxTyDIniWIA4SUI8Wj0a5LKHSAJL_9Q';
 const GID = '811297100';
@@ -69,15 +109,21 @@ async function main() {
     byCityKey.set(r.city.toLowerCase().trim(), r);
   }
 
+  // tonda-58293 FIX #1: region comes from the GPP party slug (cityKey-derived),
+  // not the sheet's free-text region column. Sheet country/underboss stay
+  // (display only). Cities with no GPP party fall back to null region.
+  const cityKeyToRegion = await buildCityKeyToRegion();
+
   let upserted = 0;
   let skipped = 0;
   for (const [cityKey, r] of byCityKey) {
     const chatId = BigInt(r.groupId);
     const isSupergroup = r.groupId.startsWith('-100');
+    const region = cityKeyToRegion.get(cityKey) ?? null;
 
     if (dryRun) {
       console.log(
-        `[dry-run] ${cityKey} -> chat_id=${chatId.toString()} supergroup=${isSupergroup} url=${r.chatUrl || '(none)'}`,
+        `[dry-run] ${cityKey} -> chat_id=${chatId.toString()} supergroup=${isSupergroup} region=${region ?? '(none)'} url=${r.chatUrl || '(none)'}`,
       );
       skipped++;
       continue;
@@ -85,7 +131,6 @@ async function main() {
 
     const country = r.country || null;
     const underboss = r.underboss || null;
-    const region = r.region || null;
 
     await prisma.cityTelegramGroup.upsert({
       where: { cityKey },

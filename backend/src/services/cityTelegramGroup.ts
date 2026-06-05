@@ -15,8 +15,57 @@
  * surface skips/failures.
  */
 import { prisma } from '../config/database.js';
+import { getGppRegionByCityKey } from '../helpers/underbossScope.js';
 
 const BOT_API = 'https://api.telegram.org';
+
+/**
+ * tonda-58293 FIX #6: single shared helper for persisting a supergroup
+ * migration to `city_telegram_groups`. Previously copy-pasted across
+ * `sendToCityGroup`, the `/broadcast` handler, and `/groups/:cityKey/refresh`.
+ *
+ * Upserts the row keyed by cityKey: sets the new chatId, isSupergroup=true,
+ * source='migration', region (GPP slug via FIX #1) so a freshly-created row
+ * isn't NULL, and lastVerifiedAt=now(). Best-effort: never throws — a failed
+ * persist must not flip a successful send to an error. Returns true on success.
+ */
+export async function persistCityGroupMigration(
+  cityKey: string,
+  newChatId: string | bigint,
+): Promise<boolean> {
+  const key = (cityKey || '').toLowerCase().trim();
+  if (!key) return false;
+  try {
+    const region = await getGppRegionByCityKey(key);
+    await prisma.cityTelegramGroup.upsert({
+      where: { cityKey: key },
+      create: {
+        cityKey: key,
+        chatId: BigInt(newChatId),
+        isSupergroup: true,
+        source: 'migration',
+        region,
+        lastVerifiedAt: new Date(),
+      },
+      update: {
+        chatId: BigInt(newChatId),
+        isSupergroup: true,
+        source: 'migration',
+        // Only backfill region when it's currently missing — never clobber a
+        // value an admin/import already set.
+        ...(region ? { region } : {}),
+        lastVerifiedAt: new Date(),
+      },
+    });
+    return true;
+  } catch (err: any) {
+    console.error(
+      `[tonda-58293][city-group] failed to persist migration for ${key}:`,
+      err?.message || err,
+    );
+    return false;
+  }
+}
 
 export interface SendToCityGroupResult {
   ok: boolean;
@@ -91,23 +140,8 @@ export async function sendToCityGroup(
       result = await send(newChatId);
 
       if (result.ok) {
-        try {
-          await prisma.cityTelegramGroup.update({
-            where: { cityKey: key },
-            data: {
-              chatId: BigInt(newChatId),
-              isSupergroup: true,
-              source: 'migration',
-              lastVerifiedAt: new Date(),
-            },
-          });
-        } catch (persistErr: any) {
-          // Send succeeded; failing to persist must not flip the result to error.
-          console.error(
-            `[tonda-58293][city-group] failed to persist migration for ${key}:`,
-            persistErr?.message || persistErr,
-          );
-        }
+        // Send succeeded; failing to persist must not flip the result to error.
+        await persistCityGroupMigration(key, newChatId);
         return { ok: true, chatId: newChatId, migratedTo: newChatId };
       }
 
