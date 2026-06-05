@@ -44,6 +44,7 @@ import {
   type ReceiptLightboxImage,
   formatUsd,
   computePartyTotals,
+  CapInlineEditor,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
@@ -2652,6 +2653,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
+  onCapUpdated,
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
@@ -3278,6 +3280,22 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                               : 'Tax forms: off'}
                           </button>
                         )}
+                        {/* calzone-58293: inline reimbursement-cap editor in the By-city header so
+                            admins can raise/clear the party's cap without leaving /payments. Saves to
+                            parties.reimbursement_cap_usd (admin + underboss, scope-checked server-side).
+                            stopPropagation so editing doesn't toggle the row expand. */}
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-theme-text-muted"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Reimbursement cap (validated value or max numeric event_tag)"
+                        >
+                          <CapInlineEditor
+                            partyId={row.party.id}
+                            currentCapUsd={row.party.effectiveReimbursementCapUsd ?? null}
+                            onUpdated={() => onCapUpdated?.(row.party.id)}
+                          />
+                          <span>cap</span>
+                        </span>
                         {/* bottarga-92104: red "Possible scam" pill — visible
                             in the city header next to other status pills when
                             the `possible-scam` tag is present on the party.
