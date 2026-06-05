@@ -15,6 +15,7 @@ import { usePizza } from '../../contexts/PizzaContext';
 import { updateParty } from '../../lib/supabase';
 import { IconInput } from '../IconInput';
 import { FindVenueModal } from '../checklist/FindVenueModal';
+import { Gpp27StatusPanel } from './Gpp27StatusPanel';
 import {
   GPP27_STEPS,
   stepUnlocked,
@@ -274,6 +275,33 @@ export const GPP27DashboardTab: React.FC = () => {
     return s ? t(s.labelKey) : id;
   };
 
+  // Best available headcount for attendance-driven coaching: prefer the host's
+  // expected override, then the target. Used for the pizza-count math.
+  const headcount = party.expectedAttendance ?? party.targetAttendance ?? null;
+
+  // Resolve a step's coach one-liner. Dynamic steps interpolate attendance:
+  //   - venue: the size-tier guidance (matches the venue section banner).
+  //   - pizzeria: ~1 large pizza per 3 guests, from the best headcount.
+  // Static steps just translate their coachKey.
+  const coachOf = (step: Gpp27Step): string | null => {
+    if (!step.coachKey) return null;
+    if (step.dynamicCoach) {
+      if (step.id === 'venue') {
+        if (headcount == null) return t('gpp27.coach.venue');
+        return headcount < 25
+          ? t('gpp27.venueGuidanceSmall')
+          : headcount <= 60
+            ? t('gpp27.venueGuidanceMedium')
+            : t('gpp27.venueGuidanceLarge');
+      }
+      if (step.id === 'pizzeria') {
+        if (headcount == null) return t('gpp27.coach.pizzeria_generic');
+        return t('gpp27.coach.pizzeria', { count: Math.ceil(headcount / 3) });
+      }
+    }
+    return t(step.coachKey);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -281,6 +309,10 @@ export const GPP27DashboardTab: React.FC = () => {
           GPP27 &mdash; {t('gpp27.setupTitle')} (preview)
         </h2>
       </div>
+
+      {/* Consolidated approval + funding status (slice 4). Single source for
+          the approval state the 2026 dashboard scatters across tiles/callouts. */}
+      <Gpp27StatusPanel party={party} />
 
       {/* Next Up card */}
       {nextUp ? (
@@ -294,9 +326,9 @@ export const GPP27DashboardTab: React.FC = () => {
           <h3 className="text-lg font-semibold text-theme-text mb-1">
             {t(nextUp.step.labelKey)}
           </h3>
-          {nextUp.step.coachKey && (
+          {coachOf(nextUp.step) && (
             <p className="text-sm text-theme-text-muted mb-4">
-              {t(nextUp.step.coachKey)}
+              {coachOf(nextUp.step)}
             </p>
           )}
           <button
@@ -408,11 +440,21 @@ export const GPP27DashboardTab: React.FC = () => {
                   size={16}
                   className={done ? 'text-theme-text-muted shrink-0' : 'text-theme-text-secondary shrink-0'}
                 />
-                <span
-                  className={`text-sm ${done ? 'text-theme-text-muted line-through' : 'text-theme-text'}`}
-                >
-                  {t(step.labelKey)}
-                </span>
+                <div className="min-w-0">
+                  <span
+                    className={`text-sm ${done ? 'text-theme-text-muted line-through' : 'text-theme-text'}`}
+                  >
+                    {t(step.labelKey)}
+                  </span>
+                  {/* slice 4: inline per-step coaching one-liner. Hidden once the
+                      step is done (the strikethrough label is enough) and when
+                      locked (the locked hint takes priority). */}
+                  {!done && !locked && coachOf(step) && (
+                    <p className="text-xs text-theme-text-muted mt-0.5">
+                      {coachOf(step)}
+                    </p>
+                  )}
+                </div>
 
                 {lockedHint && (
                   <span className="text-xs text-theme-text-faint ml-2 inline-flex items-center gap-1">

@@ -46,6 +46,13 @@ export interface Gpp27Step {
   prereqs?: string[];
   /** i18n key for a one-line why/how (slice 4 expands the copy). */
   coachKey?: string;
+  /**
+   * slice 4: true => the coach copy is interpolated with attendance-driven
+   * params (e.g. pizza count). The component (which has `party`) resolves the
+   * params and i18n string; this config only flags that it needs them so the
+   * step table stays free of party logic.
+   */
+  dynamicCoach?: boolean;
 }
 
 /**
@@ -76,6 +83,7 @@ export const GPP27_STEPS: Gpp27Step[] = [
     isDone: ({ party }) => !!(party.address || party.venueName),
     prereqs: ['target'],
     coachKey: 'gpp27.coach.venue',
+    dynamicCoach: true,
   },
   {
     id: 'team',
@@ -99,6 +107,7 @@ export const GPP27_STEPS: Gpp27Step[] = [
     icon: Pizza,
     isDone: ({ party }) => (party.selectedPizzerias?.length ?? 0) > 0,
     coachKey: 'gpp27.coach.pizzeria',
+    dynamicCoach: true,
   },
   {
     id: 'budget',

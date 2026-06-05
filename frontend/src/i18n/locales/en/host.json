@@ -623,16 +623,32 @@
       "throwParty": "Throw the party"
     },
     "coach": {
-      "createEvent": "Your event is live — let's get it ready for the big day.",
-      "target": "Pick a headcount goal. It shapes the venue and supplies you'll need.",
-      "venue": "Lock in a space that fits your target crowd.",
-      "team": "Add co-hosts to share the load and unlock dashboard access.",
-      "partners": "Line up local partners and sponsors to support your event.",
-      "pizzeria": "Pick the pizzeria that'll feed your guests.",
-      "budget": "Plan what you'll spend so reimbursement goes smoothly.",
-      "funding": "Submit your event for underboss review to unlock funding.",
-      "socials": "Spread the word — post your event across your channels.",
-      "throwParty": "Everything's ready. Go throw an amazing party!"
+      "createEvent": "Add a date, place, and cover image so guests know what to expect.",
+      "target": "Set a headcount goal — it drives your venue size and how much pizza to order.",
+      "venue": "Lock in a space that comfortably fits your target crowd.",
+      "team": "Add a co-host or two to share the work and unlock dashboard access for them.",
+      "partners": "Line up local sponsors or partners to chip in food, space, or promotion.",
+      "pizzeria": "Plan ~{{count}} large pizzas (about 1 per 3 guests) and pick a nearby pizzeria.",
+      "pizzeria_generic": "Plan about 1 large pizza per 3 guests, then pick a nearby pizzeria.",
+      "budget": "Sketch your costs and stay within your reimbursement cap so payouts go smoothly.",
+      "funding": "Once approved by your underboss, your reimbursement cap unlocks here.",
+      "socials": "Share your event link across your channels to fill those seats.",
+      "throwParty": "Everything's set — print your essentials and go throw a great party!"
+    },
+    "status": {
+      "pendingTitle": "Under review",
+      "pendingBody": "Your underboss is reviewing your event. Your reimbursement cap unlocks once you're approved.",
+      "approvedTitle": "Approved",
+      "approvedBody": "You're approved for GPP27 funding. Here's your reimbursement cap — tap to open Payments.",
+      "capLabel": "Reimbursement cap",
+      "capUnderReview": "Under review",
+      "capTitleShown": "Reimbursement cap — open the Payments tab",
+      "capTitleReview": "Your underboss is reviewing your event — open the Payments tab",
+      "rejectedBody": "We can't support your event financially this year, but we're happy to list your event on the site!",
+      "listWithoutFunding": "List My Event Without Funding",
+      "maybeNextYear": "Maybe Next Year",
+      "listedBody": "Your event is listed as a Community event on the site. These are self funded events that will not be funded by PizzaDAO.",
+      "hiddenBody": "Your event is currently not listed on the site."
     }
   },
   "checklist": {
