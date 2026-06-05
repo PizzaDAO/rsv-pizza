@@ -108,12 +108,12 @@ export const W9Form: React.FC<W9FormProps> = ({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 mb-4 flex items-start gap-3">
-        <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+        <AlertCircle className="text-amber-400 [.gpp-theme_&]:text-amber-700 shrink-0 mt-0.5" size={18} />
         <div className="flex-1">
-          <p className="text-sm font-medium text-amber-200">
+          <p className="text-sm font-medium text-amber-300 [.gpp-theme_&]:text-amber-900">
             W-9 is only for US persons
           </p>
-          <p className="text-xs text-amber-100 mt-1">
+          <p className="text-xs text-amber-100 [.gpp-theme_&]:text-amber-900 mt-1">
             Use W-9 if you're a US citizen, US resident, US LLC, or US corporation —
             regardless of where the event is hosted. If you live or are based outside
             the US, use W-8BEN (individual) or W-8BEN-E (entity) instead.
@@ -122,14 +122,14 @@ export const W9Form: React.FC<W9FormProps> = ({
             <button
               type="button"
               onClick={() => onSwitchFormType?.('w8ben')}
-              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40"
+              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40 [.gpp-theme_&]:text-amber-900 [.gpp-theme_&]:bg-amber-500/30 [.gpp-theme_&]:hover:bg-amber-500/40 [.gpp-theme_&]:border-amber-700/40"
             >
               Switch to W-8BEN (individual)
             </button>
             <button
               type="button"
               onClick={() => onSwitchFormType?.('w8bene')}
-              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40"
+              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40 [.gpp-theme_&]:text-amber-900 [.gpp-theme_&]:bg-amber-500/30 [.gpp-theme_&]:hover:bg-amber-500/40 [.gpp-theme_&]:border-amber-700/40"
             >
               Switch to W-8BEN-E (entity)
             </button>
