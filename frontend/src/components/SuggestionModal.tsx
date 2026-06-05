@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, Pencil, ImagePlus } from 'lucide-react';
+import { X, Loader2, ImagePlus, Lightbulb, User, Mail } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadEventImage, submitSuggestion } from '../lib/supabase';
@@ -148,16 +148,14 @@ export function SuggestionModal({ open, onClose }: SuggestionModalProps) {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 mb-1">
-              <Pencil size={20} className="text-[#ff393a]" />
-              <h2 className="text-lg font-semibold text-gray-900">Suggest an improvement</h2>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Suggest an improvement</h2>
             <p className="text-sm text-gray-600 mb-4">
               Spotted something? Share an idea to make the site better.
             </p>
 
             <div className="space-y-3">
               <IconInput
+                icon={Lightbulb}
                 multiline
                 rows={4}
                 required
@@ -166,11 +164,13 @@ export function SuggestionModal({ open, onClose }: SuggestionModalProps) {
                 placeholder="Share an idea to improve the site…"
               />
               <IconInput
+                icon={User}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name (optional)"
               />
               <IconInput
+                icon={Mail}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
