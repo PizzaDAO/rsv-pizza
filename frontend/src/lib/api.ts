@@ -3152,7 +3152,10 @@ export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pen
   });
 }
 
-// Bulk delete events (underboss auth)
+// Bulk soft-cancel events (underboss auth). ziti-58475: this no longer hard-deletes;
+// it sets cancelledAt/cancelledBy server-side, so the rows, their children (guests,
+// sponsors, RSVPs) and public URLs are preserved and the events can be reinstated.
+// Name + endpoint kept unchanged to avoid churn at call sites.
 export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-delete', {
     method: 'DELETE',
