@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Building2, MapPin, Hash, FileSignature, CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Building2, MapPin, Hash, FileSignature, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
 
@@ -46,6 +46,8 @@ const TAX_CLASS_OPTIONS: Array<{ value: NonNullable<W9FormData['taxClassificatio
   { value: 'other', label: 'Other' },
 ];
 
+type TinType = 'ssn' | 'ein';
+
 /**
  * W-9 host form. All fields are controlled; the parent passes `value` /
  * `onChange` so the draft can be saved as you type. Required-field validation
@@ -53,8 +55,27 @@ const TAX_CLASS_OPTIONS: Array<{ value: NonNullable<W9FormData['taxClassificatio
  * the place to surface failures.
  */
 export const W9Form: React.FC<W9FormProps> = ({ value, onChange, disabled }) => {
+  // Derive initial TIN type from whichever value is populated.
+  // Default to 'ssn' (most common for individual hosts).
+  const initialTinType: TinType = value.ein && !value.ssn ? 'ein' : 'ssn';
+  const [tinType, setTinType] = useState<TinType>(initialTinType);
+  const [showExemptCodes, setShowExemptCodes] = useState<boolean>(
+    !!(value.exemptPayeeCode || value.fatcaCode),
+  );
+
   const set = <K extends keyof W9FormData>(key: K, v: W9FormData[K]) =>
     onChange({ ...value, [key]: v });
+
+  // Switching TIN type clears the other field so the PDF only receives one.
+  const switchTinType = (next: TinType) => {
+    if (next === tinType) return;
+    setTinType(next);
+    if (next === 'ssn') {
+      onChange({ ...value, ein: '' });
+    } else {
+      onChange({ ...value, ssn: '' });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -99,25 +120,6 @@ export const W9Form: React.FC<W9FormProps> = ({ value, onChange, disabled }) => 
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Exempt payee code (optional)"
-          value={value.exemptPayeeCode ?? ''}
-          onChange={(e) => set('exemptPayeeCode', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="FATCA reporting code (optional)"
-          value={value.fatcaCode ?? ''}
-          onChange={(e) => set('fatcaCode', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
-
       <IconInput
         icon={MapPin}
         type="text"
@@ -145,25 +147,91 @@ export const W9Form: React.FC<W9FormProps> = ({ value, onChange, disabled }) => 
         disabled={disabled}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Social Security Number (XXX-XX-XXXX)"
-          value={value.ssn ?? ''}
-          onChange={(e) => set('ssn', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Employer ID Number (XX-XXXXXXX)"
-          value={value.ein ?? ''}
-          onChange={(e) => set('ein', e.target.value)}
-          disabled={disabled}
-        />
+      <div>
+        <p className="text-xs text-theme-text-muted mb-2">Taxpayer Identification Number (TIN)</p>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2">
+          <label className={`flex items-center gap-2 cursor-pointer text-sm text-theme-text ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <input
+              type="radio"
+              name="w9-tin-type"
+              value="ssn"
+              checked={tinType === 'ssn'}
+              onChange={() => switchTinType('ssn')}
+              disabled={disabled}
+              className="accent-[#ff393a]"
+            />
+            <span>SSN (individual / sole proprietor)</span>
+          </label>
+          <label className={`flex items-center gap-2 cursor-pointer text-sm text-theme-text ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <input
+              type="radio"
+              name="w9-tin-type"
+              value="ein"
+              checked={tinType === 'ein'}
+              onChange={() => switchTinType('ein')}
+              disabled={disabled}
+              className="accent-[#ff393a]"
+            />
+            <span>EIN (business entity)</span>
+          </label>
+        </div>
+        {tinType === 'ssn' ? (
+          <IconInput
+            icon={Hash}
+            type="text"
+            placeholder="XXX-XX-XXXX"
+            value={value.ssn ?? ''}
+            onChange={(e) => set('ssn', e.target.value)}
+            disabled={disabled}
+          />
+        ) : (
+          <IconInput
+            icon={Hash}
+            type="text"
+            placeholder="XX-XXXXXXX"
+            value={value.ein ?? ''}
+            onChange={(e) => set('ein', e.target.value)}
+            disabled={disabled}
+          />
+        )}
       </div>
-      <p className="text-xs text-theme-text-muted">Enter one of SSN or EIN.</p>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowExemptCodes((prev) => !prev)}
+          className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+          aria-expanded={showExemptCodes}
+        >
+          {showExemptCodes ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span>Advanced — for institutional payees only</span>
+        </button>
+        {showExemptCodes && (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-theme-text-muted">
+              These codes apply to government agencies, tax-exempt organizations, and financial
+              institutions — not to individual contractors.{' '}
+              <strong>If you're an individual or small business, leave both blank.</strong>
+            </p>
+            <IconInput
+              icon={Hash}
+              type="text"
+              placeholder="Exempt payee code (e.g. 1 = US govt, 2 = 501(a) org)"
+              value={value.exemptPayeeCode ?? ''}
+              onChange={(e) => set('exemptPayeeCode', e.target.value)}
+              disabled={disabled}
+            />
+            <IconInput
+              icon={Hash}
+              type="text"
+              placeholder="FATCA reporting code (A through M; rarely applies)"
+              value={value.fatcaCode ?? ''}
+              onChange={(e) => set('fatcaCode', e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="pt-2">
         <Checkbox
