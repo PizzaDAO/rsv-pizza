@@ -32,8 +32,8 @@ import {
   getPayoutWalletAddress,
   getPayoutWalletBalanceUsd,
   getPerAddressPaidTotals,
-  PER_ADDRESS_HARD_CAP_USD,
 } from '../services/usdc-base.service.js';
+import { getPayoutCaps } from '../lib/privateConfig.js';
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
@@ -70,20 +70,19 @@ const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'queued', 'rejected', 'p
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
- * acciuga-62583: hard per-submission ceiling of $675 (cassoeula-92103, was $650) —
- * same value as `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the
- * USDC-execute ceiling) but enforced here at SUBMISSION time across all admin
- * create/edit paths (external POST + PATCH). No override path. Inlined here
- * per task spec — mirror of the helper in payout.routes.ts so we don't extract
- * a shared module just for two callsites.
+ * acciuga-62583: hard per-submission ceiling — enforced here at SUBMISSION time
+ * across all admin create/edit paths (external POST + PATCH). No override path.
+ *
+ * marinara-71630 P2: the cap value now comes from app_config via
+ * `getPayoutCaps().perSubmissionMaxUsd` (real values out of committed source).
+ * The caller resolves the caps (async) and passes the number in, so this helper
+ * stays a cheap synchronous assertion.
  */
-const PER_SUBMISSION_MAX_USD = 675;
-
-function assertWithinPerSubmissionCap(amountUsd: number) {
+function assertWithinPerSubmissionCap(amountUsd: number, perSubmissionMaxUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
-  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+  if (amountUsd > perSubmissionMaxUsd) {
     throw new AppError(
-      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      `Payment requests are limited to $${perSubmissionMaxUsd} per submission. Please reduce the amount or split into multiple submissions.`,
       400,
       'PER_SUBMISSION_CAP_EXCEEDED',
     );
@@ -2289,8 +2288,8 @@ router.post(
 // Returns cumulative paid USDC for a single recipient wallet, optionally with
 // a `wouldExceed` flag for a proposed additional amount. Backs the warning
 // panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
-// already received $Y; sending $Z more would push past the $676 per-address
-// cap" before they fire off a duplicate payment.
+// already received $Y; sending $Z more would push past the per-address cap"
+// before they fire off a duplicate payment.
 //
 // Query params:
 //   address (required): 0x...40 hex chars (case-insensitive)
@@ -2332,13 +2331,15 @@ router.get(
       }
 
       const { paidUsd, paidCount } = await getPerAddressPaidTotals(addressRaw);
-      const wouldExceed = amount == null ? null : paidUsd + amount > PER_ADDRESS_HARD_CAP_USD;
+      // marinara-71630 P2: per-address cap now sourced from app_config.
+      const perAddressHardCapUsd = (await getPayoutCaps()).perAddressHardCapUsd;
+      const wouldExceed = amount == null ? null : paidUsd + amount > perAddressHardCapUsd;
 
       res.json({
         address: addressRaw,
         paidUsd,
         paidCount,
-        capUsd: PER_ADDRESS_HARD_CAP_USD,
+        capUsd: perAddressHardCapUsd,
         wouldExceed,
       });
     } catch (error) {
@@ -3073,10 +3074,10 @@ router.patch(
           // the admin couldn't edit it down because aglio-62584's checkbox
           // override only covered the user-typed amount, not the in-flight
           // value the modal recomputed against the bad OCR sum. Admins can
-          // always proceed; the soft $675 default is now informational in
-          // the modal. The USDC execute hard ceiling
-          // (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a
-          // separate safety net at on-chain send time — admins can split
+          // always proceed; the soft per-submission default is now
+          // informational in the modal. The USDC execute hard per-tx ceiling
+          // (getPayoutCaps().hardPerTxCeilingUsd in usdc-base.service.ts)
+          // remains a separate safety net at on-chain send time — admins split
           // executes or record as external payment to handle larger sums.
           // The per-party cap (tiramisu-49102) and per-address cap
           // (bianco-89172) likewise stay on the approve/mark-paid/execute
@@ -3245,14 +3246,14 @@ router.post(
       // approve time via `allowOverPartyCap` (mirrors salame-92103's existing
       // override on /execute). Underbosses can NEVER skip the cap — only the
       // four admin-class roles (admin / super_admin / payment_admin) get the
-      // ack pathway. The per-submission ceiling ($675), per-address cap, and
-      // daily cap are unchanged.
+      // ack pathway. The per-submission ceiling, per-address cap, and daily
+      // cap are unchanged.
       const allowOverPartyCap =
         actor.actorKind !== 'underboss' &&
         !!(req.body && req.body.allowOverPartyCap);
 
       // guanciale-49340: admin-class can also opt to bypass the per-address
-      // ($676) hard cap in the inline autoExecute usdc_base branch via
+      // hard cap in the inline autoExecute usdc_base branch via
       // `allowOverPerAddressCap`. The by-city SendPaymentModal sets this when
       // the amber per-address cap warning's ack has been ticked. The flag is
       // forwarded to executePayout (which already accepts/forwards it to
@@ -3268,7 +3269,9 @@ router.post(
       //
       // nduja-92106: skip the per-party throw when the admin has ticked the
       // override checkbox in PayoutReviewModal. Per-submission ceiling stays.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: approvePerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), approvePerSubmissionMaxUsd);
       if (!allowOverPartyCap) {
         await assertWithinPartyCap(
           existing.partyId,
@@ -3349,8 +3352,8 @@ router.post(
               // forward it here).
               allowOverPartyCap,
               // guanciale-49340: forward the per-address cap override so the
-              // inline USDC send can bypass the $676 hard cap when the admin
-              // acked the by-city Send modal's per-address warning.
+              // inline USDC send can bypass the per-address hard cap when the
+              // admin acked the by-city Send modal's per-address warning.
               allowOverPerAddressCap,
             });
             autoExecuted = true;
@@ -3844,7 +3847,9 @@ router.post(
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // mark-paid time too. mark-paid is the manual override that records an
       // out-of-band payment for an existing row — same gates apply.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: markPaidPerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), markPaidPerSubmissionMaxUsd);
       await assertWithinPartyCap(
         existing.partyId,
         Number(existing.finalAmountUsd),
@@ -4129,7 +4134,9 @@ router.post(
       // checks here is belt-and-braces — if the party cap was tightened
       // between approve and queue, we surface the violation instead of
       // silently letting the wire request go out.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: queuePerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), queuePerSubmissionMaxUsd);
       await assertWithinPartyCap(
         existing.partyId,
         Number(existing.finalAmountUsd),
@@ -4278,7 +4285,7 @@ async function executePayout(params: {
   };
   body: any;
   /**
-   * bianco-89172: when true, skip the per-address $676 cumulative cap
+   * bianco-89172: when true, skip the per-address cumulative cap
    * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
    * the warning's acknowledgement checkbox has been ticked.
    */
@@ -4330,9 +4337,10 @@ async function executePayout(params: {
   // salame-92103: when `allowOverPartyCap` is set (admin-class only, sourced
   // from the modal's acknowledgement checkbox), skip the per-party cap throw
   // so admins can execute a payment that exceeds the party's effective cap.
-  // The per-submission ceiling ($675), per-address cap, and daily cap are
-  // unchanged.
-  assertWithinPerSubmissionCap(finalAmountUsd);
+  // The per-submission ceiling, per-address cap, and daily cap are unchanged.
+  // marinara-71630 P2: per-submission cap from app_config (env-free).
+  const { perSubmissionMaxUsd: executePerSubmissionMaxUsd } = await getPayoutCaps();
+  assertWithinPerSubmissionCap(finalAmountUsd, executePerSubmissionMaxUsd);
   if (!allowOverPartyCap) {
     await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
   }
@@ -4703,9 +4711,8 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
-        // bianco-89172: admin can acknowledge the per-address $676 cap
-        // warning via the PayoutReviewModal checkbox; the frontend forwards
-        // the flag here.
+        // bianco-89172: admin can acknowledge the per-address cap warning via
+        // the PayoutReviewModal checkbox; the frontend forwards the flag here.
         allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
         // salame-92103: admin can acknowledge the per-party cap warning via
         // the PayoutReviewModal checkbox; same admin-class gate as the route

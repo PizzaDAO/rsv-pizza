@@ -12,12 +12,13 @@
   },
 
   "private.payout_caps": {
-    "_note": "PLACEHOLDER caps. Real production caps are seeded separately and are NOT committed. The loader treats 0 as 'unconfigured'.",
-    "perSubmissionMaxUsd": 100,
-    "perAddressHardCapUsd": 100,
-    "perTxCapUsd": 100,
-    "dailyCapUsd": 100,
-    "w9ThresholdUsd": 100
+    "_note": "OBVIOUSLY-FAKE placeholder caps documenting shape only. Real production caps are seeded separately (marinara-71630 P2) and are NOT committed. perAddressHardCapUsd should sit just above hardPerTxCeilingUsd; hardPerTxCeilingUsd is the over-everything per-tx ceiling.",
+    "perSubmissionMaxUsd": 111,
+    "perAddressHardCapUsd": 444,
+    "perTxCapUsd": 222,
+    "dailyCapUsd": 555,
+    "w9ThresholdUsd": 333,
+    "hardPerTxCeilingUsd": 444
   },
 
   "private.fraud_weights": {
