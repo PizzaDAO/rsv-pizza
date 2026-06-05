@@ -268,6 +268,8 @@ export interface Party {
   maxGuests: number | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;
@@ -409,11 +411,10 @@ export interface DonationPublicStats {
     message: string | null;
     createdAt: string;
   }[];
-  topDonors?: {
-    name: string | null;
+  donors?: {
+    displayName: string;
     amount: number | null;
     message: string | null;
-    isAnonymous: boolean;
     avatarUrl: string | null;
   }[];
 }

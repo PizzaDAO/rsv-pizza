@@ -233,6 +233,8 @@ export interface UpdatePartyData {
   city?: string | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   eventTags?: string[];
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
@@ -363,6 +365,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       city: data.city,
       expectedGuests: data.expectedGuests,
       estimatedAttendance: data.estimatedAttendance,
+      targetAttendance: data.targetAttendance,
+      expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
@@ -3159,7 +3163,10 @@ export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pen
   });
 }
 
-// Bulk delete events (underboss auth)
+// Bulk soft-cancel events (underboss auth). ziti-58475: this no longer hard-deletes;
+// it sets cancelledAt/cancelledBy server-side, so the rows, their children (guests,
+// sponsors, RSVPs) and public URLs are preserved and the events can be reinstated.
+// Name + endpoint kept unchanged to avoid churn at call sites.
 export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-delete', {
     method: 'DELETE',
@@ -6378,4 +6385,15 @@ export async function fetchGpp27PublishStatus(partyId: string): Promise<Gpp27Pub
 
 export async function publishGpp27Event(partyId: string): Promise<{ success: boolean; published: boolean }> {
   return apiRequest(`/api/gpp27/parties/${partyId}/publish`, { method: 'POST' });
+}
+
+// scarpetta-58472: site-wide suggestions list (admin / underboss view-only).
+export interface Suggestion {
+  id: string; createdAt: string; body: string;
+  imageUrl: string | null; name: string | null; email: string | null;
+  pageUrl: string | null; status: string;
+  aiSummary: string | null; aiTags: string[] | null;
+}
+export async function fetchSuggestions() {
+  return apiRequest<{ suggestions: Suggestion[] }>('/api/suggestions');
 }

@@ -23,6 +23,7 @@ import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
+import { SuggestionsPage } from './pages/SuggestionsPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
 import { SouthAfricaPaymentsPage } from './pages/SouthAfricaPaymentsPage';
@@ -119,6 +120,8 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
+            {/* scarpetta-58472: admin/underboss-only suggestions list — before /:slug catch-all */}
+            <Route path="/suggestions" element={<SuggestionsPage />} />
             <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner/report" element={<ConsolidatedReportPage />} />
