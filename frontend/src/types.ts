@@ -2202,6 +2202,12 @@ export interface AdminPayoutFilters {
    * (bottarga-92104). By-city endpoint only, like hideClosed. Default true.
    */
   hideScams?: boolean;
+  /**
+   * provatura-92107: hide US cities (party.region === 'usa') from the by-city
+   * /payments admin queue. Client-side filter, admin dashboard only (not
+   * regional portals). Default true.
+   */
+  hideUsCities?: boolean;
 }
 
 export interface AdminPayoutTotals {
