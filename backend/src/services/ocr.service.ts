@@ -52,8 +52,18 @@ export interface OcrResult {
   lineItems?: OcrLineItem[];
   merchant?: string | null;
   receiptDate?: string | null;
+  // stracciatella-92114: optional model-supplied locator ("left half" / "top")
+  // so the host can map each detected receipt back to its position in a
+  // multi-receipt photo. Null for single-receipt images / older callers.
+  boundingHint?: string | null;
   raw: unknown;
 }
+
+// stracciatella-92114: hard caps to keep the multi-receipt prompt from
+// blowing the token budget. A single photo realistically holds a handful of
+// receipts; cap defensively and truncate per-receipt line items.
+const MAX_DETECTED_RECEIPTS = 10;
+const MAX_LINE_ITEMS_PER_RECEIPT = 60;
 
 // mortadella-92103: ISO-2 country → primary ISO-4217 currency. Used as a
 // strong currency prior when the receipt symbol is ambiguous (most LATAM
@@ -137,6 +147,49 @@ Always return valid JSON.`;
 }
 
 /**
+ * stracciatella-92114: multi-receipt system prompt. A single uploaded photo
+ * may contain MULTIPLE separate receipts (e.g. two pizza receipts side by
+ * side). This prompt asks the model to return `{ "receipts": Receipt[] }`
+ * where each Receipt has the SAME fields as the single-receipt prompt, plus an
+ * optional `boundingHint` locator.
+ *
+ * Bias = UNDER-SPLIT (locked decision): when the model is unsure whether
+ * something is one receipt or two, it MUST treat it as ONE. The host can
+ * manually split later; over-splitting double-counts money, which is worse.
+ *
+ * Reuses the same country-prior context block as the single-receipt prompt so
+ * ambiguous `$` symbols still resolve to the local currency.
+ */
+export function buildMultiSystemPrompt(partyCountry?: string | null): string {
+  // Reuse the single-receipt prompt's field contract + country prior, then
+  // wrap it in the multi-receipt envelope + under-split instructions.
+  const single = buildSystemPrompt(partyCountry);
+
+  const multi = `You are a receipt analysis assistant. The uploaded image MAY contain MULTIPLE separate receipts (for example two pizza receipts photographed side by side, or stacked).
+
+Return ONLY a JSON object of the form:
+{ "receipts": Receipt[] }
+
+Each Receipt object has EXACTLY the fields described below (amount, currency, confidence, merchant, receiptDate, lineItems, items), PLUS one optional field:
+- boundingHint: string | null (a short human locator for where this receipt sits in the image, e.g. "left half", "top", "right receipt". Null if there is only one receipt or you can't tell.)
+
+CRITICAL splitting rules (UNDER-SPLIT — when unsure, MERGE):
+- Return one Receipt per DISTINCT transaction / DISTINCT grand total.
+- If pieces of the image clearly belong to the SAME transaction (same merchant header, a continuous list of items, a single grand total spanning them), MERGE them into ONE Receipt. NEVER double-count the same purchase.
+- When you are UNSURE whether you are looking at one receipt or two, prefer treating it as ONE receipt.
+- If the image contains exactly one receipt, return an array of ONE Receipt.
+- If NO legible receipt is present, return { "receipts": [] }.
+
+The per-Receipt field contract (fields, currency rules, lineItems schema, country prior) is exactly as follows:
+
+${single}
+
+Reminder: wrap the result as { "receipts": [ ... ] }. Always return valid JSON.`;
+
+  return multi;
+}
+
+/**
  * Fetch an image from a public URL and convert to a base64 data URL.
  * Suitable for passing as `image_url.url` to OpenAI vision endpoints.
  */
@@ -209,9 +262,88 @@ function sanitizeLineItems(raw: unknown): OcrLineItem[] {
  * Back-compat shim: callers passing a string (legacy `analyzeReceipt(url)`)
  * still work — the function accepts either a string or `{ imageUrl, partyCountry }`.
  */
-export async function analyzeReceipt(
+/**
+ * Parse + sanitize a SINGLE receipt object (the gpt-4o per-receipt shape) into
+ * an `OcrResult`. Extracted from the old `analyzeReceipt` body so both the
+ * single-receipt and multi-receipt code paths share identical sanitization.
+ *
+ * Throws if the object is missing a finite `amount` (mirrors the historical
+ * single-receipt contract). The multi-receipt caller catches per-receipt so
+ * one bad element doesn't fail the whole image.
+ */
+export function parseSingleReceipt(parsed: any): OcrResult {
+  // Validate minimum shape
+  const amount = typeof parsed?.amount === 'number' ? parsed.amount : Number(parsed?.amount);
+  // mortadella-92103: do NOT default to USD on ambiguity. When the model
+  // returns missing/empty/'UNKNOWN' currency, surface `null` so the caller
+  // refuses to auto-convert (CURRENCY_UNRESOLVED on the doc; admin/host must
+  // pick the correct code via the override dropdown).
+  const rawCurrency = typeof parsed?.currency === 'string' ? parsed.currency.trim() : '';
+  const currency: string | null =
+    rawCurrency.length === 0 || rawCurrency.toUpperCase() === 'UNKNOWN'
+      ? null
+      : rawCurrency;
+  const modelConfidence = typeof parsed?.confidence === 'number'
+    ? Math.max(0, Math.min(1, parsed.confidence))
+    : 0;
+  // Clamp confidence to 0.49 when currency is unresolved so the UI consistently
+  // surfaces it as "low" and asks for review.
+  const confidence = currency === null ? Math.min(modelConfidence, 0.49) : modelConfidence;
+
+  if (!Number.isFinite(amount)) {
+    throw new Error(`OpenAI returned non-numeric amount: ${JSON.stringify(parsed)}`);
+  }
+
+  // formaggi-89172: merchant + receiptDate are best-effort. Coerce missing/
+  // empty strings to null so the JSONB row has consistent shape.
+  const merchant = typeof parsed?.merchant === 'string' && parsed.merchant.trim().length > 0
+    ? parsed.merchant.trim()
+    : null;
+  const receiptDate = typeof parsed?.receiptDate === 'string' && parsed.receiptDate.trim().length > 0
+    ? parsed.receiptDate.trim()
+    : null;
+  // stracciatella-92114: optional locator for multi-receipt photos.
+  const boundingHint = typeof parsed?.boundingHint === 'string' && parsed.boundingHint.trim().length > 0
+    ? parsed.boundingHint.trim().slice(0, 120)
+    : null;
+
+  // stracciatella-92114: truncate per-receipt line items to keep token + DB
+  // sizes bounded when several receipts share one image.
+  const lineItems = sanitizeLineItems(parsed?.lineItems).slice(0, MAX_LINE_ITEMS_PER_RECEIPT);
+
+  return {
+    amount,
+    currency,
+    confidence,
+    items: Array.isArray(parsed?.items) ? parsed.items.filter((s: unknown) => typeof s === 'string') : undefined,
+    lineItems,
+    merchant,
+    receiptDate,
+    boundingHint,
+    raw: parsed,
+  };
+}
+
+/**
+ * stracciatella-92114: multi-receipt OCR. Sends the image to gpt-4o asking for
+ * `{ receipts: Receipt[] }` and returns ONE `OcrResult` per detected receipt
+ * (capped at `MAX_DETECTED_RECEIPTS`). Under-split bias lives in the prompt.
+ *
+ * Robustness:
+ * - If the model returns a bare legacy single-receipt object (no `receipts`
+ *   key), it's wrapped as a single-element array.
+ * - Each receipt is parsed independently; an individual element that fails
+ *   sanitization (e.g. non-numeric amount) is skipped rather than failing the
+ *   whole image.
+ * - No legible receipt → empty array. The route maps that to
+ *   `NO_RECEIPT_DETECTED`.
+ *
+ * Does NOT do currency conversion — call `convertToUSD` per element.
+ * Throws only on network/auth/non-JSON errors (parity with `analyzeReceipt`).
+ */
+export async function analyzeReceiptMulti(
   arg: string | { imageUrl: string; partyCountry?: string | null },
-): Promise<OcrResult> {
+): Promise<OcrResult[]> {
   const imageUrl = typeof arg === 'string' ? arg : arg.imageUrl;
   const partyCountry = typeof arg === 'string' ? null : (arg.partyCountry ?? null);
   const base64Image = await imageUrlToBase64DataUrl(imageUrl);
@@ -219,18 +351,21 @@ export async function analyzeReceipt(
   const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [
-      { role: 'system', content: buildSystemPrompt(partyCountry) },
+      { role: 'system', content: buildMultiSystemPrompt(partyCountry) },
       {
         role: 'user',
         content: [
-          { type: 'text', text: 'Extract the total amount and per-line items from this receipt.' },
+          {
+            type: 'text',
+            text: 'This image may contain one or more receipts. Extract each distinct receipt, following the under-split rules. Return { "receipts": [...] }.',
+          },
           { type: 'image_url', image_url: { url: base64Image } },
         ],
       },
     ],
-    // formaggi-89172: bumped from 500 → 1500 to fit the per-line items array.
-    // Receipts with 10–20 lines were getting truncated mid-JSON otherwise.
-    max_tokens: 1500,
+    // stracciatella-92114: bumped 1500 → 4000 to fit multiple receipts each
+    // with their own per-line items array without mid-JSON truncation.
+    max_tokens: 4000,
     response_format: { type: 'json_object' },
   });
 
@@ -246,45 +381,62 @@ export async function analyzeReceipt(
     throw new Error(`OpenAI returned non-JSON content: ${content.slice(0, 200)}`);
   }
 
-  // Validate minimum shape
-  const amount = typeof parsed.amount === 'number' ? parsed.amount : Number(parsed.amount);
-  // mortadella-92103: do NOT default to USD on ambiguity. When the model
-  // returns missing/empty/'UNKNOWN' currency, surface `null` so the caller
-  // refuses to auto-convert (CURRENCY_UNRESOLVED on the doc; admin/host must
-  // pick the correct code via the override dropdown).
-  const rawCurrency = typeof parsed.currency === 'string' ? parsed.currency.trim() : '';
-  const currency: string | null =
-    rawCurrency.length === 0 || rawCurrency.toUpperCase() === 'UNKNOWN'
-      ? null
-      : rawCurrency;
-  const modelConfidence = typeof parsed.confidence === 'number'
-    ? Math.max(0, Math.min(1, parsed.confidence))
-    : 0;
-  // Clamp confidence to 0.49 when currency is unresolved so the UI consistently
-  // surfaces it as "low" and asks for review.
-  const confidence = currency === null ? Math.min(modelConfidence, 0.49) : modelConfidence;
-
-  if (!Number.isFinite(amount)) {
-    throw new Error(`OpenAI returned non-numeric amount: ${JSON.stringify(parsed)}`);
+  // Normalize to an array of raw receipt objects.
+  let rawReceipts: any[];
+  if (Array.isArray(parsed?.receipts)) {
+    rawReceipts = parsed.receipts;
+  } else if (Array.isArray(parsed)) {
+    // Model returned a bare array.
+    rawReceipts = parsed;
+  } else if (parsed && typeof parsed === 'object') {
+    // Robustness: model ignored the envelope and returned a bare legacy
+    // single-receipt object. Wrap it as a single-element array.
+    rawReceipts = [parsed];
+  } else {
+    rawReceipts = [];
   }
 
-  // formaggi-89172: merchant + receiptDate are best-effort. Coerce missing/
-  // empty strings to null so the JSONB row has consistent shape.
-  const merchant = typeof parsed.merchant === 'string' && parsed.merchant.trim().length > 0
-    ? parsed.merchant.trim()
-    : null;
-  const receiptDate = typeof parsed.receiptDate === 'string' && parsed.receiptDate.trim().length > 0
-    ? parsed.receiptDate.trim()
-    : null;
+  const capped = rawReceipts.slice(0, MAX_DETECTED_RECEIPTS);
+  const out: OcrResult[] = [];
+  for (const r of capped) {
+    try {
+      out.push(parseSingleReceipt(r));
+    } catch {
+      // Skip an unparseable element; keep siblings. An entirely empty result
+      // is surfaced as NO_RECEIPT_DETECTED by the route.
+    }
+  }
+  return out;
+}
 
-  return {
-    amount,
-    currency,
-    confidence,
-    items: Array.isArray(parsed.items) ? parsed.items.filter((s: unknown) => typeof s === 'string') : undefined,
-    lineItems: sanitizeLineItems(parsed.lineItems),
-    merchant,
-    receiptDate,
-    raw: parsed,
-  };
+/**
+ * Send a single receipt image to gpt-4o and return ONE `OcrResult`.
+ *
+ * stracciatella-92114: now a thin wrapper over `analyzeReceiptMulti` that
+ * returns the FIRST detected receipt — preserving the historical single-object
+ * contract for every existing caller (admin retry/re-OCR, line-item backfill,
+ * the FX-trusted fast path). When the image has multiple receipts this returns
+ * only the first; multi-detection happens exclusively at original upload via
+ * `analyzeReceiptMulti`. When NO receipt is legible, returns a NO_RECEIPT-style
+ * empty result ($0, null currency, confidence 0) rather than throwing — mirrors
+ * the way the rest of the pipeline signals an OCR miss via the row's amount.
+ */
+export async function analyzeReceipt(
+  arg: string | { imageUrl: string; partyCountry?: string | null },
+): Promise<OcrResult> {
+  const results = await analyzeReceiptMulti(arg);
+  if (results.length === 0) {
+    return {
+      amount: 0,
+      currency: null,
+      confidence: 0,
+      items: undefined,
+      lineItems: [],
+      merchant: null,
+      receiptDate: null,
+      boundingHint: null,
+      raw: { receipts: [] },
+    };
+  }
+  return results[0];
 }

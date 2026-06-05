@@ -5515,6 +5515,14 @@ export interface CreatePayoutPhotoInput {
   ocrLineItems?: unknown;
   ocrRaw?: unknown;
   ocrError?: string | null;
+  // stracciatella-92114: multi-receipt-per-photo. When a single uploaded image
+  // resolved to N receipts at preview time, the frontend emits N receiptPhotos
+  // entries sharing url/fileName/fileSize/mimeType, each carrying its own OCR
+  // fields + the 0-based index of which detected receipt it represents (and the
+  // total count so the backend can label "k of n"). The backend persists one
+  // payout_documents row per entry.
+  sourceReceiptIndex?: number;
+  sourceReceiptCount?: number;
 }
 
 export interface CreatePayoutData {

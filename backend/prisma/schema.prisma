@@ -1965,6 +1965,16 @@ model PayoutDocument {
   // Independent flags — both can be true on the same row but the UI prefers
   // duplicate as the primary signal (duplicate pill wins on the thumbnail).
   ineligible       Boolean  @default(false) @map("ineligible")
+  // stracciatella-92114: multi-receipt-per-photo OCR. A single uploaded image
+  // can contain N separate receipts; each becomes its own payout_documents row
+  // sharing the same `url`. These columns let the UI label "Receipt k of n —
+  // from {fileName}". All nullable: historical (one-receipt-per-photo) rows
+  // have NULL and render flat exactly as before. `boundingHint` is an optional
+  // model-supplied locator ("left half"/"top") to help the host map a detected
+  // receipt back to the photo.
+  sourceReceiptIndex Int?    @map("source_receipt_index")
+  sourceReceiptCount Int?    @map("source_receipt_count")
+  boundingHint       String? @map("bounding_hint")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in

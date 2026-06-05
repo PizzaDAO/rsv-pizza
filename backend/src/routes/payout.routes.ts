@@ -21,7 +21,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
-import { analyzeReceipt } from '../services/ocr.service.js';
+import { analyzeReceipt, analyzeReceiptMulti } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizeForPg, sanitizePgString } from '../lib/sanitizePg.js';
 import { looksLikeEnsName, resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
@@ -140,6 +140,11 @@ function serializeDocument(d: any) {
     exchangeRate: d.exchangeRate != null ? numberFromDecimal(d.exchangeRate) : null,
     ocrError: d.ocrError ?? null,
     sortOrder: d.sortOrder,
+    // stracciatella-92114: multi-receipt-per-photo labeling. Null on historical
+    // (one-receipt-per-photo) rows — those render flat exactly as before.
+    sourceReceiptIndex: d.sourceReceiptIndex ?? null,
+    sourceReceiptCount: d.sourceReceiptCount ?? null,
+    boundingHint: d.boundingHint ?? null,
     // soppressata-92110: surface admin exclusion flags read-only so hosts can
     // see which receipts / OCR line items were excluded from their total.
     isDuplicate: d.isDuplicate ?? false,
@@ -573,40 +578,67 @@ router.post(
         where: { id: partyId },
         select: { country: true },
       });
-      const ocr = await analyzeReceipt({
+      // stracciatella-92114: a single uploaded photo may contain MULTIPLE
+      // receipts. Detect them all, then convert each independently (FX is
+      // per-amount — an unresolved currency on one must not poison siblings).
+      const ocrResults = await analyzeReceiptMulti({
         imageUrl,
         partyCountry: partyForCountry?.country ?? null,
       });
-      const fx = await convertToUSD(ocr.amount, ocr.currency);
 
-      // mortadella-92103: when FX can't resolve (no currency from OCR + no
-      // country prior + no override), surface that to the host so they can
-      // fix it with the currency override dropdown. We still return shape-
-      // compatible fields so the frontend type doesn't have to branch.
-      const unresolved = fx.source === 'unresolved';
+      // Build the per-receipt preview array. Each element mirrors the legacy
+      // top-level single-receipt shape + an `index`, `merchant`, `boundingHint`.
+      const receipts = await Promise.all(
+        ocrResults.map(async (ocr, index) => {
+          const fx = await convertToUSD(ocr.amount, ocr.currency);
+          const unresolved = fx.source === 'unresolved';
+          return {
+            index,
+            amount: unresolved ? 0 : (fx.usdAmount ?? 0),
+            currency: 'USD',
+            originalAmount: fx.originalAmount,
+            originalCurrency: unresolved ? '' : (fx.originalCurrency ?? ''),
+            exchangeRate: unresolved ? 0 : (fx.exchangeRate ?? 0),
+            confidence: ocr.confidence,
+            items: ocr.items,
+            lineItems: ocr.lineItems ?? null,
+            ocrRaw: ocr.raw ?? null,
+            merchant: ocr.merchant ?? null,
+            boundingHint: ocr.boundingHint ?? null,
+            fxSource: fx.source,
+            conversionNote: unresolved
+              ? `Currency could not be determined automatically — please pick the correct currency to convert ${fx.originalAmount.toLocaleString()} to USD.`
+              : fx.originalCurrency && fx.originalCurrency !== 'USD' && fx.usdAmount != null && fx.exchangeRate != null
+                ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate.toFixed(6)} USD)`
+                : undefined,
+            ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
+          };
+        })
+      );
+
+      const receiptCount = receipts.length;
+
+      // Back-compat: populate the existing top-level single-receipt fields from
+      // receipts[0] (zeros when none) so un-deployed / cached old frontends keep
+      // working. 0 receipts → NO_RECEIPT_DETECTED.
+      const head = receipts[0];
       res.json({
-        amount: unresolved ? 0 : (fx.usdAmount ?? 0),
+        // stracciatella-92114: new multi-receipt payload.
+        receipts,
+        receiptCount,
+        // Legacy top-level fields (from the first detected receipt).
+        amount: head ? head.amount : 0,
         currency: 'USD',
-        originalAmount: fx.originalAmount,
-        originalCurrency: unresolved ? '' : (fx.originalCurrency ?? ''),
-        exchangeRate: unresolved ? 0 : (fx.exchangeRate ?? 0),
-        confidence: ocr.confidence,
-        items: ocr.items,
-        // provolone-49301: expose the structured line items + raw OCR payload
-        // (already computed in this same analyzeReceipt call — zero extra
-        // compute) so the frontend can forward them at submit. POST /payouts
-        // then persists them and SKIPS a second gpt-4o pass, while still
-        // re-running the free convertToUSD to re-lock FX authoritatively.
-        lineItems: ocr.lineItems ?? null,
-        ocrRaw: ocr.raw ?? null,
-        fxSource: fx.source,
-        conversionNote: unresolved
-          ? `Currency could not be determined automatically — please pick the correct currency to convert ${fx.originalAmount.toLocaleString()} to USD.`
-          : fx.originalCurrency && fx.originalCurrency !== 'USD' && fx.usdAmount != null && fx.exchangeRate != null
-            ? `Converted from ${fx.originalAmount.toLocaleString()} ${fx.originalCurrency} → $${fx.usdAmount.toFixed(2)} USD (1 ${fx.originalCurrency} = $${fx.exchangeRate.toFixed(6)} USD)`
-            : undefined,
-        // mortadella-92103: explicit signal so the frontend can warn the host.
-        ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
+        originalAmount: head ? head.originalAmount : 0,
+        originalCurrency: head ? head.originalCurrency : '',
+        exchangeRate: head ? head.exchangeRate : 0,
+        confidence: head ? head.confidence : 0,
+        items: head ? head.items : undefined,
+        lineItems: head ? head.lineItems : null,
+        ocrRaw: head ? head.ocrRaw : null,
+        fxSource: head ? head.fxSource : undefined,
+        conversionNote: head ? head.conversionNote : undefined,
+        ocrError: receiptCount === 0 ? 'NO_RECEIPT_DETECTED' : (head ? head.ocrError : null),
       });
     } catch (error) {
       next(error);
@@ -711,6 +743,13 @@ interface IncomingDocument {
   ocrLineItems?: unknown;
   ocrRaw?: unknown;
   ocrError?: string | null;
+  // stracciatella-92114: multi-receipt-per-photo. When a single uploaded image
+  // resolved to N receipts at preview time, the frontend emits N receiptPhotos
+  // entries sharing the same `url`, each carrying its own forwarded OCR fields
+  // and the 0-based index of which detected receipt it represents. The backend
+  // persists one payout_documents row per entry.
+  sourceReceiptIndex?: number;
+  sourceReceiptCount?: number;
 }
 
 router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -964,8 +1003,14 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (!Array.isArray(pizzaPhotos)) {
       throw new AppError('pizzaPhotos must be an array', 400, 'INVALID_PIZZA_PHOTOS');
     }
-    if (receiptPhotos.length > 10) {
-      throw new AppError('Max 10 receipt photos', 400, 'TOO_MANY_RECEIPTS');
+    // stracciatella-92114: the frontend now emits ONE receiptPhotos entry per
+    // DETECTED receipt, so a single multi-receipt photo expands into several
+    // entries sharing one url. The dropzone still caps at 10 photos, and each
+    // photo caps at MAX_DETECTED_RECEIPTS=10 detected receipts, so 100 is the
+    // theoretical ceiling. Cap here at 100 entries (was 10 photos) so the
+    // multi-receipt happy path isn't rejected.
+    if (receiptPhotos.length > 100) {
+      throw new AppError('Max 100 receipts', 400, 'TOO_MANY_RECEIPTS');
     }
     if (pizzaPhotos.length > 10) {
       throw new AppError('Max 10 pizza photos', 400, 'TOO_MANY_PIZZA_PHOTOS');
@@ -1034,8 +1079,16 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // arugula-38633 v3 follow-up: skip the parallel-OCR step when there are
     // no receipts — the host supplied `finalAmountUsd` directly. FX fields
     // collapse to USD passthrough below.
+    // stracciatella-92114: each receiptPhotos entry resolves to ONE OR MORE
+    // detected receipts (a "receipt unit"). The forwarded-payload fast path is
+    // always a single unit (the frontend already split multi-receipt photos
+    // into N entries at preview time, each carrying its own OCR fields). The
+    // fallback path (old client / no forwarded OCR) calls analyzeReceiptMulti
+    // and FANS OUT one input into N units. The build loop below turns each unit
+    // into its own payout_documents row.
+    type ReceiptUnit = { ocr: any; fx: any };
     const ocrResults: PromiseSettledResult<
-      | { ok: true; doc: IncomingDocument; ocr: any; fx: any }
+      | { ok: true; doc: IncomingDocument; units: ReceiptUnit[] }
       | { ok: false; doc: IncomingDocument; error: string }
     >[] = receiptPhotos.length === 0
       ? []
@@ -1047,7 +1100,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
               // original-currency fields and SKIP a second analyzeReceipt
               // pass. We still re-run the FREE convertToUSD below to re-lock
               // FX authoritatively — the USD amount + exchange rate ALWAYS
-              // come from the server, never from the client.
+              // come from the server, never from the client. This is always a
+              // single unit (multi-receipt split happened at preview time).
               if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
                 const ocr = {
                   amount: r.ocrOriginalAmount as number,
@@ -1057,16 +1111,27 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
                   raw: r.ocrRaw ?? null,
                 };
                 const fx = await convertToUSD(ocr.amount, ocr.currency);
-                return { ok: true as const, doc: r, ocr, fx };
+                return { ok: true as const, doc: r, units: [{ ocr, fx }] };
               }
-              // Fallback (no forwarded payload, e.g. old clients): OCR here.
+              // Fallback (no forwarded payload, e.g. old clients): OCR here and
+              // FAN OUT into N units when the image holds multiple receipts.
               // bocconcino-92104: PDFs are OCR'd via their `.thumb.png` sibling.
-              const ocr = await analyzeReceipt({
+              const ocrList = await analyzeReceiptMulti({
                 imageUrl: deriveOcrUrl(r),
                 partyCountry,
               });
-              const fx = await convertToUSD(ocr.amount, ocr.currency);
-              return { ok: true as const, doc: r, ocr, fx };
+              if (ocrList.length === 0) {
+                // No legible receipt — keep one error row so the image isn't
+                // silently dropped (host can fix the amount manually).
+                return { ok: false as const, doc: r, error: 'NO_RECEIPT_DETECTED' };
+              }
+              const units = await Promise.all(
+                ocrList.map(async (ocr) => {
+                  const fx = await convertToUSD(ocr.amount, ocr.currency);
+                  return { ocr, fx } as ReceiptUnit;
+                }),
+              );
+              return { ok: true as const, doc: r, units };
             } catch (err: any) {
               return { ok: false as const, doc: r, error: err?.message || 'OCR failed' };
             }
@@ -1106,11 +1171,21 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
+      // stracciatella-92114: multi-receipt-per-photo labeling. Null for pizza/
+      // event docs and single-receipt photos.
+      sourceReceiptIndex: number | null;
+      sourceReceiptCount: number | null;
+      boundingHint: string | null;
       // napoletana-58211: filled in below for kind='pizza' docs after we
       // insert the canonical photos row. Receipts keep this null.
       photoId: string | null;
     }> = [];
 
+    // stracciatella-92114: each settled result carries ONE OR MORE receipt
+    // units. Expand into one payout_documents row per unit. Use a composite
+    // sortOrder = entryIndex*100 + receiptIndex so split rows stay stably
+    // ordered after their siblings (and never collide across entries — capped
+    // at MAX_DETECTED_RECEIPTS=10 per image).
     let idx = 0;
     for (const settled of ocrResults) {
       // Promise.allSettled always resolves; the inner promise we created also
@@ -1118,43 +1193,66 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       const result = settled.status === 'fulfilled' ? settled.value : null;
       const doc = (receiptPhotos as IncomingDocument[])[idx];
       if (result && result.ok) {
-        const { ocr, fx } = result;
-        // mortadella-92103: refuse to count an unresolved-currency receipt
-        // toward the sum. The row is still persisted (so the receipt image
-        // and OCR amount are preserved for forensics + host override) but
-        // ocrAmount is NULL and ocrError carries CURRENCY_UNRESOLVED. Host
-        // /admin must pick the correct currency via the override dropdown.
-        const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
-        if (!unresolved) {
-          extractedUsdSum += fx.usdAmount!;
-          if (!foundFirstRate) {
-            originalAmount = fx.originalAmount;
-            originalCurrency = fx.originalCurrency ?? 'USD';
-            exchangeRate = fx.exchangeRate ?? 1;
-            foundFirstRate = true;
+        const units = result.units;
+        // stracciatella-92114: when the FRONTEND already split a multi-receipt
+        // photo into N entries (forwarded fast path = 1 unit each), it stamps
+        // each entry with its own sourceReceiptIndex/Count so we can label
+        // "k of n". When the BACKEND fanned out (fallback multi-OCR), units.length
+        // is the authoritative count. Forwarded values win for the 1-unit case.
+        const forwardedCount =
+          typeof doc.sourceReceiptCount === 'number' && doc.sourceReceiptCount > 1
+            ? doc.sourceReceiptCount
+            : null;
+        const sourceReceiptCount = units.length > 1 ? units.length : (forwardedCount ?? units.length);
+        units.forEach((unit, receiptIndex) => {
+          const { ocr, fx } = unit;
+          // mortadella-92103: refuse to count an unresolved-currency receipt
+          // toward the sum. The row is still persisted (so the receipt image
+          // and OCR amount are preserved for forensics + host override) but
+          // ocrAmount is NULL and ocrError carries CURRENCY_UNRESOLVED. Host
+          // /admin must pick the correct currency via the override dropdown.
+          const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
+          if (!unresolved) {
+            extractedUsdSum += fx.usdAmount!;
+            if (!foundFirstRate) {
+              originalAmount = fx.originalAmount;
+              originalCurrency = fx.originalCurrency ?? 'USD';
+              exchangeRate = fx.exchangeRate ?? 1;
+              foundFirstRate = true;
+            }
           }
-        }
-        docsToCreate.push({
-          kind: 'receipt',
-          url: doc.url,
-          fileName: doc.fileName || extractFileName(doc.url),
-          fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
-          mimeType: doc.mimeType || 'image/jpeg',
-          ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
-          ocrCurrency: unresolved ? null : fx.originalCurrency,
-          ocrConfidence: new Decimal(ocr.confidence),
-          // mortadella-92103: persist the raw foreign-currency amount + ISO
-          // code + locked rate per receipt. Even unresolved rows carry
-          // originalAmount (the host needs to see what the receipt said).
-          originalAmount: new Decimal(fx.originalAmount),
-          originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
-          exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
-          ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
-          // formaggi-89172: structured per-line items for pizza-price analytics.
-          ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
-          ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
-          sortOrder: idx,
-          photoId: null,
+          docsToCreate.push({
+            kind: 'receipt',
+            url: doc.url,
+            fileName: doc.fileName || extractFileName(doc.url),
+            fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
+            mimeType: doc.mimeType || 'image/jpeg',
+            ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
+            ocrCurrency: unresolved ? null : fx.originalCurrency,
+            ocrConfidence: new Decimal(ocr.confidence),
+            // mortadella-92103: persist the raw foreign-currency amount + ISO
+            // code + locked rate per receipt. Even unresolved rows carry
+            // originalAmount (the host needs to see what the receipt said).
+            originalAmount: new Decimal(fx.originalAmount),
+            originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+            exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
+            ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
+            // formaggi-89172: structured per-line items for pizza-price analytics.
+            ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
+            ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
+            sortOrder: idx * 100 + receiptIndex,
+            // stracciatella-92114: prefer the forwarded per-entry index (the
+            // frontend already assigned 0..N-1 across the split entries); fall
+            // back to the local fan-out index. Count is null for single-receipt
+            // photos so they render flat (no "k of n" label).
+            sourceReceiptIndex:
+              sourceReceiptCount > 1
+                ? (typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : receiptIndex)
+                : null,
+            sourceReceiptCount: sourceReceiptCount > 1 ? sourceReceiptCount : null,
+            boundingHint: typeof ocr.boundingHint === 'string' ? ocr.boundingHint : null,
+            photoId: null,
+          });
         });
       } else {
         const err = result && !result.ok ? result.error : 'Unexpected OCR result';
@@ -1173,7 +1271,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           ocrRaw: null,
           ocrLineItems: null,
           ocrError: err,
-          sortOrder: idx,
+          sortOrder: idx * 100,
+          sourceReceiptIndex: typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : null,
+          sourceReceiptCount: null,
+          boundingHint: null,
           photoId: null,
         });
       }
@@ -1199,6 +1300,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrLineItems: null,
         ocrError: null,
         sortOrder: i,
+        // stracciatella-92114: pizza photos are never multi-receipt.
+        sourceReceiptIndex: null,
+        sourceReceiptCount: null,
+        boundingHint: null,
         // napoletana-58211: filled in inside the transaction below — we
         // create the canonical photos row first, then attach its id here.
         photoId: null,
@@ -1224,6 +1329,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         ocrLineItems: null,
         ocrError: null,
         sortOrder: i,
+        // stracciatella-92114: event photos are never multi-receipt.
+        sourceReceiptIndex: null,
+        sourceReceiptCount: null,
+        boundingHint: null,
         photoId: null,
       });
     });

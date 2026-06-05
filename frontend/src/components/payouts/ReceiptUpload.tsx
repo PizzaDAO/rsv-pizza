@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
+import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, GitMerge, Layers } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
-import { OcrPreviewResult } from '../../types';
+import { OcrPreviewResult, OcrReceiptPreview } from '../../types';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
@@ -14,8 +14,43 @@ export interface ReceiptItem {
   fileName: string;
   fileSize: number;
   mimeType: string;
-  ocr?: OcrPreviewResult;
+  // stracciatella-92114: a single uploaded photo can contain MULTIPLE receipts.
+  // We keep ONE ReceiptItem per file, but hold an array of detected receipts.
+  // The single-receipt case (length <= 1) renders exactly as before.
+  receipts?: OcrReceiptPreview[];
   error?: string;
+}
+
+/**
+ * stracciatella-92114: normalize an ocr-preview response into an
+ * `OcrReceiptPreview[]`. New backends return `receipts`; old/cached backends
+ * only return the legacy top-level single-receipt fields — wrap those as a
+ * one-element array so the UI is uniform.
+ */
+function toReceiptArray(ocr: OcrPreviewResult): OcrReceiptPreview[] {
+  if (Array.isArray(ocr.receipts)) {
+    // NO_RECEIPT_DETECTED comes back as an empty array; preserve it.
+    return ocr.receipts;
+  }
+  return [
+    {
+      index: 0,
+      amount: ocr.amount,
+      currency: 'USD',
+      originalAmount: ocr.originalAmount,
+      originalCurrency: ocr.originalCurrency,
+      exchangeRate: ocr.exchangeRate,
+      confidence: ocr.confidence,
+      items: ocr.items,
+      lineItems: ocr.lineItems,
+      ocrRaw: ocr.ocrRaw,
+      merchant: null,
+      boundingHint: null,
+      fxSource: ocr.fxSource,
+      conversionNote: ocr.conversionNote,
+      ocrError: ocr.ocrError,
+    },
+  ];
 }
 
 interface ReceiptUploadProps {
@@ -90,7 +125,10 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
           ? derivePdfThumbnailUrl(uploaded.url)
           : uploaded.url;
         const ocr = await previewReceiptOCR(partyId, ocrUrl);
-        nextItems = updateItem(nextItems, itemId, { status: 'done', ocr });
+        nextItems = updateItem(nextItems, itemId, {
+          status: 'done',
+          receipts: toReceiptArray(ocr),
+        });
         onChange(nextItems);
       } catch (err: any) {
         nextItems = updateItem(nextItems, itemId, {
@@ -154,85 +192,131 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 
       {items.length > 0 && (
         <ul className="space-y-2">
-          {items.map(item => (
-            <li
-              key={item.id}
-              className="flex items-center gap-3 p-3 rounded-xl bg-theme-surface-hover"
-            >
-              <ReceiptThumb item={item} />
+          {items.map(item => {
+            const receiptCount = item.receipts?.length ?? 0;
+            const isMulti = receiptCount > 1;
+            // stracciatella-92114: 0 detected receipts (NO_RECEIPT_DETECTED) —
+            // surface the same kind of inline warning as an OCR error so the
+            // host removes or re-uploads. We never silently keep a $0 receipt.
+            const noReceiptDetected =
+              item.status === 'done' && item.receipts != null && receiptCount === 0;
+            const head = item.receipts?.[0];
 
+            return (
+              <li
+                key={item.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-theme-surface-hover"
+              >
+                <ReceiptThumb item={item} />
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-theme-text truncate">{item.fileName}</p>
-                <div className="text-xs text-theme-text-muted mt-0.5">
-                  {item.status === 'uploading' && (
-                    <span className="inline-flex items-center gap-1">
-                      <Loader2 size={12} className="animate-spin" /> Uploading…
-                    </span>
-                  )}
-                  {item.status === 'ocring' && (
-                    <span className="inline-flex items-center gap-1">
-                      <Loader2 size={12} className="animate-spin" /> Reading receipt…
-                    </span>
-                  )}
-                  {item.status === 'done' && item.ocr && (
-                    <span className="inline-flex items-center gap-2 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-theme-text truncate">{item.fileName}</p>
+                    {isMulti && (
+                      <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-[#ff393a]/10 text-[#ff393a]">
+                        <Layers size={11} /> {receiptCount} receipts detected in this photo
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-theme-text-muted mt-0.5">
+                    {item.status === 'uploading' && (
                       <span className="inline-flex items-center gap-1">
-                        {item.ocr.confidence >= 0.8
-                          ? <CheckCircle2 size={12} className="text-emerald-400" />
-                          : <AlertCircle size={12} className="text-amber-400" />}
-                        ${item.ocr.amount.toFixed(2)} USD
+                        <Loader2 size={12} className="animate-spin" /> Uploading…
                       </span>
-                      <span className="text-theme-text-muted">
-                        (from {item.ocr.originalAmount.toLocaleString()})
+                    )}
+                    {item.status === 'ocring' && (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 size={12} className="animate-spin" /> Reading receipt…
                       </span>
-                      {/* focaccia-89172: native currency override dropdown.
-                          OCR misreads `₹` as `$` etc.; host picks the correct
-                          ISO code and we re-convert in-place. */}
-                      <CurrencyOverrideSelect
+                    )}
+                    {noReceiptDetected && (
+                      <span className="inline-flex items-center gap-1 text-amber-400">
+                        <AlertCircle size={12} /> No receipt found — remove or re-upload
+                      </span>
+                    )}
+
+                    {/* Single-receipt case: identical to the pre-stracciatella UI. */}
+                    {item.status === 'done' && !isMulti && head && (
+                      <ReceiptDetailRow
                         partyId={partyId}
-                        originalAmount={item.ocr.originalAmount}
-                        currentCurrency={item.ocr.originalCurrency}
+                        receipt={head}
                         onConverted={result => {
-                          const next = updateItem(items, item.id, {
-                            ocr: {
-                              ...item.ocr!,
-                              amount: result.usdAmount,
-                              originalAmount: result.originalAmount,
-                              originalCurrency: result.originalCurrency,
-                              exchangeRate: result.exchangeRate,
-                              conversionNote: result.conversionNote,
-                              fxSource:
-                                (result.source as OcrPreviewResult['fxSource']) ||
-                                item.ocr!.fxSource,
-                            },
-                          });
-                          onChange(next);
+                          onChange(updateReceipt(items, item.id, 0, result));
                         }}
                       />
-                      <span className={item.ocr.confidence >= 0.8 ? 'text-emerald-300' : 'text-amber-300'}>
-                        {Math.round(item.ocr.confidence * 100)}% confidence
+                    )}
+
+                    {item.status === 'error' && (
+                      <span className="inline-flex items-center gap-1 text-red-400">
+                        <AlertCircle size={12} /> {item.error || 'Failed'}
                       </span>
-                    </span>
-                  )}
-                  {item.status === 'error' && (
-                    <span className="inline-flex items-center gap-1 text-red-400">
-                      <AlertCircle size={12} /> {item.error || 'Failed'}
-                    </span>
+                    )}
+                  </div>
+
+                  {/* Multi-receipt case: nested per-receipt list. */}
+                  {item.status === 'done' && isMulti && item.receipts && (
+                    <ul className="mt-2 space-y-2">
+                      {item.receipts.map((r, k) => (
+                        <li
+                          key={k}
+                          className="rounded-lg border border-theme-stroke bg-theme-surface px-2.5 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-xs font-medium text-theme-text">
+                              Receipt {k + 1} of {receiptCount}
+                              {r.boundingHint ? ` — ${r.boundingHint}` : ''}
+                              {r.merchant ? ` · ${r.merchant}` : ''}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {/* Secondary: merge this receipt into the previous one. */}
+                              {k > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => onChange(mergeReceiptIntoPrevious(items, item.id, k))}
+                                  className="inline-flex items-center gap-1 p-1 rounded text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+                                  aria-label={`Merge receipt ${k + 1} into receipt ${k}`}
+                                  title="Merge into previous receipt"
+                                >
+                                  <GitMerge size={13} />
+                                </button>
+                              )}
+                              {/* Primary: remove this detected receipt. */}
+                              <button
+                                type="button"
+                                onClick={() => onChange(removeReceipt(items, item.id, k))}
+                                className="p-1 rounded text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                aria-label={`Remove receipt ${k + 1}`}
+                                title="Remove this receipt"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          <ReceiptDetailRow
+                            partyId={partyId}
+                            receipt={r}
+                            onConverted={result => {
+                              onChange(updateReceipt(items, item.id, k, result));
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => handleRemove(item.id)}
-                className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                aria-label="Remove receipt"
-              >
-                <X size={16} />
-              </button>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(item.id)}
+                  className="p-1.5 rounded-md text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  aria-label="Remove receipt"
+                >
+                  <X size={16} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -242,6 +326,122 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 function updateItem(items: ReceiptItem[], id: string, patch: Partial<ReceiptItem>): ReceiptItem[] {
   return items.map(it => (it.id === id ? { ...it, ...patch } : it));
 }
+
+/**
+ * stracciatella-92114: apply a convert-fx result to receipt `k` of item `id`.
+ */
+function updateReceipt(
+  items: ReceiptItem[],
+  id: string,
+  k: number,
+  result: { usdAmount: number; originalAmount: number; originalCurrency: string; exchangeRate: number; conversionNote?: string; source: string },
+): ReceiptItem[] {
+  return items.map(it => {
+    if (it.id !== id || !it.receipts) return it;
+    const receipts = it.receipts.map((r, j) =>
+      j === k
+        ? {
+            ...r,
+            amount: result.usdAmount,
+            originalAmount: result.originalAmount,
+            originalCurrency: result.originalCurrency,
+            exchangeRate: result.exchangeRate,
+            conversionNote: result.conversionNote,
+            fxSource: (result.source as OcrReceiptPreview['fxSource']) || r.fxSource,
+            // A successful override resolves a previously-unresolved currency.
+            ocrError: result.usdAmount > 0 ? null : r.ocrError,
+          }
+        : r,
+    );
+    return { ...it, receipts };
+  });
+}
+
+/**
+ * stracciatella-92114: remove detected receipt `k` from item `id`. If it was
+ * the last detected receipt the whole item is dropped (the photo no longer
+ * contributes any receipt). Indexes are re-derived at submit time, so we don't
+ * renumber here.
+ */
+function removeReceipt(items: ReceiptItem[], id: string, k: number): ReceiptItem[] {
+  return items.flatMap(it => {
+    if (it.id !== id || !it.receipts) return [it];
+    const receipts = it.receipts.filter((_, j) => j !== k);
+    if (receipts.length === 0) return [];
+    return [{ ...it, receipts }];
+  });
+}
+
+/**
+ * stracciatella-92114: merge detected receipt `k` into receipt `k-1` (over-split
+ * correction). Sums the USD + original amounts and concatenates line items; the
+ * previous receipt's currency/rate wins. Drops receipt `k`.
+ */
+function mergeReceiptIntoPrevious(items: ReceiptItem[], id: string, k: number): ReceiptItem[] {
+  return items.map(it => {
+    if (it.id !== id || !it.receipts || k <= 0 || k >= it.receipts.length) return it;
+    const prev = it.receipts[k - 1];
+    const cur = it.receipts[k];
+    const merged: OcrReceiptPreview = {
+      ...prev,
+      amount: (prev.amount ?? 0) + (cur.amount ?? 0),
+      // Only sum original amounts when both share a currency; otherwise keep
+      // prev's original amount (USD sum above is still correct for the total).
+      originalAmount:
+        prev.originalCurrency && prev.originalCurrency === cur.originalCurrency
+          ? (prev.originalAmount ?? 0) + (cur.originalAmount ?? 0)
+          : prev.originalAmount,
+      lineItems: [...(prev.lineItems ?? []), ...(cur.lineItems ?? [])],
+      confidence: Math.min(prev.confidence ?? 0, cur.confidence ?? 0),
+      // If either side was unresolved, the merged total should be reviewed.
+      ocrError: prev.ocrError || cur.ocrError || null,
+    };
+    const receipts = it.receipts
+      .map((r, j) => (j === k - 1 ? merged : r))
+      .filter((_, j) => j !== k);
+    return { ...it, receipts };
+  });
+}
+
+/**
+ * stracciatella-92114: the per-receipt details strip — amount/USD/confidence +
+ * the currency override dropdown. Used identically for the single-receipt case
+ * (rendered inline) and each row of the multi-receipt nested list.
+ */
+const ReceiptDetailRow: React.FC<{
+  partyId: string;
+  receipt: OcrReceiptPreview;
+  onConverted: (result: { usdAmount: number; originalAmount: number; originalCurrency: string; exchangeRate: number; conversionNote?: string; source: string }) => void;
+}> = ({ partyId, receipt, onConverted }) => {
+  const unresolved = receipt.ocrError === 'CURRENCY_UNRESOLVED';
+  return (
+    <span className="inline-flex items-center gap-2 flex-wrap">
+      <span className="inline-flex items-center gap-1">
+        {receipt.confidence >= 0.8
+          ? <CheckCircle2 size={12} className="text-emerald-400" />
+          : <AlertCircle size={12} className="text-amber-400" />}
+        ${receipt.amount.toFixed(2)} USD
+      </span>
+      <span className="text-theme-text-muted">
+        (from {receipt.originalAmount.toLocaleString()})
+      </span>
+      {/* focaccia-89172: native currency override dropdown. OCR misreads `₹`
+          as `$` etc.; host picks the correct ISO code and we re-convert. */}
+      <CurrencyOverrideSelect
+        partyId={partyId}
+        originalAmount={receipt.originalAmount}
+        currentCurrency={receipt.originalCurrency}
+        onConverted={onConverted}
+      />
+      <span className={receipt.confidence >= 0.8 ? 'text-emerald-300' : 'text-amber-300'}>
+        {Math.round(receipt.confidence * 100)}% confidence
+      </span>
+      {unresolved && (
+        <span className="text-amber-300">— pick a currency to convert</span>
+      )}
+    </span>
+  );
+};
 
 /**
  * bocconcino-92104: small thumbnail component for an in-progress upload. PDFs

@@ -2014,6 +2014,18 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <span className="absolute top-1 left-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
                           receipt
                         </span>
+                        {/* stracciatella-92114: "k/n" badge when this receipt
+                            was one of several detected in a single photo. Lets
+                            admins see at a glance which thumbnails are siblings
+                            sharing the same source image. */}
+                        {doc.sourceReceiptCount != null && doc.sourceReceiptCount > 1 && (
+                          <span
+                            className="absolute bottom-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#ff393a] text-white"
+                            title={`Receipt ${(doc.sourceReceiptIndex ?? 0) + 1} of ${doc.sourceReceiptCount} — from ${doc.fileName}`}
+                          >
+                            {(doc.sourceReceiptIndex ?? 0) + 1}/{doc.sourceReceiptCount}
+                          </span>
+                        )}
                         {/* coppa-92105: 8px alternating dark/transparent
                             diagonal stripes laid over the thumbnail when
                             marked duplicate. The opacity-50 dim alone reads

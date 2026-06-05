@@ -830,6 +830,14 @@ function serializePayout(row: any): any {
       ocrLineItems: Array.isArray(d.ocrLineItems) ? d.ocrLineItems : null,
       ocrError: d.ocrError,
       sortOrder: d.sortOrder,
+      // stracciatella-92114: multi-receipt-per-photo labeling. When a single
+      // uploaded image resolved to N receipts, each row carries its 0-based
+      // index + the total count so the reviewer UI can show "Receipt k of n —
+      // from {fileName}" and optionally group siblings under one thumbnail.
+      // Null on historical (one-receipt-per-photo) rows → render flat.
+      sourceReceiptIndex: d.sourceReceiptIndex ?? null,
+      sourceReceiptCount: d.sourceReceiptCount ?? null,
+      boundingHint: d.boundingHint ?? null,
       // culatello-92104: admin-flagged duplicate receipts. Reviewer modal
       // dims these rows + excludes them from the OCR sum + the host PATCH
       // finalAmountUsd recompute path.
@@ -5655,6 +5663,10 @@ router.patch(
           ineligible: updated.ineligible === true,
           ocrError: updated.ocrError,
           sortOrder: updated.sortOrder,
+          // stracciatella-92114: echo labeling fields (admin edits never re-split).
+          sourceReceiptIndex: updated.sourceReceiptIndex ?? null,
+          sourceReceiptCount: updated.sourceReceiptCount ?? null,
+          boundingHint: updated.boundingHint ?? null,
           uploadedByUserId: updated.uploadedByUserId ?? null,
         },
       });
@@ -5962,6 +5974,12 @@ router.post(
           ocrAttemptCount: true,
           ocrLineItems: true,
           sortOrder: true,
+          // stracciatella-92114: surface labeling fields so the admin UI keeps
+          // the "Receipt k of n" label after an inline re-OCR (retry stays
+          // single-row — it never re-splits).
+          sourceReceiptIndex: true,
+          sourceReceiptCount: true,
+          boundingHint: true,
         },
       });
 
@@ -5989,6 +6007,10 @@ router.post(
             ? updated.ocrLineItems
             : null,
           sortOrder: updated.sortOrder,
+          // stracciatella-92114
+          sourceReceiptIndex: updated.sourceReceiptIndex ?? null,
+          sourceReceiptCount: updated.sourceReceiptCount ?? null,
+          boundingHint: updated.boundingHint ?? null,
         },
         ranInline,
         inlineError,
