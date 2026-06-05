@@ -46,6 +46,18 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled 
   const valueRef = useRef(value);
   valueRef.current = value;
 
+  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
+  // fresh mount. Saved drafts with an existing date are left untouched; the
+  // effect only fires once so subsequent user edits remain authoritative.
+  useEffect(() => {
+    const v = valueRef.current;
+    if (!v.date || v.date.trim() === '') {
+      const today = new Date().toISOString().slice(0, 10);
+      onChangeRef.current({ ...v, date: today });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The treaty-claim country defaults to permanentCountry (typical case:
   // host is claiming benefits under their country of residence's treaty).
   // We watch that field and auto-suggest article + rate + income type.

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   User,
   Building2,
@@ -90,6 +90,17 @@ export const W9Form: React.FC<W9FormProps> = ({
   const [showExemptCodes, setShowExemptCodes] = useState<boolean>(
     !!(value.exemptPayeeCode || value.fatcaCode || value.accountNumbers),
   );
+
+  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
+  // fresh mount. Saved drafts with an existing date are left untouched; the
+  // effect only fires once so subsequent user edits remain authoritative.
+  useEffect(() => {
+    if (!value.date || value.date.trim() === "") {
+      const today = new Date().toISOString().slice(0, 10);
+      onChange({ ...value, date: today });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const set = <K extends keyof W9FormData>(key: K, v: W9FormData[K]) =>
     onChange({ ...value, [key]: v });
