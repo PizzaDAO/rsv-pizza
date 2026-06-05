@@ -152,74 +152,8 @@ export function RSVPFormStep1({
         </div>
       )}
 
-      {/* Combined PizzaDAO + SWC opt-in (variant arm of A/B test, any active SWC region) */}
-      {form.activeRegionConfig && form.optinAbVariant === 'variant' ? (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setCombinedOptIn(!form.combinedOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.combinedOptIn ? (
-                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.combinedOptIn')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowRegionalOptinAbModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showRegionalOptinAbModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowRegionalOptinAbModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowRegionalOptinAbModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t(`${form.activeRegionConfig.modalNamespace}.title`)}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t(`${form.activeRegionConfig.modalNamespace}.description`)}{' '}
-                  <a
-                    href={form.activeRegionConfig.privacyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t(`${form.activeRegionConfig.modalNamespace}.privacyPolicy`)}
-                  </a> and{' '}
-                  <a
-                    href={form.activeRegionConfig.termsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t(`${form.activeRegionConfig.modalNamespace}.${form.activeRegionConfig.termsKey}`)}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      ) : (
+      {/* Combined PizzaDAO + SWC opt-in (every event by default; legacy two-checkbox UI only for preserved-control existing-guests on SWC events) */}
+      {form.activeRegionConfig && form.optinAbVariant === 'control' ? (
         <>
           {/* PizzaDAO Newsletter opt-in */}
           <button
@@ -304,6 +238,74 @@ export function RSVPFormStep1({
                 document.body
               )}
             </>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => form.setCombinedOptIn(!form.combinedOptIn)}
+              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
+            >
+              {form.combinedOptIn ? (
+                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
+              ) : (
+                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
+              )}
+              <span className="text-sm text-theme-text">
+                {t('step1.combinedOptIn')}
+              </span>
+            </button>
+            {form.activeRegionConfig && (
+              <button
+                type="button"
+                onClick={() => form.setShowRegionalOptinAbModal(true)}
+                className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
+              >
+                <Info size={18} />
+              </button>
+            )}
+          </div>
+
+          {form.activeRegionConfig && form.showRegionalOptinAbModal && createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => form.setShowRegionalOptinAbModal(false)}
+            >
+              <div
+                className="card p-6 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => form.setShowRegionalOptinAbModal(false)}
+                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-bold text-theme-text mb-3">{t(`${form.activeRegionConfig.modalNamespace}.title`)}</h3>
+                <p className="text-sm text-theme-text-secondary leading-relaxed">
+                  {t(`${form.activeRegionConfig.modalNamespace}.description`)}{' '}
+                  <a
+                    href={form.activeRegionConfig.privacyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    {t(`${form.activeRegionConfig.modalNamespace}.privacyPolicy`)}
+                  </a> and{' '}
+                  <a
+                    href={form.activeRegionConfig.termsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    {t(`${form.activeRegionConfig.modalNamespace}.${form.activeRegionConfig.termsKey}`)}
+                  </a>.
+                </p>
+              </div>
+            </div>,
+            document.body
           )}
         </>
       )}

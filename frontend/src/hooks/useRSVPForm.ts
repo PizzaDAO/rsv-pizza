@@ -216,8 +216,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   }, [activeRegionConfig, isEthconfEvent]);
 
   const combinedOptIn = (() => {
-    if (!activeRegionConfig || !mailingListOptIn) return false;
+    if (!mailingListOptIn) return false;
     if (isEthconfEvent && !ethconfOptIn) return false;
+    if (!activeRegionConfig) return mailingListOptIn;
     switch (activeRegionConfig.swcOptInField) {
       case 'swcOptIn':   return swcOptIn;
       case 'swcCaOptIn': return swcCaOptIn;
