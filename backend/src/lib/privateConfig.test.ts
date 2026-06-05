@@ -10,7 +10,14 @@ const mockPrisma = vi.hoisted(() => ({
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
-import { getPayoutCaps, invalidateAll, PRIVATE_CONFIG_KEYS } from './privateConfig.js';
+import {
+  getPayoutCaps,
+  getCityTiers,
+  getReimbursementTiers,
+  getSponsorshipPricing,
+  invalidateAll,
+  PRIVATE_CONFIG_KEYS,
+} from './privateConfig.js';
 
 describe('getPayoutCaps', () => {
   beforeEach(() => {
@@ -70,5 +77,63 @@ describe('getPayoutCaps', () => {
     const caps = await getPayoutCaps();
 
     expect(caps.perTxCapUsd).toBeGreaterThan(0);
+  });
+});
+
+// marinara-71630 P5: city tiers + reimbursement tiers + sponsorship pricing
+// accessors. Cover read-through and the SAFE (not just present) fallbacks.
+describe('getCityTiers / getReimbursementTiers / getSponsorshipPricing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('reads city tiers from app_config when present', async () => {
+    const seeded = { tier1: ['new york'], tier2: ['austin'] };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const tiers = await getCityTiers();
+
+    expect(tiers).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.cityTiers },
+    });
+  });
+
+  it('city tiers fall back to EMPTY lists (everything -> tier 3) when absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getCityTiers()).toEqual({ tier1: [], tier2: [] });
+  });
+
+  it('reads reimbursement tiers from app_config when present', async () => {
+    const seeded = {
+      perHeadRates: { '1': 10, '2': 8, '3': 6 },
+      ceilingUsd: 625,
+      attendanceRsvpCoefficient: 0.4,
+    };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const reimb = await getReimbursementTiers();
+
+    expect(reimb).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.reimbursementTiers },
+    });
+  });
+
+  it('reimbursement tiers fall back to ALL-ZERO ($0 suggestion) when absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    const reimb = await getReimbursementTiers();
+    expect(reimb.ceilingUsd).toBe(0);
+    expect(reimb.attendanceRsvpCoefficient).toBe(0);
+    for (const v of Object.values(reimb.perHeadRates)) expect(v).toBe(0);
+  });
+
+  it('sponsorship pricing fall back has a NON-ZERO roundTo (no divide-by-zero)', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    const pricing = await getSponsorshipPricing();
+    expect(pricing.tierConfig).toEqual({});
+    expect(pricing.base).toBe(0);
+    expect(pricing.roundTo).toBeGreaterThan(0);
   });
 });

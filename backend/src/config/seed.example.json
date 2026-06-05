@@ -43,6 +43,30 @@
     ]
   },
 
+  "private.city_tiers": {
+    "_note": "PLACEHOLDER tier-1/tier-2 city name lists documenting SHAPE only — OBVIOUSLY FAKE city names. Real lists are seeded separately and NOT committed. Anything not matched (including empty lists) resolves to tier 3. Matching is case-insensitive substring after stripping spaces/hyphens (see cityTierFrom in src/helpers/gpp27.ts).",
+    "tier1": ["exampleburg", "placeholder city"],
+    "tier2": ["sampletown", "demo metropolis"]
+  },
+
+  "private.reimbursement_tiers": {
+    "_note": "PLACEHOLDER GPP27 reimbursement config documenting SHAPE only — OBVIOUSLY FAKE numbers. Real per-head rates, ceiling, and coefficient are seeded separately and NOT committed. perHeadRates keyed by tier ('1'/'2'/'3') = per-attendee USD; ceilingUsd = absolute per-event cap the suggestion clamps to; attendanceRsvpCoefficient = coefficient on current RSVP count in expectedAttendance = max(lastYear, coeff*rsvp).",
+    "perHeadRates": { "1": 9, "2": 9, "3": 9 },
+    "ceilingUsd": 999,
+    "attendanceRsvpCoefficient": 0.99
+  },
+
+  "private.sponsorship_pricing": {
+    "_note": "PLACEHOLDER sponsorship pricing tiers documenting SHAPE only — OBVIOUSLY FAKE numbers. Real floor/ceiling/max bands, base, and roundTo are seeded separately and NOT committed. tierConfig keyed by tier ('1'/'2'/'3'); price = base + ((clamp(guests,floor,ceiling) - floor)/(ceiling - floor))*(max - base), rounded to nearest roundTo. roundTo must be non-zero (divisor).",
+    "tierConfig": {
+      "1": { "floor": 9, "ceiling": 99, "max": 999 },
+      "2": { "floor": 9, "ceiling": 99, "max": 888 },
+      "3": { "floor": 9, "ceiling": 99, "max": 777 }
+    },
+    "base": 999,
+    "roundTo": 50
+  },
+
   "private.scoring_weights": {
     "_note": "PLACEHOLDER scoring weights — OBVIOUSLY FAKE numbers documenting shape only. Real production weights are seeded separately and are NOT committed. leaderboard.{link,invite,checkin,photo}=composite GPP board weights; photoCap=max photos counted per party; bestOfBonus=points per scorecard Best-Of win. pizzeria.{topLimit=max pizzerias surfaced per event on the /gpp/pizzerias map, distanceWeightPerMile=miles penalty per mile from venue}.",
     "leaderboard": {

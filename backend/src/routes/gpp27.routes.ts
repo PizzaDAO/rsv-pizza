@@ -8,9 +8,9 @@ import {
   GPP27_TAG,
   citySlugFromCityName,
   assertGpp27Authorized,
-  suggestReimbursementCap,
-  REIMBURSEMENT_CEILING_USD,
+  computeReimbursementCap,
 } from '../helpers/gpp27.js';
+import { getCityTiers, getReimbursementTiers } from '../lib/privateConfig.js';
 
 /**
  * soppressata-50927 — GPP27 (Bitcoin Pizza Day 2027) admin/underboss-gated
@@ -115,11 +115,22 @@ router.get('/budget-suggestion', requireAuth, async (req: AuthRequest, res: Resp
     const lastYear = await lastYearEstimatedAttendance(citySlug);
     const rsvpCount = partyId ? await currentRsvpCount(partyId) : 0;
 
-    const s = suggestReimbursementCap({
-      cityName: city,
-      lastYearEstimatedAttendance: lastYear,
-      currentRsvpCount: rsvpCount,
-    });
+    // Resolve city-tier + reimbursement config from app_config (60s-cached).
+    const [cityTiers, reimb] = await Promise.all([getCityTiers(), getReimbursementTiers()]);
+
+    const s = computeReimbursementCap(
+      {
+        cityName: city,
+        lastYearEstimatedAttendance: lastYear,
+        currentRsvpCount: rsvpCount,
+      },
+      {
+        tiers: cityTiers,
+        rates: reimb.perHeadRates,
+        ceilingUsd: reimb.ceilingUsd,
+        coefficient: reimb.attendanceRsvpCoefficient,
+      },
+    );
 
     res.json({
       city,
@@ -130,7 +141,7 @@ router.get('/budget-suggestion', requireAuth, async (req: AuthRequest, res: Resp
       expectedAttendance: s.expectedAttendance,
       rawSuggestedCapUsd: s.rawSuggested,
       suggestedCapUsd: s.cappedSuggested,
-      ceilingUsd: REIMBURSEMENT_CEILING_USD,
+      ceilingUsd: reimb.ceilingUsd,
     });
   } catch (error) {
     next(error);
@@ -327,14 +338,16 @@ router.patch('/parties/:partyId/budget', requireAuth, async (req: AuthRequest, r
     if (raw == null || typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
       throw new AppError('reimbursementCapUsd must be a non-negative number', 400, 'VALIDATION_ERROR');
     }
-    const capped = Math.min(Math.round(raw), REIMBURSEMENT_CEILING_USD);
+    // Clamp to the configured per-event ceiling (app_config, 60s-cached).
+    const { ceilingUsd } = await getReimbursementTiers();
+    const capped = Math.min(Math.round(raw), ceilingUsd);
 
     await prisma.party.update({
       where: { id: partyId },
       data: { reimbursementCapUsd: capped },
     });
 
-    res.json({ success: true, reimbursementCapUsd: capped, ceilingUsd: REIMBURSEMENT_CEILING_USD });
+    res.json({ success: true, reimbursementCapUsd: capped, ceilingUsd });
   } catch (error) {
     next(error);
   }

@@ -29,6 +29,9 @@ const KEYS = {
   fraudWeights: 'private.fraud_weights',
   sponsors: 'private.sponsors',
   scoringWeights: 'private.scoring_weights',
+  cityTiers: 'private.city_tiers',
+  reimbursementTiers: 'private.reimbursement_tiers',
+  sponsorshipPricing: 'private.sponsorship_pricing',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -220,6 +223,89 @@ export function getScoringWeights(): Promise<ScoringWeights> {
   return getConfig<ScoringWeights>(KEYS.scoringWeights, {
     leaderboard: {},
     pizzeria: {},
+  });
+}
+
+// ---------------------------------------------------------------------------
+// City tiers + GPP27 reimbursement + sponsorship pricing (marinara-71630 P5)
+//
+// These three keys move the city-tier lists, the GPP27 per-head
+// reimbursement rates/ceiling/formula, and the sponsorship pricing tiers out
+// of committed source (backend/src/helpers/gpp27.ts and the frontend
+// sponsorshipPricing util) and into `app_config`. Real values are seeded to
+// prod out-of-band; the fallbacks below are non-sensitive and chosen so an
+// unseeded config is SAFE rather than wrong.
+// ---------------------------------------------------------------------------
+
+export interface CityTiers {
+  tier1: string[];
+  tier2: string[];
+}
+
+/**
+ * Tier-1/tier-2 city name lists (everything not matched is tier 3). Real lists
+ * are seeded to `app_config`.
+ *
+ * Fallback = empty lists. With no tier-1/tier-2 entries every city resolves to
+ * tier 3, which is the safe default: tier 3 carries the LOWEST per-head
+ * reimbursement rate and the most conservative sponsorship pricing band, so an
+ * unseeded config never over-suggests a payout or an inflated sponsorship.
+ */
+export function getCityTiers(): Promise<CityTiers> {
+  return getConfig<CityTiers>(KEYS.cityTiers, { tier1: [], tier2: [] });
+}
+
+export interface ReimbursementTiers {
+  /** Per-head USD reimbursement rate keyed by tier ('1' | '2' | '3'). */
+  perHeadRates: Record<string, number>;
+  /** Absolute per-event reimbursement ceiling (USD) the suggestion clamps to. */
+  ceilingUsd: number;
+  /** Coefficient applied to the current RSVP count in the attendance estimate. */
+  attendanceRsvpCoefficient: number;
+}
+
+/**
+ * GPP27 reimbursement rules: per-head rates by tier, the per-event ceiling, and
+ * the RSVP coefficient used in expectedAttendance = max(lastYear, coeff*rsvp).
+ * Real values are seeded to `app_config`.
+ *
+ * Fallback = all zeros (rates `{1:0,2:0,3:0}`, ceiling 0, coefficient 0). This
+ * is FAIL-SAFE: an unseeded config suggests a $0 cap (and the ceiling clamps to
+ * $0) rather than over-suggesting a reimbursement. The worst case is "the
+ * budget tool suggests $0 until config is seeded", never an over-payment.
+ */
+export function getReimbursementTiers(): Promise<ReimbursementTiers> {
+  return getConfig<ReimbursementTiers>(KEYS.reimbursementTiers, {
+    perHeadRates: { '1': 0, '2': 0, '3': 0 },
+    ceilingUsd: 0,
+    attendanceRsvpCoefficient: 0,
+  });
+}
+
+export interface SponsorshipPricing {
+  /** Per-tier pricing band keyed by tier ('1' | '2' | '3'). */
+  tierConfig: Record<string, { floor: number; ceiling: number; max: number }>;
+  /** Base price (USD) every event starts from. */
+  base: number;
+  /** Round the computed price to the nearest this-many USD. */
+  roundTo: number;
+}
+
+/**
+ * Sponsorship pricing tiers consumed by the (future) frontend pricing util and
+ * surfaced via GET /api/config/pricing. Real values are seeded to `app_config`.
+ *
+ * Fallback = empty tierConfig + base 0 + roundTo 50. `roundTo` is deliberately
+ * NON-ZERO even in the fallback: the downstream price formula divides by
+ * `roundTo`, so a zero here would produce NaN/Infinity. An empty `tierConfig`
+ * means a price can't be computed for any tier until config is seeded (the
+ * consumer treats a missing tier as "no suggestion"), which is the safe default.
+ */
+export function getSponsorshipPricing(): Promise<SponsorshipPricing> {
+  return getConfig<SponsorshipPricing>(KEYS.sponsorshipPricing, {
+    tierConfig: {},
+    base: 0,
+    roundTo: 50,
   });
 }
 
