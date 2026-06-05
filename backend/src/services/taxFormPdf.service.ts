@@ -759,6 +759,13 @@ export interface W8BENEFormData {
   giin?: string;
   foreignTin?: string;
   referenceNumbers?: string;
+  // Part III — Claim of Tax Treaty Benefits (chapter 3). Same field names as
+  // W-8BEN Part II so the frontend (mortadella-92107) reuses the auto-suggest.
+  treatyCountry?: string;
+  articleParagraph?: string;
+  withholdingRate?: string;
+  incomeType?: string;
+  treatyExplanation?: string;
   // Part XXIX — Certification
   signature: string;
   signerCapacity?: string;
@@ -1030,25 +1037,128 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
   });
   y -= 44;
 
-  // Part XXIX - Certification (we skip the intermediate FATCA-classification
-  // parts II–XXVIII; complex cases use a paper form).
+  // Part III — Claim of Tax Treaty Benefits (chapter 3 only). Mirrors the
+  // W-8BEN Part II rendering pattern. Renders even when fields are blank so
+  // the admin reviewer can see the section was intentionally not claimed.
+  // Parts II + IV–XXVIII (advanced FATCA classifications) are still skipped;
+  // those cases fall back to a paper form.
   page.drawRectangle({ x: 30, y: y - 2, width: 552, height: 2, color: HEADER });
   y -= 6;
-  page.drawText('Part XXIX', { x: 33, y: y - 4, size: 10, font: bold, color: HEADER });
-  page.drawText('Certification', { x: 95, y: y - 4, size: 10, font, color: HEADER });
+  page.drawText('Part III', { x: 33, y: y - 4, size: 10, font: bold, color: HEADER });
+  page.drawText('Claim of Tax Treaty Benefits (for chapter 3 purposes only)', {
+    x: 85,
+    y: y - 4,
+    size: 10,
+    font,
+    color: HEADER,
+  });
+  y -= 20;
+
+  // 14a — Resident-of-treaty-country statement.
+  drawField(page, {
+    x: 30,
+    y,
+    width: 552,
+    height: 32,
+    label:
+      '14a  I certify that the beneficial owner is a resident of the following country within the meaning of the income tax treaty between the United States and that country:',
+    value: data.treatyCountry || '',
+    font,
+    boldFont: bold,
+  });
+  y -= 36;
+
+  // 14b — Derives-income checkbox. Checked when a treaty country was named
+  // (the host is affirmatively claiming the benefit). When blank, we leave
+  // the box unchecked.
+  drawCheckbox(page, {
+    x: 33,
+    y,
+    checked: Boolean(data.treatyCountry && data.treatyCountry.trim()),
+    font,
+  });
+  const derivesText =
+    '14b  The beneficial owner derives the item (or items) of income for which the treaty benefits are claimed, and, if applicable, meets the requirements of the treaty provision dealing with limitation on benefits.';
+  let derivesY = y;
+  for (const line of wrapText(derivesText, font, 7.5, 520)) {
+    page.drawText(line, { x: 50, y: derivesY - 2, size: 7.5, font, color: rgb(0.3, 0.3, 0.3) });
+    derivesY -= 10;
+  }
+  y = derivesY - 6;
+
+  // 15 — Article / paragraph + withholding rate + income type (one row).
+  drawField(page, {
+    x: 30,
+    y,
+    width: 276,
+    height: 32,
+    label: '15  Article and paragraph of treaty',
+    value: data.articleParagraph || '',
+    font,
+    boldFont: bold,
+  });
+  drawField(page, {
+    x: 306,
+    y,
+    width: 136,
+    height: 32,
+    label: '    Withholding rate (%)',
+    value: data.withholdingRate || '',
+    font,
+    boldFont: bold,
+  });
+  drawField(page, {
+    x: 442,
+    y,
+    width: 140,
+    height: 32,
+    label: '    Type of income',
+    value: data.incomeType || '',
+    font,
+    boldFont: bold,
+  });
+  y -= 36;
+
+  // Explanation of additional conditions — optional, but always render the
+  // box so the form looks consistent.
+  drawField(page, {
+    x: 30,
+    y,
+    width: 552,
+    height: 40,
+    label:
+      '    Explain the additional conditions in the Article and paragraph the beneficial owner meets to be eligible for the rate of withholding:',
+    value: data.treatyExplanation || '',
+    font,
+    boldFont: bold,
+    fontSize: 8,
+  });
+  y -= 48;
+
+  // Part I + Part III fill page 1; push certification onto page 2 so the
+  // signature box never collides with the footer.
+  const page2 = doc.addPage([612, 792]);
+  y = 760;
+
+  // Part XXIX - Certification (we skip the intermediate FATCA-classification
+  // parts II + IV–XXVIII; complex cases use a paper form).
+  page2.drawRectangle({ x: 30, y: y - 2, width: 552, height: 2, color: HEADER });
+  y -= 6;
+  page2.drawText('Part XXIX', { x: 33, y: y - 4, size: 10, font: bold, color: HEADER });
+  page2.drawText('Certification', { x: 95, y: y - 4, size: 10, font, color: HEADER });
   y -= 18;
 
   const certText =
     'Under penalties of perjury, I declare that I have examined the information on this form and to the best of my knowledge and belief it is true, correct, and complete. I further certify under penalties of perjury that the entity identified on line 1 of this form is the beneficial owner of all the income to which this form relates, is using this form to certify its status for chapter 4 purposes, and is not a U.S. person. I agree that I will submit a new form within 30 days if any certification on this form becomes incorrect.';
   for (const line of wrapText(certText, font, 7.5, 540)) {
-    page.drawText(line, { x: 33, y: y - 2, size: 7.5, font, color: rgb(0.3, 0.3, 0.3) });
+    page2.drawText(line, { x: 33, y: y - 2, size: 7.5, font, color: rgb(0.3, 0.3, 0.3) });
     y -= 10;
   }
   y -= 10;
 
-  page.drawRectangle({ x: 30, y: y - 1, width: 552, height: 1, color: rgb(0, 0, 0) });
+  page2.drawRectangle({ x: 30, y: y - 1, width: 552, height: 1, color: rgb(0, 0, 0) });
   y -= 4;
-  drawField(page, {
+  drawField(page2, {
     x: 30,
     y,
     width: 280,
@@ -1059,7 +1169,7 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
     boldFont: bold,
     fontSize: 13,
   });
-  drawField(page, {
+  drawField(page2, {
     x: 310,
     y,
     width: 130,
@@ -1069,7 +1179,7 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
     font,
     boldFont: bold,
   });
-  drawField(page, {
+  drawField(page2, {
     x: 440,
     y,
     width: 142,
@@ -1080,7 +1190,16 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
     boldFont: bold,
   });
 
-  page.drawText(`Generated ${todayIso()}  |  Submission #${refId}`, {
+  // Footer on both pages so the submission id is visible regardless of which
+  // page an admin downloads/prints in isolation.
+  page.drawText(`Generated ${todayIso()}  |  Submission #${refId}  |  Page 1 of 2`, {
+    x: 30,
+    y: 30,
+    size: 7,
+    font,
+    color: rgb(0.6, 0.6, 0.6),
+  });
+  page2.drawText(`Generated ${todayIso()}  |  Submission #${refId}  |  Page 2 of 2`, {
     x: 30,
     y: 30,
     size: 7,
