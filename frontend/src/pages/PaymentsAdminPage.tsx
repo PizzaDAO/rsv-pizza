@@ -1028,6 +1028,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const viewerKind = role.viewerKind;
   const isUnderboss = viewerKind === 'underboss';
 
+  // Count of the rows actually rendered in the active table: cities in the
+  // by-city view, individual payouts in the by-payment / payments views. Sits
+  // next to the view toggle so the admin sees how many rows the current
+  // filters surface.
+  const visibleRowCount =
+    viewMode === 'by-city' ? displayedByPartyRows.length : payouts.length;
+  const visibleRowLabel =
+    viewMode === 'by-city'
+      ? `${visibleRowCount} ${visibleRowCount === 1 ? 'city' : 'cities'}`
+      : `${visibleRowCount} payment${visibleRowCount === 1 ? '' : 's'}`;
+
   return (
     <Layout>
       <Helmet>
@@ -1191,7 +1202,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             bar's sticky position.
             coppa-92106: third "Payments" tab shows the actual payments ledger
             (status=paid|completed, proven-only, sorted by paid_at DESC). */}
-        <div className="flex items-center justify-end gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <span className="text-sm font-medium text-theme-text-muted">
+            {loading ? '…' : visibleRowLabel}
+          </span>
+          <div className="flex items-center gap-2">
           <span className="text-xs uppercase tracking-wide text-theme-text-muted">View:</span>
           <div
             role="tablist"
@@ -1237,6 +1252,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             >
               Payments
             </button>
+          </div>
           </div>
         </div>
 
