@@ -1692,6 +1692,44 @@ model QuizAnswer {
   @@map("quiz_answers")
 }
 
+// ============================================
+// Survey question config (pugliese-58297)
+// ============================================
+// DB-backed post-event survey question set. Previously a code constant in
+// backend/src/lib/surveyQuestions.ts. Service-role only.
+
+model SurveyQuestionSet {
+  id        String   @id
+  version   Int      @default(1)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  questions SurveyQuestion[]
+
+  @@map("survey_question_sets")
+}
+
+model SurveyQuestion {
+  id          String   // question slug (snake_case)
+  questionSet String   @map("question_set")
+  set         SurveyQuestionSet @relation(fields: [questionSet], references: [id])
+
+  position    Int
+  type        String   // 'rating' | 'yesno' | 'multiple' | 'text'
+  text        String
+  scale       Int?
+  multi       Boolean  @default(false)
+  allowOther  Boolean  @default(false) @map("allow_other")
+  options     Json     @default("[]")
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt      @map("updated_at") @db.Timestamptz
+
+  @@id([questionSet, id])
+  @@unique([questionSet, position])
+  @@map("survey_questions")
+}
+
 model SlugAlias {
   oldSlug   String   @id @map("old_slug")
   partyId   String   @map("party_id") @db.Uuid

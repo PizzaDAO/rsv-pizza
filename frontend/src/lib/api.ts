@@ -6187,6 +6187,85 @@ export async function getSurveyResults(partyId: string): Promise<SurveyResults> 
   });
 }
 
+// ---------------------------------------------------------------------------
+// pugliese-58297: admin survey-question CRUD
+// ---------------------------------------------------------------------------
+
+export interface AdminSurveyQuestion extends SurveyQuestion {
+  position: number;
+  active: boolean;
+}
+
+export interface AdminSurveyQuestionsResponse {
+  questionSet: string;
+  version: number;
+  questions: AdminSurveyQuestion[];
+}
+
+export async function listAdminSurveyQuestions(
+  set: string = 'default'
+): Promise<AdminSurveyQuestionsResponse> {
+  return apiRequest<AdminSurveyQuestionsResponse>(
+    `/api/admin/survey-questions?set=${encodeURIComponent(set)}`,
+    { method: 'GET', requireAuth: true }
+  );
+}
+
+export interface AdminSurveyQuestionInput {
+  id: string;
+  questionSet?: string;
+  type: 'rating' | 'yesno' | 'multiple' | 'text';
+  text: string;
+  scale?: number | null;
+  multi?: boolean;
+  allowOther?: boolean;
+  options?: string[];
+  active?: boolean;
+  position?: number;
+}
+
+export async function createAdminSurveyQuestion(
+  body: AdminSurveyQuestionInput
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>('/api/admin/survey-questions', {
+    method: 'POST',
+    body,
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestion(
+  id: string,
+  body: Partial<AdminSurveyQuestionInput>,
+  set: string = 'default'
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>(
+    `/api/admin/survey-questions/${encodeURIComponent(id)}?set=${encodeURIComponent(set)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
+export async function reorderAdminSurveyQuestions(
+  orderedIds: string[],
+  set: string = 'default'
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>('/api/admin/survey-questions/reorder', {
+    method: 'POST',
+    body: { set, orderedIds },
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestionSet(
+  setId: string,
+  body: { version?: number }
+): Promise<{ questionSet: { id: string; version: number; updatedAt: string } }> {
+  return apiRequest<{ questionSet: { id: string; version: number; updatedAt: string } }>(
+    `/api/admin/survey-question-sets/${encodeURIComponent(setId)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
 // ============================================
 // Tax forms (salame-92110)
 // ============================================
