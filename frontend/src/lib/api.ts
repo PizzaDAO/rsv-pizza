@@ -869,11 +869,22 @@ export interface PublicEvent {
 }
 
 // Public Event API (no auth required)
-export async function getEventBySlug(slug: string): Promise<PublicEvent | { redirect: true; slug: string } | null> {
+export async function getEventBySlug(
+  slug: string,
+  year?: number | string | null,
+): Promise<PublicEvent | { redirect: true; slug: string } | null> {
   try {
-    const response = await fetch(`${API_URL}/api/events/${slug}`, {
+    // soppressata-50927: thread the optional ?year= param to the year-aware
+    // resolver. Send the caller's auth token when present so admins/in-scope
+    // underbosses can preview gated GPP27 (2027) events pre-launch.
+    const qs = year != null && `${year}`.length > 0 ? `?year=${encodeURIComponent(`${year}`)}` : '';
+    const token = getAuthToken();
+    const response = await fetch(`${API_URL}/api/events/${slug}${qs}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
 
     const data = await response.json();
@@ -6256,4 +6267,115 @@ export async function rejectTaxForm(id: string, reason: string): Promise<TaxForm
     { method: 'POST', body: { reason }, requireAuth: true },
   );
   return res.taxForm;
+}
+
+// ===========================================================================
+// soppressata-50927 — GPP27 (Bitcoin Pizza Day 2027) admin/UB-gated flow.
+// ===========================================================================
+
+export interface Gpp27AgreementClause {
+  id: string;
+  version: string;
+  sortOrder: number;
+  body: string;
+  requiresAck: boolean;
+}
+
+export interface Gpp27AgreementResponse {
+  version: string | null;
+  clauses: Gpp27AgreementClause[];
+}
+
+export async function fetchGpp27Agreement(): Promise<Gpp27AgreementResponse> {
+  return apiRequest<Gpp27AgreementResponse>('/api/gpp27/agreement');
+}
+
+export interface Gpp27BudgetSuggestion {
+  city: string;
+  tier: 1 | 2 | 3;
+  perHeadRate: number;
+  lastYearEstimatedAttendance: number | null;
+  currentRsvpCount: number;
+  expectedAttendance: number;
+  rawSuggestedCapUsd: number;
+  suggestedCapUsd: number;
+  ceilingUsd: number;
+}
+
+export async function fetchGpp27BudgetSuggestion(
+  city: string,
+  partyId?: string,
+): Promise<Gpp27BudgetSuggestion> {
+  const qs = new URLSearchParams({ city });
+  if (partyId) qs.set('partyId', partyId);
+  return apiRequest<Gpp27BudgetSuggestion>(`/api/gpp27/budget-suggestion?${qs.toString()}`);
+}
+
+export interface Gpp27CreateEventInput {
+  city: string;
+  hostName: string;
+  email: string;
+  telegram?: string;
+  country?: string;
+  countryCode?: string;
+  cityFormattedName?: string;
+  cityLat?: number;
+  cityLng?: number;
+  timezone?: string;
+}
+
+export interface Gpp27CreateEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    customUrl: string | null;
+    city: string | null;
+    region: string | null;
+    year: number;
+  };
+  eventPageUrl: string;
+  hostPageUrl: string;
+}
+
+export async function createGpp27Event(input: Gpp27CreateEventInput): Promise<Gpp27CreateEventResponse> {
+  return apiRequest<Gpp27CreateEventResponse>('/api/gpp27/events', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export async function setGpp27Budget(
+  partyId: string,
+  reimbursementCapUsd: number,
+): Promise<{ success: boolean; reimbursementCapUsd: number; ceilingUsd: number }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/budget`, {
+    method: 'PATCH',
+    body: { reimbursementCapUsd },
+  });
+}
+
+export async function acceptGpp27Agreement(
+  partyId: string,
+): Promise<{ success: boolean; agreementVersion: string; agreementAcceptedAt: string }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/agreement/accept`, { method: 'POST' });
+}
+
+export interface Gpp27PublishStatus {
+  partyId: string;
+  agreementSigned: boolean;
+  agreementVersionMatches: boolean;
+  hasMerchAddress: boolean;
+  currentAgreementVersion: string | null;
+  signedAgreementVersion: string | null;
+  canPublish: boolean;
+}
+
+export async function fetchGpp27PublishStatus(partyId: string): Promise<Gpp27PublishStatus> {
+  return apiRequest<Gpp27PublishStatus>(`/api/gpp27/parties/${partyId}/publish-status`);
+}
+
+export async function publishGpp27Event(partyId: string): Promise<{ success: boolean; published: boolean }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/publish`, { method: 'POST' });
 }
