@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { BEST_OF_BONUS } from './scorecardLeaderboard.routes.js';
+import { BEST_OF_BONUS, SCORECARD_LEADERBOARD_ITEMS } from '../lib/scorecardScore.js';
 
 const router = Router();
 
@@ -276,8 +276,15 @@ router.get('/:inviteCode/leaderboard', requireAuth, async (req: AuthRequest, res
         id: true,
         name: true,
         email: true,
+        // panzerotti-58931: de-duped item set — exclude generic photo /
+        // pizza_selfie (they overlap engagement's approved-photo count on the
+        // unified board). Mirrors SCORECARD_LEADERBOARD_ITEMS so This-Party and
+        // the worldwide board agree on per-guest points.
         scorecardItems: {
-          where: { completed: true },
+          where: {
+            completed: true,
+            itemKey: { in: SCORECARD_LEADERBOARD_ITEMS as unknown as string[] },
+          },
           select: { id: true },
         },
         // panzerotti-58931 Phase 2.1: Best Of wins add BEST_OF_BONUS each.

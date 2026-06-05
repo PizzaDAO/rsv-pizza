@@ -6,6 +6,10 @@ const mockPrisma = vi.hoisted(() => ({
   party: {
     findMany: vi.fn(),
   },
+  // panzerotti-58931: the de-duped scorecard aggregate pass. Default to no
+  // scorecard activity so the engagement-only assertions stay exact; individual
+  // tests can override with per-guest item/win rows.
+  $queryRaw: vi.fn(),
 }));
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
@@ -44,8 +48,11 @@ function makeParty(overrides: Partial<any> = {}) {
   return { ...defaults, ...overrides };
 }
 
+let guestSeq = 0;
 function guest(submittedVia: string, opts: Partial<any> = {}) {
   return {
+    id: opts.id ?? `guest-${guestSeq++}`,
+    name: opts.name ?? 'Guest Test',
     submittedVia,
     status: opts.status ?? 'CONFIRMED',
     approved: opts.approved ?? null,
@@ -57,6 +64,10 @@ describe('Public leaderboard route — stromboli-71593', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __testing.cache.clear();
+    guestSeq = 0;
+    // Default: no scorecard activity. Tests that exercise the unified scorecard
+    // contribution override this with explicit aggregate rows.
+    mockPrisma.$queryRaw.mockResolvedValue([]);
   });
 
   describe('GET /api/leaderboard scoring', () => {
@@ -85,6 +96,7 @@ describe('Public leaderboard route — stromboli-71593', () => {
         inviteRsvps: 1,
         checkIns: 1,
         photos: 4,
+        scorecard: 0,
       });
       expect(row.score).toBe(6.3);
     });
@@ -161,6 +173,54 @@ describe('Public leaderboard route — stromboli-71593', () => {
       expect(res.status).toBe(200);
       expect(res.body.parties.total).toBe(1);
       expect(res.body.parties.rows.map((r: any) => r.id)).toEqual(['a']);
+    });
+  });
+
+  // panzerotti-58931: unified score = engagement + de-duped scorecard points.
+  describe('GET /api/leaderboard unified scorecard contribution', () => {
+    it('adds de-duped scorecard points (items + 5*wins) to party score, breakdown, and guests board', async () => {
+      const checkedIn = guest('link', { id: 'g1', name: 'Ada Lovelace', checkedInAt: new Date() });
+      mockPrisma.party.findMany.mockResolvedValue([
+        makeParty({ id: 'a', city: 'Lagos', country: 'Nigeria', guests: [checkedIn] }),
+      ]);
+      // g1: 2 completed de-duped items + 1 win → 2 + 5*1 = 7 scorecard points.
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { party_id: 'a', guest_id: 'g1', item_count: 2, win_count: 1 },
+      ]);
+      const app = createTestApp();
+      const res = await request(app).get('/api/leaderboard');
+      expect(res.status).toBe(200);
+      const row = res.body.parties.rows[0];
+      // engagement: 1 link + 1 check-in = 3.0; scorecard: 7 → total 10.0
+      expect(row.breakdown).toEqual({
+        linkRsvps: 1,
+        inviteRsvps: 0,
+        checkIns: 1,
+        photos: 0,
+        scorecard: 7,
+      });
+      expect(row.score).toBe(10);
+      // Guests board: privacy name "First L.", score = 7.
+      expect(res.body.guests.total).toBe(1);
+      expect(res.body.guests.rows[0]).toMatchObject({
+        rank: 1,
+        name: 'Ada L.',
+        city: 'Lagos',
+        country: 'Nigeria',
+        score: 7,
+      });
+    });
+
+    it('omits guests with no scorecard activity from the guests board', async () => {
+      mockPrisma.party.findMany.mockResolvedValue([
+        makeParty({ id: 'a', guests: [guest('link', { id: 'g1', checkedInAt: new Date() })] }),
+      ]);
+      mockPrisma.$queryRaw.mockResolvedValue([]); // no scorecard rows
+      const app = createTestApp();
+      const res = await request(app).get('/api/leaderboard');
+      expect(res.status).toBe(200);
+      expect(res.body.parties.rows[0].breakdown.scorecard).toBe(0);
+      expect(res.body.guests.total).toBe(0);
     });
   });
 
@@ -496,8 +556,8 @@ describe('Public leaderboard route — stromboli-71593', () => {
         guests: [{ submittedVia: 'link', status: 'CONFIRMED', approved: null, checkedInAt: new Date() }],
         photos: [],
       } as any);
-      // 1 link + 1 check-in = 1.0 + 2.0 = 3.0
-      expect(breakdown).toEqual({ linkRsvps: 1, inviteRsvps: 0, checkIns: 1, photos: 0 });
+      // 1 link + 1 check-in = 1.0 + 2.0 = 3.0 (no scorecard activity)
+      expect(breakdown).toEqual({ linkRsvps: 1, inviteRsvps: 0, checkIns: 1, photos: 0, scorecard: 0 });
       expect(score).toBe(3);
     });
   });

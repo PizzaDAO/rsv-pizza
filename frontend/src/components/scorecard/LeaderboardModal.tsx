@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { X, Loader2, Trophy } from 'lucide-react';
 import {
   getPartyLeaderboard,
-  getScorecardGlobalLeaderboard,
+  fetchLeaderboard,
   LeaderboardEntry,
-  ScorecardGuestRow,
-  ScorecardPartyRow,
-  ScorecardCountryRow,
+  LeaderboardGuestRow,
+  LeaderboardPartyRow,
+  LeaderboardCountryRow,
 } from '../../lib/api';
 
 interface LeaderboardModalProps {
@@ -25,9 +25,9 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 interface GlobalData {
-  guests: ScorecardGuestRow[];
-  parties: ScorecardPartyRow[];
-  countries: ScorecardCountryRow[];
+  guests: LeaderboardGuestRow[];
+  parties: LeaderboardPartyRow[];
+  countries: LeaderboardCountryRow[];
 }
 
 export function LeaderboardModal({ inviteCode, onClose }: LeaderboardModalProps) {
@@ -72,9 +72,16 @@ export function LeaderboardModal({ inviteCode, onClose }: LeaderboardModalProps)
     (async () => {
       setGlobalLoading(true);
       try {
-        const data = await getScorecardGlobalLeaderboard();
+        // panzerotti-58931: the worldwide game board was merged into the unified
+        // public leaderboard. All-time window; pull a large page so the Parties
+        // list isn't truncated (guests are already top-100, countries are full).
+        const data = await fetchLeaderboard('all', 200, 0);
         if (!cancelled) {
-          setGlobal({ guests: data.guests, parties: data.parties, countries: data.countries });
+          setGlobal({
+            guests: data.guests.rows,
+            parties: data.parties.rows,
+            countries: data.countries.rows,
+          });
           setGlobalError(null);
         }
       } catch (err: any) {
@@ -206,7 +213,7 @@ export function LeaderboardModal({ inviteCode, onClose }: LeaderboardModalProps)
                   <ol className="space-y-1.5">
                     {global.parties.map((p) =>
                       renderRow(
-                        p.partyId,
+                        p.id,
                         p.rank,
                         p.name,
                         [p.city, p.country].filter(Boolean).join(', ') || null,
