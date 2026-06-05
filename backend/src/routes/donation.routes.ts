@@ -5,6 +5,18 @@ import { AppError } from '../middleware/error.js';
 
 const router = Router();
 
+// Format a donor's name for public display: first name + last-initial.
+// e.g. "Jane Doe" -> "Jane D.", "Cher" -> "Cher", anonymous -> "Anon".
+// NEVER expose the raw donorName/full surname to the client.
+function formatDonorDisplayName(donorName: string | null | undefined, isAnonymous: boolean): string {
+  if (isAnonymous) return 'Anon';
+  const n = (donorName || '').trim();
+  if (!n) return 'Supporter';
+  const parts = n.split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 // Helper function to check if user can access party donations
 async function canUserAccessDonations(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can access any party
@@ -122,17 +134,18 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       createdAt: d.createdAt,
     }));
 
-    // Top 12 donors by amount, for the public "Supporters" highlight.
-    const topDonations = [...donations]
+    // All donors by amount DESC, for the public "Supporters" row + modal.
+    // Capped at 250 defensively.
+    const sortedDonations = [...donations]
       .sort((a, b) => Number(b.amount) - Number(a.amount))
-      .slice(0, 12);
+      .slice(0, 250);
 
     // Best-effort avatar lookup: match non-anonymous donor emails to
     // registered users' profile pictures (case-insensitive). Most donors
     // won't have an account; that's expected.
     const lookupEmails = Array.from(
       new Set(
-        topDonations
+        sortedDonations
           .filter(d => !d.isAnonymous && d.donorEmail)
           .map(d => (d.donorEmail as string).toLowerCase())
       )
@@ -150,11 +163,12 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       }
     }
 
-    const topDonors = topDonations.map(d => ({
-      name: d.isAnonymous ? null : d.donorName,
+    // Public donor list. Only the formatted displayName is exposed —
+    // never the raw donorName, full surname, or donorEmail.
+    const donors = sortedDonations.map(d => ({
+      displayName: formatDonorDisplayName(d.donorName, d.isAnonymous),
       amount: amountsPublic ? Number(d.amount) : null,
       message: d.message,
-      isAnonymous: d.isAnonymous,
       avatarUrl: d.isAnonymous
         ? null
         : (avatarMap.get((d.donorEmail ?? '').toLowerCase()) ?? null),
@@ -172,7 +186,7 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       donationEthAddress: party.donationEthAddress,
       amountsPublic,
       recentDonors,
-      topDonors,
+      donors,
     });
   } catch (error) {
     next(error);
