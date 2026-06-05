@@ -85,6 +85,18 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
   const valueRef = useRef(value);
   valueRef.current = value;
 
+  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
+  // fresh mount. Saved drafts with an existing date are left untouched; the
+  // effect only fires once so subsequent user edits remain authoritative.
+  useEffect(() => {
+    const v = valueRef.current;
+    if (!v.date || v.date.trim() === '') {
+      const today = new Date().toISOString().slice(0, 10);
+      onChangeRef.current({ ...v, date: today });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Default the treaty-claim country to the entity's country of incorporation
   // (most common case for an entity claiming treaty benefits). Host can edit.
   const treatyKey = (value.treatyCountry?.trim() || value.countryOfIncorporation?.trim() || '').trim();
