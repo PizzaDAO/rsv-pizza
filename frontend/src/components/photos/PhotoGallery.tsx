@@ -485,6 +485,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               uploaderEmail={uploaderEmail}
               guestId={guestId}
               photoModeration={photoModeration}
+              isHost={isHost}
               availableTags={availableTags}
               onUploadComplete={handleUploadComplete}
               onClose={() => setShowUpload(false)}
