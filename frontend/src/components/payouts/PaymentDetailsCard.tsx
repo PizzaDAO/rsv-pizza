@@ -8,9 +8,10 @@ import {
   getPaymentOptIn,
   submitPaymentOptIn,
   removePaymentOptIn,
+  fetchReimbursementOptions,
+  ResolvedReimbursementOption,
 } from '../../lib/api';
 import { PayoutMethodPicker } from './PayoutMethodPicker';
-import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 
 const EMPTY_BANK: BankDetails = {};
 
@@ -37,6 +38,38 @@ type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 export const PaymentDetailsCard: React.FC = () => {
   const { user, setUser } = useAuth();
   const { party } = usePizza();
+
+  // marinara-71630 P1: the BACKEND decides which payout options are available
+  // for this party (country/tag-driven config). We fetch them once here and
+  // share them with the picker (so it doesn't double-fetch) AND drive the
+  // save-guard below from them — block saving a method whose resolved option is
+  // absent or disabled, replacing the old frontend `isMercuryBlocked` logic.
+  // When the fetch fails / config is unseeded we leave this null and the
+  // picker's own fallback (three enabled methods) governs, so the save-guard
+  // simply allows the save (matches the picker's enabled state).
+  const [resolvedOptions, setResolvedOptions] = useState<ResolvedReimbursementOption[] | null>(null);
+  useEffect(() => {
+    const partyId = party?.id;
+    if (!partyId) {
+      setResolvedOptions(null);
+      return;
+    }
+    let cancelled = false;
+    fetchReimbursementOptions(partyId)
+      .then((opts) => {
+        if (cancelled) return;
+        // Empty (unseeded) → null so the save-guard defers to the picker
+        // fallback (all three methods enabled).
+        setResolvedOptions(opts.length > 0 ? opts : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedOptions(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [party?.id]);
 
   // Local mirrors of the user's persisted values. These drive PayoutMethodPicker
   // directly so the UI updates instantly; the debounced save flushes to the
@@ -140,16 +173,23 @@ export const PaymentDetailsCard: React.FC = () => {
     prevSnapshot.current = snapshot;
     isDirty.current = true;
 
-    // pepperoni-47301: never autosave `mercury_card` when the party's country
-    // is on Mercury's restricted list — the per-party payout submission would
-    // be rejected by the backend anyway. Surface the reason locally so the
-    // host knows to pick another method.
-    if (method === 'mercury_card' && isMercuryBlocked(party?.country)) {
-      setSaveStatus('error');
-      setSaveError(
-        `Mercury cards are unavailable in ${party?.country ?? 'your country'}. Pick another method.`
-      );
-      return;
+    // marinara-71630 P1: never autosave a method the BACKEND has decided is
+    // unavailable for this party — the resolved option is either absent
+    // (restricted away) or disabled (e.g. Mercury in a blocked country). The
+    // per-party payout submission would be rejected anyway. Surface the
+    // server-provided reason so the host knows to pick another method. When
+    // `resolvedOptions` is null (unseeded config / fetch failed) we skip this
+    // guard and defer to the picker's all-enabled fallback.
+    if (method != null && resolvedOptions) {
+      const opt = resolvedOptions.find((o) => o.id === method && o.kind === 'method');
+      if (!opt || !opt.enabled) {
+        setSaveStatus('error');
+        setSaveError(
+          opt?.disabledReason ??
+            `This payout method isn't available for ${party?.country ?? 'your country'}. Pick another method.`
+        );
+        return;
+      }
     }
 
     // Don't fire the save until the method-specific fields are valid.
@@ -205,7 +245,7 @@ export const PaymentDetailsCard: React.FC = () => {
     // We intentionally exclude buildPayload from deps — it closes over the
     // latest values via the surrounding effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, walletAddress, bankDetails, methodValid]);
+  }, [method, walletAddress, bankDetails, methodValid, resolvedOptions]);
 
   // PayoutMethodPicker requires non-null method. For the empty state we let
   // the user pick a method first; the picker still renders all three radios.
@@ -371,6 +411,7 @@ export const PaymentDetailsCard: React.FC = () => {
         onBankDetailsChange={setBankDetails}
         userEmail={user?.email}
         reimbursementCapUsd={party?.effectiveReimbursementCapUsd ?? null}
+        options={resolvedOptions}
       />
 
       {saveError && (

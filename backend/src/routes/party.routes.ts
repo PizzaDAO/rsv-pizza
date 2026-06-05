@@ -15,6 +15,8 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
+import { getReimbursementRules } from '../lib/privateConfig.js';
+import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2329,6 +2331,38 @@ router.delete('/:partyId/payment-opt-in', async (req: AuthRequest, res: Response
     });
 
     res.json({ optedIn: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:id/reimbursement-options
+// marinara-71630 P1: the BACKEND decides which payout options the host sees,
+// driven by private `app_config` rules (country/tag scoped). The host-facing
+// picker renders whatever this returns. On a config miss the rules fallback is
+// empty → `{ options: [] }`; the frontend falls back to its three built-in
+// methods so the picker never renders empty. Never 500s on missing config.
+router.get('/:id/reimbursement-options', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    if (!req.userId) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+
+    const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+    if (!canEdit) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const party = await prisma.party.findUnique({
+      where: { id },
+      select: { country: true, eventTags: true },
+    });
+    if (!party) throw new AppError('Party not found', 404, 'NOT_FOUND');
+
+    const rules = await getReimbursementRules();
+    const options = resolveReimbursementOptions(
+      { country: party.country, eventTags: party.eventTags },
+      rules
+    );
+
+    res.json({ options });
   } catch (error) {
     next(error);
   }

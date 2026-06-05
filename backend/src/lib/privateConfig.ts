@@ -106,14 +106,50 @@ export async function getConfig<T>(key: string, fallback: T): Promise<T> {
 // fallback. Real values are seeded to `app_config` in production.
 // ---------------------------------------------------------------------------
 
+/**
+ * One configurable reimbursement option.
+ *
+ * `kind: 'method'` options (e.g. usdc_base / mercury_card / wire) are real,
+ * selectable payout methods the host can pick and submit receipts against.
+ * `kind: 'external'` options (e.g. an SWC-hub informational card) are NOT
+ * selectable payout methods — the frontend renders them as informational
+ * cards (optionally with a link via `url`) and must never set `method` to
+ * their id.
+ */
+export interface ReimbursementOption {
+  id: string;
+  label: string;
+  description?: string;
+  kind: 'method' | 'external';
+  url?: string;
+}
+
+/**
+ * A country/tag-scoped override of the visible/enabled options.
+ *
+ * Matches a party when `party.country === match.country` OR `match.tag` is
+ * present in `party.eventTags`.
+ *  - `visible` (if set) restricts the shown options to exactly these ids
+ *    (preserving `methods[]` order) — e.g. US → `['swc_hub']`.
+ *  - `disable` marks shown-but-disabled options with a reason (e.g.
+ *    mercury_card in Mercury-blocked countries).
+ */
+export interface CountryRule {
+  match: { country?: string; tag?: string };
+  visible?: string[];
+  disable?: Array<{ id: string; reason: string }>;
+}
+
 export interface ReimbursementRules {
-  methods: Array<{ id: string; label: string }>;
-  countryRules: Array<{ match: { country?: string; tag?: string }; allow: string[] }>;
+  methods: ReimbursementOption[];
+  default: string[];
+  countryRules: CountryRule[];
 }
 
 export function getReimbursementRules(): Promise<ReimbursementRules> {
   return getConfig<ReimbursementRules>(KEYS.reimbursementRules, {
     methods: [],
+    default: [],
     countryRules: [],
   });
 }
