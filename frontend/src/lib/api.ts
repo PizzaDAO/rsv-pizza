@@ -3558,6 +3558,9 @@ export interface BroadcastResult {
   city: string;
   success: boolean;
   error?: string;
+  // calzone-58481: false when the row used a {link}/{appLink} token but had no
+  // linked party to resolve it (token was stripped, not shipped literally).
+  linkResolved?: boolean;
 }
 
 export interface BroadcastResponse {
@@ -3569,11 +3572,12 @@ export interface BroadcastResponse {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  appTab?: string | null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
-    body: { groups, message, parseMode },
+    body: { groups, message, parseMode, appTab: appTab || null },
   });
 }
 
@@ -3599,11 +3603,12 @@ export interface BroadcastHost {
 export async function sendHostTelegramBroadcast(
   hosts: BroadcastHost[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  appTab?: string | null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
     method: 'POST',
-    body: { hosts, message, parseMode },
+    body: { hosts, message, parseMode, appTab: appTab || null },
   });
 }
 

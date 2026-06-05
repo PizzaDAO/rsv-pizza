@@ -311,6 +311,7 @@ model Party {
   reimbursementCapAppeals ReimbursementCapAppeal[]
   reimbursementCapAudits  ReimbursementCapAudit[]
   surveyResponses         SurveyResponse[]
+  cityTelegramGroups      CityTelegramGroup[]
 
   @@map("parties")
 }
@@ -2127,4 +2128,37 @@ model ImageAuthenticityCheck {
   @@index([imageUrl])
   @@index([partyId])
   @@map("image_authenticity_checks")
+}
+
+// calzone-58481: city Telegram broadcast groups, moved out of the GPP Google
+// Sheet so the DB is the source of truth. Each group optionally FK-links to a
+// GPP Party so the /broadcast handler can resolve per-recipient {link} and
+// {appLink} tokens server-side. `chatId` is the Telegram chat_id (BigInt,
+// negative for supergroups) — unique so a group can only be registered once.
+// `partyId` is nullable: a group may be registered before its GPP event exists
+// (or stay unlinked for non-GPP city chats). City/country/region/underboss are
+// DENORMALIZED copies kept on the row so UB-scoping works even when partyId is
+// null (scope logic runs against the row's city/region, not the party).
+//
+// ⚠️ No Prisma auto-migration in this repo — the live DDL (CREATE TABLE + index
+// + FK) is in the PR description and must be applied to prod manually before
+// merge. The FK uses ON DELETE SET NULL so cancelling/deleting a party leaves
+// the group row intact but unlinked.
+model CityTelegramGroup {
+  id        String   @id @default(cuid())
+  partyId   String?  @map("party_id") @db.Uuid
+  party     Party?   @relation(fields: [partyId], references: [id], onDelete: SetNull)
+  chatId    BigInt   @unique @map("chat_id")
+  chatUrl   String?  @map("chat_url")
+  city      String
+  country   String
+  region    String?
+  underboss String?
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("city_telegram_groups")
 }

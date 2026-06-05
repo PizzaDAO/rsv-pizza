@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, OutreachTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -96,13 +96,15 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'superlatives' | 'outreach'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'superlatives' | 'outreach' | 'telegram-groups'>('events');
 
   const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
+  // calzone-58481: partyIds drive DB-linked group pre-selection.
+  const [broadcastPartyIds, setBroadcastPartyIds] = useState<string[]>([]);
 
   // Partner tags for EventRow indicator
   const [partnerTags, setPartnerTags] = useState<string[]>([]);
@@ -677,14 +679,27 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('telegram-groups')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'telegram-groups'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.telegramGroups', 'Telegram Groups')}
+              {activeTab === 'telegram-groups' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} isAdmin={isAdmin} />
+            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities, partyIds) => { setBroadcastCities(cities); setBroadcastPartyIds(partyIds || []); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} isAdmin={isAdmin} />
           )}
 
           {activeTab === 'cities' && (
-            <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} />
+            <CitiesTable events={filteredData.events} selectedRegions={selectedRegions} meData={meData} onTelegramBroadcast={(cities, partyIds) => { setBroadcastCities(cities); setBroadcastPartyIds(partyIds || []); setShowBroadcast(true); }} />
           )}
 
           {activeTab === 'partners' && (
@@ -703,6 +718,10 @@ export function UnderbossDashboard() {
             <OutreachTab isAdmin={isAdmin} />
           )}
 
+          {activeTab === 'telegram-groups' && (
+            <TelegramGroupsTab events={allData?.events} />
+          )}
+
         </section>
         </div>
       </main>
@@ -710,7 +729,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); setBroadcastPartyIds([]); }} preSelectedCities={broadcastCities} preSelectedPartyIds={broadcastPartyIds} events={filteredData?.events ?? []} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(

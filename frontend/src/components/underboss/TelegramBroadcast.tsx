@@ -4,11 +4,10 @@ import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
+import { BROADCAST_APPS } from '../../lib/appDefinitions';
 import {
   sendTelegramBroadcast,
-  sendTelegramTest,
   sendHostTelegramBroadcast,
-  sendHostTelegramTest,
   BroadcastResult,
 } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
@@ -127,12 +126,14 @@ function citiesMatch(eventCity: string, sheetCity: string): boolean {
 interface TelegramBroadcastProps {
   onClose: () => void;
   preSelectedCities?: string[];
+  /** calzone-58481: partyIds for DB-linked group pre-selection (no fuzzy match). */
+  preSelectedPartyIds?: string[];
   events?: UnderbossEvent[];
 }
 
 type ViewState = 'compose' | 'sending' | 'results';
 
-export function TelegramBroadcast({ onClose, preSelectedCities, events }: TelegramBroadcastProps) {
+export function TelegramBroadcast({ onClose, preSelectedCities, preSelectedPartyIds, events }: TelegramBroadcastProps) {
   const { t } = useTranslation('partner');
   // Data loading
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
@@ -152,6 +153,8 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   // Message
   const [message, setMessage] = useState('');
   const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('None');
+  // calzone-58481: chosen app for the {appLink} token (value = app `tab`, '' = none).
+  const [selectedAppTab, setSelectedAppTab] = useState<string>('');
 
   // State flow
   const [viewState, setViewState] = useState<ViewState>('compose');
@@ -169,13 +172,17 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
       try {
         const data = await fetchTelegramGroups();
         setGroups(data);
-        // Auto-select groups matching pre-selected cities (fuzzy match)
-        if (preSelectedCities && preSelectedCities.length > 0) {
+        // calzone-58481: auto-select groups by DB-linked partyId (no fuzzy match).
+        // Fallback to an EXACT (case-insensitive) city-name match for callers
+        // that only supply cities (CitiesTable aggregates by city, not party).
+        const partyIdSet = new Set(preSelectedPartyIds || []);
+        const cityKeySet = new Set((preSelectedCities || []).map(c => c.toLowerCase().trim()));
+        if (partyIdSet.size > 0 || cityKeySet.size > 0) {
           const matchingIds = new Set<string>();
           for (const g of data) {
-            if (preSelectedCities.some(pc => citiesMatch(pc, g.city))) {
-              matchingIds.add(g.groupId);
-            }
+            const byParty = g.partyId !== null && partyIdSet.has(g.partyId);
+            const byCity = cityKeySet.has(g.city.toLowerCase().trim());
+            if (byParty || byCity) matchingIds.add(g.groupId);
           }
           if (matchingIds.size > 0) setSelectedIds(matchingIds);
         }
@@ -214,9 +221,15 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   const filteredGroups = useMemo(() => {
     let filtered = groups;
 
-    // When opened from actions dropdown, only show groups matching the selected cities (fuzzy match)
-    if (preSelectedCities && preSelectedCities.length > 0) {
-      filtered = filtered.filter(g => preSelectedCities.some(pc => citiesMatch(pc, g.city)));
+    // calzone-58481: when opened from the actions dropdown, only show groups
+    // linked to the selected parties (or, fallback, an exact city-name match).
+    if ((preSelectedPartyIds && preSelectedPartyIds.length > 0) || (preSelectedCities && preSelectedCities.length > 0)) {
+      const partyIdSet = new Set(preSelectedPartyIds || []);
+      const cityKeySet = new Set((preSelectedCities || []).map(c => c.toLowerCase().trim()));
+      filtered = filtered.filter(g =>
+        (g.partyId !== null && partyIdSet.has(g.partyId)) ||
+        cityKeySet.has(g.city.toLowerCase().trim())
+      );
     }
 
     if (regionFilter !== 'all') {
@@ -234,7 +247,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     }
 
     return filtered;
-  }, [groups, regionFilter, search, preSelectedCities]);
+  }, [groups, regionFilter, search, preSelectedCities, preSelectedPartyIds]);
 
   // Selection helpers
   const toggleGroup = (groupId: string) => {
@@ -431,7 +444,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (recipientMode === 'groups' || recipientMode === 'both') {
       if (selectedGroups.length > 0) {
         try {
-          const r = await sendTelegramBroadcast(selectedGroups, message, parseMode);
+          const r = await sendTelegramBroadcast(selectedGroups, message, parseMode, selectedAppTab || null);
           allResults.push(...r.results.map(res => ({ ...res, kind: 'group' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
@@ -444,7 +457,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (recipientMode === 'hosts' || recipientMode === 'both') {
       if (selectedHostsPayload.length > 0) {
         try {
-          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode);
+          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode, selectedAppTab || null);
           allResults.push(...r.results.map(res => ({ ...res, kind: 'host' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
@@ -462,19 +475,28 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     setViewState('results');
   };
 
-  // Send test to a single group
+  // Send test to a single group.
+  // calzone-58481: route a single-group test through /broadcast so {link} and
+  // {appLink} are resolved server-side from the group's DB-linked party (the
+  // /test endpoint has only a raw chatId and can't resolve them). {city} and
+  // {country} are still resolved server-side by /broadcast as well.
   const handleTest = async (group: TelegramGroup) => {
     setTestingChatId(group.groupId);
     setTestResult(null);
 
-    // Replace template vars for preview
-    let testMsg = message;
-    testMsg = testMsg.replace(/\{city\}/g, group.city);
-    testMsg = testMsg.replace(/\{country\}/g, group.country);
-
     try {
-      const result = await sendTelegramTest(group.groupId, testMsg, parseMode);
-      setTestResult(result);
+      const r = await sendTelegramBroadcast(
+        [{ chatId: group.groupId, city: group.city, country: group.country }],
+        message,
+        parseMode,
+        selectedAppTab || null
+      );
+      const res = r.results[0];
+      setTestResult(
+        res
+          ? { chatId: group.groupId, success: res.success, error: res.error }
+          : { chatId: group.groupId, success: false, error: 'No result returned' }
+      );
     } catch (err: any) {
       setTestResult({ chatId: group.groupId, success: false, error: err.message });
     } finally {
@@ -483,17 +505,26 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   };
 
   // Send a per-row test DM to a single host (sausage-24183).
+  // calzone-58481: route through /host-broadcast (single host) so {link} and
+  // {appLink} resolve server-side from the host's party. {city}/{hostName} are
+  // also substituted server-side by /host-broadcast.
   const handleHostTest = async (row: HostRow) => {
     setTestingHostPartyId(row.partyId);
     setTestResult(null);
 
-    let testMsg = message;
-    testMsg = testMsg.replace(/\{city\}/g, row.city);
-    testMsg = testMsg.replace(/\{hostName\}/g, row.hostName);
-
     try {
-      const result = await sendHostTelegramTest(row.partyId, testMsg, parseMode);
-      setTestResult(result);
+      const r = await sendHostTelegramBroadcast(
+        [{ partyId: row.partyId, city: row.city, hostName: row.hostName }],
+        message,
+        parseMode,
+        selectedAppTab || null
+      );
+      const res = r.results[0];
+      setTestResult(
+        res
+          ? { chatId: row.partyId, success: res.success, error: res.error }
+          : { chatId: row.partyId, success: false, error: 'No result returned' }
+      );
     } catch (err: any) {
       setTestResult({ chatId: row.partyId, success: false, error: err.message });
     } finally {
@@ -957,6 +988,18 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                     <span className="text-xs text-theme-text-faint">
                       {message.length} / 4096
                     </span>
+                    {/* calzone-58481: app picker for the {appLink} token. value = app `tab`. */}
+                    <select
+                      value={selectedAppTab}
+                      onChange={(e) => setSelectedAppTab(e.target.value)}
+                      className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
+                      title={t('telegram.appLinkTitle', '{appLink} target app') as string}
+                    >
+                      <option value="">{t('telegram.appNone', '— no app —')}</option>
+                      {BROADCAST_APPS.map((a) => (
+                        <option key={a.tab} value={a.tab}>{a.name}</option>
+                      ))}
+                    </select>
                     <select
                       value={parseMode}
                       onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
@@ -990,6 +1033,25 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                     }}
                   />
                 </p>
+                {/* calzone-58481: per-recipient link token chips. Click to insert. */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {(['{link}', '{appLink}'] as const).map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() =>
+                        setMessage((prev) => (prev.length + token.length <= 4096 ? `${prev}${token}` : prev))
+                      }
+                      className="text-xs px-2 py-0.5 rounded-full border border-theme-stroke bg-theme-surface text-theme-text-secondary hover:text-red-500 hover:border-red-500/40 transition-colors"
+                      title={t('telegram.insertToken', 'Insert {{token}}', { token }) as string}
+                    >
+                      <code className="text-red-500/80">{token}</code>
+                    </button>
+                  ))}
+                  <span className="text-xs text-theme-text-faint">
+                    {t('telegram.linkTokenHint', '{link} = event page · {appLink} = chosen app (per recipient)')}
+                  </span>
+                </div>
               </div>
 
               {/* Send button */}

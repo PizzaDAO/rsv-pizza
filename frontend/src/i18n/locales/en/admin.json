@@ -144,7 +144,8 @@
       "cities": "Cities",
       "partners": "Partners",
       "fakeDetection": "Fake Detection",
-      "outreach": "Outreach"
+      "outreach": "Outreach",
+      "telegramGroups": "Telegram Groups"
     }
   },
   "fakeDetection": {

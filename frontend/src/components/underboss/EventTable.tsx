@@ -18,7 +18,7 @@ interface EventTableProps {
   showRegion?: boolean;
   onEventUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
   onBulkAction?: () => void;
-  onTelegramBroadcast?: (cities: string[]) => void;
+  onTelegramBroadcast?: (cities: string[], partyIds?: string[]) => void;
   partnerTags?: string[];
   onFilteredEventsChange?: (events: UnderbossEvent[]) => void;
   isAdmin?: boolean;
@@ -612,18 +612,20 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   <button
                     onClick={() => {
                       setShowActionDropdown(false);
-                      // Extract city names from selected events (strip "Global Pizza Party " prefix)
-                      const cities = events
-                        .filter(e => selectedIds.has(e.id))
-                        .map(e => {
-                          // customUrl is the city name lowercase no spaces (e.g., "tokyo")
-                          // name is "Global Pizza Party CityName"
-                          const prefix = 'Global Pizza Party ';
-                          return e.name.startsWith(prefix)
-                            ? e.name.slice(prefix.length)
-                            : e.customUrl || e.name;
-                        });
-                      onTelegramBroadcast?.(cities);
+                      // Extract city names + partyIds from selected events.
+                      // calzone-58481: partyIds drive DB-linked pre-selection
+                      // (no runtime fuzzy city matching).
+                      const selected = events.filter(e => selectedIds.has(e.id));
+                      const cities = selected.map(e => {
+                        // customUrl is the city name lowercase no spaces (e.g., "tokyo")
+                        // name is "Global Pizza Party CityName"
+                        const prefix = 'Global Pizza Party ';
+                        return e.name.startsWith(prefix)
+                          ? e.name.slice(prefix.length)
+                          : e.customUrl || e.name;
+                      });
+                      const partyIds = selected.map(e => e.id);
+                      onTelegramBroadcast?.(cities, partyIds);
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface transition-colors"
                   >

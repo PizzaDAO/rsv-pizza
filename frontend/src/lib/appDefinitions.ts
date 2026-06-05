@@ -45,3 +45,32 @@ export const PINNABLE_APPS: PinnableApp[] = [
   { id: 'print-nametags', name: 'Print', tab: 'print', icon: Printer },
   { id: 'payments', name: 'Payments', tab: 'payments', icon: Receipt },
 ];
+
+/**
+ * calzone-58481: single source of truth for the Telegram broadcast {appLink}
+ * app picker. The URL segment is the app's `tab` value (host app URL is
+ * /host/:inviteCode/:tab), NOT its id. Keep the `tab` values in sync with the
+ * backend BROADCAST_APP_TABS catalog in backend/src/lib/broadcastApps.ts.
+ */
+export interface BroadcastApp {
+  name: string;
+  tab: string;
+}
+
+export const BROADCAST_APPS: BroadcastApp[] = [
+  { name: 'Party Kit', tab: 'gpp' },
+  { name: 'Venue', tab: 'venue' },
+  { name: 'Partners', tab: 'partners' },
+  { name: 'Pizza & Drinks', tab: 'pizza' },
+  { name: 'Budget', tab: 'budget' },
+  { name: 'Staffing', tab: 'staff' },
+  { name: 'Flyer', tab: 'flyer' },
+  { name: 'Promo', tab: 'promo' },
+  { name: 'Print / Nametags', tab: 'print' },
+  { name: 'Party Guide', tab: 'party-guide' },
+  { name: 'Music / DJ', tab: 'music' },
+  { name: 'Displays', tab: 'displays' },
+  { name: 'Raffle', tab: 'raffle' },
+  { name: 'Reports', tab: 'report' },
+  { name: 'Payments', tab: 'payments' },
+];

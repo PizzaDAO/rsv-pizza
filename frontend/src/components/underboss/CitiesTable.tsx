@@ -74,7 +74,7 @@ interface CitiesTableProps {
   events: UnderbossEvent[];
   selectedRegions: string[];
   meData: UnderbossMeResponse | null;
-  onTelegramBroadcast?: (cities: string[]) => void;
+  onTelegramBroadcast?: (cities: string[], partyIds?: string[]) => void;
 }
 
 export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadcast }: CitiesTableProps) {

@@ -4,11 +4,53 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { isValidAppTab } from '../lib/broadcastApps.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
 
 const router = Router();
+
+/** Public event page URL for a party. Mirrors nft.routes.ts:80. */
+function publicEventLink(party: { customUrl?: string | null; inviteCode?: string | null } | null | undefined): string {
+  if (!party) return '';
+  const slug = party.customUrl || party.inviteCode;
+  return slug ? `https://rsv.pizza/${slug}` : '';
+}
+
+/** Host app deep-link for a party + chosen app tab. */
+function appDeepLink(
+  party: { inviteCode?: string | null } | null | undefined,
+  appTab: string | null | undefined
+): string {
+  if (!party || !party.inviteCode || !appTab) return '';
+  return `https://rsv.pizza/host/${party.inviteCode}/${appTab}`;
+}
+
+/**
+ * Substitute the per-recipient {link} and {appLink} tokens. Always strips any
+ * remaining {link}/{appLink} occurrences so an unresolved token (unlinked
+ * group, missing slug, no app chosen) never ships as a literal to a group.
+ */
+function substituteLinkTokens(message: string, linkUrl: string, appLinkUrl: string): string {
+  let out = message;
+  out = out.replace(/\{link\}/g, linkUrl || '');
+  out = out.replace(/\{appLink\}/g, appLinkUrl || '');
+  return out;
+}
+
+/** Shape returned by GET /groups + consumed by the broadcast UI. */
+type TelegramGroupRow = {
+  id: string;
+  chatId: string;
+  chatUrl: string;
+  city: string;
+  country: string;
+  region: string;
+  underboss: string;
+  partyId: string | null;
+  partyLinked: boolean;
+};
 
 /**
  * Check whether a broadcast group is within the UB's city scope.
@@ -34,10 +76,208 @@ function groupInBroadcastScope(
   return allowed.includes(groupCity);
 }
 
+/** Serialize a DB row to the API shape. */
+function serializeGroup(g: {
+  id: string;
+  chatId: bigint;
+  chatUrl: string | null;
+  city: string;
+  country: string;
+  region: string | null;
+  underboss: string | null;
+  partyId: string | null;
+}): TelegramGroupRow {
+  return {
+    id: g.id,
+    chatId: g.chatId.toString(),
+    chatUrl: g.chatUrl || '',
+    city: g.city,
+    country: g.country,
+    region: g.region || '',
+    underboss: g.underboss || '',
+    partyId: g.partyId,
+    partyLinked: g.partyId !== null,
+  };
+}
+
+// GET /groups — DB-backed list of city Telegram groups, UB-scoped.
+// Replaces the Google-Sheet fetch the frontend previously used.
+router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const rows = await prisma.cityTelegramGroup.findMany({
+      orderBy: [{ city: 'asc' }],
+      select: {
+        id: true,
+        chatId: true,
+        chatUrl: true,
+        city: true,
+        country: true,
+        region: true,
+        underboss: true,
+        partyId: true,
+      },
+    });
+    // Scope against the denormalized city/region on each row (works even when
+    // partyId is null). Admins/graphics-admins see all.
+    const scoped = rows.filter((g) =>
+      groupInBroadcastScope(g, { regions: ub.regions, cities: ub.cities || [] })
+    );
+    res.json({ groups: scoped.map(serializeGroup) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /groups — create a city Telegram group (admin/UB-scoped).
+router.post('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const { chatId, chatUrl, city, country, region, underboss, partyId } = req.body || {};
+
+    if (chatId === undefined || chatId === null || `${chatId}`.trim() === '') {
+      throw new AppError('chatId is required', 400, 'VALIDATION_ERROR');
+    }
+    const chatIdStr = String(chatId).replace('#', '').trim();
+    if (!/^-?\d+$/.test(chatIdStr)) {
+      throw new AppError('chatId must be a numeric Telegram chat_id', 400, 'VALIDATION_ERROR');
+    }
+    if (!city || typeof city !== 'string' || !city.trim()) {
+      throw new AppError('city is required', 400, 'VALIDATION_ERROR');
+    }
+    if (!country || typeof country !== 'string' || !country.trim()) {
+      throw new AppError('country is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Scope check: the new row must be within the caller's scope.
+    if (!groupInBroadcastScope({ city }, { regions: ub.regions, cities: ub.cities || [] })) {
+      throw new AppError('City is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+
+    // Optional party link must reference a real party.
+    let linkedPartyId: string | null = null;
+    if (partyId) {
+      if (typeof partyId !== 'string') {
+        throw new AppError('partyId must be a string', 400, 'VALIDATION_ERROR');
+      }
+      const party = await prisma.party.findUnique({ where: { id: partyId }, select: { id: true } });
+      if (!party) throw new AppError('Linked party not found', 404, 'NOT_FOUND');
+      linkedPartyId = party.id;
+    }
+
+    const created = await prisma.cityTelegramGroup.create({
+      data: {
+        chatId: BigInt(chatIdStr),
+        chatUrl: chatUrl ? String(chatUrl) : null,
+        city: city.trim(),
+        country: country.trim(),
+        region: region ? String(region) : null,
+        underboss: underboss ? String(underboss) : null,
+        partyId: linkedPartyId,
+        createdBy: ub.email,
+        updatedBy: ub.email,
+      },
+      select: {
+        id: true, chatId: true, chatUrl: true, city: true,
+        country: true, region: true, underboss: true, partyId: true,
+      },
+    });
+    res.status(201).json({ group: serializeGroup(created) });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return next(new AppError('A group with this chatId already exists', 409, 'DUPLICATE'));
+    }
+    next(error);
+  }
+});
+
+// PATCH /groups/:id — update a group (incl. link/unlink partyId), UB-scoped.
+router.patch('/groups/:id', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const { id } = req.params;
+    const existing = await prisma.cityTelegramGroup.findUnique({
+      where: { id },
+      select: { id: true, city: true, region: true },
+    });
+    if (!existing) throw new AppError('Group not found', 404, 'NOT_FOUND');
+    if (!groupInBroadcastScope(existing, { regions: ub.regions, cities: ub.cities || [] })) {
+      throw new AppError('Group is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+
+    const { chatId, chatUrl, city, country, region, underboss, partyId } = req.body || {};
+    const data: any = { updatedBy: ub.email };
+
+    if (chatId !== undefined) {
+      const chatIdStr = String(chatId).replace('#', '').trim();
+      if (!/^-?\d+$/.test(chatIdStr)) {
+        throw new AppError('chatId must be a numeric Telegram chat_id', 400, 'VALIDATION_ERROR');
+      }
+      data.chatId = BigInt(chatIdStr);
+    }
+    if (chatUrl !== undefined) data.chatUrl = chatUrl ? String(chatUrl) : null;
+    if (city !== undefined) {
+      if (!city || !String(city).trim()) throw new AppError('city cannot be empty', 400, 'VALIDATION_ERROR');
+      data.city = String(city).trim();
+    }
+    if (country !== undefined) {
+      if (!country || !String(country).trim()) throw new AppError('country cannot be empty', 400, 'VALIDATION_ERROR');
+      data.country = String(country).trim();
+    }
+    if (region !== undefined) data.region = region ? String(region) : null;
+    if (underboss !== undefined) data.underboss = underboss ? String(underboss) : null;
+    if (partyId !== undefined) {
+      if (partyId === null || partyId === '') {
+        data.partyId = null; // unlink
+      } else {
+        if (typeof partyId !== 'string') throw new AppError('partyId must be a string', 400, 'VALIDATION_ERROR');
+        const party = await prisma.party.findUnique({ where: { id: partyId }, select: { id: true } });
+        if (!party) throw new AppError('Linked party not found', 404, 'NOT_FOUND');
+        data.partyId = party.id;
+      }
+    }
+
+    const updated = await prisma.cityTelegramGroup.update({
+      where: { id },
+      data,
+      select: {
+        id: true, chatId: true, chatUrl: true, city: true,
+        country: true, region: true, underboss: true, partyId: true,
+      },
+    });
+    res.json({ group: serializeGroup(updated) });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return next(new AppError('A group with this chatId already exists', 409, 'DUPLICATE'));
+    }
+    next(error);
+  }
+});
+
+// DELETE /groups/:id — remove a group, UB-scoped.
+router.delete('/groups/:id', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const ub = req.underboss!;
+    const { id } = req.params;
+    const existing = await prisma.cityTelegramGroup.findUnique({
+      where: { id },
+      select: { id: true, city: true, region: true },
+    });
+    if (!existing) throw new AppError('Group not found', 404, 'NOT_FOUND');
+    if (!groupInBroadcastScope(existing, { regions: ub.regions, cities: ub.cities || [] })) {
+      throw new AppError('Group is outside your assigned scope', 403, 'FORBIDDEN');
+    }
+    await prisma.cityTelegramGroup.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /broadcast — Send message to multiple Telegram groups
 router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { groups, message, parseMode } = req.body;
+    const { groups, message, parseMode, appTab } = req.body;
 
     // Validate groups
     if (!Array.isArray(groups) || groups.length === 0) {
@@ -54,6 +294,16 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     if (message.length > 4096) {
       throw new AppError('message must be 4096 characters or less', 400, 'VALIDATION_ERROR');
     }
+
+    // calzone-58481: optional {appLink} target. The URL segment is the app's
+    // `tab` value; validate against the server-side catalog so a bogus tab can
+    // never produce a deep-link. Empty/absent = no app chosen.
+    const validatedAppTab: string | null =
+      appTab === undefined || appTab === null || appTab === ''
+        ? null
+        : isValidAppTab(appTab)
+          ? appTab
+          : (() => { throw new AppError('appTab is not a recognized app', 400, 'VALIDATION_ERROR'); })();
 
     // Validate parseMode
     const validParseModes = ['HTML', 'Markdown', 'None', undefined];
@@ -80,7 +330,29 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
     console.log(`[Telegram Broadcast] ${req.underboss!.email} sending to ${groups.length} groups at ${new Date().toISOString()}`);
 
-    const results: Array<{ chatId: string; city: string; success: boolean; error?: string }> = [];
+    // calzone-58481: resolve each group's linked party server-side by chatId so
+    // {link}/{appLink} use the authoritative DB association (never client-supplied).
+    // Build a chatId -> party map for the groups in this request.
+    const chatIds: bigint[] = [];
+    for (const g of groups) {
+      const idStr = String(g?.chatId ?? '').replace('#', '').trim();
+      if (/^-?\d+$/.test(idStr)) chatIds.push(BigInt(idStr));
+    }
+    const groupRows = chatIds.length > 0
+      ? await prisma.cityTelegramGroup.findMany({
+          where: { chatId: { in: chatIds } },
+          select: {
+            chatId: true,
+            party: { select: { customUrl: true, inviteCode: true } },
+          },
+        })
+      : [];
+    const partyByChatId = new Map<string, { customUrl: string | null; inviteCode: string | null } | null>();
+    for (const row of groupRows) {
+      partyByChatId.set(row.chatId.toString(), row.party);
+    }
+
+    const results: Array<{ chatId: string; city: string; success: boolean; error?: string; linkResolved?: boolean }> = [];
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
@@ -91,10 +363,19 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
         continue;
       }
 
+      // Resolve per-recipient link tokens from the DB-linked party (if any).
+      const linkedParty = partyByChatId.get(String(chatId).replace('#', '').trim()) ?? null;
+      const linkUrl = publicEventLink(linkedParty);
+      const appLinkUrl = appDeepLink(linkedParty, validatedAppTab);
+      const usesLinkToken = /\{link\}|\{appLink\}/.test(message);
+      const linkResolved = !usesLinkToken || (!!linkedParty && (linkUrl !== '' || appLinkUrl !== ''));
+
       // Replace template variables
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city || '');
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
+      // Substitute (and strip-if-unresolved) the per-recipient link tokens.
+      personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
       personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
@@ -132,14 +413,14 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           );
           telegramResult = await retryResponse.json();
           if (telegramResult.ok) {
-            results.push({ chatId, city: city || '', success: true, error: `Migrated: update sheet to ${newChatId}` });
+            results.push({ chatId, city: city || '', success: true, error: `Migrated: update DB chatId to ${newChatId}`, linkResolved });
           } else {
-            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
+            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry', linkResolved });
           }
         } else if (telegramResult.ok) {
-          results.push({ chatId, city: city || '', success: true });
+          results.push({ chatId, city: city || '', success: true, linkResolved });
         } else {
-          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error' });
+          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error', linkResolved });
         }
       } catch (err: any) {
         results.push({
@@ -147,6 +428,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           city: city || '',
           success: false,
           error: err.message || 'Network error',
+          linkResolved,
         });
       }
 
@@ -170,7 +452,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 // POST /host-broadcast — Send DM to multiple host private chats
 router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { hosts, message, parseMode } = req.body;
+    const { hosts, message, parseMode, appTab } = req.body;
 
     if (!Array.isArray(hosts) || hosts.length === 0) {
       throw new AppError('hosts must be a non-empty array', 400, 'VALIDATION_ERROR');
@@ -191,6 +473,14 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
     }
 
+    // calzone-58481: validate optional {appLink} target tab.
+    const validatedAppTab: string | null =
+      appTab === undefined || appTab === null || appTab === ''
+        ? null
+        : isValidAppTab(appTab)
+          ? appTab
+          : (() => { throw new AppError('appTab is not a recognized app', 400, 'VALIDATION_ERROR'); })();
+
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
       throw new AppError('Telegram bot token not configured', 500, 'CONFIG_ERROR');
@@ -207,13 +497,16 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
 
     const partyRows = await prisma.party.findMany({
       where: { id: { in: partyIds }, hostTelegramChatId: { not: null } },
-      select: { id: true, hostTelegramChatId: true, name: true },
+      // calzone-58481: customUrl + inviteCode added for {link}/{appLink} tokens.
+      select: { id: true, hostTelegramChatId: true, name: true, customUrl: true, inviteCode: true },
     });
     const chatByPartyId = new Map<string, bigint>();
+    const partyMetaById = new Map<string, { customUrl: string | null; inviteCode: string | null }>();
     for (const row of partyRows) {
       if (row.hostTelegramChatId !== null) {
         chatByPartyId.set(row.id, row.hostTelegramChatId);
       }
+      partyMetaById.set(row.id, { customUrl: row.customUrl, inviteCode: row.inviteCode });
     }
 
     console.log(`[Telegram Host Broadcast] ${req.underboss!.email} sending to ${hosts.length} hosts (${partyRows.length} connected) at ${new Date().toISOString()}`);
@@ -244,9 +537,15 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       }
 
       // Replace template variables
+      const partyMeta = partyMetaById.get(partyId) ?? null;
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city);
       personalizedMessage = personalizedMessage.replace(/\{hostName\}/g, hostName);
+      personalizedMessage = substituteLinkTokens(
+        personalizedMessage,
+        publicEventLink(partyMeta),
+        appDeepLink(partyMeta, validatedAppTab)
+      );
       personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
