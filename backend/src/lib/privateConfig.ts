@@ -160,21 +160,30 @@ export interface PayoutCaps {
   perTxCapUsd: number;
   dailyCapUsd: number;
   w9ThresholdUsd: number;
+  hardPerTxCeilingUsd: number;
 }
 
 /**
- * Payout caps. Fallback is intentionally all-zero: a zero cap means
- * "config not seeded; treat as unconfigured". Consumers (later phases) MUST
- * treat 0 as unconfigured rather than as a literal $0 cap. The real
- * production caps are seeded to `app_config` and never committed here.
+ * Payout money caps (marinara-71630 P2). The real production caps live ONLY in
+ * `app_config` (key `private.payout_caps`) and are seeded out-of-band — they
+ * are NEVER committed to this repo.
+ *
+ * Fallback = FAIL-SAFE LOW placeholders, deliberately NOT the real values and
+ * NOT zero. If this fallback ever fires (DB miss / unseeded key / parse error),
+ * payouts cap LOW (safe) rather than over-pay: every enforcement path rejects
+ * amounts ABOVE these floors, so the worst case is "legitimate payouts are
+ * blocked until config is seeded", never "an over-payment slips through". The
+ * numbers are kept coherent (ceiling / per-address ≥ per-tx / per-submission)
+ * so the ordering invariants the consumers rely on still hold.
  */
 export function getPayoutCaps(): Promise<PayoutCaps> {
   return getConfig<PayoutCaps>(KEYS.payoutCaps, {
-    perSubmissionMaxUsd: 0,
-    perAddressHardCapUsd: 0,
-    perTxCapUsd: 0,
-    dailyCapUsd: 0,
-    w9ThresholdUsd: 0,
+    perSubmissionMaxUsd: 100,
+    perAddressHardCapUsd: 110,
+    perTxCapUsd: 100,
+    dailyCapUsd: 100,
+    w9ThresholdUsd: 100,
+    hardPerTxCeilingUsd: 100,
   });
 }
 

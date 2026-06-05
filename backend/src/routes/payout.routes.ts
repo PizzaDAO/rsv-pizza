@@ -29,8 +29,8 @@ import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import {
   getLatestSubmittedTaxFormForUser,
   getYtdPayoutTotalUsd,
-  US_W9_YTD_THRESHOLD_USD,
 } from './tax-form.routes.js';
+import { getPayoutCaps } from '../lib/privateConfig.js';
 
 const router = Router();
 
@@ -432,20 +432,20 @@ async function assertMercuryAllowed(
 }
 
 /**
- * acciuga-62583: hard per-submission ceiling of $675 (cassoeula-92103, was $650).
- * Independent of the per-party cap (tiramisu-49102): even on uncapped parties,
- * no single payout row can exceed $675. Same numeric value as
- * `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the USDC-execute ceiling)
- * but enforced here at SUBMISSION time across all methods — no override path.
+ * acciuga-62583: hard per-submission ceiling. Independent of the per-party cap
+ * (tiramisu-49102): even on uncapped parties, no single payout row can exceed
+ * the cap. Enforced at SUBMISSION time across all methods — no override path.
  * Hosts split larger expenses across multiple submissions.
+ *
+ * marinara-71630 P2: the cap value now comes from app_config via
+ * `getPayoutCaps().perSubmissionMaxUsd` (real values out of committed source).
+ * The caller resolves the caps (async) and passes the number in.
  */
-const PER_SUBMISSION_MAX_USD = 675;
-
-function assertWithinPerSubmissionCap(amountUsd: number) {
+function assertWithinPerSubmissionCap(amountUsd: number, perSubmissionMaxUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
-  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+  if (amountUsd > perSubmissionMaxUsd) {
     throw new AppError(
-      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      `Payment requests are limited to $${perSubmissionMaxUsd} per submission. Please reduce the amount or split into multiple submissions.`,
       400,
       'PER_SUBMISSION_CAP_EXCEEDED',
     );
@@ -875,8 +875,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // snapshotted onto the resulting payout.
     //
     // Inside the flagged-on branch, the salame-92110 required-vs-not logic
-    // still applies (latest form OR projected YTD ≥ $600), but in practice
-    // both reduce to "form must exist" because the flag itself is the gate.
+    // still applies (latest form OR projected YTD ≥ the W-9 threshold), but in
+    // practice both reduce to "form must exist" because the flag is the gate.
     //
     // Skipped entirely (regardless of party flag) when:
     //   - purpose='shipping' (shipping coordinators don't take taxable income
@@ -906,14 +906,16 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       if (gateRecipientUserId) {
         if (partyTaxFormRequired) {
           // Per-event flag is ON — enforce salame-92110 gate.
-          const [latestForm, ytdTotal] = await Promise.all([
+          // marinara-71630 P2: W-9 YTD threshold from app_config (env-free).
+          const [latestForm, ytdTotal, { w9ThresholdUsd }] = await Promise.all([
             getLatestSubmittedTaxFormForUser(gateRecipientUserId),
             getYtdPayoutTotalUsd(gateRecipientUserId),
+            getPayoutCaps(),
           ]);
           const incomingAmount =
             typeof finalAmountUsd === 'number' && finalAmountUsd > 0 ? finalAmountUsd : 0;
           const projectedYtd = ytdTotal + incomingAmount;
-          const required = latestForm != null || projectedYtd >= US_W9_YTD_THRESHOLD_USD;
+          const required = latestForm != null || projectedYtd >= w9ThresholdUsd;
           if (required && !latestForm) {
             throw new AppError(
               'A tax form (W-9, W-8BEN, or W-8BEN-E) is required before this payment can be submitted.',

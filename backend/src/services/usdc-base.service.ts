@@ -5,13 +5,15 @@
  * The wallet private key lives in `USDC_PAYOUT_WALLET_PRIVATE_KEY` (Vercel env)
  * and is loaded into a viem account on demand — never logged.
  *
- * Pre-flight safety (defense in depth — every check runs every time):
+ * Pre-flight safety (defense in depth — every check runs every time). All
+ * money caps come from app_config via `getPayoutCaps()` (marinara-71630 P2);
+ * the two env-tunable caps keep env-highest precedence (env > config > fallback):
  *   1. recipient `toAddress` must be a valid 0x address (viem `isAddress`)
- *   2. `amountUsd` > 0 and ≤ USDC_PAYOUT_MAX_USD env (default 200)
- *   3. HARD ceiling `amountUsd` ≤ $1000 regardless of env (cannot be overridden)
+ *   2. `amountUsd` > 0 and ≤ per-tx cap (USDC_PAYOUT_MAX_USD env, else config)
+ *   3. HARD per-tx ceiling regardless of env (cannot be overridden) — config
  *   4. wallet USDC balance ≥ `amountUsd` (read from Base via public RPC)
- *   5. running 24h sum of paid USDC payouts + `amountUsd` ≤ USDC_PAYOUT_DAILY_CAP_USD
- *      (default $2000) — queried from the `payouts` table
+ *   5. running 24h sum of paid USDC payouts + `amountUsd` ≤ daily cap
+ *      (USDC_PAYOUT_DAILY_CAP_USD env, else config) — queried from `payouts`
  *
  * On submit we wait for the tx receipt and confirm `status === 'success'` before
  * returning. Caller is responsible for updating the payout row to status=paid
@@ -33,24 +35,28 @@ import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { prisma } from '../config/database.js';
 import { looksLikeEnsName, resolveEns } from './ens.service.js';
+import { getPayoutCaps } from '../lib/privateConfig.js';
 
 const USDC_BASE_ADDRESS: Hex = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
-const HARD_PER_TX_CEILING_USD = 675;
-const DEFAULT_PER_TX_CAP_USD = 200;
-const DEFAULT_DAILY_CAP_USD = 2000;
 const TX_RECEIPT_TIMEOUT_MS = 90_000;
 
 /**
- * bianco-89172: per-address cumulative cap. No single 0x address should ever
- * receive more than $676 USDC (cassoeula-92103, was $651) across all parties
- * without explicit admin acknowledgement. Matches HARD_PER_TX_CEILING_USD +
- * $1 cushion (so a single at-the-ceiling tx doesn't accidentally trip this)
- * while still catching the double-payment scenarios observed in Osogbo ($626)
- * and Seropédica ($600).
+ * marinara-71630 P2: the payout MONEY caps (per-tx default, daily cap, hard
+ * per-tx ceiling, per-address cumulative cap) used to be hardcoded module-level
+ * consts here. They now come from `getPayoutCaps()` (app_config-backed, 60s
+ * cache) so the real numbers stay out of committed source. The env overrides
+ * (`USDC_PAYOUT_MAX_USD`, `USDC_PAYOUT_DAILY_CAP_USD`) are preserved with the
+ * same precedence as before: env var (if set) > config value > fail-safe-low
+ * fallback. See backend/src/lib/privateConfig.ts.
+ *
+ * bianco-89172: the per-address cumulative cap (`perAddressHardCapUsd`) is the
+ * "no single 0x address receives more than the cap across all parties without
+ * explicit admin acknowledgement" rule. It sits $1 above the hard per-tx
+ * ceiling so a single at-the-ceiling tx doesn't accidentally trip it, while
+ * still catching the double-payment scenarios observed in production.
  * Override via `sendUsdcPayment(addr, amt, { allowOverPerAddressCap: true })`.
  */
-export const PER_ADDRESS_HARD_CAP_USD = 676;
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -172,7 +178,10 @@ export interface UsdcDailyCapStatus {
 }
 
 export async function getUsdcDailyCapStatus(): Promise<UsdcDailyCapStatus> {
-  const capUsd = getEnvNumber('USDC_PAYOUT_DAILY_CAP_USD', DEFAULT_DAILY_CAP_USD);
+  // marinara-71630 P2: daily cap default now comes from app_config; env stays
+  // highest-precedence (env > config > fail-safe-low fallback).
+  const caps = await getPayoutCaps();
+  const capUsd = getEnvNumber('USDC_PAYOUT_DAILY_CAP_USD', caps.dailyCapUsd);
   const usedUsd = await getUsdcUsedInLast24h();
   return {
     usedUsd,
@@ -240,7 +249,7 @@ export async function getPerAddressPaidTotals(
  * Throws on any pre-flight failure or onchain revert. Caller must persist the
  * resulting `txHash` on the payout row.
  *
- * `opts.allowOverPerAddressCap` (bianco-89172): bypass the per-address $676
+ * `opts.allowOverPerAddressCap` (bianco-89172): bypass the per-address
  * cumulative-paid pre-flight. Required when the admin has acknowledged the
  * warning in PayoutReviewModal / BulkSendModal. Default false.
  */
@@ -291,7 +300,11 @@ export async function sendUsdcPayment(
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
     throw new Error(`Invalid payout amount: ${amountUsd}`);
   }
-  const perTxCapUsd = getEnvNumber('USDC_PAYOUT_MAX_USD', DEFAULT_PER_TX_CAP_USD);
+  // marinara-71630 P2: resolve all money caps once at the top of the
+  // enforcement path. Real values come from app_config; env still wins for the
+  // two tunable caps (env > config > fail-safe-low fallback).
+  const caps = await getPayoutCaps();
+  const perTxCapUsd = getEnvNumber('USDC_PAYOUT_MAX_USD', caps.perTxCapUsd);
   if (amountUsd > perTxCapUsd) {
     throw new Error(
       `Amount $${amountUsd.toFixed(2)} exceeds per-tx cap of $${perTxCapUsd.toFixed(2)} (USDC_PAYOUT_MAX_USD)`,
@@ -299,9 +312,9 @@ export async function sendUsdcPayment(
   }
 
   // 3. Hard ceiling — defense in depth even if env is misconfigured high
-  if (amountUsd > HARD_PER_TX_CEILING_USD) {
+  if (amountUsd > caps.hardPerTxCeilingUsd) {
     throw new Error(
-      `Amount $${amountUsd.toFixed(2)} exceeds hard per-tx ceiling of $${HARD_PER_TX_CEILING_USD} (code constant)`,
+      `Amount $${amountUsd.toFixed(2)} exceeds hard per-tx ceiling of $${caps.hardPerTxCeilingUsd} (config constant)`,
     );
   }
 
@@ -315,7 +328,7 @@ export async function sendUsdcPayment(
   }
 
   // 5. Daily cap
-  const dailyCapUsd = getEnvNumber('USDC_PAYOUT_DAILY_CAP_USD', DEFAULT_DAILY_CAP_USD);
+  const dailyCapUsd = getEnvNumber('USDC_PAYOUT_DAILY_CAP_USD', caps.dailyCapUsd);
   const usedUsd = await getUsdcUsedInLast24h();
   if (usedUsd + amountUsd > dailyCapUsd) {
     throw new Error(
@@ -330,10 +343,10 @@ export async function sendUsdcPayment(
   // only when an admin has ticked the acknowledgement checkbox.
   if (!opts?.allowOverPerAddressCap) {
     const perAddressTotal = await getPerAddressPaidTotalUsd(recipient);
-    if (perAddressTotal + amountUsd > PER_ADDRESS_HARD_CAP_USD) {
+    if (perAddressTotal + amountUsd > caps.perAddressHardCapUsd) {
       throw new Error(
         `This wallet has already received $${perAddressTotal.toFixed(2)} USDC. ` +
-          `Sending $${amountUsd.toFixed(2)} more would exceed the $${PER_ADDRESS_HARD_CAP_USD} per-address cap. ` +
+          `Sending $${amountUsd.toFixed(2)} more would exceed the $${caps.perAddressHardCapUsd} per-address cap. ` +
           `Set allowOverPerAddressCap=true to acknowledge and proceed.`,
       );
     }
