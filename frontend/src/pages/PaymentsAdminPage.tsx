@@ -37,7 +37,7 @@ import type {
   PrepayQueueRow,
   PrepayCandidate,
 } from '../types';
-import { formatUsd } from '../components/payments-shared';
+import { formatUsd, computePartyTotals } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
 import { fetchSheetCities } from '../lib/cities';
@@ -697,6 +697,36 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         return sort === 'name_asc' ? cmp : -cmp;
       });
     }
+    // stracci-58471: Last activity column header. The backend's by-party default
+    // is already activity-ordered, but we re-sort client-side so BOTH directions
+    // work and stay in lockstep with the lastActivityAt the column renders.
+    if (sort === 'activity_asc' || sort === 'activity_desc') {
+      const activity = (r: PartyPayoutsRow) =>
+        new Date(r.aggregates.lastActivityAt).getTime();
+      return [...rows].sort((a, b) =>
+        sort === 'activity_asc' ? activity(a) - activity(b) : activity(b) - activity(a),
+      );
+    }
+    // stracci-58471: Approved / Paid / Outstanding column headers. computePartyTotals
+    // is the same money math the table cells use, so each column sorts by exactly
+    // the dollar figure the admin sees in it.
+    if (
+      sort === 'approved_asc' ||
+      sort === 'approved_desc' ||
+      sort === 'paid_asc' ||
+      sort === 'paid_desc' ||
+      sort === 'outstanding_asc' ||
+      sort === 'outstanding_desc'
+    ) {
+      const pick = (r: PartyPayoutsRow) => {
+        const t = computePartyTotals(r);
+        if (sort.startsWith('approved')) return t.approvedUsd;
+        if (sort.startsWith('paid')) return t.paidUsd;
+        return t.outstandingUsd;
+      };
+      const asc = sort.endsWith('_asc');
+      return [...rows].sort((a, b) => (asc ? pick(a) - pick(b) : pick(b) - pick(a)));
+    }
     return rows;
   }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal]);
 
@@ -1307,21 +1337,13 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
             rows={displayedByPartyRows}
-            // stracci-58471: clickable Event header. Reflects the current sort
-            // (for the chevron) and cycles asc → desc → cleared (back to the
-            // default created_desc) on each click.
+            // stracci-58471: clickable column headers (Event / Receipt total /
+            // Approved / Paid / Outstanding / Last activity). `sort` drives the
+            // chevron; each header cycles its column through the two directions
+            // then back to `defaultSort` via onSortChange.
             sort={filters.sort}
-            onSortByName={() =>
-              setFilters((prev) => ({
-                ...prev,
-                sort:
-                  prev.sort === 'name_asc'
-                    ? 'name_desc'
-                    : prev.sort === 'name_desc'
-                      ? 'created_desc'
-                      : 'name_asc',
-              }))
-            }
+            defaultSort={DEFAULT_FILTERS.sort ?? 'created_desc'}
+            onSortChange={(next) => setFilters((prev) => ({ ...prev, sort: next }))}
             fakeScores={fakeScores}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}

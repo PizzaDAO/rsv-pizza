@@ -2183,11 +2183,21 @@ export interface AdminPayoutFilters {
     // view ("show me every payment that actually went out, newest first").
     | 'paid_at_desc'
     | 'paid_at_asc'
-    // stracci-58471: order by event/city name (A–Z / Z–A). By-city view only —
-    // applied client-side in PaymentsAdminPage; the backend has no name sort and
-    // falls through to its activity order, which the client-side reorder wins over.
+    // stracci-58471: column-header sorts for the by-city table. All applied
+    // client-side in PaymentsAdminPage (the backend has no name/approved/paid/
+    // outstanding sort), so the client-side reorder wins over its activity order.
+    //  • name_*        — event/city name (A–Z / Z–A)
+    //  • approved_*    — Approved column total
+    //  • paid_*        — Paid column total
+    //  • outstanding_* — Outstanding column total
     | 'name_asc'
-    | 'name_desc';
+    | 'name_desc'
+    | 'approved_asc'
+    | 'approved_desc'
+    | 'paid_asc'
+    | 'paid_desc'
+    | 'outstanding_asc'
+    | 'outstanding_desc';
   /**
    * coppa-92106: when true, the backend applies the prosciutto-92106
    * "has proof of send" predicate so only proven payments
