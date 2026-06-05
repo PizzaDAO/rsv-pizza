@@ -409,11 +409,10 @@ export interface DonationPublicStats {
     message: string | null;
     createdAt: string;
   }[];
-  topDonors?: {
-    name: string | null;
+  donors?: {
+    displayName: string;
     amount: number | null;
     message: string | null;
-    isAnonymous: boolean;
     avatarUrl: string | null;
   }[];
 }
