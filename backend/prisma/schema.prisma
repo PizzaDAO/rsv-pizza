@@ -250,6 +250,14 @@ model Party {
   reimbursementCapAppealNote String?   @map("reimbursement_cap_appeal_note")
   reimbursementCapAppealedAt DateTime? @map("reimbursement_cap_appealed_at") @db.Timestamptz
 
+  // soppressata-50927: GPP27 City Host Agreement sign-off. A 2027 GPP event
+  // cannot be published until the host has accepted the CURRENT active version
+  // of the agreement (gpp_agreement_clauses) AND a valid merch delivery address
+  // exists (party_kits). Storing the version means a future clause edit (new
+  // version) re-prompts hosts who signed an older one.
+  agreementAcceptedAt DateTime? @map("agreement_accepted_at") @db.Timestamptz
+  agreementVersion    String?   @map("agreement_version")
+
   // pinsa-92103: "fully paid out / closed" timestamp on the city's payout
   // ledger. Stamped by the panettone-92103 Mark Party Paid flow when there's
   // nothing left in-flight — either because every pending+approved row just
@@ -1577,6 +1585,25 @@ model AppConfig {
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   @@map("app_config")
+}
+
+// soppressata-50927: GPP27 City Host Agreement clauses, stored as DATA so they
+// can be edited / reordered / re-versioned without a deploy. The frontend
+// renders one Checkbox per active clause (ordered by sortOrder), interpolating
+// the `{tier amount}` token from getCityTier(city). A host's acceptance is
+// persisted on the party as agreement_accepted_at + agreement_version.
+model GppAgreementClause {
+  id          String   @id @default(uuid()) @db.Uuid
+  version     String
+  sortOrder   Int      @map("sort_order")
+  body        String
+  requiresAck Boolean  @default(true) @map("requires_ack")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([active, version, sortOrder])
+  @@map("gpp_agreement_clauses")
 }
 
 // ============================================
