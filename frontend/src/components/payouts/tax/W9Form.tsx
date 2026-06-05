@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import { IconInput } from "../../IconInput";
 import { Checkbox } from "../../Checkbox";
@@ -41,6 +42,13 @@ interface W9FormProps {
   value: W9FormData;
   onChange: (next: W9FormData) => void;
   disabled?: boolean;
+  /**
+   * culatello-92107: Called when the host realizes mid-edit that the W-9
+   * isn't the right form for them (they're not a US person). The parent
+   * should discard the current W-9 draft and switch the active editor to
+   * W-8BEN (individual) or W-8BEN-E (entity).
+   */
+  onSwitchFormType?: (target: 'w8ben' | 'w8bene') => void;
 }
 
 const TAX_CLASS_OPTIONS: Array<{
@@ -73,6 +81,7 @@ export const W9Form: React.FC<W9FormProps> = ({
   value,
   onChange,
   disabled,
+  onSwitchFormType,
 }) => {
   // Derive initial TIN type from whichever value is populated.
   // Default to 'ssn' (most common for individual hosts).
@@ -98,6 +107,35 @@ export const W9Form: React.FC<W9FormProps> = ({
 
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 mb-4 flex items-start gap-3">
+        <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-amber-200">
+            W-9 is only for US persons
+          </p>
+          <p className="text-xs text-amber-100 mt-1">
+            Use W-9 if you're a US citizen, US resident, US LLC, or US corporation —
+            regardless of where the event is hosted. If you live or are based outside
+            the US, use W-8BEN (individual) or W-8BEN-E (entity) instead.
+          </p>
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              onClick={() => onSwitchFormType?.('w8ben')}
+              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40"
+            >
+              Switch to W-8BEN (individual)
+            </button>
+            <button
+              type="button"
+              onClick={() => onSwitchFormType?.('w8bene')}
+              className="text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40"
+            >
+              Switch to W-8BEN-E (entity)
+            </button>
+          </div>
+        </div>
+      </div>
       <div>
         <IconInput
           icon={User}
