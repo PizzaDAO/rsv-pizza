@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "nft:backfill": "tsx scripts/backfill-nft-mints.ts",
     "email:backfill": "tsx scripts/backfill-email-status.ts",
+    "seed:private-config": "tsx src/config/seedPrivateConfig.ts",
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {

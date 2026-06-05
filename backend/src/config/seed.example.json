@@ -1,0 +1,41 @@
+{
+  "_readme": "marinara-71630 P0 private-config seed template. These are NON-SENSITIVE PLACEHOLDER values that only document the SHAPE of each app_config entry. To seed real values: (1) copy this file to seed.private.json (gitignored), (2) fill in the real production values, (3) run `npm run seed:private-config` from the backend dir. If seed.private.json is absent the runner falls back to THIS file and seeds placeholders (with a loud warning). Keys map 1:1 to app_config rows; each value is stored JSON-stringified in the `value` column.",
+
+  "private.reimbursement_rules": {
+    "methods": [
+      { "id": "example_usdc", "label": "Example USDC payout" },
+      { "id": "example_paypal", "label": "Example PayPal payout" }
+    ],
+    "countryRules": [
+      { "match": { "country": "Exampleland" }, "allow": ["example_usdc"] }
+    ]
+  },
+
+  "private.payout_caps": {
+    "_note": "PLACEHOLDER caps. Real production caps are seeded separately and are NOT committed. The loader treats 0 as 'unconfigured'.",
+    "perSubmissionMaxUsd": 100,
+    "perAddressHardCapUsd": 100,
+    "perTxCapUsd": 100,
+    "dailyCapUsd": 100,
+    "w9ThresholdUsd": 100
+  },
+
+  "private.fraud_weights": {
+    "_note": "SECRET in production (backend-only, never shipped to frontend). Placeholder here is empty/zero.",
+    "weights": {},
+    "tiers": { "high": 0, "medium": 0, "low": 0 }
+  },
+
+  "private.sponsors": {
+    "sponsors": [
+      { "name": "Example Sponsor One", "tier": "gold", "logoUrl": "https://example.com/logo1.png", "url": "https://example.com" },
+      { "name": "Example Sponsor Two", "tier": "silver", "logoUrl": "https://example.com/logo2.png", "url": "https://example.com" }
+    ]
+  },
+
+  "private.scoring_weights": {
+    "_note": "PLACEHOLDER scoring weights documenting shape only.",
+    "leaderboard": { "exampleSignal": 0 },
+    "pizzeria": { "exampleSignal": 0 }
+  }
+}
