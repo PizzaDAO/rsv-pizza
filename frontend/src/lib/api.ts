@@ -4126,6 +4126,9 @@ export interface LeaderboardPartyRow {
     inviteRsvps: number;
     checkIns: number;
     photos: number;
+    // panzerotti-58931: de-duped scorecard points contributed to this party's
+    // unified score.
+    scorecard: number;
   };
 }
 
@@ -4134,6 +4137,17 @@ export interface LeaderboardCountryRow {
   country: string;
   countryCode: string | null;
   partyCount: number;
+  score: number;
+}
+
+// panzerotti-58931: top-100 checked-in guests by per-guest de-duped scorecard
+// score (privacy "First L.").
+export interface LeaderboardGuestRow {
+  rank: number;
+  name: string;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
   score: number;
 }
 
@@ -4148,6 +4162,10 @@ export interface LeaderboardResponse {
   };
   countries: {
     rows: LeaderboardCountryRow[];
+    total: number;
+  };
+  guests: {
+    rows: LeaderboardGuestRow[];
     total: number;
   };
 }
@@ -4334,46 +4352,10 @@ export async function getPartyLeaderboard(inviteCode: string): Promise<Leaderboa
   return apiRequest<LeaderboardResponse>(`/api/scorecard/${inviteCode}/leaderboard`);
 }
 
-// panzerotti-58931 Phase 2.1: worldwide game leaderboard (guests / parties / countries)
-
-export interface ScorecardGuestRow {
-  rank: number;
-  name: string;
-  city: string | null;
-  country: string | null;
-  countryCode: string | null;
-  score: number;
-}
-
-export interface ScorecardPartyRow {
-  rank: number;
-  partyId: string;
-  name: string;
-  city: string | null;
-  country: string | null;
-  countryCode: string | null;
-  slug: string;
-  score: number;
-}
-
-export interface ScorecardCountryRow {
-  rank: number;
-  country: string;
-  countryCode: string | null;
-  partyCount: number;
-  score: number;
-}
-
-export interface ScorecardGlobalLeaderboardResponse {
-  guests: ScorecardGuestRow[];
-  parties: ScorecardPartyRow[];
-  countries: ScorecardCountryRow[];
-  computedAt: string;
-}
-
-export async function getScorecardGlobalLeaderboard(): Promise<ScorecardGlobalLeaderboardResponse> {
-  return apiRequest<ScorecardGlobalLeaderboardResponse>('/api/scorecard-leaderboard');
-}
+// panzerotti-58931: the worldwide game leaderboard (guests / parties /
+// countries) was merged into the unified public board. Use `fetchLeaderboard()`
+// above — its response now carries `guests`, `parties`, and `countries`. The
+// old `/api/scorecard-leaderboard` endpoint and its types were removed.
 
 // panzerotti-58931 Phase 2.1: admin Best Of judging queue
 
@@ -6135,6 +6117,9 @@ export interface PhotosFeedFilters {
   // || seed) as the order key so pagination + filters stay consistent.
   sort?: 'newest' | 'random';
   seed?: string | null;
+  // cannoli-58292: event-year filter. Backend defaults to the current calendar
+  // year when omitted; only photos uploaded after their event's start show.
+  year?: number;
 }
 
 export async function getPhotosFeed(
@@ -6159,6 +6144,10 @@ export async function getPhotosFeed(
       params.append('sort', 'random');
       params.append('seed', filters.seed);
     }
+    // cannoli-58292: event-year filter.
+    if (typeof filters?.year === 'number') {
+      params.append('year', String(filters.year));
+    }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,
       { method: 'GET', requireAuth: false }
@@ -6171,6 +6160,10 @@ export async function getPhotosFeed(
 
 export interface PhotosFeedFacets {
   countries: Array<{ name: string; count: number }>;
+  // cannoli-58292: distinct event years available in the feed (desc). Older
+  // backends won't return this — keep optional and default to [] at the call
+  // site so the dropdown gracefully shows just the current year.
+  years?: number[];
 }
 
 export async function getPhotosFeedFacets(): Promise<PhotosFeedFacets | null> {

@@ -26,18 +26,13 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
 
   const donors = stats.donors;
   const donorCount = stats.donorCount ?? donors.length;
-  const recipient = stats.recipient || t('thisEvent');
   const showAmounts = stats.amountsPublic === true;
 
   const inlineDonors = donors.slice(0, INLINE_DONORS);
   const moreCount = Math.max(donorCount - inlineDonors.length, 0);
 
   return (
-    <div className="mt-4 pt-4 border-t border-theme-stroke">
-      <p className="text-theme-text-muted text-xs font-medium mb-2">
-        {t('supportersOf', { recipient })}
-      </p>
-
+    <div className="mt-3">
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -50,7 +45,7 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
               const showAmount = showAmounts && donor.amount != null;
               return (
                 <span key={i}>
-                  {i > 0 && <span className="text-theme-text-muted"> · </span>}
+                  {i > 0 && <span className="text-theme-text-muted">, </span>}
                   <span className="font-medium">{donor.displayName}</span>
                   {showAmount && (
                     <span className="text-[#ff393a] font-semibold"> {formatAmount(donor.amount as number)}</span>
@@ -59,7 +54,7 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
               );
             })}
             {moreCount > 0 && (
-              <span className="text-theme-text-muted"> · {t('moreSupporters', { count: moreCount })}</span>
+              <span className="text-theme-text-muted">, {t('moreSupporters', { count: moreCount })}</span>
             )}
           </span>
         </div>

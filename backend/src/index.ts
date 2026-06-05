@@ -64,7 +64,6 @@ import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
-import scorecardLeaderboardRoutes from './routes/scorecardLeaderboard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
 import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admin/UB-gated private-config read endpoint
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
@@ -211,7 +210,6 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
-app.use('/api/scorecard-leaderboard', scorecardLeaderboardRoutes); // panzerotti-58931: worldwide game leaderboard + rollups
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
 app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug

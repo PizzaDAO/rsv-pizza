@@ -250,6 +250,10 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   name: true,
   inviteCode: true,
   customUrl: true,
+  // stracciatella-58291: event start date/time, used to hide a party's
+  // legacy pre-event photos on /payments. Inert extra column for the
+  // serializer (which selects named fields), consumed by the photo filters.
+  date: true,
   // bruschetta-58291: surface the party's country on the /payments admin
   // queue rows + power the Country filter dropdown in PayoutsFilterBar.
   country: true,
@@ -1908,6 +1912,14 @@ router.get(
       // 'pizza-selfie' → Pizza photos, everything else → Event photos) can be
       // reused as-is. Admins see every photo regardless of moderation status;
       // the frontend renders a "Hidden" pill when `status !== 'approved'`.
+      // stracciatella-58291: map party id → event start so we can hide a
+      // party's legacy pre-event photos. This batched query spans many
+      // parties, so we filter in JS below rather than in the `where`.
+      const partyDateById = new Map<string, Date | null>();
+      for (const row of payoutRows) {
+        const pid = (row as any).party?.id as string | undefined;
+        if (pid) partyDateById.set(pid, ((row as any).party?.date as Date | null) ?? null);
+      }
       const eventPhotosByParty = new Map<string, any[]>();
       if (uniquePartyIds.length > 0) {
         const photoRows = await prisma.photo.findMany({
@@ -1929,6 +1941,10 @@ router.get(
           },
         });
         for (const p of photoRows) {
+          // stracciatella-58291: skip photos uploaded before the event
+          // started (no-op when the party has no start date).
+          const partyDate = partyDateById.get(p.partyId);
+          if (partyDate && p.createdAt < partyDate) continue;
           const list = eventPhotosByParty.get(p.partyId) ?? [];
           list.push({
             id: p.id,
@@ -2900,7 +2916,9 @@ router.get(
       const row = await prisma.payout.findUnique({
         where: { id: req.params.id },
         include: {
-          party: { select: { ...PAYOUT_PARTY_SELECT, region: true } },
+          // stracciatella-58291: `date` (event start) drives the photo filter
+          // below; it's already in PAYOUT_PARTY_SELECT but kept explicit here.
+          party: { select: { ...PAYOUT_PARTY_SELECT, region: true, date: true } },
           host: { select: { id: true, name: true, email: true } },
           documents: {
             orderBy: { sortOrder: 'asc' },
@@ -2944,8 +2962,16 @@ router.get(
       // focaccia-92104: surface `tags` so the frontend can split this list
       // into "Pizza photos" (tagged Pizza / pizza-selfie) vs "Event photos"
       // (everything else) in PayoutReviewModal's photo grids.
+      // stracciatella-58291: only surface photos uploaded on/after the event
+      // start, hiding a party's legacy pre-event (e.g. 2025) photos. No filter
+      // when the party has no start date — never hide everything.
+      const partyDate = (row as any).party?.date as Date | null | undefined;
       const eventPhotos = await prisma.photo.findMany({
-        where: { partyId: row.partyId, deletedAt: null }, // provolone-58931
+        where: {
+          partyId: row.partyId,
+          deletedAt: null, // provolone-58931
+          ...(partyDate ? { createdAt: { gte: partyDate } } : {}),
+        },
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
