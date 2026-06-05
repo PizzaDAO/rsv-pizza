@@ -12,17 +12,32 @@ const MAX_FILTER_ITEMS = 50;
 type FeedSource = 'photo' | 'payout';
 type FeedSort = 'newest' | 'random';
 
-// nduja-58291: exclude GPP 2025 (and prior) legacy uploads from the global
-// /photos feed. Two-pronged filter:
-//   1. photo_year column: NULL or >= 2026 (catches Athens/Bratislava which
-//      explicitly set photo_year=2024/2025).
-//   2. file_name regex: reject names containing a 2021-2025 year string
-//      preceded by start-of-string or a non-digit. Catches WhatsApp/iPhone
-//      timestamp-prefixed filenames (e.g. IMG-20250523-WA0069.jpg) without
-//      false-negatives on 2026 timestamps. Per-party PhotoGallery is NOT
-//      filtered — hosts may legitimately want prior-year photos on their
-//      own event page.
-const PRIOR_YEAR_FILENAME_RE = /(^|[^0-9])(2021|2022|2023|2024|2025)/;
+// cannoli-58292: the /photos feed is organized by EVENT YEAR. A photo's
+// "effective year" is:
+//   COALESCE(photo.photo_year,                       -- uploader override
+//            EXTRACT(YEAR FROM party.date)::int,      -- the event's year
+//            EXTRACT(YEAR FROM photo.created_at)::int -- fallback (no event date)
+//   )
+// For payout_documents (no photo_year column) the first term is dropped.
+//
+// Two filters apply UNIFORMLY to every year view (newest, random, ZIP):
+//   1. effective_year = :year
+//   2. after-event-start cutoff: party.date IS NULL OR photo.created_at >= party.date
+// This SUPERSEDES the nduja-58291 prior-year filename-regex + photo_year OR
+// exclusion, which has been removed.
+const MIN_YEAR = 2015;
+function currentYear(): number {
+  return new Date().getFullYear();
+}
+// cannoli-58292: parse + validate the `year` query param. Defaults to the
+// current calendar year; clamps the accepted range to [2015, currentYear+1].
+function parseYear(raw: unknown): number {
+  const cy = currentYear();
+  if (typeof raw !== 'string' || !raw.trim()) return cy;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < MIN_YEAR || n > cy + 1) return cy;
+  return n;
+}
 
 // napoletana-58210: cursor format extended to include the source discriminator
 // so the (createdAt, id) tuple is unambiguous when merging two tables. Format:
@@ -90,24 +105,10 @@ function parseCsv(raw: unknown, cap = MAX_FILTER_ITEMS): string[] {
   return out;
 }
 
-// Build the shared "feed-eligible" party filter (mirrored across /feed and /feed/facets).
-function buildPartyFilter(opts: { regions: string[]; countries: string[]; partnerTag: string | null }) {
-  const partyFilter: any = {
-    underbossStatus: 'approved',
-    photosPublic: true,
-    photosEnabled: true,
-  };
-  if (opts.regions.length > 0) {
-    partyFilter.region = { in: opts.regions };
-  }
-  if (opts.countries.length > 0) {
-    partyFilter.country = { in: opts.countries };
-  }
-  if (opts.partnerTag) {
-    partyFilter.eventTags = { has: opts.partnerTag };
-  }
-  return partyFilter;
-}
+// cannoli-58292: buildPartyFilter (typed Prisma party predicate) was removed —
+// every feed path (newest, random, ZIP) is now raw SQL and inlines the
+// party-eligibility WHERE clauses (underboss_status / photos_public /
+// photos_enabled + region/country/partnerTag) as parameter-bound fragments.
 
 // napoletana-58210: shape returned per feed item. `source` discriminates
 // between the curated `photos` table and the uncurated `payout_documents`
@@ -161,239 +162,202 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       ? String(parseInt((req.query.seed as string) || '', 10) || 0)
       : null;
 
+    // cannoli-58292: the requested event year (defaults to current calendar year).
+    const year = parseYear(req.query.year);
+
     if (sort === 'random' && seed !== null) {
-      return await handleRandomFeed(req, res, { limit, regions, countries, partnerTag, seed });
+      return await handleRandomFeed(req, res, { limit, regions, countries, partnerTag, seed, year });
     }
 
     const cursor = parseCursor(req.query.cursor);
 
-    const partyFilter = buildPartyFilter({ regions, countries, partnerTag });
-
-    // napoletana-58210: each source queries `limit + 1` rows so we can detect
-    // hasMore deterministically after the merge. We over-fetch slightly (each
-    // side gets `limit + 1`) rather than `limit*2` because the merge picks at
-    // most `limit + 1` from the combined pool; pulling `limit*2` per side would
-    // waste rows. The trade-off: if one source dominates the time window the
-    // cursor straddles, the next page may need a follow-up query — fine for an
-    // infinite-scroll UX.
-    //
-    // nduja-58291: over-fetch on the photos side to compensate for the
-    // post-query filename regex filter (some rows will drop). Capped at 100 so
-    // a pathological filter doesn't run away.
     const fetchSize = limit + 1;
-    const photoFetchSize = Math.min(limit * 2 + 1, 100);
 
-    // -- photos source ----------------------------------------------------
-    const photoWhere: any = {
-      status: 'approved',
-      starred: true,
-      deletedAt: null, // provolone-58931: never surface soft-deleted photos in the public feed
-      // nduja-58291: column-level prior-year exclusion.
-      OR: [
-        { photoYear: null },
-        { photoYear: { gte: 2026 } },
-      ],
-      party: { is: partyFilter },
+    // cannoli-58292: the newest feed moved from two typed Prisma findMany calls
+    // (merged in JS) to a single raw-SQL UNION ALL. Neither the
+    // column-to-column after-event-start cutoff nor the effective-year COALESCE
+    // is expressible in Prisma's typed `where`. We compute everything in SQL,
+    // keyset-paginate over (created_at DESC, id DESC), and re-attach the
+    // per-user vote flag via a LEFT JOIN on the source-appropriate votes table.
+    //
+    // Cursor format preserved from napoletana-58210: `<iso>_<source>_<id>`.
+    // Legacy `<iso>_<id>` cursors parse with source=null. When the cursor has
+    // an explicit source we still order the whole combined set by the same
+    // (created_at, id) tuple, so a single keyset predicate over the UNION ALL
+    // result is correct regardless of which source the boundary row came from.
+
+    // -- shared party-eligibility predicate (parameter-bound) ----------------
+    const regionFilter = regions.length > 0
+      ? Prisma.sql`AND pa.region = ANY(${regions}::text[])`
+      : Prisma.empty;
+    const countryFilter = countries.length > 0
+      ? Prisma.sql`AND pa.country = ANY(${countries}::text[])`
+      : Prisma.empty;
+    const partnerTagFilter = partnerTag
+      ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+      : Prisma.empty;
+
+    // cannoli-58292: keyset predicate. The boundary row's id orders within the
+    // combined set; an explicit-source cursor and a legacy cursor behave
+    // identically because the UNION ALL is ordered by the same tuple.
+    const userId = req.userId ?? null;
+
+    const photoVoteSelect = userId
+      ? Prisma.sql`(pv.user_id IS NOT NULL)`
+      : Prisma.sql`false`;
+    const photoVoteJoin = userId
+      ? Prisma.sql`LEFT JOIN photo_votes pv ON pv.photo_id = p.id AND pv.user_id = ${userId}`
+      : Prisma.empty;
+    const payoutVoteSelect = userId
+      ? Prisma.sql`(pdv.user_id IS NOT NULL)`
+      : Prisma.sql`false`;
+    const payoutVoteJoin = userId
+      ? Prisma.sql`LEFT JOIN payout_document_votes pdv ON pdv.payout_document_id = pd.id AND pdv.user_id = ${userId}`
+      : Prisma.empty;
+
+    const cursorPredicate = cursor
+      ? Prisma.sql`WHERE (u.created_at < ${cursor.createdAt}
+          OR (u.created_at = ${cursor.createdAt} AND u.id < ${cursor.id}))`
+      : Prisma.empty;
+
+    type RawFeedRow = {
+      id: string;
+      source: FeedSource;
+      url: string;
+      thumbnail_url: string | null;
+      caption: string | null;
+      mime_type: string;
+      duration: number | null;
+      width: number | null;
+      height: number | null;
+      created_at: Date;
+      vote_count: number;
+      voted_by_me: boolean;
+      payout_id: string | null;
+      party_id: string;
+      party_name: string;
+      custom_url: string | null;
+      invite_code: string;
+      city: string | null;
+      country: string | null;
     };
-    if (cursor) {
-      // When cursor source is explicit, only paginate within that source for
-      // strict tuple ordering. When legacy (source=null), apply the cursor to
-      // both sides so behavior is backwards-compatible.
-      //
-      // nduja-58291: the year-OR is already on `photoWhere.OR`. Move it into
-      // an AND clause alongside the cursor-OR so both compose without one
-      // clobbering the other.
-      if (cursor.source === 'photo' || cursor.source === null) {
-        photoWhere.AND = [
-          { OR: photoWhere.OR },
-          {
-            OR: [
-              { createdAt: { lt: cursor.createdAt } },
-              { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
-            ],
-          },
-        ];
-        delete photoWhere.OR;
-      } else {
-        // Cursor is in the other source — pull photos strictly older than the
-        // cursor timestamp (id tiebreak doesn't apply across sources).
-        photoWhere.createdAt = { lte: cursor.createdAt };
-      }
-    }
 
-    // -- payout pizza photos source ---------------------------------------
-    const payoutDocWhere: any = {
-      kind: 'pizza',
-      // napoletana-58211: rows already mirrored into the `photos` table are
-      // represented on the photo side of the union — exclude them here to
-      // avoid double-display. New uploads always create both rows
-      // atomically (see POST /:partyId/payouts), and the backfill script
-      // links existing pizza docs to a canonical photos row.
-      photoId: null,
-      // exclude docs whose payout was rejected. payout_id is nullable on the
-      // schema but in practice always set for pizza docs (verified during
-      // implementation). The nested `payout: { isNot: { status: 'rejected' } }`
-      // handles both states.
-      OR: [
-        { payoutId: null },
-        { payout: { isNot: { status: 'rejected' } } },
-      ],
-      party: { is: partyFilter },
-    };
-    if (cursor) {
-      if (cursor.source === 'payout' || cursor.source === null) {
-        // Strict tuple ordering within the payout source.
-        const tupleClause = [
-          { createdAt: { lt: cursor.createdAt } },
-          { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
-        ];
-        payoutDocWhere.AND = [
-          { OR: payoutDocWhere.OR },
-          { OR: tupleClause },
-        ];
-        delete payoutDocWhere.OR;
-      } else {
-        // Cursor is in the photo source — pull payouts at-or-older than the
-        // cursor timestamp; id tiebreak doesn't cross sources.
-        payoutDocWhere.AND = [
-          { OR: payoutDocWhere.OR },
-          { createdAt: { lte: cursor.createdAt } },
-        ];
-        delete payoutDocWhere.OR;
-      }
-    }
+    const rawRows = await prisma.$queryRaw<RawFeedRow[]>(Prisma.sql`
+      SELECT * FROM (
+        -- photos source ---------------------------------------------------
+        SELECT
+          p.id::text AS id,
+          'photo'::text AS source,
+          p.url AS url,
+          p.thumbnail_url AS thumbnail_url,
+          p.caption AS caption,
+          p.mime_type AS mime_type,
+          p.duration AS duration,
+          p.width AS width,
+          p.height AS height,
+          p.created_at AS created_at,
+          p.vote_count AS vote_count,
+          ${photoVoteSelect} AS voted_by_me,
+          NULL::uuid AS payout_id,
+          pa.id::text AS party_id,
+          pa.name AS party_name,
+          pa.custom_url AS custom_url,
+          pa.invite_code AS invite_code,
+          pa.city AS city,
+          pa.country AS country
+        FROM photos p
+        JOIN parties pa ON pa.id = p.party_id
+        ${photoVoteJoin}
+        WHERE p.status = 'approved'
+          AND p.starred = true
+          AND p.deleted_at IS NULL -- provolone-58931
+          AND pa.underboss_status = 'approved'
+          AND pa.photos_public = true
+          AND pa.photos_enabled = true
+          -- cannoli-58292: effective_year = :year
+          AND COALESCE(
+                p.photo_year,
+                EXTRACT(YEAR FROM pa.date)::int,
+                EXTRACT(YEAR FROM p.created_at)::int
+              ) = ${year}
+          -- cannoli-58292: after-event-start cutoff (no-op when event has no date)
+          AND (pa.date IS NULL OR p.created_at >= pa.date)
+          ${regionFilter}
+          ${countryFilter}
+          ${partnerTagFilter}
 
-    const [photoRows, payoutRows] = await Promise.all([
-      prisma.photo.findMany({
-        where: photoWhere,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        // nduja-58291: over-fetch on the photos side to absorb post-query
-        // filename-regex dropouts (no equivalent for payout docs — those
-        // have no fileName column, so the regex doesn't apply).
-        take: photoFetchSize,
-        select: {
-          id: true,
-          url: true,
-          thumbnailUrl: true,
-          caption: true,
-          mimeType: true,
-          duration: true,
-          width: true,
-          height: true,
-          createdAt: true,
-          voteCount: true,
-          fileName: true,
-          votes: req.userId
-            ? { where: { userId: req.userId }, select: { id: true } }
-            : false,
-          party: {
-            select: {
-              id: true,
-              name: true,
-              customUrl: true,
-              inviteCode: true,
-              city: true,
-              country: true,
-            },
-          },
-        },
-      }),
-      prisma.payoutDocument.findMany({
-        where: payoutDocWhere,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: fetchSize,
-        select: {
-          id: true,
-          url: true,
-          mimeType: true,
-          createdAt: true,
-          payoutId: true,
-          voteCount: true,
-          votes: req.userId
-            ? { where: { userId: req.userId }, select: { id: true } }
-            : false,
-          party: {
-            select: {
-              id: true,
-              name: true,
-              customUrl: true,
-              inviteCode: true,
-              city: true,
-              country: true,
-            },
-          },
-        },
-      }),
-    ]);
+        UNION ALL
 
-    // nduja-58291: filename-regex pass. Drops legacy GPP 2025 uploads with
-    // WhatsApp/iPhone/Android timestamp-prefix filenames (e.g.
-    // IMG-20250523-WA0069.jpg) that don't have photo_year set.
-    const filteredPhotoRows = photoRows.filter(
-      (p) => !p.fileName || !PRIOR_YEAR_FILENAME_RE.test(p.fileName),
-    );
+        -- payout pizza photos source (napoletana-58211: effectively empty in
+        -- practice — mirrored docs have photo_id set — but kept for parity) --
+        SELECT
+          pd.id::text AS id,
+          'payout'::text AS source,
+          pd.url AS url,
+          NULL::text AS thumbnail_url,
+          NULL::text AS caption,
+          pd.mime_type AS mime_type,
+          NULL::double precision AS duration,
+          NULL::int AS width,
+          NULL::int AS height,
+          pd.created_at AS created_at,
+          pd.vote_count AS vote_count,
+          ${payoutVoteSelect} AS voted_by_me,
+          pd.payout_id AS payout_id,
+          pa.id::text AS party_id,
+          pa.name AS party_name,
+          pa.custom_url AS custom_url,
+          pa.invite_code AS invite_code,
+          pa.city AS city,
+          pa.country AS country
+        FROM payout_documents pd
+        JOIN parties pa ON pa.id = pd.party_id
+        LEFT JOIN payouts po ON po.id = pd.payout_id
+        ${payoutVoteJoin}
+        WHERE pd.kind = 'pizza'
+          AND pd.photo_id IS NULL -- napoletana-58211: avoid double-display
+          AND (pd.payout_id IS NULL OR po.status <> 'rejected')
+          AND pa.underboss_status = 'approved'
+          AND pa.photos_public = true
+          AND pa.photos_enabled = true
+          -- cannoli-58292: effective_year = :year (no photo_year column here)
+          AND COALESCE(
+                EXTRACT(YEAR FROM pa.date)::int,
+                EXTRACT(YEAR FROM pd.created_at)::int
+              ) = ${year}
+          -- cannoli-58292: after-event-start cutoff
+          AND (pa.date IS NULL OR pd.created_at >= pa.date)
+          ${regionFilter}
+          ${countryFilter}
+          ${partnerTagFilter}
+      ) u
+      ${cursorPredicate}
+      ORDER BY u.created_at DESC, u.id DESC
+      LIMIT ${fetchSize}
+    `);
 
-    // Merge into a single list, sorted by (createdAt desc, id desc) tiebreak.
-    const merged: FeedItem[] = [
-      ...filteredPhotoRows.map((p): FeedItem => {
-        const votes = (p as typeof p & { votes?: { id: string }[] }).votes;
-        return {
-          id: p.id,
-          source: 'photo',
-          url: p.url,
-          thumbnailUrl: p.thumbnailUrl,
-          caption: p.caption,
-          mimeType: p.mimeType,
-          duration: p.duration,
-          width: p.width,
-          height: p.height,
-          createdAt: p.createdAt,
-          voteCount: p.voteCount,
-          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
-          payoutId: null,
-          party: {
-            id: p.party.id,
-            slug: p.party.customUrl || p.party.inviteCode,
-            name: p.party.name,
-            city: p.party.city,
-            country: p.party.country,
-          },
-        };
-      }),
-      ...payoutRows.map((pd): FeedItem => {
-        const votes = (pd as typeof pd & { votes?: { id: string }[] }).votes;
-        return {
-          id: pd.id,
-          source: 'payout',
-          url: pd.url,
-          // Payout docs don't have thumbnails / captions / dimensions.
-          thumbnailUrl: null,
-          caption: null,
-          mimeType: pd.mimeType,
-          duration: null,
-          width: null,
-          height: null,
-          createdAt: pd.createdAt,
-          voteCount: pd.voteCount,
-          votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
-          payoutId: pd.payoutId,
-          party: {
-            id: pd.party.id,
-            slug: pd.party.customUrl || pd.party.inviteCode,
-            name: pd.party.name,
-            city: pd.party.city,
-            country: pd.party.country,
-          },
-        };
-      }),
-    ];
-
-    merged.sort((a, b) => {
-      const tDiff = b.createdAt.getTime() - a.createdAt.getTime();
-      if (tDiff !== 0) return tDiff;
-      // Tiebreak by id desc to match the per-table orderBy.
-      return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
-    });
+    const merged: FeedItem[] = rawRows.map((r): FeedItem => ({
+      id: r.id,
+      source: r.source,
+      url: r.url,
+      thumbnailUrl: r.thumbnail_url,
+      caption: r.caption,
+      mimeType: r.mime_type,
+      duration: r.duration,
+      width: r.width,
+      height: r.height,
+      createdAt: r.created_at,
+      voteCount: Number(r.vote_count),
+      votedByMe: !!r.voted_by_me,
+      payoutId: r.payout_id,
+      party: {
+        id: r.party_id,
+        slug: r.custom_url || r.invite_code,
+        name: r.party_name,
+        city: r.city,
+        country: r.country,
+      },
+    }));
 
     const hasMore = merged.length > limit;
     const page = hasMore ? merged.slice(0, limit) : merged;
@@ -441,9 +405,10 @@ async function handleRandomFeed(
     countries: string[];
     partnerTag: string | null;
     seed: string;
+    year: number; // cannoli-58292
   },
 ): Promise<void> {
-  const { limit, regions, countries, partnerTag, seed } = opts;
+  const { limit, regions, countries, partnerTag, seed, year } = opts;
   const cursor = parseRandomCursor(req.query.cursor);
   const fetchSize = limit + 1;
 
@@ -475,13 +440,14 @@ async function handleRandomFeed(
       AND pa.underboss_status = 'approved'
       AND pa.photos_public = true
       AND pa.photos_enabled = true
-      -- nduja-58291: exclude prior-year (2025-and-earlier) legacy uploads.
-      -- Column filter catches Athens/Bratislava (explicit photo_year); regex
-      -- catches Natal etc. where filename embeds a year preceded by a
-      -- non-digit (WhatsApp/iPhone/Android timestamp filenames). Mirrored in
-      -- the newest-sort Prisma path via PRIOR_YEAR_FILENAME_RE.
-      AND (p.photo_year IS NULL OR p.photo_year >= 2026)
-      AND p.file_name !~ '(^|[^0-9])(2021|2022|2023|2024|2025)'
+      -- cannoli-58292: effective_year = :year (supersedes nduja-58291).
+      AND COALESCE(
+            p.photo_year,
+            EXTRACT(YEAR FROM pa.date)::int,
+            EXTRACT(YEAR FROM p.created_at)::int
+          ) = ${year}
+      -- cannoli-58292: after-event-start cutoff (no-op when event has no date).
+      AND (pa.date IS NULL OR p.created_at >= pa.date)
       ${regionFilter}
       ${countryFilter}
       ${partnerTagFilter}
@@ -595,7 +561,8 @@ router.get('/feed/facets', async (_req: Request, res: Response, next: NextFuncti
     });
 
     if (grouped.length === 0) {
-      return res.json({ countries: [] });
+      // cannoli-58292: still return an (empty) years array for shape parity.
+      return res.json({ countries: [], years: [] });
     }
 
     const partyIds = grouped.map((g) => g.partyId);
@@ -618,7 +585,33 @@ router.get('/feed/facets', async (_req: Request, res: Response, next: NextFuncti
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
-    res.json({ countries });
+    // cannoli-58292: distinct effective years across feed-eligible photos,
+    // applying the SAME base predicate as the feed (approved + starred +
+    // not-deleted + party-eligible + after-event-start cutoff). Populates the
+    // year dropdown. Raw SQL because effective_year and the cutoff are
+    // column-to-column expressions Prisma's typed query can't express.
+    const yearRows = await prisma.$queryRaw<{ year: number }[]>(Prisma.sql`
+      SELECT DISTINCT COALESCE(
+               p.photo_year,
+               EXTRACT(YEAR FROM pa.date)::int,
+               EXTRACT(YEAR FROM p.created_at)::int
+             ) AS year
+      FROM photos p
+      JOIN parties pa ON pa.id = p.party_id
+      WHERE p.status = 'approved'
+        AND p.starred = true
+        AND p.deleted_at IS NULL
+        AND pa.underboss_status = 'approved'
+        AND pa.photos_public = true
+        AND pa.photos_enabled = true
+        AND (pa.date IS NULL OR p.created_at >= pa.date)
+      ORDER BY year DESC
+    `);
+    const years = yearRows
+      .map((r) => Number(r.year))
+      .filter((y) => Number.isFinite(y));
+
+    res.json({ countries, years });
   } catch (error) {
     next(error);
   }
@@ -668,52 +661,78 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
     const partnerTag = typeof partnerTagRaw === 'string' && partnerTagRaw.trim()
       ? partnerTagRaw.trim()
       : null;
+    // cannoli-58292: ZIP honors the same year + cutoff as the feed.
+    const year = parseYear(req.query.year);
 
-    const partyFilter = buildPartyFilter({ regions, countries, partnerTag });
+    const regionFilter = regions.length > 0
+      ? Prisma.sql`AND pa.region = ANY(${regions}::text[])`
+      : Prisma.empty;
+    const countryFilter = countries.length > 0
+      ? Prisma.sql`AND pa.country = ANY(${countries}::text[])`
+      : Prisma.empty;
+    const partnerTagFilter = partnerTag
+      ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+      : Prisma.empty;
 
-    // Mirror /feed's photo-source WHERE: status=approved + starred=true + party.
-    // nduja-58292: also apply the same prior-year filter as /feed so the ZIP
-    // download doesn't include the very photos /photos hides. Two-pronged:
-    // photo_year column (NULL or >=2026) here, plus a post-query filename
-    // regex pass below (Prisma can't express POSIX regex on string columns).
-    const photoWhere: Prisma.PhotoWhereInput = {
-      status: 'approved',
-      starred: true,
-      deletedAt: null, // provolone-58931: never surface soft-deleted photos in the public feed
-      OR: [
-        { photoYear: null },
-        { photoYear: { gte: 2026 } },
-      ],
-      party: { is: partyFilter },
+    // cannoli-58292: raw SQL so the ZIP mirrors /feed exactly — effective_year
+    // = :year + after-event-start cutoff (column-to-column comparisons Prisma's
+    // typed `where` can't express). Replaces the nduja-58292 prior-year
+    // filename/photoYear exclusion. Photos table only (matches the prior
+    // behavior — payout docs are mirrored into `photos` post-napoletana-58211).
+    type DlRow = {
+      id: string;
+      url: string;
+      file_name: string | null;
+      mime_type: string;
+      city: string | null;
+      custom_url: string | null;
+      invite_code: string;
+      name: string;
     };
+    const dlRows = await prisma.$queryRaw<DlRow[]>(Prisma.sql`
+      SELECT
+        p.id::text AS id,
+        p.url AS url,
+        p.file_name AS file_name,
+        p.mime_type AS mime_type,
+        pa.city AS city,
+        pa.custom_url AS custom_url,
+        pa.invite_code AS invite_code,
+        pa.name AS name
+      FROM photos p
+      JOIN parties pa ON pa.id = p.party_id
+      WHERE p.status = 'approved'
+        AND p.starred = true
+        AND p.deleted_at IS NULL -- provolone-58931
+        AND pa.underboss_status = 'approved'
+        AND pa.photos_public = true
+        AND pa.photos_enabled = true
+        AND COALESCE(
+              p.photo_year,
+              EXTRACT(YEAR FROM pa.date)::int,
+              EXTRACT(YEAR FROM p.created_at)::int
+            ) = ${year}
+        AND (pa.date IS NULL OR p.created_at >= pa.date)
+        ${regionFilter}
+        ${countryFilter}
+        ${partnerTagFilter}
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT ${DOWNLOAD_MAX_PHOTOS}
+    `);
 
-    const photos = await prisma.photo.findMany({
-      where: photoWhere,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: DOWNLOAD_MAX_PHOTOS,
-      select: {
-        id: true,
-        url: true,
-        fileName: true,
-        mimeType: true,
-        party: {
-          select: {
-            city: true,
-            customUrl: true,
-            inviteCode: true,
-            name: true,
-          },
-        },
+    // Map to the shape the archive worker pool expects (party nested object).
+    const filtered = dlRows.map((r) => ({
+      id: r.id,
+      url: r.url,
+      fileName: r.file_name,
+      mimeType: r.mime_type,
+      party: {
+        city: r.city,
+        customUrl: r.custom_url,
+        inviteCode: r.invite_code,
+        name: r.name,
       },
-    });
-
-    // nduja-58292: filename-regex post-filter — same approach as /feed's
-    // newest-sort path. Drops legacy GPP 2025 uploads with WhatsApp/iPhone/
-    // Android timestamp-prefix filenames (e.g. IMG-20250523-WA0069.jpg) that
-    // don't have photo_year set.
-    const filtered = photos.filter(
-      (p) => !p.fileName || !PRIOR_YEAR_FILENAME_RE.test(p.fileName),
-    );
+    }));
 
     if (filtered.length === 0) {
       return res.status(404).json({ error: { message: 'No photos match the filter' } });

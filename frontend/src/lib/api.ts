@@ -6056,6 +6056,9 @@ export interface PhotosFeedFilters {
   // || seed) as the order key so pagination + filters stay consistent.
   sort?: 'newest' | 'random';
   seed?: string | null;
+  // cannoli-58292: event-year filter. Backend defaults to the current calendar
+  // year when omitted; only photos uploaded after their event's start show.
+  year?: number;
 }
 
 export async function getPhotosFeed(
@@ -6080,6 +6083,10 @@ export async function getPhotosFeed(
       params.append('sort', 'random');
       params.append('seed', filters.seed);
     }
+    // cannoli-58292: event-year filter.
+    if (typeof filters?.year === 'number') {
+      params.append('year', String(filters.year));
+    }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,
       { method: 'GET', requireAuth: false }
@@ -6092,6 +6099,10 @@ export async function getPhotosFeed(
 
 export interface PhotosFeedFacets {
   countries: Array<{ name: string; count: number }>;
+  // cannoli-58292: distinct event years available in the feed (desc). Older
+  // backends won't return this — keep optional and default to [] at the call
+  // site so the dropdown gracefully shows just the current year.
+  years?: number[];
 }
 
 export async function getPhotosFeedFacets(): Promise<PhotosFeedFacets | null> {
