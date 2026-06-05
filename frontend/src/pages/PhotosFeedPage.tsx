@@ -46,8 +46,18 @@ export function PhotosFeedPage() {
     () => (searchParams.get('sort') === 'random' ? searchParams.get('seed') : null)
   );
 
+  // cannoli-58292: event-year filter. Defaults to the current calendar year
+  // (matching the backend default). Initialized from URL if present + valid.
+  const CURRENT_YEAR = new Date().getFullYear();
+  const [activeYear, setActiveYear] = useState<number>(() => {
+    const raw = searchParams.get('year');
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) ? n : CURRENT_YEAR;
+  });
+
   // Facets + partner tags
   const [facetCountries, setFacetCountries] = useState<Array<{ name: string; count: number }>>([]);
+  const [facetYears, setFacetYears] = useState<number[]>([]);
   const [myPartnerTags, setMyPartnerTags] = useState<string[]>([]);
 
   // Feed
@@ -71,11 +81,13 @@ export function PhotosFeedPage() {
   const partnerTagRef = useRef(activePartnerTag);
   const sortModeRef = useRef(sortMode);
   const seedRef = useRef(seed);
+  const yearRef = useRef(activeYear); // cannoli-58292
   countriesRef.current = activeCountries;
   regionsRef.current = activeRegions;
   partnerTagRef.current = activePartnerTag;
   sortModeRef.current = sortMode;
   seedRef.current = seed;
+  yearRef.current = activeYear;
 
   // Sync filter state -> URL so refresh / sharing work.
   useEffect(() => {
@@ -87,10 +99,13 @@ export function PhotosFeedPage() {
       next.set('sort', 'random');
       next.set('seed', seed);
     }
+    // cannoli-58292: only put year in the URL when it differs from the current
+    // calendar default, so a fresh /photos link stays clean.
+    if (activeYear !== CURRENT_YEAR) next.set('year', String(activeYear));
     // Replace (don't push) to keep history clean.
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed]);
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear]);
 
   // Build the raw-country list to send to the backend by expanding each
   // selected alpha-2 to all known locale variants intersected with what
@@ -125,6 +140,7 @@ export function PhotosFeedPage() {
         partnerTag: partnerTagRef.current,
         sort: sortModeRef.current,
         seed: seedRef.current,
+        year: yearRef.current, // cannoli-58292
       };
       const res = await getPhotosFeed(cursorRef.current, 24, filters);
       if (!res) {
@@ -147,9 +163,10 @@ export function PhotosFeedPage() {
 
   // Reset + reload whenever a filter changes. sicilian-58195: include sort
   // + seed so picking Shuffle (or reshuffling with a new seed) re-pages.
+  // cannoli-58292: include year so changing it resets the cursor + re-pages.
   const filterKey = useMemo(
-    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}|${sortMode}|${seed || ''}`,
-    [activeCountries, activeRegions, activePartnerTag, sortMode, seed]
+    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}|${sortMode}|${seed || ''}|${activeYear}`,
+    [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear]
   );
 
   useEffect(() => {
@@ -167,6 +184,8 @@ export function PhotosFeedPage() {
     getPhotosFeedFacets().then((res) => {
       if (cancelled || !res) return;
       setFacetCountries(res.countries);
+      // cannoli-58292: populate the year dropdown.
+      setFacetYears(res.years ?? []);
     });
     return () => { cancelled = true; };
   }, []);
@@ -228,6 +247,16 @@ export function PhotosFeedPage() {
     return Array.from(byCode.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [facetCountries]);
 
+  // cannoli-58292: year dropdown options — facet years plus the current
+  // calendar year and the currently-selected year (so the selection is always
+  // representable even if the facet list lags), deduped + sorted desc.
+  const yearOptions = useMemo(() => {
+    const set = new Set<number>(facetYears);
+    set.add(CURRENT_YEAR);
+    set.add(activeYear);
+    return Array.from(set).filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
+  }, [facetYears, activeYear, CURRENT_YEAR]);
+
   const clearAllFilters = () => {
     setActiveCountries([]);
     setActiveRegions([]);
@@ -235,6 +264,8 @@ export function PhotosFeedPage() {
     // sicilian-58195: clearing also returns to default newest-first order.
     setSortMode('newest');
     setSeed(null);
+    // cannoli-58292: reset to the default (current calendar) year.
+    setActiveYear(CURRENT_YEAR);
   };
 
   // sicilian-58195: shuffle handler. Generates a new seed and switches to
@@ -269,8 +300,10 @@ export function PhotosFeedPage() {
       params.append('sort', 'random');
       params.append('seed', seed);
     }
+    // cannoli-58292: ZIP download honors the selected event year.
+    params.append('year', String(activeYear));
     return params.toString();
-  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, buildCountriesForBackend]);
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear, buildCountriesForBackend]);
 
   const handleDownloadZip = async () => {
     if (downloading || !activePartnerTag) return;
@@ -319,7 +352,7 @@ export function PhotosFeedPage() {
     []
   );
 
-  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag || sortMode === 'random';
+  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag || sortMode === 'random' || activeYear !== CURRENT_YEAR;
 
   return (
     <ThemeProvider theme="gpp">
@@ -342,6 +375,12 @@ export function PhotosFeedPage() {
           className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 border-b border-theme-stroke flex flex-wrap items-center gap-2"
           style={{ background: 'rgba(255,255,255,0.95)' }}
         >
+          {/* cannoli-58292: event-year selector (single-select). */}
+          <YearFilterButton
+            options={yearOptions}
+            selected={activeYear}
+            onChange={setActiveYear}
+          />
           <CountryFilterButton
             options={countryOptions}
             selected={activeCountries}
@@ -592,6 +631,49 @@ function CountryFilterButton({
           );
         })
       )}
+    </FilterDropdownShell>
+  );
+}
+
+// cannoli-58292: single-select year dropdown. Reuses FilterDropdownShell; the
+// label always shows the selected year and the chosen option is highlighted.
+// `count` is left at 0 (no badge) — there's always exactly one year selected,
+// so a "1" badge would be noise.
+function YearFilterButton({
+  options, selected, onChange,
+}: {
+  options: number[];
+  selected: number;
+  onChange: (next: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <FilterDropdownShell
+      label={`Year: ${selected}`}
+      count={0}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+      panelClassName="min-w-[140px]"
+    >
+      {options.map((y) => {
+        const isSel = y === selected;
+        return (
+          <button
+            key={y}
+            onClick={() => { onChange(y); setOpen(false); }}
+            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+              isSel ? 'text-red-600 font-medium' : 'text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+              isSel ? 'bg-red-500 border-red-500' : 'border-black/20'
+            }`}>
+              {isSel && <Check size={12} className="text-white" />}
+            </div>
+            <span className="flex-1">{y}</span>
+          </button>
+        );
+      })}
     </FilterDropdownShell>
   );
 }
