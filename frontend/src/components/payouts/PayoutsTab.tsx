@@ -263,6 +263,12 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                 New receipt
               </button>
             </div>
+            {/* Set host expectations on payout timing — most payouts land ~7
+                days after a receipt is submitted. */}
+            <div className="flex items-start gap-2 text-xs text-theme-text-muted">
+              <Info size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Most payments will take ~7 days from receipt submission.</span>
+            </div>
           </div>
 
           <PayoutsList
