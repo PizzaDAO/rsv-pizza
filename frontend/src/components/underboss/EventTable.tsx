@@ -646,7 +646,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.addTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'add' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {['review', 'swc', 'Global Pizza Party'].map((tag) => (
                           <button
                             key={tag}
@@ -725,7 +725,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.removeTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'remove' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {/* Show tags that exist on selected events */}
                         {(() => {
                           const selectedEvents = events.filter(e => selectedIds.has(e.id));
