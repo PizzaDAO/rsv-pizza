@@ -595,7 +595,14 @@
     "venueGuidanceLarge": "60+ people? Consider renting a venue.",
     "chooseVenue": "Choose your venue",
     "changeVenue": "Change venue",
-    "savedVenue": "Your venue"
+    "savedVenue": "Your venue",
+    "targetSaved": "Target attendance saved",
+    "expectedStepTitle": "Expected attendance",
+    "expectedAuto": "Auto (from RSVPs)",
+    "expectedOverridden": "Set by you",
+    "expectedResetAuto": "Reset to auto",
+    "expectedPlaceholder": "Override expected attendance",
+    "expectedHelper": "Tracks your live RSVP count. Override it if you have a firmer number."
   },
   "checklist": {
     "addTask": "Add Task",

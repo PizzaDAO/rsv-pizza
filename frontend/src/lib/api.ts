@@ -232,6 +232,8 @@ export interface UpdatePartyData {
   city?: string | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   eventTags?: string[];
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
@@ -361,6 +363,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       city: data.city,
       expectedGuests: data.expectedGuests,
       estimatedAttendance: data.estimatedAttendance,
+      targetAttendance: data.targetAttendance,
+      expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,

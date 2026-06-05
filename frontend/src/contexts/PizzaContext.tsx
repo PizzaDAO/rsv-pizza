@@ -118,6 +118,8 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     maxGuests: dbParty.max_guests,
     expectedGuests: dbParty.expected_guests || null,
     estimatedAttendance: dbParty.estimated_attendance ?? null,
+    targetAttendance: dbParty.target_attendance ?? null,
+    expectedAttendance: dbParty.expected_attendance ?? null,
     hideGuests: dbParty.hide_guests || false,
     requireApproval: dbParty.require_approval || false,
     password: dbParty.password,
