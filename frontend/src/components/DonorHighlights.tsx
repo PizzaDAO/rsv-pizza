@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import { DonationPublicStats } from '../types';
-import { SupportersModal, DonorAvatar } from './SupportersModal';
+import { SupportersModal } from './SupportersModal';
 
 interface DonorHighlightsProps {
   stats: DonationPublicStats;
@@ -15,7 +15,6 @@ function formatAmount(cents: number): string {
 
 // How many donors to inline in the row before collapsing to "+N more".
 const INLINE_DONORS = 3;
-const INLINE_AVATARS = 3;
 
 export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
   const { t } = useTranslation('event');
@@ -31,7 +30,6 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
   const showAmounts = stats.amountsPublic === true;
 
   const inlineDonors = donors.slice(0, INLINE_DONORS);
-  const avatarDonors = donors.slice(0, INLINE_AVATARS);
   const moreCount = Math.max(donorCount - inlineDonors.length, 0);
 
   return (
@@ -45,15 +43,6 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
         onClick={() => setOpen(true)}
         className="group flex items-center gap-3 w-full text-left rounded-xl border border-theme-stroke bg-theme-surface hover:bg-theme-surface-hover transition-colors px-3 py-2"
       >
-        {/* Overlapping avatars */}
-        <div className="flex flex-shrink-0 -space-x-2">
-          {avatarDonors.map((donor, i) => (
-            <div key={i} className="ring-2 ring-theme-surface rounded-full">
-              <DonorAvatar displayName={donor.displayName} avatarUrl={donor.avatarUrl} size={28} />
-            </div>
-          ))}
-        </div>
-
         {/* Inline donor list */}
         <div className="min-w-0 flex-1 text-sm text-theme-text">
           <span className="truncate inline">
