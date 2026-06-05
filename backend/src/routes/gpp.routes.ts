@@ -14,7 +14,9 @@ import { getCountryCode } from '../lib/countryCode.js';
 const router = Router();
 
 // Map ISO country codes to underboss regions
-function countryCodeToRegion(countryCode: string): string | null {
+// soppressata-50927: exported so the GPP27 (2027) create flow can reuse the
+// exact same region-inference logic as the 2026 create path.
+export function countryCodeToRegion(countryCode: string): string | null {
   const cc = countryCode.toUpperCase();
 
   // USA
@@ -73,7 +75,8 @@ function countryCodeToRegion(countryCode: string): string | null {
 }
 
 // Fallback: map country NAMES to regions when countryCode is missing
-function countryNameToRegion(country: string): string | null {
+// soppressata-50927: exported for reuse by the GPP27 create flow.
+export function countryNameToRegion(country: string): string | null {
   const name = country.toLowerCase().trim();
   const map: Record<string, string> = {
     'united states': 'usa', 'usa': 'usa',
