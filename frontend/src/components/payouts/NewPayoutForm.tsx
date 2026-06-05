@@ -511,10 +511,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           The auto-sum excludes those receipts until the host picks a code via
           the per-row CurrencyOverrideSelect dropdown. */}
       {unresolvedReceiptCount > 0 && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               {unresolvedReceiptCount === 1
                 ? "1 receipt's currency could not be detected. Use the currency picker on that row to set the correct currency — it isn't counted in the total yet."
                 : `${unresolvedReceiptCount} receipts' currencies could not be detected. Use the currency picker on those rows — they aren't counted in the total yet.`}
@@ -527,10 +527,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           enabled, admin reviews from /payments. Only renders when the party
           has an effective cap AND the typed amount exceeds it. */}
       {exceedsPartyCap && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               Heads up: receipts total ${finalAmount.toFixed(2)}, but your reimbursement cap is ${effectiveCapUsd!.toFixed(2)}. We'll reimburse the cap; the receipts stay attached as evidence. Admin can approve more in special cases.
             </div>
           </div>
@@ -540,10 +540,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       {/* speck-89172: $675 hard-ceiling amber warning. USDC execute caps at
           $675 per tx, so admin may need to split this into multiple sends. */}
       {exceedsHardCeiling && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               Heads up: ${finalAmount.toFixed(2)} exceeds the ${PER_PAYMENT_HARD_CEILING_USD} per-payment maximum. Admin may need to split into multiple sends.
             </div>
           </div>
@@ -557,10 +557,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           disabled until userMethodValid is true. Backend mirrors this gate
           (PAYMENT_METHOD_NOT_SET / PAYMENT_METHOD_INCOMPLETE). */}
       {!userMethodValid && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               {methodNoticeText}{' '}
               <a
                 href="#payment-details-card"
