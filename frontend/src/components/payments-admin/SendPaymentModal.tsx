@@ -342,6 +342,9 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   // either the country='United States' OR an event_tags entry containing
   // 'SWC Hub' (case-insensitive).
   const swcHub = useMemo(() => {
+    // marzano-58293: 'nonhub' tag opts the party out of the SWC Hub gate (USDC
+    // treatment) — precedence over the country + 'swc hub' signals below.
+    if ((eventTags ?? []).some((t) => t && t.trim().toLowerCase() === 'nonhub')) return false;
     if (country && country.trim().toLowerCase() === 'united states') return true;
     return (eventTags ?? []).some((t) => t && t.toLowerCase().includes('swc hub'));
   }, [country, eventTags]);

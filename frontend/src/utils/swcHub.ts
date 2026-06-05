@@ -25,6 +25,16 @@ export function isSwcHubParty(
   party?: { country?: string | null; eventTags?: string[] | null } | null,
 ): boolean {
   if (!party) return false;
+  // marzano-58293: explicit per-party opt-out. A 'nonhub' tag forces USDC
+  // treatment — it takes precedence over BOTH the 'SWC Hub' tag and the
+  // US-country fallback below. Mirrors the existing `nonpres` opt-out
+  // precedent. Used to drop the SWC Hub reimbursement gate from US cities.
+  if (
+    Array.isArray(party.eventTags) &&
+    party.eventTags.some((t) => t != null && t.trim().toLowerCase() === 'nonhub')
+  ) {
+    return false;
+  }
   if (Array.isArray(party.eventTags) && party.eventTags.includes('SWC Hub')) return true;
   if (party.country === 'United States') return true;
   return false;
