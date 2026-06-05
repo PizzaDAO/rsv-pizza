@@ -113,6 +113,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   hideClosed: true,
   // stracchino-92108: hide possible-scam-flagged cities (bottarga-92104) by default.
   hideScams: true,
+  // provatura-92107: hide US cities (party.region === 'usa') by default on the
+  // admin /payments by-city dashboard.
+  hideUsCities: true,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -650,6 +653,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         ? byPartyRows
         : byPartyRows.filter((row) => row.payouts.some((p) => p.status === status));
 
+    // provatura-92107: hide US cities (region 'usa') when the toggle is on.
+    // Admin dashboard only — regional portals are already region-scoped and
+    // never apply this.
+    const rows =
+      !isRegionalPortal && filters.hideUsCities
+        ? filtered.filter((row) => row.party.region !== 'usa')
+        : filtered;
+
     // "Oldest/Newest first" in the by-city view should order cities by their
     // host UPLOAD time, not lastActivityAt. The /by-party endpoint doesn't
     // implement created_asc/created_desc — they fall through to its activity
@@ -662,7 +673,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         Math.min(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
       const latest = (r: PartyPayoutsRow) =>
         Math.max(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
-      return [...filtered].sort((a, b) =>
+      return [...rows].sort((a, b) =>
         sort === 'created_asc' ? earliest(a) - earliest(b) : latest(b) - latest(a),
       );
     }
@@ -670,13 +681,13 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     // Receipt total column the admin sees, not the backend by-party
     // payout-sum order they'd otherwise fall through to.
     if (sort === 'amount_desc' || sort === 'amount_asc') {
-      return [...filtered].sort((a, b) => {
+      return [...rows].sort((a, b) => {
         const cmp = computeReceiptsTotalUsd(a) - computeReceiptsTotalUsd(b);
         return sort === 'amount_asc' ? cmp : -cmp;
       });
     }
-    return filtered;
-  }, [byPartyRows, filters.status, filters.sort]);
+    return rows;
+  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -1161,6 +1172,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           showHideClosedToggle={viewMode === 'by-city'}
           // stracchino-92108: Hide possible scams, by-city view only (same as above).
           showHideScamsToggle={viewMode === 'by-city'}
+          // provatura-92107: Hide US cities — by-city view + admin dashboard
+          // only (regional portals are already region-scoped).
+          showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}
           // pancetta-92103: Regions multi-select is the admin /payments tool;
           // regional sub-portals (`/payments/latam` etc.) are hard-scoped by
           // their `regionFilter` prop and shouldn't show a second region

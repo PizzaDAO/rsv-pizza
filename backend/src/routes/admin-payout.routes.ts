@@ -253,6 +253,9 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // bruschetta-58291: surface the party's country on the /payments admin
   // queue rows + power the Country filter dropdown in PayoutsFilterBar.
   country: true,
+  // provatura-92107: surface region so the /payments by-city "Hide US cities"
+  // toggle can filter rows where party.region === 'usa'.
+  region: true,
   expectedGuests: true,
   // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
   // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
@@ -2081,9 +2084,9 @@ router.get(
             customUrl: b.partyMeta.customUrl ?? null,
             inviteCode: b.partyMeta.inviteCode ?? null,
             country: b.partyMeta.country ?? null,
-            // region isn't on PAYOUT_PARTY_SELECT; surface null so frontend
-            // doesn't depend on it (party object also rendered in expansion).
-            region: null as string | null,
+            // provatura-92107: region now selected via PAYOUT_PARTY_SELECT so
+            // the by-city "Hide US cities" toggle can filter party.region.
+            region: (b.partyMeta.region as string | null) ?? null,
             effectiveReimbursementCapUsd: computeEffectiveCapUsd({
               reimbursementCapUsd: b.partyMeta.reimbursementCapUsd,
               eventTags: b.partyMeta.eventTags,

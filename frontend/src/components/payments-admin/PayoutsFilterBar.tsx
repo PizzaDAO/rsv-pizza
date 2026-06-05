@@ -36,6 +36,12 @@ interface PayoutsFilterBarProps {
    */
   showHideScamsToggle?: boolean;
   /**
+   * provatura-92107: when true, render the "Hide US cities" checkbox. By-city
+   * view + admin dashboard only (regional portals are region-scoped). Defaults
+   * to false.
+   */
+  showHideUsToggle?: boolean;
+  /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
    * hard-scoped by their `regionFilter` prop). Defaults to false.
@@ -140,6 +146,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideClosed) n += 1;
   // stracchino-92108: count Hide possible scams alongside Hide closed cities.
   if (filters.hideScams) n += 1;
+  // provatura-92107: count Hide US cities alongside the other hide toggles.
+  if (filters.hideUsCities) n += 1;
   return n;
 }
 
@@ -162,6 +170,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   availableTags,
   showHideClosedToggle,
   showHideScamsToggle,
+  showHideUsToggle,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -449,6 +458,17 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.hideScams}
                 onChange={() => update({ hideScams: !filters.hideScams })}
                 label="Hide possible scams"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* provatura-92107: Hide US cities (party.region === 'usa'). By-city
+                + admin dashboard only, same gating as the other hide toggles. */}
+            {showHideUsToggle && (
+              <Checkbox
+                checked={!!filters.hideUsCities}
+                onChange={() => update({ hideUsCities: !filters.hideUsCities })}
+                label="Hide US cities"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />

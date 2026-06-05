@@ -33,6 +33,7 @@ const DEFAULTS = {
   sort: 'created_desc' as SortValue,
   hideClosed: true,
   hideScams: true,
+  hideUsCities: true,
 };
 const DEFAULT_VIEW: ViewMode = 'by-city';
 
@@ -84,6 +85,7 @@ export function filtersToSearchParams(
   // Default-TRUE booleans: only emit when the user turned them OFF.
   if (filters.hideClosed === false) params.set('hideClosed', '0');
   if (filters.hideScams === false) params.set('hideScams', '0');
+  if (filters.hideUsCities === false) params.set('hideUsCities', '0');
 
   if (viewMode !== DEFAULT_VIEW) params.set('view', viewMode);
 
@@ -116,6 +118,7 @@ export function searchParamsToFilters(
     purpose: DEFAULTS.purpose,
     hideClosed: DEFAULTS.hideClosed,
     hideScams: DEFAULTS.hideScams,
+    hideUsCities: DEFAULTS.hideUsCities,
     sort: DEFAULTS.sort,
     ...(regions ? { regions } : {}),
   };
@@ -173,6 +176,7 @@ export function searchParamsToFilters(
   // else => true. Absent => leave the default (true).
   if (params.has('hideClosed')) filters.hideClosed = params.get('hideClosed') !== '0';
   if (params.has('hideScams')) filters.hideScams = params.get('hideScams') !== '0';
+  if (params.has('hideUsCities')) filters.hideUsCities = params.get('hideUsCities') !== '0';
 
   const viewRaw = params.get('view');
   const viewMode: ViewMode | null =
