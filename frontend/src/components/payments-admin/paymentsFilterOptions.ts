@@ -46,4 +46,6 @@ export const SORT_VALUES: SortValue[] = [
   'activity_asc',
   'paid_at_desc',
   'paid_at_asc',
+  'name_asc',
+  'name_desc',
 ];

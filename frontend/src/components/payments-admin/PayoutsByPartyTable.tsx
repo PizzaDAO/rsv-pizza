@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Loader2,
   Paperclip,
   Flag,
@@ -30,6 +31,7 @@ import { IconInput } from '../IconInput';
 import type {
   AdminPayout,
   AdminPayoutEventPhoto,
+  AdminPayoutFilters,
   PartyPayoutsRow,
   PayoutDocument,
   PayoutStatus,
@@ -123,6 +125,14 @@ const PHOTO_PREVIEW_LIMIT = 4;
 
 interface PayoutsByPartyTableProps {
   rows: PartyPayoutsRow[];
+  /**
+   * stracci-58471: current sort order, used to render the asc/desc indicator
+   * on the (clickable) Event column header. Only the `name_*` values affect
+   * this column's chevron; other sorts leave it neutral.
+   */
+  sort?: AdminPayoutFilters['sort'];
+  /** stracci-58471: click handler for the Event header — toggles name sort. */
+  onSortByName?: () => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   /** Opens the per-payout review modal (same shape as PayoutsTable). */
@@ -2566,6 +2576,8 @@ function RollupTile({
 
 export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   rows,
+  sort,
+  onSortByName,
   selectedIds,
   onToggleSelect,
   onRowClick,
@@ -2927,7 +2939,28 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
               <th className="px-3 py-3 w-10"></th>
-              <th className="px-3 py-3 font-medium">Event</th>
+              {/* stracci-58471: clickable Event header — sorts rows by event name. */}
+              <th className="px-3 py-3 font-medium">
+                {onSortByName ? (
+                  <button
+                    type="button"
+                    onClick={onSortByName}
+                    className="inline-flex items-center gap-1 font-medium hover:text-theme-text transition-colors"
+                    title="Sort by event name"
+                  >
+                    Event
+                    {sort === 'name_asc' ? (
+                      <ChevronUp size={14} />
+                    ) : sort === 'name_desc' ? (
+                      <ChevronDown size={14} />
+                    ) : (
+                      <ChevronDown size={14} className="opacity-30" />
+                    )}
+                  </button>
+                ) : (
+                  'Event'
+                )}
+              </th>
               <th className="px-3 py-3 font-medium">Receipt total</th>
               <th className="px-3 py-3 font-medium">Approved</th>
               <th className="px-3 py-3 font-medium">Paid</th>

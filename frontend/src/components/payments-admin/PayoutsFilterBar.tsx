@@ -114,6 +114,10 @@ const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   // here as a manual pick on the other views for completeness).
   { value: 'paid_at_desc', label: 'Most recently paid' },
   { value: 'paid_at_asc', label: 'Oldest payment first' },
+  // stracci-58471: event-name sort, also reachable by clicking the by-city
+  // table's Event column header.
+  { value: 'name_asc', label: 'Event name (A–Z)' },
+  { value: 'name_desc', label: 'Event name (Z–A)' },
 ];
 const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.label }),

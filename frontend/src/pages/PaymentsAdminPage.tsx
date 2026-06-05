@@ -686,6 +686,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         return sort === 'amount_asc' ? cmp : -cmp;
       });
     }
+    // stracci-58471: clicking the Event column header sorts by event name.
+    // Strip the "Global Pizza Party " prefix (mirrors the prepay-queue city
+    // sort) so cities order by their actual locality, not the constant prefix.
+    if (sort === 'name_asc' || sort === 'name_desc') {
+      const stripCity = (name: string) =>
+        name.replace(/^Global Pizza Party\s+/i, '').trim();
+      return [...rows].sort((a, b) => {
+        const cmp = stripCity(a.party.name).localeCompare(stripCity(b.party.name));
+        return sort === 'name_asc' ? cmp : -cmp;
+      });
+    }
     return rows;
   }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal]);
 
@@ -1296,6 +1307,21 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
             rows={displayedByPartyRows}
+            // stracci-58471: clickable Event header. Reflects the current sort
+            // (for the chevron) and cycles asc → desc → cleared (back to the
+            // default created_desc) on each click.
+            sort={filters.sort}
+            onSortByName={() =>
+              setFilters((prev) => ({
+                ...prev,
+                sort:
+                  prev.sort === 'name_asc'
+                    ? 'name_desc'
+                    : prev.sort === 'name_desc'
+                      ? 'created_desc'
+                      : 'name_asc',
+              }))
+            }
             fakeScores={fakeScores}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}

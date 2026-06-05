@@ -2182,7 +2182,12 @@ export interface AdminPayoutFilters {
     // coppa-92106: order by actual paid_at timestamp for the Payments-ledger
     // view ("show me every payment that actually went out, newest first").
     | 'paid_at_desc'
-    | 'paid_at_asc';
+    | 'paid_at_asc'
+    // stracci-58471: order by event/city name (A–Z / Z–A). By-city view only —
+    // applied client-side in PaymentsAdminPage; the backend has no name sort and
+    // falls through to its activity order, which the client-side reorder wins over.
+    | 'name_asc'
+    | 'name_desc';
   /**
    * coppa-92106: when true, the backend applies the prosciutto-92106
    * "has proof of send" predicate so only proven payments
