@@ -100,6 +100,10 @@
     "countryFilterClear": "清除",
     "countryFilterInclude": "包含国家",
     "countryFilterExclude": "排除国家",
+    "tagsFilterSearch": "搜索标签…",
+    "tagsFilterNoMatches": "无匹配标签",
+    "countryFilterSearch": "搜索国家…",
+    "countryFilterNoMatches": "无匹配国家",
     "clearFilters": "清除筛选",
     "rsvpFilterLabel": "Filter by RSVP count",
     "rsvpGreaterThan": "> RSVPs",
@@ -419,7 +423,10 @@
       "groupsSection": "Group chats",
       "hostsSection": "Host DMs",
       "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
-      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way.",
+      "linkNotAdded": "link not added",
+      "linkMissingWarning": "{{count}} recipient received the message without the link.",
+      "linkMissingWarning_other": "{{count}} recipients received the message without the link."
     }
   },
   "eventRow": {

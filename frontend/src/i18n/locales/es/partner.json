@@ -100,6 +100,10 @@
     "countryFilterClear": "Limpiar",
     "countryFilterInclude": "Incluir país",
     "countryFilterExclude": "Excluir país",
+    "tagsFilterSearch": "Buscar etiquetas…",
+    "tagsFilterNoMatches": "No hay etiquetas coincidentes",
+    "countryFilterSearch": "Buscar países…",
+    "countryFilterNoMatches": "No hay países coincidentes",
     "clearFilters": "Limpiar filtros",
     "rsvpFilterLabel": "Filter by RSVP count",
     "rsvpGreaterThan": "> RSVPs",
@@ -419,7 +423,10 @@
       "groupsSection": "Group chats",
       "hostsSection": "Host DMs",
       "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
-      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way.",
+      "linkNotAdded": "link not added",
+      "linkMissingWarning": "{{count}} recipient received the message without the link.",
+      "linkMissingWarning_other": "{{count}} recipients received the message without the link."
     }
   },
   "eventRow": {

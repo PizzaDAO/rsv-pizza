@@ -52,6 +52,10 @@ export const PINNABLE_APPS: PinnableApp[] = [
  * app's `tab` value (host app URL is /host/:inviteCode/:tab), NOT its id. Keep
  * the `tab` values in sync with the backend BROADCAST_APP_TABS catalog in
  * backend/src/lib/broadcastApps.ts.
+ *
+ * pesto-58496: this frontend⊆backend invariant is ENFORCED by the unit test
+ * frontend/src/lib/broadcastAppCatalog.test.ts. Every tab below must pass the
+ * backend's isValidAppTab; the test fails if you add one the backend rejects.
  */
 export interface BroadcastApp {
   name: string;

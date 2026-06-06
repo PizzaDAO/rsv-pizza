@@ -76,6 +76,7 @@ import {
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
+import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -159,6 +160,7 @@ app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pu
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
+app.use('/api/saved-views', savedViewsRoutes); // montanara-58497: per-account saved filter views (/payments + /underboss)
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)

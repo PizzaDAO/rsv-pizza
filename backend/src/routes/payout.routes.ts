@@ -72,6 +72,39 @@ const WITHDRAWABLE_STATUSES = ['pending', 'approved'] as const;
 // ---------- helpers ----------
 
 /**
+ * porchetta-58296: payout-submission readiness. Returns whether the event has
+ * each of the three host-designated role photos (group / box_stack / pizza)
+ * AND at least one receipt. Role photos must be dated after the event start
+ * (party.date NULL ⇒ no cutoff, mirroring the photo-feed rule). Single
+ * round-trip via per-role EXISTS + a receipt EXISTS on payout_documents.
+ */
+export async function getPayoutSubmissionReadiness(partyId: string) {
+  const rows = await prisma.$queryRaw<{
+    has_group: boolean;
+    has_box: boolean;
+    has_pizza: boolean;
+    has_receipt: boolean;
+  }[]>(Prisma.sql`
+    WITH pa AS (SELECT date FROM parties WHERE id = ${partyId}::uuid)
+    SELECT
+      EXISTS (SELECT 1 FROM photos p, pa WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
+                AND p.payout_role = 'group'     AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_group,
+      EXISTS (SELECT 1 FROM photos p, pa WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
+                AND p.payout_role = 'box_stack' AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_box,
+      EXISTS (SELECT 1 FROM photos p, pa WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
+                AND p.payout_role = 'pizza'     AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_pizza,
+      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = ${partyId}::uuid AND pd.kind = 'receipt') AS has_receipt
+  `);
+  const row = rows[0];
+  return {
+    hasGroupPhoto: !!row?.has_group,
+    hasBoxStackPhoto: !!row?.has_box,
+    hasPizzaPhoto: !!row?.has_pizza,
+    hasReceipt: !!row?.has_receipt,
+  };
+}
+
+/**
  * Serialize a Prisma Payout (with optional documents) to the JSON shape the
  * frontend expects. Converts Decimal → number, Date → ISO string.
  */
@@ -756,6 +789,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       finalAmountUsd,
       saveAsDefault,
       estimatedAttendance,
+      // porchetta-58296: host must affirm "I have submitted all my receipts and
+      // they are itemized." before the payout can be created.
+      receiptAttested,
       // bismarck-92103: admin-only override so the resulting Payout row is
       // credited to the chosen cohost (not the admin creating it). When set
       // AND the caller is an admin, `recipientHostUserId` replaces the
@@ -889,6 +925,53 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
     if (!adminPrepayingForCohost) {
       await assertUserHasValidPayoutMethod(req.userId);
+    }
+
+    // porchetta-58296: gate submission on the host having (1) attested their
+    // receipts, (2) at least one receipt on file (incoming or already stored),
+    // and (3) all three designated event role photos (group/box_stack/pizza).
+    // Exempt purpose='shipping' — kit-shipping reimbursements are filed by
+    // coordinators via a separate flow with no event photos and no receipt
+    // attestation, so this gate would always block them. Mirrored client-side
+    // as a disabled submit button; enforced here so an API bypass still fails.
+    if (!isShippingPurpose) {
+      if (receiptAttested !== true) {
+        throw new AppError(
+          'Confirm your receipts are submitted and itemized before submitting.',
+          400,
+          'RECEIPT_ATTESTATION_REQUIRED',
+        );
+      }
+      const incomingReceiptCount = Array.isArray(receiptPhotos) ? receiptPhotos.length : 0;
+      const submissionReadiness = await getPayoutSubmissionReadiness(partyId);
+      if (incomingReceiptCount < 1 && !submissionReadiness.hasReceipt) {
+        throw new AppError(
+          'Upload at least one receipt before submitting.',
+          400,
+          'RECEIPTS_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasGroupPhoto) {
+        throw new AppError(
+          'Designate a group photo before submitting.',
+          400,
+          'GROUP_PHOTO_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasBoxStackPhoto) {
+        throw new AppError(
+          'Designate a box stack photo before submitting.',
+          400,
+          'BOX_STACK_PHOTO_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasPizzaPhoto) {
+        throw new AppError(
+          'Designate a pizza photo before submitting.',
+          400,
+          'PIZZA_PHOTO_REQUIRED',
+        );
+      }
     }
 
     // salame-92110 + culatello-92106: tax-form gate.
@@ -1206,53 +1289,13 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       idx++;
     }
 
-    // Pizza photos: no OCR, just persist
-    (pizzaPhotos as IncomingDocument[]).forEach((p, i) => {
-      docsToCreate.push({
-        kind: 'pizza',
-        url: p.url,
-        fileName: p.fileName || extractFileName(p.url),
-        fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
-        mimeType: p.mimeType || 'image/jpeg',
-        ocrAmount: null,
-        ocrCurrency: null,
-        ocrConfidence: null,
-        // mortadella-92103: pizza photos have no FX detail.
-        originalAmount: null,
-        originalCurrency: null,
-        exchangeRate: null,
-        ocrRaw: null,
-        ocrLineItems: null,
-        ocrError: null,
-        sortOrder: i,
-        // napoletana-58211: filled in inside the transaction below — we
-        // create the canonical photos row first, then attach its id here.
-        photoId: null,
-      });
-    });
-
-    // pomodoro-92110: event photos persist as kind:'event' docs. Same shape as
-    // pizza (no FX detail); they mirror to the gallery in the transaction below.
-    (eventPhotos as IncomingDocument[]).forEach((p, i) => {
-      docsToCreate.push({
-        kind: 'event',
-        url: p.url,
-        fileName: p.fileName || extractFileName(p.url),
-        fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
-        mimeType: p.mimeType || 'image/jpeg',
-        ocrAmount: null,
-        ocrCurrency: null,
-        ocrConfidence: null,
-        originalAmount: null,
-        originalCurrency: null,
-        exchangeRate: null,
-        ocrRaw: null,
-        ocrLineItems: null,
-        ocrError: null,
-        sortOrder: i,
-        photoId: null,
-      });
-    });
+    // porchetta-58296: pizza/event photos are no longer persisted as payout
+    // documents. The NewPayoutForm now designates role photos in the gallery
+    // (`photos.payout_role`) instead of uploading kind='pizza'/'event' docs
+    // here. Only receipts (kind='receipt') are created from this handler going
+    // forward. The `pizzaPhotos`/`eventPhotos` body fields are still accepted +
+    // validated above for back-compat with old clients but are otherwise
+    // ignored.
 
     // Final amount: host override (if provided) or OCR sum
     const hasExplicitAmount = typeof finalAmountUsd === 'number' && finalAmountUsd > 0;
@@ -1629,6 +1672,29 @@ router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: R
         createdAt: d.createdAt.toISOString(),
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- GET /:partyId/payouts/submission-readiness ----------
+
+/**
+ * porchetta-58296: drives the NewPayoutForm submit gate. Returns whether the
+ * event has each of the three host-designated role photos (group/box_stack/
+ * pizza) and at least one receipt. Auth mirrors the receipts-library guard
+ * (`canUserEditParty`). Mounted BEFORE `/:partyId/payouts/:payoutId` so the
+ * literal path wins over the dynamic param.
+ */
+router.get('/:partyId/payouts/submission-readiness', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const readiness = await getPayoutSubmissionReadiness(partyId);
+    res.json(readiness);
   } catch (error) {
     next(error);
   }

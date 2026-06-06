@@ -803,6 +803,13 @@ model Photo {
   reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz
   reviewedBy String?   @map("reviewed_by")
 
+  // porchetta-58296: host-designated payout role. One photo per role per event
+  // (partial unique index on (party_id, payout_role) WHERE not null + not deleted).
+  // Values: 'group' | 'box_stack' | 'pizza'. Gates payout submission.
+  payoutRole      String?   @map("payout_role")
+  payoutRoleSetAt DateTime? @map("payout_role_set_at") @db.Timestamptz
+  payoutRoleSetBy String?   @map("payout_role_set_by")
+
   // Video metadata
   duration Float? // Video duration in seconds (null for images)
 
@@ -2212,4 +2219,21 @@ model ImageAuthenticityCheck {
   @@index([imageUrl])
   @@index([partyId])
   @@map("image_authenticity_checks")
+}
+
+// montanara-58497: per-account saved filter views for the /payments + /underboss
+// admin dashboards. Keyed by the caller's auth email (lowercased) — no FK to
+// User. `params` is the serialized URL query string (page-agnostic) produced by
+// the page's own (de)serializer, so applying a view just replays the query.
+model SavedFilterView {
+  id        String   @id @default(uuid())
+  userEmail String   @map("user_email")
+  scope     String // 'payments' | 'underboss'
+  name      String
+  params    String // serialized URL query string (page-agnostic)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userEmail, scope, name])
+  @@map("saved_filter_views")
 }
