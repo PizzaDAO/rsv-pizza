@@ -851,6 +851,24 @@
       "invalidType": "不支持的文件类型。请使用 JPEG、PNG、WebP、GIF 或 HEIC。",
       "tooLarge": "文件过大。最大为 25 MB。",
       "uploadFailed": "上传失败。请重试。"
-    }
+    },
+    "updateYourEstimate": "更新你的估计",
+    "guestsPlaceholder": "例如 50",
+    "rsvpHint_one": "目前已有 {{count}} 份回复。",
+    "rsvpHint_other": "目前已有 {{count}} 份回复。",
+    "errorPositiveNumber": "请输入正数",
+    "errorFailedToSave": "保存失败",
+    "bannerSetGuestsAndLocation": "设置你的{{guests}}和地点，以获得资金批准。",
+    "bannerSetGuests": "设置你的{{guests}}，以获得资金批准。",
+    "bannerSetLocation": "设置你的地点，以获得资金批准。",
+    "capReimburse": "我们将为你报销最多 {{cap}} 美元。",
+    "capReimburseWithKit": "我们将为你报销最多 {{cap}} 美元的披萨费用和最多 {{kitCap}} 美元的派对套件费用。",
+    "appeal": "申诉",
+    "underbossReviewing": "你的 underboss 正在审核你的活动以设置付款上限。",
+    "reachOnTelegram": "通过 Telegram 联系他：",
+    "receiptsHeader": "收据",
+    "newReceipt": "新收据",
+    "payoutTimingNote": "大多数付款将在提交收据后约 7 天内完成。",
+    "backToReceipts": "返回收据"
   }
 }

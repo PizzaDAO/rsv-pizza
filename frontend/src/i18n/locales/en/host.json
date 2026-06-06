@@ -970,6 +970,24 @@
       "invalidType": "Unsupported file type. Use JPEG, PNG, WebP, GIF, or HEIC.",
       "tooLarge": "File too large. Maximum size is 25 MB.",
       "uploadFailed": "Upload failed. Please try again."
-    }
+    },
+    "updateYourEstimate": "Update your estimate",
+    "guestsPlaceholder": "e.g. 50",
+    "rsvpHint_one": "{{count}} RSVP so far.",
+    "rsvpHint_other": "{{count}} RSVPs so far.",
+    "errorPositiveNumber": "Enter a positive number",
+    "errorFailedToSave": "Failed to save",
+    "bannerSetGuestsAndLocation": "Set your {{guests}} and your location to get your funding approved.",
+    "bannerSetGuests": "Set your {{guests}} to get your funding approved.",
+    "bannerSetLocation": "Set your location to get your funding approved.",
+    "capReimburse": "We'll reimburse you for up to ${{cap}}.",
+    "capReimburseWithKit": "We'll reimburse you for up to ${{cap}} of pizza and up to ${{kitCap}} of party kit expenses.",
+    "appeal": "Appeal",
+    "underbossReviewing": "Your underboss is reviewing your event to set your payment cap.",
+    "reachOnTelegram": "Reach them on Telegram:",
+    "receiptsHeader": "Receipts",
+    "newReceipt": "New receipt",
+    "payoutTimingNote": "Most payments will take ~7 days from receipt submission.",
+    "backToReceipts": "Back to receipts"
   }
 }

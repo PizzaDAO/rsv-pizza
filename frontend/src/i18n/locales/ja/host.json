@@ -851,6 +851,24 @@
       "invalidType": "対応していないファイル形式です。JPEG、PNG、WebP、GIF、HEIC を使用してください。",
       "tooLarge": "ファイルが大きすぎます。最大サイズは25 MBです。",
       "uploadFailed": "アップロードに失敗しました。もう一度お試しください。"
-    }
+    },
+    "updateYourEstimate": "見積もりを更新",
+    "guestsPlaceholder": "例：50",
+    "rsvpHint_one": "現在 {{count}} 件のRSVP。",
+    "rsvpHint_other": "現在 {{count}} 件のRSVP。",
+    "errorPositiveNumber": "正の数を入力してください",
+    "errorFailedToSave": "保存に失敗しました",
+    "bannerSetGuestsAndLocation": "資金の承認を受けるには、{{guests}}と開催地を設定してください。",
+    "bannerSetGuests": "資金の承認を受けるには、{{guests}}を設定してください。",
+    "bannerSetLocation": "資金の承認を受けるには、開催地を設定してください。",
+    "capReimburse": "最大 {{cap}} ドルまで払い戻します。",
+    "capReimburseWithKit": "ピザ代として最大 {{cap}} ドル、パーティーキット費用として最大 {{kitCap}} ドルまで払い戻します。",
+    "appeal": "異議申し立て",
+    "underbossReviewing": "アンダーボスがあなたのイベントを審査し、支払い上限を設定しています。",
+    "reachOnTelegram": "Telegramで連絡：",
+    "receiptsHeader": "領収書",
+    "newReceipt": "新しい領収書",
+    "payoutTimingNote": "ほとんどの支払いは、領収書の提出から約7日かかります。",
+    "backToReceipts": "領収書に戻る"
   }
 }

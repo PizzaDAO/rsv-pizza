@@ -851,6 +851,24 @@
       "invalidType": "Tipo de arquivo não compatível. Use JPEG, PNG, WebP, GIF ou HEIC.",
       "tooLarge": "Arquivo muito grande. O tamanho máximo é 25 MB.",
       "uploadFailed": "Falha no envio. Tente novamente."
-    }
+    },
+    "updateYourEstimate": "Atualizar sua estimativa",
+    "guestsPlaceholder": "ex.: 50",
+    "rsvpHint_one": "{{count}} confirmação até agora.",
+    "rsvpHint_other": "{{count}} confirmações até agora.",
+    "errorPositiveNumber": "Insira um número positivo",
+    "errorFailedToSave": "Falha ao salvar",
+    "bannerSetGuestsAndLocation": "Defina seus {{guests}} e seu local para ter seu financiamento aprovado.",
+    "bannerSetGuests": "Defina seus {{guests}} para ter seu financiamento aprovado.",
+    "bannerSetLocation": "Defina seu local para ter seu financiamento aprovado.",
+    "capReimburse": "Reembolsaremos você em até {{cap}} $.",
+    "capReimburseWithKit": "Reembolsaremos você em até {{cap}} $ de pizza e até {{kitCap}} $ de despesas do kit de festa.",
+    "appeal": "Recorrer",
+    "underbossReviewing": "Seu underboss está analisando seu evento para definir seu limite de pagamento.",
+    "reachOnTelegram": "Fale com ele no Telegram:",
+    "receiptsHeader": "Recibos",
+    "newReceipt": "Novo recibo",
+    "payoutTimingNote": "A maioria dos pagamentos leva cerca de 7 dias após o envio do recibo.",
+    "backToReceipts": "Voltar aos recibos"
   }
 }
