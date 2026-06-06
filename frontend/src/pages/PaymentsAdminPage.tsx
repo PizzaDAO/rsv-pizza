@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
+import { SavedViewsMenu } from '../components/SavedViewsMenu';
 import {
   fetchAdminMe,
   fetchUnderbossMe,
@@ -1267,6 +1268,16 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               Payments
             </button>
           </div>
+          {/* montanara-58497: per-account saved filter views */}
+          <SavedViewsMenu
+            scope="payments"
+            currentParams={filtersToSearchParams(filters, viewMode).toString()}
+            onApply={(p) => {
+              const { filters: f, viewMode: vm } = searchParamsToFilters(new URLSearchParams(p), regions);
+              setFilters((prev) => ({ ...prev, ...f }));
+              if (vm) setViewMode(vm);
+            }}
+          />
           </div>
         </div>
 

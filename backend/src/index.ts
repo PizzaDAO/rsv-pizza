@@ -36,6 +36,7 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
+import eventAssistantRoutes from './routes/eventAssistant.routes.js';
 import payoutDocumentVoteRoutes from './routes/payout-document-vote.routes.js';
 import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
@@ -76,6 +77,7 @@ import {
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
+import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -159,6 +161,7 @@ app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pu
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
+app.use('/api/saved-views', savedViewsRoutes); // montanara-58497: per-account saved filter views (/payments + /underboss)
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
@@ -189,6 +192,7 @@ app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake fo
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
+app.use('/api/parties', eventAssistantRoutes); // arancini-58492: NL event assistant (path-scoped auth, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)
 app.use('/api/parties', reportRoutes); // Report routes (includes public report viewing)
 app.use('/api/parties', leaderboardRoutes); // quattro-71244: gamified dashboard leaderboard (host only, before partyRoutes)

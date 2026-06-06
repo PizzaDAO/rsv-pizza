@@ -194,6 +194,10 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     // ONE party matches a cityKey — ambiguous/no match leaves the token to be
     // stripped, so a broadcast never ships the wrong event's link.
     const usesLinkToken = /\{link\}|\{appLink\}/.test(message);
+    // pesto-58496: track each token independently so per-recipient results can
+    // flag when a USED token resolved to empty (link not added for that city).
+    const usesLink = /\{link\}/.test(message);
+    const usesAppLink = /\{appLink\}/.test(message);
     const partyByCityKey = new Map<string, { customUrl: string | null; inviteCode: string | null } | null>();
     if (usesLinkToken) {
       const cityKeys = Array.from(
@@ -226,7 +230,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       }
     }
 
-    const results: Array<{ chatId: string; city: string; success: boolean; error?: string }> = [];
+    const results: Array<{ chatId: string; city: string; success: boolean; error?: string; linkResolved?: boolean }> = [];
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
@@ -241,6 +245,11 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       const linkedParty = usesLinkToken ? (partyByCityKey.get((city || '').toLowerCase().trim()) ?? null) : null;
       const linkUrl = publicEventLink(linkedParty);
       const appLinkUrl = appDeepLink(linkedParty, validatedAppTab);
+
+      // pesto-58496: flag a recipient when a USED link token resolved to empty
+      // (the link was stripped, so this recipient got the message without it).
+      // If the message uses no link tokens, never flag (leave true).
+      const linkResolved = !((usesLink && !linkUrl) || (usesAppLink && !appLinkUrl));
 
       // Replace template variables
       let personalizedMessage = message;
@@ -290,14 +299,14 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
             // the group's cityKey (already lowercased) so this updates the
             // existing row rather than creating an orphan. region set in-helper.
             await persistCityGroupMigration((city || '').toLowerCase().trim(), newChatId);
-            results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)` });
+            results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)`, linkResolved });
           } else {
-            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
+            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry', linkResolved });
           }
         } else if (telegramResult.ok) {
-          results.push({ chatId, city: city || '', success: true });
+          results.push({ chatId, city: city || '', success: true, linkResolved });
         } else {
-          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error' });
+          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error', linkResolved });
         }
       } catch (err: any) {
         results.push({
@@ -305,6 +314,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           city: city || '',
           success: false,
           error: err.message || 'Network error',
+          linkResolved,
         });
       }
 
@@ -556,6 +566,11 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
     // guanciale-58491: pull ALL requested parties (not just connected ones) so
     // the email-the-message fallback can reach hosts whose chat_id is null at
     // send time. customUrl + inviteCode for {link}/{appLink}; user for email.
+    // pesto-58496: track each link token independently so per-recipient results
+    // can flag when a USED token resolved to empty (link not added).
+    const usesLink = /\{link\}/.test(message);
+    const usesAppLink = /\{appLink\}/.test(message);
+
     const partyRows = await prisma.party.findMany({
       where: { id: { in: partyIds } },
       select: {
@@ -594,6 +609,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       success: boolean;
       error?: string;
       emailed?: boolean;
+      linkResolved?: boolean;
     }> = [];
 
     for (let i = 0; i < hosts.length; i++) {
@@ -611,6 +627,9 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       const partyMeta = partyMetaById.get(partyId) ?? null;
       const linkUrl = publicEventLink(partyMeta);
       const appLinkUrl = appDeepLink(partyMeta, validatedAppTab);
+
+      // pesto-58496: flag a recipient when a USED link token resolved to empty.
+      const linkResolved = !((usesLink && !linkUrl) || (usesAppLink && !appLinkUrl));
 
       // Replace template variables (shared by the Telegram + email paths). The
       // email path uses this text WITHOUT the Benny signature (TG-only).
@@ -640,6 +659,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
           success: false,
           error: emailed ? 'Not connected — emailed instead' : 'Host has not connected Telegram',
           emailed,
+          linkResolved,
         });
         continue;
       }
@@ -664,7 +684,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         const telegramResult = await telegramResponse.json();
 
         if (telegramResult.ok) {
-          results.push({ partyId, city, hostName, success: true });
+          results.push({ partyId, city, hostName, success: true, linkResolved });
         } else {
           const description: string = telegramResult.description || 'Unknown Telegram error';
           const errorCode: number = telegramResult.error_code || telegramResponse.status;
@@ -691,9 +711,10 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
               hostName,
               success: false,
               error: 'Host blocked the bot — disconnected',
+              linkResolved,
             });
           } else {
-            results.push({ partyId, city, hostName, success: false, error: description });
+            results.push({ partyId, city, hostName, success: false, error: description, linkResolved });
           }
         }
       } catch (err: any) {
@@ -703,6 +724,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
           hostName,
           success: false,
           error: err?.message || 'Network error',
+          linkResolved,
         });
       }
 

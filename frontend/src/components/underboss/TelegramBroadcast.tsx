@@ -630,6 +630,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
     }
   };
 
+  // pesto-58496: count recipients flagged with linkResolved === false. Only the
+  // explicit boolean false counts — undefined (older prod backend) is ignored so
+  // previews against the old backend never surface a spurious warning.
+  const linkMissingCount = results.filter((r) => r.linkResolved === false).length;
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -1252,6 +1257,20 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                 </div>
               )}
 
+              {/* pesto-58496: warn when any recipient got the message without a
+                  USED link token resolving. Only react to explicit === false so
+                  an older prod backend (field undefined) shows no warning. */}
+              {linkMissingCount > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-600">
+                      {t('telegram.results.linkMissingWarning', { count: linkMissingCount })}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Summary */}
               <div className="flex items-center gap-4 justify-center py-4">
                 <div className="text-center">
@@ -1302,6 +1321,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                                 )}
                               </div>
                               <span className="text-sm text-theme-text flex-1">{r.city || r.chatId}</span>
+                              {r.linkResolved === false && (
+                                <span className="text-xs text-amber-500 whitespace-nowrap">
+                                  {t('telegram.results.linkNotAdded')}
+                                </span>
+                              )}
                               {r.error && (
                                 <span className="text-xs text-red-400 max-w-[200px] truncate" title={r.error}>
                                   {r.error}
@@ -1345,6 +1369,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                                   )}
                                 </div>
                                 <span className="text-sm text-theme-text flex-1">{r.city || r.chatId}</span>
+                                {r.linkResolved === false && (
+                                  <span className="text-xs text-amber-500 whitespace-nowrap">
+                                    {t('telegram.results.linkNotAdded')}
+                                  </span>
+                                )}
                                 {r.error && (
                                   <span className={`text-xs max-w-[200px] truncate ${isBlocked ? 'text-yellow-600' : 'text-red-400'}`} title={r.error}>
                                     {r.error}
@@ -1386,6 +1415,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                             )}
                           </div>
                           <span className="text-sm text-theme-text flex-1">{r.city || r.chatId}</span>
+                          {r.linkResolved === false && (
+                            <span className="text-xs text-amber-500 whitespace-nowrap">
+                              {t('telegram.results.linkNotAdded')}
+                            </span>
+                          )}
                           {r.error && (
                             <span className={`text-xs max-w-[200px] truncate ${isBlocked ? 'text-yellow-600' : 'text-red-400'}`} title={r.error}>
                               {r.error}

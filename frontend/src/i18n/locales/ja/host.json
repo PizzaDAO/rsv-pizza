@@ -821,6 +821,29 @@
     "ineligiblePill": "対象外",
     "ineligibleLineTag": "対象外",
     "lineItemsToggle": "明細項目",
-    "eligibleLineTotal": "対象金額合計"
+    "eligibleLineTotal": "対象金額合計",
+    "receiptAttestation": "すべての領収書を提出し、項目別に明記しました。",
+    "receiptAttestationHelp": "これを有効にするには、領収書を少なくとも1枚アップロードしてください。",
+    "eventPhotosTitle": "イベント写真",
+    "eventPhotosSubtitle": "イベントの集合写真、箱の山の写真、ピザの写真を指定してください。ギャラリーから選ぶか、新しくアップロードできます。",
+    "selectOrUpload": "選択またはアップロード",
+    "additionalPhotos": "写真を追加（任意）",
+    "roles": {
+      "group": "集合写真",
+      "boxStack": "箱の山の写真",
+      "pizza": "ピザの写真"
+    },
+    "rolePicker": {
+      "title": "{{role}}を選択",
+      "subtitle": "ギャラリーからイベント写真を選ぶか、新しくアップロードしてください。",
+      "selectFromGallery": "ギャラリーから選択",
+      "uploadNew": "新規アップロード",
+      "uploading": "アップロード中…",
+      "empty": "写真がまだありません。アップロードして始めましょう。",
+      "ineligibleNote": "イベント開始前に撮影",
+      "invalidType": "対応していないファイル形式です。JPEG、PNG、WebP、GIF、HEIC を使用してください。",
+      "tooLarge": "ファイルが大きすぎます。最大サイズは25 MBです。",
+      "uploadFailed": "アップロードに失敗しました。もう一度お試しください。"
+    }
   }
 }

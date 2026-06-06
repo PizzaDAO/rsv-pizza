@@ -395,6 +395,45 @@ export async function updateHostGoals(partyId: string, hostGoals: HostGoals) {
   return updatePartyApi(partyId, { hostGoals });
 }
 
+// arancini-58492: Natural-language Event Assistant.
+export interface AssistantProposedChange {
+  /** snake_case field key understood by `updateParty`. */
+  key: string;
+  /** The proposed value to apply when accepted. */
+  value: unknown;
+  label: string;
+  currentDisplay: string;
+  proposedDisplay: string;
+  reason?: string;
+}
+
+export interface EventAssistantResponse {
+  assistantMessage: string;
+  clarifyingQuestion?: string;
+  proposedChanges: AssistantProposedChange[];
+}
+
+export interface AssistantHistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Ask the Event Assistant to turn a plain-English instruction into a structured
+ * diff of editable event fields. The backend NEVER writes — it only proposes;
+ * the caller applies the host-accepted subset via `updateParty`.
+ */
+export async function eventAssistant(
+  partyId: string,
+  instruction: string,
+  history: AssistantHistoryTurn[] = [],
+): Promise<EventAssistantResponse> {
+  return apiRequest<EventAssistantResponse>(`/api/parties/${partyId}/assistant`, {
+    method: 'POST',
+    body: { instruction, conversationHistory: history },
+  });
+}
+
 /**
  * bottarga-92104: shared constant for the "possible scam" manual flag. Stored
  * as a value in `parties.event_tags` (alongside other tags) so existing tag
@@ -3678,6 +3717,10 @@ export interface BroadcastResult {
   city: string;
   success: boolean;
   error?: string;
+  // pesto-58496: false when a USED {link}/{appLink} token resolved to empty for
+  // this recipient (message sent without the link). Older prod backends omit
+  // this field entirely — undefined must NOT be treated as a warning.
+  linkResolved?: boolean;
 }
 
 export interface BroadcastResponse {
@@ -5761,11 +5804,13 @@ export interface CreatePayoutPhotoInput {
 }
 
 export interface CreatePayoutData {
-  pizzaPhotos: CreatePayoutPhotoInput[];
-  // pomodoro-92110: event photos (cap 30) persist as kind:'event' payout docs
-  // and mirror to the public gallery just like pizza photos.
-  eventPhotos: CreatePayoutPhotoInput[];
+  // porchetta-58296: pizza/event photos are no longer uploaded here — the host
+  // designates role photos in the gallery (photos.payout_role). Removed from
+  // the create payload.
   receiptPhotos: CreatePayoutPhotoInput[];
+  // porchetta-58296: host attestation that all receipts are submitted +
+  // itemized. Backend rejects without it (RECEIPT_ATTESTATION_REQUIRED).
+  receiptAttested?: boolean;
   hostNotes?: string;
   /**
    * arugula-38633 v3 follow-up: optional. When omitted/null, the payout is
@@ -5813,6 +5858,53 @@ export async function createPayout(
     { method: 'POST', body: data, requireAuth: true }
   );
   return res.payout;
+}
+
+/**
+ * porchetta-58296: designate (or clear) a photo's payout role. Host-only
+ * PATCH on the gallery photo. Pass `null` to clear the role. Returns the
+ * updated Photo, or null on failure.
+ */
+export async function designatePhotoRole(
+  partyId: string,
+  photoId: string,
+  role: 'group' | 'box_stack' | 'pizza' | null
+): Promise<Photo | null> {
+  try {
+    const res = await apiRequest<{ photo: Photo }>(
+      `/api/parties/${partyId}/photos/${photoId}`,
+      { method: 'PATCH', body: { payoutRole: role }, requireAuth: true }
+    );
+    return res.photo;
+  } catch (error) {
+    console.error('Error designating photo role:', error);
+    return null;
+  }
+}
+
+export interface PayoutSubmissionReadiness {
+  hasGroupPhoto: boolean;
+  hasBoxStackPhoto: boolean;
+  hasPizzaPhoto: boolean;
+  hasReceipt: boolean;
+}
+
+/**
+ * porchetta-58296: drives the NewPayoutForm submit gate — whether the event
+ * has all three designated role photos + at least one receipt.
+ */
+export async function fetchPayoutSubmissionReadiness(
+  partyId: string
+): Promise<PayoutSubmissionReadiness | null> {
+  try {
+    return await apiRequest<PayoutSubmissionReadiness>(
+      `/api/parties/${partyId}/payouts/submission-readiness`,
+      { requireAuth: true }
+    );
+  } catch (error) {
+    console.error('Error fetching payout submission readiness:', error);
+    return null;
+  }
 }
 
 export async function listPayouts(partyId: string): Promise<Payout[]> {
@@ -6810,4 +6902,41 @@ export interface Suggestion {
 }
 export async function fetchSuggestions() {
   return apiRequest<{ suggestions: Suggestion[] }>('/api/suggestions');
+}
+
+// =============================================================================
+// Saved filter views (montanara-58497) — per-account, keyed by auth email.
+// `params` is the page's serialized URL query string (page-agnostic).
+// =============================================================================
+export type SavedViewScope = 'payments' | 'underboss';
+
+export interface SavedView {
+  id: string;
+  name: string;
+  params: string;
+  updatedAt: string;
+}
+
+export async function listSavedViews(scope: SavedViewScope): Promise<SavedView[]> {
+  const { views } = await apiRequest<{ views: SavedView[] }>(
+    `/api/saved-views?scope=${encodeURIComponent(scope)}`,
+  );
+  return views;
+}
+
+export async function saveFilterView(
+  scope: SavedViewScope,
+  name: string,
+  params: string,
+): Promise<SavedView> {
+  return apiRequest<SavedView>('/api/saved-views', {
+    method: 'POST',
+    body: { scope, name, params },
+  });
+}
+
+export async function deleteSavedView(id: string): Promise<void> {
+  await apiRequest<{ ok: boolean }>(`/api/saved-views/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }

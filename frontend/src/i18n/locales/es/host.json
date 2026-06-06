@@ -821,6 +821,29 @@
     "ineligiblePill": "No elegible",
     "ineligibleLineTag": "no elegible",
     "lineItemsToggle": "Artículos",
-    "eligibleLineTotal": "Total elegible"
+    "eligibleLineTotal": "Total elegible",
+    "receiptAttestation": "He enviado todos mis recibos y están detallados.",
+    "receiptAttestationHelp": "Sube al menos un recibo para habilitar esto.",
+    "eventPhotosTitle": "Fotos del evento",
+    "eventPhotosSubtitle": "Designa una foto de grupo, una foto de la torre de cajas y una foto de la pizza de tu evento. Selecciónalas de tu galería o sube nuevas.",
+    "selectOrUpload": "Seleccionar o subir",
+    "additionalPhotos": "Añadir más fotos (opcional)",
+    "roles": {
+      "group": "Foto de grupo",
+      "boxStack": "Foto de la torre de cajas",
+      "pizza": "Foto de la pizza"
+    },
+    "rolePicker": {
+      "title": "Elige tu {{role}}",
+      "subtitle": "Selecciona una foto del evento de tu galería o sube una nueva.",
+      "selectFromGallery": "Seleccionar de tu galería",
+      "uploadNew": "Subir nueva",
+      "uploading": "Subiendo…",
+      "empty": "Aún no hay fotos. Sube una para empezar.",
+      "ineligibleNote": "Tomada antes de que comenzara el evento",
+      "invalidType": "Tipo de archivo no compatible. Usa JPEG, PNG, WebP, GIF o HEIC.",
+      "tooLarge": "Archivo demasiado grande. El tamaño máximo es 25 MB.",
+      "uploadFailed": "Error al subir. Inténtalo de nuevo."
+    }
   }
 }

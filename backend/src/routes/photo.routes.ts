@@ -236,6 +236,10 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       guest: { id: string; name: string | null } | null;
       source: 'photo' | 'payout';
       payoutId: string | null;
+      // porchetta-58296: surfaced so the payout form can hydrate its role slots.
+      // Declared explicitly (not just carried by ...rest) so a future `select:`
+      // on the photos query can't silently drop this gate-critical field.
+      payoutRole: string | null;
     };
 
     const merged: Merged[] = [
@@ -249,6 +253,7 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
           guest: guest ?? null,
           source: 'photo',
           payoutId: null,
+          payoutRole: rest.payoutRole ?? null,
           votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
         };
       }),
@@ -286,6 +291,8 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
           guest: null,
           source: 'payout',
           payoutId: pd.payoutId,
+          // Payout-sourced rows never carry a gallery role designation.
+          payoutRole: null,
         };
       }),
     ];
@@ -711,7 +718,7 @@ router.get('/:partyId/photos/:photoId', optionalAuth, async (req: AuthRequest, r
 router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, photoId } = req.params;
-    const { caption, tags, starred, status, photoYear } = req.body;
+    const { caption, tags, starred, status, photoYear, payoutRole } = req.body;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
@@ -744,25 +751,100 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
       }
     }
 
-    const photo = await prisma.photo.update({
-      where: { id: photoId },
-      data: {
-        ...(caption !== undefined && { caption }),
-        ...(tags !== undefined && { tags }),
-        ...(photoYear !== undefined && { photoYear: photoYear === null ? null : parseInt(photoYear, 10) }),
-        ...(starred !== undefined && {
-          starred,
-          starredAt: starred ? new Date() : null,
-        }),
-        ...(status !== undefined && ['approved', 'rejected', 'pending'].includes(status) && {
-          status,
-          reviewedAt: new Date(),
-          reviewedBy: req.userId || null,
-        }),
-      },
-      include: {
-        guest: { select: { id: true, name: true } },
-      },
+    // porchetta-58296: host-designated payout role. Accept
+    // 'group' | 'box_stack' | 'pizza' (set) or null (clear). Validate the enum,
+    // reject pre-event-start photos, and enforce one photo per role per event
+    // (clear the prior holder in the same transaction as the set).
+    const PAYOUT_ROLES = ['group', 'box_stack', 'pizza'] as const;
+    type PayoutRole = (typeof PAYOUT_ROLES)[number];
+    let validatedPayoutRole: PayoutRole | null | undefined;
+    if (payoutRole !== undefined) {
+      if (payoutRole === null) {
+        validatedPayoutRole = null;
+      } else if (typeof payoutRole === 'string' && (PAYOUT_ROLES as readonly string[]).includes(payoutRole)) {
+        validatedPayoutRole = payoutRole as PayoutRole;
+      } else {
+        throw new AppError(
+          `payoutRole must be one of: ${PAYOUT_ROLES.join(', ')}, or null`,
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+    }
+
+    // porchetta-58296: when assigning a role, the photo must be dated after the
+    // event's start (reuse the photo-feed cutoff: party.date NULL ⇒ no cutoff).
+    if (validatedPayoutRole) {
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { date: true },
+      });
+      if (party?.date && existingPhoto.createdAt < party.date) {
+        throw new AppError(
+          'This photo was taken before the event started and cannot be designated.',
+          400,
+          'PHOTO_BEFORE_EVENT_START',
+        );
+      }
+    }
+
+    // porchetta-58296: human gallery tag mirrored onto the photo when a role is
+    // assigned, so it also shows under that filter in the gallery.
+    const ROLE_TO_TAG: Record<PayoutRole, string> = {
+      group: 'Group Photo',
+      box_stack: 'Box Tower',
+      pizza: 'Pizza',
+    };
+
+    const photo = await prisma.$transaction(async (tx) => {
+      // porchetta-58296: enforce one photo per role per event. Clear the role
+      // from any OTHER photo on this party before setting it here (belt-and-
+      // braces with the partial unique index).
+      if (validatedPayoutRole) {
+        await tx.photo.updateMany({
+          where: {
+            partyId,
+            payoutRole: validatedPayoutRole,
+            id: { not: photoId },
+            deletedAt: null,
+          },
+          data: { payoutRole: null, payoutRoleSetAt: null, payoutRoleSetBy: null },
+        });
+      }
+
+      const nextTags =
+        validatedPayoutRole
+          ? Array.from(new Set([...(existingPhoto.tags ?? []), ROLE_TO_TAG[validatedPayoutRole]]))
+          : undefined;
+
+      return tx.photo.update({
+        where: { id: photoId },
+        data: {
+          ...(caption !== undefined && { caption }),
+          ...(tags !== undefined && { tags }),
+          ...(photoYear !== undefined && { photoYear: photoYear === null ? null : parseInt(photoYear, 10) }),
+          ...(starred !== undefined && {
+            starred,
+            starredAt: starred ? new Date() : null,
+          }),
+          ...(status !== undefined && ['approved', 'rejected', 'pending'].includes(status) && {
+            status,
+            reviewedAt: new Date(),
+            reviewedBy: req.userId || null,
+          }),
+          ...(validatedPayoutRole !== undefined && {
+            payoutRole: validatedPayoutRole,
+            payoutRoleSetAt: validatedPayoutRole ? new Date() : null,
+            payoutRoleSetBy: validatedPayoutRole ? (req.userId || null) : null,
+            // Only append the human tag when assigning (not when clearing) and
+            // only if the caller didn't explicitly set `tags` in this request.
+            ...(nextTags !== undefined && tags === undefined && { tags: nextTags }),
+          }),
+        },
+        include: {
+          guest: { select: { id: true, name: true } },
+        },
+      });
     });
 
     res.json({ photo });
