@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, AlertTriangle, ExternalLink, Loader2, Pencil, Send, DollarSign, RefreshCw, Repeat2, Tag, Undo2, Flag, Coins, Play, ChevronDown, ChevronRight, Plus, Trash2, Copy } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -1741,7 +1742,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     }
   }
 
-  return (
+  // montanara-58499 follow-up: Layout wraps the page in `<main relative z-[1]>`,
+  // which opens a stacking context. A `fixed z-50` modal rendered as a child of
+  // that main can't rise above the sibling `<Footer relative z-[1]>` painted
+  // later in the DOM, so the footer overlapped the modal's action buttons. Portal
+  // the whole modal to document.body so its z-50 sits in the root stacking
+  // context, clear of the footer. (React events still bubble through the React
+  // tree, so the backdrop onClose + stopPropagation below keep working.)
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
@@ -3524,12 +3532,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
 
             {/* Mark paid form */}
             {showMarkPaidForm && (
-              <div className="rounded-xl border border-blue-300 p-3 bg-blue-50 text-sm space-y-2">
-                <h3 className="font-semibold text-blue-900 mb-1">Mark as paid (manual)</h3>
+              // The light bg-blue-50 panel was unreadable inside this dark
+              // modal — the global dark `input[type=text]` rule out-specifies
+              // the LIGHT_PANEL_INPUT `bg-white` utility so the inputs rendered
+              // dark, and the Cancel button's `text-theme-text-secondary` is a
+              // light-grey token meant for dark surfaces. Restyle the panel as a
+              // dark tinted card (same convention as the amber cap-warning card
+              // below) so the default dark inputs + text are legible. No
+              // LIGHT_PANEL_INPUT on the inputs here — they use the native dark
+              // styling.
+              <div className="rounded-xl border border-blue-500/30 p-3 bg-blue-500/10 text-sm space-y-2">
+                <h3 className="font-semibold text-blue-200 mb-1">Mark as paid (manual)</h3>
                 {payout.payoutMethod === 'wire' && (
                   <IconInput
                     icon={Pencil}
-                    className={LIGHT_PANEL_INPUT}
                     placeholder="Wire reference number"
                     value={wireRef}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWireRef(e.target.value)}
@@ -3538,7 +3554,6 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.payoutMethod === 'usdc_base' && (
                   <IconInput
                     icon={Pencil}
-                    className={LIGHT_PANEL_INPUT}
                     placeholder="Transaction hash (0x...)"
                     value={txHash}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTxHash(e.target.value)}
@@ -3548,14 +3563,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   <>
                     <IconInput
                       icon={Pencil}
-                      className={LIGHT_PANEL_INPUT}
                       placeholder="Card last 4 digits"
                       value={cardLast4}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardLast4(e.target.value)}
                     />
                     <IconInput
                       icon={Pencil}
-                      className={LIGHT_PANEL_INPUT}
                       placeholder="Mercury card id (optional)"
                       value={cardId}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardId(e.target.value)}
@@ -3564,7 +3577,6 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
                 <IconInput
                   icon={Pencil}
-                  className={LIGHT_PANEL_INPUT}
                   placeholder="Note (optional)"
                   value={paidNote}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaidNote(e.target.value)}
@@ -4053,7 +4065,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           lightboxReceipt ? (authChecks[lightboxReceipt.url]?.verdict ?? null) : null
         }
       />
-    </div>
+    </div>,
+    document.body,
   );
 };
 
