@@ -94,5 +94,8 @@
   },
 
   "_note_gpp_global_editors": "PLACEHOLDER global-editor allowlist (marinara-71630 P6) documenting SHAPE only — an OBVIOUSLY-FAKE example email. Real emails are seeded separately and NOT committed. A plain string[] of emails that get invisible editor access to ALL GPP events (they don't appear in any party's co_hosts). Access checks compare emails case-INSENSITIVELY. Empty list = no one gets global-editor rights (safe fallback); normal owner/co-host/underboss/admin checks still apply.",
-  "private.gpp_global_editors": ["editor@example.com"]
+  "private.gpp_global_editors": ["editor@example.com"],
+
+  "_note_operational_limits": "Operational quota limits (marinara-71630 P8). UNLIKE the private.* keys above these are NOT secret — they're just tunable operational quotas, so the REAL values (importHardCap 2000, photoPerUserPerEvent 30) are shown here. The in-code fallback in privateConfig.ts IS the current value, so behavior is identical with or without this row; seeding it just lets the team OVERRIDE the quotas without a deploy. importHardCap = max guests per bulk-import request; photoPerUserPerEvent = max photos one user may have (pending+approved) on a single event.",
+  "operational.limits": { "importHardCap": 2000, "photoPerUserPerEvent": 30 }
 }

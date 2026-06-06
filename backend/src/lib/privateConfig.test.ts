@@ -17,6 +17,7 @@ import {
   getReimbursementCapBands,
   getSponsorshipPricing,
   getGppGlobalEditors,
+  getOperationalLimits,
   invalidateAll,
   PRIVATE_CONFIG_KEYS,
 } from './privateConfig.js';
@@ -201,5 +202,51 @@ describe('getGppGlobalEditors', () => {
   it('falls back to [] when the stored value is not valid JSON', async () => {
     mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json[' });
     expect(await getGppGlobalEditors()).toEqual([]);
+  });
+});
+
+// marinara-71630 P8: operational quota limits accessor. NON-SECRET — the
+// fallback IS the current real value (2000 / 30), so behavior is identical
+// with or without a row; the row only lets the team override without a deploy.
+describe('getOperationalLimits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('returns the seeded config values when an app_config row is present', async () => {
+    const seeded = { importHardCap: 5000, photoPerUserPerEvent: 50 };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const limits = await getOperationalLimits();
+
+    expect(limits).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.operationalLimits },
+    });
+  });
+
+  it('falls back to the CURRENT real values (2000 / 30) when the row is absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
+  });
+
+  it('falls back to current values (never throws) when the DB read fails', async () => {
+    mockPrisma.appConfig.findUnique.mockRejectedValue(new Error('db down'));
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
+  });
+
+  it('falls back to current values when the stored value is not valid JSON', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json{' });
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
   });
 });

@@ -73,8 +73,15 @@ vi.mock('./rsvp.routes.js', () => ({
 // isMercuryBlocked layering is what disables it. The real (un-mocked)
 // isMercuryBlocked / normalizeCountry is exercised so normalization is tested.
 const mockGetReimbursementRules = vi.hoisted(() => vi.fn());
+// marinara-71630 P8: the bulk-import handler now resolves its hard cap from
+// getOperationalLimits(). Stub it with the current real values so the import
+// tests (and the "> 2000" cap test) exercise the production cap.
+const mockGetOperationalLimits = vi.hoisted(() =>
+  vi.fn(async () => ({ importHardCap: 2000, photoPerUserPerEvent: 30 }))
+);
 vi.mock('../lib/privateConfig.js', () => ({
   getReimbursementRules: mockGetReimbursementRules,
+  getOperationalLimits: mockGetOperationalLimits,
 }));
 
 const parseAuth = (req: any) => {
