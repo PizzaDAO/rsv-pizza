@@ -5,7 +5,7 @@ import { AppError } from '../middleware/error.js';
 import { withBennySignature } from '../lib/bennySignature.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
@@ -16,7 +16,7 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
-import { getReimbursementRules } from '../lib/privateConfig.js';
+import { getReimbursementRules, getGppGlobalEditors } from '../lib/privateConfig.js';
 import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
@@ -45,7 +45,8 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
 
   // Check if user is a GPP global editor
   if (userEmail && (party as any).eventType === 'gpp') {
-    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+    const gppEditors = await getGppGlobalEditors();
+    if (gppEditors.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
       return party;
     }
   }
@@ -138,7 +139,8 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
 
     // 4. GPP global editor parties (if user is a GPP global editor)
     let gppEditorParties: typeof ownedParties = [];
-    if (userEmail && GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
+    const gppEditors = await getGppGlobalEditors();
+    if (userEmail && gppEditors.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
       gppEditorParties = await prisma.party.findMany({
         where: { eventType: 'gpp' },
         select: slimSelect,

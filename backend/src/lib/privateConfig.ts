@@ -33,6 +33,7 @@ const KEYS = {
   reimbursementTiers: 'private.reimbursement_tiers',
   reimbursementCapBands: 'private.reimbursement_cap_bands',
   sponsorshipPricing: 'private.sponsorship_pricing',
+  gppGlobalEditors: 'private.gpp_global_editors',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -348,6 +349,34 @@ export function getSponsorshipPricing(): Promise<SponsorshipPricing> {
     base: 0,
     roundTo: 50,
   });
+}
+
+// ---------------------------------------------------------------------------
+// GPP global-editor allowlist (marinara-71630 P6)
+//
+// Emails that automatically get editor access to ALL GPP events. These users
+// don't appear in any party's co_hosts array, so they're invisible in host
+// settings and on the public event page — granting cross-event edit rights.
+// Moved out of committed source (was a hardcoded const in
+// backend/src/helpers/partyAccess.ts). Real list is seeded to `app_config`
+// (key `private.gpp_global_editors`) out-of-band; NOT committed.
+// ---------------------------------------------------------------------------
+
+/**
+ * Emails granted invisible editor access to every GPP event.
+ *
+ * Fallback = EMPTY list. This is FAIL-SAFE: an unseeded config grants no one
+ * global-editor rights, so the worst case is "a global editor temporarily
+ * can't edit until config is seeded" — never "an extra account silently gains
+ * cross-event edit access". Normal access checks (owner, co-host, scoped
+ * underboss, admin) are unaffected by this list and still apply.
+ *
+ * The consuming access checks compare emails case-INSENSITIVELY (both sides
+ * lowercased), preserving the original `partyAccess.ts` semantics; this
+ * accessor returns the list verbatim and leaves casing to the caller.
+ */
+export function getGppGlobalEditors(): Promise<string[]> {
+  return getConfig<string[]>(KEYS.gppGlobalEditors, []);
 }
 
 export { KEYS as PRIVATE_CONFIG_KEYS };

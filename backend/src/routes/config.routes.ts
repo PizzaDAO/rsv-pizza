@@ -1,14 +1,21 @@
 import { Router, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import {
+  requireAuth,
+  AuthRequest,
+  isPaymentAdmin,
+  isUnderboss,
+} from '../middleware/auth.js';
 import {
   requireUnderbossAuth,
   UnderbossAuthRequest,
 } from '../middleware/underbossAuth.js';
+import { AppError } from '../middleware/error.js';
 import {
   getCityTiers,
   getSponsorshipPricing,
   getReimbursementTiers,
   getReimbursementCapBands,
+  getPayoutCaps,
 } from '../lib/privateConfig.js';
 
 /**
@@ -59,6 +66,63 @@ router.get(
         reimbursementCapBands: {
           bands: reimbursementCapBands.bands,
           roundingIncrementUsd: reimbursementCapBands.roundingIncrementUsd,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/config/payout-caps — per-submission / per-address payout caps for
+// the payments-admin modals (marinara-71630 P6).
+//
+// The 3 payments-admin modals (PayoutReviewModal, ExternalPaymentModal,
+// CreatePrepaymentModal) used to bake the per-submission cap ($675) into the
+// frontend bundle for a UX-only warning + a client-side clamp. The real number
+// now lives in `app_config` (key `private.payout_caps`, already seeded) and is
+// served here so it stays out of the open-source frontend.
+//
+// Auth: these modals are rendered on /payments by a BROADER set of roles than
+// /pricing's underboss gate — admin / super_admin / payment_admin (via
+// `requireAnyAdminOrPaymentAdmin` on the admin-payout routes), OR a regional
+// underboss on a regional portal. A `payment_admin` would NOT pass
+// `requireUnderbossAuth`, so this endpoint can't reuse the /pricing gate.
+// Instead it admits anyone who is a payments-admin OR an active underboss —
+// exactly the viewer set that opens these modals. The cap is UX-only (the
+// backend remains the enforcement authority), so this is low-stakes.
+// ---------------------------------------------------------------------------
+async function requirePaymentsAdminOrUnderboss(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+) {
+  try {
+    const email = req.userEmail;
+    if ((await isPaymentAdmin(email)) || (await isUnderboss(email))) {
+      next();
+      return;
+    }
+    throw new AppError('Payments admin or underboss access required', 403, 'FORBIDDEN');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.get(
+  '/payout-caps',
+  requireAuth,
+  requirePaymentsAdminOrUnderboss,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const caps = await getPayoutCaps();
+      // Only the two caps the frontend modals actually use for UX. The rest of
+      // PayoutCaps (per-tx, daily, w9 threshold, hard ceiling) stay backend-only.
+      res.json({
+        payoutCaps: {
+          perSubmissionMaxUsd: caps.perSubmissionMaxUsd,
+          perAddressHardCapUsd: caps.perAddressHardCapUsd,
         },
       });
     } catch (error) {

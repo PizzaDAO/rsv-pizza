@@ -4,6 +4,7 @@ import { IconInput } from '../IconInput';
 import { PayoutMethodIcon, PAYOUT_METHOD_LABELS } from '../payments-shared';
 import { isMercuryBlocked } from '../../lib/mercuryBlockedCountries';
 import { createPayout } from '../../lib/api';
+import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import type { PrepayCandidate, PrepayQueueRow } from '../../types';
 
 /**
@@ -17,11 +18,21 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
- * acciuga-62583: hard per-submission ceiling of $675 (cassoeula-92103, was $650).
- * Matches backend `PER_SUBMISSION_CAP_EXCEEDED` (400). No override path —
- * admin must split larger prepayments across multiple submissions.
+ * acciuga-62583: hard per-submission ceiling matching backend
+ * `PER_SUBMISSION_CAP_EXCEEDED` (400). No override path — admin must split larger
+ * prepayments across multiple submissions.
+ *
+ * marinara-71630 P6: the real ceiling value moved out of this open-source bundle
+ * into `app_config` (private.payout_caps) and is fetched via `usePayoutCaps`.
+ * GRACEFUL LOADING BEHAVIOR: while the cap is unknown (loading / fetch error) it
+ * resolves to a high neutral sentinel, so the client-side per-submission clamp is
+ * a no-op (submit is NOT blocked) and the warning doesn't show. The backend still
+ * enforces PER_SUBMISSION_CAP_EXCEEDED (400) on submit, so an over-cap amount sent
+ * in the brief pre-load window is rejected server-side (surfaced inline as an
+ * error) rather than silently allowed. We deliberately do NOT bake the real number
+ * in as a fallback. The pre-filled default (clamped to the remaining party cap)
+ * stays conservative regardless.
  */
-const PER_SUBMISSION_MAX_USD = 675;
 
 interface CreatePrepaymentModalProps {
   row: PrepayQueueRow;
@@ -51,6 +62,12 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   onCreated,
 }) => {
   const { party, candidates } = row;
+  // marinara-71630 P6: per-submission ceiling fetched from app_config (not
+  // hardcoded). High neutral sentinel while unknown → the client clamp + warning
+  // are inert and the backend enforces; see the module-level note above.
+  const { caps: payoutCaps } = usePayoutCaps();
+  const perSubmissionMaxUsd =
+    payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
   const cap = party.effectiveReimbursementCapUsd ?? 0;
   // tiramisu-49102: cap-remaining = cap minus what's already been paid for
   // this party. `partyPaidUsd` is what BISMARCK-92103 attached to PrepayQueueRow
@@ -63,12 +80,12 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   // decimals round-trip through the backend without loss.
   // tiramisu-49102: clamp the default to whatever's actually left under the
   // cap (so a paid-down event doesn't pre-fill an over-cap default).
-  // acciuga-62583: also clamp to the hard $675 per-submission ceiling so the
+  // acciuga-62583: also clamp to the hard per-submission ceiling so the
   // pre-filled default never trips the backend limit.
   const rawDefault = cap > 0 ? cap / 2 : 1;
   const clampedDefault =
     remainingUsd != null ? Math.min(rawDefault, remainingUsd) : rawDefault;
-  const defaultAmount = Math.min(clampedDefault, PER_SUBMISSION_MAX_USD).toFixed(2);
+  const defaultAmount = Math.min(clampedDefault, perSubmissionMaxUsd).toFixed(2);
 
   const mercuryBlocked = isMercuryBlocked(party.country);
 
@@ -109,9 +126,10 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
   const exceedsRemaining =
     remainingUsd != null && Number.isFinite(amountNum) && amountNum > remainingUsd + 1e-9;
 
-  // acciuga-62583: hard per-submission $675 ceiling, no override. Backend
-  // also enforces with 400 PER_SUBMISSION_CAP_EXCEEDED.
-  const exceedsPerSubmission = Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+  // acciuga-62583: hard per-submission ceiling, no override. Backend also
+  // enforces with 400 PER_SUBMISSION_CAP_EXCEEDED. While the cap is unknown
+  // (high sentinel) this is false — submit isn't blocked; backend still guards.
+  const exceedsPerSubmission = Number.isFinite(amountNum) && amountNum > perSubmissionMaxUsd;
 
   const canSubmit =
     !!selectedCandidate &&
@@ -314,10 +332,10 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
                 Exceeds cap: ${remainingUsd.toFixed(2)} remaining
               </p>
             )}
-            {/* acciuga-62583: per-submission $675 ceiling */}
+            {/* acciuga-62583: per-submission ceiling (value from app_config) */}
             {exceedsPerSubmission && (
               <p className="text-xs text-red-500 mt-1">
-                Single payments capped at ${PER_SUBMISSION_MAX_USD}
+                Single payments capped at ${perSubmissionMaxUsd}
               </p>
             )}
           </div>
