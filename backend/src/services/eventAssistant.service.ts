@@ -225,8 +225,10 @@ function buildSystemPrompt(snapshot: Record<string, unknown>, timezone: string, 
     `Event timezone: ${timezone}`,
     `Today (in event timezone): ${todayInTz}`,
     '',
-    'Current event values (snake_case keys, same keys you propose):',
-    JSON.stringify(snapshot, null, 2),
+    'Current event values (snake_case keys, same keys you propose). Only fields with a current value are listed; any catalog field NOT present here is currently empty/unset, so you may still propose values for it:',
+    // Prompt gets the non-empty subset of the snapshot to save tokens; the diff
+    // logic still uses the full untrimmed snapshot (see runEventAssistant).
+    JSON.stringify(omitEmptyValues(snapshot), null, 2),
   ].join('\n');
 }
 
@@ -261,7 +263,7 @@ export async function runEventAssistant(params: {
   const tool = buildToolSchema(role);
 
   const response = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: buildSystemPrompt(snapshot, timezone, role) },
       ...history,
@@ -354,6 +356,22 @@ export async function runEventAssistant(params: {
 }
 
 /* -------------------------------- helpers --------------------------------- */
+
+/**
+ * Return a copy of the snapshot omitting "empty" keys (null/undefined/''/[]), so
+ * the prompt only spends tokens on fields that actually carry a value. `false`
+ * and `0` are KEPT — they're meaningful states, not absence.
+ */
+function omitEmptyValues(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (v === '') continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 function omitKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
