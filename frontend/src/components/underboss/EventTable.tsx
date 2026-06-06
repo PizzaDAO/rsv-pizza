@@ -102,7 +102,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [regionFilter, setRegionFilter] = useState<string>('all');
   const [rsvpComparator, setRsvpComparator] = useState<'>' | '<'>('>');
   const [rsvpThreshold, setRsvpThreshold] = useState<string>('');
   // quattro-12847: client-side "Open appeals only" filter. Client-side keeps
@@ -175,6 +174,27 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     setTagTouchOrder((p) => [tag, ...p.filter((k) => k !== tag)]); // float to top
   }
 
+  // Tri-state per-country filter (crosta-58498): mirrors the tag filter, but
+  // country is single-valued per event so includes use OR (not AND).
+  const [countryIncludes, setCountryIncludes] = useState<string[]>([]);
+  const [countryExcludes, setCountryExcludes] = useState<string[]>([]);
+  const [countryTouchOrder, setCountryTouchOrder] = useState<string[]>([]); // most-recently-touched first
+  const [showCountryFilter, setShowCountryFilter] = useState(false);
+
+  function getCountryFilterState(country: string): 'neutral' | 'include' | 'exclude' {
+    if (countryIncludes.includes(country)) return 'include';
+    if (countryExcludes.includes(country)) return 'exclude';
+    return 'neutral';
+  }
+
+  function setCountryFilterState(country: string, next: 'neutral' | 'include' | 'exclude') {
+    setCountryIncludes((p) => p.filter((k) => k !== country));
+    setCountryExcludes((p) => p.filter((k) => k !== country));
+    if (next === 'include') setCountryIncludes((p) => [...p, country]);
+    else if (next === 'exclude') setCountryExcludes((p) => [...p, country]);
+    setCountryTouchOrder((p) => [country, ...p.filter((k) => k !== country)]); // float to top
+  }
+
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -227,12 +247,13 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       );
     }
 
-    // Country filter (only when showRegion is active)
-    if (showRegion && regionFilter !== 'all') {
-      result = result.filter((e) => {
-        const country = e.country || '';
-        return country === regionFilter;
-      });
+    // Tri-state country filter (crosta-58498, only when showRegion is active).
+    // Country is single-valued, so include = OR (any selected), exclude = NONE.
+    if (showRegion && countryIncludes.length > 0) {
+      result = result.filter((e) => !!e.country && countryIncludes.includes(e.country));
+    }
+    if (showRegion && countryExcludes.length > 0) {
+      result = result.filter((e) => !e.country || !countryExcludes.includes(e.country));
     }
 
     // Tri-state tag filter (provola-58497): include = must have ALL; exclude = must have NONE
@@ -296,7 +317,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagIncludes, tagExcludes, rsvpComparator, rsvpThreshold, appealsOnly]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, countryIncludes, countryExcludes, showRegion, tagIncludes, tagExcludes, rsvpComparator, rsvpThreshold, appealsOnly]);
 
   useEffect(() => {
     onFilteredEventsChange?.(filteredEvents);
@@ -314,6 +335,19 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     const rest = availableTags.filter((t) => !active.includes(t));
     return [...active, ...rest];
   }, [availableTags, tagTouchOrder, tagIncludes, tagExcludes]);
+
+  const availableCountries = useMemo(
+    () => Array.from(new Set(events.map((e) => e.country).filter((c): c is string => Boolean(c)))).sort(),
+    [events]
+  );
+
+  // Dropdown ordering: floated active (include/exclude) countries first
+  // (most-recently touched first), then the remaining available alphabetically.
+  const orderedCountries = useMemo(() => {
+    const active = countryTouchOrder.filter((c) => countryIncludes.includes(c) || countryExcludes.includes(c));
+    const rest = availableCountries.filter((c) => !active.includes(c));
+    return [...active, ...rest];
+  }, [availableCountries, countryTouchOrder, countryIncludes, countryExcludes]);
 
   // Sponsorship suggestion banner: shown when exactly one tag is required
   // (single-tag include is the analog of the old single-select tag filter).
@@ -362,7 +396,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const hasActiveFilters =
     progressIncludes.length > 0 ||
     progressExcludes.length > 0 ||
-    regionFilter !== 'all' ||
+    countryIncludes.length > 0 ||
+    countryExcludes.length > 0 ||
     tagIncludes.length > 0 ||
     tagExcludes.length > 0 ||
     rsvpThreshold.trim() !== '' ||
@@ -427,18 +462,86 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           onToggle={(newState) => setFilterState('listed', newState)}
         />
 
-        {/* Country filter -- only when showRegion */}
-        {showRegion && (
-          <select
-            value={regionFilter}
-            onChange={(e) => setRegionFilter(e.target.value)}
-            className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
-          >
-            <option value="all">{t('eventTable.countryAll')}</option>
-            {[...new Set(events.map(e => e.country).filter(Boolean))].sort().map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+        {/* Tri-state country filter dropdown (crosta-58498) -- only when showRegion */}
+        {showRegion && availableCountries.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowCountryFilter((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                countryIncludes.length + countryExcludes.length > 0
+                  ? 'bg-theme-surface border-theme-stroke-hover text-theme-text'
+                  : 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
+              }`}
+            >
+              {countryIncludes.length + countryExcludes.length > 0
+                ? `${t('eventTable.countryFilterLabel')} (${countryIncludes.length + countryExcludes.length})`
+                : t('eventTable.countryFilterLabel')}
+              <ChevronDown size={14} />
+            </button>
+            {showCountryFilter && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowCountryFilter(false)} />
+                <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1">
+                  {(countryIncludes.length > 0 || countryExcludes.length > 0) && (
+                    <div className="flex items-center justify-end px-3 py-1.5 border-b border-theme-stroke">
+                      <button
+                        onClick={() => {
+                          setCountryIncludes([]);
+                          setCountryExcludes([]);
+                          setCountryTouchOrder([]);
+                        }}
+                        className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
+                      >
+                        {t('eventTable.countryFilterClear')}
+                      </button>
+                    </div>
+                  )}
+                  <div className="max-h-80 overflow-y-auto py-1">
+                    {orderedCountries.map((country, i) => {
+                      const state = getCountryFilterState(country);
+                      // Divider after the last floated active country (only if there are inactive countries below).
+                      const activeCount = orderedCountries.filter(
+                        (cc) => countryIncludes.includes(cc) || countryExcludes.includes(cc)
+                      ).length;
+                      const showDivider = activeCount > 0 && i === activeCount && activeCount < orderedCountries.length;
+                      return (
+                        <React.Fragment key={country}>
+                          {showDivider && <div className="border-t border-theme-stroke my-1" />}
+                          <div className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-surface transition-colors">
+                            <span className="text-sm text-theme-text truncate">{country}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => setCountryFilterState(country, state === 'include' ? 'neutral' : 'include')}
+                                className="p-1 hover:opacity-70 transition-opacity"
+                                aria-label={t('eventTable.countryFilterInclude')}
+                                title={t('eventTable.countryFilterInclude')}
+                              >
+                                <ThumbsUp
+                                  size={13}
+                                  className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                                />
+                              </button>
+                              <button
+                                onClick={() => setCountryFilterState(country, state === 'exclude' ? 'neutral' : 'exclude')}
+                                className="p-1 hover:opacity-70 transition-opacity"
+                                aria-label={t('eventTable.countryFilterExclude')}
+                                title={t('eventTable.countryFilterExclude')}
+                              >
+                                <ThumbsDown
+                                  size={13}
+                                  className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* Tri-state tag filter dropdown (provola-58497) */}
@@ -578,7 +681,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
             onClick={() => {
               setProgressIncludes([]);
               setProgressExcludes([]);
-              setRegionFilter('all');
+              setCountryIncludes([]);
+              setCountryExcludes([]);
+              setCountryTouchOrder([]);
               setTagIncludes([]);
               setTagExcludes([]);
               setTagTouchOrder([]);
