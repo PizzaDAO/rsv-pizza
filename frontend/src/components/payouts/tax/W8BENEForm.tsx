@@ -14,6 +14,7 @@ import {
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
 import { LocationAutocomplete } from '../../LocationAutocomplete';
+import { CountryPicker } from './CountryPicker';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
 
 // prosciutto-92107: case-insensitive US match for the permanent-residence
@@ -210,16 +211,17 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         disabled={disabled}
         required
       />
-      <IconInput
-        icon={Globe}
-        type="text"
-        placeholder="Country of incorporation"
+      {/* bocconcino-92107: searchable country picker replaces a plain text
+          input — ~250 ISO-3166 entries with flag emoji + native-name aliases.
+          Saved value is the full English name (e.g. "Germany"). Resetting
+          `treatyAutoFilledFor` lets the treaty effect re-evaluate when the
+          host changes the country (unless they've manually set treatyCountry). */}
+      <CountryPicker
         value={value.countryOfIncorporation ?? ''}
-        onChange={(e) => {
-          // Resetting the cache lets the treaty effect re-evaluate when the
-          // host changes the country (unless they've manually set treatyCountry).
-          onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
-        }}
+        onChange={(c) =>
+          onChange({ ...value, countryOfIncorporation: c, treatyAutoFilledFor: undefined })
+        }
+        placeholder="Country of incorporation"
         disabled={disabled}
         required
       />
