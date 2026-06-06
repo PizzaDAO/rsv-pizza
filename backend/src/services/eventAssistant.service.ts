@@ -200,16 +200,19 @@ function tzOffsetMsAt(instantMs: number, timezone: string): number {
 
 /* ------------------------------ prompt build ------------------------------ */
 
-function buildSystemPrompt(snapshot: Record<string, unknown>, timezone: string, role: RequesterRole): string {
-  const today = new Date();
-  const todayInTz = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    weekday: 'long',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(today);
-
+/**
+ * The system message is INTENTIONALLY STATIC — byte-identical across every
+ * event, host, and day — so OpenAI's automatic prompt caching can reuse the
+ * system message + tool schema as a cached prefix (50% off cached input). It
+ * therefore contains ONLY behavioral instructions and constant format rules:
+ * NO snapshot, NO concrete "today" date, NO specific timezone. All variable
+ * content lives in the trailing user message (see buildUserMessage).
+ *
+ * The only per-request branch is the host/admin line. Hosts and admins are two
+ * distinct static prefixes (each still cache-stable across all events/days),
+ * which is fine — caching keys on the exact prefix bytes.
+ */
+function buildSystemPrompt(role: RequesterRole): string {
   return [
     'You are the RSV.Pizza Event Assistant. A host gives you a plain-English instruction and you propose a structured set of changes to their event by calling the `propose_event_changes` function.',
     '',
@@ -217,11 +220,33 @@ function buildSystemPrompt(snapshot: Record<string, unknown>, timezone: string, 
     '- Only propose fields the host explicitly asked to change. Do NOT touch anything else.',
     '- For list fields you MUST return the COMPLETE new array (the full resulting list), not a delta.',
     '- For co_hosts you may ONLY remove or reorder existing entries — NEVER add a new co-host.',
-    '- For dates/times: resolve any relative phrasing ("next Friday", "tomorrow at 6pm") to an absolute local datetime in the event timezone, formatted as "YYYY-MM-DD HH:MM". Do not include a timezone offset; the value is interpreted in the event timezone.',
+    '- For dates/times: resolve any relative phrasing ("next Friday", "tomorrow at 6pm") to an absolute local datetime in the event timezone, formatted as "YYYY-MM-DD HH:MM". Do not include a timezone offset; the value is interpreted in the event timezone. The current date and the event timezone are provided in the host message below.',
     '- Suggested donation amounts are in CENTS (500 = $5.00).',
     '- If the instruction is ambiguous and you cannot safely propose changes, set `clarifying_question` and leave `changes` empty.',
     role === 'admin' ? '- You are assisting an ADMIN; admin-only fields are available.' : '- You are assisting a HOST; only host-editable fields are available.',
-    '',
+  ].join('\n');
+}
+
+/**
+ * Build the trailing USER message that carries all the per-request VARIABLE
+ * content: today's date, the event timezone, the trimmed current snapshot, and
+ * the host's instruction. Keeping this out of the system message preserves the
+ * static cacheable prefix (system message + tool schema).
+ */
+function buildUserMessage(
+  snapshot: Record<string, unknown>,
+  timezone: string,
+  instruction: string,
+): string {
+  const todayInTz = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
+  return [
     `Event timezone: ${timezone}`,
     `Today (in event timezone): ${todayInTz}`,
     '',
@@ -229,6 +254,9 @@ function buildSystemPrompt(snapshot: Record<string, unknown>, timezone: string, 
     // Prompt gets the non-empty subset of the snapshot to save tokens; the diff
     // logic still uses the full untrimmed snapshot (see runEventAssistant).
     JSON.stringify(omitEmptyValues(snapshot), null, 2),
+    '',
+    'Host instruction:',
+    instruction,
   ].join('\n');
 }
 
@@ -265,9 +293,11 @@ export async function runEventAssistant(params: {
   const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: buildSystemPrompt(snapshot, timezone, role) },
+      // Static prefix (cacheable): behavioral system prompt + tool schema.
+      { role: 'system', content: buildSystemPrompt(role) },
       ...history,
-      { role: 'user', content: instruction },
+      // Variable suffix: today's date + event tz + snapshot + the instruction.
+      { role: 'user', content: buildUserMessage(snapshot, timezone, instruction) },
     ],
     tools: [tool],
     tool_choice: { type: 'function', function: { name: 'propose_event_changes' } },
