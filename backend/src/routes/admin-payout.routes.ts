@@ -6025,6 +6025,324 @@ router.post(
 );
 
 // ============================================
+// sfincione-58500: POST /api/admin/payouts/:id/documents
+//
+// Let a full payment admin attach a new receipt / pizza-proof / event-proof
+// document to an existing payout straight from the /payments review modal —
+// the same things a host can do via PATCH /api/payouts/:id, but admin-side and
+// per-document.
+//
+// Mirrors the host-PATCH attach path in payout.routes.ts (~L2346-2412):
+//   - pizza/event docs are mirrored into the gallery (`photos`) auto-approved
+//     + auto-starred, with the dedup pre-check on (partyId, fileSize, mimeType).
+//   - receipts are OCR'd inline (analyzeReceipt + convertToUSD), exactly like
+//     POST /documents/:docId/retry-ocr. OCR failures do NOT fail the request —
+//     the doc is persisted with an ocrError so the admin can fix it via the
+//     existing edit / retry-ocr controls.
+//
+// Auth: requireAuth + requireAnyAdminOrPaymentAdmin (admin / super_admin /
+// payment_admin). Regional underbosses are not permitted (the middleware
+// rejects them) — the frontend also hides the control for underboss viewers.
+//
+// Body: { kind: 'receipt'|'pizza'|'event', url, fileName, fileSize, mimeType }
+// Returns: { document: <serialized payout_documents row> }
+// ============================================
+
+const ADMIN_DOC_KINDS = ['receipt', 'pizza', 'event'] as const;
+type AdminDocKind = (typeof ADMIN_DOC_KINDS)[number];
+
+// sfincione-58500: replicated from payout.routes.ts (not exported there).
+// PDFs feed their sibling `.thumb.png` to the image-only OCR pipeline; images
+// use their canonical URL.
+function deriveAdminOcrUrl(doc: { url: string; mimeType?: string | null }): string {
+  const mime = (doc.mimeType || '').toLowerCase();
+  const looksLikePdf =
+    mime === 'application/pdf' || doc.url.toLowerCase().split('?')[0].endsWith('.pdf');
+  return looksLikePdf ? `${doc.url}.thumb.png` : doc.url;
+}
+
+// sfincione-58500: replicated from payout.routes.ts assertSupabasePayoutUrl —
+// only accept Supabase-Storage URLs under the payout's own folder so an admin
+// can't point OCR / the gallery at an arbitrary external URL.
+function assertSupabasePayoutDocUrl(imageUrl: unknown, partyId: string): string {
+  if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
+    throw new AppError('url is required', 400, 'INVALID_IMAGE_URL');
+  }
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    throw new AppError('url is not a valid URL', 400, 'INVALID_IMAGE_URL');
+  }
+  if (!/\.supabase\.co$/.test(url.hostname)) {
+    throw new AppError('url must be hosted on Supabase Storage', 400, 'INVALID_IMAGE_URL');
+  }
+  const pathname = decodeURIComponent(url.pathname);
+  if (!pathname.includes('/event-images/')) {
+    throw new AppError('url must point into the event-images bucket', 400, 'INVALID_IMAGE_URL');
+  }
+  const expectedSegment = `/event-images/payouts/${partyId}/`;
+  if (!pathname.includes(expectedSegment)) {
+    throw new AppError(
+      `url must be under payouts/${partyId}/ in the event-images bucket`,
+      400,
+      'INVALID_IMAGE_URL_SCOPE',
+    );
+  }
+  return imageUrl;
+}
+
+router.post(
+  '/:id/documents',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const body = (req.body || {}) as {
+        kind?: unknown;
+        url?: unknown;
+        fileName?: unknown;
+        fileSize?: unknown;
+        mimeType?: unknown;
+      };
+
+      const kind = body.kind;
+      if (typeof kind !== 'string' || !(ADMIN_DOC_KINDS as readonly string[]).includes(kind)) {
+        throw new AppError(
+          `kind must be one of: ${ADMIN_DOC_KINDS.join(', ')}`,
+          400,
+          'VALIDATION_ERROR',
+        );
+      }
+      const docKind = kind as AdminDocKind;
+
+      const fileName = typeof body.fileName === 'string' && body.fileName.length > 0
+        ? body.fileName
+        : 'upload';
+      const fileSize = typeof body.fileSize === 'number' && Number.isFinite(body.fileSize)
+        ? body.fileSize
+        : 0;
+      const mimeType = typeof body.mimeType === 'string' && body.mimeType.length > 0
+        ? body.mimeType
+        : 'application/octet-stream';
+
+      const payout = await prisma.payout.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          partyId: true,
+          party: { select: { country: true } },
+        },
+      });
+      if (!payout) {
+        throw new AppError('Payout not found', 404, 'NOT_FOUND');
+      }
+
+      const partyId = payout.partyId;
+      const url = assertSupabasePayoutDocUrl(body.url, partyId);
+
+      const actor = await loadActor(req);
+      const uploaderUserId = req.userId ?? null;
+      const uploaderEmail = req.userEmail ?? null;
+
+      // sortOrder = (max existing doc sortOrder for this payout) + 1.
+      const maxAgg = await prisma.payoutDocument.aggregate({
+        where: { payoutId: payout.id },
+        _max: { sortOrder: true },
+      });
+      const sortOrder = (maxAgg._max.sortOrder ?? -1) + 1;
+
+      // For receipts: run OCR inline (mirrors POST /documents/:docId/retry-ocr).
+      // OCR fields default to "no result" and are overwritten on success.
+      let ocrAmount: Decimal | null = null;
+      let ocrCurrency: string | null = null;
+      let ocrConfidence: Decimal | null = null;
+      let originalAmount: Decimal | null = null;
+      let originalCurrency: string | null = null;
+      let exchangeRate: Decimal | null = null;
+      let ocrLineItems: Prisma.InputJsonValue | typeof Prisma.JsonNull = Prisma.JsonNull;
+      let ocrRaw: Prisma.InputJsonValue | typeof Prisma.JsonNull = Prisma.JsonNull;
+      let ocrError: string | null = null;
+      let ocrAttemptedAt: Date | null = null;
+      let ocrAttemptCount = 0;
+
+      if (docKind === 'receipt') {
+        const { analyzeReceipt } = await import('../services/ocr.service.js');
+        const { convertToUSD } = await import('../services/fx.service.js');
+        const ocrUrl = deriveAdminOcrUrl({ url, mimeType });
+        ocrAttemptedAt = new Date();
+        ocrAttemptCount = 1;
+        try {
+          const result = await analyzeReceipt({
+            imageUrl: ocrUrl,
+            partyCountry: payout.party?.country ?? null,
+          });
+          const fx = await convertToUSD(result.amount, result.currency);
+          const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
+          ocrLineItems = (result.lineItems ?? []) as unknown as Prisma.InputJsonValue;
+          ocrConfidence = new Decimal(result.confidence);
+          ocrRaw = {
+            ocr: result.raw,
+            fx: { source: fx.source, rate: fx.exchangeRate },
+          } as Prisma.InputJsonValue;
+          // Keep originalAmount even when unresolved so the admin sees what the
+          // receipt said and can pick the right currency in the edit modal.
+          originalAmount = new Decimal(fx.originalAmount);
+          ocrAmount = unresolved ? null : new Decimal(fx.usdAmount!);
+          ocrCurrency = unresolved ? null : fx.originalCurrency;
+          exchangeRate = unresolved
+            ? null
+            : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null);
+          ocrError = unresolved ? 'CURRENCY_UNRESOLVED' : null;
+        } catch (err: any) {
+          // Don't fail the request — persist the doc with the error so the
+          // admin can fix the amount via the existing edit / retry-ocr UI.
+          const msg = err?.message ? String(err.message) : String(err);
+          ocrError = msg.slice(0, 500);
+        }
+      }
+
+      const created = await prisma.$transaction(async (tx) => {
+        let photoId: string | null = null;
+
+        // pizza/event docs mirror into the gallery (photos) auto-approved +
+        // auto-starred, with the dedup pre-check from payout.routes.ts.
+        if (docKind === 'pizza' || docKind === 'event') {
+          const now = new Date();
+          const dup = await tx.photo.findFirst({
+            where: { partyId, fileSize, mimeType },
+            select: { id: true },
+          });
+          if (dup) {
+            photoId = dup.id;
+          } else {
+            const photo = await tx.photo.create({
+              data: {
+                partyId,
+                url,
+                fileName,
+                fileSize,
+                mimeType,
+                uploadedBy: null,
+                uploaderName: null,
+                uploaderEmail: uploaderEmail,
+                status: 'approved',
+                starred: true,
+                starredAt: now,
+                reviewedAt: now,
+                reviewedBy: uploaderUserId,
+              },
+              select: { id: true },
+            });
+            photoId = photo.id;
+          }
+        }
+
+        const row = await tx.payoutDocument.create({
+          data: {
+            partyId,
+            payoutId: payout.id,
+            kind: docKind,
+            url,
+            fileName,
+            fileSize,
+            mimeType,
+            sortOrder,
+            photoId,
+            uploadedByUserId: uploaderUserId,
+            uploadedByEmail: uploaderEmail,
+            ocrAmount,
+            ocrCurrency,
+            ocrConfidence,
+            originalAmount,
+            originalCurrency,
+            exchangeRate,
+            ocrLineItems,
+            ocrRaw,
+            ocrError,
+            ocrAttemptedAt,
+            ocrAttemptCount,
+          },
+          select: {
+            id: true,
+            kind: true,
+            url: true,
+            fileName: true,
+            fileSize: true,
+            mimeType: true,
+            ocrAmount: true,
+            ocrCurrency: true,
+            ocrConfidence: true,
+            originalAmount: true,
+            originalCurrency: true,
+            exchangeRate: true,
+            ocrLineItems: true,
+            isDuplicate: true,
+            ineligible: true,
+            ocrError: true,
+            sortOrder: true,
+            sourceReceiptIndex: true,
+            sourceReceiptCount: true,
+            boundingHint: true,
+            uploadedByUserId: true,
+          },
+        });
+
+        await tx.payoutAudit.create({
+          data: {
+            payoutId: payout.id,
+            action: 'edit_documents',
+            actorEmail: actor.email,
+            actorKind: actor.actorKind,
+            note: JSON.stringify({
+              scope: docKind === 'receipt' ? 'receipt' : 'photo',
+              documentId: row.id,
+              message: `admin added ${docKind} ${fileName}`,
+            }),
+          },
+        });
+
+        return row;
+      });
+
+      res.json({
+        document: {
+          id: created.id,
+          kind: created.kind,
+          url: created.url,
+          fileName: created.fileName,
+          fileSize: created.fileSize,
+          mimeType: created.mimeType,
+          ocrAmount: created.ocrAmount == null ? null : Number(created.ocrAmount),
+          ocrCurrency: created.ocrCurrency,
+          ocrConfidence:
+            created.ocrConfidence == null ? null : Number(created.ocrConfidence),
+          originalAmount:
+            created.originalAmount == null ? null : Number(created.originalAmount),
+          originalCurrency: created.originalCurrency,
+          exchangeRate:
+            created.exchangeRate == null ? null : Number(created.exchangeRate),
+          ocrLineItems: Array.isArray(created.ocrLineItems)
+            ? created.ocrLineItems
+            : null,
+          isDuplicate: created.isDuplicate === true,
+          ineligible: created.ineligible === true,
+          ocrError: created.ocrError,
+          sortOrder: created.sortOrder,
+          sourceReceiptIndex: created.sourceReceiptIndex ?? null,
+          sourceReceiptCount: created.sourceReceiptCount ?? null,
+          boundingHint: created.boundingHint ?? null,
+          uploadedByUserId: created.uploadedByUserId ?? null,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
 // crocchetta-92106 + crocchetta-92107: Telegram receipts reminder.
 //
 // Sends a Telegram nudge via the Molto Benny bot (`TELEGRAM_BOT_TOKEN`) to:

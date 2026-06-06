@@ -1869,6 +1869,18 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               }
               await refresh();
             }}
+            // sfincione-58500: after an admin attaches a receipt/photo, re-fetch
+            // the detail so the new doc + recomputed receipt subtotal render,
+            // and refresh the list so the row's amount/cap state stays in sync.
+            onDocumentsChanged={async () => {
+              try {
+                const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
+                setDetail(fresh);
+              } catch {
+                /* ignore — modal keeps its current state on a refetch failure */
+              }
+              await refresh();
+            }}
           />
         )}
         {externalModalState.open && (

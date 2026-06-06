@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, TaxForm, TaxFormType, TaxFormStatus } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, TaxForm, TaxFormType, TaxFormStatus } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -5109,6 +5109,29 @@ export async function retryPayoutDocumentOcr(
     `/api/admin/payouts/documents/${docId}/retry-ocr`,
     { method: 'POST', body: { runNow: opts?.runNow ?? true } },
   );
+}
+
+/**
+ * sfincione-58500: admin attaches a new receipt / pizza-proof / event-proof
+ * document to an existing payout from the /payments review modal. The backend
+ * OCRs receipts inline and mirrors pizza/event docs into the gallery, exactly
+ * like the host PATCH path. Returns the freshly-created PayoutDocument; callers
+ * re-fetch the payout detail to pick up recomputed receipt subtotals.
+ */
+export async function addAdminPayoutDocument(
+  payoutId: string,
+  body: {
+    kind: 'receipt' | 'pizza' | 'event';
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  },
+): Promise<{ document: PayoutDocument }> {
+  return apiRequest(`/api/admin/payouts/${payoutId}/documents`, {
+    method: 'POST',
+    body,
+  });
 }
 
 export async function approveAdminPayout(
