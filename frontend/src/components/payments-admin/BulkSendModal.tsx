@@ -4,6 +4,7 @@ import { X, Send, Loader2, CheckCircle2, XCircle, ExternalLink, AlertTriangle } 
 import { Checkbox } from '../Checkbox';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
+import { useSwcHubRules } from '../../hooks/useSwcHubRules';
 import type { AdminPayout, WalletPaidTotal } from '../../types';
 import { bulkExecutePayouts, fetchWalletPaidTotal, type BulkSendResult } from '../../lib/api';
 
@@ -35,6 +36,8 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   onCancel,
   onComplete,
 }) => {
+  // marinara-71630 P7: SWC-hub rules from config (same payments-admin endpoint).
+  const { rules: swcHubRules } = useSwcHubRules();
   const [phase, setPhase] = useState<Phase>('idle');
   const [results, setResults] = useState<BulkSendResult[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -234,13 +237,13 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     const swcHubRowIds = new Set<string>();
     const swcHubParties = new Set<string>();
     for (const p of eligible) {
-      if (isSwcHubParty(p.party)) {
+      if (isSwcHubParty(p.party, swcHubRules)) {
         swcHubRowIds.add(p.id);
         if (p.party?.id) swcHubParties.add(p.party.id);
       }
     }
     return { swcHubRowIds, swcHubPartyCount: swcHubParties.size };
-  }, [eligible]);
+  }, [eligible, swcHubRules]);
 
   // Close on Escape (only when not sending — never cancel an in-flight batch)
   useEffect(() => {

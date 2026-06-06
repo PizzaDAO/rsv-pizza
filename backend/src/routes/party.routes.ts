@@ -16,9 +16,8 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
-import { getReimbursementRules, getGppGlobalEditors } from '../lib/privateConfig.js';
-import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
-import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
+import { getGppGlobalEditors } from '../lib/privateConfig.js';
+import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2360,26 +2359,13 @@ router.get('/:id/reimbursement-options', async (req: AuthRequest, res: Response,
     });
     if (!party) throw new AppError('Party not found', 404, 'NOT_FOUND');
 
-    const rules = await getReimbursementRules();
-    const options = resolveReimbursementOptions(
-      { country: party.country, eventTags: party.eventTags },
-      rules
-    );
-
-    // marinara-71630: the config resolver matches country EXACTLY, but the
-    // Mercury sanctions gate must NORMALIZE (lowercase / strip parentheticals)
-    // so casing/parenthetical variants of a blocked country are still blocked.
-    // The sanctions list is compliance, not a private business secret, so it
-    // stays in code (`isMercuryBlocked`) and is layered over the config-resolved
-    // options here rather than encoded into `app_config`. Only mutate the
-    // mercury_card entry if it's present; leave everything else untouched.
-    if (isMercuryBlocked(party.country)) {
-      const mercury = options.find((o) => o.id === 'mercury_card');
-      if (mercury) {
-        mercury.enabled = false;
-        mercury.disabledReason = `Mercury cards are unavailable in ${party.country ?? 'your country'} due to compliance restrictions.`;
-      }
-    }
+    // Resolve config options + the code-side Mercury sanctions gate via the
+    // shared helper (same layering the PATCH /api/user/me save guard enforces,
+    // so display + enforcement can't drift).
+    const options = await resolvePartyReimbursementOptions({
+      country: party.country,
+      eventTags: party.eventTags,
+    });
 
     res.json({ options });
   } catch (error) {

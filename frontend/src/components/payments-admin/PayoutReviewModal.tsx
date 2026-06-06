@@ -8,6 +8,7 @@ import { isSwcHubParty } from '../../utils/swcHub';
 import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
+import { useSwcHubRules } from '../../hooks/useSwcHubRules';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 import {
@@ -250,6 +251,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // hardcoded). High neutral sentinel while unknown → the amber warning below
   // is inert until the real cap loads.
   const { caps: payoutCaps } = usePayoutCaps();
+  // marinara-71630 P7: SWC-hub country/tag rules now come from config (served on
+  // the same payments-admin endpoint as the caps). While unresolved (null) the
+  // matcher treats the party as NOT-SWC, so the warning simply doesn't block.
+  const { rules: swcHubRules } = useSwcHubRules();
   const perSubmissionMaxUsd =
     payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
   // Flag-ready inline error (mirrors the unapproveError pattern).
@@ -432,7 +437,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // the override. Revert-to-pending and revert-to-approved are NOT gated
   // (those are rollback actions, not reimbursement). Reset on every modal
   // close/reopen by the parent (PayoutReviewModal is re-mounted per payout).
-  const swcHub = isSwcHubParty(payout.party);
+  const swcHub = isSwcHubParty(payout.party, swcHubRules);
   const [swcAck, setSwcAck] = useState(false);
   // Re-sync the ack on payout swap (parent reload after refresh()) so admins
   // don't carry an ack across distinct payouts displayed in the same modal.

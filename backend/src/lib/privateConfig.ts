@@ -34,6 +34,7 @@ const KEYS = {
   reimbursementCapBands: 'private.reimbursement_cap_bands',
   sponsorshipPricing: 'private.sponsorship_pricing',
   gppGlobalEditors: 'private.gpp_global_editors',
+  swcHubRules: 'private.swc_hub_rules',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -377,6 +378,44 @@ export function getSponsorshipPricing(): Promise<SponsorshipPricing> {
  */
 export function getGppGlobalEditors(): Promise<string[]> {
   return getConfig<string[]>(KEYS.gppGlobalEditors, []);
+}
+
+// ---------------------------------------------------------------------------
+// SWC-hub party rules (marinara-71630 P7)
+//
+// Which parties are SWC-hub-routed (reimbursement handled through SWC, not
+// rsv.pizza) used to be hardcoded in the OPEN frontend (`frontend/src/utils/
+// swcHub.ts`): country === 'United States', the 'SWC Hub' event tag, and a
+// 'nonhub' exclusion tag. Those business literals move here, into `app_config`
+// (key `private.swc_hub_rules`), out of the open-source bundle. The non-secret
+// MATCHING logic stays in `swcHub.ts`; this just supplies the data.
+// ---------------------------------------------------------------------------
+
+export interface SwcHubRules {
+  /** Country names that flag a party as SWC-hub (matched per swcHub.ts). */
+  countries: string[];
+  /** Event tags that flag a party as SWC-hub. */
+  tags: string[];
+  /** Event tags that force a party OUT of the SWC-hub gate (takes precedence). */
+  excludeTags: string[];
+}
+
+/**
+ * SWC-hub party matching rules consumed by the payments-admin SWC warning.
+ *
+ * Fallback = EMPTY lists (`{ countries: [], tags: [], excludeTags: [] }`). This
+ * is FAIL-SAFE: with no rules NOTHING is flagged SWC-hub, so the worst case is
+ * "the SWC admin warning doesn't appear until config is seeded" — the SWC
+ * warning is a frontend-only admin ACK (not an enforcement gate), so an
+ * unseeded config simply means the soft warning doesn't block a send, never an
+ * over-broad block. Real values are seeded to `app_config` out-of-band.
+ */
+export function getSwcHubRules(): Promise<SwcHubRules> {
+  return getConfig<SwcHubRules>(KEYS.swcHubRules, {
+    countries: [],
+    tags: [],
+    excludeTags: [],
+  });
 }
 
 export { KEYS as PRIVATE_CONFIG_KEYS };

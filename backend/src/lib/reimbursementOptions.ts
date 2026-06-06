@@ -12,6 +12,8 @@
  */
 
 import type { ReimbursementOption, ReimbursementRules, CountryRule } from './privateConfig.js';
+import { getReimbursementRules } from './privateConfig.js';
+import { isMercuryBlocked } from './mercuryBlockedCountries.js';
 
 /** A fully-resolved option ready to send to the frontend. */
 export interface ResolvedOption {
@@ -94,4 +96,41 @@ export function resolveReimbursementOptions(
     });
   }
   return out;
+}
+
+/**
+ * Resolve a party's reimbursement options with the SAME layering the
+ * `GET /api/parties/:id/reimbursement-options` endpoint applies:
+ *  1. config-resolved options ({@link resolveReimbursementOptions} over
+ *     {@link getReimbursementRules}), then
+ *  2. the code-side Mercury sanctions gate ({@link isMercuryBlocked}) layered on
+ *     top — if the party's country is Mercury-blocked, the `mercury_card` entry
+ *     (when present) is forced `enabled:false` with a compliance reason.
+ *
+ * This is the single source of truth for "which payout methods may this party
+ * use", shared by the GET endpoint (display) and the PATCH /api/user/me save
+ * guard (enforcement) so they can never drift. Never throws — an unseeded
+ * config yields `[]`.
+ */
+export async function resolvePartyReimbursementOptions(
+  party: ResolverParty,
+): Promise<ResolvedOption[]> {
+  const rules = await getReimbursementRules();
+  const options = resolveReimbursementOptions(party, rules);
+
+  // marinara-71630: the config resolver matches country EXACTLY, but the
+  // Mercury sanctions gate must NORMALIZE (lowercase / strip parentheticals) so
+  // casing/parenthetical variants of a blocked country are still blocked. The
+  // sanctions list is compliance, not a private business secret, so it stays in
+  // code (`isMercuryBlocked`) and is layered over the config-resolved options
+  // here. Only mutate the mercury_card entry if it's present.
+  if (isMercuryBlocked(party.country)) {
+    const mercury = options.find((o) => o.id === 'mercury_card');
+    if (mercury) {
+      mercury.enabled = false;
+      mercury.disabledReason = `Mercury cards are unavailable in ${party.country ?? 'your country'} due to compliance restrictions.`;
+    }
+  }
+
+  return options;
 }

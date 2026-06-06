@@ -16,6 +16,7 @@ import {
   getReimbursementTiers,
   getReimbursementCapBands,
   getPayoutCaps,
+  getSwcHubRules,
 } from '../lib/privateConfig.js';
 
 /**
@@ -116,13 +117,24 @@ router.get(
   requirePaymentsAdminOrUnderboss,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const caps = await getPayoutCaps();
+      // marinara-71630 P7: bundle the SWC-hub matching rules into this same
+      // payments-admin endpoint. The SWC warning (SwcHubWarning) renders on the
+      // exact same /payments modals as the cap warning, for the exact same
+      // viewer set (payments-admin OR underboss), so it reuses this gate rather
+      // than adding a sibling endpoint. The rules are non-secret business data
+      // (country/tag lists) moved out of the open-source frontend bundle.
+      const [caps, swcHub] = await Promise.all([getPayoutCaps(), getSwcHubRules()]);
       // Only the two caps the frontend modals actually use for UX. The rest of
       // PayoutCaps (per-tx, daily, w9 threshold, hard ceiling) stay backend-only.
       res.json({
         payoutCaps: {
           perSubmissionMaxUsd: caps.perSubmissionMaxUsd,
           perAddressHardCapUsd: caps.perAddressHardCapUsd,
+        },
+        swcHub: {
+          countries: swcHub.countries,
+          tags: swcHub.tags,
+          excludeTags: swcHub.excludeTags,
         },
       });
     } catch (error) {

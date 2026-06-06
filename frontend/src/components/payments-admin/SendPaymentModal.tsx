@@ -27,6 +27,7 @@ import {
   type ApprovedPartySearchResult,
 } from '../../lib/api';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
+import { useSwcHubRules } from '../../hooks/useSwcHubRules';
 import type { PayoutMethod, WalletPaidTotal } from '../../types';
 
 /**
@@ -136,6 +137,11 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   // marinara-71630 P6 — per-submission cap from private config (was hardcoded
   // in the bundle). Neutral fallback while loading/on error → warning is inert.
   const { caps: payoutCaps } = usePayoutCaps();
+  // marinara-71630 P7: SWC-hub country/tag rules from config (same payments-admin
+  // endpoint as the caps). The local memo below applies the SAME looser
+  // (case-insensitive) matching this modal has always used, now against the
+  // configured rule values. While unresolved (null) nothing is flagged SWC.
+  const { rules: swcHubRules } = useSwcHubRules();
   const perSubmissionMaxUsd =
     payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
 
@@ -349,16 +355,31 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       ? Math.max(0, paidTotalUsd + amountNum - effectiveReimbursementCapUsd)
       : 0;
 
-  // SWC Hub derivation — mirrors isSwcHubParty's two-input shape. We accept
-  // either the country='United States' OR an event_tags entry containing
-  // 'SWC Hub' (case-insensitive).
+  // SWC Hub derivation — mirrors isSwcHubParty's two-input shape, but keeps this
+  // modal's historically LOOSER (case-insensitive) matching: country matched
+  // case-insensitively/trimmed, tag matched via case-insensitive `includes`.
+  // marinara-71630 P7: the country/tag/exclude literals now come from config
+  // (swcHubRules) instead of being hardcoded. The normalization below is
+  // UNCHANGED so behavior is preserved; null rules → not-SWC (safe default).
   const swcHub = useMemo(() => {
-    // marzano-58293: 'nonhub' tag opts the party out of the SWC Hub gate (USDC
-    // treatment) — precedence over the country + 'swc hub' signals below.
-    if ((eventTags ?? []).some((t) => t && t.trim().toLowerCase() === 'nonhub')) return false;
-    if (country && country.trim().toLowerCase() === 'united states') return true;
-    return (eventTags ?? []).some((t) => t && t.toLowerCase().includes('swc hub'));
-  }, [country, eventTags]);
+    if (!swcHubRules) return false;
+    const tags = eventTags ?? [];
+    const excludeTags = swcHubRules.excludeTags ?? [];
+    // marzano-58293: an exclude tag (e.g. 'nonhub') opts the party out of the
+    // SWC Hub gate (USDC treatment) — precedence over the country + tag signals.
+    if (
+      excludeTags.length > 0 &&
+      tags.some(
+        (t) => t && excludeTags.includes(t.trim().toLowerCase()),
+      )
+    ) {
+      return false;
+    }
+    const countries = (swcHubRules.countries ?? []).map((c) => c.trim().toLowerCase());
+    if (country && countries.includes(country.trim().toLowerCase())) return true;
+    const ruleTags = (swcHubRules.tags ?? []).map((t) => t.toLowerCase());
+    return tags.some((t) => t && ruleTags.some((rt) => t.toLowerCase().includes(rt)));
+  }, [country, eventTags, swcHubRules]);
 
   // Mercury blocked-country gate — same source as CreatePrepaymentModal
   // (pepperoni-47301). Disables the Mercury option, doesn't bypass.

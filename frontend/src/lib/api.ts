@@ -6126,6 +6126,16 @@ export interface UpdateUserMeInput {
   preferredPayoutMethod?: PayoutMethod | null;
   payoutWalletAddress?: string | null;
   payoutBankDetails?: BankDetails | null;
+  /**
+   * marinara-71630 P7: the event this payout method is being configured for.
+   * When set alongside a non-null `preferredPayoutMethod`, the backend
+   * hard-enforces that the method is allowed for that party (config-resolved
+   * options + the Mercury sanctions gate) and rejects a disallowed method with
+   * a 400 `PAYOUT_METHOD_NOT_ALLOWED`. PaymentDetailsCard always sends it so the
+   * crafted-request gap is closed; legitimate saves (the picker only offers
+   * enabled methods) are unaffected.
+   */
+  partyId?: string;
 }
 
 /**
@@ -6264,15 +6274,57 @@ export interface PayoutCapsConfig {
 }
 
 /**
+ * marinara-71630 P7 — SWC-hub matching rules served alongside the payout caps.
+ *
+ * The country/tag literals that drive the payments-admin SWC warning used to be
+ * hardcoded in the open-source frontend (`frontend/src/utils/swcHub.ts`). They
+ * now live in `app_config` (private.swc_hub_rules) and are served by the SAME
+ * GET /api/config/payout-caps endpoint (same payments-admin gate, same modals).
+ * Callers should go through the `useSwcHubRules` hook.
+ */
+export interface SwcHubRulesConfig {
+  /** Country names that flag a party SWC-hub (matched EXACTLY by swcHub.ts). */
+  countries: string[];
+  /** Event tags that flag a party SWC-hub (matched EXACTLY). */
+  tags: string[];
+  /** Event tags that force a party OUT of the gate (matched case-insensitively). */
+  excludeTags: string[];
+}
+
+/** Combined payload of GET /api/config/payout-caps. */
+export interface PayoutConfigResponse {
+  payoutCaps: PayoutCapsConfig;
+  swcHub: SwcHubRulesConfig;
+}
+
+/**
+ * Fetch the combined payments-admin payout config (caps + SWC-hub rules) in a
+ * single request. The `usePayoutCaps` / `useSwcHubRules` hooks each project out
+ * the slice they need and share the underlying network request via a module
+ * cache.
+ */
+export async function fetchPayoutConfig(): Promise<PayoutConfigResponse> {
+  return apiRequest<PayoutConfigResponse>('/api/config/payout-caps');
+}
+
+/**
  * Fetch the payments-admin payout caps. Callers should go through the
  * `usePayoutCaps` hook, which caches the result across components and supplies a
  * NEUTRAL fallback (never the real number) while loading / on error.
  */
 export async function fetchPayoutCaps(): Promise<PayoutCapsConfig> {
-  const res = await apiRequest<{ payoutCaps: PayoutCapsConfig }>(
-    '/api/config/payout-caps',
-  );
+  const res = await fetchPayoutConfig();
   return res.payoutCaps;
+}
+
+/**
+ * Fetch the payments-admin SWC-hub rules. Callers should go through the
+ * `useSwcHubRules` hook, which caches the result and supplies an EMPTY-rules
+ * fallback (nothing flagged SWC) while loading / on error.
+ */
+export async function fetchSwcHubRules(): Promise<SwcHubRulesConfig> {
+  const res = await fetchPayoutConfig();
+  return res.swcHub;
 }
 
 /**

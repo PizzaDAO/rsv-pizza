@@ -2,6 +2,8 @@ import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { resolveWalletInput } from '../services/ens.service.js';
+import { canUserEditParty } from '../helpers/partyAccess.js';
+import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 
 const router = Router();
 
@@ -44,6 +46,15 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
       preferredPayoutMethod,
       payoutWalletAddress,
       payoutBankDetails,
+      // marinara-71630 P7: the party this payout method is being configured for.
+      // Optional — when present (PaymentDetailsCard always sends it) and a
+      // payout method is being SET, the backend hard-enforces that the method is
+      // actually allowed for that party (config-resolved options + the Mercury
+      // sanctions gate, the SAME layering GET /reimbursement-options uses). This
+      // closes the gap where a crafted request could persist a disallowed method
+      // (e.g. mercury_card for a Mercury-blocked country). Legitimate saves from
+      // the card pass unchanged — the picker only ever offers enabled methods.
+      partyId,
     } = req.body;
 
     // Validate payoutMethod if provided (DB CHECK constraint mirrors this).
@@ -55,6 +66,54 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
       return res.status(400).json({
         error: { message: 'Invalid preferredPayoutMethod', code: 'VALIDATION_ERROR' },
       });
+    }
+
+    // marinara-71630 P7: hard-enforce the per-party reimbursement-option gating
+    // on the SAVE path. The GET /reimbursement-options endpoint DECIDES which
+    // methods a host may use, but until now nothing rejected a save of a
+    // disallowed method. When a non-null method is being set AND a partyId is
+    // supplied, resolve that party's allowed options and reject if the method is
+    // absent from the list or present-but-disabled. We only gate when partyId is
+    // provided (the legacy user-pref save without a party context is unchanged),
+    // and only when the caller can edit that party (so this never leaks party
+    // existence). On a config miss the resolver returns [] → we skip the gate
+    // (fail-open) so an unseeded config never blocks legitimate saves; the
+    // frontend already only offers enabled methods.
+    if (
+      preferredPayoutMethod !== undefined
+      && preferredPayoutMethod !== null
+      && partyId
+    ) {
+      const canEdit = await canUserEditParty(String(partyId), req.userId, req.userEmail);
+      if (canEdit) {
+        const party = await prisma.party.findUnique({
+          where: { id: String(partyId) },
+          select: { country: true, eventTags: true },
+        });
+        if (party) {
+          const options = await resolvePartyReimbursementOptions({
+            country: party.country,
+            eventTags: party.eventTags,
+          });
+          // Only enforce when the config actually resolved options for this
+          // party (non-empty). An empty list means unseeded config → fail-open.
+          if (options.length > 0) {
+            const opt = options.find(
+              (o) => o.id === preferredPayoutMethod && o.kind === 'method',
+            );
+            if (!opt || !opt.enabled) {
+              return res.status(400).json({
+                error: {
+                  message:
+                    opt?.disabledReason ??
+                    `The payout method "${preferredPayoutMethod}" isn't available for this event. Pick an allowed method.`,
+                  code: 'PAYOUT_METHOD_NOT_ALLOWED',
+                },
+              });
+            }
+          }
+        }
+      }
     }
 
     // taleggio-30219: resolve ENS → 0x before storing the user-default

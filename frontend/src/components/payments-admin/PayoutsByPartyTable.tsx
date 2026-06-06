@@ -48,6 +48,7 @@ import {
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
+import { useSwcHubRules } from '../../hooks/useSwcHubRules';
 import { isVideoFile } from '../../lib/mediaUtils';
 import {
   updatePayoutDocument,
@@ -2653,6 +2654,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   busyRowId,
   loading,
 }) => {
+  // marinara-71630 P7: SWC-hub rules from config (same payments-admin endpoint).
+  const { rules: swcHubRules } = useSwcHubRules();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // bottarga-92104: optimistic-override map for the `possible-scam` tag so the
   // pill + menu label flip immediately on click without waiting for a parent
@@ -3192,7 +3195,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             table-level actions aren't disabled here — the per-
                             action modals (PayoutReviewModal, MarkPartyPaidModal)
                             are the canonical gate point. */}
-                        {isSwcHubParty(row.party) && (
+                        {isSwcHubParty(row.party, swcHubRules) && (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] text-amber-300 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30"
                             title="SWC Hub party — reimbursement should be processed via SWC, not rsv.pizza"

@@ -156,6 +156,11 @@ export const PaymentDetailsCard: React.FC = () => {
       preferredPayoutMethod: method,
       payoutWalletAddress: method === 'usdc_base' ? walletAddress.trim() : null,
       payoutBankDetails: method === 'wire' ? bankDetails : null,
+      // marinara-71630 P7: send the party so the backend can hard-enforce the
+      // per-party reimbursement-option gating on save (rejects a disallowed
+      // method with 400). The client-side guard above already blocks this, but
+      // the server is now the authority — closing the crafted-request gap.
+      ...(party?.id ? { partyId: party.id } : {}),
     };
   };
 

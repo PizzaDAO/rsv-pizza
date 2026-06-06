@@ -17,6 +17,7 @@ import {
   getReimbursementCapBands,
   getSponsorshipPricing,
   getGppGlobalEditors,
+  getSwcHubRules,
   invalidateAll,
   PRIVATE_CONFIG_KEYS,
 } from './privateConfig.js';
@@ -201,5 +202,45 @@ describe('getGppGlobalEditors', () => {
   it('falls back to [] when the stored value is not valid JSON', async () => {
     mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json[' });
     expect(await getGppGlobalEditors()).toEqual([]);
+  });
+});
+
+// marinara-71630 P7: SWC-hub party rules accessor. Cover read-through and the
+// SAFE (empty = nothing flagged SWC) fallback.
+describe('getSwcHubRules', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('reads the rules from app_config when present', async () => {
+    const seeded = {
+      countries: ['United States'],
+      tags: ['SWC Hub'],
+      excludeTags: ['nonhub'],
+    };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const rules = await getSwcHubRules();
+
+    expect(rules).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.swcHubRules },
+    });
+  });
+
+  it('falls back to EMPTY lists (nothing flagged SWC-hub) when absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getSwcHubRules()).toEqual({ countries: [], tags: [], excludeTags: [] });
+  });
+
+  it('falls back to empty rules (never throws) when the DB read fails', async () => {
+    mockPrisma.appConfig.findUnique.mockRejectedValue(new Error('db down'));
+    expect(await getSwcHubRules()).toEqual({ countries: [], tags: [], excludeTags: [] });
+  });
+
+  it('falls back to empty rules when the stored value is not valid JSON', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json{' });
+    expect(await getSwcHubRules()).toEqual({ countries: [], tags: [], excludeTags: [] });
   });
 });

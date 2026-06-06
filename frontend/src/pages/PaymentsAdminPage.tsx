@@ -40,6 +40,7 @@ import type {
 import { formatUsd, computePartyTotals } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
+import { useSwcHubRules } from '../hooks/useSwcHubRules';
 import { normalizeText } from '../lib/normalizeText';
 import {
   PayoutsFilterBar,
@@ -162,6 +163,9 @@ function computeReceiptsTotalUsd(row: PartyPayoutsRow): number {
 }
 
 export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPageProps = {}) {
+  // marinara-71630 P7: SWC-hub country/tag rules from config (served on the same
+  // payments-admin endpoint as the caps). Passed into isSwcHubParty below.
+  const { rules: swcHubRules } = useSwcHubRules();
   // argentina-92103: stable region list to thread into API calls + filter
   // defaults. `undefined` when running as the unscoped /payments dashboard.
   const regions = useMemo(
@@ -1175,7 +1179,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                     // parmigiana-92104: PrepayQueueRow.party already carries
                     // country + eventTags so we can resolve the flag here and
                     // let MarkPartyPaidModal stay decoupled from the row shape.
-                    isSwcHub: isSwcHubParty(row.party),
+                    isSwcHub: isSwcHubParty(row.party, swcHubRules),
                   })
                 }
               />
@@ -1341,7 +1345,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 // parmigiana-92104: PartyPayoutsRow.party carries
                 // country + eventTags — resolve the SWC Hub flag here so the
                 // modal stays decoupled from the row shape.
-                isSwcHub: isSwcHubParty(row?.party),
+                isSwcHub: isSwcHubParty(row?.party, swcHubRules),
               });
             }}
             // Undo an accidental close. The table owns the reopenParty call +
@@ -1842,7 +1846,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 partyNameHint: detail.party.name,
                 // parmigiana-92104: PayoutReviewModal's `payout.party` has
                 // country + eventTags surfaced — propagate the SWC Hub flag.
-                isSwcHub: isSwcHubParty(detail.party),
+                isSwcHub: isSwcHubParty(detail.party, swcHubRules),
               })
             }
             // tagliatelle-49102: after a tag mutation, refresh the payouts

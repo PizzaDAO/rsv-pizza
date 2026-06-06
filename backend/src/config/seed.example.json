@@ -94,5 +94,12 @@
   },
 
   "_note_gpp_global_editors": "PLACEHOLDER global-editor allowlist (marinara-71630 P6) documenting SHAPE only — an OBVIOUSLY-FAKE example email. Real emails are seeded separately and NOT committed. A plain string[] of emails that get invisible editor access to ALL GPP events (they don't appear in any party's co_hosts). Access checks compare emails case-INSENSITIVELY. Empty list = no one gets global-editor rights (safe fallback); normal owner/co-host/underboss/admin checks still apply.",
-  "private.gpp_global_editors": ["editor@example.com"]
+  "private.gpp_global_editors": ["editor@example.com"],
+
+  "_note_swc_hub_rules": "PLACEHOLDER SWC-hub party rules (marinara-71630 P7) documenting SHAPE only — OBVIOUSLY-FAKE values. Real values are seeded separately and NOT committed. Drives the payments-admin SWC warning (frontend-only admin ACK, not an enforcement gate). `countries` + `tags` flag a party SWC-hub (the matcher in swcHub.ts matches countries EXACTLY by name and tags EXACTLY); `excludeTags` force a party OUT of the gate and take precedence (matched case-INSENSITIVELY + trimmed, so seed exclude values lowercased). Empty lists = nothing flagged SWC-hub (safe fallback; the soft warning simply doesn't appear).",
+  "private.swc_hub_rules": {
+    "countries": ["Exampleland"],
+    "tags": ["Example Hub"],
+    "excludeTags": ["nonhub"]
+  }
 }

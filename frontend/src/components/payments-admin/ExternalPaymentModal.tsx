@@ -28,6 +28,7 @@ import {
 } from '../../lib/api';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
+import { useSwcHubRules } from '../../hooks/useSwcHubRules';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 
 /**
@@ -174,6 +175,8 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   // marinara-71630 P6: per-submission soft cap fetched from app_config (not
   // hardcoded). High neutral sentinel while unknown → warning stays inert.
   const { caps: payoutCaps } = usePayoutCaps();
+  // marinara-71630 P7: SWC-hub rules from config (same payments-admin endpoint).
+  const { rules: swcHubRules } = useSwcHubRules();
   const perSubmissionMaxUsd =
     payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
 
@@ -200,7 +203,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   // parmigiana-92104: derive SWC Hub status from the selected party (clean
   // when nothing's selected yet).
-  const swcHub = isSwcHubParty(selectedParty);
+  const swcHub = isSwcHubParty(selectedParty, swcHubRules);
 
   const canSubmit = useMemo(() => {
     if (!partyId.trim()) return false;

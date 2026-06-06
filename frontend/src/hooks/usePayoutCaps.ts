@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { fetchPayoutCaps, type PayoutCapsConfig } from '../lib/api';
+import type { PayoutCapsConfig } from '../lib/api';
+import {
+  loadPayoutConfig,
+  getCachedPayoutConfig,
+  NEUTRAL_PAYOUT_CAPS,
+} from './payoutConfigCache';
 
 /**
  * marinara-71630 P6 — shared loader for the payments-admin payout caps that
@@ -8,9 +13,9 @@ import { fetchPayoutCaps, type PayoutCapsConfig } from '../lib/api';
  * numbers now live in `app_config` (private.payout_caps) and are served by
  * GET /api/config/payout-caps (payments-admin OR underboss gated).
  *
- * Caching: the fetch fires ONCE process-wide. The in-flight promise is cached at
- * module scope so several modals mounting together share a single request. The
- * resolved value is memoized so late subscribers resolve on the next tick.
+ * marinara-71630 P7: that endpoint now also carries the SWC-hub rules, so the
+ * underlying cached request is shared via `payoutConfigCache` with
+ * `useSwcHubRules` — both hooks resolve from one network request.
  *
  * Fallback: on any fetch failure (and while loading) the hook resolves to a
  * NEUTRAL cap, NOT the real production value. The backend is the enforcement
@@ -27,33 +32,7 @@ import { fetchPayoutCaps, type PayoutCapsConfig } from '../lib/api';
  * the backend rejects any over-cap amount regardless of what the frontend shows.
  */
 
-/** Neutral, non-secret fallback. High sentinel → UX warning/clamp is inert until the real cap loads. */
-export const NEUTRAL_PAYOUT_CAPS: PayoutCapsConfig = {
-  perSubmissionMaxUsd: Number.POSITIVE_INFINITY,
-  perAddressHardCapUsd: Number.POSITIVE_INFINITY,
-};
-
-// Module-level cache: shared across every hook consumer for the page lifetime.
-let cachedPromise: Promise<PayoutCapsConfig> | null = null;
-let cachedCaps: PayoutCapsConfig | null = null;
-
-function loadPayoutCaps(): Promise<PayoutCapsConfig> {
-  if (!cachedPromise) {
-    cachedPromise = fetchPayoutCaps()
-      .then((caps) => {
-        cachedCaps = caps;
-        return caps;
-      })
-      .catch((err) => {
-        console.warn('[usePayoutCaps] failed to load payout caps; using neutral fallback', err);
-        cachedCaps = NEUTRAL_PAYOUT_CAPS;
-        // Reset so a later mount can retry the fetch (e.g. transient 401/network).
-        cachedPromise = null;
-        return NEUTRAL_PAYOUT_CAPS;
-      });
-  }
-  return cachedPromise;
-}
+export { NEUTRAL_PAYOUT_CAPS };
 
 export interface UsePayoutCapsResult {
   caps: PayoutCapsConfig | null;
@@ -66,17 +45,20 @@ export interface UsePayoutCapsResult {
  * resolves.
  */
 export function usePayoutCaps(): UsePayoutCapsResult {
-  const [caps, setCaps] = useState<PayoutCapsConfig | null>(cachedCaps);
+  const [caps, setCaps] = useState<PayoutCapsConfig | null>(
+    getCachedPayoutConfig()?.payoutCaps ?? null,
+  );
 
   useEffect(() => {
-    if (cachedCaps) {
+    const cached = getCachedPayoutConfig();
+    if (cached) {
       // Already resolved (another consumer beat us to it).
-      setCaps(cachedCaps);
+      setCaps(cached.payoutCaps);
       return;
     }
     let active = true;
-    loadPayoutCaps().then((c) => {
-      if (active) setCaps(c);
+    loadPayoutConfig().then((cfg) => {
+      if (active) setCaps(cfg.payoutCaps);
     });
     return () => {
       active = false;
