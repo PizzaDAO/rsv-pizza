@@ -20,6 +20,7 @@ import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
+import heicRoutes from './routes/heic.routes.js'; // taleggio-71042: server-side HEIC->JPEG convert
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import gpp27Routes from './routes/gpp27.routes.js'; // soppressata-50927: admin-gated GPP27 (2027) create flow
@@ -175,6 +176,7 @@ app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-bas
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
 app.use('/api/tax-forms', taxFormRouter); // salame-92110: host tax-form upload (W-9 / W-8BEN / W-8BEN-E)
 app.use('/api/auth', authRoutes);
+app.use('/api/heic', heicRoutes); // taleggio-71042: public server-side HEIC->JPEG convert (no auth; SSRF-guarded)
 app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
