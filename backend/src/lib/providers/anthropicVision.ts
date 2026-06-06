@@ -11,6 +11,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getLlmModels } from '../privateConfig.js';
 import {
   VisionProvider,
   VisionResult,
@@ -51,9 +52,10 @@ export const anthropicVisionProvider: VisionProvider = {
 
   async analyze(imageDataUrl: string, ctx: VisionContext): Promise<VisionResult> {
     const { mediaType, data } = parseDataUrl(imageDataUrl);
+    const secondOpinionModel = (await getLlmModels()).visionSecondOpinion;
 
     const response = await getAnthropic().messages.create({
-      model: 'claude-3-5-sonnet-latest',
+      model: secondOpinionModel,
       max_tokens: 800,
       system: VISION_SYSTEM_PROMPT,
       messages: [

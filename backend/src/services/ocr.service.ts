@@ -16,6 +16,7 @@
 
 import { getOpenAI } from '../lib/openai.js';
 import { getCountryCode } from '../lib/countryCode.js';
+import { getLlmModels } from '../lib/privateConfig.js';
 
 // formaggi-89172: allowed categories. Keep in sync with the system prompt
 // and the sanitizer below. `other` is the safe fallback for anything else.
@@ -347,9 +348,10 @@ export async function analyzeReceiptMulti(
   const imageUrl = typeof arg === 'string' ? arg : arg.imageUrl;
   const partyCountry = typeof arg === 'string' ? null : (arg.partyCountry ?? null);
   const base64Image = await imageUrlToBase64DataUrl(imageUrl);
+  const ocrModel = (await getLlmModels()).ocr;
 
   const response = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o',
+    model: ocrModel,
     messages: [
       { role: 'system', content: buildMultiSystemPrompt(partyCountry) },
       {

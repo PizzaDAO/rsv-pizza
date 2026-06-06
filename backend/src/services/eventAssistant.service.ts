@@ -16,6 +16,7 @@
 
 import { prisma } from '../config/database.js';
 import { getOpenAI } from '../lib/openai.js';
+import { getLlmModels } from '../lib/privateConfig.js';
 import {
   buildToolSchema,
   validatePatch,
@@ -289,9 +290,10 @@ export async function runEventAssistant(params: {
     .map((t) => ({ role: t.role, content: t.content.slice(0, MAX_INSTRUCTION_LEN) }));
 
   const tool = buildToolSchema(role);
+  const assistantModel = (await getLlmModels()).assistant;
 
   const response = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: assistantModel,
     messages: [
       // Static prefix (cacheable): behavioral system prompt + tool schema.
       { role: 'system', content: buildSystemPrompt(role) },
