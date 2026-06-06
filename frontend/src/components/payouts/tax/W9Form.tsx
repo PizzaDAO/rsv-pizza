@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   User,
   Building2,
@@ -258,16 +258,10 @@ export const W9Form: React.FC<W9FormProps> = ({
     !!(value.exemptPayeeCode || value.fatcaCode || value.accountNumbers),
   );
 
-  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
-  // fresh mount. Saved drafts with an existing date are left untouched; the
-  // effect only fires once so subsequent user edits remain authoritative.
-  useEffect(() => {
-    if (!value.date || value.date.trim() === "") {
-      const today = new Date().toISOString().slice(0, 10);
-      onChange({ ...value, date: today });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // lonza-92106: the today-default for the signature Date field is now seeded
+  // by the parent (TaxFormSection) before this component mounts, so we don't
+  // need (or want) a mount-effect here. The old child-side effect raced with
+  // the parent's draft fetch and got overwritten when the draft arrived.
 
   const set = <K extends keyof W9FormData>(key: K, v: W9FormData[K]) =>
     onChange({ ...value, [key]: v });

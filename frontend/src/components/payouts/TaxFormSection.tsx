@@ -80,10 +80,26 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
   }, [autoOpenFormType]);
 
   // Seed the editor with existing draft/submitted data when entering edit mode.
+  //
+  // lonza-92106: default the signature `date` field to today (YYYY-MM-DD) here
+  // — at the parent level — so the value is guaranteed to be populated BEFORE
+  // any of the form components mount. The prior approach (a mount-effect in
+  // each form component) raced with this draft-seed effect: the form mounted
+  // with empty value, the mount-effect synchronously called `onChange` with
+  // today, then this effect re-fired with the loaded draft (often `date=''`)
+  // and overwrote today. Centralising the default eliminates the race for
+  // both the no-draft-on-file case (empty `existing.formData`) and the
+  // saved-draft-with-blank-date case.
   useEffect(() => {
     if (!editingType) return;
     const existing = forms.find((f) => f.formType === editingType);
-    setDraftData((existing?.formData as Record<string, any>) || {});
+    const seeded: Record<string, any> = {
+      ...((existing?.formData as Record<string, any>) || {}),
+    };
+    if (!seeded.date || (typeof seeded.date === 'string' && seeded.date.trim() === '')) {
+      seeded.date = new Date().toISOString().slice(0, 10);
+    }
+    setDraftData(seeded);
   }, [editingType, forms]);
 
   const handlePick = (formType: TaxFormType) => {
