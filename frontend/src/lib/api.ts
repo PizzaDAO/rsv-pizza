@@ -5708,11 +5708,13 @@ export interface CreatePayoutPhotoInput {
 }
 
 export interface CreatePayoutData {
-  pizzaPhotos: CreatePayoutPhotoInput[];
-  // pomodoro-92110: event photos (cap 30) persist as kind:'event' payout docs
-  // and mirror to the public gallery just like pizza photos.
-  eventPhotos: CreatePayoutPhotoInput[];
+  // porchetta-58296: pizza/event photos are no longer uploaded here — the host
+  // designates role photos in the gallery (photos.payout_role). Removed from
+  // the create payload.
   receiptPhotos: CreatePayoutPhotoInput[];
+  // porchetta-58296: host attestation that all receipts are submitted +
+  // itemized. Backend rejects without it (RECEIPT_ATTESTATION_REQUIRED).
+  receiptAttested?: boolean;
   hostNotes?: string;
   /**
    * arugula-38633 v3 follow-up: optional. When omitted/null, the payout is
@@ -5760,6 +5762,53 @@ export async function createPayout(
     { method: 'POST', body: data, requireAuth: true }
   );
   return res.payout;
+}
+
+/**
+ * porchetta-58296: designate (or clear) a photo's payout role. Host-only
+ * PATCH on the gallery photo. Pass `null` to clear the role. Returns the
+ * updated Photo, or null on failure.
+ */
+export async function designatePhotoRole(
+  partyId: string,
+  photoId: string,
+  role: 'group' | 'box_stack' | 'pizza' | null
+): Promise<Photo | null> {
+  try {
+    const res = await apiRequest<{ photo: Photo }>(
+      `/api/parties/${partyId}/photos/${photoId}`,
+      { method: 'PATCH', body: { payoutRole: role }, requireAuth: true }
+    );
+    return res.photo;
+  } catch (error) {
+    console.error('Error designating photo role:', error);
+    return null;
+  }
+}
+
+export interface PayoutSubmissionReadiness {
+  hasGroupPhoto: boolean;
+  hasBoxStackPhoto: boolean;
+  hasPizzaPhoto: boolean;
+  hasReceipt: boolean;
+}
+
+/**
+ * porchetta-58296: drives the NewPayoutForm submit gate — whether the event
+ * has all three designated role photos + at least one receipt.
+ */
+export async function fetchPayoutSubmissionReadiness(
+  partyId: string
+): Promise<PayoutSubmissionReadiness | null> {
+  try {
+    return await apiRequest<PayoutSubmissionReadiness>(
+      `/api/parties/${partyId}/payouts/submission-readiness`,
+      { requireAuth: true }
+    );
+  } catch (error) {
+    console.error('Error fetching payout submission readiness:', error);
+    return null;
+  }
 }
 
 export async function listPayouts(partyId: string): Promise<Payout[]> {

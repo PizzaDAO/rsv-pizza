@@ -821,6 +821,29 @@
     "ineligiblePill": "不符合条件",
     "ineligibleLineTag": "不符合条件",
     "lineItemsToggle": "明细项目",
-    "eligibleLineTotal": "符合条件总额"
+    "eligibleLineTotal": "符合条件总额",
+    "receiptAttestation": "我已提交所有收据，并且都已逐项列出。",
+    "receiptAttestationHelp": "请至少上传一张收据以启用此选项。",
+    "eventPhotosTitle": "活动照片",
+    "eventPhotosSubtitle": "指定一张活动的合影、一张盒子堆叠照片和一张披萨照片。可从图库中选择或上传新照片。",
+    "selectOrUpload": "选择或上传",
+    "additionalPhotos": "添加更多照片（可选）",
+    "roles": {
+      "group": "合影",
+      "boxStack": "盒子堆叠照片",
+      "pizza": "披萨照片"
+    },
+    "rolePicker": {
+      "title": "选择你的{{role}}",
+      "subtitle": "从图库中选择一张活动照片或上传新照片。",
+      "selectFromGallery": "从图库中选择",
+      "uploadNew": "上传新照片",
+      "uploading": "上传中…",
+      "empty": "暂无照片。上传一张以开始。",
+      "ineligibleNote": "拍摄于活动开始之前",
+      "invalidType": "不支持的文件类型。请使用 JPEG、PNG、WebP、GIF 或 HEIC。",
+      "tooLarge": "文件过大。最大为 25 MB。",
+      "uploadFailed": "上传失败。请重试。"
+    }
   }
 }
