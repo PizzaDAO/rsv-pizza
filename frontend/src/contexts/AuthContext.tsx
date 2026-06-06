@@ -22,6 +22,11 @@ interface User {
   preferredPayoutMethod?: PayoutMethod | null;
   payoutWalletAddress?: string | null;
   payoutBankDetails?: BankDetails | null;
+  // marinara-71630 P7b: server-computed super-admin flag (DB Admin table,
+  // role === 'super_admin'). Hydrated from GET /api/user/me on mount; replaces
+  // the old hardcoded `hello@rarepizzas.com` email checks in HostPage/EventPage.
+  // Extends those controls to ALL Admin-table super_admins (approved widening).
+  isSuperAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -95,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             preferredPayoutMethod: me.preferredPayoutMethod ?? null,
             payoutWalletAddress: me.payoutWalletAddress ?? null,
             payoutBankDetails: me.payoutBankDetails ?? null,
+            // marinara-71630 P7b: server-computed super-admin flag.
+            isSuperAdmin: me.isSuperAdmin === true,
           };
           try { localStorage.setItem('user', JSON.stringify(merged)); } catch { /* quota */ }
           return merged;

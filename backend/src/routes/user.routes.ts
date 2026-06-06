@@ -1,7 +1,10 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { resolveWalletInput } from '../services/ens.service.js';
+import { canUserEditParty } from '../helpers/partyAccess.js';
+import { getReimbursementRules } from '../lib/privateConfig.js';
+import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 
 const router = Router();
 
@@ -27,7 +30,14 @@ router.get('/me', async (req: AuthRequest, res: Response, next: NextFunction) =>
       },
     });
 
-    res.json({ user });
+    // marinara-71630 P7b: surface the server-side super-admin determination so
+    // the frontend can stop hardcoding the internal `hello@rarepizzas.com`
+    // identity (HostPage/EventPage). Computed via the EXISTING `isSuperAdmin`
+    // DB-backed rule (Admin table, role === 'super_admin') so it extends these
+    // controls to ALL Admin-table super_admins, not just one email.
+    const superAdmin = await isSuperAdmin(req.userEmail);
+
+    res.json({ user: user ? { ...user, isSuperAdmin: superAdmin } : user });
   } catch (error) {
     next(error);
   }
@@ -44,6 +54,10 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
       preferredPayoutMethod,
       payoutWalletAddress,
       payoutBankDetails,
+      // marinara-71630 P7b: PaymentDetailsCard sends the party in scope so the
+      // backend can hard-enforce party-scoped reimbursement-option gating on the
+      // SAVE path (the GET endpoint only DECIDES which methods are allowed).
+      partyId,
     } = req.body;
 
     // Validate payoutMethod if provided (DB CHECK constraint mirrors this).
@@ -74,6 +88,54 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
               code: 'INVALID_WALLET_ADDRESS',
             },
           });
+        }
+      }
+    }
+
+    // marinara-71630 P7b: hard-enforce party-scoped reimbursement-option gating
+    // on the SAVE path. The GET endpoint only DECIDES which methods a host may
+    // pick; a crafted request could otherwise persist a method this party isn't
+    // allowed to use (e.g. mercury_card for a Mercury-blocked country). When the
+    // request sets a non-null payout method AND names a partyId the caller can
+    // edit, resolve that party's allowed options (via the SAME shared helper the
+    // GET endpoint uses) and reject if the submitted method is absent or
+    // disabled. FAIL OPEN if the config is unseeded (empty resolved set) so a
+    // missing app_config row never blocks legitimate saves.
+    if (
+      preferredPayoutMethod !== undefined
+      && preferredPayoutMethod !== null
+      && partyId
+      && typeof partyId === 'string'
+    ) {
+      const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+      if (canEdit) {
+        const party = await prisma.party.findUnique({
+          where: { id: partyId },
+          select: { country: true, eventTags: true },
+        });
+        if (party) {
+          const rules = await getReimbursementRules();
+          const options = resolvePartyReimbursementOptions(
+            { country: party.country, eventTags: party.eventTags },
+            rules
+          );
+          // Fail OPEN on an unseeded config: an empty resolved set means we have
+          // no rules to enforce, so don't block the save.
+          if (options.length > 0) {
+            const opt = options.find(
+              (o) => o.id === preferredPayoutMethod && o.kind === 'method'
+            );
+            if (!opt || !opt.enabled) {
+              return res.status(400).json({
+                error: {
+                  message:
+                    opt?.disabledReason ||
+                    `The payout method "${preferredPayoutMethod}" is not available for this event.`,
+                  code: 'PAYOUT_METHOD_NOT_ALLOWED',
+                },
+              });
+            }
+          }
         }
       }
     }
