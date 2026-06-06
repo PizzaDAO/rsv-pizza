@@ -8,6 +8,10 @@
  * frontend/src/lib/appDefinitions.ts. The frontend is the UX source of truth;
  * the backend only needs the set of valid `tab` values to validate an incoming
  * `appTab` so a literal {appLink} token can never ship to a recipient.
+ *
+ * pesto-58496: this frontend⊆backend invariant is ENFORCED by the unit test
+ * frontend/src/lib/broadcastAppCatalog.test.ts (it imports this file directly).
+ * If you add a BROADCAST_APPS entry whose tab isn't here, that test fails.
  */
 export const BROADCAST_APP_TABS: readonly string[] = [
   'partners',

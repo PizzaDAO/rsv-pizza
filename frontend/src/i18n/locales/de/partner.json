@@ -415,7 +415,10 @@
       "groupsSection": "Group chats",
       "hostsSection": "Host DMs",
       "blockedWarning": "{{count}} host blocked the bot and was disconnected. Consider reaching out another way.",
-      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way."
+      "blockedWarning_other": "{{count}} hosts blocked the bot and were disconnected. Consider reaching out another way.",
+      "linkNotAdded": "link not added",
+      "linkMissingWarning": "{{count}} recipient received the message without the link.",
+      "linkMissingWarning_other": "{{count}} recipients received the message without the link."
     }
   },
   "eventRow": {
