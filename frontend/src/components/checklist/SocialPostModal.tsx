@@ -59,7 +59,7 @@ function buildDefaultText(party: Party): string {
     `${flag}\u{1F355}\u{1F973}\n` +
     `We had a blast celebrating Bitcoin Pizza Day in ${city}!\n` +
     `\n` +
-    `Thanks ${tags} for supporting the event! See you next year!`
+    `Thanks ${tags} for supporting the event. See you next year!`
   );
 }
 
