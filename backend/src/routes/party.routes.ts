@@ -5,9 +5,10 @@ import { AppError } from '../middleware/error.js';
 import { withBennySignature } from '../lib/bennySignature.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
-import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS, GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import {
   capValuesDiffer,
@@ -16,7 +17,7 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
-import { getReimbursementRules } from '../lib/privateConfig.js';
+import { getReimbursementRules, getGppGlobalEditors } from '../lib/privateConfig.js';
 import { resolveReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 
@@ -45,7 +46,8 @@ async function getPartyWithOwnershipCheck(partyId: string, userId?: string, user
 
   // Check if user is a GPP global editor
   if (userEmail && (party as any).eventType === 'gpp') {
-    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+    const gppEditors = await getGppGlobalEditors();
+    if (gppEditors.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
       return party;
     }
   }
@@ -138,7 +140,8 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
 
     // 4. GPP global editor parties (if user is a GPP global editor)
     let gppEditorParties: typeof ownedParties = [];
-    if (userEmail && GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
+    const gppEditors = await getGppGlobalEditors();
+    if (userEmail && gppEditors.some(e => e.toLowerCase() === userEmail!.toLowerCase())) {
       gppEditorParties = await prisma.party.findMany({
         where: { eventType: 'gpp' },
         select: slimSelect,
@@ -886,14 +889,35 @@ async function softCancelParty(
   userEmail: string | undefined,
   reason: string | null,
 ) {
-  return prisma.party.update({
-    where: { id: partyId },
-    data: {
-      cancelledAt: new Date(),
-      cancelledBy: userEmail || 'unknown',
-      cancellationReason:
-        reason && reason.trim() ? reason.trim().slice(0, 500) : null,
-    },
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.party.findUnique({
+      where: { id: partyId },
+      select: { underbossStatus: true },
+    });
+    const downgrade =
+      !!current && ['approved', 'listed'].includes(current.underbossStatus);
+    const updated = await tx.party.update({
+      where: { id: partyId },
+      data: {
+        cancelledAt: new Date(),
+        cancelledBy: userEmail || 'unknown',
+        cancellationReason:
+          reason && reason.trim() ? reason.trim().slice(0, 500) : null,
+        ...(downgrade ? { underbossStatus: 'pending' } : {}),
+      },
+    });
+    if (downgrade) {
+      await writeStatusAudit(
+        tx,
+        partyId,
+        current!.underbossStatus,
+        'pending',
+        userEmail || 'unknown',
+        'owner',
+        'auto-unapproved on host cancel',
+      );
+    }
+    return updated;
   });
 }
 

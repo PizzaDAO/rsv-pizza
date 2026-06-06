@@ -581,10 +581,18 @@ router.post(
       // stracciatella-92114: a single uploaded photo may contain MULTIPLE
       // receipts. Detect them all, then convert each independently (FX is
       // per-amount — an unresolved currency on one must not poison siblings).
-      const ocrResults = await analyzeReceiptMulti({
-        imageUrl,
-        partyCountry: partyForCountry?.country ?? null,
-      });
+      //
+      // scamorza-58296: graceful fallback. A transient OCR/FX failure used to
+      // bubble to next(error) → bare HTTP 500, dead-ending the host with an
+      // "internal server error" on the receipt row. Instead, catch here and
+      // return a shape-compatible 200 that flags OCR_FAILED so the frontend
+      // drops the host into a manual USD-amount entry field (mirrors the
+      // POST /payouts allSettled resilience for the preview path).
+      try {
+        const ocrResults = await analyzeReceiptMulti({
+          imageUrl,
+          partyCountry: partyForCountry?.country ?? null,
+        });
 
       // Build the per-receipt preview array. Each element mirrors the legacy
       // top-level single-receipt shape + an `index`, `merchant`, `boundingHint`.
@@ -640,6 +648,25 @@ router.post(
         conversionNote: head ? head.conversionNote : undefined,
         ocrError: receiptCount === 0 ? 'NO_RECEIPT_DETECTED' : (head ? head.ocrError : null),
       });
+      } catch (err) {
+        console.warn(`[ocr-preview] OCR failed for party ${partyId}; returning manual-entry fallback.`, err);
+        return res.json({
+          receipts: [],
+          receiptCount: 0,
+          amount: 0,
+          currency: 'USD',
+          originalAmount: 0,
+          originalCurrency: '',
+          exchangeRate: 0,
+          confidence: 0,
+          items: [],
+          lineItems: null,
+          ocrRaw: null,
+          fxSource: 'unresolved',
+          conversionNote: undefined,
+          ocrError: 'OCR_FAILED',
+        });
+      }
     } catch (error) {
       next(error);
     }

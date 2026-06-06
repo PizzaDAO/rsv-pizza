@@ -44,6 +44,7 @@ import {
   type ReceiptLightboxImage,
   formatUsd,
   computePartyTotals,
+  CapInlineEditor,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
@@ -226,15 +227,6 @@ interface PayoutsByPartyTableProps {
       groupReason?: string;
     } | { error: string },
   ) => void;
-  /**
-   * crocchetta-92107: per-city Telegram group chat_id map keyed by the
-   * lower-cased, trimmed city name (with the "Global Pizza Party " prefix
-   * stripped). Populated by the parent from `fetchSheetCities()` —
-   * `SheetCity.groupId` — the same source /underboss uses for its broadcast
-   * tooling. When a row's city is missing from the map, the group post is
-   * skipped server-side with `groupReason: 'no city TG group set'`.
-   */
-  cityGroupChatIds?: Map<string, string>;
   /**
    * bufalina-60733: fake-detection risk scores keyed by party id. Only
    * medium/high (≥30) parties are present; an absent key means "no badge".
@@ -2652,10 +2644,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
+  onCapUpdated,
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
-  cityGroupChatIds,
   fakeScores,
   viewerRole = 'admin',
   busyRowId,
@@ -2928,20 +2920,17 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
    * crocchetta-92106 + crocchetta-92107: dispatch the Send-receipts-reminder
    * POST and surface the per-channel outcome to the parent via
    * `onTgReminderResult` so the page-level toast stack renders the right
-   * message. The per-city Telegram group chat_id is resolved from
-   * `cityGroupChatIds` (a sheet-derived map keyed by the stripped,
-   * lower-cased city name); when the map has no entry the request omits the
-   * field and the backend marks the group post skipped. Errors are caught
-   * and forwarded with an `error` shape so the parent can flash a failure
-   * toast without the table needing its own alert path.
+   * message. tonda-58293: the per-city Telegram group chat_id is now resolved
+   * server-side from `city_telegram_groups` (the backend derives the city from
+   * the party name); the client no longer passes a groupChatId. Errors are
+   * caught and forwarded with an `error` shape so the parent can flash a
+   * failure toast without the table needing its own alert path.
    */
   async function handleSendTgReminder(row: PartyPayoutsRow) {
     const partyId = row.party.id;
-    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
-    const groupChatId = cityGroupChatIds?.get(cityKey);
     setTgReminderBusyPartyId(partyId);
     try {
-      const result = await sendTgReceiptsReminder(partyId, groupChatId);
+      const result = await sendTgReceiptsReminder(partyId);
       onTgReminderResult?.(partyId, result);
     } catch (err) {
       onTgReminderResult?.(partyId, {
@@ -2954,16 +2943,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
 
   /**
    * Sibling of {@link handleSendTgReminder}: dispatch the wallet reminder POST
-   * and forward the per-channel outcome via `onTgWalletReminderResult`. Same
-   * city→group chat_id resolution.
+   * and forward the per-channel outcome via `onTgWalletReminderResult`. Group
+   * chat_id resolved server-side (tonda-58293) — no client groupChatId.
    */
   async function handleSendWalletReminder(row: PartyPayoutsRow) {
     const partyId = row.party.id;
-    const cityKey = stripGppPrefix(row.party.name).toLowerCase().trim();
-    const groupChatId = cityGroupChatIds?.get(cityKey);
     setWalletReminderBusyPartyId(partyId);
     try {
-      const result = await sendTgWalletReminder(partyId, groupChatId);
+      const result = await sendTgWalletReminder(partyId);
       onTgWalletReminderResult?.(partyId, result);
     } catch (err) {
       onTgWalletReminderResult?.(partyId, {
@@ -3278,6 +3265,22 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                               : 'Tax forms: off'}
                           </button>
                         )}
+                        {/* calzone-58293: inline reimbursement-cap editor in the By-city header so
+                            admins can raise/clear the party's cap without leaving /payments. Saves to
+                            parties.reimbursement_cap_usd (admin + underboss, scope-checked server-side).
+                            stopPropagation so editing doesn't toggle the row expand. */}
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-theme-text-muted"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Reimbursement cap (validated value or max numeric event_tag)"
+                        >
+                          <CapInlineEditor
+                            partyId={row.party.id}
+                            currentCapUsd={row.party.effectiveReimbursementCapUsd ?? null}
+                            onUpdated={() => onCapUpdated?.(row.party.id)}
+                          />
+                          <span>cap</span>
+                        </span>
                         {/* bottarga-92104: red "Possible scam" pill — visible
                             in the city header next to other status pills when
                             the `possible-scam` tag is present on the party.

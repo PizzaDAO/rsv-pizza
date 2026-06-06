@@ -1,15 +1,27 @@
 import { prisma } from '../config/database.js';
 import { isSuperAdmin, isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getUnderbossScope, partyMatchesScope } from './underbossScope.js';
+import { getGppGlobalEditors } from '../lib/privateConfig.js';
 
 /**
  * Emails that automatically get editor access to ALL GPP events.
  * These users don't appear in the co_hosts array, so they're invisible
  * in host settings and on the public event page.
+ *
+ * marinara-71630 P6: the real allowlist moved out of committed source into
+ * `app_config` (key `private.gpp_global_editors`). Read it via the async
+ * `getGppGlobalEditors()` accessor (re-exported here for callers that used to
+ * import the const). Email comparison stays case-INSENSITIVE — every callsite
+ * lowercases both the configured email and the candidate email before
+ * comparing, preserving the original semantics exactly.
  */
-export const GPP_GLOBAL_EDITORS = [
-  'hunter@rarepizzas.com',
-];
+export { getGppGlobalEditors };
+
+/** True iff `userEmail` is in the GPP global-editor allowlist (case-insensitive). */
+async function isGppGlobalEditor(userEmail: string): Promise<boolean> {
+  const editors = await getGppGlobalEditors();
+  return editors.some((e) => e.toLowerCase() === userEmail.toLowerCase());
+}
 
 /**
  * Valid tab IDs that can appear in a co-host's allowedTabs array.
@@ -75,7 +87,7 @@ export async function canUserEditParty(
 
   // Check if user is a GPP global editor
   if (userEmail && (party as any).eventType === 'gpp') {
-    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+    if (await isGppGlobalEditor(userEmail)) {
       return true;
     }
   }
@@ -152,7 +164,7 @@ export async function canUserAccessTab(
 
   // GPP global editors can access all tabs
   if (userEmail && party.eventType === 'gpp') {
-    if (GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === userEmail.toLowerCase())) {
+    if (await isGppGlobalEditor(userEmail)) {
       return true;
     }
   }

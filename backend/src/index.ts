@@ -69,6 +69,10 @@ import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admi
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
+import {
+  surveyQuestionsAdminRouter,
+  surveyQuestionSetsAdminRouter,
+} from './routes/admin/surveyQuestions.routes.js';
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
@@ -150,6 +154,8 @@ app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wal
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
 app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-management routes (transfer ownership) — before /api/admin catch-all
 app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-61455: image-authenticity check — before /api/admin catch-all
+app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-58297: survey question CRUD — before /api/admin catch-all
+app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)

@@ -103,7 +103,6 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [regionFilter, setRegionFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
   const [rsvpComparator, setRsvpComparator] = useState<'>' | '<'>('>');
   const [rsvpThreshold, setRsvpThreshold] = useState<string>('');
   // quattro-12847: client-side "Open appeals only" filter. Client-side keeps
@@ -153,6 +152,27 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     } else if (newState === 'exclude') {
       setProgressExcludes((prev) => [...prev, key]);
     }
+  }
+
+  // Tri-state per-tag filter (provola-58497): include (require) / exclude / neutral.
+  // tagTouchOrder floats recently-interacted tags to the top of the dropdown.
+  const [tagIncludes, setTagIncludes] = useState<string[]>([]);
+  const [tagExcludes, setTagExcludes] = useState<string[]>([]);
+  const [tagTouchOrder, setTagTouchOrder] = useState<string[]>([]); // most-recently-touched first
+  const [showTagFilter, setShowTagFilter] = useState(false);
+
+  function getTagFilterState(tag: string): 'neutral' | 'include' | 'exclude' {
+    if (tagIncludes.includes(tag)) return 'include';
+    if (tagExcludes.includes(tag)) return 'exclude';
+    return 'neutral';
+  }
+
+  function setTagFilterState(tag: string, next: 'neutral' | 'include' | 'exclude') {
+    setTagIncludes((p) => p.filter((k) => k !== tag));
+    setTagExcludes((p) => p.filter((k) => k !== tag));
+    if (next === 'include') setTagIncludes((p) => [...p, tag]);
+    else if (next === 'exclude') setTagExcludes((p) => [...p, tag]);
+    setTagTouchOrder((p) => [tag, ...p.filter((k) => k !== tag)]); // float to top
   }
 
   function toggleSelect(id: string) {
@@ -215,9 +235,12 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
       });
     }
 
-    // Tag filter
-    if (tagFilter !== 'all') {
-      result = result.filter((e) => e.eventTags?.includes(tagFilter));
+    // Tri-state tag filter (provola-58497): include = must have ALL; exclude = must have NONE
+    if (tagIncludes.length > 0) {
+      result = result.filter((e) => tagIncludes.every((tag) => e.eventTags?.includes(tag)));
+    }
+    if (tagExcludes.length > 0) {
+      result = result.filter((e) => tagExcludes.every((tag) => !e.eventTags?.includes(tag)));
     }
 
     // RSVP count filter — only applied when threshold has a non-empty value
@@ -273,7 +296,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     });
 
     return result;
-  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagFilter, rsvpComparator, rsvpThreshold, appealsOnly]);
+  }, [events, search, sortField, sortDir, progressIncludes, progressExcludes, regionFilter, showRegion, tagIncludes, tagExcludes, rsvpComparator, rsvpThreshold, appealsOnly]);
 
   useEffect(() => {
     onFilteredEventsChange?.(filteredEvents);
@@ -284,12 +307,23 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     [events]
   );
 
+  // Dropdown ordering: floated active (include/exclude) tags first (most-recently
+  // touched first), then the remaining available tags alphabetically.
+  const orderedTags = useMemo(() => {
+    const active = tagTouchOrder.filter((t) => tagIncludes.includes(t) || tagExcludes.includes(t));
+    const rest = availableTags.filter((t) => !active.includes(t));
+    return [...active, ...rest];
+  }, [availableTags, tagTouchOrder, tagIncludes, tagExcludes]);
+
+  // Sponsorship suggestion banner: shown when exactly one tag is required
+  // (single-tag include is the analog of the old single-select tag filter).
+  const sponsorshipTag = tagIncludes.length === 1 && tagExcludes.length === 0 ? tagIncludes[0] : null;
   const sponsorshipSuggestion = useMemo(() => {
-    if (tagFilter === 'all' || filteredEvents.length === 0) return null;
+    if (!sponsorshipTag || filteredEvents.length === 0) return null;
     // Hold the banner until the pricing config loads — avoids flashing a $0 total.
     if (!pricingConfig) return null;
     return calculateTagSponsorshipTotal(filteredEvents, pricingConfig);
-  }, [tagFilter, filteredEvents, pricingConfig]);
+  }, [sponsorshipTag, filteredEvents, pricingConfig]);
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
@@ -329,7 +363,8 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     progressIncludes.length > 0 ||
     progressExcludes.length > 0 ||
     regionFilter !== 'all' ||
-    tagFilter !== 'all' ||
+    tagIncludes.length > 0 ||
+    tagExcludes.length > 0 ||
     rsvpThreshold.trim() !== '' ||
     appealsOnly;
 
@@ -406,18 +441,86 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
           </select>
         )}
 
-        {/* Tag filter */}
+        {/* Tri-state tag filter dropdown (provola-58497) */}
         {availableTags.length > 0 && (
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="bg-theme-surface border border-theme-stroke rounded-lg px-3 py-1.5 text-sm text-theme-text-secondary focus:outline-none focus:border-theme-stroke-hover"
-          >
-            <option value="all">{t('eventTable.tagAll')}</option>
-            {availableTags.map((tag) => (
-              <option key={tag} value={tag}>{t('eventTable.tagPrefix', { tag })}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              onClick={() => setShowTagFilter((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                tagIncludes.length + tagExcludes.length > 0
+                  ? 'bg-theme-surface border-theme-stroke-hover text-theme-text'
+                  : 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
+              }`}
+            >
+              {tagIncludes.length + tagExcludes.length > 0
+                ? `${t('eventTable.tagsFilterLabel')} (${tagIncludes.length + tagExcludes.length})`
+                : t('eventTable.tagsFilterLabel')}
+              <ChevronDown size={14} />
+            </button>
+            {showTagFilter && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTagFilter(false)} />
+                <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1">
+                  {(tagIncludes.length > 0 || tagExcludes.length > 0) && (
+                    <div className="flex items-center justify-end px-3 py-1.5 border-b border-theme-stroke">
+                      <button
+                        onClick={() => {
+                          setTagIncludes([]);
+                          setTagExcludes([]);
+                          setTagTouchOrder([]);
+                        }}
+                        className="text-xs text-red-500/70 hover:text-red-500 transition-colors"
+                      >
+                        {t('eventTable.tagsFilterClear')}
+                      </button>
+                    </div>
+                  )}
+                  <div className="max-h-80 overflow-y-auto py-1">
+                    {orderedTags.map((tag, i) => {
+                      const state = getTagFilterState(tag);
+                      // Divider after the last floated active tag (only if there are inactive tags below).
+                      const activeCount = orderedTags.filter(
+                        (tt) => tagIncludes.includes(tt) || tagExcludes.includes(tt)
+                      ).length;
+                      const showDivider = activeCount > 0 && i === activeCount && activeCount < orderedTags.length;
+                      return (
+                        <React.Fragment key={tag}>
+                          {showDivider && <div className="border-t border-theme-stroke my-1" />}
+                          <div className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-surface transition-colors">
+                            <span className="text-sm text-theme-text truncate">{tag}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => setTagFilterState(tag, state === 'include' ? 'neutral' : 'include')}
+                                className="p-1 hover:opacity-70 transition-opacity"
+                                aria-label={t('eventTable.tagsFilterInclude')}
+                                title={t('eventTable.tagsFilterInclude')}
+                              >
+                                <ThumbsUp
+                                  size={13}
+                                  className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`}
+                                />
+                              </button>
+                              <button
+                                onClick={() => setTagFilterState(tag, state === 'exclude' ? 'neutral' : 'exclude')}
+                                className="p-1 hover:opacity-70 transition-opacity"
+                                aria-label={t('eventTable.tagsFilterExclude')}
+                                title={t('eventTable.tagsFilterExclude')}
+                              >
+                                <ThumbsDown
+                                  size={13}
+                                  className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-theme-text-faint'}`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* RSVP count filter */}
@@ -476,7 +579,9 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
               setProgressIncludes([]);
               setProgressExcludes([]);
               setRegionFilter('all');
-              setTagFilter('all');
+              setTagIncludes([]);
+              setTagExcludes([]);
+              setTagTouchOrder([]);
               setRsvpThreshold('');
               setAppealsOnly(false);
             }}
@@ -492,7 +597,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke">
           <DollarSign size={14} className="text-theme-text-secondary" />
           <span className="text-sm text-theme-text">
-            Suggested sponsorship for "<span className="font-medium">{tagFilter}</span>"
+            Suggested sponsorship for "<span className="font-medium">{sponsorshipTag}</span>"
             ({sponsorshipSuggestion.eventCount} events):
             {discount > 0 ? (
               <>

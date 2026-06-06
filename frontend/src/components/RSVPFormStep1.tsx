@@ -5,6 +5,9 @@ import { IconInput } from './IconInput';
 import { useTranslation } from 'react-i18next';
 import { TURTLES } from '../constants/options';
 import type { useRSVPForm } from '../hooks/useRSVPForm';
+// lasagna-49278: DB-driven opt-in checkbox renderer + config fetch hook.
+import { RsvpCheckboxList } from './RsvpCheckboxList';
+import { useRsvpCheckboxConfig } from '../hooks/useRsvpCheckboxConfig';
 
 interface RSVPFormStep1Props {
   form: ReturnType<typeof useRSVPForm>;
@@ -23,10 +26,14 @@ export function RSVPFormStep1({
   showWallet,
   showTurtleRoles,
 }: RSVPFormStep1Props) {
-  const { t } = useTranslation('rsvp');
+  const { t, i18n } = useTranslation('rsvp');
   const { t: tCommon } = useTranslation('common');
   const [turtleDropdownOpen, setTurtleDropdownOpen] = useState(false);
   const turtleRef = useRef<HTMLDivElement>(null);
+  // lasagna-49278: DB-driven config for the opt-in checkboxes. Replaces the
+  // 9 hardcoded blocks below the turtle dropdown. While `loading`, no
+  // checkboxes render (intentionally conservative — see plan §"Loading state").
+  const { config: rsvpCheckboxConfig } = useRsvpCheckboxConfig(form.eventId);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -152,76 +159,20 @@ export function RSVPFormStep1({
         </div>
       )}
 
-      {/* Combined PizzaDAO + SWC opt-in (variant arm of A/B test, any active SWC region) */}
-      {form.activeRegionConfig && form.optinAbVariant === 'variant' ? (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setCombinedOptIn(!form.combinedOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.combinedOptIn ? (
-                <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.combinedOptIn')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowRegionalOptinAbModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
+      {/*
+        lasagna-49278: opt-in checkbox section. Two paths:
 
-          {form.showRegionalOptinAbModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowRegionalOptinAbModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowRegionalOptinAbModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t(`${form.activeRegionConfig.modalNamespace}.title`)}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t(`${form.activeRegionConfig.modalNamespace}.description`)}{' '}
-                  <a
-                    href={form.activeRegionConfig.privacyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t(`${form.activeRegionConfig.modalNamespace}.privacyPolicy`)}
-                  </a> and{' '}
-                  <a
-                    href={form.activeRegionConfig.termsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t(`${form.activeRegionConfig.modalNamespace}.${form.activeRegionConfig.termsKey}`)}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      ) : (
+          1. PRESERVATION BRANCH — re-submits by existing guests previously
+             bucketed into optin_ab_variant='control' still see the old
+             two-checkbox layout (mailing list + matching regional SWC).
+             This branch shrinks over time as 'control' churns out.
+
+          2. CONFIG-DRIVEN — everyone else (new RSVPs, variant re-submits,
+             non-SWC events) gets the DB-driven RsvpCheckboxList renderer.
+      */}
+      {form.activeRegionConfig && form.optinAbVariant === 'control' ? (
         <>
-          {/* PizzaDAO Newsletter opt-in */}
+          {/* PizzaDAO Newsletter opt-in (preservation) */}
           <button
             type="button"
             onClick={() => form.setMailingListOptIn(!form.mailingListOptIn)}
@@ -237,7 +188,7 @@ export function RSVPFormStep1({
             </span>
           </button>
 
-          {/* SWC checkbox + info modal (US) */}
+          {/* Matching regional SWC checkbox + info modal (preservation) */}
           {form.isSwcEvent && (
             <>
               <div className="flex items-center gap-2">
@@ -251,9 +202,7 @@ export function RSVPFormStep1({
                   ) : (
                     <Square size={20} className="text-theme-text-muted flex-shrink-0" />
                   )}
-                  <span className="text-sm text-theme-text">
-                    {t('step1.swcJoin')}
-                  </span>
+                  <span className="text-sm text-theme-text">{t('step1.swcJoin')}</span>
                 </button>
                 <button
                   type="button"
@@ -263,16 +212,12 @@ export function RSVPFormStep1({
                   <Info size={18} />
                 </button>
               </div>
-
               {form.showSwcInfoModal && createPortal(
                 <div
                   className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                   onClick={() => form.setShowSwcInfoModal(false)}
                 >
-                  <div
-                    className="card p-6 max-w-md w-full relative"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="card p-6 max-w-md w-full relative" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => form.setShowSwcInfoModal(false)}
                       className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
@@ -282,20 +227,10 @@ export function RSVPFormStep1({
                     <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcModal.title')}</h3>
                     <p className="text-sm text-theme-text-secondary leading-relaxed">
                       {t('swcModal.description')}{' '}
-                      <a
-                        href="https://www.standwithcrypto.org/privacy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-400 hover:text-purple-300 underline"
-                      >
+                      <a href="https://www.standwithcrypto.org/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">
                         {t('swcModal.privacyPolicy')}
                       </a> and{' '}
-                      <a
-                        href="https://www.standwithcrypto.org/terms-of-service"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-400 hover:text-purple-300 underline"
-                      >
+                      <a href="https://www.standwithcrypto.org/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">
                         {t('swcModal.termsConditions')}
                       </a>.
                     </p>
@@ -306,369 +241,13 @@ export function RSVPFormStep1({
             </>
           )}
         </>
-      )}
-
-      {/* SWC Canada checkbox + info modal */}
-      {form.isSwcCaEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setSwcCaOptIn(!form.swcCaOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.swcCaOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.swcNotify')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowSwcCaInfoModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showSwcCaInfoModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcCaInfoModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowSwcCaInfoModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcCaModal.title')}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcCaModal.description')}{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/ca/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcCaModal.privacyPolicy')}
-                  </a> and{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/ca/terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcCaModal.termsOfService')}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      )}
-
-      {/* SWC Australia checkbox + info modal */}
-      {form.isSwcAuEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setSwcAuOptIn(!form.swcAuOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.swcAuOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.swcNotify')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowSwcAuInfoModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showSwcAuInfoModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcAuInfoModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowSwcAuInfoModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcAuModal.title')}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcAuModal.description')}{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/au/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcAuModal.privacyPolicy')}
-                  </a> and{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/au/terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcAuModal.termsOfService')}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      )}
-
-      {/* SWC EU checkbox + info modal */}
-      {form.isSwcEuEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setSwcEuOptIn(!form.swcEuOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.swcEuOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.swcNotify')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowSwcEuInfoModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showSwcEuInfoModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcEuInfoModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowSwcEuInfoModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcEuModal.title')}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcEuModal.description')}{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/eu/en/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcEuModal.privacyPolicy')}
-                  </a> and{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/eu/en/terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcEuModal.termsOfService')}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      )}
-
-      {/* SWC UK checkbox + info modal */}
-      {form.isSwcUkEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setSwcUkOptIn(!form.swcUkOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.swcUkOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.swcNotify')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowSwcUkInfoModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showSwcUkInfoModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcUkInfoModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowSwcUkInfoModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcUkModal.title')}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcUkModal.description')}{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/gb/en/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcUkModal.privacyPolicy')}
-                  </a> and{' '}
-                  <a
-                    href="https://www.standwithcrypto.org/gb/en/terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcUkModal.termsOfService')}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      )}
-
-      {/* SWC Brazil checkbox + info modal */}
-      {form.isSwcBrEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => form.setSwcBrOptIn(!form.swcBrOptIn)}
-              className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer flex-1"
-            >
-              {form.swcBrOptIn ? (
-                <CheckSquare2 size={20} className="text-purple-500 flex-shrink-0" />
-              ) : (
-                <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-              )}
-              <span className="text-sm text-theme-text">
-                {t('step1.swcBrNotify')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setShowSwcBrInfoModal(true)}
-              className="p-3 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors text-theme-text-muted hover:text-theme-text"
-            >
-              <Info size={18} />
-            </button>
-          </div>
-
-          {form.showSwcBrInfoModal && createPortal(
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-              onClick={() => form.setShowSwcBrInfoModal(false)}
-            >
-              <div
-                className="card p-6 max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => form.setShowSwcBrInfoModal(false)}
-                  className="absolute top-3 right-3 text-theme-text-muted hover:text-theme-text transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <h3 className="text-lg font-bold text-theme-text mb-3">{t('swcBrModal.title')}</h3>
-                <p className="text-sm text-theme-text-secondary leading-relaxed">
-                  {t('swcBrModal.description')}{' '}
-                  <a
-                    href="https://www.juntosporcripto.org/br/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcBrModal.privacyPolicy')}
-                  </a> and{' '}
-                  <a
-                    href="https://www.juntosporcripto.org/br/terms-of-service"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:text-purple-300 underline"
-                  >
-                    {t('swcBrModal.termsOfService')}
-                  </a>.
-                </p>
-              </div>
-            </div>,
-            document.body
-          )}
-        </>
-      )}
-
-      {/* ETHConf discount opt-in */}
-      {form.isEthconfEvent && !(form.activeRegionConfig && form.optinAbVariant === 'variant') && (
-        <button
-          type="button"
-          onClick={() => form.setEthconfOptIn(!form.ethconfOptIn)}
-          className="flex items-center gap-3 p-4 bg-theme-surface rounded-xl border border-theme-stroke hover:bg-theme-surface-hover transition-colors cursor-pointer w-full"
-        >
-          {form.ethconfOptIn ? (
-            <CheckSquare2 size={20} className="text-[#ff393a] flex-shrink-0" />
-          ) : (
-            <Square size={20} className="text-theme-text-muted flex-shrink-0" />
-          )}
-          <span className="text-sm text-theme-text">
-            {t('step1.ethconfDiscount')}
-          </span>
-        </button>
+      ) : (
+        <RsvpCheckboxList
+          config={rsvpCheckboxConfig}
+          form={form}
+          eventTags={form.eventTags}
+          currentLocale={i18n.language}
+        />
       )}
 
       {/* Error display */}

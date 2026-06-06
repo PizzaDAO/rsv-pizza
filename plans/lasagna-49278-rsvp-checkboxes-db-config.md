@@ -56,9 +56,13 @@ Single JSON in `app_config` would force the renderer to fetch and parse a blob o
 One migration, one new table, no Prisma-side renames or `guests` changes.
 
 ```sql
--- One row per renderable checkbox. v1 ships exactly 8 rows (one per existing hardcoded block).
+-- One row per renderable checkbox. v1 ships 8 global rows (party_id IS NULL).
+-- Per-event override rows MAY be added later (party_id REFERENCES parties(id));
+-- when present, they take precedence over the global row with the same `id`.
 CREATE TABLE rsvp_checkboxes (
-  id                 text PRIMARY KEY,                -- stable handle: 'mailing_list','swc_us','swc_ca','swc_au','swc_eu','swc_uk','swc_br','ethconf'
+  -- Composite primary key: a checkbox handle is global (party_id=null) OR scoped to one party.
+  id                 text NOT NULL,                   -- stable handle: 'mailing_list','swc_us','swc_ca','swc_au','swc_eu','swc_uk','swc_br','ethconf', or future custom IDs
+  party_id           text REFERENCES parties(id) ON DELETE CASCADE, -- NULL = global default; non-null = override for one event
   position           int  NOT NULL,                   -- render order on the form
   active             boolean NOT NULL DEFAULT true,   -- soft-disable without delete (set to false to hide everywhere)
 
@@ -67,9 +71,9 @@ CREATE TABLE rsvp_checkboxes (
   excluded_tags      text[] NOT NULL DEFAULT '{}',    -- never render if event has any of these tags
   always_show        boolean NOT NULL DEFAULT false,  -- if true, ignore required_tags (used for mailing_list, which renders on every event)
 
-  -- Destination columns this checkbox writes to (1..N entries, all must be in the WHITELISTED set on backend)
+  -- Destination columns this checkbox writes to (1..N entries, all must be in the backend WHITELIST: see admin PATCH validation)
   opt_in_fields      text[] NOT NULL,                 -- e.g. ['mailingListOptIn'], or ['mailingListOptIn','swcOptIn'] for combined
-  combined_group     text,                            -- nullable; rows sharing a non-null group render as ONE combined checkbox (see "Combined opt-in" below)
+  combined_group     text,                            -- nullable; rows sharing a non-null group render as ONE combined checkbox
 
   -- Label copy
   label_i18n_key     text,                            -- e.g. 'step1.combinedOptIn' — preferred when present
@@ -77,27 +81,32 @@ CREATE TABLE rsvp_checkboxes (
   label_overrides    jsonb NOT NULL DEFAULT '{}',     -- optional per-locale literal overrides: {"pt":"...","de":"..."} — beats both above for those locales
 
   -- Optional info modal
-  info_modal_i18n_ns text,                            -- e.g. 'swcModal' — if set, render the (i) button; modal renders {ns}.title / {ns}.description / {ns}.privacyPolicy / {ns}.{termsKey}
-  info_modal_privacy_url text,                        -- only used if info_modal_i18n_ns set
-  info_modal_terms_url   text,                        -- only used if info_modal_i18n_ns set
-  info_modal_terms_key   text,                        -- 'termsConditions' or 'termsOfService' — chooses which sub-key inside the namespace
+  info_modal_i18n_ns text,                            -- e.g. 'swcModal' — if set, render the (i) button; modal pulls {ns}.title / {ns}.description / {ns}.privacyPolicy / {ns}.{termsKey} unless overridden by modal_overrides
+  info_modal_privacy_url text,                        -- only used if info_modal_i18n_ns set OR modal_overrides supplies privacy text/url
+  info_modal_terms_url   text,                        -- only used if info_modal_i18n_ns set OR modal_overrides supplies terms text/url
+  info_modal_terms_key   text,                        -- 'termsConditions' or 'termsOfService' — chooses sub-key inside the i18n namespace
+  modal_overrides    jsonb NOT NULL DEFAULT '{}',     -- per-locale + per-field modal copy overrides. Shape: {"en":{"title":"...","description":"...","privacyPolicy":"Privacy Policy","termsConditions":"Terms","privacyUrl":"https://...","termsUrl":"https://..."},"pt":{...}}. Any field not provided falls back to i18n namespace / info_modal_*_url columns. Empty {} means use i18n bundle entirely.
 
   -- Theme accent for the checkbox color (matches today's red for mailing-list, purple for SWC)
   accent_color       text NOT NULL DEFAULT 'red',     -- 'red' | 'purple' — frontend whitelist; unknown values fall back to red
 
   updated_at         timestamptz NOT NULL DEFAULT now(),
-  updated_by         text
+  updated_by         text,
+
+  PRIMARY KEY (id, party_id)                          -- one global row per id; optional per-party overrides keyed by (id, party_id)
 );
 
-CREATE INDEX rsvp_checkboxes_active_pos_idx ON rsvp_checkboxes (active, position);
+-- Lookup index for the renderer: fetch global rows + the override rows for ONE party at a time.
+CREATE INDEX rsvp_checkboxes_global_idx  ON rsvp_checkboxes (active, position) WHERE party_id IS NULL;
+CREATE INDEX rsvp_checkboxes_per_event_idx ON rsvp_checkboxes (party_id, id) WHERE party_id IS NOT NULL;
 
 -- Column-level public read of the fields the form needs. updated_at / updated_by stay admin-only.
 GRANT SELECT (
-  id, position, active, required_tags, excluded_tags, always_show,
+  id, party_id, position, active, required_tags, excluded_tags, always_show,
   opt_in_fields, combined_group,
   label_i18n_key, label_default, label_overrides,
   info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
-  accent_color
+  modal_overrides, accent_color
 ) ON rsvp_checkboxes TO anon, authenticated;
 
 ALTER TABLE rsvp_checkboxes ENABLE ROW LEVEL SECURITY;
@@ -106,8 +115,16 @@ CREATE POLICY "Anyone can read rsvp checkboxes"
   ON rsvp_checkboxes FOR SELECT
   USING (true);
 
--- (no INSERT / UPDATE / DELETE grants — service_role only via backend admin endpoint)
+-- (no INSERT / UPDATE / DELETE grants — service_role only, via backend admin endpoint)
 ```
+
+### Per-event override semantics
+
+- Renderer fetches **two** sets of rows per RSVP page load:
+  1. All `active=true` rows with `party_id IS NULL` (global config) — cached at module level, same fetch for every page in the session.
+  2. All `active=true` rows with `party_id = <current event id>` (override) — fetched per event.
+- For each `id`, an override row supersedes the global row entirely (no field-level merge — simpler, predictable).
+- **GPP events (`eventType === 'gpp'`) are not editable from the host-facing UI** — admin UI still allows it, and direct DB edits work, but the host UI (deferred to phase 2 — see §Out of scope) won't expose the editor for GPP. The data model imposes no restriction.
 
 ### Seed: 8 rows mirroring today's hardcoded behavior
 
@@ -194,14 +211,25 @@ Alternatively (cleaner): introduce a `label_when_grouped_i18n_key` column. But t
 - **No changes to `POST /api/rsvp/:inviteCode/guest`** — backend still accepts the 8 named opt-in flags from the request body and writes to the 8 named columns. The frontend's responsibility is to set the right flags before submit; the backend stays config-agnostic.
 - **One server-side validation hardening:** add an allowlist check that `opt_in_fields` from any config row must be one of the 8 known fields. This belongs in a config-loader on the **admin write endpoint** (below), not the public read path.
 
-### Admin endpoints (for v2 admin UI — defer to follow-up, but keep contract in mind)
+### Admin endpoints (in v1 — shipped with the renderer)
 
 Mirror the experiment-flags pattern at `backend/src/routes/admin.routes.ts:993–1032`:
-- `GET /api/admin/rsvp-checkboxes` — list all rows (active + inactive)
-- `PATCH /api/admin/rsvp-checkboxes/:id` — update a row, validating `opt_in_fields` against the hardcoded whitelist and `accent_color` against `{red,purple}`.
-- `POST /api/admin/rsvp-checkboxes` — create a new row (only legal for the 8 existing field names in v1; expanding requires a column-add deploy).
+- `GET    /api/admin/rsvp-checkboxes` — list all rows (active + inactive, global + per-event). Query param `?party_id=<id>` filters to overrides for one event.
+- `POST   /api/admin/rsvp-checkboxes` — create a new row. Body validates `opt_in_fields` against a hardcoded backend whitelist (`mailingListOptIn`, `swcOptIn`, `swcCaOptIn`, `swcAuOptIn`, `swcEuOptIn`, `swcUkOptIn`, `swcBrOptIn`, `ethconfOptIn`) and `accent_color` against `{red,purple}`. `party_id` is optional (null = global default).
+- `PATCH  /api/admin/rsvp-checkboxes/:id?party_id=<id?>` — update a row identified by composite key (`id`, optional `party_id`). Same field validation as POST. Always stamps `updated_by = req.userEmail`.
+- `DELETE /api/admin/rsvp-checkboxes/:id?party_id=<id?>` — hard delete (only legal for non-seeded rows OR per-event overrides; the 8 seeded global rows should be `active=false`'d instead — backend enforces by rejecting DELETE if the row is one of the 8 known global IDs).
 
-**These can land in a separate PR after the renderer works against direct-DB-edited rows.**
+All endpoints require `requireAuth + isAdmin(req.userEmail)`. Same pattern as `/funnel-stats` and the OptinAB endpoint.
+
+### Admin UI (in v1 — shipped with the renderer)
+
+New tab on `/admin` (mirrors the existing OptinABTab pattern from arugula-34107):
+- `frontend/src/components/admin/RsvpCheckboxesTab.tsx` — table of all global rows + a "show overrides for event…" picker.
+- For each row: inline-edit position, active toggle, required_tags multi-select, excluded_tags multi-select, opt_in_fields multi-select (from the 8-item allowlist), combined_group text, label_i18n_key / label_default / label_overrides JSON editor, info_modal_*  fields, modal_overrides JSON editor, accent_color dropdown.
+- "+ New checkbox" button → modal with the same fields (must pick an `opt_in_field` from the whitelist).
+- "Reset to defaults" button per row (PATCH with the seed values from a static frontend constant).
+- Edits are sent to the admin endpoints; on save, the renderer cache is invalidated for the next page mount (refresh button surfaces in the tab too).
+- **GPP carve-out:** the admin UI works for all events including GPP. The carve-out only affects the **host-facing** editor (deferred to phase 2 / future PR), which won't expose this UI to GPP hosts.
 
 ## Migration strategy: parity-first cutover
 
@@ -209,42 +237,43 @@ Goal: zero behavior change at the moment of deploy. After deploy, Snax can edit 
 
 ### Sequence
 
-1. **Migration applied to prod** — creates `rsvp_checkboxes` table + seeds 8 rows mirroring today's hardcoded behavior **exactly** (URLs, i18n keys, tags, fields, accent colors). Seed values are checked into the migration file; no manual DB intervention needed.
-2. **Backend deploy** — no backend code changes in v1 (renderer is frontend-only). Migration alone is the backend-side change.
-3. **Frontend deploy** with renderer flipped on, behind a small kill-switch (`experiment_flags.rsvp_checkbox_config_enabled` defaulting to `true` at deploy time, can be flipped to `false` to fall back to hardcoded blocks).
+1. **Migration applied to prod** — creates `rsvp_checkboxes` table + seeds 8 global rows (`party_id IS NULL`) mirroring today's hardcoded behavior **exactly** (URLs, i18n keys, tags, fields, accent colors). Seed values are checked into the migration file; no manual DB intervention needed.
+2. **Backend deploy** — new admin endpoints land here (`GET/POST/PATCH/DELETE /api/admin/rsvp-checkboxes`). RSVP submit path is unchanged.
+3. **Frontend deploy** — renderer flips on as the only path. **No kill-switch flag** (Snax accepts the risk; hardcoded-fallback-in-hook covers the "DB fetch failed" case, which is the dominant failure mode).
 
-### Parity verification (must run before flipping kill switch to true if shipping cautiously, or before deploy if shipping flag=true)
+### Parity verification (must run before frontend deploy)
 
 For each of the 6 SWC regions + ETHConf + a non-SWC event:
 - Load `/rsvp/<slug>` in incognito, take screenshot of the rendered checkbox stack.
 - Compare visually to the same URL on the previous deploy. Spec: identical labels, identical (i) info modals, identical render order, identical accent colors.
 - Submit one RSVP per case and verify the same DB columns get `true` as before (test in dev/preview against a sandbox event).
 
-If parity fails for any case, flip kill switch back, fix the config row(s), redeploy or re-edit, retry.
+If parity fails for any case, fix the config row(s) in Supabase and re-test before merging.
 
-### Cleanup PR (v1.1, after kill switch has been ON for one week with no rollbacks)
+### Cleanup PR (v1.1, after one week of clean operation)
 
 Delete:
 - The hardcoded checkbox blocks in `RSVPFormStep1.tsx` (the renderer is now the only path; preservation branch stays).
 - `frontend/src/lib/optinAbRegions.ts` — `REGIONAL_OPTIN_AB` array (config table is the source of truth). `findActiveRegion` may keep one tag-match utility if anywhere else uses it; check via grep before deletion.
-- The kill switch experiment flag.
 
 The preservation branch stays for now (until OptinAB analytics confirm no more `control` re-submits, which Snax can verify from the admin OptinAB tab).
 
 ## Step-by-step implementation order
 
-1. **Migration `supabase/migrations/<ts>_rsvp_checkboxes.sql`** — create table, GRANT, RLS policy, insert 8 seed rows.
-2. **Apply migration to prod** before frontend deploy (per project memory: two-patch field-list pattern).
+1. **Migration `supabase/migrations/<ts>_rsvp_checkboxes.sql`** — create table, indexes, GRANT, RLS policy, insert 8 global seed rows (`party_id IS NULL`).
+2. **Apply migration to prod** before backend or frontend deploys.
 3. **Frontend type** — add `RsvpCheckboxConfig` interface in `frontend/src/types/` or inline in the new hook. Mirror the columns 1:1.
-4. **Hook `frontend/src/hooks/useRsvpCheckboxConfig.ts`** — Supabase select, module-level promise cache, hardcoded fallback constant, returns `{ config, loading, error }`. The fallback constant is the same 8 rows, written as a TypeScript array.
-5. **Renderer component `frontend/src/components/RsvpCheckboxList.tsx`** — accepts `config`, `form` (`useRSVPForm` return), `eventTags`. Does the filter → group → render pipeline. One renderer for both standalone and combined checkboxes (group of 1 is a special case of group of N).
-6. **Wire renderer into `RSVPFormStep1.tsx`** — replace the 9 hardcoded blocks with `<RsvpCheckboxList ... />` (preservation branch kept as a separate conditional sibling).
+4. **Hook `frontend/src/hooks/useRsvpCheckboxConfig.ts`** — Supabase select with two fetches: global (`party_id IS NULL`, cached at module level) + per-party (passed as a hook argument). Hardcoded fallback constant (same 8 seed rows written as a TS array) returned if the global fetch errors. Returns `{ config, loading, error }`.
+5. **Renderer component `frontend/src/components/RsvpCheckboxList.tsx`** — accepts `config`, `form` (`useRSVPForm` return), `eventTags`. Does the filter → group → render pipeline. One renderer for both standalone and combined checkboxes.
+6. **Wire renderer into `RSVPFormStep1.tsx`** — replace the hardcoded blocks with `<RsvpCheckboxList ... />` (preservation branch kept as a separate conditional sibling). Pass `eventData.id` to the hook so per-event overrides apply.
 7. **Hook helper in `useRSVPForm.ts`** — add `setOptInByField(field: string, value: boolean)` that maps field-name strings to the existing 8 setters. Export it.
-8. **Kill-switch experiment flag** — `rsvp_checkbox_config_enabled` seeded `true` in the same migration. `RSVPFormStep1.tsx` reads it via existing `getExperimentFlag`; falls back to hardcoded path if `false`. (Optional belt-and-suspenders — Snax can drop this if confident.)
-9. **TSC + build clean** both sides.
-10. **Parity check on a dev event** for every SWC region + ETHConf + a vanilla event.
-11. **PR with the two-patch deploy warning** in the body (apply migration before frontend deploy).
-12. **Post-deploy verification** — pick three production events (one US SWC, one non-SWC, one ETHConf), RSVP in incognito, confirm correct columns flip in Supabase.
+8. **Backend admin routes** — `backend/src/routes/admin.routes.ts`: add `GET/POST/PATCH/DELETE /api/admin/rsvp-checkboxes` per §"Admin endpoints". Hardcoded whitelist constant for `opt_in_fields`. Reject DELETE on the 8 seeded global IDs (force soft-disable instead).
+9. **Frontend API client** — `frontend/src/lib/api.ts`: add `listRsvpCheckboxes`, `createRsvpCheckbox`, `updateRsvpCheckbox`, `deleteRsvpCheckbox`.
+10. **Admin UI** — `frontend/src/components/admin/RsvpCheckboxesTab.tsx`. Wire into the existing tab strip on `/admin` (look at OptinABTab placement at `AdminPage.tsx` for the pattern). Table view + inline edit + "+ New" modal + per-party-override picker.
+11. **TSC + build clean** both sides.
+12. **Parity check on a dev event** for every SWC region + ETHConf + a vanilla event (compare screenshots vs. linguine-83104 master).
+13. **PR with the deploy ordering warning** in the body: migration → backend → frontend, applied in that sequence.
+14. **Post-deploy verification** — RSVP in incognito on 3 prod events (one US SWC, one non-SWC, one ETHConf); confirm correct columns flip in Supabase. Then run the "win-condition test" SQL (see below) and confirm the label changes without a deploy.
 
 ## Verification / test plan
 
@@ -274,24 +303,19 @@ UPDATE rsvp_checkboxes
 
 Wait < 1 session (or reload page). Confirm the next form-mount in a fresh browser shows the new label in **every** locale. No PR, no deploy, no merge. **This is the proof the refactor worked.**
 
-## Open questions for Snax
+## Decisions made (2026-06-05)
 
-1. **Per-event override scope.** Should hosts be able to hide/customize checkboxes on their own event? V1 plan says no (global only). If yes, add `party_id text REFERENCES parties(id)` to allow per-event rows that override global. **Default recommendation: defer to v2.**
-
-2. **Locale resolution: hard preference or strict mode?** If `label_i18n_key='step1.combinedOptIn'` is set but the key is missing from a locale's bundle, do we (a) silently fall back to `label_default`, or (b) render the raw key (today's react-i18next default)? Plan currently assumes (a) via a `t` wrapper that checks existence first. Snax: confirm.
-
-3. **Kill switch — wanted or paranoid?** If shipping with high confidence, skip the experiment flag and just deploy. If wanting belt-and-suspenders for one of the most heavily-trafficked surfaces in the app, keep it. **Recommendation: keep it for one release cycle, then remove in v1.1 cleanup.**
-
-4. **Combined-group spokesperson rule.** Plan says "lowest-position row." Snax: is the implicit assumption (mailing_list is always spokesperson because it's always_show + position=10) acceptable? Or do we want an explicit `is_combined_spokesperson` column for clarity?
-
-5. **Admin UI in scope here?** Plan defers to follow-up (consistent with `pugliese-58297` pattern). Snax: confirm Supabase-dashboard SQL editing is fine for v1, or bundle a `/admin/rsvp-checkboxes` CRUD page now?
+1. **Per-event override:** data model supports it via `(id, party_id)` composite PK. Admin UI exposes the editor for all events. Host-facing editor is deferred to a future PR; when shipped, it will be hidden for GPP events (hosts of GPP events can't change checkboxes).
+2. **Modal copy editable via DB:** `modal_overrides JSONB` column in v1 — full per-locale modal title/description/url override.
+3. **Kill switch:** none. Hardcoded fallback in `useRsvpCheckboxConfig` covers the DB-fetch-failed path.
+4. **Admin CRUD UI:** in v1, bundled with the renderer. New `/admin` tab `RsvpCheckboxesTab` + backend admin endpoints.
+5. **Combined-group spokesperson rule:** lowest-position row in group. `mailing_list` always wins because it's `always_show=true` + `position=10`. No new column needed.
+6. **Locale resolution:** silently fall back to `label_default` (option a) — don't surface raw i18n keys to users.
 
 ## Out of scope (explicitly)
 
-- **Adding a 9th destination column without a deploy** — fundamentally requires Prisma + backend + frontend changes; not solvable by config-only.
-- **Per-event checkbox overrides** — global only in v1.
-- **Modal description / title overrides via config** — i18n key only in v1 (URL is configurable). Adding `modal_overrides` JSONB is a 1-column-add followup.
-- **Admin CRUD UI** — Supabase dashboard SQL editing is the v1 editor surface.
+- **Adding a 9th destination column without a deploy** — fundamentally requires Prisma + backend + frontend changes; not solvable by config-only. (Backend admin POST validates against the hardcoded 8-field whitelist.)
+- **Host-facing editor for per-event overrides** — data model supports it, admin UI exposes it, but the host-facing surface (RSVP form's settings on the HostPage) is deferred. When shipped, must hide the editor for GPP events.
 - **Migrating non-checkbox fields** (wallet, dietary, etc.) to DB-driven config — those have richer validation logic; out of scope.
 - **Touching the OptinAB analytics tab** — config table is independent of `optin_ab_variant` column.
 - **Deleting the preservation branch** — kept until OptinAB control re-submits go to zero.
@@ -306,9 +330,19 @@ Wait < 1 session (or reload page). Confirm the next form-mount in a fresh browse
 - (optional) `frontend/src/components/RsvpCheckboxInfoModal.tsx` — extracted from the duplicated portal modal markup currently 7× inline in `RSVPFormStep1.tsx`.
 
 ### Modified
-- `frontend/src/components/RSVPFormStep1.tsx` — delete 9 hardcoded checkbox blocks, render `<RsvpCheckboxList>`, keep preservation branch as a guarded sibling.
+- `frontend/src/components/RSVPFormStep1.tsx` — delete the hardcoded checkbox blocks, render `<RsvpCheckboxList>`, keep preservation branch as a guarded sibling.
 - `frontend/src/hooks/useRSVPForm.ts` — add `setOptInByField` generic setter; keep all 8 specific setters + state slots; leave preservation logic intact.
 - `frontend/src/lib/optinAbRegions.ts` — leave for now (referenced by preservation branch); cleanup in v1.1.
+- `frontend/src/lib/api.ts` — add 4 admin client methods (`list/create/update/delete RsvpCheckbox`).
+- `frontend/src/pages/AdminPage.tsx` — add new tab strip entry for "RSVP Checkboxes" and mount `<RsvpCheckboxesTab />`.
+- `backend/src/routes/admin.routes.ts` — add 4 admin endpoints + hardcoded `opt_in_fields` whitelist constant.
+
+### New
+- `supabase/migrations/<ts>_rsvp_checkboxes.sql`
+- `frontend/src/hooks/useRsvpCheckboxConfig.ts`
+- `frontend/src/components/RsvpCheckboxList.tsx`
+- `frontend/src/components/admin/RsvpCheckboxesTab.tsx`
+- (optional) `frontend/src/components/RsvpCheckboxInfoModal.tsx` — extracted modal portal
 
 ### Untouched (deliberately)
 - `backend/prisma/schema.prisma` — eight `*OptIn` Guest columns stay.

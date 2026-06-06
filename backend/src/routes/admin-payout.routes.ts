@@ -49,6 +49,9 @@ import {
   type RegionalAuthRequest,
 } from '../middleware/regionalUnderboss.js';
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
+import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
+import { sendToCityGroup } from '../services/cityTelegramGroup.js';
+import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 
 const router = Router();
 
@@ -6092,6 +6095,31 @@ async function sendTelegramMessage(
   }
 }
 
+/**
+ * tonda-58293 FIX #4: send a reminder to a party's city Telegram GROUP.
+ *
+ * Shared by tg-receipts-reminder and tg-wallet-reminder (previously two
+ * identical blocks). The earlier version skipped the group entirely when the
+ * party name didn't match the GPP pattern (`cityKeyFromPartyName` → null),
+ * dropping coverage for non-GPP-named parties. We now fall back to the raw
+ * lowercased/trimmed party name as the cityKey. A non-matching key simply
+ * yields `sendToCityGroup`'s existing "no city TG group set" skip — no new
+ * failure mode — while correctly-named groups now get reached.
+ */
+async function sendCityGroupReminder(
+  partyName: string,
+  text: string,
+): Promise<{ groupSent: boolean; groupReason?: string }> {
+  const cityKey = cityKeyFromPartyName(partyName) ?? partyName.toLowerCase().trim();
+  if (!cityKey) {
+    return { groupSent: false, groupReason: 'no city TG group set' };
+  }
+  const result = await sendToCityGroup(cityKey, text);
+  return result.ok
+    ? { groupSent: true }
+    : { groupSent: false, groupReason: result.reason };
+}
+
 router.post(
   '/:partyId/tg-receipts-reminder',
   requireAuth,
@@ -6136,25 +6164,11 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      // Group chat — per-city chat_id supplied by the caller. The frontend
-      // resolves it from the GPP sheet (`SheetCity.groupId`) using the same
-      // city→chat_id map that /underboss uses for its broadcast tooling. We
-      // intentionally don't fetch the sheet from the backend; mirrors the
-      // `/api/telegram/broadcast` contract where the client supplies chatIds.
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
-      let groupSent = false;
-      let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
-        if (result.ok) {
-          groupSent = true;
-        } else {
-          groupReason = result.reason;
-        }
-      } else {
-        groupReason = 'no city TG group set';
-      }
+      // Group chat — tonda-58293: the backend resolves the per-city group
+      // chat_id from `city_telegram_groups` via `sendToCityGroup` (which also
+      // persists supergroup migrations). FIX #4: falls back to the raw party
+      // name as cityKey so non-GPP-named parties aren't silently skipped.
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -6233,20 +6247,11 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
-      let groupSent = false;
-      let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
-        if (result.ok) {
-          groupSent = true;
-        } else {
-          groupReason = result.reason;
-        }
-      } else {
-        groupReason = 'no city TG group set';
-      }
+      // Group chat — tonda-58293: resolved server-side from
+      // `city_telegram_groups` via `sendToCityGroup` (adds the migration
+      // retry+persist this endpoint previously lacked). FIX #4: shared helper
+      // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
 
       console.log(
         `[tg-wallet-reminder] party=${party.id} slug=${slug} host_dm=${
@@ -6641,6 +6646,7 @@ partyMarkPaidRouter.post(
           // pinsa-92103: needed so we don't double-stamp paymentsClosedAt
           // on a city that's already marked closed.
           paymentsClosedAt: true,
+          eventTags: true,
         },
       });
       if (!party) {
@@ -6757,7 +6763,10 @@ partyMarkPaidRouter.post(
           const closedAt = new Date();
           const updated = await prisma.party.update({
             where: { id: partyId },
-            data: { paymentsClosedAt: closedAt },
+            data: {
+              paymentsClosedAt: closedAt,
+              eventTags: withPaidTag(party.eventTags),
+            },
             select: { id: true, name: true, paymentsClosedAt: true },
           });
           res.json({
@@ -6983,7 +6992,10 @@ partyMarkPaidRouter.post(
           if (remainingInflight === 0) {
             await tx.party.update({
               where: { id: partyId },
-              data: { paymentsClosedAt: now },
+              data: {
+                paymentsClosedAt: now,
+                eventTags: withPaidTag(party.eventTags),
+              },
             });
           }
         }
@@ -7049,7 +7061,7 @@ partyMarkPaidRouter.post(
 
       const party = await prisma.party.findUnique({
         where: { id: partyId },
-        select: { id: true, name: true, paymentsClosedAt: true },
+        select: { id: true, name: true, paymentsClosedAt: true, eventTags: true },
       });
       if (!party) {
         throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -7102,7 +7114,10 @@ partyMarkPaidRouter.post(
 
         await tx.party.update({
           where: { id: partyId },
-          data: { paymentsClosedAt: null },
+          data: {
+            paymentsClosedAt: null,
+            eventTags: withoutPaidTag(party.eventTags),
+          },
         });
       });
 

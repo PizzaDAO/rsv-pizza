@@ -16,6 +16,7 @@ import {
   getReimbursementTiers,
   getReimbursementCapBands,
   getSponsorshipPricing,
+  getGppGlobalEditors,
   invalidateAll,
   PRIVATE_CONFIG_KEYS,
 } from './privateConfig.js';
@@ -164,5 +165,41 @@ describe('getCityTiers / getReimbursementTiers / getSponsorshipPricing', () => {
     expect(cap.bands).toEqual({});
     // Increment is the original 25 and must be non-zero (it's a divisor).
     expect(cap.roundingIncrementUsd).toBe(25);
+  });
+});
+
+// marinara-71630 P6: GPP global-editor allowlist accessor. Cover read-through
+// and the SAFE (empty = no one) fallback.
+describe('getGppGlobalEditors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('reads the allowlist from app_config when present', async () => {
+    const seeded = ['editor@example.com', 'someone@example.com'];
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const editors = await getGppGlobalEditors();
+
+    expect(editors).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.gppGlobalEditors },
+    });
+  });
+
+  it('falls back to an EMPTY list (no one gets global-editor rights) when absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getGppGlobalEditors()).toEqual([]);
+  });
+
+  it('falls back to [] (never throws) when the DB read fails', async () => {
+    mockPrisma.appConfig.findUnique.mockRejectedValue(new Error('db down'));
+    expect(await getGppGlobalEditors()).toEqual([]);
+  });
+
+  it('falls back to [] when the stored value is not valid JSON', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json[' });
+    expect(await getGppGlobalEditors()).toEqual([]);
   });
 });

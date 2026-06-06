@@ -144,6 +144,19 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
     setStatusMessage(null);
   };
 
+  // prosciutto-92107: mirror handleSwitchFromW9 for the reverse path. Surfaced
+  // from W-8BEN / W-8BEN-E when the host picks a US permanent-residence
+  // country (W-8 forms are for foreign persons / entities only). Discards the
+  // partial draft for the same reason — the W-8 treaty / chapter4 fields
+  // don't translate to W-9.
+  const handleSwitchToW9 = (_target: 'w9') => {
+    setDraftData({});
+    setEditingType('w9');
+    setPickerOpen(false);
+    setError(null);
+    setStatusMessage(null);
+  };
+
   const renderEditor = () => {
     if (!editingType) return null;
     const editorBody =
@@ -154,9 +167,17 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
           onSwitchFormType={handleSwitchFromW9}
         />
       ) : editingType === 'w8ben' ? (
-        <W8BENForm value={draftData as W8BENFormData} onChange={(v) => setDraftData(v)} />
+        <W8BENForm
+          value={draftData as W8BENFormData}
+          onChange={(v) => setDraftData(v)}
+          onSwitchFormType={handleSwitchToW9}
+        />
       ) : (
-        <W8BENEForm value={draftData as W8BENEFormData} onChange={(v) => setDraftData(v)} />
+        <W8BENEForm
+          value={draftData as W8BENEFormData}
+          onChange={(v) => setDraftData(v)}
+          onSwitchFormType={handleSwitchToW9}
+        />
       );
     return (
       <div className="space-y-4">

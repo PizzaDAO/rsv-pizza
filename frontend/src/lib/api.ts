@@ -490,11 +490,11 @@ export async function removeCustomTag(
  * Two messages, same body:
  *   1. DM to the primary host (uses `parties.host_telegram_chat_id`; skipped
  *      with a reason when the host hasn't linked Telegram).
- *   2. Post to the **city's** Telegram group chat. The caller resolves the
- *      chat_id from the GPP sheet (same `SheetCity.groupId` field that
- *      powers /underboss broadcasts) and passes it in `groupChatId`. When
- *      omitted/empty, the backend skips with `groupReason: 'no city TG
- *      group set'` (per-party, not a global env var).
+ *   2. Post to the **city's** Telegram group chat. tonda-58293: the backend
+ *      now resolves the group chat_id from `city_telegram_groups` (keyed by
+ *      the city derived from the party name) — the client no longer passes a
+ *      `groupChatId`. When no group is on file the backend skips with
+ *      `groupReason: 'no city TG group set'`.
  *
  * Backend returns per-channel success + skip reason so the UI can render an
  * accurate partial-success toast. Triggered from the /payments by-city ⋮
@@ -509,14 +509,12 @@ export interface SendTgReceiptsReminderResponse {
 
 export async function sendTgReceiptsReminder(
   partyId: string,
-  groupChatId?: string | null,
 ): Promise<SendTgReceiptsReminderResponse> {
   return apiRequest<SendTgReceiptsReminderResponse>(
     `/api/admin/payouts/${partyId}/tg-receipts-reminder`,
     {
       method: 'POST',
       requireAuth: true,
-      body: groupChatId ? { groupChatId } : undefined,
     },
   );
 }
@@ -526,19 +524,141 @@ export async function sendTgReceiptsReminder(
  * address at rsv.pizza/host/<slug>/payments" reminder via the Molto Benny
  * Telegram bot — DM to the primary host + post to the city's group chat. Same
  * per-channel success + skip-reason contract. Unlike the receipts reminder this
- * does NOT persist a sent-at timestamp.
+ * does NOT persist a sent-at timestamp. tonda-58293: group chat_id resolved
+ * server-side; no `groupChatId` arg.
  */
 export async function sendTgWalletReminder(
   partyId: string,
-  groupChatId?: string | null,
 ): Promise<SendTgReceiptsReminderResponse> {
   return apiRequest<SendTgReceiptsReminderResponse>(
     `/api/admin/payouts/${partyId}/tg-wallet-reminder`,
     {
       method: 'POST',
       requireAuth: true,
-      body: groupChatId ? { groupChatId } : undefined,
     },
+  );
+}
+
+/**
+ * tonda-58293: DB-first read of the city → Telegram group mapping. Replaces
+ * the client-side Google Sheet fetch (`fetchTelegramGroups()`) for sends.
+ * Returns rows from `city_telegram_groups` scoped to the caller's cities
+ * (admins/region-only UBs get all). `chatId` is a string (BigInt-safe).
+ * Mounted at `/api/underboss/telegram/groups` (underboss-scoped auth).
+ */
+export interface CityTelegramGroupRow {
+  id: string;
+  cityKey: string;
+  chatId: string | null;
+  chatUrl: string | null;
+  title: string | null;
+  country: string | null;
+  region: string | null;
+  underboss: string | null;
+  isSupergroup: boolean;
+  source: string;
+  lastVerifiedAt: string | null;
+}
+
+export async function fetchCityTelegramGroups(): Promise<CityTelegramGroupRow[]> {
+  const res = await apiRequest<{ groups: CityTelegramGroupRow[] }>(
+    `/api/underboss/telegram/groups`,
+    { method: 'GET', requireAuth: true },
+  );
+  return res.groups;
+}
+
+/**
+ * tonda-58293 Phase 2: Telegram Groups gap report. Returns every GPP city
+ * (the universe) LEFT JOINed against `city_telegram_groups`, plus the pending
+ * (unassigned) bot captures. chatIds are strings (BigInt-safe).
+ * Mounted at `/api/underboss/telegram/groups/status` (underboss-scoped auth).
+ */
+export interface TelegramGroupCityStatus {
+  cityKey: string;
+  hasChatId: boolean;
+  isSupergroup: boolean;
+  source: string | null;
+  lastVerifiedAt: string | null;
+  chatUrl: string | null;
+  region: string | null;
+  country: string | null;
+}
+
+export interface TelegramPendingCapture {
+  chatId: string;
+  title: string | null;
+  chatType: string | null;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface TelegramGroupsStatus {
+  cities: TelegramGroupCityStatus[];
+  pendingCaptures: TelegramPendingCapture[];
+}
+
+export async function fetchTelegramGroupsStatus(): Promise<TelegramGroupsStatus> {
+  return apiRequest<TelegramGroupsStatus>(
+    `/api/underboss/telegram/groups/status`,
+    { method: 'GET', requireAuth: true },
+  );
+}
+
+/**
+ * Assign a pending capture (by chatId) to a city. Writes through to
+ * `city_telegram_groups` so reminders/broadcasts can use it immediately.
+ */
+export async function assignTelegramGroup(
+  chatId: string,
+  cityKey: string,
+): Promise<{ ok: boolean; cityKey: string; chatId: string }> {
+  return apiRequest(
+    `/api/underboss/telegram/groups/assign`,
+    { method: 'POST', requireAuth: true, body: { chatId, cityKey } },
+  );
+}
+
+export interface TelegramGroupTestResult {
+  cityKey: string;
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  chatId?: string;
+  migratedTo?: string;
+}
+
+/** Send a one-off test message to a city's Telegram group. */
+export async function testCityTelegramGroup(
+  cityKey: string,
+): Promise<TelegramGroupTestResult> {
+  return apiRequest<TelegramGroupTestResult>(
+    `/api/underboss/telegram/groups/${encodeURIComponent(cityKey)}/test`,
+    { method: 'POST', requireAuth: true },
+  );
+}
+
+export interface TelegramGroupRefreshResult {
+  cityKey: string;
+  ok: boolean;
+  migrated?: boolean;
+  reason?: string;
+  /** chatId echoed on failure (string, BigInt-safe). */
+  chatId?: string;
+  group?: TelegramGroupCityStatus & { id: string; chatId: string | null };
+}
+
+/**
+ * tonda-58293 Phase 2: re-verify a city's KNOWN Telegram group via getChat.
+ * Updates title / is_supergroup / last_verified_at, and persists the new id if
+ * the group migrated to a supergroup. 400 if the city has no chat_id yet.
+ */
+export async function refreshCityTelegramGroup(
+  cityKey: string,
+): Promise<TelegramGroupRefreshResult> {
+  return apiRequest<TelegramGroupRefreshResult>(
+    `/api/underboss/telegram/groups/${encodeURIComponent(cityKey)}/refresh`,
+    { method: 'POST', requireAuth: true },
   );
 }
 
@@ -3569,11 +3689,13 @@ export interface BroadcastResponse {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
+  appTab: string | null = null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
-    body: { groups, message, parseMode },
+    body: { groups, message, parseMode, appTab },
   });
 }
 
@@ -3599,11 +3721,13 @@ export interface BroadcastHost {
 export async function sendHostTelegramBroadcast(
   hosts: BroadcastHost[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
+  appTab: string | null = null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
     method: 'POST',
-    body: { hosts, message, parseMode },
+    body: { hosts, message, parseMode, appTab },
   });
 }
 
@@ -4285,6 +4409,68 @@ export async function setExperimentFlag(key: string, enabled: boolean): Promise<
     console.error('Error setting experiment flag:', error);
     return null;
   }
+}
+
+// ── lasagna-49278: RSVP opt-in checkbox config admin ──
+// Same row shape as the renderer hook (frontend/src/hooks/useRsvpCheckboxConfig.ts).
+export interface RsvpCheckboxAdminRow {
+  id: string;
+  party_id: string | null;
+  position: number;
+  active: boolean;
+  required_tags: string[];
+  excluded_tags: string[];
+  always_show: boolean;
+  opt_in_fields: string[];
+  combined_group: string | null;
+  label_i18n_key: string | null;
+  label_default: string | null;
+  label_overrides: Record<string, string>;
+  info_modal_i18n_ns: string | null;
+  info_modal_privacy_url: string | null;
+  info_modal_terms_url: string | null;
+  info_modal_terms_key: string | null;
+  modal_overrides: Record<string, unknown>;
+  accent_color: string;
+  updated_at?: string;
+  updated_by?: string | null;
+}
+
+export type RsvpCheckboxAdminInput = Partial<Omit<RsvpCheckboxAdminRow, 'updated_at' | 'updated_by'>> & { id?: string };
+
+export async function listRsvpCheckboxes(partyId?: string): Promise<RsvpCheckboxAdminRow[]> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  const res = await apiRequest<{ checkboxes: RsvpCheckboxAdminRow[] }>(`/api/admin/rsvp-checkboxes${qs}`);
+  return res.checkboxes;
+}
+
+export async function createRsvpCheckbox(body: RsvpCheckboxAdminInput): Promise<RsvpCheckboxAdminRow> {
+  const res = await apiRequest<{ checkbox: RsvpCheckboxAdminRow }>('/api/admin/rsvp-checkboxes', {
+    method: 'POST',
+    body,
+  });
+  return res.checkbox;
+}
+
+export async function updateRsvpCheckbox(
+  id: string,
+  partyId: string | null,
+  body: RsvpCheckboxAdminInput,
+): Promise<RsvpCheckboxAdminRow> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  const res = await apiRequest<{ checkbox: RsvpCheckboxAdminRow }>(
+    `/api/admin/rsvp-checkboxes/${encodeURIComponent(id)}${qs}`,
+    { method: 'PATCH', body },
+  );
+  return res.checkbox;
+}
+
+export async function deleteRsvpCheckbox(id: string, partyId?: string): Promise<void> {
+  const qs = partyId ? `?party_id=${encodeURIComponent(partyId)}` : '';
+  await apiRequest<{ deleted: boolean }>(
+    `/api/admin/rsvp-checkboxes/${encodeURIComponent(id)}${qs}`,
+    { method: 'DELETE' },
+  );
 }
 
 // ── Guest Scorecard ──
@@ -6066,6 +6252,37 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
   return apiRequest<PricingConfig>('/api/config/pricing');
 }
 
+// ============================================
+// marinara-71630 P6 — payout caps for the payments-admin modals.
+//
+// The per-submission cap used to be hardcoded (`$675`) in 3 payments-admin
+// modals for a UX-only warning + a client clamp. The real number now lives in
+// `app_config` (private.payout_caps) and is served by GET /api/config/payout-caps,
+// gated to the SAME viewer set that opens those modals (payments-admin OR an
+// active underboss — a `payment_admin` doesn't pass the /pricing underboss gate,
+// so this is a separate sibling endpoint). The backend remains the enforcement
+// authority; this is purely for the warning text + CreatePrepaymentModal's clamp.
+// ============================================
+
+export interface PayoutCapsConfig {
+  /** Per-submission soft cap (USD) — drives the modals' amber warnings + clamp. */
+  perSubmissionMaxUsd: number;
+  /** Per-recipient-address hard cap (USD). */
+  perAddressHardCapUsd: number;
+}
+
+/**
+ * Fetch the payments-admin payout caps. Callers should go through the
+ * `usePayoutCaps` hook, which caches the result across components and supplies a
+ * NEUTRAL fallback (never the real number) while loading / on error.
+ */
+export async function fetchPayoutCaps(): Promise<PayoutCapsConfig> {
+  const res = await apiRequest<{ payoutCaps: PayoutCapsConfig }>(
+    '/api/config/payout-caps',
+  );
+  return res.payoutCaps;
+}
+
 /**
  * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
  * via the backend's mainnet-resolver utility endpoint. Returns null on any
@@ -6263,6 +6480,85 @@ export async function getSurveyResults(partyId: string): Promise<SurveyResults> 
   });
 }
 
+// ---------------------------------------------------------------------------
+// pugliese-58297: admin survey-question CRUD
+// ---------------------------------------------------------------------------
+
+export interface AdminSurveyQuestion extends SurveyQuestion {
+  position: number;
+  active: boolean;
+}
+
+export interface AdminSurveyQuestionsResponse {
+  questionSet: string;
+  version: number;
+  questions: AdminSurveyQuestion[];
+}
+
+export async function listAdminSurveyQuestions(
+  set: string = 'default'
+): Promise<AdminSurveyQuestionsResponse> {
+  return apiRequest<AdminSurveyQuestionsResponse>(
+    `/api/admin/survey-questions?set=${encodeURIComponent(set)}`,
+    { method: 'GET', requireAuth: true }
+  );
+}
+
+export interface AdminSurveyQuestionInput {
+  id: string;
+  questionSet?: string;
+  type: 'rating' | 'yesno' | 'multiple' | 'text';
+  text: string;
+  scale?: number | null;
+  multi?: boolean;
+  allowOther?: boolean;
+  options?: string[];
+  active?: boolean;
+  position?: number;
+}
+
+export async function createAdminSurveyQuestion(
+  body: AdminSurveyQuestionInput
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>('/api/admin/survey-questions', {
+    method: 'POST',
+    body,
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestion(
+  id: string,
+  body: Partial<AdminSurveyQuestionInput>,
+  set: string = 'default'
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>(
+    `/api/admin/survey-questions/${encodeURIComponent(id)}?set=${encodeURIComponent(set)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
+export async function reorderAdminSurveyQuestions(
+  orderedIds: string[],
+  set: string = 'default'
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>('/api/admin/survey-questions/reorder', {
+    method: 'POST',
+    body: { set, orderedIds },
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestionSet(
+  setId: string,
+  body: { version?: number }
+): Promise<{ questionSet: { id: string; version: number; updatedAt: string } }> {
+  return apiRequest<{ questionSet: { id: string; version: number; updatedAt: string } }>(
+    `/api/admin/survey-question-sets/${encodeURIComponent(setId)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
 // ============================================
 // Tax forms (salame-92110)
 // ============================================
@@ -6391,7 +6687,7 @@ export interface Gpp27CreateEventInput {
   city: string;
   hostName: string;
   email: string;
-  telegram?: string;
+  telegram: string;
   country?: string;
   countryCode?: string;
   cityFormattedName?: string;

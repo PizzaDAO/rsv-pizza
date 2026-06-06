@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, GitMerge, Layers } from 'lucide-react';
+import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, DollarSign, GitMerge, Layers } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
 import { OcrPreviewResult, OcrReceiptPreview } from '../../types';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
+import { IconInput } from '../IconInput';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 export interface ReceiptItem {
@@ -29,6 +30,32 @@ export interface ReceiptItem {
  */
 function toReceiptArray(ocr: OcrPreviewResult): OcrReceiptPreview[] {
   if (Array.isArray(ocr.receipts)) {
+    // scamorza-58296: a transient OCR/FX failure comes back as receipts:[] with
+    // a top-level ocrError='OCR_FAILED'. Surface it as a single synthetic
+    // receipt carrying that flag so the host gets the manual USD-amount entry
+    // instead of the "no receipt found — remove or re-upload" dead-end (which
+    // is reserved for a genuinely empty NO_RECEIPT_DETECTED response).
+    if (ocr.receipts.length === 0 && ocr.ocrError === 'OCR_FAILED') {
+      return [
+        {
+          index: 0,
+          amount: 0,
+          currency: 'USD',
+          originalAmount: 0,
+          originalCurrency: '',
+          exchangeRate: 0,
+          confidence: 0,
+          items: undefined,
+          lineItems: null,
+          ocrRaw: null,
+          merchant: null,
+          boundingHint: null,
+          fxSource: 'unresolved',
+          conversionNote: undefined,
+          ocrError: 'OCR_FAILED',
+        },
+      ];
+    }
     // NO_RECEIPT_DETECTED comes back as an empty array; preserve it.
     return ocr.receipts;
   }
@@ -236,8 +263,39 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                       </span>
                     )}
 
+                    {/* scamorza-58296: automatic read failed (transient OCR
+                        error) — arrives as a 200 with ocrError='OCR_FAILED'
+                        (surfaced by toReceiptArray as a single synthetic
+                        receipt). Drop the host into a manual USD-amount entry
+                        instead of dead-ending. */}
+                    {item.status === 'done' && !isMulti && head && head.ocrError === 'OCR_FAILED' && (
+                      <ManualAmountEntry
+                        amount={head.amount}
+                        onAmount={amount => {
+                          const valid = Number.isFinite(amount) && amount > 0;
+                          onChange(items.map(it => {
+                            if (it.id !== item.id || !it.receipts) return it;
+                            const receipts = it.receipts.map((r, j) => j === 0 ? {
+                              ...r,
+                              amount,
+                              originalAmount: amount,
+                              originalCurrency: 'USD',
+                              exchangeRate: 1,
+                              confidence: 1,
+                              fxSource: 'usd-passthrough' as OcrReceiptPreview['fxSource'],
+                              // clear the failure flag once a valid amount is
+                              // entered so submit treats this as a normal USD
+                              // receipt rather than excluding it.
+                              ocrError: valid ? null : 'OCR_FAILED',
+                            } : r);
+                            return { ...it, receipts };
+                          }));
+                        }}
+                      />
+                    )}
+
                     {/* Single-receipt case: identical to the pre-stracciatella UI. */}
-                    {item.status === 'done' && !isMulti && head && (
+                    {item.status === 'done' && !isMulti && head && head.ocrError !== 'OCR_FAILED' && (
                       <ReceiptDetailRow
                         partyId={partyId}
                         receipt={head}
@@ -326,6 +384,45 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 function updateItem(items: ReceiptItem[], id: string, patch: Partial<ReceiptItem>): ReceiptItem[] {
   return items.map(it => (it.id === id ? { ...it, ...patch } : it));
 }
+
+/**
+ * scamorza-58296: manual USD-amount entry shown when the automatic OCR read
+ * failed (transient error). The host types the receipt total themselves and we
+ * persist it through the normal submit-forwarding path as a USD-passthrough
+ * amount. Local text state so partial input ("12.") doesn't fight the parsed
+ * number on every keystroke.
+ */
+const ManualAmountEntry: React.FC<{
+  amount: number;
+  onAmount: (amount: number) => void;
+}> = ({ amount, onAmount }) => {
+  const [raw, setRaw] = useState(amount > 0 ? String(amount) : '');
+
+  return (
+    <span className="block w-full">
+      <div className="max-w-[12rem]">
+        <IconInput
+          icon={DollarSign}
+          type="text"
+          inputMode="decimal"
+          value={raw}
+          placeholder="Enter amount in USD"
+          onChange={e => {
+            const v = e.target.value;
+            // Allow only a number with an optional single decimal point.
+            if (v !== '' && !/^\d*\.?\d*$/.test(v)) return;
+            setRaw(v);
+            onAmount(parseFloat(v));
+          }}
+          className="py-1.5 text-sm"
+        />
+      </div>
+      <span className="block mt-1 text-xs text-theme-text-muted">
+        Couldn't read this receipt automatically — enter the amount in USD.
+      </span>
+    </span>
+  );
+};
 
 /**
  * stracciatella-92114: apply a convert-fx result to receipt `k` of item `id`.

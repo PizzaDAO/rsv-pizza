@@ -1,8 +1,39 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Building2, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, Info } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Building2,
+  Globe,
+  MapPin,
+  Hash,
+  FileSignature,
+  CalendarDays,
+  AlertTriangle,
+  Info,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
+import { LocationAutocomplete } from '../../LocationAutocomplete';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
+
+// prosciutto-92107: case-insensitive US match for the permanent-residence
+// warning. The IRS treats US territories the same way for W-8 purposes.
+const US_COUNTRY_NAMES = new Set([
+  'united states',
+  'united states of america',
+  'usa',
+  'us',
+  'puerto rico',
+  'guam',
+  'u.s. virgin islands',
+  'us virgin islands',
+  'american samoa',
+  'northern mariana islands',
+]);
+const isUSCountry = (country?: string | null): boolean => {
+  if (!country) return false;
+  return US_COUNTRY_NAMES.has(country.trim().toLowerCase());
+};
 
 export type W8BENEEntityType =
   | 'corporation'
@@ -27,9 +58,14 @@ export interface W8BENEFormData {
   chapter4Status?: W8BENEChapter4Status;
   permanentAddress?: string;
   permanentCity?: string;
+  // prosciutto-92107: split address into structured fields.
+  permanentStateProvince?: string;
+  permanentPostalCode?: string;
   permanentCountry?: string;
   mailingAddress?: string;
   mailingCity?: string;
+  mailingStateProvince?: string;
+  mailingPostalCode?: string;
   mailingCountry?: string;
   usTin?: string;
   giin?: string;
@@ -56,6 +92,12 @@ interface W8BENEFormProps {
   value: W8BENEFormData;
   onChange: (next: W8BENEFormData) => void;
   disabled?: boolean;
+  /**
+   * prosciutto-92107: surfaced when the picked permanent-residence country is
+   * the United States — W-8BEN-E is for foreign entities only. Parent should
+   * discard the W-8BEN-E draft and switch the editor to W-9.
+   */
+  onSwitchFormType?: (target: 'w9') => void;
 }
 
 const ENTITY_TYPES: Array<{ value: W8BENEEntityType; label: string }> = [
@@ -78,12 +120,37 @@ const CHAPTER4: Array<{ value: W8BENEChapter4Status; label: string; hint?: strin
   { value: 'ffi', label: 'FFI', hint: 'Foreign financial institution — paper form required.' },
 ];
 
-export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disabled }) => {
+export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disabled, onSwitchFormType }) => {
   // ----- hooks (declared above any early returns per react-hooks rules) -----
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const valueRef = useRef(value);
   valueRef.current = value;
+
+  // pancetta-92107: Advanced — rarely applies expander. Holds disregarded
+  // entity name (Line 3), US EIN, GIIN, and reference number(s) — all niche
+  // fields that confuse the typical foreign-entity host. Auto-opens if a
+  // saved draft already populated any of them so the user can see their data.
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(
+    !!(value.disregardedEntityName || value.usTin || value.giin || value.referenceNumbers),
+  );
+
+  // pesto-92107: gate the mailing address block behind a checkbox. Default
+  // is unchecked = mailing fields hidden, which signals "use permanent
+  // residence" per IRS convention (the PDF generator already renders an
+  // empty mailing block in that case). If the saved draft already has
+  // mailing data in any structured field, auto-check the box on mount so
+  // the host sees it. Probes all five prosciutto-92107 structured fields.
+  const [showMailingAddress, setShowMailingAddress] = useState<boolean>(() => {
+    const v = value;
+    return Boolean(
+      (v.mailingAddress && v.mailingAddress.trim()) ||
+        (v.mailingCity && v.mailingCity.trim()) ||
+        (v.mailingStateProvince && v.mailingStateProvince.trim()) ||
+        (v.mailingPostalCode && v.mailingPostalCode.trim()) ||
+        (v.mailingCountry && v.mailingCountry.trim()),
+    );
+  });
 
   // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
   // fresh mount. Saved drafts with an existing date are left untouched; the
@@ -150,29 +217,19 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         disabled={disabled}
         required
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Globe}
-          type="text"
-          placeholder="Country of incorporation"
-          value={value.countryOfIncorporation ?? ''}
-          onChange={(e) => {
-            // Resetting the cache lets the treaty effect re-evaluate when the
-            // host changes the country (unless they've manually set treatyCountry).
-            onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
-          }}
-          disabled={disabled}
-          required
-        />
-        <IconInput
-          icon={Building2}
-          type="text"
-          placeholder="Disregarded entity name (if any)"
-          value={value.disregardedEntityName ?? ''}
-          onChange={(e) => set('disregardedEntityName', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
+      <IconInput
+        icon={Globe}
+        type="text"
+        placeholder="Country of incorporation"
+        value={value.countryOfIncorporation ?? ''}
+        onChange={(e) => {
+          // Resetting the cache lets the treaty effect re-evaluate when the
+          // host changes the country (unless they've manually set treatyCountry).
+          onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
+        }}
+        disabled={disabled}
+        required
+      />
 
       <div>
         <p className="text-xs text-theme-text-muted mb-1">Entity type (Chapter 3)</p>
@@ -231,14 +288,26 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
 
       <div className="space-y-2">
         <p className="text-xs text-theme-text-muted">Permanent residence address</p>
-        <IconInput
-          icon={MapPin}
-          type="text"
-          placeholder="Street, apt / suite"
+        {/* prosciutto-92107: Google Places autocomplete on the street input.
+            On pick, fills City / State or Province / Postal Code / Country.
+            Each field remains individually editable. */}
+        <LocationAutocomplete
           value={value.permanentAddress ?? ''}
-          onChange={(e) => set('permanentAddress', e.target.value)}
+          onChange={(v) => set('permanentAddress', v)}
+          onCitySelected={(cityData) => {
+            const nextAddress = cityData.street || value.permanentAddress || cityData.formattedName || '';
+            onChange({
+              ...value,
+              permanentAddress: nextAddress,
+              permanentCity: cityData.cityName || value.permanentCity || '',
+              permanentStateProvince: cityData.state || value.permanentStateProvince || '',
+              permanentPostalCode: cityData.postalCode || value.permanentPostalCode || '',
+              permanentCountry: cityData.country || value.permanentCountry || '',
+            });
+          }}
           disabled={disabled}
-          required
+          placeholder="Street, apt / suite"
+          types={['geocode', 'establishment']}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <IconInput
@@ -253,6 +322,24 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
           <IconInput
             icon={MapPin}
             type="text"
+            placeholder="State or province"
+            value={value.permanentStateProvince ?? ''}
+            onChange={(e) => set('permanentStateProvince', e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <IconInput
+            icon={MapPin}
+            type="text"
+            placeholder="Postal code"
+            value={value.permanentPostalCode ?? ''}
+            onChange={(e) => set('permanentPostalCode', e.target.value)}
+            disabled={disabled}
+          />
+          <IconInput
+            icon={MapPin}
+            type="text"
             placeholder="Country"
             value={value.permanentCountry ?? ''}
             onChange={(e) => set('permanentCountry', e.target.value)}
@@ -260,74 +347,196 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
             required
           />
         </div>
+        {isUSCountry(value.permanentCountry) && (
+          <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mt-2">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-amber-300 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-xs text-amber-100 [.gpp-theme_&]:text-amber-900">
+                  <strong>W-8BEN-E is for foreign entities.</strong> Your
+                  permanent residence can't be in the United States. If the
+                  entity is a US person, use W-9 instead.
+                </div>
+                {onSwitchFormType && (
+                  <button
+                    type="button"
+                    onClick={() => onSwitchFormType('w9')}
+                    className="mt-2 text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40 [.gpp-theme_&]:text-amber-900 [.gpp-theme_&]:bg-amber-500/30 [.gpp-theme_&]:hover:bg-amber-500/40 [.gpp-theme_&]:border-amber-700/40"
+                  >
+                    Switch to W-9
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs text-theme-text-muted">Mailing address (if different)</p>
-        <IconInput
-          icon={MapPin}
-          type="text"
-          placeholder="Street, apt / suite"
-          value={value.mailingAddress ?? ''}
-          onChange={(e) => set('mailingAddress', e.target.value)}
+        {/* pesto-92107: gate the mailing address block behind a checkbox.
+            Most hosts use one address; surfacing both blocks by default
+            adds noise. Saved drafts with mailing data auto-check the box
+            on mount via the lazy initializer above. */}
+        <Checkbox
+          checked={showMailingAddress}
+          onChange={() => {
+            const next = !showMailingAddress;
+            setShowMailingAddress(next);
+            if (!next) {
+              // Clear any stale mailing values so they don't carry through
+              // to the submit payload after the host unchecks. Covers the
+              // full set of structured fields (prosciutto-92107) including
+              // the legacy `mailingAddress` line which doubles as street.
+              onChange({
+                ...value,
+                mailingAddress: '',
+                mailingCity: '',
+                mailingStateProvince: '',
+                mailingPostalCode: '',
+                mailingCountry: '',
+              });
+            }
+          }}
           disabled={disabled}
+          label="I have a different mailing address"
+          labelClassName="text-xs text-theme-text"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="City or town"
-            value={value.mailingCity ?? ''}
-            onChange={(e) => set('mailingCity', e.target.value)}
-            disabled={disabled}
-          />
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="Country"
-            value={value.mailingCountry ?? ''}
-            onChange={(e) => set('mailingCountry', e.target.value)}
-            disabled={disabled}
-          />
-        </div>
+        <p className="text-xs text-white/40">
+          Check this only if your mail goes somewhere different from your permanent residence above.
+        </p>
+        {showMailingAddress && (
+          <div className="space-y-2 pt-1">
+            {/* prosciutto-92107: Google Places autocomplete on the street
+                input. On pick, fills City / State or Province / Postal Code
+                / Country. Each field remains individually editable. */}
+            <LocationAutocomplete
+              value={value.mailingAddress ?? ''}
+              onChange={(v) => set('mailingAddress', v)}
+              onCitySelected={(cityData) => {
+                const nextAddress = cityData.street || value.mailingAddress || cityData.formattedName || '';
+                onChange({
+                  ...value,
+                  mailingAddress: nextAddress,
+                  mailingCity: cityData.cityName || value.mailingCity || '',
+                  mailingStateProvince: cityData.state || value.mailingStateProvince || '',
+                  mailingPostalCode: cityData.postalCode || value.mailingPostalCode || '',
+                  mailingCountry: cityData.country || value.mailingCountry || '',
+                });
+              }}
+              disabled={disabled}
+              placeholder="Street, apt / suite"
+              types={['geocode', 'establishment']}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="City or town"
+                value={value.mailingCity ?? ''}
+                onChange={(e) => set('mailingCity', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="State or province"
+                value={value.mailingStateProvince ?? ''}
+                onChange={(e) => set('mailingStateProvince', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="Postal code"
+                value={value.mailingPostalCode ?? ''}
+                onChange={(e) => set('mailingPostalCode', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="Country"
+                value={value.mailingCountry ?? ''}
+                onChange={(e) => set('mailingCountry', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="US EIN (optional)"
-          value={value.usTin ?? ''}
-          onChange={(e) => set('usTin', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="GIIN (if applicable)"
-          value={value.giin ?? ''}
-          onChange={(e) => set('giin', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
+      <IconInput
+        icon={Hash}
+        type="text"
+        placeholder="Foreign TIN (your home-country tax ID)"
+        value={value.foreignTin ?? ''}
+        onChange={(e) => set('foreignTin', e.target.value)}
+        disabled={disabled}
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Foreign TIN"
-          value={value.foreignTin ?? ''}
-          onChange={(e) => set('foreignTin', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Reference number(s)"
-          value={value.referenceNumbers ?? ''}
-          onChange={(e) => set('referenceNumbers', e.target.value)}
-          disabled={disabled}
-        />
+      {/* pancetta-92107: Advanced — rarely applies. Disregarded entity name
+          (Line 3), US EIN, GIIN, and reference numbers all live here. These
+          fields confuse the typical foreign-entity host; almost none of them
+          have a US EIN, a GIIN, internal reference numbers, or a separate
+          disregarded entity actually receiving the funds. Mirrors the
+          bottarga-92107 W-9 expander pattern. */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((prev) => !prev)}
+          className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+          aria-expanded={showAdvanced}
+        >
+          {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span>Advanced — rarely applies</span>
+        </button>
+        {showAdvanced && (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-theme-text-muted">
+              For sophisticated entity structures only. Fill these in only if your entity (the
+              beneficial owner above) operates through a SEPARATE disregarded entity that is
+              physically receiving the payment, has a US EIN, is a registered FFI with a GIIN,
+              or uses internal reference numbers.{' '}
+              <strong>Most foreign organizations leave these blank.</strong>
+            </p>
+            <IconInput
+              icon={Building2}
+              type="text"
+              placeholder="Name of disregarded entity receiving the payment (rarely applies)"
+              value={value.disregardedEntityName ?? ''}
+              onChange={(e) => set('disregardedEntityName', e.target.value)}
+              disabled={disabled}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={Hash}
+                type="text"
+                placeholder="US EIN (optional)"
+                value={value.usTin ?? ''}
+                onChange={(e) => set('usTin', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={Hash}
+                type="text"
+                placeholder="GIIN (FFIs only)"
+                value={value.giin ?? ''}
+                onChange={(e) => set('giin', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <IconInput
+              icon={Hash}
+              type="text"
+              placeholder="Reference number(s) (optional)"
+              value={value.referenceNumbers ?? ''}
+              onChange={(e) => set('referenceNumbers', e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+        )}
       </div>
 
       {/* Part III — Claim of Tax Treaty Benefits */}

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { IconInput } from "../../IconInput";
 import { Checkbox } from "../../Checkbox";
+import { LocationAutocomplete } from "../../LocationAutocomplete";
 
 export interface W9FormData {
   name?: string;
@@ -29,6 +30,14 @@ export interface W9FormData {
   exemptPayeeCode?: string;
   fatcaCode?: string;
   address?: string;
+  // prosciutto-92107: split address into structured fields. Old drafts that
+  // saved `cityStateZip` are still accepted server-side via the back-compat
+  // shim, but new submits prefer city/state/zipCode for autofill round-trip
+  // and a cleaner PDF render.
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  /** @deprecated kept on the type for back-compat with pre-prosciutto drafts. */
   cityStateZip?: string;
   accountNumbers?: string;
   ssn?: string;
@@ -166,13 +175,22 @@ const getLine1Helper = (
   return "Enter the entity's legal name as registered with the IRS — it must match its EIN.";
 };
 
+// coppa-92107: per the IRS instructions, Line 2 is only filled when the
+// operating / trade name differs from the Line 1 legal name. Sole props with
+// no DBA, single-member LLCs whose name matches the owner, corps without a
+// DBA, etc. should leave it blank. We mark every variant of the placeholder
+// with an explicit "(optional)" suffix EXCEPT the LLC disregarded-entity
+// path, where Line 2 is the place the IRS expects the LLC's name (so it's
+// effectively required *for that classification* — though we still don't
+// gate the submit on it, since the host might be a sole prop misclassified
+// as disregarded; leave the IRS to bounce that, not us).
 const getLine2Placeholder = (
   category: ClassCategory | "",
   llcSub: LlcSub | "",
 ): string => {
   if (category === "llc" && llcSub === "disregarded")
     return "LLC name (the disregarded entity)";
-  return "Business / DBA name (if different from above)";
+  return "Business / DBA name (optional — only if different from above)";
 };
 
 const getLine2Helper = (
@@ -180,11 +198,12 @@ const getLine2Helper = (
   llcSub: LlcSub | "",
 ): string | null => {
   if (category === "llc" && llcSub === "disregarded")
-    return "Enter the LLC's name here. Line 1 above must be the owner's name.";
+    return "The LLC's name. Required if the LLC name differs from the owner's name on Line 1.";
   if (category === "individual")
-    return "Optional. Only fill in if you operate under a DBA / trade name that differs from your legal name.";
+    return "Skip if you don't operate under a different business name (DBA).";
   if (!category) return null;
-  return "Optional. Only fill in if your operating / trade name differs from Line 1.";
+  // C/S corp, partnership, trust/estate, LLC taxed as C/S/P, other.
+  return "Skip if your operating name matches your legal name on Line 1.";
 };
 
 // Line 2 is hidden when it would never apply. Currently we always show it
@@ -415,24 +434,59 @@ export const W9Form: React.FC<W9FormProps> = ({
             </div>
           )}
 
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="Address (number, street, apt / suite)"
+          {/* prosciutto-92107: Google Places autocomplete on the street input.
+              On pick, fills City / State / ZIP from address_components; each
+              field is still individually editable afterwards. */}
+          <LocationAutocomplete
             value={value.address ?? ""}
-            onChange={(e) => set("address", e.target.value)}
-            disabled={disabled}
-            required
+            onChange={(v) => set("address", v)}
+            onCitySelected={(cityData) => {
+              // Compose street if Google parsed one, otherwise leave the
+              // formatted address the user already saw in the input.
+              const nextAddress = cityData.street || value.address || cityData.formattedName || "";
+              // W-9 is US-only — ignore country, keep state as 2-letter code.
+              onChange({
+                ...value,
+                address: nextAddress,
+                city: cityData.cityName || value.city || "",
+                state: cityData.state || value.state || "",
+                zipCode: cityData.postalCode || value.zipCode || "",
+              });
+            }}
+            placeholder="Address (number, street, apt / suite)"
+            // Allow both establishment + geocode picks so users can pick "123
+            // Main St" or "Acme Corp" (the latter still yields address parts).
+            types={['geocode', 'establishment']}
           />
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="City, state, and ZIP code"
-            value={value.cityStateZip ?? ""}
-            onChange={(e) => set("cityStateZip", e.target.value)}
-            disabled={disabled}
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="City"
+              value={value.city ?? ""}
+              onChange={(e) => set("city", e.target.value)}
+              disabled={disabled}
+              required
+            />
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="State (e.g. CA)"
+              value={value.state ?? ""}
+              onChange={(e) => set("state", e.target.value)}
+              disabled={disabled}
+              required
+            />
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="ZIP code"
+              value={value.zipCode ?? ""}
+              onChange={(e) => set("zipCode", e.target.value)}
+              disabled={disabled}
+              required
+            />
+          </div>
 
           <div>
             <p className="text-xs text-theme-text-muted mb-2">

@@ -1,8 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { captureTelegramGroup } from '../services/telegramGroupCapture.js';
 import { withBennySignature } from '../lib/bennySignature.js';
 
 const router = Router();
+
+const GROUP_TYPES = new Set(['group', 'supergroup']);
 
 /**
  * Telegram webhook handler — receives inbound updates from the Telegram Bot API.
@@ -64,6 +67,118 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
     }
 
     const update = req.body || {};
+
+    // ── tonda-58293 Phase 2: discrete group chat-id capture ───────────────
+    // The bot learns a group's chat_id only from updates it receives. Capture
+    // is intentionally limited to DISCRETE events (not every group message —
+    // the bot sits in ~466+ groups with privacy mode OFF, so an upsert per
+    // message is a needless write firehose; a group's chat_id is immutable
+    // except on supergroup migration, which is auto-handled on send).
+    //   - `my_chat_member` fires when the bot is added/promoted regardless of
+    //     privacy mode → AUTOMATIC capture path for NEW groups.
+    //   - `/register` (or `/register@<botusername>`) posted in a group →
+    //     MANUAL capture path for groups the bot was already sitting in.
+    // Both run BEFORE the private-DM logic below; group updates never reach
+    // that path (it requires chat.type === 'private'). Non-command group
+    // messages are ignored (no upsert) and just 200.
+
+    // Automatic path: bot added/promoted to a group/supergroup.
+    //
+    // tonda-58293 FIX #2: `my_chat_member` also fires when the bot is REMOVED
+    // (status 'left'/'kicked') or restricted. Capturing on those would keep a
+    // group looking "connected" after the bot was kicked. Only capture when the
+    // bot is an active member: status ∈ {member, administrator}, or 'restricted'
+    // with is_member === true. On left/kicked → do nothing (just 200); we do NOT
+    // delete the existing row ("safe auto-capture").
+    try {
+      const memberChat = update.my_chat_member?.chat;
+      const newStatus: string | undefined = update.my_chat_member?.new_chat_member?.status;
+      const isMember: boolean | undefined = update.my_chat_member?.new_chat_member?.is_member;
+      const botIsActiveMember =
+        newStatus === 'member' ||
+        newStatus === 'administrator' ||
+        (newStatus === 'restricted' && isMember === true);
+      if (memberChat && GROUP_TYPES.has(memberChat.type) && typeof memberChat.id === 'number') {
+        if (botIsActiveMember) {
+          await captureTelegramGroup({
+            chatId: memberChat.id,
+            title: memberChat.title ?? null,
+            chatType: memberChat.type,
+          });
+        }
+        // Active-member → captured above. left/kicked/restricted-not-member →
+        // intentionally a no-op. Either way this update is fully handled.
+        return res.status(200).json({ ok: true });
+      }
+    } catch (captureErr: any) {
+      console.error('[Telegram Webhook] my_chat_member capture failed:', captureErr?.message || captureErr);
+      // Always 200, never block.
+      return res.status(200).json({ ok: true });
+    }
+
+    // Manual path: `/register` command in a group/supergroup.
+    {
+      const msgChat = update.message?.chat;
+      const msgText: string = typeof update.message?.text === 'string' ? update.message.text : '';
+      if (msgChat && GROUP_TYPES.has(msgChat.type) && typeof msgChat.id === 'number') {
+        // Only act on the /register command. Telegram delivers commands as
+        // `/register` or `/register@BotUsername` (group disambiguation). Take
+        // the first whitespace-delimited token, strip any `@mention` suffix,
+        // and compare case-insensitively. Everything else in a group is ignored.
+        const firstToken = msgText.trim().split(/\s+/)[0] || '';
+        const command = firstToken.split('@')[0].toLowerCase();
+        if (command === '/register') {
+          try {
+            const result = await captureTelegramGroup({
+              chatId: msgChat.id,
+              title: msgChat.title ?? null,
+              chatType: msgChat.type,
+            });
+            const confirmation = result.matchedCityKey
+              ? `✅ Captured this group for ${result.matchedCityKey} — reminders are now wired up.`
+              : '✅ Got it — this group is captured. An admin can assign it to a city in /underboss.';
+            await sendMessage(botToken, msgChat.id, confirmation);
+          } catch (captureErr: any) {
+            console.error('[Telegram Webhook] /register capture failed:', captureErr?.message || captureErr);
+          }
+          // /register handled (with reply) — always 200, never fall through.
+          return res.status(200).json({ ok: true });
+        }
+
+        // ── ricotta-58494: passive harvest ───────────────────────────────
+        // Privacy mode is OFF, so every group message already reaches us. For
+        // a non-`/register` group message we silently learn the group's
+        // chat_id the FIRST time we ever see it. To avoid a write firehose
+        // (the bot sits in 466+ groups), do ONE cheap indexed point lookup on
+        // the unique `chat_id`: if a capture row already exists this is a
+        // no-op (no re-upsert, no last_seen). Only a never-before-seen group
+        // triggers a single captureTelegramGroup() — which records it and, on
+        // a title→city match, fill-if-empty write-throughs to
+        // city_telegram_groups; unmatched groups become pending captures for
+        // the /underboss gap tab. No in-group reply (unlike /register).
+        try {
+          const existing = await prisma.telegramGroupCapture.findUnique({
+            where: { chatId: BigInt(msgChat.id) },
+            select: { id: true },
+          });
+          if (!existing) {
+            await captureTelegramGroup({
+              chatId: msgChat.id,
+              title: msgChat.title ?? null,
+              chatType: msgChat.type,
+            });
+          }
+        } catch (passiveErr: any) {
+          console.error('[Telegram Webhook] passive-harvest capture failed:', passiveErr?.message || passiveErr);
+        }
+
+        // Group message fully handled (passive capture or known-group no-op) —
+        // always 200, never fall through to the private-DM path.
+        return res.status(200).json({ ok: true });
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     const message = update.message;
     if (!message) {
       // No message in this update (could be an edit, channel post, etc.) — ignore.
