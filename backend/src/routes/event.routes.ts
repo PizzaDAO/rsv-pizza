@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin } from '../middleware/auth.js';
-import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
+import { getGppGlobalEditors } from '../lib/privateConfig.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
@@ -462,7 +462,8 @@ router.post('/:slug/check-host', async (req: Request, res: Response, next: NextF
     let isHost = !!matchedHost;
     let canEdit = !!matchedHost?.canEdit;
     if (!canEdit && (party as any).eventType === 'gpp' && email) {
-      const isGppEditor = GPP_GLOBAL_EDITORS.some(e => e.toLowerCase() === email.toLowerCase());
+      const gppEditors = await getGppGlobalEditors();
+      const isGppEditor = gppEditors.some(e => e.toLowerCase() === email.toLowerCase());
       if (isGppEditor) {
         isHost = true;
         canEdit = true;

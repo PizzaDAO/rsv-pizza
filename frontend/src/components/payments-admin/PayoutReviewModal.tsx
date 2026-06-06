@@ -7,6 +7,7 @@ import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
 import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 import {
@@ -31,15 +32,19 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
- * lasagna-92103: $675 is the "sane-default" per-submission soft cap. The
- * backend admin PATCH no longer enforces it (admin amount is canonical), so
- * this constant now drives a purely informational amber warning — no
- * Checkbox, no Save block. The USDC execute hard ceiling
- * (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a separate
- * safety net at on-chain send time, but admins can split executes or record
- * external payments to handle larger sums.
+ * lasagna-92103: the per-submission soft cap drives a purely informational
+ * amber warning — no Checkbox, no Save block. The backend admin PATCH no longer
+ * enforces it (admin amount is canonical); the USDC execute hard ceiling
+ * (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a separate safety
+ * net at on-chain send time, but admins can split executes or record external
+ * payments to handle larger sums.
+ *
+ * marinara-71630 P6: the real cap value moved out of this open-source bundle into
+ * `app_config` (private.payout_caps) and is fetched via `usePayoutCaps`. While
+ * the cap is unknown (loading / fetch error) it resolves to a high neutral
+ * sentinel, so the warning simply never fires until the real cap loads — a
+ * graceful no-op, never the real number baked in as a fallback.
  */
-const PER_SUBMISSION_MAX_USD = 675;
 
 interface PayoutReviewModalProps {
   payout: AdminPayoutDetail;
@@ -241,6 +246,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
   // green Flag-ready button replaces them in the footer slot.
   const isAdminViewer = viewerRole === 'admin';
+  // marinara-71630 P6: per-submission soft cap fetched from app_config (not
+  // hardcoded). High neutral sentinel while unknown → the amber warning below
+  // is inert until the real cap loads.
+  const { caps: payoutCaps } = usePayoutCaps();
+  const perSubmissionMaxUsd =
+    payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
   // Flag-ready inline error (mirrors the unapproveError pattern).
   const [flagReadyError, setFlagReadyError] = useState<string | null>(null);
   // tagliatelle-49102: in-modal event_tags editor. Full admins (admin /
@@ -343,7 +354,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // lasagna-92103: `ackOverSubmissionCap` is gone — admin amount is now
   // canonical on the backend, so the modal doesn't gate Save on an
   // acknowledgement. The amber warning below stays as an informational
-  // heads-up when the typed amount exceeds the $675 sane-default cap.
+  // heads-up when the typed amount exceeds the per-submission soft cap.
   // `saveAmountError` still renders inline below the Save button when
   // the backend (or any other failure path) rejects — wallet/method
   // validation, etc.
@@ -2108,7 +2119,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   // not-busy — no longer on an over-cap acknowledgement.
                   const draftNum = Number(draftAmount);
                   const draftIsValid = Number.isFinite(draftNum) && draftNum >= 0;
-                  const exceedsCap = draftIsValid && draftNum > PER_SUBMISSION_MAX_USD;
+                  const exceedsCap = draftIsValid && draftNum > perSubmissionMaxUsd;
                   const saveDisabled = busy || !draftIsValid;
                   return (
                     <div className="space-y-2">
@@ -2167,7 +2178,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         </button>
                       </div>
                       {/* lasagna-92103: informational amber heads-up when the
-                          typed value exceeds the $675 sane-default cap. NOT a
+                          typed value exceeds the per-submission soft cap. NOT a
                           gate — admin amount is canonical on the backend; the
                           warning is purely a visual nudge so admins notice
                           unusually large amounts before saving. */}
@@ -2181,10 +2192,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                               </div>
                               <div className="text-theme-text-secondary text-xs">
                                 <b>${draftNum.toFixed(2)}</b> is over the{' '}
-                                <b>${PER_SUBMISSION_MAX_USD}</b> per-submission
+                                <b>${perSubmissionMaxUsd}</b> per-submission
                                 soft cap. Admin edits aren&apos;t gated by
                                 this — proceed if intentional. USDC execute
-                                still caps at <b>${PER_SUBMISSION_MAX_USD}</b>{' '}
+                                still caps at <b>${perSubmissionMaxUsd}</b>{' '}
                                 per on-chain tx.
                               </div>
                             </div>

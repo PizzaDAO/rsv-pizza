@@ -56,7 +56,7 @@ vi.mock('../helpers/partyAccess.js', () => ({
   canUserEditParty: async (partyId: string, userId?: string) => {
     return userId === 'host-user-123' || userId === 'host-user-other';
   },
-  GPP_GLOBAL_EDITORS: [],
+  getGppGlobalEditors: async () => [],
   VALID_TAB_IDS: [],
 }));
 

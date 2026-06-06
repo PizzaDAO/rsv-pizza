@@ -27,17 +27,21 @@ import {
   type ApprovedPartySearchResult,
 } from '../../lib/api';
 import { uploadPayoutPhoto } from '../../lib/supabase';
+import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import type { ExternalPaymentInput, PayoutMethod } from '../../types';
 
 /**
- * lasagna-92103: $675 is the "sane-default" per-submission soft cap. The
- * backend admin POST /external no longer enforces it (admin amount is
- * canonical), so this constant now drives a purely informational amber
- * warning — no Checkbox, no Submit block. The USDC execute hard ceiling
- * is irrelevant for external (off-platform) payments which are already
- * settled outside our hot wallet.
+ * lasagna-92103: the per-submission soft cap drives a purely informational amber
+ * warning — no Checkbox, no Submit block. The backend admin POST /external no
+ * longer enforces it (admin amount is canonical); the USDC execute hard ceiling
+ * is irrelevant for external (off-platform) payments which are already settled
+ * outside our hot wallet.
+ *
+ * marinara-71630 P6: the real cap value moved out of this open-source bundle into
+ * `app_config` (private.payout_caps) and is fetched via `usePayoutCaps`. While
+ * unknown (loading / fetch error) it resolves to a high neutral sentinel so the
+ * warning is inert until the real cap loads — never the real number as fallback.
  */
-const PER_SUBMISSION_MAX_USD = 675;
 
 interface ExternalPaymentModalProps {
   onClose: () => void;
@@ -167,10 +171,16 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   const amountNum = useMemo(() => Number(amountStr), [amountStr]);
 
-  // lasagna-92103: typed amount exceeds the $675 soft cap. Drives the
+  // marinara-71630 P6: per-submission soft cap fetched from app_config (not
+  // hardcoded). High neutral sentinel while unknown → warning stays inert.
+  const { caps: payoutCaps } = usePayoutCaps();
+  const perSubmissionMaxUsd =
+    payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
+
+  // lasagna-92103: typed amount exceeds the per-submission soft cap. Drives the
   // informational amber warning below — no longer blocks Submit.
   const exceedsCap =
-    Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+    Number.isFinite(amountNum) && amountNum > perSubmissionMaxUsd;
 
   // derived: the active partyId (only set once a party is picked).
   const partyId = selectedParty?.id ?? '';
@@ -559,7 +569,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               required
             />
             {/* lasagna-92103: informational amber heads-up when the typed
-                amount exceeds the $675 sane-default cap. NOT a gate — admin
+                amount exceeds the per-submission soft cap. NOT a gate — admin
                 amount is canonical for external records. External payments
                 don't go through our hot wallet so the per-tx ceiling is
                 irrelevant; this is purely a visual nudge so admins notice
@@ -573,7 +583,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
                       Heads-up: over per-submission soft cap
                     </div>
                     <div className="text-theme-text-secondary">
-                      ${amountNum.toFixed(2)} is over the ${PER_SUBMISSION_MAX_USD} per-submission
+                      ${amountNum.toFixed(2)} is over the ${perSubmissionMaxUsd} per-submission
                       soft cap. Admin edits aren&apos;t gated by this — proceed if intentional.
                       External payments don&apos;t go through our hot wallet so the USDC per-tx
                       ceiling doesn&apos;t apply here.

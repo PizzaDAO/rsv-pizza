@@ -26,6 +26,7 @@ import {
   searchApprovedParties,
   type ApprovedPartySearchResult,
 } from '../../lib/api';
+import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import type { PayoutMethod, WalletPaidTotal } from '../../types';
 
 /**
@@ -45,9 +46,13 @@ import type { PayoutMethod, WalletPaidTotal } from '../../types';
  *   POST /api/admin/payouts/:id/execute (or autoExecute on approve for USDC).
  * Two-row audit chain (create + execute) — that's the trade-off for not
  * needing a new atomic endpoint, and it's GOOD for traceability.
+ *
+ * marinara-71630 P6 — the per-submission cap is no longer hardcoded here; it's
+ * fetched from `app_config` (private.payout_caps) via `usePayoutCaps`. While the
+ * cap is unknown (loading / fetch failure) the neutral fallback is
+ * `Number.POSITIVE_INFINITY`, so the amber warning simply doesn't fire until the
+ * real value loads. The backend enforces the cap regardless.
  */
-
-const PER_SUBMISSION_MAX_USD = 675;
 
 interface SendPaymentModalProps {
   partyId: string;
@@ -127,6 +132,12 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   // front so adding a conditional return below can't change hook order.
   // (feedback_hooks_above_early_returns)
   const cleanName = useMemo(() => stripGppPrefix(partyName), [partyName]);
+
+  // marinara-71630 P6 — per-submission cap from private config (was hardcoded
+  // in the bundle). Neutral fallback while loading/on error → warning is inert.
+  const { caps: payoutCaps } = usePayoutCaps();
+  const perSubmissionMaxUsd =
+    payoutCaps?.perSubmissionMaxUsd ?? Number.POSITIVE_INFINITY;
 
   // Load the host-candidate list for this party via the existing
   // `parties/search` endpoint. We search by the cleaned city name and
@@ -355,7 +366,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
 
   // Per-submission ceiling.
   const exceedsPerSubmission =
-    Number.isFinite(amountNum) && amountNum > PER_SUBMISSION_MAX_USD;
+    Number.isFinite(amountNum) && amountNum > perSubmissionMaxUsd;
 
   // Per-method destination validity.
   const usdcValid = method !== 'usdc_base' || walletAddress.trim().length > 0;
@@ -636,7 +647,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
             </p>
             {exceedsPerSubmission && (
               <p className="text-xs text-red-500 mt-1">
-                Single payments capped at ${PER_SUBMISSION_MAX_USD}.
+                Single payments capped at ${perSubmissionMaxUsd}.
               </p>
             )}
           </div>

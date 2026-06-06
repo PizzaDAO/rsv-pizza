@@ -6240,6 +6240,37 @@ export async function fetchPricingConfig(): Promise<PricingConfig> {
   return apiRequest<PricingConfig>('/api/config/pricing');
 }
 
+// ============================================
+// marinara-71630 P6 — payout caps for the payments-admin modals.
+//
+// The per-submission cap used to be hardcoded (`$675`) in 3 payments-admin
+// modals for a UX-only warning + a client clamp. The real number now lives in
+// `app_config` (private.payout_caps) and is served by GET /api/config/payout-caps,
+// gated to the SAME viewer set that opens those modals (payments-admin OR an
+// active underboss — a `payment_admin` doesn't pass the /pricing underboss gate,
+// so this is a separate sibling endpoint). The backend remains the enforcement
+// authority; this is purely for the warning text + CreatePrepaymentModal's clamp.
+// ============================================
+
+export interface PayoutCapsConfig {
+  /** Per-submission soft cap (USD) — drives the modals' amber warnings + clamp. */
+  perSubmissionMaxUsd: number;
+  /** Per-recipient-address hard cap (USD). */
+  perAddressHardCapUsd: number;
+}
+
+/**
+ * Fetch the payments-admin payout caps. Callers should go through the
+ * `usePayoutCaps` hook, which caches the result across components and supplies a
+ * NEUTRAL fallback (never the real number) while loading / on error.
+ */
+export async function fetchPayoutCaps(): Promise<PayoutCapsConfig> {
+  const res = await apiRequest<{ payoutCaps: PayoutCapsConfig }>(
+    '/api/config/payout-caps',
+  );
+  return res.payoutCaps;
+}
+
 /**
  * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
  * via the backend's mainnet-resolver utility endpoint. Returns null on any
