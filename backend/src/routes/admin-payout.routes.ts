@@ -2247,8 +2247,10 @@ router.get(
 // payments-admin by-city table badges + the send-payment confirmation gate.
 //
 // Body: { partyIds: string[] }  (string array, capped at 500).
-// Response: { scores: Record<partyId, { score, tier, topFlags }> }
+// Response: { scores: Record<partyId, { score, tier, topFlags, flags }> }
 //   - `topFlags` = up to 3 fired-flag `detail` strings, highest weight first.
+//   - `flags` = EVERY fired flag as { detail, weight }, highest weight first
+//     (backs the clickable Risk pill popover on /payments — bresaola-58502).
 //   - tier `clean` entries (score < 10) are OMITTED to keep the payload small;
 //     the frontend badge self-hides for anything below `medium` anyway.
 //
@@ -2286,7 +2288,12 @@ router.post(
 
       const scores: Record<
         string,
-        { score: number; tier: string; topFlags: string[] }
+        {
+          score: number;
+          tier: string;
+          topFlags: string[];
+          flags: { detail: string; weight: number }[];
+        }
       > = {};
 
       if (partyIds.length > 0) {
@@ -2294,12 +2301,15 @@ router.post(
         for (const r of rows) {
           // Omit clean events to keep the payload small.
           if (r.tier === 'clean') continue;
-          const topFlags = r.flags
+          const firedSorted = r.flags
             .filter(f => f.fired)
-            .sort((a, b) => b.weight - a.weight)
-            .slice(0, 3)
-            .map(f => f.detail);
-          scores[r.id] = { score: r.score, tier: r.tier, topFlags };
+            .sort((a, b) => b.weight - a.weight);
+          const topFlags = firedSorted.slice(0, 3).map(f => f.detail);
+          const flags = firedSorted.map(f => ({
+            detail: f.detail,
+            weight: f.weight,
+          }));
+          scores[r.id] = { score: r.score, tier: r.tier, topFlags, flags };
         }
       }
 
