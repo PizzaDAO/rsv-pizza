@@ -3689,11 +3689,13 @@ export interface BroadcastResponse {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
+  appTab: string | null = null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
-    body: { groups, message, parseMode },
+    body: { groups, message, parseMode, appTab },
   });
 }
 
@@ -3719,11 +3721,13 @@ export interface BroadcastHost {
 export async function sendHostTelegramBroadcast(
   hosts: BroadcastHost[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
+  appTab: string | null = null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
     method: 'POST',
-    body: { hosts, message, parseMode },
+    body: { hosts, message, parseMode, appTab },
   });
 }
 
