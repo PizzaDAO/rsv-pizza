@@ -135,6 +135,23 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
     !!(value.disregardedEntityName || value.usTin || value.giin || value.referenceNumbers),
   );
 
+  // pesto-92107: gate the mailing address block behind a checkbox. Default
+  // is unchecked = mailing fields hidden, which signals "use permanent
+  // residence" per IRS convention (the PDF generator already renders an
+  // empty mailing block in that case). If the saved draft already has
+  // mailing data in any structured field, auto-check the box on mount so
+  // the host sees it. Probes all five prosciutto-92107 structured fields.
+  const [showMailingAddress, setShowMailingAddress] = useState<boolean>(() => {
+    const v = value;
+    return Boolean(
+      (v.mailingAddress && v.mailingAddress.trim()) ||
+        (v.mailingCity && v.mailingCity.trim()) ||
+        (v.mailingStateProvince && v.mailingStateProvince.trim()) ||
+        (v.mailingPostalCode && v.mailingPostalCode.trim()) ||
+        (v.mailingCountry && v.mailingCountry.trim()),
+    );
+  });
+
   // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
   // fresh mount. Saved drafts with an existing date are left untouched; the
   // effect only fires once so subsequent user edits remain authoritative.
@@ -356,61 +373,98 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs text-theme-text-muted">Mailing address (if different)</p>
-        <LocationAutocomplete
-          value={value.mailingAddress ?? ''}
-          onChange={(v) => set('mailingAddress', v)}
-          onCitySelected={(cityData) => {
-            const nextAddress = cityData.street || value.mailingAddress || cityData.formattedName || '';
-            onChange({
-              ...value,
-              mailingAddress: nextAddress,
-              mailingCity: cityData.cityName || value.mailingCity || '',
-              mailingStateProvince: cityData.state || value.mailingStateProvince || '',
-              mailingPostalCode: cityData.postalCode || value.mailingPostalCode || '',
-              mailingCountry: cityData.country || value.mailingCountry || '',
-            });
+        {/* pesto-92107: gate the mailing address block behind a checkbox.
+            Most hosts use one address; surfacing both blocks by default
+            adds noise. Saved drafts with mailing data auto-check the box
+            on mount via the lazy initializer above. */}
+        <Checkbox
+          checked={showMailingAddress}
+          onChange={() => {
+            const next = !showMailingAddress;
+            setShowMailingAddress(next);
+            if (!next) {
+              // Clear any stale mailing values so they don't carry through
+              // to the submit payload after the host unchecks. Covers the
+              // full set of structured fields (prosciutto-92107) including
+              // the legacy `mailingAddress` line which doubles as street.
+              onChange({
+                ...value,
+                mailingAddress: '',
+                mailingCity: '',
+                mailingStateProvince: '',
+                mailingPostalCode: '',
+                mailingCountry: '',
+              });
+            }
           }}
           disabled={disabled}
-          placeholder="Street, apt / suite"
-          types={['geocode', 'establishment']}
+          label="I have a different mailing address"
+          labelClassName="text-xs text-theme-text"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="City or town"
-            value={value.mailingCity ?? ''}
-            onChange={(e) => set('mailingCity', e.target.value)}
-            disabled={disabled}
-          />
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="State or province"
-            value={value.mailingStateProvince ?? ''}
-            onChange={(e) => set('mailingStateProvince', e.target.value)}
-            disabled={disabled}
-          />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="Postal code"
-            value={value.mailingPostalCode ?? ''}
-            onChange={(e) => set('mailingPostalCode', e.target.value)}
-            disabled={disabled}
-          />
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="Country"
-            value={value.mailingCountry ?? ''}
-            onChange={(e) => set('mailingCountry', e.target.value)}
-            disabled={disabled}
-          />
-        </div>
+        <p className="text-xs text-white/40">
+          Check this only if your mail goes somewhere different from your permanent residence above.
+        </p>
+        {showMailingAddress && (
+          <div className="space-y-2 pt-1">
+            {/* prosciutto-92107: Google Places autocomplete on the street
+                input. On pick, fills City / State or Province / Postal Code
+                / Country. Each field remains individually editable. */}
+            <LocationAutocomplete
+              value={value.mailingAddress ?? ''}
+              onChange={(v) => set('mailingAddress', v)}
+              onCitySelected={(cityData) => {
+                const nextAddress = cityData.street || value.mailingAddress || cityData.formattedName || '';
+                onChange({
+                  ...value,
+                  mailingAddress: nextAddress,
+                  mailingCity: cityData.cityName || value.mailingCity || '',
+                  mailingStateProvince: cityData.state || value.mailingStateProvince || '',
+                  mailingPostalCode: cityData.postalCode || value.mailingPostalCode || '',
+                  mailingCountry: cityData.country || value.mailingCountry || '',
+                });
+              }}
+              disabled={disabled}
+              placeholder="Street, apt / suite"
+              types={['geocode', 'establishment']}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="City or town"
+                value={value.mailingCity ?? ''}
+                onChange={(e) => set('mailingCity', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="State or province"
+                value={value.mailingStateProvince ?? ''}
+                onChange={(e) => set('mailingStateProvince', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="Postal code"
+                value={value.mailingPostalCode ?? ''}
+                onChange={(e) => set('mailingPostalCode', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={MapPin}
+                type="text"
+                placeholder="Country"
+                value={value.mailingCountry ?? ''}
+                onChange={(e) => set('mailingCountry', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <IconInput
