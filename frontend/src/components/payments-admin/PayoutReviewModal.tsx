@@ -21,6 +21,7 @@ import {
 } from '../payments-shared';
 import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
+import { AdminAddAttachment } from './AdminAddAttachment';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
@@ -225,6 +226,14 @@ interface PayoutReviewModalProps {
    * Parent owns the modal state.
    */
   onMarkPartyPaid?: () => void;
+  /**
+   * sfincione-58500: called after an admin attaches a new receipt / pizza /
+   * event document to this payout via AdminAddAttachment. Parent should
+   * re-fetch the payout detail (getAdminPayout) + refresh the list so the new
+   * doc + recomputed receipt subtotal appear. Only invoked for full payment
+   * admins (the controls are hidden for underbosses).
+   */
+  onDocumentsChanged?: () => Promise<void> | void;
   busy?: boolean;
 }
 
@@ -251,6 +260,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   viewerRole = 'admin',
   onFlagReady,
   onMarkPartyPaid,
+  onDocumentsChanged,
   busy = false,
 }) => {
   // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
@@ -1882,9 +1892,22 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             {/* focaccia-92104: Pizza photos — party.photos tagged
                 `Pizza` (default tagger) or `pizza-selfie` (EventPage). */}
             <div>
-              <h3 className="text-sm font-semibold text-theme-text mb-2">
-                Pizza photos ({pizzaPhotos.length})
-              </h3>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="text-sm font-semibold text-theme-text">
+                  Pizza photos ({pizzaPhotos.length})
+                </h3>
+                {/* sfincione-58500: full payment admins can attach a pizza- or
+                    event-proof photo (kind picker on the control). The backend
+                    mirrors it into the gallery. Hidden for underbosses. */}
+                {isAdminViewer && (
+                  <AdminAddAttachment
+                    payoutId={payout.id}
+                    partyId={payout.partyId}
+                    mode="photo"
+                    onAdded={() => onDocumentsChanged?.()}
+                  />
+                )}
+              </div>
               {pizzaPhotos.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No pizza photos yet.</p>
               ) : (
@@ -1950,9 +1973,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 PayoutDocuments. The per-receipt OCR list on the right is the
                 editable companion to these thumbnails. */}
             <div>
-              <h3 className="text-sm font-semibold text-theme-text mb-2">
-                Receipts ({receipts.length})
-              </h3>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="text-sm font-semibold text-theme-text">
+                  Receipts ({receipts.length})
+                </h3>
+                {/* sfincione-58500: full payment admins can attach a receipt
+                    here — OCR'd inline server-side. Hidden for underbosses. */}
+                {isAdminViewer && (
+                  <AdminAddAttachment
+                    payoutId={payout.id}
+                    partyId={payout.partyId}
+                    mode="receipt"
+                    onAdded={() => onDocumentsChanged?.()}
+                  />
+                )}
+              </div>
               {receipts.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No receipts attached.</p>
               ) : (
