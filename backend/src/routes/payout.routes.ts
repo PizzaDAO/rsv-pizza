@@ -930,44 +930,48 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // porchetta-58296: gate submission on the host having (1) attested their
     // receipts, (2) at least one receipt on file (incoming or already stored),
     // and (3) all three designated event role photos (group/box_stack/pizza).
-    // Applies to ALL purposes (incl. shipping) for now. Mirrored client-side as
-    // a disabled submit button; enforced here so an API bypass still fails.
-    if (receiptAttested !== true) {
-      throw new AppError(
-        'Confirm your receipts are submitted and itemized before submitting.',
-        400,
-        'RECEIPT_ATTESTATION_REQUIRED',
-      );
-    }
-    const incomingReceiptCount = Array.isArray(receiptPhotos) ? receiptPhotos.length : 0;
-    const submissionReadiness = await getPayoutSubmissionReadiness(partyId);
-    if (incomingReceiptCount < 1 && !submissionReadiness.hasReceipt) {
-      throw new AppError(
-        'Upload at least one receipt before submitting.',
-        400,
-        'RECEIPTS_REQUIRED',
-      );
-    }
-    if (!submissionReadiness.hasGroupPhoto) {
-      throw new AppError(
-        'Designate a group photo before submitting.',
-        400,
-        'GROUP_PHOTO_REQUIRED',
-      );
-    }
-    if (!submissionReadiness.hasBoxStackPhoto) {
-      throw new AppError(
-        'Designate a box stack photo before submitting.',
-        400,
-        'BOX_STACK_PHOTO_REQUIRED',
-      );
-    }
-    if (!submissionReadiness.hasPizzaPhoto) {
-      throw new AppError(
-        'Designate a pizza photo before submitting.',
-        400,
-        'PIZZA_PHOTO_REQUIRED',
-      );
+    // Exempt purpose='shipping' — kit-shipping reimbursements are filed by
+    // coordinators via a separate flow with no event photos and no receipt
+    // attestation, so this gate would always block them. Mirrored client-side
+    // as a disabled submit button; enforced here so an API bypass still fails.
+    if (!isShippingPurpose) {
+      if (receiptAttested !== true) {
+        throw new AppError(
+          'Confirm your receipts are submitted and itemized before submitting.',
+          400,
+          'RECEIPT_ATTESTATION_REQUIRED',
+        );
+      }
+      const incomingReceiptCount = Array.isArray(receiptPhotos) ? receiptPhotos.length : 0;
+      const submissionReadiness = await getPayoutSubmissionReadiness(partyId);
+      if (incomingReceiptCount < 1 && !submissionReadiness.hasReceipt) {
+        throw new AppError(
+          'Upload at least one receipt before submitting.',
+          400,
+          'RECEIPTS_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasGroupPhoto) {
+        throw new AppError(
+          'Designate a group photo before submitting.',
+          400,
+          'GROUP_PHOTO_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasBoxStackPhoto) {
+        throw new AppError(
+          'Designate a box stack photo before submitting.',
+          400,
+          'BOX_STACK_PHOTO_REQUIRED',
+        );
+      }
+      if (!submissionReadiness.hasPizzaPhoto) {
+        throw new AppError(
+          'Designate a pizza photo before submitting.',
+          400,
+          'PIZZA_PHOTO_REQUIRED',
+        );
+      }
     }
 
     // salame-92110 + culatello-92106: tax-form gate.
