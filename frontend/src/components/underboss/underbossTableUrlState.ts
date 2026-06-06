@@ -56,9 +56,10 @@ export interface EventTableFilters {
   sortDir: 'asc' | 'desc';
   progressIncludes: string[];
   progressExcludes: string[];
-  regionFilter: string; // country, 'all' default
   tagIncludes: string[]; // tri-state tag filter (provola-58497)
   tagExcludes: string[];
+  countryIncludes: string[]; // tri-state country filter (crosta-58498)
+  countryExcludes: string[];
   rsvpComparator: '>' | '<';
   rsvpThreshold: string; // '' default
   appealsOnly: boolean;
@@ -70,9 +71,10 @@ export const DEFAULT_EVENT_TABLE_FILTERS: EventTableFilters = {
   sortDir: 'asc',
   progressIncludes: [],
   progressExcludes: [],
-  regionFilter: 'all',
   tagIncludes: [],
   tagExcludes: [],
+  countryIncludes: [],
+  countryExcludes: [],
   rsvpComparator: '>',
   rsvpThreshold: '',
   appealsOnly: false,
@@ -164,15 +166,18 @@ export function eventTableFiltersToSearchParams(
     params.set('exc', filters.progressExcludes.join(','));
   }
 
-  if (filters.regionFilter && filters.regionFilter !== 'all') {
-    params.set('country', filters.regionFilter);
-  }
-
   if (filters.tagIncludes.length > 0) {
     params.set('tagInc', filters.tagIncludes.join(','));
   }
   if (filters.tagExcludes.length > 0) {
     params.set('tagExc', filters.tagExcludes.join(','));
+  }
+
+  if (filters.countryIncludes.length > 0) {
+    params.set('countryInc', filters.countryIncludes.join(','));
+  }
+  if (filters.countryExcludes.length > 0) {
+    params.set('countryExc', filters.countryExcludes.join(','));
   }
 
   const threshold = filters.rsvpThreshold.trim();
@@ -209,6 +214,8 @@ export function searchParamsToEventTableFilters(
     progressExcludes: [],
     tagIncludes: [],
     tagExcludes: [],
+    countryIncludes: [],
+    countryExcludes: [],
   };
 
   const q = params.get('q');
@@ -233,11 +240,11 @@ export function searchParamsToEventTableFilters(
   filters.progressIncludes = sanitizeKeyList(params.get('inc'));
   filters.progressExcludes = sanitizeKeyList(params.get('exc'));
 
-  const country = params.get('country');
-  if (country && country.trim()) filters.regionFilter = country.trim();
-
   filters.tagIncludes = sanitizeTagList(params.get('tagInc'));
   filters.tagExcludes = sanitizeTagList(params.get('tagExc'));
+
+  filters.countryIncludes = sanitizeTagList(params.get('countryInc'));
+  filters.countryExcludes = sanitizeTagList(params.get('countryExc'));
 
   const rsvpRaw = params.get('rsvp');
   if (rsvpRaw) {
