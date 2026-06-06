@@ -20,6 +20,11 @@ const mockPrisma = vi.hoisted(() => ({
     count: vi.fn(() => Promise.resolve(0)),
   },
   guest: { findFirst: vi.fn() },
+  // marinara-71630 P8: the upload handler now resolves its per-user photo cap
+  // from getOperationalLimits(), which reads app_config. Default to no row so
+  // the loader falls back to the current real value (30) — the behavior the
+  // upload tests assume.
+  appConfig: { findUnique: vi.fn(() => Promise.resolve(null)) },
 }));
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));

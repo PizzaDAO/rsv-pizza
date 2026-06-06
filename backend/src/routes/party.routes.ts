@@ -17,7 +17,7 @@ import {
 } from '../helpers/reimbursementCapAudit.js';
 import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
-import { getReimbursementRules, getGppGlobalEditors } from '../lib/privateConfig.js';
+import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 
 // Helper function to get party with ownership check
@@ -1525,7 +1525,6 @@ router.post('/:id/guests', async (req: AuthRequest, res: Response, next: NextFun
 // supabase_realtime fan-out burst.
 const IMPORT_SOURCE_ALLOWLIST = ['luma', 'meetup', 'eventbrite', 'csv'] as const;
 type ImportSource = typeof IMPORT_SOURCE_ALLOWLIST[number];
-const IMPORT_HARD_CAP = 2000;
 const IMPORT_CHUNK_SIZE = 50;
 const IMPORT_CHUNK_GAP_MS = 100;
 const IMPORT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1533,6 +1532,12 @@ const IMPORT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 router.post('/:id/guests/import', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+
+    // marinara-71630 P8: the bulk-import hard cap is a tunable operational
+    // quota resolved from config (fallback = current value 2000), so it can be
+    // overridden without a deploy. Templated into the cap-exceeded message so
+    // the message always reflects the configured value.
+    const importHardCap = (await getOperationalLimits()).importHardCap;
 
     // Verify ownership or super admin
     const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
@@ -1566,9 +1571,9 @@ router.post('/:id/guests/import', async (req: AuthRequest, res: Response, next: 
     if (!Array.isArray(guests) || guests.length === 0) {
       throw new AppError('guests must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    if (guests.length > IMPORT_HARD_CAP) {
+    if (guests.length > importHardCap) {
       throw new AppError(
-        `Max ${IMPORT_HARD_CAP} guests per import; split the file into multiple uploads`,
+        `Max ${importHardCap} guests per import; split the file into multiple uploads`,
         400,
         'VALIDATION_ERROR'
       );

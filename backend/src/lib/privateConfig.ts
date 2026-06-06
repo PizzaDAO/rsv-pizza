@@ -34,6 +34,7 @@ const KEYS = {
   reimbursementCapBands: 'private.reimbursement_cap_bands',
   sponsorshipPricing: 'private.sponsorship_pricing',
   gppGlobalEditors: 'private.gpp_global_editors',
+  operationalLimits: 'operational.limits',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -377,6 +378,38 @@ export function getSponsorshipPricing(): Promise<SponsorshipPricing> {
  */
 export function getGppGlobalEditors(): Promise<string[]> {
   return getConfig<string[]>(KEYS.gppGlobalEditors, []);
+}
+
+// ---------------------------------------------------------------------------
+// Operational quota limits (marinara-71630 P8)
+//
+// Host-facing operational quotas (bulk-import hard cap, per-user-per-event
+// photo cap). Unlike the `private.*` keys above these are NOT secret — they're
+// just operational knobs. They live here so the team can OVERRIDE them via an
+// `app_config` row WITHOUT a deploy.
+// ---------------------------------------------------------------------------
+
+export interface OperationalLimits {
+  /** Max guests accepted in a single bulk-import request. */
+  importHardCap: number;
+  /** Max photos one user may have (pending+approved) on a single event. */
+  photoPerUserPerEvent: number;
+}
+
+/**
+ * Operational quota limits. NON-SECRET — these are tunable operational
+ * quotas, not sensitive config.
+ *
+ * Fallback = the CURRENT real values (importHardCap 2000, photoPerUserPerEvent
+ * 30). Because the fallback IS the live value, behavior is identical whether or
+ * not an `app_config` row exists; seeding the `operational.limits` row simply
+ * lets the team OVERRIDE these quotas without shipping a deploy.
+ */
+export function getOperationalLimits(): Promise<OperationalLimits> {
+  return getConfig<OperationalLimits>(KEYS.operationalLimits, {
+    importHardCap: 2000,
+    photoPerUserPerEvent: 30,
+  });
 }
 
 export { KEYS as PRIVATE_CONFIG_KEYS };
