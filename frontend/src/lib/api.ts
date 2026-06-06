@@ -3922,6 +3922,67 @@ export async function revokePartnerAiShareToken(
   });
 }
 
+// soppressata-72251: per-partner BizDev industry report (companies-only, no PII).
+// Lives behind GET /api/bizdev?partner={tag}. Auth: admin / underboss / own-tag
+// sponsor (server-authoritative). Uses a bespoke fetch (not apiRequest) so the
+// page can branch on the HTTP status — 401/403/404 each render a distinct state,
+// and a 401 here must NOT clear the auth token (apiRequest does that on 401).
+export interface BizdevCompany {
+  company: string;
+  rsvpCount: number;
+  eventCount: number;
+  confidence: 'high' | 'medium';
+}
+
+export interface BizdevBucket {
+  bucketId: string;
+  label: string;
+  companies: BizdevCompany[];
+}
+
+export interface BizdevReport {
+  tag: string;
+  label: string;
+  blurb: string;
+  scope: 'approved-gpp';
+  coverage: {
+    events: number;
+    totalEmails: number;
+    matched: number;
+    personal: number;
+    internal: number;
+    distinctCompanies: number;
+  };
+  featured: BizdevBucket[];
+  other: BizdevBucket[];
+}
+
+export class BizdevReportError extends Error {
+  status: number;
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.name = 'BizdevReportError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export async function fetchBizdevReport(partner: string): Promise<BizdevReport> {
+  const token = getAuthToken();
+  const res = await fetch(
+    `${API_URL}/api/bizdev?partner=${encodeURIComponent(partner)}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const message = body?.error?.message || body?.message || `Request failed (${res.status})`;
+    const code = body?.error?.code || body?.code;
+    throw new BizdevReportError(res.status, message, code);
+  }
+  return res.json();
+}
+
 // pecorino-64118 follow-up: download list of guest emails opted into a partner's
 // newsletter (ethconf + SWC family). Errors with 400 NO_NEWSLETTER for tags
 // without a newsletter (e.g. pizzadao).
