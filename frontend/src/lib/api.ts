@@ -6807,3 +6807,40 @@ export interface Suggestion {
 export async function fetchSuggestions() {
   return apiRequest<{ suggestions: Suggestion[] }>('/api/suggestions');
 }
+
+// =============================================================================
+// Saved filter views (montanara-58497) — per-account, keyed by auth email.
+// `params` is the page's serialized URL query string (page-agnostic).
+// =============================================================================
+export type SavedViewScope = 'payments' | 'underboss';
+
+export interface SavedView {
+  id: string;
+  name: string;
+  params: string;
+  updatedAt: string;
+}
+
+export async function listSavedViews(scope: SavedViewScope): Promise<SavedView[]> {
+  const { views } = await apiRequest<{ views: SavedView[] }>(
+    `/api/saved-views?scope=${encodeURIComponent(scope)}`,
+  );
+  return views;
+}
+
+export async function saveFilterView(
+  scope: SavedViewScope,
+  name: string,
+  params: string,
+): Promise<SavedView> {
+  return apiRequest<SavedView>('/api/saved-views', {
+    method: 'POST',
+    body: { scope, name, params },
+  });
+}
+
+export async function deleteSavedView(id: string): Promise<void> {
+  await apiRequest<{ ok: boolean }>(`/api/saved-views/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}

@@ -2220,3 +2220,20 @@ model ImageAuthenticityCheck {
   @@index([partyId])
   @@map("image_authenticity_checks")
 }
+
+// montanara-58497: per-account saved filter views for the /payments + /underboss
+// admin dashboards. Keyed by the caller's auth email (lowercased) — no FK to
+// User. `params` is the serialized URL query string (page-agnostic) produced by
+// the page's own (de)serializer, so applying a view just replays the query.
+model SavedFilterView {
+  id        String   @id @default(uuid())
+  userEmail String   @map("user_email")
+  scope     String // 'payments' | 'underboss'
+  name      String
+  params    String // serialized URL query string (page-agnostic)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userEmail, scope, name])
+  @@map("saved_filter_views")
+}
