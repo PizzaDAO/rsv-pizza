@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { AccountPage } from './pages/AccountPage';
 import { GPPLandingPage } from './pages/GPPLandingPage';
+import { GPP27CreatePage } from './pages/GPP27CreatePage';
 import { CheckInPage } from './pages/CheckInPage';
 import { DJPage } from './pages/DJPage';
 import { PublicReportPage } from './pages/PublicReportPage';
@@ -22,6 +23,7 @@ import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
+import { SuggestionsPage } from './pages/SuggestionsPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
 import { SouthAfricaPaymentsPage } from './pages/SouthAfricaPaymentsPage';
@@ -69,6 +71,8 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/new" element={<NewEventPage />} />
             <Route path="/gpp" element={<GPPLandingPage />} />
+            {/* soppressata-50927: admin/UB-gated 2027 create flow; must come before /:slug */}
+            <Route path="/gpp27" element={<GPP27CreatePage />} />
             <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
             {/* /map must come before /:slug */}
             <Route path="/map" element={<EventsMapPage />} />
@@ -116,6 +120,8 @@ function App() {
             <Route path="/underboss/:region" element={<UnderbossDashboard />} />
             <Route path="/shipping" element={<ShippingDashboard />} />
             <Route path="/admin" element={<AdminPage />} />
+            {/* scarpetta-58472: admin/underboss-only suggestions list — before /:slug catch-all */}
+            <Route path="/suggestions" element={<SuggestionsPage />} />
             <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner/report" element={<ConsolidatedReportPage />} />

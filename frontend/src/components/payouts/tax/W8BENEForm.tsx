@@ -1,7 +1,8 @@
-import React from 'react';
-import { Building2, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Building2, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, Info } from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
+import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
 
 export type W8BENEEntityType =
   | 'corporation'
@@ -34,6 +35,17 @@ export interface W8BENEFormData {
   giin?: string;
   foreignTin?: string;
   referenceNumbers?: string;
+  // Part III — Claim of Tax Treaty Benefits
+  treatyCountry?: string;
+  articleParagraph?: string;
+  withholdingRate?: string;
+  incomeType?: string;
+  treatyExplanation?: string;
+  /**
+   * mortadella-92107: tracks the country we last auto-filled treaty values
+   * for so host edits aren't overwritten on re-render or draft reload.
+   */
+  treatyAutoFilledFor?: string;
   certify?: boolean;
   signature?: string;
   signerCapacity?: string;
@@ -67,6 +79,61 @@ const CHAPTER4: Array<{ value: W8BENEChapter4Status; label: string; hint?: strin
 ];
 
 export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disabled }) => {
+  // ----- hooks (declared above any early returns per react-hooks rules) -----
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
+  // fresh mount. Saved drafts with an existing date are left untouched; the
+  // effect only fires once so subsequent user edits remain authoritative.
+  useEffect(() => {
+    const v = valueRef.current;
+    if (!v.date || v.date.trim() === '') {
+      const today = new Date().toISOString().slice(0, 10);
+      onChangeRef.current({ ...v, date: today });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Default the treaty-claim country to the entity's country of incorporation
+  // (most common case for an entity claiming treaty benefits). Host can edit.
+  const treatyKey = (value.treatyCountry?.trim() || value.countryOfIncorporation?.trim() || '').trim();
+  const treatyEntry = useMemo(() => lookupTreaty(treatyKey), [treatyKey]);
+  const treatyCode = useMemo(() => normalizeCountryCode(treatyKey), [treatyKey]);
+
+  useEffect(() => {
+    if (disabled) return;
+    if (!treatyKey) return;
+    const cacheKey = treatyCode || treatyKey.toLowerCase();
+    const v = valueRef.current;
+    if (v.treatyAutoFilledFor === cacheKey) return;
+    if (!treatyEntry) {
+      onChangeRef.current({ ...v, treatyAutoFilledFor: cacheKey });
+      return;
+    }
+    if (!treatyEntry.hasTreaty) {
+      onChangeRef.current({
+        ...v,
+        treatyCountry: v.treatyCountry ?? v.countryOfIncorporation ?? '',
+        articleParagraph: '',
+        withholdingRate: '',
+        incomeType: '',
+        treatyAutoFilledFor: cacheKey,
+      });
+      return;
+    }
+    onChangeRef.current({
+      ...v,
+      treatyCountry: v.treatyCountry || v.countryOfIncorporation || '',
+      articleParagraph: treatyEntry.article ?? '',
+      withholdingRate: String(treatyEntry.otherIncomeRate),
+      incomeType: 'Other income',
+      treatyAutoFilledFor: cacheKey,
+    });
+  }, [treatyKey, treatyCode, treatyEntry, disabled]);
+
   const set = <K extends keyof W8BENEFormData>(key: K, v: W8BENEFormData[K]) =>
     onChange({ ...value, [key]: v });
 
@@ -89,7 +156,11 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
           type="text"
           placeholder="Country of incorporation"
           value={value.countryOfIncorporation ?? ''}
-          onChange={(e) => set('countryOfIncorporation', e.target.value)}
+          onChange={(e) => {
+            // Resetting the cache lets the treaty effect re-evaluate when the
+            // host changes the country (unless they've manually set treatyCountry).
+            onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
+          }}
           disabled={disabled}
           required
         />
@@ -255,6 +326,82 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
           placeholder="Reference number(s)"
           value={value.referenceNumbers ?? ''}
           onChange={(e) => set('referenceNumbers', e.target.value)}
+          disabled={disabled}
+        />
+      </div>
+
+      {/* Part III — Claim of Tax Treaty Benefits */}
+      <div className="space-y-2">
+        <p className="text-xs text-theme-text-muted">Part III — Claim of tax treaty benefits (optional)</p>
+        <p className="text-[11px] text-theme-text-muted/80 leading-relaxed">
+          This is general guidance based on IRS Publication 901, not tax advice. Consult a tax
+          professional if you're unsure.
+        </p>
+        <IconInput
+          icon={Globe}
+          type="text"
+          placeholder="Country for tax treaty claim"
+          value={value.treatyCountry ?? ''}
+          onChange={(e) =>
+            onChange({ ...value, treatyCountry: e.target.value, treatyAutoFilledFor: undefined })
+          }
+          disabled={disabled}
+        />
+        {treatyKey && treatyEntry?.hasTreaty && (
+          <div className="flex items-start gap-1.5 text-[11px] text-theme-text-muted">
+            <Info size={12} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Auto-filled based on {treatyKey}'s US tax treaty (Other income at{' '}
+              {treatyEntry.otherIncomeRate}% under {treatyEntry.article}). Edit if needed.
+              {treatyEntry.notes ? ` ${treatyEntry.notes}` : ''}
+            </span>
+          </div>
+        )}
+        {treatyKey && treatyEntry && !treatyEntry.hasTreaty && (
+          <div className="card p-2.5 border-l-4 border-l-amber-500 bg-amber-500/10">
+            <div className="flex items-start gap-2 text-[11px] text-amber-100">
+              <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+              <span>
+                No US tax treaty in force with {treatyKey} — leave the treaty fields blank; default
+                30% withholding applies if classified as US-source income.
+                {treatyEntry.notes ? ` ${treatyEntry.notes}` : ''}
+              </span>
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <IconInput
+            icon={Hash}
+            type="text"
+            placeholder="Article + paragraph"
+            value={value.articleParagraph ?? ''}
+            onChange={(e) => set('articleParagraph', e.target.value)}
+            disabled={disabled}
+          />
+          <IconInput
+            icon={Hash}
+            type="text"
+            placeholder="Withholding rate (%)"
+            value={value.withholdingRate ?? ''}
+            onChange={(e) => set('withholdingRate', e.target.value)}
+            disabled={disabled}
+          />
+          <IconInput
+            icon={Hash}
+            type="text"
+            placeholder="Type of income"
+            value={value.incomeType ?? ''}
+            onChange={(e) => set('incomeType', e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <IconInput
+          icon={Hash}
+          multiline
+          rows={2}
+          placeholder="Explanation for treaty claim (optional)"
+          value={value.treatyExplanation ?? ''}
+          onChange={(e) => set('treatyExplanation', e.target.value)}
           disabled={disabled}
         />
       </div>

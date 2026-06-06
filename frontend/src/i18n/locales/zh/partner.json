@@ -36,7 +36,9 @@
     "partners": "合作伙伴",
     "social": "社交",
     "thrown": "已举办",
-    "estimate": "预估人数"
+    "estimate": "预估人数",
+    "receipt": "收据",
+    "payment": "付款信息"
   },
   "eventCard": {
     "hostedBy": "由 {{name}} 主办",
@@ -110,11 +112,11 @@
     "deselectAll": "取消全选",
     "noEventsSelected": "未选择活动",
     "cancelEventsTitle": "取消活动？",
-    "cancelEventsDesc": "这将永久删除 {{count}} 个活动。此操作无法撤销。",
-    "cancelEventsDesc_other": "这将永久删除 {{count}} 个活动。此操作无法撤销。",
+    "cancelEventsDesc": "这将取消 {{count}} 个活动。其公开页面仍会保留并显示\"已取消\"提示，RSVP 将暂停，你可以随时恢复。",
+    "cancelEventsDesc_other": "这将取消 {{count}} 个活动。其公开页面仍会保留并显示\"已取消\"提示，RSVP 将暂停，你可以随时恢复。",
     "keepEvents": "保留活动",
-    "deleteEvents": "删除 {{count}} 个活动",
-    "deleteEvents_other": "删除 {{count}} 个活动",
+    "deleteEvents": "取消 {{count}} 个活动",
+    "deleteEvents_other": "取消 {{count}} 个活动",
     "copyCitiesTitle": "复制城市（已选 {{count}} 个）",
     "copyToClipboard": "复制到剪贴板",
     "copied": "已复制！",

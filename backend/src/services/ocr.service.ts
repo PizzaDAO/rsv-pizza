@@ -15,6 +15,7 @@
  */
 
 import { getOpenAI } from '../lib/openai.js';
+import { getCountryCode } from '../lib/countryCode.js';
 
 // formaggi-89172: allowed categories. Keep in sync with the system prompt
 // and the sanitizer below. `other` is the safe fallback for anything else.
@@ -93,7 +94,7 @@ export const COUNTRY_TO_PRIMARY_CURRENCY: Record<string, string> = {
   CM: 'XAF', CF: 'XAF', TD: 'XAF', GQ: 'XAF', GA: 'XAF', CG: 'XAF',
 };
 
-function buildSystemPrompt(partyCountry?: string | null): string {
+export function buildSystemPrompt(partyCountry?: string | null): string {
   const base = `You are a receipt analysis assistant. Extract the total amount and per-line items from the receipt image.
 Return ONLY a JSON object with these fields:
 - amount: number (the total amount paid, as a decimal number)
@@ -119,9 +120,15 @@ Always return valid JSON.`;
   // mortadella-92103: country prior. When the host's event has a known country
   // and that country has a single dominant ISO-4217 currency, prefer it for
   // ambiguous-symbol receipts (the `$` problem in MX/AR/CL/CO/UY/...).
-  const code = typeof partyCountry === 'string'
-    ? partyCountry.trim().toUpperCase().slice(0, 2)
-    : '';
+  // calzone-58294: `parties.country` stores full English names (e.g. "Togo"),
+  // not ISO-2. Naively slicing the first 2 chars mis-keyed the lookup
+  // ("Togo"->"TO"=Tonga, "Mexico"->"ME"=Montenegro, "United States"->"UN") so
+  // the prior never fired. Reuse the canonical name->ISO-2 normalizer, and keep
+  // a back-compat fallback for any legacy caller that passes a bare ISO-2 code.
+  const raw = typeof partyCountry === 'string' ? partyCountry.trim() : '';
+  const code =
+    getCountryCode(raw) ??
+    (/^[A-Za-z]{2}$/.test(raw) ? raw.toUpperCase() : '');
   const primary = code ? COUNTRY_TO_PRIMARY_CURRENCY[code] : undefined;
   if (code && primary) {
     return `${base}\n\nContext: this receipt is from ${code}; the primary currency in ${code} is ${primary}. If the printed currency symbol is ambiguous (e.g. just "$"), prefer ${primary}. Only return USD if the receipt clearly shows USD (e.g. "USD", "US$", or an unambiguous US-based merchant).`;
@@ -193,9 +200,11 @@ function sanitizeLineItems(raw: unknown): OcrLineItem[] {
  * wrap in `Promise.allSettled` so one bad receipt doesn't fail the whole batch.
  */
 /**
- * mortadella-92103: now accepts an optional `partyCountry` (ISO-2). When the
- * receipt symbol is ambiguous, the country prior steers OCR toward the local
- * primary currency instead of silently defaulting to USD.
+ * mortadella-92103: now accepts an optional `partyCountry` (a full English
+ * country name as stored on `parties.country`, e.g. "Togo", or a bare ISO-2
+ * code). When the receipt symbol is ambiguous, the country prior steers OCR
+ * toward the local primary currency instead of silently defaulting to USD.
+ * calzone-58294: normalized via getCountryCode so full names resolve correctly.
  *
  * Back-compat shim: callers passing a string (legacy `analyzeReceipt(url)`)
  * still work — the function accepts either a string or `{ imageUrl, partyCountry }`.

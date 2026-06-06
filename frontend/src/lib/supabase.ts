@@ -120,6 +120,23 @@ export async function uploadEventImage(file: File, bucket: string = 'event-image
 }
 
 /**
+ * Submit a free-text site suggestion (optionally with an image) into the
+ * `suggestions` table via a direct anon insert. Throws on failure.
+ */
+export async function submitSuggestion(input: {
+  body: string; name?: string; email?: string; imageUrl?: string; pageUrl?: string;
+}): Promise<void> {
+  const { error } = await supabase.from('suggestions').insert({
+    body: input.body,
+    name: input.name || null,
+    email: input.email || null,
+    image_url: input.imageUrl || null,
+    page_url: input.pageUrl || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Upload a sponsor logo to Supabase Storage and return the public URL
  * @param file The image file to upload
  * @returns The public URL of the uploaded logo, or null if upload failed
@@ -356,7 +373,16 @@ export async function uploadPayoutPhoto(
   const allowedTypes = kind === 'receipt'
     ? [...allowedImageTypes, 'application/pdf']
     : allowedImageTypes;
-  if (!allowedTypes.includes(file.type)) {
+  // schiacciata-71042: some browsers report an empty file.type for HEIC, so the
+  // MIME allowlist would reject a valid .heic/.heif upload. Detect HEIC by mime
+  // OR filename extension and let an empty-type HEIC file through validation.
+  const lowerName = file.name.toLowerCase();
+  const isHeic =
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    lowerName.endsWith('.heic') ||
+    lowerName.endsWith('.heif');
+  if (!allowedTypes.includes(file.type) && !(isHeic && !file.type)) {
     console.error('Invalid file type for payout photo:', file.type);
     throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: JPEG, PNG, WebP, HEIC, PDF.`);
   }
@@ -366,15 +392,38 @@ export async function uploadPayoutPhoto(
     throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 10MB.`);
   }
 
+  // schiacciata-71042: convert HEIC->JPEG client-side before upload. iPhone
+  // hosts upload .heic receipts, and OpenAI gpt-4o vision (the OCR backend)
+  // can't decode HEIC, so analyzeReceipt threw -> 500 on the ocr-preview
+  // endpoint. Reuse the existing heic2any dep so OCR receives a readable JPEG.
+  let uploadBlob: Blob = file;
+  let uploadName = file.name;
+  let uploadMime = file.type || 'application/octet-stream';
+  let uploadExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  if (isHeic) {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+      const jpegBlob = Array.isArray(out) ? out[0] : out;
+      uploadBlob = jpegBlob;
+      uploadMime = 'image/jpeg';
+      uploadExt = 'jpg';
+      uploadName = file.name.replace(/\.(heic|heif)$/i, '') + '.jpg';
+    } catch (convErr) {
+      console.error('HEIC→JPEG conversion failed:', convErr);
+      throw new Error('Could not process HEIC image — please convert it to JPEG and retry.');
+    }
+  }
+
   try {
-    const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileExt = uploadExt;
     const timestamp = Date.now();
     const rand = Math.random().toString(36).substring(7);
     const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('event-images')
-      .upload(path, file, { cacheControl: '3600', upsert: false });
+      .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
 
     if (error) {
       console.error('Error uploading payout photo:', error);
@@ -417,9 +466,9 @@ export async function uploadPayoutPhoto(
 
     return {
       url: urlData.publicUrl,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
+      fileName: uploadName,
+      fileSize: uploadBlob.size,
+      mimeType: uploadMime,
     };
   } catch (err) {
     console.error('Error uploading payout photo:', err);
@@ -763,6 +812,8 @@ export interface DbParty {
   max_guests: number | null;
   expected_guests?: number | null;
   estimated_attendance?: number | null;
+  target_attendance?: number | null;
+  expected_attendance?: number | null;
   hide_guests: boolean;
   require_approval: boolean;
   password?: string | null;
@@ -796,6 +847,7 @@ export interface DbParty {
   donation_recipient?: string | null;
   donation_recipient_url?: string | null;
   donation_eth_address?: string | null;
+  donation_amounts_public?: boolean;
   venue_report_published?: boolean;
   venue_report_slug?: string | null;
   venue_report_title?: string | null;
@@ -887,11 +939,11 @@ export interface DbGuest {
 // Safe column list for parties table — excludes password
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
-  pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, estimated_attendance, hide_guests,
+  pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, estimated_attendance, target_attendance, expected_attendance, hide_guests,
   require_approval, venue_name, selected_pizzerias,
   event_image_url, description, address, latitude, longitude, country, city, place_id, rsvp_closed_at, co_hosts_public, created_at, updated_at, user_id,
   donation_enabled, donation_goal, donation_message, suggested_amounts, donation_recipient,
-  donation_recipient_url, donation_eth_address, share_to_unlock, share_tweet_text,
+  donation_recipient_url, donation_eth_address, donation_amounts_public, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
   photos_enabled, photos_public, photo_moderation,
   event_type, event_tags, budget_total, budget_enabled,
@@ -1957,6 +2009,8 @@ export async function updateParty(
     max_guests?: number | null;
     expected_guests?: number | null;
     estimated_attendance?: number | null;
+    target_attendance?: number | null;
+    expected_attendance?: number | null;
     event_tags?: string[];
     hide_guests?: boolean;
     require_approval?: boolean;
@@ -1974,6 +2028,7 @@ export async function updateParty(
     donation_recipient?: string | null;
     donation_recipient_url?: string | null;
     donation_eth_address?: string | null;
+    donation_amounts_public?: boolean;
     share_to_unlock?: boolean;
     share_tweet_text?: string | null;
     photo_moderation?: boolean;
@@ -2041,6 +2096,8 @@ export async function updateParty(
         maxGuests: updates.max_guests,
         expectedGuests: updates.expected_guests,
         estimatedAttendance: updates.estimated_attendance,
+        targetAttendance: updates.target_attendance,
+        expectedAttendance: updates.expected_attendance,
         eventTags: updates.event_tags,
         hideGuests: updates.hide_guests,
         requireApproval: updates.require_approval,
@@ -2061,6 +2118,7 @@ export async function updateParty(
         donationRecipient: updates.donation_recipient,
         donationRecipientUrl: updates.donation_recipient_url,
         donationEthAddress: updates.donation_eth_address,
+        donationAmountsPublic: updates.donation_amounts_public,
         shareToUnlock: updates.share_to_unlock,
         shareTweetText: updates.share_tweet_text,
         photoModeration: updates.photo_moderation,

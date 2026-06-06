@@ -5,7 +5,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import type { AdminPayoutDetail, PayoutAuditEntry, WalletPaidTotal, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
@@ -16,6 +16,7 @@ import {
   formatUsd,
   formatOriginalCurrency,
   ReceiptLightbox,
+  AuthenticityPanel,
 } from '../payments-shared';
 import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
@@ -545,6 +546,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // doesn't clobber the other or the amount-edit error.
   const [ineligibleSavingId, setIneligibleSavingId] = useState<string | null>(null);
   const [ineligibleSaveErrors, setIneligibleSaveErrors] = useState<Record<string, string>>({});
+
+  // marinara-61455: per-image cached authenticity verdicts, keyed by image URL.
+  // Lazily loaded when a receipt is shown in the lightbox (so reopening doesn't
+  // re-pay for the API call), and updated in place when the admin runs / re-runs
+  // a check via the AuthenticityPanel. Advisory only — drives the purple banner
+  // + stripe overlay; never gates any action.
+  const [authChecks, setAuthChecks] = useState<Record<string, ImageAuthenticityCheck | null>>({});
+  // URLs we've already attempted to lazy-load, so we don't refetch a null result
+  // on every render of the lightbox.
+  const [authLoadedUrls, setAuthLoadedUrls] = useState<Record<string, boolean>>({});
 
   // Hooks must be declared above any early returns. There aren't any early
   // returns in this component today, but keeping all hooks grouped here makes
@@ -1234,6 +1245,29 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     return receipts[idx];
   }, [lightboxCurrentIndex, pizzas.length, eventDocs.length, receipts]);
 
+  // marinara-61455: lazily load the cached authenticity verdict for the receipt
+  // currently in the lightbox. Runs once per URL (tracked in authLoadedUrls) so
+  // navigating back and forth doesn't refetch. Best-effort — a failed fetch just
+  // leaves the panel in its "Verify authenticity" state.
+  useEffect(() => {
+    const url = lightboxReceipt?.url;
+    if (!url || !canEditReceipts) return;
+    if (authLoadedUrls[url]) return;
+    setAuthLoadedUrls((m) => ({ ...m, [url]: true }));
+    let cancelled = false;
+    (async () => {
+      try {
+        const cached = await getImageAuthenticityCheck(url);
+        if (!cancelled) setAuthChecks((m) => ({ ...m, [url]: cached }));
+      } catch {
+        // ignore — panel falls back to the un-checked state.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lightboxReceipt?.url, canEditReceipts, authLoadedUrls]);
+
   // pesto-92104: "is the editor dirty?" — used by the navigation prompt
   // (Save / Discard / Cancel) so admins don't accidentally lose in-flight
   // amount / currency / line-item edits when arrow-keying through receipts.
@@ -1305,6 +1339,32 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     toggleDuplicate(lightboxReceipt.id, !(lightboxReceipt.isDuplicate === true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lightboxReceipt]);
+
+  // marinara-61455: V key = run the image-authenticity check on the current
+  // receipt (uses cache; force-recheck is the panel's "Re-check" button). Only
+  // wired when an editor is mounted, so non-receipt photos don't trigger it.
+  const lightboxOnVerifyShortcut = useCallback(() => {
+    const r = lightboxReceipt;
+    if (!r) return;
+    // Don't re-run if we already have a verdict cached for this image — the
+    // panel's "Re-check" button is the explicit force path.
+    if (authChecks[r.url]) return;
+    (async () => {
+      try {
+        const { verifyImageAuthenticity } = await import('../../lib/api');
+        const { check } = await verifyImageAuthenticity({
+          imageUrl: r.url,
+          sourceKind: 'receipt',
+          partyId: payout.partyId,
+          payoutDocumentId: r.id,
+        });
+        setAuthChecks((m) => ({ ...m, [r.url]: check }));
+      } catch {
+        // Swallow — the panel surfaces errors on explicit button clicks.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxReceipt, authChecks]);
 
   // pesto-92104: render the ReceiptEditor when the lightbox is showing a
   // receipt AND the viewer can edit (admin / super_admin / payment_admin).
@@ -1392,6 +1452,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         retrying={retryingDocId === r.id}
         retryError={retryErrors[r.id]}
         onRetryOcr={() => retryOcr(r.id)}
+        authenticityVerdict={authChecks[r.url]?.verdict ?? null}
+        authenticityPanel={
+          <AuthenticityPanel
+            imageUrl={r.url}
+            sourceKind="receipt"
+            partyId={payout.partyId}
+            payoutDocumentId={r.id}
+            initialCheck={authChecks[r.url] ?? null}
+            onResult={(check) =>
+              setAuthChecks((m) => ({ ...m, [r.url]: check }))
+            }
+          />
+        }
       />
     );
     // The deps list intentionally excludes the function references that
@@ -1415,6 +1488,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     retryingDocId,
     retryErrors,
     retryClearedErrors,
+    authChecks,
   ]);
 
   // culatello-92104: duplicates are evidence-only — exclude their OCR
@@ -3130,21 +3204,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     agnostic; the server-side check fires for usdc / wire /
                     mercury_card alike. */}
                 {partyWouldExceedCap && partyCap != null && (
-                  // ricotta-92103: amber values (text-amber-200/100/300) read
-                  // fine on dark `.card` backgrounds but wash out on gpp-theme,
-                  // where `.gpp-theme .card { background: rgba(255,255,255,.92)
-                  // !important }` repaints the panel white. Override to dark
-                  // amber under `.gpp-theme` via Tailwind arbitrary variants.
-                  // See architecture_gpp_theme_text_white_override + screenshot
-                  // 2026-05-29 (/payments/latam cap-warning unreadable).
+                  // ricotta-92103 / fix: this warning is rendered inside the
+                  // Execute payout form, which is ALWAYS a light panel
+                  // (`bg-emerald-50`), so the `[.gpp-theme_&]` dark override
+                  // never fired and the light-amber base classes washed out on
+                  // the light panel. Use solid dark amber shades that read in
+                  // both themes. (The footer Approve warning below sits on
+                  // `bg-theme-surface` and correctly keeps the theme variant.)
                   <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
                     <div className="flex items-start gap-2.5">
-                      <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                      <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
                       <div className="flex-1 text-sm">
-                        <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                        <div className="font-medium text-amber-900 mb-1">
                           Per-party cap warning
                         </div>
-                        <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                        <div className="text-amber-800 text-xs">
                           This payment exceeds the party's ${partyCap.toFixed(2)} cap by{' '}
                           <b>${partyOverBy.toFixed(2)}</b>{' '}
                           (remaining: ${(partyCapRemaining ?? 0).toFixed(2)}).
@@ -3154,7 +3228,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                             checked={overridePartyCap}
                             onChange={() => setOverridePartyCap((v) => !v)}
                             label="I acknowledge — proceed anyway"
-                            labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                            labelClassName="text-sm text-amber-900"
                           />
                         </div>
                       </div>
@@ -3203,17 +3277,21 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       </div>
                     )}
                     {!walletPaidLoading && walletPaidTotal?.wouldExceed && payout.payoutWalletAddress && (
-                      // ricotta-92103: same gpp-theme contrast fix as the
-                      // per-party warning above. Bumps amber text to dark
-                      // shades under `.gpp-theme` where the panel paints white.
+                      // ricotta-92103 / fix: this warning lives inside the
+                      // Execute payout form, which is ALWAYS a light panel
+                      // (`bg-emerald-50`), not just under `.gpp-theme`. The old
+                      // light-amber base classes washed out here because the
+                      // `[.gpp-theme_&]` dark override never fired. Use solid
+                      // dark amber shades that read on the light panel in both
+                      // themes.
                       <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
                         <div className="flex items-start gap-2.5">
-                          <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                          <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
                           <div className="flex-1 text-sm">
-                            <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                            <div className="font-medium text-amber-900 mb-1">
                               Per-address cap warning
                             </div>
-                            <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                            <div className="text-amber-800 text-xs">
                               Wallet{' '}
                               <code className="font-mono text-[11px]">
                                 {payout.payoutWalletAddress.slice(0, 6)}…{payout.payoutWalletAddress.slice(-4)}
@@ -3233,7 +3311,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                 checked={overrideCap}
                                 onChange={() => setOverrideCap((v) => !v)}
                                 label="I acknowledge — proceed anyway"
-                                labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                                labelClassName="text-sm text-amber-900"
                               />
                             </div>
                           </div>
@@ -3875,6 +3953,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         editorPane={lightboxEditorPane}
         onBeforeNavigate={lightboxOnBeforeNavigate}
         onDuplicateShortcut={lightboxOnDuplicateShortcut}
+        /* marinara-61455: only wire V when an editor (i.e. a receipt) is in view. */
+        onVerifyShortcut={lightboxEditorPane ? lightboxOnVerifyShortcut : undefined}
         /* coppa-92105: paint the lightbox photo pane with a DUPLICATE banner +
             diagonal-stripe overlay when the focused image is an admin-marked
             duplicate. Only fires for the receipt bucket because lightboxReceipt
@@ -3887,6 +3967,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         isIneligible={
           lightboxReceipt?.ineligible === true
           && lightboxReceipt?.isDuplicate !== true
+        }
+        /* marinara-61455: purple authenticity overlay on the photo pane when the
+            focused receipt image is flagged AI-generated / doctored. Orthogonal
+            to the duplicate / ineligible flags (can co-exist). */
+        authenticityVerdict={
+          lightboxReceipt ? (authChecks[lightboxReceipt.url]?.verdict ?? null) : null
         }
       />
     </div>

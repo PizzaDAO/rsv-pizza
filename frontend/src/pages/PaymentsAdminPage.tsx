@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -36,9 +37,10 @@ import type {
   PrepayQueueRow,
   PrepayCandidate,
 } from '../types';
-import { formatUsd } from '../components/payments-shared';
+import { formatUsd, computePartyTotals } from '../components/payments-shared';
 import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
+import { normalizeText } from '../lib/normalizeText';
 import {
   PayoutsFilterBar,
   PayoutsTable,
@@ -58,6 +60,13 @@ import {
   MarkPartyPaidModal,
 } from '../components/payments-admin';
 import type { BulkSendResult } from '../lib/api';
+// panuozzo-92114: URL <-> filter/view-mode (de)serializer so a refresh / shared
+// link restores the exact filtered view.
+import {
+  filtersToSearchParams,
+  searchParamsToFilters,
+  type ViewMode as PaymentsViewMode,
+} from '../components/payments-admin/paymentsUrlState';
 
 /**
  * argentina-92103: viewer-role state. The full /payments dashboard accepts
@@ -103,6 +112,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   hideClosed: true,
   // stracchino-92108: hide possible-scam-flagged cities (bottarga-92104) by default.
   hideScams: true,
+  // provatura-92107: hide US cities (party.region === 'usa') by default on the
+  // admin /payments by-city dashboard.
+  hideUsCities: true,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -117,15 +129,15 @@ const SHOW_PREPAY_QUEUE = false;
 // so typing a city matches what's actually rendered in the table.
 function matchesPrepaySearch(row: PrepayQueueRow, q: string): boolean {
   if (!q) return true;
-  const needle = q.toLowerCase().trim();
+  const needle = normalizeText(q.trim());
   if (!needle) return true;
-  const nameStripped = row.party.name.replace(/^Global Pizza Party\s+/i, '').toLowerCase();
+  const nameStripped = normalizeText(row.party.name.replace(/^Global Pizza Party\s+/i, ''));
   if (nameStripped.includes(needle)) return true;
-  if (row.party.name.toLowerCase().includes(needle)) return true;
-  if (row.party.country?.toLowerCase().includes(needle)) return true;
+  if (normalizeText(row.party.name).includes(needle)) return true;
+  if (normalizeText(row.party.country).includes(needle)) return true;
   for (const c of row.candidates) {
-    if ((c.name ?? '').toLowerCase().includes(needle)) return true;
-    if (c.email.toLowerCase().includes(needle)) return true;
+    if (normalizeText(c.name).includes(needle)) return true;
+    if (normalizeText(c.email).includes(needle)) return true;
   }
   return false;
 }
@@ -167,9 +179,30 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const isRegionalPortal = !!regions;
 
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
-  const [filters, setFilters] = useState<AdminPayoutFilters>(() =>
-    regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS,
-  );
+
+  // panuozzo-92114: the URL query string is the source of restore-on-load state
+  // for filters + view mode. We parse it ONCE in the lazy useState initialisers
+  // below; after mount, `filters`/`viewMode` state is the single source of truth
+  // that PUSHES to the URL via the sync effect. We never read searchParams back
+  // into state on re-render (that would oscillate).
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Capture the initial parse once so both lazy initialisers agree even though
+  // useState runs them in declaration order. (searchParams is stable on mount.)
+  const initialUrlStateRef = useRef<ReturnType<typeof searchParamsToFilters> | null>(null);
+  if (initialUrlStateRef.current === null) {
+    initialUrlStateRef.current = searchParamsToFilters(searchParams, regions);
+  }
+
+  const [filters, setFilters] = useState<AdminPayoutFilters>(() => {
+    const parsed = initialUrlStateRef.current!;
+    // searchParamsToFilters already merged in `regions` when present, so this is
+    // a complete filters object equivalent to {...DEFAULT_FILTERS, ...url, regions}.
+    // Keep any DEFAULT_FILTERS-only fields (currency etc.) the serializer doesn't
+    // model by layering it underneath.
+    return regions
+      ? { ...DEFAULT_FILTERS, ...parsed.filters, regions }
+      : { ...DEFAULT_FILTERS, ...parsed.filters };
+  });
 
   // etruria-92103: primary view is `by-city` (one row per party with status
   // aggregates, click to expand). `by-payment` keeps the existing per-row
@@ -180,9 +213,15 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   // per status=paid|completed payment, proof-gated (prosciutto-92106), sorted
   // by paid_at DESC. Distinct from `by-payment` which shows every payout
   // regardless of status.
-  type ViewMode = 'by-city' | 'by-payment' | 'payments';
+  // panuozzo-92114: keep this local alias equal to the exported ViewMode so the
+  // (de)serializer and this component never drift.
+  type ViewMode = PaymentsViewMode;
   const VIEW_MODE_LS_KEY = 'paymentsAdminViewMode';
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // panuozzo-92114: URL `?view=` wins (shared/refreshed link), then the
+    // admin's sticky localStorage default, then the by-city fallback.
+    const fromUrl = initialUrlStateRef.current?.viewMode;
+    if (fromUrl) return fromUrl;
     if (typeof window === 'undefined') return 'by-city';
     try {
       const stored = window.localStorage.getItem(VIEW_MODE_LS_KEY);
@@ -201,6 +240,19 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       /* ignore */
     }
   }, [viewMode]);
+
+  // panuozzo-92114: push filters + view mode into the URL query string so a
+  // refresh / shared link restores the exact view. Uses replace:true (matches
+  // LeaderboardPage) so filter tweaks don't flood the back-stack. Guarded so we
+  // only call setSearchParams when the serialized string actually changes,
+  // avoiding redundant churn / render loops.
+  useEffect(() => {
+    const next = filtersToSearchParams(filters, viewMode);
+    const nextStr = next.toString();
+    if (nextStr !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [filters, viewMode, searchParams, setSearchParams]);
 
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
   // etruria-92103: by-city grouped rows from /by-party. Empty when viewing
@@ -519,14 +571,6 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     [prepayQueue, prepaySearch],
   );
 
-  const availableCurrencies = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of payouts) {
-      if (p.originalCurrency) set.add(p.originalCurrency.toUpperCase());
-    }
-    return Array.from(set).sort();
-  }, [payouts]);
-
   // pancetta-92103: the prior `availableCountries` derivation was removed
   // alongside the single-country dropdown. The new Regions multi-select is
   // sourced from PAYMENTS_REGION_SCOPES (a static map) — no per-load derivation
@@ -582,6 +626,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         ? byPartyRows
         : byPartyRows.filter((row) => row.payouts.some((p) => p.status === status));
 
+    // provatura-92107: hide US cities (region 'usa') when the toggle is on.
+    // Admin dashboard only — regional portals are already region-scoped and
+    // never apply this.
+    const rows =
+      !isRegionalPortal && filters.hideUsCities
+        ? filtered.filter((row) => row.party.region !== 'usa')
+        : filtered;
+
     // "Oldest/Newest first" in the by-city view should order cities by their
     // host UPLOAD time, not lastActivityAt. The /by-party endpoint doesn't
     // implement created_asc/created_desc — they fall through to its activity
@@ -594,7 +646,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         Math.min(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
       const latest = (r: PartyPayoutsRow) =>
         Math.max(...r.payouts.map((p) => new Date(p.createdAt).getTime()));
-      return [...filtered].sort((a, b) =>
+      return [...rows].sort((a, b) =>
         sort === 'created_asc' ? earliest(a) - earliest(b) : latest(b) - latest(a),
       );
     }
@@ -602,13 +654,54 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     // Receipt total column the admin sees, not the backend by-party
     // payout-sum order they'd otherwise fall through to.
     if (sort === 'amount_desc' || sort === 'amount_asc') {
-      return [...filtered].sort((a, b) => {
+      return [...rows].sort((a, b) => {
         const cmp = computeReceiptsTotalUsd(a) - computeReceiptsTotalUsd(b);
         return sort === 'amount_asc' ? cmp : -cmp;
       });
     }
-    return filtered;
-  }, [byPartyRows, filters.status, filters.sort]);
+    // stracci-58471: clicking the Event column header sorts by event name.
+    // Strip the "Global Pizza Party " prefix (mirrors the prepay-queue city
+    // sort) so cities order by their actual locality, not the constant prefix.
+    if (sort === 'name_asc' || sort === 'name_desc') {
+      const stripCity = (name: string) =>
+        name.replace(/^Global Pizza Party\s+/i, '').trim();
+      return [...rows].sort((a, b) => {
+        const cmp = stripCity(a.party.name).localeCompare(stripCity(b.party.name));
+        return sort === 'name_asc' ? cmp : -cmp;
+      });
+    }
+    // stracci-58471: Last activity column header. The backend's by-party default
+    // is already activity-ordered, but we re-sort client-side so BOTH directions
+    // work and stay in lockstep with the lastActivityAt the column renders.
+    if (sort === 'activity_asc' || sort === 'activity_desc') {
+      const activity = (r: PartyPayoutsRow) =>
+        new Date(r.aggregates.lastActivityAt).getTime();
+      return [...rows].sort((a, b) =>
+        sort === 'activity_asc' ? activity(a) - activity(b) : activity(b) - activity(a),
+      );
+    }
+    // stracci-58471: Approved / Paid / Outstanding column headers. computePartyTotals
+    // is the same money math the table cells use, so each column sorts by exactly
+    // the dollar figure the admin sees in it.
+    if (
+      sort === 'approved_asc' ||
+      sort === 'approved_desc' ||
+      sort === 'paid_asc' ||
+      sort === 'paid_desc' ||
+      sort === 'outstanding_asc' ||
+      sort === 'outstanding_desc'
+    ) {
+      const pick = (r: PartyPayoutsRow) => {
+        const t = computePartyTotals(r);
+        if (sort.startsWith('approved')) return t.approvedUsd;
+        if (sort.startsWith('paid')) return t.paidUsd;
+        return t.outstandingUsd;
+      };
+      const asc = sort.endsWith('_asc');
+      return [...rows].sort((a, b) => (asc ? pick(a) - pick(b) : pick(b) - pick(a)));
+    }
+    return rows;
+  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -949,6 +1042,17 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const viewerKind = role.viewerKind;
   const isUnderboss = viewerKind === 'underboss';
 
+  // Count of the rows actually rendered in the active table: cities in the
+  // by-city view, individual payouts in the by-payment / payments views. Sits
+  // next to the view toggle so the admin sees how many rows the current
+  // filters surface.
+  const visibleRowCount =
+    viewMode === 'by-city' ? displayedByPartyRows.length : payouts.length;
+  const visibleRowLabel =
+    viewMode === 'by-city'
+      ? `${visibleRowCount} ${visibleRowCount === 1 ? 'city' : 'cities'}`
+      : `${visibleRowCount} payment${visibleRowCount === 1 ? '' : 's'}`;
+
   return (
     <Layout>
       <Helmet>
@@ -1082,8 +1186,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         <PayoutsFilterBar
           filters={filters}
           onChange={setFilters}
-          onReset={() => setFilters(DEFAULT_FILTERS)}
-          availableCurrencies={availableCurrencies}
+          // panuozzo-92114: re-inject the hard `regions` scope on regional
+          // portals so Reset can't silently widen a regional underboss's view.
+          // The URL sync effect then clears the query string automatically.
+          onReset={() => setFilters(regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS)}
           availableTags={availableTags}
           // pinsa-92103: Hide closed cities only makes sense on the by-city
           // view (paymentsClosedAt is a party-level signal). The per-payment
@@ -1091,6 +1197,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           showHideClosedToggle={viewMode === 'by-city'}
           // stracchino-92108: Hide possible scams, by-city view only (same as above).
           showHideScamsToggle={viewMode === 'by-city'}
+          // provatura-92107: Hide US cities — by-city view + admin dashboard
+          // only (regional portals are already region-scoped).
+          showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}
           // pancetta-92103: Regions multi-select is the admin /payments tool;
           // regional sub-portals (`/payments/latam` etc.) are hard-scoped by
           // their `regionFilter` prop and shouldn't show a second region
@@ -1107,7 +1216,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             bar's sticky position.
             coppa-92106: third "Payments" tab shows the actual payments ledger
             (status=paid|completed, proven-only, sorted by paid_at DESC). */}
-        <div className="flex items-center justify-end gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <span className="text-sm font-medium text-theme-text-muted">
+            {loading ? '…' : visibleRowLabel}
+          </span>
+          <div className="flex items-center gap-2">
           <span className="text-xs uppercase tracking-wide text-theme-text-muted">View:</span>
           <div
             role="tablist"
@@ -1154,6 +1267,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               Payments
             </button>
           </div>
+          </div>
         </div>
 
         {/* coppa-92106: breadcrumb under the toggle when the Payments-ledger
@@ -1196,6 +1310,13 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         {viewMode === 'by-city' ? (
           <PayoutsByPartyTable
             rows={displayedByPartyRows}
+            // stracci-58471: clickable column headers (Event / Receipt total /
+            // Approved / Paid / Outstanding / Last activity). `sort` drives the
+            // chevron; each header cycles its column through the two directions
+            // then back to `defaultSort` via onSortChange.
+            sort={filters.sort}
+            defaultSort={DEFAULT_FILTERS.sort ?? 'created_desc'}
+            onSortChange={(next) => setFilters((prev) => ({ ...prev, sort: next }))}
             fakeScores={fakeScores}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}

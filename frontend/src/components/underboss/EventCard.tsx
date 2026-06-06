@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
+import { AuthenticityPanel } from '../payments-shared';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
 
@@ -309,6 +310,21 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
   // GPP photo count for the badge (fetched once, cached at module level)
   const [gppCount, setGppCount] = useState(0);
 
+  // marinara-61455: admin "Verify cover authenticity" — lazily load any cached
+  // verdict for the event cover when the photos section is expanded, so the
+  // panel shows a prior result without re-paying for the API call.
+  const [coverAuthCheck, setCoverAuthCheck] = useState<ImageAuthenticityCheck | null>(null);
+  const [coverAuthLoaded, setCoverAuthLoaded] = useState(false);
+  useEffect(() => {
+    if (!photosExpanded || coverAuthLoaded || !event.eventImageUrl) return;
+    setCoverAuthLoaded(true);
+    let cancelled = false;
+    getImageAuthenticityCheck(event.eventImageUrl)
+      .then((c) => { if (!cancelled) setCoverAuthCheck(c); })
+      .catch(() => { /* panel falls back to the un-checked state */ });
+    return () => { cancelled = true; };
+  }, [photosExpanded, coverAuthLoaded, event.eventImageUrl]);
+
   useEffect(() => {
     const cityName = event.name.replace(/^Global Pizza Party\s*/i, '').trim();
     if (!cityName) return;
@@ -575,6 +591,32 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
                   {t('eventRow.showAllPhotos', { count: displayPhotos.length })}
                 </button>
               )}
+            </div>
+          )}
+
+          {/* marinara-61455: admin "Verify cover authenticity" — runs the
+              AI-generated / doctored check on the event cover image. Advisory
+              only; the panel surfaces a verdict + reasons but never gates
+              anything. Only rendered when the event has a cover image. */}
+          {event.eventImageUrl && (
+            <div className="mt-3 pt-3 border-t border-theme-stroke/50 space-y-2">
+              <div className="flex items-center gap-2">
+                <img
+                  src={event.eventImageUrl}
+                  alt="Event cover"
+                  className="w-12 h-12 rounded object-cover border border-theme-stroke shrink-0"
+                  loading="lazy"
+                />
+                <span className="text-xs text-theme-text-muted">Event cover image</span>
+              </div>
+              <AuthenticityPanel
+                imageUrl={event.eventImageUrl}
+                sourceKind="event_image"
+                partyId={event.id}
+                initialCheck={coverAuthCheck}
+                onResult={setCoverAuthCheck}
+                compact
+              />
             </div>
           )}
         </div>

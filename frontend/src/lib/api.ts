@@ -204,6 +204,7 @@ export interface UpdatePartyData {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  donationAmountsPublic?: boolean;
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
   photoModeration?: boolean;
@@ -232,6 +233,8 @@ export interface UpdatePartyData {
   city?: string | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   eventTags?: string[];
   telegramGroup?: string | null;
   hostTelegramLinkToken?: string | null;
@@ -333,6 +336,7 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       donationRecipient: data.donationRecipient,
       donationRecipientUrl: data.donationRecipientUrl,
       donationEthAddress: data.donationEthAddress,
+      donationAmountsPublic: data.donationAmountsPublic,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
       photoModeration: data.photoModeration,
@@ -361,6 +365,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       city: data.city,
       expectedGuests: data.expectedGuests,
       estimatedAttendance: data.estimatedAttendance,
+      targetAttendance: data.targetAttendance,
+      expectedAttendance: data.expectedAttendance,
       eventTags: data.eventTags,
       telegramGroup: data.telegramGroup,
       hostTelegramLinkToken: data.hostTelegramLinkToken,
@@ -987,11 +993,22 @@ export interface PublicEvent {
 }
 
 // Public Event API (no auth required)
-export async function getEventBySlug(slug: string): Promise<PublicEvent | { redirect: true; slug: string } | null> {
+export async function getEventBySlug(
+  slug: string,
+  year?: number | string | null,
+): Promise<PublicEvent | { redirect: true; slug: string } | null> {
   try {
-    const response = await fetch(`${API_URL}/api/events/${slug}`, {
+    // soppressata-50927: thread the optional ?year= param to the year-aware
+    // resolver. Send the caller's auth token when present so admins/in-scope
+    // underbosses can preview gated GPP27 (2027) events pre-launch.
+    const qs = year != null && `${year}`.length > 0 ? `?year=${encodeURIComponent(`${year}`)}` : '';
+    const token = getAuthToken();
+    const response = await fetch(`${API_URL}/api/events/${slug}${qs}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
 
     const data = await response.json();
@@ -3266,7 +3283,10 @@ export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pen
   });
 }
 
-// Bulk delete events (underboss auth)
+// Bulk soft-cancel events (underboss auth). ziti-58475: this no longer hard-deletes;
+// it sets cancelledAt/cancelledBy server-side, so the rows, their children (guests,
+// sponsors, RSVPs) and public URLs are preserved and the events can be reinstated.
+// Name + endpoint kept unchanged to avoid churn at call sites.
 export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-delete', {
     method: 'DELETE',
@@ -4226,6 +4246,9 @@ export interface LeaderboardPartyRow {
     inviteRsvps: number;
     checkIns: number;
     photos: number;
+    // panzerotti-58931: de-duped scorecard points contributed to this party's
+    // unified score.
+    scorecard: number;
   };
 }
 
@@ -4234,6 +4257,17 @@ export interface LeaderboardCountryRow {
   country: string;
   countryCode: string | null;
   partyCount: number;
+  score: number;
+}
+
+// panzerotti-58931: top-100 checked-in guests by per-guest de-duped scorecard
+// score (privacy "First L.").
+export interface LeaderboardGuestRow {
+  rank: number;
+  name: string;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
   score: number;
 }
 
@@ -4248,6 +4282,10 @@ export interface LeaderboardResponse {
   };
   countries: {
     rows: LeaderboardCountryRow[];
+    total: number;
+  };
+  guests: {
+    rows: LeaderboardGuestRow[];
     total: number;
   };
 }
@@ -4434,46 +4472,10 @@ export async function getPartyLeaderboard(inviteCode: string): Promise<Leaderboa
   return apiRequest<LeaderboardResponse>(`/api/scorecard/${inviteCode}/leaderboard`);
 }
 
-// panzerotti-58931 Phase 2.1: worldwide game leaderboard (guests / parties / countries)
-
-export interface ScorecardGuestRow {
-  rank: number;
-  name: string;
-  city: string | null;
-  country: string | null;
-  countryCode: string | null;
-  score: number;
-}
-
-export interface ScorecardPartyRow {
-  rank: number;
-  partyId: string;
-  name: string;
-  city: string | null;
-  country: string | null;
-  countryCode: string | null;
-  slug: string;
-  score: number;
-}
-
-export interface ScorecardCountryRow {
-  rank: number;
-  country: string;
-  countryCode: string | null;
-  partyCount: number;
-  score: number;
-}
-
-export interface ScorecardGlobalLeaderboardResponse {
-  guests: ScorecardGuestRow[];
-  parties: ScorecardPartyRow[];
-  countries: ScorecardCountryRow[];
-  computedAt: string;
-}
-
-export async function getScorecardGlobalLeaderboard(): Promise<ScorecardGlobalLeaderboardResponse> {
-  return apiRequest<ScorecardGlobalLeaderboardResponse>('/api/scorecard-leaderboard');
-}
+// panzerotti-58931: the worldwide game leaderboard (guests / parties /
+// countries) was merged into the unified public board. Use `fetchLeaderboard()`
+// above — its response now carries `guests`, `parties`, and `countries`. The
+// old `/api/scorecard-leaderboard` endpoint and its types were removed.
 
 // panzerotti-58931 Phase 2.1: admin Best Of judging queue
 
@@ -4846,6 +4848,63 @@ export async function markReceiptIneligible(
 }
 
 /**
+ * marinara-61455: image-authenticity (AI-generated / doctored) admin check.
+ *
+ * Manual, on-demand tool that judges whether a payment-receipt image or a host
+ * event-cover image is AI-generated or doctored. Returns a cached verdict +
+ * confidence + reasons. Advisory only — the verdict flags for human review, it
+ * never auto-rejects. Mirrors the `markReceiptDuplicate` thin-wrapper pattern.
+ */
+export type ImageAuthenticityVerdict = 'authentic' | 'suspicious' | 'likely_fake';
+
+export interface ImageAuthenticityCheck {
+  id: string;
+  imageUrl: string;
+  sourceKind: 'receipt' | 'event_image';
+  partyId: string | null;
+  payoutDocumentId: string | null;
+  verdict: ImageAuthenticityVerdict;
+  score: number;
+  reasons: unknown;
+  provider: string;
+  elaArtifactUrl: string | null;
+  checkedAt: string;
+  checkedBy: string | null;
+}
+
+/**
+ * Run (or return the cached) authenticity check for an image. Pass `force:true`
+ * to bypass the cache and re-run the scorer (costs an API call). Returns the
+ * persisted check row plus whether it came from cache.
+ */
+export async function verifyImageAuthenticity(params: {
+  imageUrl: string;
+  sourceKind: 'receipt' | 'event_image';
+  partyId?: string | null;
+  payoutDocumentId?: string | null;
+  force?: boolean;
+}): Promise<{ check: ImageAuthenticityCheck; cached: boolean }> {
+  return apiRequest<{ check: ImageAuthenticityCheck; cached: boolean }>(
+    '/api/admin/image-authenticity',
+    { method: 'POST', body: params },
+  );
+}
+
+/**
+ * Fetch the most recent cached authenticity check for an image, or `null` when
+ * none exists yet. Used to render a prior verdict on lightbox open without
+ * spending an API call.
+ */
+export async function getImageAuthenticityCheck(
+  imageUrl: string,
+): Promise<ImageAuthenticityCheck | null> {
+  const res = await apiRequest<{ check: ImageAuthenticityCheck | null }>(
+    `/api/admin/image-authenticity?imageUrl=${encodeURIComponent(imageUrl)}`,
+  );
+  return res.check;
+}
+
+/**
  * pancetta-92104: reset a single doc's OCR retry counter so the next backfill
  * call (or this call's inline run) re-attempts `analyzeReceipt` against the
  * receipt. Used to un-stick docs that hit the 3-attempt cap once the
@@ -4901,14 +4960,28 @@ export async function approveAdminPayout(
      * through to the autoExecute branch as well.
      */
     allowOverPartyCap?: boolean;
+    /**
+     * guanciale-49340: admin-class only. When true, the backend skips the
+     * per-address ($676) hard-cap recheck in the autoExecute usdc_base branch.
+     * Mirrors `executeAdminPayout`'s per-address override. The by-city
+     * SendPaymentModal sets this when the amber per-address cap warning's ack
+     * Checkbox has been ticked.
+     */
+    allowOverPerAddressCap?: boolean;
   },
-): Promise<{ payout: AdminPayout; autoExecuteDeferred: boolean }> {
+): Promise<{
+  payout: AdminPayout;
+  autoExecuteDeferred: boolean;
+  autoExecuted?: boolean;
+  autoExecuteSkippedReason?: string | null;
+}> {
   return apiRequest(`/api/admin/payouts/${id}/approve${regionsQuery(opts?.regions)}`, {
     method: 'POST',
     body: {
       note: opts?.note,
       autoExecute: opts?.autoExecute,
       allowOverPartyCap: opts?.allowOverPartyCap,
+      allowOverPerAddressCap: opts?.allowOverPerAddressCap,
     },
   });
 }
@@ -6037,6 +6110,74 @@ export async function removePaymentOptIn(
   );
 }
 
+// ============================================
+// marinara-71630 P1: backend-decided reimbursement options
+// ============================================
+// The backend resolves which payout options a host may see (from private
+// app_config country/tag rules); the frontend just renders them. Mirror of the
+// backend `ResolvedOption` shape (backend/src/lib/reimbursementOptions.ts) —
+// keep in sync.
+
+export interface ResolvedReimbursementOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** 'method' → selectable payout method; 'external' → informational card only. */
+  kind: 'method' | 'external';
+  url?: string;
+  enabled: boolean;
+  disabledReason?: string;
+}
+
+/**
+ * Fetch the server-decided reimbursement options for a party. Host-only
+ * (requires edit access). Returns `[]` when config is unseeded — callers
+ * should fall back to a built-in default so the picker never renders empty.
+ */
+export async function fetchReimbursementOptions(
+  partyId: string
+): Promise<ResolvedReimbursementOption[]> {
+  const res = await apiRequest<{ options: ResolvedReimbursementOption[] }>(
+    `/api/parties/${partyId}/reimbursement-options`
+  );
+  return res.options ?? [];
+}
+
+// ============================================
+// marinara-71630 P5: private pricing config
+// (city tiers + sponsorship pricing + GPP27 reimbursement) sourced at runtime
+// from GET /api/config/pricing instead of hardcoded in the open-source bundle.
+// ============================================
+
+export interface PricingConfig {
+  cityTiers: { tier1: string[]; tier2: string[] };
+  sponsorshipPricing: {
+    tierConfig: Record<string, { floor: number; ceiling: number; max: number }>;
+    base: number;
+    roundTo: number;
+  };
+  reimbursement: {
+    perHeadRates: Record<string, number>;
+    ceilingUsd: number;
+    attendanceRsvpCoefficient: number;
+  };
+  reimbursementCapBands: {
+    bands: Record<string, { guestFloor: number; guestCeiling: number; minUsd: number; maxUsd: number }>;
+    roundingIncrementUsd: number;
+  };
+}
+
+/**
+ * Fetch the admin/underboss-gated private pricing config. The city-tier lists
+ * and the sponsorship/reimbursement dollar numbers used to be hardcoded in the
+ * frontend bundle; they now live in `app_config` and are served by this
+ * endpoint (requireAuth + requireUnderbossAuth). Callers should go through the
+ * `usePricingConfig` hook, which caches the result across components.
+ */
+export async function fetchPricingConfig(): Promise<PricingConfig> {
+  return apiRequest<PricingConfig>('/api/config/pricing');
+}
+
 /**
  * taleggio-30219: resolve an ENS name (e.g. `vitalik.eth`) to its 0x address
  * via the backend's mainnet-resolver utility endpoint. Returns null on any
@@ -6096,6 +6237,9 @@ export interface PhotosFeedFilters {
   // || seed) as the order key so pagination + filters stay consistent.
   sort?: 'newest' | 'random';
   seed?: string | null;
+  // cannoli-58292: event-year filter. Backend defaults to the current calendar
+  // year when omitted; only photos uploaded after their event's start show.
+  year?: number;
 }
 
 export async function getPhotosFeed(
@@ -6120,6 +6264,10 @@ export async function getPhotosFeed(
       params.append('sort', 'random');
       params.append('seed', filters.seed);
     }
+    // cannoli-58292: event-year filter.
+    if (typeof filters?.year === 'number') {
+      params.append('year', String(filters.year));
+    }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,
       { method: 'GET', requireAuth: false }
@@ -6132,6 +6280,10 @@ export async function getPhotosFeed(
 
 export interface PhotosFeedFacets {
   countries: Array<{ name: string; count: number }>;
+  // cannoli-58292: distinct event years available in the feed (desc). Older
+  // backends won't return this — keep optional and default to [] at the call
+  // site so the dropdown gracefully shows just the current year.
+  years?: number[];
 }
 
 export async function getPhotosFeedFacets(): Promise<PhotosFeedFacets | null> {
@@ -6223,6 +6375,85 @@ export async function getSurveyResults(partyId: string): Promise<SurveyResults> 
   });
 }
 
+// ---------------------------------------------------------------------------
+// pugliese-58297: admin survey-question CRUD
+// ---------------------------------------------------------------------------
+
+export interface AdminSurveyQuestion extends SurveyQuestion {
+  position: number;
+  active: boolean;
+}
+
+export interface AdminSurveyQuestionsResponse {
+  questionSet: string;
+  version: number;
+  questions: AdminSurveyQuestion[];
+}
+
+export async function listAdminSurveyQuestions(
+  set: string = 'default'
+): Promise<AdminSurveyQuestionsResponse> {
+  return apiRequest<AdminSurveyQuestionsResponse>(
+    `/api/admin/survey-questions?set=${encodeURIComponent(set)}`,
+    { method: 'GET', requireAuth: true }
+  );
+}
+
+export interface AdminSurveyQuestionInput {
+  id: string;
+  questionSet?: string;
+  type: 'rating' | 'yesno' | 'multiple' | 'text';
+  text: string;
+  scale?: number | null;
+  multi?: boolean;
+  allowOther?: boolean;
+  options?: string[];
+  active?: boolean;
+  position?: number;
+}
+
+export async function createAdminSurveyQuestion(
+  body: AdminSurveyQuestionInput
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>('/api/admin/survey-questions', {
+    method: 'POST',
+    body,
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestion(
+  id: string,
+  body: Partial<AdminSurveyQuestionInput>,
+  set: string = 'default'
+): Promise<{ question: AdminSurveyQuestion }> {
+  return apiRequest<{ question: AdminSurveyQuestion }>(
+    `/api/admin/survey-questions/${encodeURIComponent(id)}?set=${encodeURIComponent(set)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
+export async function reorderAdminSurveyQuestions(
+  orderedIds: string[],
+  set: string = 'default'
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>('/api/admin/survey-questions/reorder', {
+    method: 'POST',
+    body: { set, orderedIds },
+    requireAuth: true,
+  });
+}
+
+export async function updateAdminSurveyQuestionSet(
+  setId: string,
+  body: { version?: number }
+): Promise<{ questionSet: { id: string; version: number; updatedAt: string } }> {
+  return apiRequest<{ questionSet: { id: string; version: number; updatedAt: string } }>(
+    `/api/admin/survey-question-sets/${encodeURIComponent(setId)}`,
+    { method: 'PATCH', body, requireAuth: true }
+  );
+}
+
 // ============================================
 // Tax forms (salame-92110)
 // ============================================
@@ -6303,4 +6534,126 @@ export async function rejectTaxForm(id: string, reason: string): Promise<TaxForm
     { method: 'POST', body: { reason }, requireAuth: true },
   );
   return res.taxForm;
+}
+
+// ===========================================================================
+// soppressata-50927 — GPP27 (Bitcoin Pizza Day 2027) admin/UB-gated flow.
+// ===========================================================================
+
+export interface Gpp27AgreementClause {
+  id: string;
+  version: string;
+  sortOrder: number;
+  body: string;
+  requiresAck: boolean;
+}
+
+export interface Gpp27AgreementResponse {
+  version: string | null;
+  clauses: Gpp27AgreementClause[];
+}
+
+export async function fetchGpp27Agreement(): Promise<Gpp27AgreementResponse> {
+  return apiRequest<Gpp27AgreementResponse>('/api/gpp27/agreement');
+}
+
+export interface Gpp27BudgetSuggestion {
+  city: string;
+  tier: 1 | 2 | 3;
+  perHeadRate: number;
+  lastYearEstimatedAttendance: number | null;
+  currentRsvpCount: number;
+  expectedAttendance: number;
+  rawSuggestedCapUsd: number;
+  suggestedCapUsd: number;
+  ceilingUsd: number;
+}
+
+export async function fetchGpp27BudgetSuggestion(
+  city: string,
+  partyId?: string,
+): Promise<Gpp27BudgetSuggestion> {
+  const qs = new URLSearchParams({ city });
+  if (partyId) qs.set('partyId', partyId);
+  return apiRequest<Gpp27BudgetSuggestion>(`/api/gpp27/budget-suggestion?${qs.toString()}`);
+}
+
+export interface Gpp27CreateEventInput {
+  city: string;
+  hostName: string;
+  email: string;
+  telegram: string;
+  country?: string;
+  countryCode?: string;
+  cityFormattedName?: string;
+  cityLat?: number;
+  cityLng?: number;
+  timezone?: string;
+}
+
+export interface Gpp27CreateEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    customUrl: string | null;
+    city: string | null;
+    region: string | null;
+    year: number;
+  };
+  eventPageUrl: string;
+  hostPageUrl: string;
+}
+
+export async function createGpp27Event(input: Gpp27CreateEventInput): Promise<Gpp27CreateEventResponse> {
+  return apiRequest<Gpp27CreateEventResponse>('/api/gpp27/events', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export async function setGpp27Budget(
+  partyId: string,
+  reimbursementCapUsd: number,
+): Promise<{ success: boolean; reimbursementCapUsd: number; ceilingUsd: number }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/budget`, {
+    method: 'PATCH',
+    body: { reimbursementCapUsd },
+  });
+}
+
+export async function acceptGpp27Agreement(
+  partyId: string,
+): Promise<{ success: boolean; agreementVersion: string; agreementAcceptedAt: string }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/agreement/accept`, { method: 'POST' });
+}
+
+export interface Gpp27PublishStatus {
+  partyId: string;
+  agreementSigned: boolean;
+  agreementVersionMatches: boolean;
+  hasMerchAddress: boolean;
+  currentAgreementVersion: string | null;
+  signedAgreementVersion: string | null;
+  canPublish: boolean;
+}
+
+export async function fetchGpp27PublishStatus(partyId: string): Promise<Gpp27PublishStatus> {
+  return apiRequest<Gpp27PublishStatus>(`/api/gpp27/parties/${partyId}/publish-status`);
+}
+
+export async function publishGpp27Event(partyId: string): Promise<{ success: boolean; published: boolean }> {
+  return apiRequest(`/api/gpp27/parties/${partyId}/publish`, { method: 'POST' });
+}
+
+// scarpetta-58472: site-wide suggestions list (admin / underboss view-only).
+export interface Suggestion {
+  id: string; createdAt: string; body: string;
+  imageUrl: string | null; name: string | null; email: string | null;
+  pageUrl: string | null; status: string;
+  aiSummary: string | null; aiTags: string[] | null;
+}
+export async function fetchSuggestions() {
+  return apiRequest<{ suggestions: Suggestion[] }>('/api/suggestions');
 }

@@ -16,8 +16,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import {
-  SURVEY_QUESTION_SET,
-  SURVEY_QUESTION_SET_VERSION,
+  loadQuestionSet,
   validateSurveyAnswers,
 } from '../lib/surveyQuestions.js';
 
@@ -204,13 +203,15 @@ publicRouter.get('/:token', async (req: Request, res: Response, next: NextFuncti
 
     const firstName = (guest.name || '').trim().split(/\s+/)[0] || '';
 
+    const set = await loadQuestionSet();
+
     res.json({
       eventName: guest.party.name,
       eventSlug: guest.party.customUrl || guest.party.inviteCode,
       firstName,
       surveyEnabled: guest.party.surveyEnabled,
-      questionSet: SURVEY_QUESTION_SET,
-      questionSetVersion: SURVEY_QUESTION_SET_VERSION,
+      questionSet: set.questions,
+      questionSetVersion: set.version,
       alreadySubmitted: !!guest.surveyResponse,
       answers: guest.surveyResponse?.answers ?? null,
     });
@@ -242,8 +243,12 @@ publicRouter.post('/:token', async (req: Request, res: Response, next: NextFunct
       throw new AppError('This survey is no longer accepting responses', 403, 'SURVEY_DISABLED');
     }
 
-    // Server-side validation against the canonical question set.
-    const answers = validateSurveyAnswers((req.body as { answers?: unknown })?.answers);
+    // Server-side validation against the loaded question set.
+    const set = await loadQuestionSet();
+    const answers = validateSurveyAnswers(
+      (req.body as { answers?: unknown })?.answers,
+      set.questions
+    );
 
     // Upsert keyed on guest_id (unique). Resubmit overwrites.
     await prisma.surveyResponse.upsert({
@@ -252,12 +257,12 @@ publicRouter.post('/:token', async (req: Request, res: Response, next: NextFunct
         partyId: guest.partyId,
         guestId: guest.id,
         email: guest.email || '',
-        questionSetVersion: SURVEY_QUESTION_SET_VERSION,
+        questionSetVersion: set.version,
         answers,
       },
       update: {
         answers,
-        questionSetVersion: SURVEY_QUESTION_SET_VERSION,
+        questionSetVersion: set.version,
         updatedAt: new Date(),
       },
     });
@@ -319,15 +324,16 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
     });
 
     const responseCount = responses.length;
+    const set = await loadQuestionSet();
 
-    // Build aggregation scaffolding from the canonical question set.
+    // Build aggregation scaffolding from the loaded question set.
     const ratings: Record<string, { sum: number; count: number; average: number | null }> = {};
     const yesno: Record<string, { yes: number; no: number }> = {};
     const multiple: Record<string, Record<string, number>> = {};
     const comments: Record<string, string[]> = {};
     const otherTexts: Record<string, string[]> = {};
 
-    for (const q of SURVEY_QUESTION_SET) {
+    for (const q of set.questions) {
       if (q.type === 'rating') ratings[q.id] = { sum: 0, count: 0, average: null };
       else if (q.type === 'yesno') yesno[q.id] = { yes: 0, no: 0 };
       else if (q.type === 'multiple') {
@@ -339,7 +345,7 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
 
     for (const r of responses) {
       const a = (r.answers ?? {}) as Record<string, unknown>;
-      for (const q of SURVEY_QUESTION_SET) {
+      for (const q of set.questions) {
         const v = a[q.id];
         if (v === undefined || v === null) continue;
         if (q.type === 'rating' && typeof v === 'number') {
@@ -360,7 +366,7 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
         }
       }
       // Collect "Other" custom-text free responses for any question with allowOther.
-      for (const q of SURVEY_QUESTION_SET) {
+      for (const q of set.questions) {
         if (!q.allowOther) continue;
         const otherRaw = a[`${q.id}_other`];
         if (typeof otherRaw === 'string') {
@@ -379,8 +385,8 @@ hostRouter.get('/:partyId/survey/results', async (req: AuthRequest, res: Respons
 
     res.json({
       responseCount,
-      questionSet: SURVEY_QUESTION_SET,
-      questionSetVersion: SURVEY_QUESTION_SET_VERSION,
+      questionSet: set.questions,
+      questionSetVersion: set.version,
       ratings,
       yesno,
       multiple,

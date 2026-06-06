@@ -10,17 +10,18 @@ import {
   PAYMENTS_REGION_SCOPES,
   type PaymentsRegionPortal,
 } from '../../utils/regions';
+// panuozzo-92114: canonical filter VALUE lists live in the React-free options
+// module so PayoutsFilterBar and the URL (de)serializer can't drift.
+import type { SortValue, StatusTabValue } from './paymentsFilterOptions';
 
 interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
   onChange: (next: AdminPayoutFilters) => void;
   onReset: () => void;
-  availableCurrencies: string[];
   /**
    * mascarpone-49102: distinct event-tag values across the currently-loaded
-   * payouts (flattened from each `party.eventTags` array). Mirrors the
-   * `availableCurrencies` pattern — derived in `PaymentsAdminPage`. Sorted
-   * ascending.
+   * payouts (flattened from each `party.eventTags` array). Derived in
+   * `PaymentsAdminPage`. Sorted ascending.
    */
   availableTags: string[];
   /**
@@ -34,6 +35,12 @@ interface PayoutsFilterBarProps {
    * By-city view only, mirroring showHideClosedToggle. Defaults to false.
    */
   showHideScamsToggle?: boolean;
+  /**
+   * provatura-92107: when true, render the "Hide US cities" checkbox. By-city
+   * view + admin dashboard only (regional portals are region-scoped). Defaults
+   * to false.
+   */
+  showHideUsToggle?: boolean;
   /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
@@ -51,7 +58,10 @@ interface PayoutsFilterBarProps {
 
 // ciabatta-92110: `'closed'` is a party-level pseudo-status (filters on
 // parties.payments_closed_at), so the tab value type widens beyond PayoutStatus.
-const STATUS_TABS: Array<{ value: PayoutStatus | 'all' | 'closed'; label: string }> = [
+// panuozzo-92114: values are validated against STATUS_TAB_VALUES in
+// paymentsFilterOptions.ts (the URL serializer's source of truth) — keep this
+// list and that one in sync.
+const STATUS_TABS: Array<{ value: StatusTabValue; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
@@ -93,7 +103,6 @@ const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = 
 // lievito-92103: `activity_desc` / `activity_asc` expose the by-city default
 // (lastActivityAt) as an explicit picker entry, and also order the per-payout
 // view by `updatedAt`. Useful for surfacing stale cities first.
-type SortValue = NonNullable<AdminPayoutFilters['sort']>;
 const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: 'created_desc', label: 'Newest first' },
   { value: 'created_asc', label: 'Oldest first' },
@@ -105,6 +114,16 @@ const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   // here as a manual pick on the other views for completeness).
   { value: 'paid_at_desc', label: 'Most recently paid' },
   { value: 'paid_at_asc', label: 'Oldest payment first' },
+  // stracci-58471: column-header sorts for the by-city table, also reachable by
+  // clicking the Event / Approved / Paid / Outstanding column headers.
+  { value: 'name_asc', label: 'Event name (A–Z)' },
+  { value: 'name_desc', label: 'Event name (Z–A)' },
+  { value: 'approved_desc', label: 'Most approved' },
+  { value: 'approved_asc', label: 'Least approved' },
+  { value: 'paid_desc', label: 'Most paid' },
+  { value: 'paid_asc', label: 'Least paid' },
+  { value: 'outstanding_desc', label: 'Most outstanding' },
+  { value: 'outstanding_asc', label: 'Least outstanding' },
 ];
 const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
@@ -122,7 +141,6 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.search && filters.search.trim()) n += 1;
   if (filters.partyId && filters.partyId.trim()) n += 1;
   if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
-  if (filters.currency && filters.currency !== 'all') n += 1;
   if (filters.country && filters.country !== 'all') n += 1;
   // pancetta-92103: regions multi-select counts as a single active filter
   // when at least one portal is selected (regardless of how many).
@@ -138,6 +156,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideClosed) n += 1;
   // stracchino-92108: count Hide possible scams alongside Hide closed cities.
   if (filters.hideScams) n += 1;
+  // provatura-92107: count Hide US cities alongside the other hide toggles.
+  if (filters.hideUsCities) n += 1;
   return n;
 }
 
@@ -157,10 +177,10 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   filters,
   onChange,
   onReset,
-  availableCurrencies,
   availableTags,
   showHideClosedToggle,
   showHideScamsToggle,
+  showHideUsToggle,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -297,21 +317,6 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             </select>
           </div>
 
-          {/* Currency dropdown */}
-          <div>
-            <select
-              value={filters.currency ?? 'all'}
-              onChange={(e) => update({ currency: e.target.value })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by currency"
-            >
-              <option value="all">All currencies</option>
-              {availableCurrencies.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
           {/* pancetta-92103: Regions multi-select — replaces the prior
               bruschetta-58291 single-country dropdown. Each region maps to a
               fixed list of `parties.region` slugs (PAYMENTS_REGION_SCOPES);
@@ -369,8 +374,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
           )}
 
           {/* mascarpone-49102: Tag dropdown — populated from event_tags
-              flattened across the loaded payout set (parallels
-              availableCurrencies/availableCountries). Backend filters
+              flattened across the loaded payout set. Backend filters
               `party.eventTags` via Prisma `{ has: tag }`. */}
           <div>
             <select
@@ -464,6 +468,17 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.hideScams}
                 onChange={() => update({ hideScams: !filters.hideScams })}
                 label="Hide possible scams"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* provatura-92107: Hide US cities (party.region === 'usa'). By-city
+                + admin dashboard only, same gating as the other hide toggles. */}
+            {showHideUsToggle && (
+              <Checkbox
+                checked={!!filters.hideUsCities}
+                onChange={() => update({ hideUsCities: !filters.hideUsCities })}
+                label="Hide US cities"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />

@@ -18,6 +18,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 import {
   requireAuth,
   AuthRequest,
@@ -31,8 +33,8 @@ import {
   getPayoutWalletAddress,
   getPayoutWalletBalanceUsd,
   getPerAddressPaidTotals,
-  PER_ADDRESS_HARD_CAP_USD,
 } from '../services/usdc-base.service.js';
+import { getPayoutCaps } from '../lib/privateConfig.js';
 import { createPublicClient, http, formatUnits, erc20Abi } from 'viem';
 import { base } from 'viem/chains';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
@@ -71,20 +73,19 @@ const ALLOWED_PAYOUT_STATUSES = ['pending', 'approved', 'queued', 'rejected', 'p
 const ALLOWED_PAYOUT_METHODS = ['mercury_card', 'wire', 'usdc_base'] as const;
 
 /**
- * acciuga-62583: hard per-submission ceiling of $675 (cassoeula-92103, was $650) —
- * same value as `HARD_PER_TX_CEILING_USD` in usdc-base.service.ts (the
- * USDC-execute ceiling) but enforced here at SUBMISSION time across all admin
- * create/edit paths (external POST + PATCH). No override path. Inlined here
- * per task spec — mirror of the helper in payout.routes.ts so we don't extract
- * a shared module just for two callsites.
+ * acciuga-62583: hard per-submission ceiling — enforced here at SUBMISSION time
+ * across all admin create/edit paths (external POST + PATCH). No override path.
+ *
+ * marinara-71630 P2: the cap value now comes from app_config via
+ * `getPayoutCaps().perSubmissionMaxUsd` (real values out of committed source).
+ * The caller resolves the caps (async) and passes the number in, so this helper
+ * stays a cheap synchronous assertion.
  */
-const PER_SUBMISSION_MAX_USD = 675;
-
-function assertWithinPerSubmissionCap(amountUsd: number) {
+function assertWithinPerSubmissionCap(amountUsd: number, perSubmissionMaxUsd: number) {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
-  if (amountUsd > PER_SUBMISSION_MAX_USD) {
+  if (amountUsd > perSubmissionMaxUsd) {
     throw new AppError(
-      `Payment requests are limited to $${PER_SUBMISSION_MAX_USD} per submission. Please reduce the amount or split into multiple submissions.`,
+      `Payment requests are limited to $${perSubmissionMaxUsd} per submission. Please reduce the amount or split into multiple submissions.`,
       400,
       'PER_SUBMISSION_CAP_EXCEEDED',
     );
@@ -251,9 +252,16 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   name: true,
   inviteCode: true,
   customUrl: true,
+  // stracciatella-58291: event start date/time, used to hide a party's
+  // legacy pre-event photos on /payments. Inert extra column for the
+  // serializer (which selects named fields), consumed by the photo filters.
+  date: true,
   // bruschetta-58291: surface the party's country on the /payments admin
   // queue rows + power the Country filter dropdown in PayoutsFilterBar.
   country: true,
+  // provatura-92107: surface region so the /payments by-city "Hide US cities"
+  // toggle can filter rows where party.region === 'usa'.
+  region: true,
   expectedGuests: true,
   // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
   // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
@@ -533,7 +541,7 @@ async function assertWithinPartyCap(
 }
 
 /** Build a Prisma `where` clause from query-string filters. */
-function buildPayoutWhere(query: Request['query']): any {
+async function buildPayoutWhere(query: Request['query']): Promise<any> {
   const where: any = {};
 
   // coppa-92106: status accepts either a single status or a comma-separated
@@ -592,10 +600,16 @@ function buildPayoutWhere(query: Request['query']): any {
   const search = query.search;
   if (typeof search === 'string' && search.trim().length > 0) {
     const needle = search.trim();
+    // diavola-83147: accent-insensitive search. Prefilter party + host ids via
+    // the `unaccent` extension, then fold the FK `in` clauses into where.OR so
+    // `jose` matches `José`, `munchen` matches `München`, etc.
+    const [partyIds, hostIds] = await Promise.all([
+      unaccentMatchIds(prisma, 'parties', ['name'], needle),
+      unaccentMatchIds(prisma, 'User', ['name', 'email'], needle),
+    ]);
     where.OR = [
-      { host: { email: { contains: needle, mode: 'insensitive' as const } } },
-      { host: { name: { contains: needle, mode: 'insensitive' as const } } },
-      { party: { name: { contains: needle, mode: 'insensitive' as const } } },
+      { partyId: { in: partyIds } },
+      { hostUserId: { in: hostIds } },
     ];
   }
 
@@ -989,14 +1003,12 @@ router.get(
       // Pull approved parties matching name / customUrl / inviteCode. Cap at 20.
       // Sorted createdAt DESC so the most recent approved events show first —
       // matches how admins typically remember "the event that was just approved".
+      // diavola-83147: accent-insensitive prefilter via the `unaccent` extension.
+      const ids = await unaccentMatchIds(prisma, 'parties', ['name', 'custom_url', 'invite_code'], rawQ);
       const parties = await prisma.party.findMany({
         where: {
           underbossStatus: 'approved',
-          OR: [
-            { name: { contains: rawQ, mode: 'insensitive' } },
-            { customUrl: { contains: rawQ, mode: 'insensitive' } },
-            { inviteCode: { contains: rawQ, mode: 'insensitive' } },
-          ],
+          id: { in: ids },
         },
         select: {
           id: true,
@@ -1112,7 +1124,7 @@ router.get(
   requireAnyAdminOrPaymentAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
       const rows = await prisma.payout.findMany({
         where,
         include: {
@@ -1848,7 +1860,7 @@ router.get(
   requireAdminOrRegionalUnderboss(),
   async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
 
       // 1. Fetch every payout matching the filter set — no skip cursor in v1.
       //    Same include shape as the LIST endpoint so `serializePayout` returns
@@ -1902,6 +1914,14 @@ router.get(
       // 'pizza-selfie' → Pizza photos, everything else → Event photos) can be
       // reused as-is. Admins see every photo regardless of moderation status;
       // the frontend renders a "Hidden" pill when `status !== 'approved'`.
+      // stracciatella-58291: map party id → event start so we can hide a
+      // party's legacy pre-event photos. This batched query spans many
+      // parties, so we filter in JS below rather than in the `where`.
+      const partyDateById = new Map<string, Date | null>();
+      for (const row of payoutRows) {
+        const pid = (row as any).party?.id as string | undefined;
+        if (pid) partyDateById.set(pid, ((row as any).party?.date as Date | null) ?? null);
+      }
       const eventPhotosByParty = new Map<string, any[]>();
       if (uniquePartyIds.length > 0) {
         const photoRows = await prisma.photo.findMany({
@@ -1923,6 +1943,10 @@ router.get(
           },
         });
         for (const p of photoRows) {
+          // stracciatella-58291: skip photos uploaded before the event
+          // started (no-op when the party has no start date).
+          const partyDate = partyDateById.get(p.partyId);
+          if (partyDate && p.createdAt < partyDate) continue;
           const list = eventPhotosByParty.get(p.partyId) ?? [];
           list.push({
             id: p.id,
@@ -2078,9 +2102,9 @@ router.get(
             customUrl: b.partyMeta.customUrl ?? null,
             inviteCode: b.partyMeta.inviteCode ?? null,
             country: b.partyMeta.country ?? null,
-            // region isn't on PAYOUT_PARTY_SELECT; surface null so frontend
-            // doesn't depend on it (party object also rendered in expansion).
-            region: null as string | null,
+            // provatura-92107: region now selected via PAYOUT_PARTY_SELECT so
+            // the by-city "Hide US cities" toggle can filter party.region.
+            region: (b.partyMeta.region as string | null) ?? null,
             effectiveReimbursementCapUsd: computeEffectiveCapUsd({
               reimbursementCapUsd: b.partyMeta.reimbursementCapUsd,
               eventTags: b.partyMeta.eventTags,
@@ -2283,8 +2307,8 @@ router.post(
 // Returns cumulative paid USDC for a single recipient wallet, optionally with
 // a `wouldExceed` flag for a proposed additional amount. Backs the warning
 // panels in PayoutReviewModal + BulkSendModal so admins can see "wallet X has
-// already received $Y; sending $Z more would push past the $676 per-address
-// cap" before they fire off a duplicate payment.
+// already received $Y; sending $Z more would push past the per-address cap"
+// before they fire off a duplicate payment.
 //
 // Query params:
 //   address (required): 0x...40 hex chars (case-insensitive)
@@ -2326,13 +2350,15 @@ router.get(
       }
 
       const { paidUsd, paidCount } = await getPerAddressPaidTotals(addressRaw);
-      const wouldExceed = amount == null ? null : paidUsd + amount > PER_ADDRESS_HARD_CAP_USD;
+      // marinara-71630 P2: per-address cap now sourced from app_config.
+      const perAddressHardCapUsd = (await getPayoutCaps()).perAddressHardCapUsd;
+      const wouldExceed = amount == null ? null : paidUsd + amount > perAddressHardCapUsd;
 
       res.json({
         address: addressRaw,
         paidUsd,
         paidCount,
-        capUsd: PER_ADDRESS_HARD_CAP_USD,
+        capUsd: perAddressHardCapUsd,
         wouldExceed,
       });
     } catch (error) {
@@ -2354,7 +2380,7 @@ router.get(
   requireAdminOrRegionalUnderboss(),
   async (req: RegionalAuthRequest, res: Response, next: NextFunction) => {
     try {
-      const where = buildPayoutWhere(req.query);
+      const where = await buildPayoutWhere(req.query);
 
       const rawLimit = parseInt(String(req.query.limit ?? '50'), 10);
       const limit = Math.min(
@@ -2892,7 +2918,9 @@ router.get(
       const row = await prisma.payout.findUnique({
         where: { id: req.params.id },
         include: {
-          party: { select: { ...PAYOUT_PARTY_SELECT, region: true } },
+          // stracciatella-58291: `date` (event start) drives the photo filter
+          // below; it's already in PAYOUT_PARTY_SELECT but kept explicit here.
+          party: { select: { ...PAYOUT_PARTY_SELECT, region: true, date: true } },
           host: { select: { id: true, name: true, email: true } },
           documents: {
             orderBy: { sortOrder: 'asc' },
@@ -2936,8 +2964,16 @@ router.get(
       // focaccia-92104: surface `tags` so the frontend can split this list
       // into "Pizza photos" (tagged Pizza / pizza-selfie) vs "Event photos"
       // (everything else) in PayoutReviewModal's photo grids.
+      // stracciatella-58291: only surface photos uploaded on/after the event
+      // start, hiding a party's legacy pre-event (e.g. 2025) photos. No filter
+      // when the party has no start date — never hide everything.
+      const partyDate = (row as any).party?.date as Date | null | undefined;
       const eventPhotos = await prisma.photo.findMany({
-        where: { partyId: row.partyId, deletedAt: null }, // provolone-58931
+        where: {
+          partyId: row.partyId,
+          deletedAt: null, // provolone-58931
+          ...(partyDate ? { createdAt: { gte: partyDate } } : {}),
+        },
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
@@ -3067,10 +3103,10 @@ router.patch(
           // the admin couldn't edit it down because aglio-62584's checkbox
           // override only covered the user-typed amount, not the in-flight
           // value the modal recomputed against the bad OCR sum. Admins can
-          // always proceed; the soft $675 default is now informational in
-          // the modal. The USDC execute hard ceiling
-          // (HARD_PER_TX_CEILING_USD in usdc-base.service.ts) remains as a
-          // separate safety net at on-chain send time — admins can split
+          // always proceed; the soft per-submission default is now
+          // informational in the modal. The USDC execute hard per-tx ceiling
+          // (getPayoutCaps().hardPerTxCeilingUsd in usdc-base.service.ts)
+          // remains a separate safety net at on-chain send time — admins split
           // executes or record as external payment to handle larger sums.
           // The per-party cap (tiramisu-49102) and per-address cap
           // (bianco-89172) likewise stay on the approve/mark-paid/execute
@@ -3239,11 +3275,20 @@ router.post(
       // approve time via `allowOverPartyCap` (mirrors salame-92103's existing
       // override on /execute). Underbosses can NEVER skip the cap — only the
       // four admin-class roles (admin / super_admin / payment_admin) get the
-      // ack pathway. The per-submission ceiling ($675), per-address cap, and
-      // daily cap are unchanged.
+      // ack pathway. The per-submission ceiling, per-address cap, and daily
+      // cap are unchanged.
       const allowOverPartyCap =
         actor.actorKind !== 'underboss' &&
         !!(req.body && req.body.allowOverPartyCap);
+
+      // guanciale-49340: admin-class can also opt to bypass the per-address
+      // hard cap in the inline autoExecute usdc_base branch via
+      // `allowOverPerAddressCap`. The by-city SendPaymentModal sets this when
+      // the amber per-address cap warning's ack has been ticked. The flag is
+      // forwarded to executePayout (which already accepts/forwards it to
+      // sendUsdcPayment); it is a no-op for wire/mercury (which execute via the
+      // separate /execute call that carries its own ack).
+      const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
 
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // approve time so rows created/edited BEFORE the cap rules landed (or
@@ -3253,7 +3298,9 @@ router.post(
       //
       // nduja-92106: skip the per-party throw when the admin has ticked the
       // override checkbox in PayoutReviewModal. Per-submission ceiling stays.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: approvePerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), approvePerSubmissionMaxUsd);
       if (!allowOverPartyCap) {
         await assertWithinPartyCap(
           existing.partyId,
@@ -3333,6 +3380,10 @@ router.post(
               // (salame-92103 already wired the override on /execute; we just
               // forward it here).
               allowOverPartyCap,
+              // guanciale-49340: forward the per-address cap override so the
+              // inline USDC send can bypass the per-address hard cap when the
+              // admin acked the by-city Send modal's per-address warning.
+              allowOverPerAddressCap,
             });
             autoExecuted = true;
           } catch (err: any) {
@@ -3825,7 +3876,9 @@ router.post(
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // mark-paid time too. mark-paid is the manual override that records an
       // out-of-band payment for an existing row — same gates apply.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: markPaidPerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), markPaidPerSubmissionMaxUsd);
       await assertWithinPartyCap(
         existing.partyId,
         Number(existing.finalAmountUsd),
@@ -4110,7 +4163,9 @@ router.post(
       // checks here is belt-and-braces — if the party cap was tightened
       // between approve and queue, we surface the violation instead of
       // silently letting the wire request go out.
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd));
+      // marinara-71630 P2: per-submission cap from app_config (env-free).
+      const { perSubmissionMaxUsd: queuePerSubmissionMaxUsd } = await getPayoutCaps();
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), queuePerSubmissionMaxUsd);
       await assertWithinPartyCap(
         existing.partyId,
         Number(existing.finalAmountUsd),
@@ -4259,7 +4314,7 @@ async function executePayout(params: {
   };
   body: any;
   /**
-   * bianco-89172: when true, skip the per-address $676 cumulative cap
+   * bianco-89172: when true, skip the per-address cumulative cap
    * pre-flight inside `sendUsdcPayment`. The admin UI sets this only when
    * the warning's acknowledgement checkbox has been ticked.
    */
@@ -4311,9 +4366,10 @@ async function executePayout(params: {
   // salame-92103: when `allowOverPartyCap` is set (admin-class only, sourced
   // from the modal's acknowledgement checkbox), skip the per-party cap throw
   // so admins can execute a payment that exceeds the party's effective cap.
-  // The per-submission ceiling ($675), per-address cap, and daily cap are
-  // unchanged.
-  assertWithinPerSubmissionCap(finalAmountUsd);
+  // The per-submission ceiling, per-address cap, and daily cap are unchanged.
+  // marinara-71630 P2: per-submission cap from app_config (env-free).
+  const { perSubmissionMaxUsd: executePerSubmissionMaxUsd } = await getPayoutCaps();
+  assertWithinPerSubmissionCap(finalAmountUsd, executePerSubmissionMaxUsd);
   if (!allowOverPartyCap) {
     await assertWithinPartyCap(existing.partyId, finalAmountUsd, existing.id);
   }
@@ -4684,9 +4740,8 @@ router.post(
         payoutId: existing.id,
         actor: { email: actor.email, actorKind: actor.actorKind },
         body: req.body || {},
-        // bianco-89172: admin can acknowledge the per-address $676 cap
-        // warning via the PayoutReviewModal checkbox; the frontend forwards
-        // the flag here.
+        // bianco-89172: admin can acknowledge the per-address cap warning via
+        // the PayoutReviewModal checkbox; the frontend forwards the flag here.
         allowOverPerAddressCap: !!(req.body && req.body.allowOverPerAddressCap),
         // salame-92103: admin can acknowledge the per-party cap warning via
         // the PayoutReviewModal checkbox; same admin-class gate as the route
@@ -5991,7 +6046,7 @@ async function sendTelegramMessage(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
+        text: withBennySignature(text),
         disable_web_page_preview: true,
       }),
     });

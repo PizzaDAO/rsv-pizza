@@ -5,6 +5,18 @@ import { AppError } from '../middleware/error.js';
 
 const router = Router();
 
+// Format a donor's name for public display: first name + last-initial.
+// e.g. "Jane Doe" -> "Jane D.", "Cher" -> "Cher", anonymous -> "Anon".
+// NEVER expose the raw donorName/full surname to the client.
+function formatDonorDisplayName(donorName: string | null | undefined, isAnonymous: boolean): string {
+  if (isAnonymous) return 'Anon';
+  const n = (donorName || '').trim();
+  if (!n) return 'Supporter';
+  const parts = n.split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 // Helper function to check if user can access party donations
 async function canUserAccessDonations(partyId: string, userId?: string, userEmail?: string): Promise<boolean> {
   // Super admin can access any party
@@ -76,6 +88,7 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
         donationRecipientUrl: true,
         donationEthAddress: true,
         suggestedAmounts: true,
+        donationAmountsPublic: true,
       },
     });
 
@@ -90,7 +103,9 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       return;
     }
 
-    // Get successful donations
+    // Get successful donations.
+    // NOTE: donorEmail is selected for server-side avatar lookup ONLY —
+    // it must NEVER be returned to the client.
     const donations = await prisma.donation.findMany({
       where: {
         partyId: id,
@@ -99,6 +114,7 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       select: {
         amount: true,
         donorName: true,
+        donorEmail: true,
         isAnonymous: true,
         message: true,
         createdAt: true,
@@ -108,12 +124,54 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
 
     const totalAmount = donations.reduce((sum, d) => sum + Number(d.amount), 0);
     const donorCount = donations.length;
+    const amountsPublic = party.donationAmountsPublic;
 
-    // Return public donor list (respecting anonymity)
+    // Return public donor list (respecting anonymity).
+    // Left exactly as-is so the DonationStep modal is unaffected.
     const recentDonors = donations.slice(0, 10).map(d => ({
       name: d.isAnonymous ? 'Anonymous' : d.donorName,
       message: d.message,
       createdAt: d.createdAt,
+    }));
+
+    // All donors by amount DESC, for the public "Supporters" row + modal.
+    // Capped at 250 defensively.
+    const sortedDonations = [...donations]
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .slice(0, 250);
+
+    // Best-effort avatar lookup: match non-anonymous donor emails to
+    // registered users' profile pictures (case-insensitive). Most donors
+    // won't have an account; that's expected.
+    const lookupEmails = Array.from(
+      new Set(
+        sortedDonations
+          .filter(d => !d.isAnonymous && d.donorEmail)
+          .map(d => (d.donorEmail as string).toLowerCase())
+      )
+    );
+    const avatarMap = new Map<string, string>();
+    if (lookupEmails.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { email: { in: lookupEmails } },
+        select: { email: true, profilePictureUrl: true },
+      });
+      for (const u of users) {
+        if (u.email && u.profilePictureUrl) {
+          avatarMap.set(u.email.toLowerCase(), u.profilePictureUrl);
+        }
+      }
+    }
+
+    // Public donor list. Only the formatted displayName is exposed —
+    // never the raw donorName, full surname, or donorEmail.
+    const donors = sortedDonations.map(d => ({
+      displayName: formatDonorDisplayName(d.donorName, d.isAnonymous),
+      amount: amountsPublic ? Number(d.amount) : null,
+      message: d.message,
+      avatarUrl: d.isAnonymous
+        ? null
+        : (avatarMap.get((d.donorEmail ?? '').toLowerCase()) ?? null),
     }));
 
     res.json({
@@ -126,7 +184,9 @@ router.get('/:id/donations/public', async (req: Request, res: Response, next: Ne
       recipientUrl: party.donationRecipientUrl,
       suggestedAmounts: party.suggestedAmounts,
       donationEthAddress: party.donationEthAddress,
+      amountsPublic,
       recentDonors,
+      donors,
     });
   } catch (error) {
     next(error);

@@ -10,7 +10,6 @@ import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PizzaPhotoUpload, PizzaPhotoItem } from './PizzaPhotoUpload';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
-import { TaxFormSection } from './TaxFormSection';
 import { TaxFormType } from '../../types';
 
 /**
@@ -44,6 +43,14 @@ interface NewPayoutFormProps {
    * estimated-attendance section is hidden entirely.
    */
   expectedGuests?: number | null;
+  /**
+   * bottarga-92106: TaxFormSection now lives on the parent PayoutsTab. When
+   * the backend returns TAX_FORM_REQUIRED, this callback lets the parent
+   * auto-open the section to the requested form type. The form still scrolls
+   * to `#tax-form-section` (the section's id, which now sits above this form
+   * on the same tab).
+   */
+  onTaxFormRequired?: (formType: TaxFormType | null) => void;
 }
 
 /**
@@ -72,6 +79,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   reimbursementCapAppealedAt,
   totalPaidUsd = 0,
   expectedGuests,
+  onTaxFormRequired,
 }) => {
   const { user } = useAuth();
   const { party } = usePizza();
@@ -136,11 +144,13 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // salame-92110: when the backend returns TAX_FORM_REQUIRED, we surface a
-  // pointer at the TaxFormSection above and (optionally) auto-open a form
-  // type if the host has indicated one. Phase 1 doesn't auto-infer US vs
-  // foreign, so we leave the type null and the host picks.
-  const [taxFormAutoOpen, setTaxFormAutoOpen] = useState<TaxFormType | null>(null);
+  // bottarga-92106: TaxFormSection no longer lives inside this form — when the
+  // backend returns TAX_FORM_REQUIRED we forward the requested form type to
+  // the parent PayoutsTab via `onTaxFormRequired` so the section (rendered
+  // between PaymentDetailsCard and the receipts list) auto-opens the right
+  // editor. Then we scroll to `#tax-form-section`, which lives above this
+  // form on the same tab. Phase 1 still doesn't auto-infer US vs foreign;
+  // when the backend doesn't supply a type, the section stays on the picker.
 
   // mortadella-92103: exclude receipts whose currency couldn't be resolved
   // (the `$` ambiguity in non-USD countries) from the auto-sum. They keep
@@ -296,11 +306,14 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       });
       onCreated(created);
     } catch (err: any) {
-      // salame-92110: when the backend says a tax form is required, scroll
-      // the host up to the TaxFormSection instead of just showing a red error.
+      // salame-92110 / bottarga-92106: when the backend says a tax form is
+      // required, ask the parent PayoutsTab to auto-open the TaxFormSection
+      // (now rendered above this form, between PaymentDetailsCard and the
+      // receipts list) and scroll to it. The section's `id="tax-form-section"`
+      // is reachable cross-component since both live in the same tab.
       if (err?.code === 'TAX_FORM_REQUIRED') {
         const requiredType: TaxFormType | null = err?.requiredFormType ?? null;
-        setTaxFormAutoOpen(requiredType);
+        onTaxFormRequired?.(requiredType);
         setSubmitError(
           'A tax form is required before this payment can be submitted. Please complete the tax form above.',
         );
@@ -481,15 +494,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         />
       </div>
 
-      {/* 4b. Tax form (salame-92110).
-          culatello-92106: only rendered when admin has flipped the per-event
-          `taxFormRequired` flag. When the flag is off (default for all events)
-          the section is hidden and the host can submit payouts without a form.
-          When the flag is on, the section is required + backend enforces
-          TAX_FORM_REQUIRED before the payout is accepted. */}
-      {party?.taxFormRequired === true && (
-        <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
-      )}
+      {/* 4b. Tax form (salame-92110 / culatello-92106) moved to PayoutsTab
+          (bottarga-92106) so hosts can pre-fill the form without opening a
+          payout. TAX_FORM_REQUIRED errors here still scroll to it via the
+          shared #tax-form-section anchor in the same tab. */}
 
       {/* 5. Submit */}
       {submitError && (
@@ -503,10 +511,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           The auto-sum excludes those receipts until the host picks a code via
           the per-row CurrencyOverrideSelect dropdown. */}
       {unresolvedReceiptCount > 0 && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               {unresolvedReceiptCount === 1
                 ? "1 receipt's currency could not be detected. Use the currency picker on that row to set the correct currency — it isn't counted in the total yet."
                 : `${unresolvedReceiptCount} receipts' currencies could not be detected. Use the currency picker on those rows — they aren't counted in the total yet.`}
@@ -519,10 +527,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           enabled, admin reviews from /payments. Only renders when the party
           has an effective cap AND the typed amount exceeds it. */}
       {exceedsPartyCap && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               Heads up: receipts total ${finalAmount.toFixed(2)}, but your reimbursement cap is ${effectiveCapUsd!.toFixed(2)}. We'll reimburse the cap; the receipts stay attached as evidence. Admin can approve more in special cases.
             </div>
           </div>
@@ -532,10 +540,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       {/* speck-89172: $675 hard-ceiling amber warning. USDC execute caps at
           $675 per tx, so admin may need to split this into multiple sends. */}
       {exceedsHardCeiling && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               Heads up: ${finalAmount.toFixed(2)} exceeds the ${PER_PAYMENT_HARD_CEILING_USD} per-payment maximum. Admin may need to split into multiple sends.
             </div>
           </div>
@@ -549,10 +557,10 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
           disabled until userMethodValid is true. Backend mirrors this gate
           (PAYMENT_METHOD_NOT_SET / PAYMENT_METHOD_INCOMPLETE). */}
       {!userMethodValid && (
-        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+        <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-50">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
-            <div className="flex-1 text-sm text-amber-100">
+            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+            <div className="flex-1 text-sm text-amber-800">
               {methodNoticeText}{' '}
               <a
                 href="#payment-details-card"

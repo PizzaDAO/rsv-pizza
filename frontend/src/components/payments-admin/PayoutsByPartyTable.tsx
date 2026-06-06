@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Loader2,
   Paperclip,
   Flag,
@@ -30,6 +31,7 @@ import { IconInput } from '../IconInput';
 import type {
   AdminPayout,
   AdminPayoutEventPhoto,
+  AdminPayoutFilters,
   PartyPayoutsRow,
   PayoutDocument,
   PayoutStatus,
@@ -41,6 +43,8 @@ import {
   ReceiptLightbox,
   type ReceiptLightboxImage,
   formatUsd,
+  computePartyTotals,
+  CapInlineEditor,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { isSwcHubParty } from '../../utils/swcHub';
@@ -123,6 +127,23 @@ const PHOTO_PREVIEW_LIMIT = 4;
 
 interface PayoutsByPartyTableProps {
   rows: PartyPayoutsRow[];
+  /**
+   * stracci-58471: current sort order, used to render the asc/desc chevron on
+   * the clickable column headers (Event / Receipt total / Approved / Paid /
+   * Outstanding / Last activity). Sorts unrelated to a column leave every
+   * header neutral.
+   */
+  sort?: AdminPayoutFilters['sort'];
+  /**
+   * stracci-58471: set the sort order from a header click. When omitted the
+   * headers render as plain (non-clickable) labels.
+   */
+  onSortChange?: (next: NonNullable<AdminPayoutFilters['sort']>) => void;
+  /**
+   * stracci-58471: the order a column returns to on its third click (after
+   * asc + desc). Defaults to `created_desc`.
+   */
+  defaultSort?: NonNullable<AdminPayoutFilters['sort']>;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   /** Opens the per-payout review modal (same shape as PayoutsTable). */
@@ -2555,8 +2576,63 @@ function RollupTile({
   );
 }
 
+/**
+ * stracci-58471: a clickable column header for the by-city table. Clicking
+ * cycles the column through its two directions then back to `defaultSort`:
+ *   • `firstDir='asc'`  → off → asc → desc → off   (used for the name column)
+ *   • `firstDir='desc'` → off → desc → asc → off   (used for amount/time columns,
+ *     where "biggest / most recent first" is the more useful opening click)
+ * Renders a plain label when `onSortChange` is absent.
+ */
+const SortHeader: React.FC<{
+  label: string;
+  asc: NonNullable<AdminPayoutFilters['sort']>;
+  desc: NonNullable<AdminPayoutFilters['sort']>;
+  firstDir: 'asc' | 'desc';
+  current?: AdminPayoutFilters['sort'];
+  defaultSort: NonNullable<AdminPayoutFilters['sort']>;
+  onSortChange?: (next: NonNullable<AdminPayoutFilters['sort']>) => void;
+  className?: string;
+}> = ({ label, asc, desc, firstDir, current, defaultSort, onSortChange, className }) => {
+  const thClass = `px-3 py-3 font-medium${className ? ` ${className}` : ''}`;
+  if (!onSortChange) {
+    return <th className={thClass}>{label}</th>;
+  }
+  const isAsc = current === asc;
+  const isDesc = current === desc;
+  const handleClick = () => {
+    if (firstDir === 'asc') {
+      onSortChange(isAsc ? desc : isDesc ? defaultSort : asc);
+    } else {
+      onSortChange(isDesc ? asc : isAsc ? defaultSort : desc);
+    }
+  };
+  return (
+    <th className={thClass}>
+      <button
+        type="button"
+        onClick={handleClick}
+        className="inline-flex items-center gap-1 font-medium hover:text-theme-text transition-colors"
+        title={`Sort by ${label.toLowerCase()}`}
+      >
+        {label}
+        {isAsc ? (
+          <ChevronUp size={14} />
+        ) : isDesc ? (
+          <ChevronDown size={14} />
+        ) : (
+          <ChevronDown size={14} className="opacity-30" />
+        )}
+      </button>
+    </th>
+  );
+};
+
 export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   rows,
+  sort,
+  onSortChange,
+  defaultSort = 'created_desc',
   selectedIds,
   onToggleSelect,
   onRowClick,
@@ -2568,6 +2644,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onAddExternalPayment,
   onSendPayment,
   onScamFlagChanged,
+  onCapUpdated,
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
@@ -2912,12 +2989,63 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
               <th className="px-3 py-3 w-10"></th>
-              <th className="px-3 py-3 font-medium">Event</th>
-              <th className="px-3 py-3 font-medium">Receipt total</th>
-              <th className="px-3 py-3 font-medium">Approved</th>
-              <th className="px-3 py-3 font-medium">Paid</th>
-              <th className="px-3 py-3 font-medium">Outstanding</th>
-              <th className="px-3 py-3 font-medium">Last activity</th>
+              {/* stracci-58471: every data column is sortable via its header.
+                  Names open A–Z; money + time columns open with the biggest /
+                  most-recent first. */}
+              <SortHeader
+                label="Event"
+                asc="name_asc"
+                desc="name_desc"
+                firstDir="asc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
+              <SortHeader
+                label="Receipt total"
+                asc="amount_asc"
+                desc="amount_desc"
+                firstDir="desc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
+              <SortHeader
+                label="Approved"
+                asc="approved_asc"
+                desc="approved_desc"
+                firstDir="desc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
+              <SortHeader
+                label="Paid"
+                asc="paid_asc"
+                desc="paid_desc"
+                firstDir="desc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
+              <SortHeader
+                label="Outstanding"
+                asc="outstanding_asc"
+                desc="outstanding_desc"
+                firstDir="desc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
+              <SortHeader
+                label="Last activity"
+                asc="activity_asc"
+                desc="activity_desc"
+                firstDir="desc"
+                current={sort}
+                defaultSort={defaultSort}
+                onSortChange={onSortChange}
+              />
             </tr>
           </thead>
           <tbody>
@@ -3019,21 +3147,15 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                   receiptUsdTotal += Number(amt) || 0;
                 }
               }
-              // bresaola-49340: proof-gate the completed contribution. Proofless
-              // completed rows (never-sent close-outs) are excluded from BOTH
-              // the committed and paid sums — mirroring how the per-row rollup
-              // drops proofless rows from approved AND paid, leaving outstanding
-              // unchanged. completedUsd still counts ALL completed; we subtract
-              // the proofless subset here for the money math.
-              const completedProvenUsd =
-                (row.aggregates.completedUsd ?? 0)
-                - (row.aggregates.completedNoProofUsd ?? 0);
-              const approvedSumUsd =
-                row.aggregates.approvedUsd
-                + row.aggregates.paidUsd
-                + completedProvenUsd;
-              const paidSumUsd = row.aggregates.paidUsd + completedProvenUsd;
-              const outstandingUsd = Math.max(0, approvedSumUsd - paidSumUsd);
+              // stracci-58471: Approved / Paid / Outstanding money math now lives
+              // in the shared computePartyTotals helper so the cells below and the
+              // page-level column-header sorts can't drift. (bresaola-49340: the
+              // completed contribution is proof-gated inside the helper.)
+              const {
+                approvedUsd: approvedSumUsd,
+                paidUsd: paidSumUsd,
+                outstandingUsd,
+              } = computePartyTotals(row);
 
               return (
                 <React.Fragment key={row.party.id}>
@@ -3143,6 +3265,22 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                               : 'Tax forms: off'}
                           </button>
                         )}
+                        {/* calzone-58293: inline reimbursement-cap editor in the By-city header so
+                            admins can raise/clear the party's cap without leaving /payments. Saves to
+                            parties.reimbursement_cap_usd (admin + underboss, scope-checked server-side).
+                            stopPropagation so editing doesn't toggle the row expand. */}
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-theme-text-muted"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Reimbursement cap (validated value or max numeric event_tag)"
+                        >
+                          <CapInlineEditor
+                            partyId={row.party.id}
+                            currentCapUsd={row.party.effectiveReimbursementCapUsd ?? null}
+                            onUpdated={() => onCapUpdated?.(row.party.id)}
+                          />
+                          <span>cap</span>
+                        </span>
                         {/* bottarga-92104: red "Possible scam" pill — visible
                             in the city header next to other status pills when
                             the `possible-scam` tag is present on the party.

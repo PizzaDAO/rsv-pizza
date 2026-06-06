@@ -7,8 +7,6 @@ import { canUserEditParty } from '../helpers/partyAccess.js';
 
 const router = Router();
 
-router.use(requireAuth);
-
 // URL-safe alphabet for nanoid (no ambiguous chars). 10 chars ~ 58 bits entropy.
 const TOKEN_LENGTH = 10;
 const generateToken = customAlphabet(
@@ -26,6 +24,7 @@ const generateToken = customAlphabet(
  */
 router.post(
   '/:partyId/connect-token',
+  requireAuth,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { partyId } = req.params;
@@ -71,6 +70,7 @@ router.post(
  */
 router.delete(
   '/:partyId/host-telegram',
+  requireAuth,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { partyId } = req.params;

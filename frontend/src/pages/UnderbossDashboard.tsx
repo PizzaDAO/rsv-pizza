@@ -6,7 +6,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -96,7 +96,7 @@ export function UnderbossDashboard() {
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'superlatives' | 'outreach' | 'telegram-groups'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'superlatives' | 'survey' | 'outreach' | 'telegram-groups'>('events');
 
   const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
@@ -664,6 +664,21 @@ export function UnderbossDashboard() {
                 )}
               </button>
             )}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('survey')}
+                className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                  activeTab === 'survey'
+                    ? 'text-theme-text'
+                    : 'text-theme-text-muted hover:text-theme-text-secondary'
+                }`}
+              >
+                {t('underbossDashboard.tabs.survey', 'Survey')}
+                {activeTab === 'survey' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                )}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('outreach')}
               className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
@@ -710,6 +725,10 @@ export function UnderbossDashboard() {
 
           {isAdmin && activeTab === 'superlatives' && (
             <SuperlativesTab />
+          )}
+
+          {isAdmin && activeTab === 'survey' && (
+            <SurveyQuestionsTab />
           )}
 
           {activeTab === 'outreach' && (

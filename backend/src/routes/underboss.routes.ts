@@ -1,11 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
 import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
 import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from '../helpers/partnerSync.js';
-import { setDeleteContext } from '../helpers/auditContext.js';
 import { buildScopedWhereClause, partyMatchesScope, UnderbossScope } from '../helpers/underbossScope.js';
 import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
 import { scorePartiesByIds, buildSybilWalletSetFromDb } from '../lib/fakeDetectionScan.js';
@@ -64,6 +64,14 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
     hasSocialPosts: !!(party.xPostUrl || party.farcasterPostUrl),
     hasThrown: eventPassed && checkedInCount > 0,
     hasEstimatedAttendance: party.estimatedAttendance != null,
+    hasSubmittedReceipt:
+      Array.isArray(party.payouts) &&
+      party.payouts.some((p: any) =>
+        Array.isArray(p.documents) &&
+        p.documents.some((d: any) => d.kind === 'receipt')),
+    hasSubmittedPaymentInfo:
+      Array.isArray(party.payouts) &&
+      party.payouts.some((p: any) => p.payoutMethod != null),
   };
 }
 
@@ -643,12 +651,11 @@ router.get('/outreach/parties-search', requireAuth, requireUnderbossAuth, async 
       return res.json({ parties: [] });
     }
 
+    // diavola-83147: accent-insensitive prefilter via the `unaccent` extension.
+    const ids = await unaccentMatchIds(prisma, 'parties', ['name', 'custom_url'], q);
     const parties = await prisma.party.findMany({
       where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { customUrl: { contains: q, mode: 'insensitive' } },
-        ],
+        id: { in: ids },
       },
       select: {
         id: true,
@@ -824,6 +831,12 @@ router.get('/:region', requireAuth, requireUnderbossAuth, async (req: UnderbossR
         },
         partyKit: { select: { status: true } },
         sponsors: { select: { status: true, amount: true } },
+        payouts: {
+          select: {
+            payoutMethod: true,
+            documents: { select: { kind: true } },
+          },
+        },
         _count: {
           select: {
             guests: true,
@@ -924,6 +937,12 @@ router.get('/:region/events', requireAuth, requireUnderbossAuth, async (req: Und
           },
           partyKit: { select: { status: true } },
           sponsors: { select: { status: true, amount: true } },
+          payouts: {
+            select: {
+              payoutMethod: true,
+              documents: { select: { kind: true } },
+            },
+          },
           _count: {
             select: {
               guests: true,
@@ -1011,6 +1030,12 @@ router.get('/:region/events/:partyId', requireAuth, requireUnderbossAuth, async 
         sponsors: {
           select: { id: true, name: true, status: true, amount: true, sponsorshipType: true },
           orderBy: { createdAt: 'desc' },
+        },
+        payouts: {
+          select: {
+            payoutMethod: true,
+            documents: { select: { kind: true } },
+          },
         },
         budgetItems: {
           // provolone-58931: exclude soft-deleted budget items from the UB detail view.
@@ -1167,7 +1192,7 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
   }
 });
 
-// DELETE /api/underboss/events/bulk-delete - Bulk delete events (admin-only, pineapple-26037)
+// DELETE /api/underboss/events/bulk-delete - Bulk soft-cancel events (admin-only, pineapple-26037; soft-cancel ziti-58475)
 router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     if (!(await isAdmin(req.userEmail))) {
@@ -1193,14 +1218,19 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
       }
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      await setDeleteContext(tx, req.userEmail, 'underboss_bulk');
-      return tx.party.deleteMany({
-        where: { id: { in: partyIds } },
-      });
+    // ziti-58475: soft-cancel instead of hard delete. The party row, its
+    // guests/sponsors/RSVPs, and the public URL all stay intact; events can be
+    // reinstated. Only flip events that aren't already cancelled (idempotent).
+    const result = await prisma.party.updateMany({
+      where: { id: { in: partyIds }, cancelledAt: null },
+      data: {
+        cancelledAt: new Date(),
+        cancelledBy: req.userEmail || 'underboss_bulk',
+        cancellationReason: null,
+      },
     });
 
-    res.json({ deleted: result.count });
+    res.json({ cancelled: result.count });
   } catch (error) {
     next(error);
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,7 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
-import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick } from '../lib/api';
+import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats } from '../lib/api';
 import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
 import { Header } from '../components/Header';
@@ -19,11 +19,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { RSVPModal } from '../components/RSVPModal';
 import { DonationStep } from '../components/DonationStep';
+import { DonorHighlights } from '../components/DonorHighlights';
 import { LoginModal } from '../components/LoginModal';
 import { PhotoGallery } from '../components/photos';
 import { GPPBadge } from '../components/gpp';
 import { MusicWidget } from '../components/music';
-import { PhotoStats } from '../types';
+import { PhotoStats, DonationPublicStats } from '../types';
 import { PizzaChefModal } from '../components/PizzaChefModal';
 import { PizzaDAOModal } from '../components/PizzaDAOModal';
 import { stripMarkdown } from '../lib/utils';
@@ -70,6 +71,9 @@ function normalizeTelegramUrl(raw: string | null | undefined): string | null {
 
 export function EventPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  // soppressata-50927: optional ?year=YYYY threaded to the year-aware resolver.
+  const yearParam = searchParams.get('year');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, i18n } = useTranslation('event');
@@ -91,6 +95,7 @@ export function EventPage() {
   const [userHasRSVPd, setUserHasRSVPd] = useState(false);
   const [existingGuestData, setExistingGuestData] = useState<ExistingGuestData | null>(null);
   const [photoStats, setPhotoStats] = useState<PhotoStats | null>(null);
+  const [donationStats, setDonationStats] = useState<DonationPublicStats | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
   const [showPizzaChef, setShowPizzaChef] = useState(false);
   const [showPizzaDAO, setShowPizzaDAO] = useState(false);
@@ -146,7 +151,7 @@ export function EventPage() {
   useEffect(() => {
     async function loadEvent() {
       if (slug) {
-        const result = await getEventBySlug(slug);
+        const result = await getEventBySlug(slug, yearParam);
 
         // Handle redirect from old slug alias
         if (result && 'redirect' in result) {
@@ -234,6 +239,19 @@ export function EventPage() {
               setShowPhotos(true);
             }
           }
+
+          // Load public donor stats for the "Supporters" highlight.
+          if (foundEvent.donationEnabled) {
+            const dStats = await getDonationStats(foundEvent.id);
+            // Guard for the { enabled: false } shape.
+            if (dStats && dStats.enabled) {
+              setDonationStats(dStats);
+            } else {
+              setDonationStats(null);
+            }
+          } else {
+            setDonationStats(null);
+          }
         } else {
           setError('Event not found. The link may be invalid or expired.');
         }
@@ -241,7 +259,7 @@ export function EventPage() {
       setLoading(false);
     }
     loadEvent();
-  }, [slug, user?.email]);
+  }, [slug, user?.email, yearParam]);
 
   // Easter eggs: Press 'p' for Pizza Chef, Enter for PizzaDAO
   useEffect(() => {
@@ -364,7 +382,29 @@ export function EventPage() {
       return true;
     });
   }, [event?.sponsors]);
-  const eventUrl = event ? `https://rsv.pizza/${event.customUrl || event.inviteCode || ''}` : '';
+  // soppressata-50927: canonical event URL is year-aware. The 2027 GPP edition
+  // shares as `/{city}?year=2027` (and any explicitly-requested ?year= is
+  // preserved). The internal customUrl may be year-suffixed (e.g. `austin27`);
+  // we strip that suffix for the public slug and express the year via ?year=.
+  const eventYear = useMemo(() => {
+    if (!event?.date) return null;
+    const y = new Date(event.date).getFullYear();
+    return Number.isInteger(y) ? y : null;
+  }, [event?.date]);
+  const eventUrl = useMemo(() => {
+    if (!event) return '';
+    const rawSlug = event.customUrl || event.inviteCode || '';
+    // Strip a trailing 2-digit year suffix from a GPP customUrl for the public slug.
+    const publicSlug = event.eventType === 'gpp'
+      ? rawSlug.replace(/^(.+?)\d{2}$/, '$1')
+      : rawSlug;
+    // Emit ?year= for the 2027 edition or whenever a non-default year is in play.
+    const needsYear = event.eventType === 'gpp' && (eventYear === 2027 || (yearParam != null && `${yearParam}`.length > 0));
+    const yearForUrl = yearParam && `${yearParam}`.length > 0 ? yearParam : eventYear;
+    return needsYear && yearForUrl
+      ? `https://rsv.pizza/${publicSlug}?year=${yearForUrl}`
+      : `https://rsv.pizza/${publicSlug}`;
+  }, [event, eventYear, yearParam]);
 
   if (loading) {
     return (
@@ -881,6 +921,7 @@ export function EventPage() {
                       <>{ t('buyPizzaFor', { recipient: '' }) }{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                     ) : t('buyPizzaForEvent', { eventName: event.name })}
                   </p>
+                  {donationStats && <DonorHighlights stats={donationStats} />}
                 </div>
               )}
 
@@ -1507,6 +1548,7 @@ export function EventPage() {
                         <>{t('supportingRecipient', { recipient: '' })}{event.donationRecipientUrl ? <a href={event.donationRecipientUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff393a] hover:text-[#ff6b6b] underline transition-colors" onClick={() => slug && trackLinkClick(slug, event.donationRecipientUrl!, 'donation', event.donationRecipient || 'donation_recipient')}>{event.donationRecipient}</a> : event.donationRecipient}</>
                       ) : t('supportingEvent', { eventName: event.name })}
                     </p>
+                    {donationStats && <DonorHighlights stats={donationStats} />}
                   </div>
                 )}
 

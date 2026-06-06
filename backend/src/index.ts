@@ -22,6 +22,7 @@ import photoRoutes from './routes/photo.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
+import gpp27Routes from './routes/gpp27.routes.js'; // soppressata-50927: admin-gated GPP27 (2027) create flow
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
@@ -54,6 +55,7 @@ import shippingRoutes from './routes/shipping.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import adminPayoutRoutes, { payoutWalletRouter, partyMarkPaidRouter } from './routes/admin-payout.routes.js';
 import adminPartyRoutes from './routes/admin-party.routes.js';
+import imageAuthenticityRoutes from './routes/imageAuthenticity.routes.js'; // marinara-61455: admin image-authenticity check
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter, partnerAiShareRouter } from './routes/sponsor-user.routes.js';
@@ -62,13 +64,18 @@ import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
 import onesheetRoutes from './routes/onesheet.routes.js';
 import scorecardRoutes from './routes/scorecard.routes.js';
-import scorecardLeaderboardRoutes from './routes/scorecardLeaderboard.routes.js';
 import citiesRoutes from './routes/cities.routes.js';
+import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admin/UB-gated private-config read endpoint
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
+import {
+  surveyQuestionsAdminRouter,
+  surveyQuestionSetsAdminRouter,
+} from './routes/admin/surveyQuestions.routes.js';
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
+import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -146,8 +153,12 @@ app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboar
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
 app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-management routes (transfer ownership) — before /api/admin catch-all
+app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-61455: image-authenticity check — before /api/admin catch-all
+app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-58297: survey question CRUD — before /api/admin catch-all
+app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
+app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
 app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
@@ -195,7 +206,9 @@ app.use('/api/events', onesheetRoutes); // One Sheet interest form (public, befo
 app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
+app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-gated create flow, budget, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
+app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe
@@ -203,7 +216,6 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
-app.use('/api/scorecard-leaderboard', scorecardLeaderboardRoutes); // panzerotti-58931: worldwide game leaderboard + rollups
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
 app.use('/api/reports', venueReportRoutes); // Public venue report viewing via slug

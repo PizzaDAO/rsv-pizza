@@ -10,6 +10,7 @@ interface PhotoUploadProps {
   uploaderEmail?: string;
   guestId?: string;
   photoModeration?: boolean;
+  isHost?: boolean;
   availableTags?: string[];
   onUploadComplete?: (photo: Photo) => void;
   onClose?: () => void;
@@ -35,6 +36,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   uploaderEmail,
   guestId,
   photoModeration = false,
+  isHost = false,
   availableTags = [],
   onUploadComplete,
   onClose,
@@ -447,15 +449,21 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             {completeCount} {completeCount !== 1 ? 'files' : 'file'} uploaded successfully
           </p>
           {photoModeration && (
-            <p className="text-amber-400/80 text-sm mt-2">
-              Uploads will appear after the host approves them.
-            </p>
+            isHost ? (
+              <p className="text-green-400/80 text-sm mt-2">
+                Your photos are now visible on the event page.
+              </p>
+            ) : (
+              <p className="text-amber-400/80 text-sm mt-2">
+                Uploads will appear after the host approves them.
+              </p>
+            )
           )}
         </div>
       )}
 
-      {/* Moderation Notice */}
-      {photoModeration && files.length === 0 && (
+      {/* Moderation Notice — only for guests; host uploads are auto-approved */}
+      {photoModeration && !isHost && files.length === 0 && (
         <p className="mt-3 text-amber-400/70 text-xs text-center">
           Uploads are reviewed by the host before appearing in the gallery.
         </p>

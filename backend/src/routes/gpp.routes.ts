@@ -3,17 +3,21 @@ import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
+import { unaccentMatchIds } from '../lib/accentSearch.js';
 import { AppError } from '../middleware/error.js';
 import { isAdmin, isUnderboss } from '../middleware/auth.js';
 import { getAutoCoHostPartners, addPartnerToParty } from '../helpers/partnerSync.js';
 import { geocodeCity } from '../lib/geocode.js';
 import { haversineKm } from '../lib/distance.js';
 import { getCountryCode } from '../lib/countryCode.js';
+import { getScoringWeights } from '../lib/privateConfig.js';
 
 const router = Router();
 
 // Map ISO country codes to underboss regions
-function countryCodeToRegion(countryCode: string): string | null {
+// soppressata-50927: exported so the GPP27 (2027) create flow can reuse the
+// exact same region-inference logic as the 2026 create path.
+export function countryCodeToRegion(countryCode: string): string | null {
   const cc = countryCode.toUpperCase();
 
   // USA
@@ -72,7 +76,8 @@ function countryCodeToRegion(countryCode: string): string | null {
 }
 
 // Fallback: map country NAMES to regions when countryCode is missing
-function countryNameToRegion(country: string): string | null {
+// soppressata-50927: exported for reuse by the GPP27 create flow.
+export function countryNameToRegion(country: string): string | null {
   const name = country.toLowerCase().trim();
   const map: Record<string, string> = {
     'united states': 'usa', 'usa': 'usa',
@@ -813,11 +818,21 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     if (!includeAllStatuses) {
       where.cancelledAt = null;
     }
-    if (city) {
-      where.name = { contains: city as string, mode: 'insensitive' };
-    }
-    if (country) {
-      where.country = { contains: country as string, mode: 'insensitive' };
+    // diavola-83147: accent-insensitive city/country filter via the `unaccent`
+    // extension. Prefilter party ids and fold into where.id so `sao` matches
+    // `São Paulo`, `munchen` matches `München`, etc. When BOTH are provided,
+    // intersect the two id sets so the filters compose (don't overwrite).
+    if (city && country) {
+      const [cityIds, countryIds] = await Promise.all([
+        unaccentMatchIds(prisma, 'parties', ['name'], city as string),
+        unaccentMatchIds(prisma, 'parties', ['country'], country as string),
+      ]);
+      const countrySet = new Set(countryIds);
+      where.id = { in: cityIds.filter((id) => countrySet.has(id)) };
+    } else if (city) {
+      where.id = { in: await unaccentMatchIds(prisma, 'parties', ['name'], city as string) };
+    } else if (country) {
+      where.id = { in: await unaccentMatchIds(prisma, 'parties', ['country'], country as string) };
     }
     if (region) {
       where.region = region as string;
@@ -872,17 +887,47 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-// vesuvio-91824: cap /gpp/pizzerias map at top-3 per event, ranked by
-// `(rating ?? 3.5) - 0.3 * distanceMiles` to event venue. Mirrors the
-// vesuvio-58492 RSVP modal ranking server-side so the world map isn't
-// over-represented by events that pre-selected many pizzerias.
-const TOP_PIZZERIA_LIMIT = 3;
-const DISTANCE_WEIGHT_PER_MILE = 0.3;
+// vesuvio-91824: cap /gpp/pizzerias map at top-N per event, ranked by
+// `(rating ?? 3.5) - distanceWeightPerMile * distanceMiles` to event venue.
+// Mirrors the vesuvio-58492 RSVP modal ranking server-side so the world map
+// isn't over-represented by events that pre-selected many pizzerias.
+//
+// `topLimit` + `distanceWeightPerMile` are seeded to `app_config`
+// (private.scoring_weights → pizzeria) and resolved per request. Committed
+// source carries only NON-SENSITIVE placeholders.
 const KM_TO_MILES = 0.621371;
+
+interface PizzeriaWeights {
+  topLimit: number;
+  distanceWeightPerMile: number;
+}
+
+// Placeholder fallback — NOT the production tuning. Used only if the
+// `private.scoring_weights` row is briefly absent. topLimit is a generous,
+// non-zero cap (so we never hide every pizzeria) and a zero distance weight
+// (pure rating order) keeps the math well-defined.
+const PIZZERIA_WEIGHTS_PLACEHOLDER: PizzeriaWeights = {
+  topLimit: 50,
+  distanceWeightPerMile: 0,
+};
+
+/** Merge the (possibly partial) seeded pizzeria weights over placeholders. */
+function resolvePizzeriaWeights(raw: Record<string, number>): PizzeriaWeights {
+  const num = (v: unknown, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+  return {
+    topLimit: num(raw.topLimit, PIZZERIA_WEIGHTS_PLACEHOLDER.topLimit),
+    distanceWeightPerMile: num(
+      raw.distanceWeightPerMile,
+      PIZZERIA_WEIGHTS_PLACEHOLDER.distanceWeightPerMile,
+    ),
+  };
+}
 
 function rankPizzeriasForEvent(
   list: any[],
   venue: { lat: number | null; lng: number | null },
+  weights: PizzeriaWeights = PIZZERIA_WEIGHTS_PLACEHOLDER,
 ): any[] {
   const venueHasCoords =
     typeof venue.lat === 'number' &&
@@ -904,16 +949,19 @@ function rankPizzeriasForEvent(
           ? haversineKm({ lat: venue.lat as number, lng: venue.lng as number }, loc) * KM_TO_MILES
           : 0;
 
-      return { p, idx, score: rating - distanceMiles * DISTANCE_WEIGHT_PER_MILE };
+      return { p, idx, score: rating - distanceMiles * weights.distanceWeightPerMile };
     })
     .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
-    .slice(0, TOP_PIZZERIA_LIMIT)
+    .slice(0, weights.topLimit)
     .map((x) => x.p);
 }
 
 // GET /api/gpp/pizzerias - All GPP pizzerias (flattened across events)
 router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Resolve pizzeria ranking weights at entry (cached 60s in privateConfig).
+    const pizzeriaWeights = resolvePizzeriaWeights((await getScoringWeights()).pizzeria);
+
     const where: any = {
       eventType: 'gpp',
       selectedPizzerias: { not: Prisma.DbNull },
@@ -946,10 +994,11 @@ router.get('/pizzerias', async (req: Request, res: Response, next: NextFunction)
       const eventCity = party.name?.replace(/^Global Pizza Party\s*/i, '').trim() || 'Unknown';
       const eventSlug = party.customUrl || party.inviteCode;
 
-      const ranked = rankPizzeriasForEvent(raw as any[], {
-        lat: party.latitude,
-        lng: party.longitude,
-      });
+      const ranked = rankPizzeriasForEvent(
+        raw as any[],
+        { lat: party.latitude, lng: party.longitude },
+        pizzeriaWeights,
+      );
 
       for (const p of ranked) {
         // Strip heavy fields, keep photoUrl if previously cached

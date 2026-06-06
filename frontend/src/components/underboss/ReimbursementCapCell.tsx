@@ -2,13 +2,19 @@ import React, { useState } from 'react';
 import { Check, Edit2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { computeSuggestedReimbursementCap } from '../../utils/reimbursementCap';
-import { updatePartyApi, reviewReimbursementCapAppeal } from '../../lib/api';
+import { updatePartyApi, reviewReimbursementCapAppeal, type PricingConfig } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
 import { AppealHistoryModal } from './AppealHistoryModal';
 
 interface ReimbursementCapCellProps {
   event: UnderbossEvent;
   onUpdate?: (eventId: string, updates: Partial<UnderbossEvent>) => void;
+  /**
+   * Private pricing config (city tiers + reimbursement rates), loaded by the
+   * parent's `usePricingConfig`. Null while loading → no suggested cap is
+   * shown (override still allowed). marinara-71630 P5.
+   */
+  pricingConfig?: PricingConfig | null;
 }
 
 /**
@@ -23,14 +29,20 @@ interface ReimbursementCapCellProps {
  * Falls back to deriving the city from the event name (strips "Global Pizza
  * Party " prefix) when the underboss API hasn't populated `event.city` yet.
  */
-export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ event, onUpdate }) => {
+export const ReimbursementCapCell: React.FC<ReimbursementCapCellProps> = ({ event, onUpdate, pricingConfig }) => {
   const cityName = event.city
     || event.name.replace(/^Global Pizza Party\s*/i, '').trim()
     || null;
-  const { suggestedUsd, formula } = computeSuggestedReimbursementCap({
-    city: cityName,
-    expectedGuests: event.expectedGuests ?? null,
-  });
+  // No config yet (still loading) → no suggestion until it resolves.
+  const { suggestedUsd, formula } = pricingConfig
+    ? computeSuggestedReimbursementCap(
+        { city: cityName, expectedGuests: event.expectedGuests ?? null },
+        {
+          cityTiers: pricingConfig.cityTiers,
+          reimbursementCapBands: pricingConfig.reimbursementCapBands,
+        },
+      )
+    : { suggestedUsd: null, formula: 'loading pricing config…' };
   const hasSuggestion = suggestedUsd != null;
 
   const currentCap = event.reimbursementCapUsd;

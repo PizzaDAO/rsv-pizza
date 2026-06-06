@@ -5,6 +5,7 @@ import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underb
 import { AppError } from '../middleware/error.js';
 import { cityKeyFromPartyName, getGppRegionByCityKey } from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -96,6 +97,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city || '');
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
+      personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
         const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
@@ -252,6 +254,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city);
       personalizedMessage = personalizedMessage.replace(/\{hostName\}/g, hostName);
+      personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
         const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
@@ -373,7 +376,7 @@ router.post('/host-test', requireAuth, requireUnderbossAuth, async (req: Underbo
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: party.hostTelegramChatId.toString(),
-            text: message,
+            text: withBennySignature(message),
             ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
           }),
         }
@@ -452,7 +455,7 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAut
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: chatId,
-            text: message,
+            text: withBennySignature(message),
             ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
           }),
         }
@@ -471,7 +474,7 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAut
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: newChatId,
-              text: message,
+              text: withBennySignature(message),
               ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
             }),
           }

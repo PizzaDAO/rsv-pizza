@@ -16,6 +16,7 @@
  */
 import { prisma } from '../config/database.js';
 import { getGppRegionByCityKey } from '../helpers/underbossScope.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 
 const BOT_API = 'https://api.telegram.org';
 
@@ -118,7 +119,7 @@ export async function sendToCityGroup(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
+        text: withBennySignature(text),
         disable_web_page_preview: true,
         ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
       }),

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { captureTelegramGroup } from '../services/telegramGroupCapture.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ async function sendMessage(
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: chatId, text: withBennySignature(text) }),
     });
   } catch (err: any) {
     console.error('[Telegram Webhook] sendMessage failed:', err?.message || err);

@@ -10,6 +10,8 @@ import { bulkUpdateUnderbossStatus, bulkDeleteEvents, bulkUpdateEventTags } from
 import { triggerFlyerRegenForEvents } from '../flyer/autoRegenFlyer';
 import type { UnderbossEvent, UnderbossEventProgress } from '../../types';
 import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
+import { usePricingConfig } from '../../hooks/usePricingConfig';
+import { normalizeText } from '../../lib/normalizeText';
 
 interface EventTableProps {
   events: UnderbossEvent[];
@@ -36,6 +38,8 @@ const PROGRESS_FILTER_KEYS: { key: keyof UnderbossEventProgress; labelKey: strin
   { key: 'hasSocialPosts', labelKey: 'progress.social' },
   { key: 'hasThrown', labelKey: 'progress.thrown' },
   { key: 'hasEstimatedAttendance', labelKey: 'progress.estimate' },
+  { key: 'hasSubmittedReceipt', labelKey: 'progress.receipt' },
+  { key: 'hasSubmittedPaymentInfo', labelKey: 'progress.payment' },
 ];
 
 function countProgress(event: UnderbossEvent): number {
@@ -93,6 +97,8 @@ function FilterPill({
 
 export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, onTelegramBroadcast, partnerTags = [], onFilteredEventsChange, isAdmin }: EventTableProps) {
   const { t } = useTranslation('partner');
+  // Private pricing config for the sponsorship-suggestion banner (marinara-71630 P5).
+  const { config: pricingConfig } = usePricingConfig();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -162,16 +168,16 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
     let result = events;
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = normalizeText(search);
       result = result.filter(
         (e) =>
-          e.name.toLowerCase().includes(q) ||
-          e.host.name?.toLowerCase().includes(q) ||
-          e.host.email?.toLowerCase().includes(q) ||
-          e.address?.toLowerCase().includes(q) ||
-          e.venueName?.toLowerCase().includes(q) ||
-          e.country?.toLowerCase().includes(q) ||
-          e.region?.toLowerCase().includes(q)
+          normalizeText(e.name).includes(q) ||
+          normalizeText(e.host.name).includes(q) ||
+          normalizeText(e.host.email).includes(q) ||
+          normalizeText(e.address).includes(q) ||
+          normalizeText(e.venueName).includes(q) ||
+          normalizeText(e.country).includes(q) ||
+          normalizeText(e.region).includes(q)
       );
     }
 
@@ -280,8 +286,10 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
 
   const sponsorshipSuggestion = useMemo(() => {
     if (tagFilter === 'all' || filteredEvents.length === 0) return null;
-    return calculateTagSponsorshipTotal(filteredEvents);
-  }, [tagFilter, filteredEvents]);
+    // Hold the banner until the pricing config loads — avoids flashing a $0 total.
+    if (!pricingConfig) return null;
+    return calculateTagSponsorshipTotal(filteredEvents, pricingConfig);
+  }, [tagFilter, filteredEvents, pricingConfig]);
 
   function toggleSelectAll() {
     if (selectedIds.size === filteredEvents.length) {
@@ -643,7 +651,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.addTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'add' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {['review', 'swc', 'Global Pizza Party'].map((tag) => (
                           <button
                             key={tag}
@@ -722,7 +730,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                       {t('eventTable.removeTag')} &rarr;
                     </button>
                     {showTagSubmenu === 'remove' && (
-                      <div className="absolute left-full top-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
+                      <div className="absolute left-full bottom-0 ml-1 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[160px]">
                         {/* Show tags that exist on selected events */}
                         {(() => {
                           const selectedEvents = events.filter(e => selectedIds.has(e.id));
@@ -801,7 +809,7 @@ export function EventTable({ events, showRegion, onEventUpdate, onBulkAction, on
                   } catch (err) { console.error('Bulk delete failed', err); }
                   setBulkLoading(false);
                 }}
-                className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors"
+                className="px-4 py-2 text-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-500/30 transition-colors"
               >
                 {t('eventTable.deleteEvents', { count: selectedIds.size })}
               </button>

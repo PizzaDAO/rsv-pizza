@@ -38,12 +38,69 @@ import {
   scoreEvent,
   buildSybilWalletSet,
   tierFromScore,
+  resolveScoring,
+  resolveWeights,
   WEIGHTS,
+  PLACEHOLDER_TIERS,
   type FakeDetectionGuest,
   type FakeDetectionParty,
   type FakeDetectionLinkClick,
   type FakeDetectionFunnelEvent,
+  type ResolvedScoring,
 } from './fakeDetection.js';
+
+// ============================================
+// Scoring fixture (marinara-71630 P3)
+//
+// The real production weights/tiers are SECRET and live only in private
+// `app_config`; they are intentionally NOT in source (committed `WEIGHTS` is an
+// all-zero placeholder) and NOT here. These TEST values are SYNTHETIC fixtures
+// (not the production numbers) chosen only to drive the scorer deterministically:
+// every non-checkin heuristic gets a uniform 9 (so the padded "Ilemela" fixture
+// saturates ≥70) and every checkin heuristic gets 16 (so the 4-flag
+// attendance-fraud roster sums ≥60 → 'high'). The canonical 60/30/10 tier
+// thresholds are reproduced for the boundary assertions.
+// ============================================
+
+const TEST_TIERS = { high: 60, medium: 30, low: 10 };
+
+const SYNTH_W = 9; // synthetic weight for every non-checkin heuristic
+const SYNTH_CHECKIN_W = 16; // synthetic weight for every check-in heuristic
+
+const TEST_WEIGHTS: Record<keyof typeof WEIGHTS, number> = {
+  cap_fill_no_waitlist: SYNTH_W,
+  low_domain_entropy: SYNTH_W,
+  wallet_too_low: SYNTH_W,
+  wallet_too_high_reuse: SYNTH_W,
+  wallet_reuse: SYNTH_W,
+  host_self_rsvp_mismatch: SYNTH_W,
+  pizzeria_fields_blank: SYNTH_W,
+  wallet_source_all_null: SYNTH_W,
+  one_word_name: SYNTH_W,
+  firstname_digits_email: SYNTH_W,
+  day_gap_pattern: SYNTH_W,
+  low_hour_entropy: SYNTH_W,
+  rapid_intersubmission: SYNTH_W,
+  cross_event_wallet: SYNTH_W,
+  low_funnel_coverage: SYNTH_W,
+  high_per_visitor_rsvp_saturation: SYNTH_W,
+  mailing_list_opt_in_extreme: SYNTH_W,
+  name_token_zscore: SYNTH_W,
+  lsh_field_sig_cluster: SYNTH_W,
+  email_digit_benford: SYNTH_W,
+  co_host_twitter_handles_missing: SYNTH_W,
+  repeat_session_rsvp_count: SYNTH_W,
+  high_bounce_rate: SYNTH_W,
+  checkin_velocity_superhuman: SYNTH_CHECKIN_W,
+  checkin_timestamp_collapse: SYNTH_CHECKIN_W,
+  single_checker_dominance: SYNTH_CHECKIN_W,
+  checkin_ratio_extreme: SYNTH_CHECKIN_W,
+};
+
+const TEST_SCORING: ResolvedScoring = resolveScoring({
+  weights: TEST_WEIGHTS,
+  tiers: TEST_TIERS,
+});
 
 // ============================================
 // Fixture helpers
@@ -1082,15 +1139,91 @@ describe('buildSybilWalletSet', () => {
 });
 
 describe('tierFromScore', () => {
-  it('maps scores to tiers', () => {
-    expect(tierFromScore(0)).toBe('clean');
-    expect(tierFromScore(9)).toBe('clean');
-    expect(tierFromScore(10)).toBe('low');
-    expect(tierFromScore(29)).toBe('low');
-    expect(tierFromScore(30)).toBe('medium');
-    expect(tierFromScore(59)).toBe('medium');
-    expect(tierFromScore(60)).toBe('high');
-    expect(tierFromScore(100)).toBe('high');
+  it('maps scores to tiers using the resolved (injected) thresholds', () => {
+    const t = TEST_TIERS;
+    expect(tierFromScore(0, t)).toBe('clean');
+    expect(tierFromScore(9, t)).toBe('clean');
+    expect(tierFromScore(10, t)).toBe('low');
+    expect(tierFromScore(29, t)).toBe('low');
+    expect(tierFromScore(30, t)).toBe('medium');
+    expect(tierFromScore(59, t)).toBe('medium');
+    expect(tierFromScore(60, t)).toBe('high');
+    expect(tierFromScore(100, t)).toBe('high');
+  });
+
+  it('honours arbitrary config-provided thresholds', () => {
+    const tiers = { high: 90, medium: 50, low: 20 };
+    expect(tierFromScore(19, tiers)).toBe('clean');
+    expect(tierFromScore(20, tiers)).toBe('low');
+    expect(tierFromScore(50, tiers)).toBe('medium');
+    expect(tierFromScore(89, tiers)).toBe('medium');
+    expect(tierFromScore(90, tiers)).toBe('high');
+  });
+});
+
+describe('resolveWeights / resolveScoring (marinara-71630 P3)', () => {
+  it('merges config weights over the all-zero placeholder', () => {
+    const w = resolveWeights({ cap_fill_no_waitlist: 42 });
+    expect(w.cap_fill_no_waitlist).toBe(42);
+    // Unspecified keys fall back to the placeholder (0).
+    expect(w.high_bounce_rate).toBe(0);
+  });
+
+  it('ignores unknown keys and non-finite values', () => {
+    const w = resolveWeights({
+      not_a_real_heuristic: 99,
+      cap_fill_no_waitlist: Number.NaN,
+    } as Record<string, number>);
+    expect((w as Record<string, number>).not_a_real_heuristic).toBeUndefined();
+    expect(w.cap_fill_no_waitlist).toBe(0); // NaN rejected → placeholder
+  });
+
+  it('falls back to all-zero placeholder weights + tiers when config is empty', () => {
+    const s = resolveScoring({ weights: {}, tiers: {} });
+    expect(s.tiers).toEqual(PLACEHOLDER_TIERS);
+    expect(Object.values(s.weights).every(v => v === 0)).toBe(true);
+  });
+
+  it('falls back to placeholder when config is entirely absent', () => {
+    const s = resolveScoring(undefined);
+    expect(s.tiers).toEqual(PLACEHOLDER_TIERS);
+    expect(Object.values(s.weights).every(v => v === 0)).toBe(true);
+  });
+});
+
+describe('scoreEvent — config-absent fallback (marinara-71630 P3)', () => {
+  it('scores 0 / clean and does not throw when no scoring config is injected', () => {
+    const party = makeParty();
+    // A roster that WOULD fire several flags under real weights.
+    const guests = fraudCheckinRoster(60, 30, 'host-1');
+    // No `scoring` arg → defaults to the committed all-zero placeholder.
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    // Flags may fire, but every weight is the placeholder 0 → score 0 → clean.
+    expect(row.score).toBe(0);
+    expect(row.tier).toBe('clean');
+  });
+
+  it('produces the expected weighted score + tier when config is injected', () => {
+    const party = makeParty();
+    const guests = fraudCheckinRoster(60, 30, 'host-1'); // fires all 4 checkin flags
+    const row = scoreEvent(
+      party,
+      guests,
+      [],
+      new Set(),
+      party.maxGuests,
+      [],
+      TEST_SCORING,
+    );
+    const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
+    const expected = Math.min(
+      100,
+      firedIds.reduce((s, id) => s + TEST_WEIGHTS[id as keyof typeof WEIGHTS], 0),
+    );
+    expect(row.score).toBe(expected);
+    expect(row.tier).toBe(tierFromScore(expected, TEST_TIERS));
+    // Sanity: the attendance-fraud roster tiers 'high' under the test thresholds.
+    expect(row.tier).toBe('high');
   });
 });
 
@@ -1148,7 +1281,7 @@ describe('scoreEvent — integration fixtures', () => {
       makeFunnelEvent({ visitorHash: 'v3', step: 'rsvp_opened', createdAt: new Date(base) }),
       makeFunnelEvent({ visitorHash: 'v4', step: 'rsvp_opened', createdAt: new Date(base) }),
     ];
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel);
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel, TEST_SCORING);
     // Should fire: cap_fill, low_domain_entropy, wallet_too_low, host_self,
     // pizzeria_blank, wallet_source_null, one_word_name, firstname_digits,
     // low_hour_entropy, rapid_intersubmission, low_funnel_coverage,
@@ -1223,7 +1356,7 @@ describe('scoreEvent — integration fixtures', () => {
         createdAt: new Date(base + i * 3600000 * 4),
       }),
     );
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel);
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, funnel, TEST_SCORING);
     expect(row.score).toBeLessThanOrEqual(10);
     expect(row.tier === 'clean' || row.tier === 'low').toBe(true);
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
@@ -1370,21 +1503,21 @@ describe('scoreEvent — check-in heuristics integration', () => {
     const party = makeParty();
     // 60 guests all checked in within ~30s by one host → ratio 100%.
     const guests = fraudCheckinRoster(60, 30, 'host-1');
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, [], TEST_SCORING);
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).toContain('checkin_velocity_superhuman');
     expect(firedIds).toContain('checkin_timestamp_collapse');
     expect(firedIds).toContain('single_checker_dominance');
     expect(firedIds).toContain('checkin_ratio_extreme');
     expect(row.score).toBeGreaterThanOrEqual(
-      WEIGHTS.checkin_velocity_superhuman + WEIGHTS.checkin_ratio_extreme,
+      TEST_WEIGHTS.checkin_velocity_superhuman + TEST_WEIGHTS.checkin_ratio_extreme,
     );
   });
 
   it('healthy roster fires none of the check-in flags', () => {
     const party = makeParty();
     const guests = healthyCheckinRoster(50, 30);
-    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests);
+    const row = scoreEvent(party, guests, [], new Set(), party.maxGuests, [], TEST_SCORING);
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).not.toContain('checkin_velocity_superhuman');
     expect(firedIds).not.toContain('checkin_timestamp_collapse');

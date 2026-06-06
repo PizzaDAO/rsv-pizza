@@ -16,6 +16,7 @@
  * skipped (Mercury already emails the host their card details).
  */
 import { prisma } from '../config/database.js';
+import { withBennySignature } from '../lib/bennySignature.js';
 
 const BOT_API = 'https://api.telegram.org';
 
@@ -69,7 +70,7 @@ export async function notifyHostOfPaymentExecution(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId.toString(),
-        text,
+        text: withBennySignature(text),
         parse_mode: 'Markdown',
         disable_web_page_preview: true,
       }),

@@ -268,6 +268,8 @@ export interface Party {
   maxGuests: number | null;
   expectedGuests?: number | null;
   estimatedAttendance?: number | null;
+  targetAttendance?: number | null;
+  expectedAttendance?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
   password?: string | null;
@@ -316,6 +318,7 @@ export interface Party {
   donationRecipient?: string | null;
   donationRecipientUrl?: string | null;
   donationEthAddress?: string | null;
+  donationAmountsPublic?: boolean;
   pinnedApps?: string[];
   region?: string | null;
   flyerGeneratedAt?: string | null;
@@ -402,10 +405,17 @@ export interface DonationPublicStats {
   recipientUrl?: string | null;
   suggestedAmounts?: number[];
   donationEthAddress?: string | null;
+  amountsPublic?: boolean;
   recentDonors?: {
     name: string | null;
     message: string | null;
     createdAt: string;
+  }[];
+  donors?: {
+    displayName: string;
+    amount: number | null;
+    message: string | null;
+    avatarUrl: string | null;
   }[];
 }
 
@@ -1107,6 +1117,8 @@ export interface UnderbossEventProgress {
   hasSocialPosts: boolean;
   hasThrown: boolean;
   hasEstimatedAttendance: boolean;
+  hasSubmittedReceipt: boolean;
+  hasSubmittedPaymentInfo: boolean;
 }
 
 export interface UnderbossEvent {
@@ -2170,7 +2182,22 @@ export interface AdminPayoutFilters {
     // coppa-92106: order by actual paid_at timestamp for the Payments-ledger
     // view ("show me every payment that actually went out, newest first").
     | 'paid_at_desc'
-    | 'paid_at_asc';
+    | 'paid_at_asc'
+    // stracci-58471: column-header sorts for the by-city table. All applied
+    // client-side in PaymentsAdminPage (the backend has no name/approved/paid/
+    // outstanding sort), so the client-side reorder wins over its activity order.
+    //  • name_*        — event/city name (A–Z / Z–A)
+    //  • approved_*    — Approved column total
+    //  • paid_*        — Paid column total
+    //  • outstanding_* — Outstanding column total
+    | 'name_asc'
+    | 'name_desc'
+    | 'approved_asc'
+    | 'approved_desc'
+    | 'paid_asc'
+    | 'paid_desc'
+    | 'outstanding_asc'
+    | 'outstanding_desc';
   /**
    * coppa-92106: when true, the backend applies the prosciutto-92106
    * "has proof of send" predicate so only proven payments
@@ -2193,6 +2220,12 @@ export interface AdminPayoutFilters {
    * (bottarga-92104). By-city endpoint only, like hideClosed. Default true.
    */
   hideScams?: boolean;
+  /**
+   * provatura-92107: hide US cities (party.region === 'usa') from the by-city
+   * /payments admin queue. Client-side filter, admin dashboard only (not
+   * regional portals). Default true.
+   */
+  hideUsCities?: boolean;
 }
 
 export interface AdminPayoutTotals {

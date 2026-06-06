@@ -36,7 +36,9 @@
     "partners": "Partner",
     "social": "Social",
     "thrown": "Durchgeführt",
-    "estimate": "Schätzung"
+    "estimate": "Schätzung",
+    "receipt": "Beleg",
+    "payment": "Zahlungsdaten"
   },
   "eventCard": {
     "hostedBy": "Veranstaltet von {{name}}",
@@ -110,11 +112,11 @@
     "deselectAll": "Alle abwählen",
     "noEventsSelected": "Keine Events ausgewählt",
     "cancelEventsTitle": "Events absagen?",
-    "cancelEventsDesc": "Dies löscht {{count}} Event dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
-    "cancelEventsDesc_other": "Dies löscht {{count}} Events dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "cancelEventsDesc": "Dies sagt {{count}} Event ab. Die öffentliche Seite bleibt mit einem Hinweis \"abgesagt\" online, RSVPs werden pausiert, und du kannst es jederzeit wieder aktivieren.",
+    "cancelEventsDesc_other": "Dies sagt {{count}} Events ab. Die öffentlichen Seiten bleiben mit einem Hinweis \"abgesagt\" online, RSVPs werden pausiert, und du kannst sie jederzeit wieder aktivieren.",
     "keepEvents": "Events behalten",
-    "deleteEvents": "{{count}} Event löschen",
-    "deleteEvents_other": "{{count}} Events löschen",
+    "deleteEvents": "{{count}} Event absagen",
+    "deleteEvents_other": "{{count}} Events absagen",
     "copyCitiesTitle": "Städte kopieren ({{count}} ausgewählt)",
     "copyToClipboard": "In Zwischenablage kopieren",
     "copied": "Kopiert!",

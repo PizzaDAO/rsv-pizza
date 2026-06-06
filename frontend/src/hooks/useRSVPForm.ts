@@ -193,22 +193,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [showRegionalOptinAbModal, setShowRegionalOptinAbModal] = useState(false);
 
   useEffect(() => {
-    if (optinAbVariant !== null) return; // preservation path already set
+    if (optinAbVariant !== null) return; // preserve existing-guest bucket if any
     if (!activeRegionConfig) return;     // not an SWC event
-    // pizzaiolo-63884: pilot mode — only events explicitly tagged 'optin-ab-test'
-    // participate in the experiment, even when the region's kill-switch flag is ON.
-    // Remove this gate (or remove the tag from each pilot event) to fan out to all
-    // region-tagged events.
-    const tags = eventData.eventTags || [];
-    if (!tags.includes('optin-ab-test')) return;
-    let cancelled = false;
-    (async () => {
-      const enabled = await getExperimentFlag(activeRegionConfig.flagKey);
-      if (cancelled) return;
-      if (!enabled) return;
-      setOptinAbVariant(Math.random() < 0.5 ? 'control' : 'variant');
-    })();
-    return () => { cancelled = true; };
+    // rigatoni-72401: A/B test concluded — every SWC event ships the combined checkbox.
+    // Kill-switch flag + pilot tag remain in DB for emergency rollback, but no longer gate the UI.
+    setOptinAbVariant('variant');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,77 +1,66 @@
 import type { UnderbossEvent } from '../types';
+import type { PricingConfig } from '../lib/api';
 
-/** Tier 1 — top global cities (max $1,000) */
-const TIER_1_CITIES = [
-  // Americas
-  'new york', 'nyc', 'los angeles', 'san francisco', 'chicago', 'miami',
-  // Europe
-  'london', 'paris',
-  // Asia-Pacific
-  'tokyo', 'singapore', 'hong kong', 'seoul', 'sydney', 'dubai',
-  'shanghai', 'beijing', 'shenzhen',
-  // Local name variants
-  'istanbul', 'İstanbul',
-  // India mega-cities
-  'delhi', 'new delhi', 'mumbai',
-];
+/**
+ * Sponsorship pricing (marinara-71630 P5).
+ *
+ * The private city-tier lists and the sponsorship dollar tiers (per-tier
+ * floor/ceiling/max, the base price, and the rounding increment) USED to be
+ * hardcoded here. They are now sourced at runtime from GET /api/config/pricing
+ * (see `usePricingConfig`) so they no longer live in the open-source bundle.
+ * The (non-secret) FORMULAS stay here — these functions take the resolved
+ * config as a parameter and reproduce the original math exactly given the
+ * seeded numbers.
+ */
 
-/** Tier 2 — major cities (max $500) */
-const TIER_2_CITIES = [
-  // US
-  'boston', 'washington', 'denver', 'seattle', 'austin', 'dallas', 'houston', 'atlanta', 'philadelphia',
-  'san diego', 'las vegas', 'phoenix', 'nashville', 'minneapolis', 'detroit', 'portland',
-  'kansas city', 'st. louis', 'salt lake city', 'pittsburgh', 'san juan', 'honolulu',
-  'raleigh', 'cleveland', 'cincinnati', 'milwaukee', 'memphis', 'jacksonville', 'omaha',
-  // Canada
-  'toronto', 'vancouver', 'calgary', 'edmonton', 'ottawa', 'montreal', 'winnipeg',
-  // Latin America
-  'mexico city', 'monterrey', 'sao paulo', 'rio de janeiro', 'buenos aires', 'bogota', 'bogotá',
-  'lima', 'santiago', 'medellin', 'medellín', 'caracas', 'quito',
-  // Europe
-  'berlin', 'amsterdam', 'barcelona', 'lisbon', 'milan', 'munich', 'hamburg', 'rome', 'roma',
-  'vienna', 'wien', 'prague', 'warsaw', 'warszawa', 'budapest', 'dublin', 'copenhagen',
-  'stockholm', 'oslo', 'zurich', 'brussels', 'athens', 'helsinki', 'bucharest',
-  'zagreb', 'ljubljana', 'gothenburg', 'tallinn', 'naples', 'moscow',
-  // Asia
-  'melbourne', 'bangkok', 'kuala lumpur', 'ho chi minh', 'hanoi', 'doha', 'beirut',
-  'chennai', 'kolkata', 'hyderabad', 'bangalore', 'pune', 'colombo', 'kathmandu',
-  // Africa
-  'lagos', 'nairobi', 'johannesburg', 'kampala', 'dar es salaam', 'accra', 'addis ababa',
-  'kigali', 'cape town',
-  // Oceania
-  'perth', 'gold coast', 'auckland', 'wellington',
-];
+export type CityTiers = PricingConfig['cityTiers'];
+export type SponsorshipPricing = PricingConfig['sponsorshipPricing'];
 
-const TIER_CONFIG: Record<1 | 2 | 3, { floor: number; ceiling: number; max: number }> = {
-  1: { floor: 25, ceiling: 150, max: 1000 },
-  2: { floor: 25, ceiling: 100, max: 500 },
-  3: { floor: 35, ceiling: 150, max: 400 },
-};
-
+/** Normalize + substring-match a city name against a list (drops spaces/hyphens). */
 function matchesList(cityName: string, list: string[]): boolean {
   const normalized = cityName.toLowerCase().replace(/[-\s]/g, '');
   return list.some((c) => normalized.includes(c.replace(/[-\s]/g, '')));
 }
 
-export function getCityTier(cityName: string): 1 | 2 | 3 {
-  if (matchesList(cityName, TIER_1_CITIES)) return 1;
-  if (matchesList(cityName, TIER_2_CITIES)) return 2;
+/**
+ * Resolve a city's tier from the configured tier-1/tier-2 lists. Anything not
+ * matched (including empty lists) is tier 3.
+ */
+export function getCityTier(cityName: string, cityTiers: CityTiers): 1 | 2 | 3 {
+  if (matchesList(cityName, cityTiers.tier1)) return 1;
+  if (matchesList(cityName, cityTiers.tier2)) return 2;
   return 3;
 }
 
 /**
  * Calculate the sponsorship price for a single event.
- * Tier 1: $200 (≤25 guests) → $1,000 (150+ guests)
- * Tier 2: $200 (≤25 guests) → $500 (100+ guests)
- * Tier 3: $200 (≤35 guests) → $300 (100+ guests)
- * Rounded to nearest $50.
+ *
+ * price = base + ((clamp(guests, floor, ceiling) - floor) / (ceiling - floor))
+ *               * (max - base), rounded to the nearest `roundTo`.
+ *
+ * Tier bands (floor/ceiling/max), the `base`, and `roundTo` all come from the
+ * resolved config. A tier with no config entry (e.g. unseeded config → empty
+ * tierConfig) yields 0 so consumers can render a placeholder instead of a
+ * bogus number.
  */
-export function calculateEventPrice(guests: number, cityName: string): number {
-  const tier = getCityTier(cityName);
-  const { floor, ceiling, max } = TIER_CONFIG[tier];
+export function calculateEventPrice(
+  guests: number,
+  cityName: string,
+  config: { cityTiers: CityTiers; sponsorshipPricing: SponsorshipPricing }
+): number {
+  const tier = getCityTier(cityName, config.cityTiers);
+  const { tierConfig, base, roundTo } = config.sponsorshipPricing;
+  const band = tierConfig[String(tier)];
+  // No band configured for this tier (unseeded / partial config) → no price.
+  if (!band) return 0;
+  const { floor, ceiling, max } = band;
+  // Guard a degenerate band (ceiling === floor) to avoid divide-by-zero.
+  const span = ceiling - floor;
   const clamped = Math.max(floor, Math.min(ceiling, guests));
-  const price = 200 + ((clamped - floor) / (ceiling - floor)) * (max - 200);
-  return Math.round(price / 50) * 50;
+  const ratio = span === 0 ? 0 : (clamped - floor) / span;
+  const price = base + ratio * (max - base);
+  const increment = roundTo > 0 ? roundTo : 1;
+  return Math.round(price / increment) * increment;
 }
 
 /**
@@ -80,7 +69,8 @@ export function calculateEventPrice(guests: number, cityName: string): number {
  * Uses expectedGuests if available, falls back to guestCount, defaults to 30.
  */
 export function calculateTagSponsorshipTotal(
-  events: UnderbossEvent[]
+  events: UnderbossEvent[],
+  config: { cityTiers: CityTiers; sponsorshipPricing: SponsorshipPricing }
 ): { total: number; eventCount: number; missingExpectedGuests: number } {
   const prefix = 'Global Pizza Party ';
   let total = 0;
@@ -92,7 +82,7 @@ export function calculateTagSponsorshipTotal(
       : event.name;
     if (event.expectedGuests == null) missingExpectedGuests++;
     const guests = event.expectedGuests ?? event.guestCount ?? 30;
-    total += calculateEventPrice(guests, cityName);
+    total += calculateEventPrice(guests, cityName, config);
   }
 
   return { total, eventCount: events.length, missingExpectedGuests };

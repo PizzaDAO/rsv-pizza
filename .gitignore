@@ -29,6 +29,9 @@ dist-ssr
 backend/prisma/*.db
 backend/prisma/migrations/*.sql
 
+# Private config — real values seeded to app_config, never committed (marinara-71630)
+backend/src/config/seed.private.json
+
 .vercel
 .env*.local
 
