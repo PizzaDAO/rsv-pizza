@@ -12,6 +12,7 @@
  */
 
 import type { ReimbursementOption, ReimbursementRules, CountryRule } from './privateConfig.js';
+import { isMercuryBlocked } from './mercuryBlockedCountries.js';
 
 /** A fully-resolved option ready to send to the frontend. */
 export interface ResolvedOption {
@@ -94,4 +95,41 @@ export function resolveReimbursementOptions(
     });
   }
   return out;
+}
+
+/**
+ * Resolve a party's reimbursement options WITH the compliance Mercury-block
+ * layer applied — the single source of truth shared by:
+ *   - `GET /api/parties/:id/reimbursement-options` (what the host picker sees), and
+ *   - the `PATCH /api/user/me` save-path gate (marinara-71630 P7b), which
+ *     rejects persisting a method this resolver reports as absent/disabled.
+ *
+ * Keeping both behind this helper guarantees the DECIDE path (GET) and the
+ * ENFORCE path (save) can't drift.
+ *
+ * The config resolver (`resolveReimbursementOptions`) matches country EXACTLY,
+ * but the Mercury sanctions gate must NORMALIZE (lowercase / strip
+ * parentheticals) so casing/parenthetical variants of a blocked country are
+ * still blocked. The sanctions list is compliance, not a private business
+ * secret, so it stays in code (`isMercuryBlocked`) and is layered over the
+ * config-resolved options here rather than encoded into `app_config`. Only the
+ * `mercury_card` entry is mutated, and only when it's present.
+ *
+ * Never throws. An empty/unseeded config yields `[]` (callers fail OPEN).
+ */
+export function resolvePartyReimbursementOptions(
+  party: ResolverParty,
+  rules: ReimbursementRules
+): ResolvedOption[] {
+  const options = resolveReimbursementOptions(party, rules);
+
+  if (isMercuryBlocked(party.country)) {
+    const mercury = options.find((o) => o.id === 'mercury_card');
+    if (mercury) {
+      mercury.enabled = false;
+      mercury.disabledReason = `Mercury cards are unavailable in ${party.country ?? 'your country'} due to compliance restrictions.`;
+    }
+  }
+
+  return options;
 }

@@ -894,7 +894,7 @@ export function EventPage() {
               )}
 
               {/* Host Button - Desktop */}
-              {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com' || canEditAsCoHost) && (
+              {user && (user.id === event.userId || user.isSuperAdmin || canEditAsCoHost) && (
                 <div className="p-4 border-t border-theme-stroke">
                   <button
                     onClick={handleEditEvent}
@@ -1012,7 +1012,7 @@ export function EventPage() {
                 )}
 
                 {/* Host Button - Mobile */}
-                {user && (user.id === event.userId || user.email?.toLowerCase() === 'hello@rarepizzas.com' || canEditAsCoHost) && (
+                {user && (user.id === event.userId || user.isSuperAdmin || canEditAsCoHost) && (
                   <div className="p-4 border-b border-theme-stroke">
                     <button
                       onClick={handleEditEvent}

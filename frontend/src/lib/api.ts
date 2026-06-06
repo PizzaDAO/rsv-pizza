@@ -6283,6 +6283,9 @@ export interface UpdateUserMeInput {
   preferredPayoutMethod?: PayoutMethod | null;
   payoutWalletAddress?: string | null;
   payoutBankDetails?: BankDetails | null;
+  // marinara-71630 P7b: party in scope so the backend can hard-enforce
+  // party-scoped reimbursement-option gating on this save path.
+  partyId?: string;
 }
 
 /**

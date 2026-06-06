@@ -156,6 +156,11 @@ export const PaymentDetailsCard: React.FC = () => {
       preferredPayoutMethod: method,
       payoutWalletAddress: method === 'usdc_base' ? walletAddress.trim() : null,
       payoutBankDetails: method === 'wire' ? bankDetails : null,
+      // marinara-71630 P7b: include the party in scope so the backend can
+      // hard-enforce party-scoped reimbursement-option gating on the save path
+      // (rejects e.g. mercury_card for a Mercury-blocked country). Omitted when
+      // there's no party (legacy/global save) — the backend then skips the gate.
+      ...(party?.id ? { partyId: party.id } : {}),
     };
   };
 

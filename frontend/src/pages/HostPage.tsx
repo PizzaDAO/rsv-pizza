@@ -45,9 +45,6 @@ import { GPPDashboardTab, GPP27DashboardTab } from '../components/gpp-dashboard'
 import { PayoutsTab } from '../components/payouts';
 import { DayOfTab } from '../components/day-of';
 
-// Super admin email that can edit any party
-const SUPER_ADMIN_EMAIL = 'hello@rarepizzas.com';
-
 type TabType = 'dashboard' | 'party-guide' | 'details' | 'venue' | 'pizza' | 'guests' | 'photos' | 'partners' | 'music' | 'report' | 'staff' | 'displays' | 'raffle' | 'budget' | 'checklist' | 'survey' | 'gpp' | 'promo' | 'flyer' | 'print' | 'payments' | 'apps';
 
 const ALL_VALID_TABS: TabType[] = ['dashboard', 'party-guide', 'details', 'venue', 'pizza', 'guests', 'photos', 'partners', 'music', 'report', 'staff', 'displays', 'raffle', 'budget', 'checklist', 'survey', 'gpp', 'promo', 'flyer', 'print', 'payments', 'apps'];
@@ -73,7 +70,7 @@ function HostPageContent() {
 
   const canEdit = useMemo(() => {
     if (!party || !user) return false;
-    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+    if (user.isSuperAdmin) return true;
     if (party.userId === user.id) return true;
     if (party.canEdit) return true; // Backend already verified co-host permissions
     return false;
@@ -97,7 +94,7 @@ function HostPageContent() {
   // Determine if this user is the owner or super admin (full access)
   const isOwnerOrAdmin = useMemo(() => {
     if (!party || !user) return false;
-    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+    if (user.isSuperAdmin) return true;
     if (party.userId === user.id) return true;
     return false;
   }, [party, user]);
