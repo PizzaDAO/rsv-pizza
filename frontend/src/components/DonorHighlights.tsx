@@ -54,7 +54,7 @@ export const DonorHighlights: React.FC<DonorHighlightsProps> = ({ stats }) => {
               );
             })}
             {moreCount > 0 && (
-              <span className="text-theme-text-muted">, {t('moreSupporters', { count: moreCount })}</span>
+              <span className="text-theme-text-muted"> {t('moreSupporters', { count: moreCount })}</span>
             )}
           </span>
         </div>
