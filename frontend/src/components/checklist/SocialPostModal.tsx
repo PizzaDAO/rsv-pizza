@@ -56,11 +56,7 @@ const RECAP_ADJECTIVES = [
   'great',
   'awesome',
   'a blast',
-  'incredible',
   'epic',
-  'unforgettable',
-  'legendary',
-  'delicious',
 ];
 
 function buildDefaultText(party: Party): string {
