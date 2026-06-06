@@ -2221,6 +2221,35 @@ model ImageAuthenticityCheck {
   @@map("image_authenticity_checks")
 }
 
+// guanciale-58491: audit log for host-DM (and city-group) broadcasts sent from
+// the /underboss Telegram broadcast tool. Each row records who sent a broadcast,
+// the message, the resolved counts (sent / failed / emailed), and the per-host
+// results. The `id` doubles as the client-minted `broadcastId` double-send guard:
+// the host-broadcast endpoint short-circuits if a row with the supplied id
+// already exists. Migration applied to prod manually before merge.
+model TelegramBroadcastLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  // Caller identity (from req.underboss).
+  actorEmail    String   @map("actor_email")
+  // 'admin' | 'underboss'
+  actorKind     String   @map("actor_kind")
+  // Logical channel, e.g. "host_dm".
+  channel       String
+  message       String
+  // How many recipients the broadcast targeted.
+  audienceCount Int      @map("audience_count")
+  sentCount     Int      @map("sent_count")
+  failedCount   Int      @map("failed_count")
+  // How many "not connected" hosts got the message text via email fallback.
+  emailedCount  Int      @default(0) @map("emailed_count")
+  // Per-recipient results blob (same shape as the endpoint response).
+  results       Json
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt(sort: Desc)])
+  @@map("telegram_broadcast_log")
+}
+
 // montanara-58497: per-account saved filter views for the /payments + /underboss
 // admin dashboards. Keyed by the caller's auth email (lowercased) — no FK to
 // User. `params` is the serialized URL query string (page-agnostic) produced by

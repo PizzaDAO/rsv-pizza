@@ -383,6 +383,14 @@
     "formatMarkdown": "Markdown",
     "sent": "Sent",
     "failed": "Failed",
+    "emailed": "Emailed",
+    "coverage": {
+      "summary": "{{linked}} of {{total}} hosts linked to Telegram",
+      "unlinkedDetail": "{{withHandle}} have a TG handle but no bot link · {{noHandle}} have neither",
+      "inviteButton": "Email deeplink to {{count}} unlinked host",
+      "inviteButton_other": "Email deeplink to {{count}} unlinked hosts",
+      "inviteResult": "Emailed {{emailed}} hosts · {{noEmail}} had no email on file"
+    },
     "searchPlaceholder": "Search city, country, or underboss...",
     "regionAll": "All Regions",
     "noGroupsMatch": "No groups match your search",

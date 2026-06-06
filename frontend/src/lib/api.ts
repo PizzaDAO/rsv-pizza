@@ -3727,6 +3727,61 @@ export interface BroadcastResponse {
   results: BroadcastResult[];
   sent: number;
   failed: number;
+  // guanciale-58491: how many not-connected hosts got the message via email
+  // fallback (present on host-broadcast responses only).
+  emailed?: number;
+  // guanciale-58491: true when a broadcastId matched an existing log row and the
+  // send was short-circuited (double-send guard).
+  duplicate?: boolean;
+}
+
+// guanciale-58491: host-DM coverage report over the in-scope GPP audience.
+export interface HostCoverageUnlinked {
+  partyId: string;
+  city: string;
+  hostName: string | null;
+  hostEmail: string | null;
+  hostTelegram: string | null;
+}
+
+export interface HostCoverageResponse {
+  total: number;
+  linked: number;
+  unlinked: number;
+  hasHandleNoChat: number;
+  noHandleNoChat: number;
+  unlinkedHosts: HostCoverageUnlinked[];
+}
+
+// guanciale-58491: a linked host in the in-scope audience (for "All hosts").
+export interface HostAudienceRow {
+  partyId: string;
+  city: string;
+  hostName: string | null;
+  hostTelegram: string | null;
+  connected: boolean;
+}
+
+export async function fetchHostCoverage(): Promise<HostCoverageResponse> {
+  return apiRequest<HostCoverageResponse>('/api/underboss/telegram/host-coverage', {
+    method: 'GET',
+  });
+}
+
+export async function inviteUnlinkedHosts(): Promise<{
+  emailed: number;
+  skipped: number;
+  noEmail: number;
+}> {
+  return apiRequest('/api/underboss/telegram/invite-unlinked', { method: 'POST' });
+}
+
+export async function fetchHostAudience(): Promise<HostAudienceRow[]> {
+  const res = await apiRequest<{ hosts: HostAudienceRow[] }>(
+    '/api/underboss/telegram/host-audience',
+    { method: 'GET' },
+  );
+  return res.hosts;
 }
 
 export async function sendTelegramBroadcast(
@@ -3766,11 +3821,13 @@ export async function sendHostTelegramBroadcast(
   message: string,
   parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
   // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
-  appTab: string | null = null
+  appTab: string | null = null,
+  // guanciale-58491: client-minted UUID double-send guard (null = none).
+  broadcastId: string | null = null
 ): Promise<BroadcastResponse> {
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
     method: 'POST',
-    body: { hosts, message, parseMode, appTab },
+    body: { hosts, message, parseMode, appTab, broadcastId },
   });
 }
 
