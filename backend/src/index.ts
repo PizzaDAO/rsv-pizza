@@ -51,6 +51,7 @@ import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
 import telegramWebhookRoutes from './routes/telegram-webhook.routes.js';
+import telegramWebhookCronRoutes from './routes/telegram-webhook-cron.routes.js'; // napoletana-58495: self-heal webhook registration
 import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
@@ -221,6 +222,7 @@ app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-c
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
+app.use('/api/cron', telegramWebhookCronRoutes); // napoletana-58495: self-healing Telegram webhook re-registration (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/display', displayRoutes); // Public display viewer routes
 app.use('/api/reports', reportRoutes); // Public report viewing via slug
