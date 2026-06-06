@@ -129,12 +129,49 @@ export interface W9FormData {
   exemptPayeeCode?: string;
   fatcaCode?: string;
   address: string;
-  cityStateZip: string;
+  // prosciutto-92107: structured address fields. The generator prefers these
+  // when present and falls back to the legacy `cityStateZip` for pre-existing
+  // drafts that haven't been re-saved.
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  /** @deprecated kept for back-compat with pre-prosciutto submits. */
+  cityStateZip?: string;
   accountNumbers?: string;
   ssn?: string;
   ein?: string;
   signature: string;
   date: string;
+}
+
+// prosciutto-92107: compose "City, State ZIP" from the structured fields.
+// Falls back to the legacy combined string if the structured fields aren't
+// populated (e.g. an older draft submitted unchanged).
+function formatW9CityStateZip(data: W9FormData): string {
+  const city = data.city?.trim();
+  const state = data.state?.trim();
+  const zip = data.zipCode?.trim();
+  if (city || state || zip) {
+    const cityState = [city, state].filter((s): s is string => !!s && s.length > 0).join(', ');
+    return [cityState, zip].filter((s): s is string => !!s && s.length > 0).join(' ');
+  }
+  return data.cityStateZip?.trim() || '';
+}
+
+// prosciutto-92107: compose "City, State/Province Postal" for the W-8 forms'
+// "City or town" PDF box. The official W-8BEN / W-8BEN-E IRS forms only
+// expose a single line for city + state/province + postal, so we collapse
+// the structured fields back into one line at render time.
+function formatW8CityLine(
+  city?: string,
+  stateProvince?: string,
+  postalCode?: string,
+): string {
+  const c = city?.trim();
+  const sp = stateProvince?.trim();
+  const pc = postalCode?.trim();
+  const cityState = [c, sp].filter((s): s is string => !!s && s.length > 0).join(', ');
+  return [cityState, pc].filter((s): s is string => !!s && s.length > 0).join(' ');
 }
 
 export async function generateW9PDF(data: W9FormData, refId: string): Promise<Buffer> {
@@ -262,14 +299,16 @@ export async function generateW9PDF(data: W9FormData, refId: string): Promise<Bu
   });
   y -= 40;
 
-  // Line 6 - City, state, ZIP
+  // Line 6 - City, state, ZIP. prosciutto-92107: composed from structured
+  // city/state/zipCode fields when present (new submits), falling back to the
+  // legacy combined `cityStateZip` for older drafts.
   drawField(page, {
     x: 30,
     y,
     width: 552,
     height: 36,
     label: '6  City, state, and ZIP code',
-    value: data.cityStateZip,
+    value: formatW9CityStateZip(data),
     font,
     boldFont: bold,
   });
@@ -397,9 +436,16 @@ export interface W8BENFormData {
   citizenship: string;
   permanentAddress: string;
   permanentCity: string;
+  // prosciutto-92107: structured address fields. Optional — the W-8BEN PDF
+  // box for "City or town" rolls state/province + postal code into the city
+  // line when those are populated.
+  permanentStateProvince?: string;
+  permanentPostalCode?: string;
   permanentCountry: string;
   mailingAddress?: string;
   mailingCity?: string;
+  mailingStateProvince?: string;
+  mailingPostalCode?: string;
   mailingCountry?: string;
   usTin?: string;
   foreignTin?: string;
@@ -503,8 +549,15 @@ export async function generateW8BENPDF(data: W8BENFormData, refId: string): Prom
     y,
     width: 276,
     height: 32,
-    label: '    City or town',
-    value: data.permanentCity,
+    label: '    City or town, state/province, postal code',
+    // prosciutto-92107: collapse structured fields back into the single PDF
+    // line the IRS form provides. Fallback to plain city when state/postal
+    // weren't provided (older drafts).
+    value: formatW8CityLine(
+      data.permanentCity,
+      data.permanentStateProvince,
+      data.permanentPostalCode,
+    ),
     font,
     boldFont: bold,
   });
@@ -532,14 +585,18 @@ export async function generateW8BENPDF(data: W8BENFormData, refId: string): Prom
   });
   y -= 40;
 
-  if (data.mailingCity || data.mailingCountry) {
+  if (data.mailingCity || data.mailingCountry || data.mailingPostalCode) {
     drawField(page, {
       x: 30,
       y,
       width: 276,
       height: 32,
-      label: '    City or town',
-      value: data.mailingCity || '',
+      label: '    City or town, state/province, postal code',
+      value: formatW8CityLine(
+        data.mailingCity,
+        data.mailingStateProvince,
+        data.mailingPostalCode,
+      ),
       font,
       boldFont: bold,
     });
@@ -751,9 +808,15 @@ export interface W8BENEFormData {
   chapter4Status: W8BENEChapter4Status;
   permanentAddress: string;
   permanentCity: string;
+  // prosciutto-92107: structured address fields (same shape as W-8BEN). The
+  // city box of the rendered PDF collapses these back into one line.
+  permanentStateProvince?: string;
+  permanentPostalCode?: string;
   permanentCountry: string;
   mailingAddress?: string;
   mailingCity?: string;
+  mailingStateProvince?: string;
+  mailingPostalCode?: string;
   mailingCountry?: string;
   usTin?: string;
   giin?: string;
@@ -938,8 +1001,14 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
     y,
     width: 276,
     height: 32,
-    label: '    City or town',
-    value: data.permanentCity,
+    label: '    City or town, state/province, postal code',
+    // prosciutto-92107: collapse structured fields back into the single PDF
+    // line the IRS form provides.
+    value: formatW8CityLine(
+      data.permanentCity,
+      data.permanentStateProvince,
+      data.permanentPostalCode,
+    ),
     font,
     boldFont: bold,
   });
@@ -968,14 +1037,18 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
   });
   y -= 40;
 
-  if (data.mailingCity || data.mailingCountry) {
+  if (data.mailingCity || data.mailingCountry || data.mailingPostalCode) {
     drawField(page, {
       x: 30,
       y,
       width: 276,
       height: 32,
-      label: '    City or town',
-      value: data.mailingCity || '',
+      label: '    City or town, state/province, postal code',
+      value: formatW8CityLine(
+        data.mailingCity,
+        data.mailingStateProvince,
+        data.mailingPostalCode,
+      ),
       font,
       boldFont: bold,
     });

@@ -83,7 +83,18 @@ function assertSubmitValid(formType: TaxFormType, data: any): void {
     requireField('name');
     requireField('taxClassification');
     requireField('address');
-    requireField('cityStateZip');
+    // prosciutto-92107: accept either the new structured fields (city + state
+    // + zipCode) or the legacy combined cityStateZip field. New form submits
+    // populate the structured fields; older drafts pre-dating this change
+    // still validate via the legacy fallback so the host can submit their
+    // saved draft without re-typing.
+    const hasStructured =
+      typeof data.city === 'string' && data.city.trim()
+      && typeof data.state === 'string' && data.state.trim()
+      && typeof data.zipCode === 'string' && data.zipCode.trim();
+    if (!hasStructured) {
+      requireField('cityStateZip');
+    }
     requireField('signature');
     requireField('date');
     // Exactly one of SSN / EIN must be present.
