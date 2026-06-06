@@ -1728,6 +1728,14 @@ export interface PayoutDocument {
   ineligible?: boolean;
   ocrError: string | null;
   sortOrder: number;
+  // stracciatella-92114: multi-receipt-per-photo. When a single uploaded image
+  // resolved to N receipts, each row carries its 0-based index + total count so
+  // admin UIs can label "Receipt k of n — from {fileName}" and optionally group
+  // siblings under one thumbnail. Null on historical (one-receipt-per-photo)
+  // rows → render flat. `boundingHint` is an optional model-supplied locator.
+  sourceReceiptIndex?: number | null;
+  sourceReceiptCount?: number | null;
+  boundingHint?: string | null;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows
   // created before this feature shipped.
   uploadedByUserId?: string | null;
@@ -2332,6 +2340,33 @@ export interface OcrLineItem {
   category?: string;
 }
 
+/**
+ * stracciatella-92114: one detected receipt within a single uploaded photo.
+ * A photo can contain N receipts (e.g. two pizza receipts side by side); the
+ * ocr-preview endpoint returns one `OcrReceiptPreview` per detected receipt.
+ * Carries the same per-receipt financial fields as the legacy top-level
+ * single-receipt shape, plus `index`, optional `merchant`, and `boundingHint`.
+ */
+export interface OcrReceiptPreview {
+  index: number;              // 0-based position among detected receipts in this photo
+  amount: number;             // USD-converted total (0 when ocrError='CURRENCY_UNRESOLVED')
+  currency: 'USD';
+  originalAmount: number;
+  originalCurrency: string;
+  exchangeRate: number;
+  confidence: number;
+  items?: string[];
+  lineItems?: OcrLineItem[];
+  ocrRaw?: unknown;
+  merchant?: string | null;
+  // Optional model-supplied locator ("left half" / "top") to help the host map
+  // this detected receipt back to its position in the photo.
+  boundingHint?: string | null;
+  fxSource?: 'jsdelivr' | 'frankfurter' | 'fallback' | 'usd-passthrough' | 'unknown' | 'unresolved';
+  conversionNote?: string;
+  ocrError?: string | null;
+}
+
 export interface OcrPreviewResult {
   amount: number;             // USD-converted total (0 when ocrError='CURRENCY_UNRESOLVED')
   currency: 'USD';
@@ -2357,6 +2392,12 @@ export interface OcrPreviewResult {
   // error); host must enter the USD amount manually. Returned as a 200 so
   // the receipt row never dead-ends on an internal server error.
   ocrError?: string | null;
+  // stracciatella-92114: when a single photo contains multiple receipts,
+  // ocr-preview returns one entry per detected receipt here. The top-level
+  // fields above mirror receipts[0] for back-compat. `receiptCount` is the
+  // detected count (0 → NO_RECEIPT_DETECTED, 1 → single-receipt flat UI).
+  receipts?: OcrReceiptPreview[];
+  receiptCount?: number;
 }
 
 /**

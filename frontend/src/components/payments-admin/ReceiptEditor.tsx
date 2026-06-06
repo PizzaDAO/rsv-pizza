@@ -296,6 +296,14 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           <p className="text-xs text-theme-text-muted truncate" title={doc.fileName}>
             {doc.fileName}
           </p>
+          {/* stracciatella-92114: multi-receipt-per-photo label. Only when a
+              single photo resolved to >1 detected receipts. */}
+          {doc.sourceReceiptCount != null && doc.sourceReceiptCount > 1 && (
+            <p className="text-xs text-[#ff393a] mt-0.5">
+              Receipt {(doc.sourceReceiptIndex ?? 0) + 1} of {doc.sourceReceiptCount}
+              {doc.boundingHint ? ` — ${doc.boundingHint}` : ''} — from {doc.fileName}
+            </p>
+          )}
         </div>
         {conf > 0 && (
           <span

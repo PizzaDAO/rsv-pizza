@@ -21,16 +21,19 @@ export const PayoutAmountSummary: React.FC<PayoutAmountSummaryProps> = ({
 }) => {
   // mortadella-92103: exclude unresolved-currency receipts from the sum so
   // the host can see at a glance that they need to pick a currency before
-  // the receipt counts. `r.ocr.amount` is USD-converted (see OcrPreviewResult).
+  // the receipt counts. `receipt.amount` is USD-converted (see OcrReceiptPreview).
+  // stracciatella-92114: flatten across all detected receipts of each photo.
   const ocrSum = receipts
-    .filter(r =>
-      r.status === 'done' && r.ocr && r.ocr.ocrError !== 'CURRENCY_UNRESOLVED'
-    )
-    .reduce((sum, r) => sum + (r.ocr?.amount ?? 0), 0);
+    .filter(r => r.status === 'done')
+    .flatMap(r => r.receipts ?? [])
+    .filter(rc => rc.ocrError !== 'CURRENCY_UNRESOLVED')
+    .reduce((sum, rc) => sum + (rc.amount ?? 0), 0);
 
-  const lowConfidenceCount = receipts.filter(
-    r => r.status === 'done' && r.ocr && r.ocr.confidence < 0.8
-  ).length;
+  const lowConfidenceCount = receipts
+    .filter(r => r.status === 'done')
+    .flatMap(r => r.receipts ?? [])
+    .filter(rc => rc.confidence < 0.8)
+    .length;
   const ocringCount = receipts.filter(r => r.status === 'ocring' || r.status === 'uploading').length;
 
   const displayAmount = overrideAmount != null ? overrideAmount : ocrSum;

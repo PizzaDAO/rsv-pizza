@@ -230,19 +230,28 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   // their preview row but aren't counted until the host picks a currency
   // via CurrencyOverrideSelect. The amber notice below tells the host what
   // to do. `r.ocr.amount` is USD-converted (see OcrPreviewResult).
+  // stracciatella-92114: a single uploaded photo can contain MULTIPLE detected
+  // receipts. Flatten across every detected receipt of every file so the sum +
+  // unresolved-count cover each receipt independently. `receipt.amount` is
+  // USD-converted (see OcrReceiptPreview).
   const ocrSum = useMemo(
     () => receipts
-      .filter(r => r.status === 'done' && r.ocr && r.ocr.ocrError !== 'CURRENCY_UNRESOLVED')
-      .reduce((sum, r) => sum + (r.ocr?.amount ?? 0), 0),
+      .filter(r => r.status === 'done')
+      .flatMap(r => r.receipts ?? [])
+      .filter(rc => rc.ocrError !== 'CURRENCY_UNRESOLVED')
+      .reduce((sum, rc) => sum + (rc.amount ?? 0), 0),
     [receipts]
   );
   // mortadella-92103: count of unresolved-currency receipts so we can show
   // a single amber notice rather than per-row warnings (the per-receipt
   // row already shows its low-confidence state via the dropdown).
+  // stracciatella-92114: now counts per detected receipt across all photos.
   const unresolvedReceiptCount = useMemo(
-    () => receipts.filter(r =>
-      r.status === 'done' && r.ocr && r.ocr.ocrError === 'CURRENCY_UNRESOLVED'
-    ).length,
+    () => receipts
+      .filter(r => r.status === 'done')
+      .flatMap(r => r.receipts ?? [])
+      .filter(rc => rc.ocrError === 'CURRENCY_UNRESOLVED')
+      .length,
     [receipts]
   );
   const finalAmount = overrideAmount != null ? overrideAmount : ocrSum;
@@ -328,27 +337,44 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
       // entirely so the backend persists payout_method=NULL.
       const forwardMethod = savedMethod && savedMethodValid;
       const created = await createPayout(partyId, {
+        // stracciatella-92114: emit ONE payload entry PER DETECTED RECEIPT. A
+        // single photo with N receipts produces N entries sharing
+        // url/fileName/fileSize/mimeType, each carrying its own OCR fields +
+        // sourceReceiptIndex (0..N-1) and sourceReceiptCount. The backend
+        // persists one payout_documents row per entry. Single-receipt photos
+        // emit exactly one entry, identical to before.
         receiptPhotos: receipts
-          .filter(r => r.status === 'done' && r.url)
-          .map(r => ({
-            url: r.url!,
-            fileName: r.fileName,
-            fileSize: r.fileSize,
-            mimeType: r.mimeType,
-            // provolone-49301: forward the preview-OCR payload so the backend
-            // skips a second gpt-4o pass. These already reflect any host
-            // currency override (CurrencyOverrideSelect mutates r.ocr in
-            // place). USD amount/rate are intentionally NOT sent — the backend
-            // re-locks FX via convertToUSD. Include the CURRENCY_UNRESOLVED
-            // case too (originalAmount is still set) so the backend treats it
-            // as forwarded and doesn't re-OCR.
-            ocrOriginalAmount: r.ocr?.originalAmount,
-            ocrOriginalCurrency: r.ocr?.originalCurrency,
-            ocrConfidence: r.ocr?.confidence,
-            ocrLineItems: r.ocr?.lineItems,
-            ocrRaw: r.ocr?.ocrRaw,
-            ocrError: r.ocr?.ocrError,
-          })),
+          .filter(r => r.status === 'done' && r.url && (r.receipts?.length ?? 0) > 0)
+          .flatMap(r => {
+            const detected = r.receipts ?? [];
+            const count = detected.length;
+            return detected.map((rc, k) => ({
+              url: r.url!,
+              fileName: r.fileName,
+              fileSize: r.fileSize,
+              mimeType: r.mimeType,
+              // provolone-49301: forward the preview-OCR payload so the backend
+              // skips a second gpt-4o pass. These already reflect any host
+              // currency override (CurrencyOverrideSelect mutates the receipt in
+              // place). USD amount/rate are intentionally NOT sent — the backend
+              // re-locks FX via convertToUSD. Include the CURRENCY_UNRESOLVED
+              // case too (originalAmount is still set) so the backend treats it
+              // as forwarded and doesn't re-OCR.
+              ocrOriginalAmount: rc.originalAmount,
+              ocrOriginalCurrency: rc.originalCurrency,
+              ocrConfidence: rc.confidence,
+              ocrLineItems: rc.lineItems,
+              ocrRaw: rc.ocrRaw,
+              ocrError: rc.ocrError,
+              // stracciatella-92114: which detected receipt this entry is, and
+              // how many were detected in the shared photo (drives "k of n").
+              sourceReceiptIndex: count > 1 ? k : undefined,
+              sourceReceiptCount: count > 1 ? count : undefined,
+            }));
+          }),
+        // porchetta-58296: pizza/event role photos are no longer uploaded as
+        // payout docs — they're designated in the gallery. Only receipts are
+        // forwarded from here now.
         // porchetta-58296: attest receipts are submitted + itemized. Backend
         // rejects without it (RECEIPT_ATTESTATION_REQUIRED).
         receiptAttested,
