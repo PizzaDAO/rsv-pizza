@@ -1428,6 +1428,53 @@ model CityStatus {
   @@map("city_statuses")
 }
 
+// tonda-58293: durable per-city Telegram group chat store. Previously the
+// city → group chat_id mapping lived ONLY in a Google Sheet and was fetched
+// client-side; supergroup migrations (Telegram's `migrate_to_chat_id`) were
+// never persisted, so broadcasts silently drifted. Keyed by `cityKey`
+// (`lower(trim(city))`, same convention as `CityStatus.city_key`).
+model CityTelegramGroup {
+  id             String    @id @default(uuid()) @db.Uuid
+  cityKey        String    @unique @map("city_key")
+  chatId         BigInt?   @map("chat_id")
+  chatUrl        String?   @map("chat_url") @db.VarChar
+  title          String?
+  country        String?
+  region         String?
+  underboss      String?
+  isSupergroup   Boolean   @default(false) @map("is_supergroup")
+  source         String    @default("manual") // sheet | webhook | migration | manual
+  lastVerifiedAt DateTime? @map("last_verified_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("city_telegram_groups")
+}
+
+// tonda-58293 Phase 2: raw inbound Telegram group captures.
+//
+// The bot learns a group's chat_id from updates it receives — primarily
+// `my_chat_member` (fires when the bot is added/promoted regardless of privacy
+// mode) and, as a bonus, group messages. We upsert every group/supergroup we
+// see here BEFORE resolving it to a city. Captures that auto-match a known
+// city are also written through to `city_telegram_groups`; unmatched captures
+// stay here as orphans awaiting manual assignment in the /underboss UI.
+//
+// Kept separate from `city_telegram_groups` so the resolved city→id map stays
+// clean and orphans have a home.
+model TelegramGroupCapture {
+  id              String   @id @default(uuid()) @db.Uuid
+  chatId          BigInt   @unique @map("chat_id")
+  title           String?
+  chatType        String?  @map("chat_type") // group | supergroup
+  assignedCityKey String?  @map("assigned_city_key") // null = pending
+  autoMatched     Boolean  @default(false) @map("auto_matched")
+  firstSeenAt     DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt      DateTime @updatedAt @map("last_seen_at") @db.Timestamptz
+
+  @@map("telegram_group_captures")
+}
+
 // ============================================
 // Shipping Coordinator Models
 // ============================================

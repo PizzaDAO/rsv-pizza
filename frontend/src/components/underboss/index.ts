@@ -12,5 +12,6 @@ export { FakeDetectionTable } from './FakeDetectionTable';
 export { SuperlativesTab } from './SuperlativesTab';
 export { SurveyQuestionsTab } from './SurveyQuestionsTab';
 export { OutreachTab } from './OutreachTab';
+export { TelegramGroupsTab } from './TelegramGroupsTab';
 export { ReimbursementCapCell } from './ReimbursementCapCell';
 export { AppealHistoryModal } from './AppealHistoryModal';

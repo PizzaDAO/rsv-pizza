@@ -49,6 +49,8 @@ import {
   type RegionalAuthRequest,
 } from '../middleware/regionalUnderboss.js';
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
+import { sendToCityGroup } from '../services/cityTelegramGroup.js';
+import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 
 const router = Router();
 
@@ -6070,6 +6072,31 @@ async function sendTelegramMessage(
   }
 }
 
+/**
+ * tonda-58293 FIX #4: send a reminder to a party's city Telegram GROUP.
+ *
+ * Shared by tg-receipts-reminder and tg-wallet-reminder (previously two
+ * identical blocks). The earlier version skipped the group entirely when the
+ * party name didn't match the GPP pattern (`cityKeyFromPartyName` → null),
+ * dropping coverage for non-GPP-named parties. We now fall back to the raw
+ * lowercased/trimmed party name as the cityKey. A non-matching key simply
+ * yields `sendToCityGroup`'s existing "no city TG group set" skip — no new
+ * failure mode — while correctly-named groups now get reached.
+ */
+async function sendCityGroupReminder(
+  partyName: string,
+  text: string,
+): Promise<{ groupSent: boolean; groupReason?: string }> {
+  const cityKey = cityKeyFromPartyName(partyName) ?? partyName.toLowerCase().trim();
+  if (!cityKey) {
+    return { groupSent: false, groupReason: 'no city TG group set' };
+  }
+  const result = await sendToCityGroup(cityKey, text);
+  return result.ok
+    ? { groupSent: true }
+    : { groupSent: false, groupReason: result.reason };
+}
+
 router.post(
   '/:partyId/tg-receipts-reminder',
   requireAuth,
@@ -6114,25 +6141,11 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      // Group chat — per-city chat_id supplied by the caller. The frontend
-      // resolves it from the GPP sheet (`SheetCity.groupId`) using the same
-      // city→chat_id map that /underboss uses for its broadcast tooling. We
-      // intentionally don't fetch the sheet from the backend; mirrors the
-      // `/api/telegram/broadcast` contract where the client supplies chatIds.
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
-      let groupSent = false;
-      let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
-        if (result.ok) {
-          groupSent = true;
-        } else {
-          groupReason = result.reason;
-        }
-      } else {
-        groupReason = 'no city TG group set';
-      }
+      // Group chat — tonda-58293: the backend resolves the per-city group
+      // chat_id from `city_telegram_groups` via `sendToCityGroup` (which also
+      // persists supergroup migrations). FIX #4: falls back to the raw party
+      // name as cityKey so non-GPP-named parties aren't silently skipped.
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -6211,20 +6224,11 @@ router.post(
         hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
       }
 
-      const rawGroupChatId =
-        typeof req.body?.groupChatId === 'string' ? req.body.groupChatId.trim() : '';
-      let groupSent = false;
-      let groupReason: string | undefined;
-      if (rawGroupChatId) {
-        const result = await sendTelegramMessage(rawGroupChatId, text);
-        if (result.ok) {
-          groupSent = true;
-        } else {
-          groupReason = result.reason;
-        }
-      } else {
-        groupReason = 'no city TG group set';
-      }
+      // Group chat — tonda-58293: resolved server-side from
+      // `city_telegram_groups` via `sendToCityGroup` (adds the migration
+      // retry+persist this endpoint previously lacked). FIX #4: shared helper
+      // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
 
       console.log(
         `[tg-wallet-reminder] party=${party.id} slug=${slug} host_dm=${

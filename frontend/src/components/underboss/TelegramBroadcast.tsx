@@ -3,15 +3,25 @@ import { createPortal } from 'react-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { fetchTelegramGroups, TelegramGroup } from '../../lib/telegram';
+import { TelegramGroup } from '../../lib/telegram';
 import {
   sendTelegramBroadcast,
   sendTelegramTest,
   sendHostTelegramBroadcast,
   sendHostTelegramTest,
+  fetchCityTelegramGroups,
   BroadcastResult,
 } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
+import { GPP_REGIONS } from '../../types';
+
+// tonda-58293 FIX #1: `city_telegram_groups.region` now stores GPP region SLUGS
+// (e.g. `western-europe`), not display names. Map slug → human label for the
+// dropdown; filtering/keying still uses the raw slug.
+const REGION_SLUG_TO_LABEL: Record<string, string> = Object.fromEntries(
+  GPP_REGIONS.map((r) => [r.id, r.label]),
+);
+const regionLabel = (slug: string): string => REGION_SLUG_TO_LABEL[slug] || slug;
 
 /** Extract a city name from a GPP event's name ("Global Pizza Party <city>"). */
 function extractCityFromEvent(ev: UnderbossEvent): string {
@@ -167,7 +177,22 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchTelegramGroups();
+        // tonda-58293: source the city → group chat_id map from the DB
+        // (`/api/underboss/telegram/groups`) instead of the Google Sheet. The
+        // endpoint is already scoped to the caller's cities/regions, and the
+        // follow-up persists the legacy country/underboss/region metadata so
+        // those columns + the region filter render again.
+        const rows = await fetchCityTelegramGroups();
+        const data: TelegramGroup[] = rows
+          .filter((r) => r.chatId && r.cityKey)
+          .map((r) => ({
+            country: r.country || '',
+            city: r.cityKey,
+            underboss: r.underboss || '',
+            region: r.region || '',
+            chatUrl: r.chatUrl || '',
+            groupId: r.chatId as string,
+          }));
         setGroups(data);
         // Auto-select groups matching pre-selected cities (fuzzy match)
         if (preSelectedCities && preSelectedCities.length > 0) {
@@ -632,7 +657,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                       onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
                       className="flex items-center gap-1.5 bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-sm text-theme-text hover:border-theme-stroke-hover transition-colors"
                     >
-                      {regionFilter === 'all' ? t('telegram.regionAll') : regionFilter}
+                      {regionFilter === 'all' ? t('telegram.regionAll') : regionLabel(regionFilter)}
                       <ChevronDown size={14} className={`transition-transform ${regionDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {regionDropdownOpen && (
@@ -659,7 +684,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                                   : 'text-theme-text-secondary hover:bg-theme-surface'
                               }`}
                             >
-                              {r}
+                              {regionLabel(r)}
                             </button>
                           ))}
                         </div>

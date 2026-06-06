@@ -37,6 +37,54 @@ export function cityKeyFromPartyName(name: string | null | undefined): string | 
 }
 
 /**
+ * tonda-58293 FIX #1: build a map of GPP cityKey → region (GPP slug).
+ *
+ * `city_telegram_groups.region`, `parties.region`, and `underbosses.regions`
+ * must all hold the SAME value (a GPP region slug like `western-europe`) so
+ * region-scoped underbosses match. Party names follow "Global Pizza Party
+ * {City}"; we derive the cityKey in code (no city_key column on parties) and
+ * map it to the party's `region` column.
+ *
+ * Single batched pass over non-cancelled GPP parties — callers should call
+ * this ONCE and reuse the map (do NOT call `getGppRegionByCityKey` in a loop).
+ * When two parties share a cityKey, the first non-null region wins.
+ */
+export async function buildGppCityKeyToRegionMap(): Promise<Map<string, string>> {
+  const parties = await prisma.party.findMany({
+    where: { eventType: 'gpp', cancelledAt: null },
+    select: { name: true, region: true },
+  });
+  const map = new Map<string, string>();
+  for (const p of parties) {
+    const key = cityKeyFromPartyName(p.name);
+    if (!key) continue;
+    const region = (p.region ?? '').trim();
+    if (!region) continue;
+    if (!map.has(key)) map.set(key, region);
+  }
+  return map;
+}
+
+/**
+ * tonda-58293 FIX #1: resolve the GPP region (slug) for a single cityKey by
+ * finding a non-cancelled GPP party whose name yields that cityKey.
+ *
+ * Returns the party's `region` slug, or null if no matching party (or the
+ * matching party has no region). Used by the capture write-through,
+ * /groups/assign, and migration-persist so new `city_telegram_groups` rows
+ * carry the slug instead of NULL.
+ *
+ * NOTE: this scans GPP parties per call. For bulk work (import / backfill),
+ * use `buildGppCityKeyToRegionMap()` once instead of calling this in a loop.
+ */
+export async function getGppRegionByCityKey(cityKey: string): Promise<string | null> {
+  const key = (cityKey || '').toLowerCase().trim();
+  if (!key) return null;
+  const map = await buildGppCityKeyToRegionMap();
+  return map.get(key) ?? null;
+}
+
+/**
  * Look up the scope for a given user email.
  * - Admins → { isAdmin: true, regions: [], cities: [] }
  * - Graphics admins → also treated as admins for scope purposes
