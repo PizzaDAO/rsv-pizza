@@ -761,6 +761,9 @@ export interface FakeDetectionScoreEntry {
   score: number;
   tier: string;
   topFlags: string[];
+  /** Every fired flag with its weight, highest first. Optional because preview
+   *  frontends hit the prod backend, which may not yet return this field. */
+  flags?: { detail: string; weight: number }[];
 }
 
 export type FakeDetectionScoreMap = Record<string, FakeDetectionScoreEntry>;
