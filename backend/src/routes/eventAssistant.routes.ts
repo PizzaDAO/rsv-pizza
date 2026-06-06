@@ -20,10 +20,16 @@ import { rateLimit } from 'express-rate-limit';
 import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isPaymentAdmin, isUnderboss } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
+import { prisma } from '../config/database.js';
 import { runEventAssistant, type AssistantHistoryTurn } from '../services/eventAssistant.service.js';
 import type { RequesterRole } from '../lib/eventEditSchema.js';
 
 const router = Router();
+
+// Test rollout: Event Assistant is enabled only for these event slugs
+// (matched against customUrl OR inviteCode). Add slugs here to widen, or
+// remove the gate entirely to enable for all hosts.
+const ASSISTANT_ENABLED_SLUGS = new Set(['philadelphia']);
 
 // Path-scope auth on /:id/assistant ONLY. Do NOT use an unconditioned
 // router.use — it would gate every /api/parties/* request.
@@ -66,6 +72,23 @@ router.post(
 
       const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
       if (!canEdit) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+
+      // Test rollout gate: the Event Assistant is only enabled for an allowlist
+      // of event slugs (currently just Philadelphia). Short-circuit with the
+      // same NOT_FOUND shape BEFORE any OpenAI work runs so non-allowlisted
+      // parties never reach the rate-limited LLM call. `/philadelphia` resolves
+      // by inviteCode first, then customUrl, so we match either (case-insensitive).
+      const slugRow = await prisma.party.findUnique({
+        where: { id },
+        select: { customUrl: true, inviteCode: true },
+      });
+      const cu = slugRow?.customUrl?.toLowerCase();
+      const ic = slugRow?.inviteCode?.toLowerCase();
+      const assistantEnabled =
+        (!!cu && ASSISTANT_ENABLED_SLUGS.has(cu)) || (!!ic && ASSISTANT_ENABLED_SLUGS.has(ic));
+      if (!assistantEnabled) {
         throw new AppError('Party not found', 404, 'NOT_FOUND');
       }
 

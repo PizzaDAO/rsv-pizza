@@ -20,6 +20,16 @@ import type { Party } from '../types';
  * PATCH path (`updatePartyApi`). The LLM never writes to the DB.
  */
 
+// Test rollout — keep in sync with backend ASSISTANT_ENABLED_SLUGS.
+export const ASSISTANT_ENABLED_SLUGS = ['philadelphia'];
+export function isEventAssistantEnabled(party: { customUrl?: string | null; inviteCode?: string | null } | null): boolean {
+  if (!party) return false;
+  const slugs = ASSISTANT_ENABLED_SLUGS;
+  const cu = party.customUrl?.toLowerCase();
+  const ic = party.inviteCode?.toLowerCase();
+  return (!!cu && slugs.includes(cu)) || (!!ic && slugs.includes(ic));
+}
+
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 function snakeToCamel(key: string): string {
