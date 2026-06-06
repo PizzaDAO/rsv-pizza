@@ -32,6 +32,16 @@ function stripGppPrefix(name: string): string {
 }
 
 /**
+ * taleggio-58499: IconInput defaults to the global dark-theme input styling
+ * (near-white text on translucent dark bg from index.css). Inside the
+ * light accent panels (Reject = bg-red-50, Execute = bg-emerald-50,
+ * Mark-paid = bg-blue-50) that produces near-white-on-light → unreadable.
+ * Force a light bg + dark text. Tailwind class specificity already beats the
+ * global element selector, so no !important is needed.
+ */
+const LIGHT_PANEL_INPUT = 'bg-white text-gray-900 placeholder:text-gray-500 border-gray-300';
+
+/**
  * lasagna-92103: the per-submission soft cap drives a purely informational
  * amber warning — no Checkbox, no Save block. The backend admin PATCH no longer
  * enforces it (admin amount is canonical); the USDC execute hard ceiling
@@ -3141,6 +3151,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   icon={X}
                   multiline
                   rows={2}
+                  className={LIGHT_PANEL_INPUT}
                   placeholder="Reason (shown to host)"
                   value={rejectReason}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectReason(e.target.value)}
@@ -3340,6 +3351,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     </p>
                     <IconInput
                       icon={Pencil}
+                      className={LIGHT_PANEL_INPUT}
                       placeholder="Wire reference number (required)"
                       value={execWireRef}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecWireRef(e.target.value)}
@@ -3355,6 +3367,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     </p>
                     <IconInput
                       icon={Pencil}
+                      className={LIGHT_PANEL_INPUT}
                       placeholder="Card last 4 digits (required, exactly 4 numbers)"
                       value={execCardLast4}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -3365,6 +3378,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     />
                     <IconInput
                       icon={Pencil}
+                      className={LIGHT_PANEL_INPUT}
                       placeholder="Mercury card id (optional)"
                       value={execCardId}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecCardId(e.target.value)}
@@ -3375,6 +3389,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.payoutMethod !== 'usdc_base' && (
                   <IconInput
                     icon={Pencil}
+                    className={LIGHT_PANEL_INPUT}
                     placeholder="Note (optional)"
                     value={execNote}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExecNote(e.target.value)}
@@ -3467,6 +3482,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.payoutMethod === 'wire' && (
                   <IconInput
                     icon={Pencil}
+                    className={LIGHT_PANEL_INPUT}
                     placeholder="Wire reference number"
                     value={wireRef}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWireRef(e.target.value)}
@@ -3475,6 +3491,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 {payout.payoutMethod === 'usdc_base' && (
                   <IconInput
                     icon={Pencil}
+                    className={LIGHT_PANEL_INPUT}
                     placeholder="Transaction hash (0x...)"
                     value={txHash}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTxHash(e.target.value)}
@@ -3484,12 +3501,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   <>
                     <IconInput
                       icon={Pencil}
+                      className={LIGHT_PANEL_INPUT}
                       placeholder="Card last 4 digits"
                       value={cardLast4}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardLast4(e.target.value)}
                     />
                     <IconInput
                       icon={Pencil}
+                      className={LIGHT_PANEL_INPUT}
                       placeholder="Mercury card id (optional)"
                       value={cardId}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardId(e.target.value)}
@@ -3498,6 +3517,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 )}
                 <IconInput
                   icon={Pencil}
+                  className={LIGHT_PANEL_INPUT}
                   placeholder="Note (optional)"
                   value={paidNote}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaidNote(e.target.value)}
