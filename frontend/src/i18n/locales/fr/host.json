@@ -851,6 +851,24 @@
       "invalidType": "Type de fichier non pris en charge. Utilisez JPEG, PNG, WebP, GIF ou HEIC.",
       "tooLarge": "Fichier trop volumineux. La taille maximale est de 25 Mo.",
       "uploadFailed": "Échec du téléversement. Veuillez réessayer."
-    }
+    },
+    "updateYourEstimate": "Mettre à jour votre estimation",
+    "guestsPlaceholder": "p. ex. 50",
+    "rsvpHint_one": "{{count}} confirmation pour le moment.",
+    "rsvpHint_other": "{{count}} confirmations pour le moment.",
+    "errorPositiveNumber": "Saisissez un nombre positif",
+    "errorFailedToSave": "Échec de l'enregistrement",
+    "bannerSetGuestsAndLocation": "Définissez vos {{guests}} et votre lieu pour faire approuver votre financement.",
+    "bannerSetGuests": "Définissez vos {{guests}} pour faire approuver votre financement.",
+    "bannerSetLocation": "Définissez votre lieu pour faire approuver votre financement.",
+    "capReimburse": "Nous vous rembourserons jusqu'à {{cap}} $.",
+    "capReimburseWithKit": "Nous vous rembourserons jusqu'à {{cap}} $ de pizza et jusqu'à {{kitCap}} $ de frais de kit de fête.",
+    "appeal": "Faire appel",
+    "underbossReviewing": "Votre underboss examine votre événement pour définir votre plafond de paiement.",
+    "reachOnTelegram": "Contactez-le sur Telegram :",
+    "receiptsHeader": "Reçus",
+    "newReceipt": "Nouveau reçu",
+    "payoutTimingNote": "La plupart des paiements prennent environ 7 jours à compter de la soumission du reçu.",
+    "backToReceipts": "Retour aux reçus"
   }
 }

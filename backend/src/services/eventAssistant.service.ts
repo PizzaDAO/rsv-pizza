@@ -16,6 +16,7 @@
 
 import { prisma } from '../config/database.js';
 import { getOpenAI } from '../lib/openai.js';
+import { getLlmModels } from '../lib/privateConfig.js';
 import {
   buildToolSchema,
   validatePatch,
@@ -304,11 +305,12 @@ export async function runEventAssistant(params: {
     .map((t) => ({ role: t.role, content: t.content.slice(0, MAX_INSTRUCTION_LEN) }));
 
   const tool = buildToolSchema(role);
+  const assistantModel = (await getLlmModels()).assistant;
 
   // gricia-58502: measure round-trip latency around the OpenAI call only.
   const startedAt = Date.now();
   const response = await getOpenAI().chat.completions.create({
-    model: ASSISTANT_MODEL,
+    model: assistantModel,
     messages: [
       // Static prefix (cacheable): behavioral system prompt + tool schema.
       { role: 'system', content: buildSystemPrompt(role) },
@@ -327,7 +329,7 @@ export async function runEventAssistant(params: {
     promptTokens: response.usage?.prompt_tokens,
     completionTokens: response.usage?.completion_tokens,
   };
-  const callMeta = { model: ASSISTANT_MODEL, usage, latencyMs };
+  const callMeta = { model: assistantModel, usage, latencyMs };
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
   // The SDK tool-call type is a union (function | custom); narrow to function.

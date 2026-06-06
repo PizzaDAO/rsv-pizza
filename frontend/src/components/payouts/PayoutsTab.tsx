@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Info, BadgeDollarSign } from 'lucide-react';
 import { Payout, TaxFormType } from '../../types';
 import { listPayouts, fetchPayoutSubmissionReadiness } from '../../lib/api';
@@ -55,6 +56,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   reimbursementCapAppealedAt,
   expectedGuests,
 }) => {
+  const { t } = useTranslation('host');
   const { party } = usePizza();
   const partyKitCapUsd = parsePartyKitCapFromTags(party?.eventTags);
   const [view, setView] = useState<View>('list');
@@ -194,13 +196,13 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
 
         if (needsExpectedGuests || needsLocation) {
           // calzone-58297: relabel "expected" → "estimated" after the event.
-          const guestsLabel = eventHasHappened ? 'estimated guests' : 'expected guests';
+          const guestsLabel = t(eventHasHappened ? 'payouts.bannerEstimatedGuests' : 'payouts.bannerExpectedGuests');
           const msg =
             needsExpectedGuests && needsLocation
-              ? `Set your ${guestsLabel} and your location to get your funding approved.`
+              ? t('payouts.bannerSetGuestsAndLocation', { guests: guestsLabel })
               : needsExpectedGuests
-                ? `Set your ${guestsLabel} to get your funding approved.`
-                : 'Set your location to get your funding approved.';
+                ? t('payouts.bannerSetGuests', { guests: guestsLabel })
+                : t('payouts.bannerSetLocation');
           return (
             <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
               <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
@@ -213,11 +215,12 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
               <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
               <div className="text-sm font-medium text-theme-text">
-                We'll reimburse you for up to ${effectiveReimbursementCapUsd!.toFixed(2)}
-                {partyKitCapUsd != null && (
-                  <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
-                )}
-                .
+                {partyKitCapUsd != null
+                  ? t('payouts.capReimburseWithKit', {
+                      cap: effectiveReimbursementCapUsd!.toFixed(2),
+                      kitCap: partyKitCapUsd.toFixed(2),
+                    })
+                  : t('payouts.capReimburse', { cap: effectiveReimbursementCapUsd!.toFixed(2) })}
                 {/*
                   mascarpone-58927: surface the cap-appeal trigger here so it's
                   discoverable without opening NewPayoutForm. AppealCapModal
@@ -228,7 +231,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                   onClick={() => setShowAppealModal(true)}
                   className="text-emerald-300 hover:underline ml-2 text-sm"
                 >
-                  Appeal
+                  {t('payouts.appeal')}
                 </button>
               </div>
             </div>
@@ -238,13 +241,13 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
             <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm font-medium text-theme-text">
-              Your underboss is reviewing your event to set your payment cap.
+              {t('payouts.underbossReviewing')}
               {(() => {
                 const contact = getUnderbossContact(party?.country);
                 if (!contact) return null;
                 return (
                   <>
-                    {' '}Reach them on Telegram:{' '}
+                    {' '}{t('payouts.reachOnTelegram')}{' '}
                     <a
                       href={contact.url}
                       target="_blank"
@@ -279,21 +282,21 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           <div className="card p-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h2 className="text-lg font-semibold text-theme-text">Receipts</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('payouts.receiptsHeader')}</h2>
               </div>
               <button
                 onClick={() => setView('new')}
                 className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
               >
                 <Plus size={16} />
-                New receipt
+                {t('payouts.newReceipt')}
               </button>
             </div>
             {/* Set host expectations on payout timing — most payouts land ~7
                 days after a receipt is submitted. */}
             <div className="flex items-start gap-2 text-xs text-theme-text-muted">
               <Info size={14} className="mt-0.5 flex-shrink-0" />
-              <span>Most payments will take ~7 days from receipt submission.</span>
+              <span>{t('payouts.payoutTimingNote')}</span>
             </div>
           </div>
 
@@ -325,7 +328,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <ArrowLeft size={16} />
-            Back to receipts
+            {t('payouts.backToReceipts')}
           </button>
           <NewPayoutForm
             partyId={partyId}
@@ -362,7 +365,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       */}
       <PaymentDetailsCard
         disabled={!paymentDetailsUnlocked}
-        disabledReason="Designate your group, box stack, and pizza photos and upload a receipt to enter your payment details."
+        disabledReason={t('payouts.paymentDetailsLocked')}
       />
 
       {detailPayoutId && (

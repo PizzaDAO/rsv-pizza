@@ -807,6 +807,24 @@
       "invalidType": "지원되지 않는 파일 형식입니다. JPEG, PNG, WebP, GIF 또는 HEIC를 사용하세요.",
       "tooLarge": "파일이 너무 큽니다. 최대 크기는 25MB입니다.",
       "uploadFailed": "업로드에 실패했습니다. 다시 시도하세요."
-    }
+    },
+    "updateYourEstimate": "추정치 업데이트",
+    "guestsPlaceholder": "예: 50",
+    "rsvpHint_one": "현재까지 {{count}}건의 RSVP.",
+    "rsvpHint_other": "현재까지 {{count}}건의 RSVP.",
+    "errorPositiveNumber": "양수를 입력하세요",
+    "errorFailedToSave": "저장하지 못했습니다",
+    "bannerSetGuestsAndLocation": "자금 승인을 받으려면 {{guests}}와 위치를 설정하세요.",
+    "bannerSetGuests": "자금 승인을 받으려면 {{guests}}를 설정하세요.",
+    "bannerSetLocation": "자금 승인을 받으려면 위치를 설정하세요.",
+    "capReimburse": "최대 {{cap}}달러까지 환급해 드립니다.",
+    "capReimburseWithKit": "피자 비용으로 최대 {{cap}}달러, 파티 키트 비용으로 최대 {{kitCap}}달러까지 환급해 드립니다.",
+    "appeal": "이의 제기",
+    "underbossReviewing": "언더보스가 결제 한도를 설정하기 위해 이벤트를 검토하고 있습니다.",
+    "reachOnTelegram": "텔레그램으로 연락하세요:",
+    "receiptsHeader": "영수증",
+    "newReceipt": "새 영수증",
+    "payoutTimingNote": "대부분의 결제는 영수증 제출 후 약 7일이 걸립니다.",
+    "backToReceipts": "영수증으로 돌아가기"
   }
 }
