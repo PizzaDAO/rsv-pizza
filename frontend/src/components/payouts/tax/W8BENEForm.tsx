@@ -1,5 +1,16 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Building2, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, Info } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Building2,
+  Globe,
+  MapPin,
+  Hash,
+  FileSignature,
+  CalendarDays,
+  AlertTriangle,
+  Info,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
@@ -85,6 +96,14 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
   const valueRef = useRef(value);
   valueRef.current = value;
 
+  // pancetta-92107: Advanced — rarely applies expander. Holds disregarded
+  // entity name (Line 3), US EIN, GIIN, and reference number(s) — all niche
+  // fields that confuse the typical foreign-entity host. Auto-opens if a
+  // saved draft already populated any of them so the user can see their data.
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(
+    !!(value.disregardedEntityName || value.usTin || value.giin || value.referenceNumbers),
+  );
+
   // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
   // fresh mount. Saved drafts with an existing date are left untouched; the
   // effect only fires once so subsequent user edits remain authoritative.
@@ -150,29 +169,19 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         disabled={disabled}
         required
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Globe}
-          type="text"
-          placeholder="Country of incorporation"
-          value={value.countryOfIncorporation ?? ''}
-          onChange={(e) => {
-            // Resetting the cache lets the treaty effect re-evaluate when the
-            // host changes the country (unless they've manually set treatyCountry).
-            onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
-          }}
-          disabled={disabled}
-          required
-        />
-        <IconInput
-          icon={Building2}
-          type="text"
-          placeholder="Disregarded entity name (if any)"
-          value={value.disregardedEntityName ?? ''}
-          onChange={(e) => set('disregardedEntityName', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
+      <IconInput
+        icon={Globe}
+        type="text"
+        placeholder="Country of incorporation"
+        value={value.countryOfIncorporation ?? ''}
+        onChange={(e) => {
+          // Resetting the cache lets the treaty effect re-evaluate when the
+          // host changes the country (unless they've manually set treatyCountry).
+          onChange({ ...value, countryOfIncorporation: e.target.value, treatyAutoFilledFor: undefined });
+        }}
+        disabled={disabled}
+        required
+      />
 
       <div>
         <p className="text-xs text-theme-text-muted mb-1">Entity type (Chapter 3)</p>
@@ -292,42 +301,76 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="US EIN (optional)"
-          value={value.usTin ?? ''}
-          onChange={(e) => set('usTin', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="GIIN (if applicable)"
-          value={value.giin ?? ''}
-          onChange={(e) => set('giin', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
+      <IconInput
+        icon={Hash}
+        type="text"
+        placeholder="Foreign TIN (your home-country tax ID)"
+        value={value.foreignTin ?? ''}
+        onChange={(e) => set('foreignTin', e.target.value)}
+        disabled={disabled}
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Foreign TIN"
-          value={value.foreignTin ?? ''}
-          onChange={(e) => set('foreignTin', e.target.value)}
-          disabled={disabled}
-        />
-        <IconInput
-          icon={Hash}
-          type="text"
-          placeholder="Reference number(s)"
-          value={value.referenceNumbers ?? ''}
-          onChange={(e) => set('referenceNumbers', e.target.value)}
-          disabled={disabled}
-        />
+      {/* pancetta-92107: Advanced — rarely applies. Disregarded entity name
+          (Line 3), US EIN, GIIN, and reference numbers all live here. These
+          fields confuse the typical foreign-entity host; almost none of them
+          have a US EIN, a GIIN, internal reference numbers, or a separate
+          disregarded entity actually receiving the funds. Mirrors the
+          bottarga-92107 W-9 expander pattern. */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((prev) => !prev)}
+          className="flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text transition-colors"
+          aria-expanded={showAdvanced}
+        >
+          {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span>Advanced — rarely applies</span>
+        </button>
+        {showAdvanced && (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-theme-text-muted">
+              For sophisticated entity structures only. Fill these in only if your entity (the
+              beneficial owner above) operates through a SEPARATE disregarded entity that is
+              physically receiving the payment, has a US EIN, is a registered FFI with a GIIN,
+              or uses internal reference numbers.{' '}
+              <strong>Most foreign organizations leave these blank.</strong>
+            </p>
+            <IconInput
+              icon={Building2}
+              type="text"
+              placeholder="Name of disregarded entity receiving the payment (rarely applies)"
+              value={value.disregardedEntityName ?? ''}
+              onChange={(e) => set('disregardedEntityName', e.target.value)}
+              disabled={disabled}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <IconInput
+                icon={Hash}
+                type="text"
+                placeholder="US EIN (optional)"
+                value={value.usTin ?? ''}
+                onChange={(e) => set('usTin', e.target.value)}
+                disabled={disabled}
+              />
+              <IconInput
+                icon={Hash}
+                type="text"
+                placeholder="GIIN (FFIs only)"
+                value={value.giin ?? ''}
+                onChange={(e) => set('giin', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <IconInput
+              icon={Hash}
+              type="text"
+              placeholder="Reference number(s) (optional)"
+              value={value.referenceNumbers ?? ''}
+              onChange={(e) => set('referenceNumbers', e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+        )}
       </div>
 
       {/* Part III — Claim of Tax Treaty Benefits */}
