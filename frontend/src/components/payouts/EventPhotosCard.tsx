@@ -1,0 +1,186 @@
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ImagePlus, Camera } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePizza } from '../../contexts/PizzaContext';
+import { Photo } from '../../types';
+import { designatePhotoRole, getPartyPhotos } from '../../lib/api';
+import { RolePhotoPicker, PayoutPhotoRole } from './RolePhotoPicker';
+import { PhotoUpload } from '../photos/PhotoUpload';
+
+const PAYOUT_ROLES: PayoutPhotoRole[] = ['group', 'box_stack', 'pizza'];
+
+interface EventPhotosCardProps {
+  partyId: string;
+  /**
+   * calzone-58297: reports whether all three role photos are designated.
+   * The parent PayoutsTab uses this (together with receipt presence) to
+   * unlock the PaymentDetailsCard.
+   */
+  onRolesChange?: (allDesignated: boolean) => void;
+}
+
+/**
+ * calzone-58297: event-level photo designation card. Hoisted out of
+ * NewPayoutForm (porchetta-58296) so the three role photos (group / box stack
+ * / pizza) are designated once per event, above the receipts area, and visible
+ * in both the list and new-payout views.
+ *
+ * The designation is persisted per-photo via `designatePhotoRole` (writes
+ * `photos.payout_role`). On mount we seed the slots from the gallery's
+ * existing `payoutRole` values. The optional uploader adds extra gallery
+ * photos with no role.
+ */
+export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
+  partyId,
+  onRolesChange,
+}) => {
+  const { t } = useTranslation('host');
+  const { user } = useAuth();
+  const { party } = usePizza();
+
+  // porchetta-58296: the three host-designated event role photos. Each slot
+  // holds the designated Photo (or undefined). Seeded on mount from the
+  // gallery's payoutRole field. The actual designation is persisted via
+  // designatePhotoRole when the host picks/uploads in the RolePhotoPicker.
+  const [roles, setRoles] = useState<Record<PayoutPhotoRole, Photo | undefined>>({
+    group: undefined,
+    box_stack: undefined,
+    pizza: undefined,
+  });
+  const [pickerRole, setPickerRole] = useState<PayoutPhotoRole | null>(null);
+  const [designating, setDesignating] = useState(false);
+  const [showAdditionalUpload, setShowAdditionalUpload] = useState(false);
+
+  // porchetta-58296: seed the role slots on mount. Pull the gallery (host view)
+  // and match the photos already carrying each payoutRole.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const photosRes = await getPartyPhotos(partyId, { status: 'all', limit: 100 });
+      if (cancelled) return;
+      const photos = photosRes?.photos ?? [];
+      const next: Record<PayoutPhotoRole, Photo | undefined> = {
+        group: undefined,
+        box_stack: undefined,
+        pizza: undefined,
+      };
+      for (const p of photos) {
+        if (p.payoutRole && PAYOUT_ROLES.includes(p.payoutRole as PayoutPhotoRole)) {
+          next[p.payoutRole as PayoutPhotoRole] = p;
+        }
+      }
+      setRoles(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId]);
+
+  // calzone-58297: report all-designated state to the parent whenever roles
+  // change so PaymentDetailsCard can unlock.
+  useEffect(() => {
+    onRolesChange?.(!!roles.group && !!roles.box_stack && !!roles.pizza);
+  }, [roles, onRolesChange]);
+
+  // porchetta-58296: designate (persist) the chosen photo for the open slot.
+  const handleRoleSelect = async (photo: Photo) => {
+    if (!pickerRole) return;
+    setDesignating(true);
+    const updated = await designatePhotoRole(partyId, photo.id, pickerRole);
+    setDesignating(false);
+    if (updated) {
+      setRoles(prev => ({ ...prev, [pickerRole]: updated }));
+      setPickerRole(null);
+    }
+  };
+
+  const roleLabels: Record<PayoutPhotoRole, string> = {
+    group: t('payouts.roles.group'),
+    box_stack: t('payouts.roles.boxStack'),
+    pizza: t('payouts.roles.pizza'),
+  };
+
+  return (
+    <div className="card p-6">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold text-theme-text">{t('payouts.eventPhotosTitle')}</h3>
+        <p className="text-xs text-theme-text-muted mt-0.5">
+          {t('payouts.eventPhotosSubtitle')}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {PAYOUT_ROLES.map(role => {
+          const photo = roles[role];
+          const isVideo = photo?.mimeType?.startsWith('video/');
+          return (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setPickerRole(role)}
+              className="relative aspect-square rounded-xl overflow-hidden bg-theme-surface border border-theme-stroke hover:border-[#ff393a]/50 transition-colors text-left"
+            >
+              {photo ? (
+                <>
+                  {isVideo ? (
+                    <video src={photo.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                  ) : (
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={roleLabels[role]}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <span className="text-xs font-medium text-white">{roleLabels[role]}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-center">
+                  <ImagePlus size={24} className="text-theme-text-muted" />
+                  <span className="text-xs font-medium text-theme-text">{roleLabels[role]}</span>
+                  <span className="text-[11px] text-theme-text-muted">{t('payouts.selectOrUpload')}</span>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Optional additional photos — gallery upload, no role. */}
+      <div className="mt-4">
+        {showAdditionalUpload ? (
+          <PhotoUpload
+            partyId={partyId}
+            isHost
+            uploaderName={user?.name ?? undefined}
+            uploaderEmail={user?.email ?? undefined}
+            onClose={() => setShowAdditionalUpload(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowAdditionalUpload(true)}
+            className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
+          >
+            <Camera size={16} />
+            {t('payouts.additionalPhotos')}
+          </button>
+        )}
+      </div>
+
+      {/* porchetta-58296: role photo picker modal (select existing or upload). */}
+      {pickerRole && (
+        <RolePhotoPicker
+          partyId={partyId}
+          role={pickerRole}
+          roleLabel={roleLabels[pickerRole]}
+          eventStart={party?.date ?? null}
+          selectedPhotoId={roles[pickerRole]?.id ?? null}
+          onSelect={designating ? () => {} : handleRoleSelect}
+          onClose={() => setPickerRole(null)}
+        />
+      )}
+    </div>
+  );
+};

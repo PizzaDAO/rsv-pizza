@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Check, AlertCircle, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
 import { BankDetails, PayoutMethod } from '../../types';
@@ -34,8 +34,21 @@ type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
  * Save behavior: debounced 1s after the last change (mirrors
  * ExpectedGuestsCard's optimistic + auto-save pattern, but without the
  * explicit Save button — the picker UI is already interactive).
+ *
+ * calzone-58297: the card is now gated. The parent PayoutsTab passes
+ * `disabled` until the host has designated all 3 role photos AND uploaded a
+ * receipt. While disabled the picker + inputs are greyed/non-interactive and
+ * the debounced autosave is skipped so a disabled card never persists.
  */
-export const PaymentDetailsCard: React.FC = () => {
+interface PaymentDetailsCardProps {
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+export const PaymentDetailsCard: React.FC<PaymentDetailsCardProps> = ({
+  disabled = false,
+  disabledReason,
+}) => {
   const { user, setUser } = useAuth();
   const { party } = usePizza();
 
@@ -178,6 +191,11 @@ export const PaymentDetailsCard: React.FC = () => {
     prevSnapshot.current = snapshot;
     isDirty.current = true;
 
+    // calzone-58297: never persist from a disabled card. The card is greyed +
+    // non-interactive while gated, but guard the save here too so nothing
+    // sneaks through (e.g. a stray hydration-driven change).
+    if (disabled) return;
+
     // marinara-71630 P1: never autosave a method the BACKEND has decided is
     // unavailable for this party — the resolved option is either absent
     // (restricted away) or disabled (e.g. Mercury in a blocked country). The
@@ -250,7 +268,7 @@ export const PaymentDetailsCard: React.FC = () => {
     // We intentionally exclude buildPayload from deps — it closes over the
     // latest values via the surrounding effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, walletAddress, bankDetails, methodValid, resolvedOptions]);
+  }, [method, walletAddress, bankDetails, methodValid, resolvedOptions, disabled]);
 
   // PayoutMethodPicker requires non-null method. For the empty state we let
   // the user pick a method first; the picker still renders all three radios.
@@ -365,8 +383,9 @@ export const PaymentDetailsCard: React.FC = () => {
 
   // Submit is disabled until the host has picked a method and the
   // method-specific fields validate. Reuses the existing `methodValid` calc
-  // so the gate matches the autosave gate.
-  const submitDisabled = !partyId || optInPending || !methodValid;
+  // so the gate matches the autosave gate. calzone-58297: also disabled while
+  // the whole card is gated (no photos/receipts yet).
+  const submitDisabled = !partyId || optInPending || !methodValid || disabled;
 
   return (
     // pizzaiolo-92103: `id` is the scroll target for the inline notice in
@@ -403,34 +422,49 @@ export const PaymentDetailsCard: React.FC = () => {
         </div>
       </div>
 
-      <PayoutMethodPicker
-        method={pickerMethod}
-        onMethodChange={(next) => {
-          setMethod(next);
-          // When switching methods we DON'T wipe the other method's stored
-          // details — they stay so the host can swap back without retyping.
-        }}
-        walletAddress={walletAddress}
-        onWalletAddressChange={setWalletAddress}
-        bankDetails={bankDetails}
-        onBankDetailsChange={setBankDetails}
-        userEmail={user?.email}
-        reimbursementCapUsd={party?.effectiveReimbursementCapUsd ?? null}
-        options={resolvedOptions}
-      />
-
-      {saveError && (
-        <p className="text-xs text-[#ff393a] mt-2">{saveError}</p>
+      {/* calzone-58297: gating notice — shown when the card is locked until
+          the host designates their 3 role photos + uploads a receipt. */}
+      {disabled && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+          <Lock size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-theme-text">
+            {disabledReason
+              ?? 'Designate your group, box stack, and pizza photos and upload a receipt to enter your payment details.'}
+          </p>
+        </div>
       )}
 
-      {/*
-        bufala-83291: per-event Submit. The autosave above keeps the user's
-        global default in sync; this section ALSO opts them in for THIS event.
-        Without an opt-in row the host won't appear on /payments as a prepay
-        candidate even if their global payment method is set.
-      */}
-      {partyId && optInLoaded && (
-        <div className="mt-5 border-t border-white/10 pt-4">
+      {/* calzone-58297: while disabled, grey out + block interaction with the
+          picker and opt-in. The autosave guard above prevents persistence. */}
+      <div className={disabled ? 'opacity-50 pointer-events-none select-none' : undefined}>
+        <PayoutMethodPicker
+          method={pickerMethod}
+          onMethodChange={(next) => {
+            setMethod(next);
+            // When switching methods we DON'T wipe the other method's stored
+            // details — they stay so the host can swap back without retyping.
+          }}
+          walletAddress={walletAddress}
+          onWalletAddressChange={setWalletAddress}
+          bankDetails={bankDetails}
+          onBankDetailsChange={setBankDetails}
+          userEmail={user?.email}
+          reimbursementCapUsd={party?.effectiveReimbursementCapUsd ?? null}
+          options={resolvedOptions}
+        />
+
+        {saveError && (
+          <p className="text-xs text-[#ff393a] mt-2">{saveError}</p>
+        )}
+
+        {/*
+          bufala-83291: per-event Submit. The autosave above keeps the user's
+          global default in sync; this section ALSO opts them in for THIS event.
+          Without an opt-in row the host won't appear on /payments as a prepay
+          candidate even if their global payment method is set.
+        */}
+        {partyId && optInLoaded && (
+          <div className="mt-5 border-t border-white/10 pt-4">
           {!optedIn ? (
             <div>
               <button
@@ -480,8 +514,9 @@ export const PaymentDetailsCard: React.FC = () => {
           {optInError && (
             <p className="text-xs text-[#ff393a] mt-2">{optInError}</p>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
