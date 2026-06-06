@@ -17,6 +17,8 @@ import {
   getReimbursementCapBands,
   getSponsorshipPricing,
   getGppGlobalEditors,
+  getOperationalLimits,
+  getLlmModels,
   invalidateAll,
   PRIVATE_CONFIG_KEYS,
 } from './privateConfig.js';
@@ -201,5 +203,113 @@ describe('getGppGlobalEditors', () => {
   it('falls back to [] when the stored value is not valid JSON', async () => {
     mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json[' });
     expect(await getGppGlobalEditors()).toEqual([]);
+  });
+});
+
+// marinara-71630 P8: operational quota limits accessor. NON-SECRET — the
+// fallback IS the current real value (2000 / 30), so behavior is identical
+// with or without a row; the row only lets the team override without a deploy.
+describe('getOperationalLimits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('returns the seeded config values when an app_config row is present', async () => {
+    const seeded = { importHardCap: 5000, photoPerUserPerEvent: 50 };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const limits = await getOperationalLimits();
+
+    expect(limits).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.operationalLimits },
+    });
+  });
+
+  it('falls back to the CURRENT real values (2000 / 30) when the row is absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
+  });
+
+  it('falls back to current values (never throws) when the DB read fails', async () => {
+    mockPrisma.appConfig.findUnique.mockRejectedValue(new Error('db down'));
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
+  });
+
+  it('falls back to current values when the stored value is not valid JSON', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json{' });
+    expect(await getOperationalLimits()).toEqual({
+      importHardCap: 2000,
+      photoPerUserPerEvent: 30,
+    });
+  });
+});
+
+// marinara-71630 P9: LLM model identifiers accessor. NON-SECRET — the fallback
+// IS the current production model per use-case, so behavior is identical with or
+// without a row; the row only lets the team swap/roll-back a model without a
+// deploy. Four separate keys (ocr/visionPrimary may diverge); the assistant tier
+// is intentionally the cheaper gpt-4o-mini.
+describe('getLlmModels', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateAll();
+  });
+
+  it('returns the seeded config values when an app_config row is present', async () => {
+    const seeded = {
+      ocr: 'gpt-4o-2024-11-20',
+      visionPrimary: 'gpt-4.1',
+      assistant: 'gpt-4o-mini-2024-07-18',
+      visionSecondOpinion: 'claude-3-7-sonnet-latest',
+    };
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify(seeded) });
+
+    const models = await getLlmModels();
+
+    expect(models).toEqual(seeded);
+    expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
+      where: { key: PRIVATE_CONFIG_KEYS.llmModels },
+    });
+  });
+
+  it('falls back to the CURRENT production models when the row is absent', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    expect(await getLlmModels()).toEqual({
+      ocr: 'gpt-4o',
+      visionPrimary: 'gpt-4o',
+      assistant: 'gpt-4o-mini',
+      visionSecondOpinion: 'claude-3-5-sonnet-latest',
+    });
+  });
+
+  it('preserves the per-use-case tier distinction in the fallback', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+    const models = await getLlmModels();
+    // The four are SEPARATE keys; the assistant deliberately runs on the cheaper
+    // mini tier and must NOT be collapsed into one global model.
+    expect(models.assistant).toBe('gpt-4o-mini');
+    expect(models.assistant).not.toBe(models.ocr);
+    expect(models.assistant).not.toBe(models.visionPrimary);
+  });
+
+  it('falls back to current models (never throws) when the DB read fails', async () => {
+    mockPrisma.appConfig.findUnique.mockRejectedValue(new Error('db down'));
+    const models = await getLlmModels();
+    expect(models.ocr).toBe('gpt-4o');
+    expect(models.visionSecondOpinion).toBe('claude-3-5-sonnet-latest');
+  });
+
+  it('falls back to current models when the stored value is not valid JSON', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: 'not-json{' });
+    const models = await getLlmModels();
+    expect(models.assistant).toBe('gpt-4o-mini');
   });
 });

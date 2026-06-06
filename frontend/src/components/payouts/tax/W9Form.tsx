@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   User,
   Building2,
@@ -45,6 +45,10 @@ export interface W9FormData {
   certify?: boolean;
   signature?: string;
   date?: string;
+  // salame-92111: Line 3b (March 2024 W-9 revision) — only meaningful when
+  // classification is Partnership / Trust-Estate / LLC taxed as Partnership.
+  // Stored in form_data; no schema change.
+  hasForeignPartnersOrOwners?: boolean;
 }
 
 interface W9FormProps {
@@ -258,16 +262,10 @@ export const W9Form: React.FC<W9FormProps> = ({
     !!(value.exemptPayeeCode || value.fatcaCode || value.accountNumbers),
   );
 
-  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
-  // fresh mount. Saved drafts with an existing date are left untouched; the
-  // effect only fires once so subsequent user edits remain authoritative.
-  useEffect(() => {
-    if (!value.date || value.date.trim() === "") {
-      const today = new Date().toISOString().slice(0, 10);
-      onChange({ ...value, date: today });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // lonza-92106: the today-default for the signature Date field is now seeded
+  // by the parent (TaxFormSection) before this component mounts, so we don't
+  // need (or want) a mount-effect here. The old child-side effect raced with
+  // the parent's draft fetch and got overwritten when the draft arrived.
 
   const set = <K extends keyof W9FormData>(key: K, v: W9FormData[K]) =>
     onChange({ ...value, [key]: v });
@@ -396,6 +394,32 @@ export const W9Form: React.FC<W9FormProps> = ({
               Disregarded = single-member LLC. The IRS treats it as the
               owner; you'll enter the owner's name on Line 1 and the LLC's
               name on Line 2.
+            </p>
+          </div>
+        )}
+        {/* salame-92111: Line 3b — new in March 2024 W-9 revision. Only
+            renders for partnership / trust-estate / LLC taxed as partnership;
+            individuals and corps never see it. */}
+        {(category === "partnership"
+          || category === "trust_estate"
+          || (category === "llc" && llcSub === "p")) && (
+          <div className="mt-3 rounded-md border border-theme-stroke bg-theme-input/40 p-3">
+            <Checkbox
+              checked={!!value.hasForeignPartnersOrOwners}
+              onChange={() =>
+                set("hasForeignPartnersOrOwners", !value.hasForeignPartnersOrOwners)
+              }
+              label="Check if you have any foreign partners, owners, or beneficiaries"
+              labelClassName="text-sm text-theme-text"
+              disabled={disabled}
+            />
+            <p className="text-xs text-theme-text-muted mt-2">
+              Per the March 2024 W-9 revision (Line 3b). If on Line 3a you
+              checked Partnership, Trust/Estate, or LLC taxed as Partnership,
+              AND you are providing this form to a partnership, trust, or
+              estate in which you have an ownership interest, the IRS requires
+              you to disclose whether you have any foreign partners, owners,
+              or beneficiaries. See the W-9 instructions.
             </p>
           </div>
         )}

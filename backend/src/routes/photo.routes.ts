@@ -5,6 +5,7 @@ import { requireAuth, optionalAuth, isSuperAdmin, AuthRequest } from '../middlew
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
+import { getOperationalLimits } from '../lib/privateConfig.js';
 
 const router = Router();
 
@@ -571,12 +572,17 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
       }
     }
 
-    // nduja-58296: per-user 30-photo cap per event. Identify the uploader by
+    // nduja-58296: per-user photo cap per event. Identify the uploader by
     // userId, guestId, or lowercased email — any match counts. Pending +
     // approved count; rejected photos do not (so a host can clean up bad
     // uploads to make room). If we can't identify the uploader at all, skip
     // the check rather than reject an otherwise valid upload.
-    const PHOTO_LIMIT_PER_USER_PER_EVENT = 30;
+    //
+    // marinara-71630 P8: the cap is a tunable operational quota resolved from
+    // config (fallback = current value 30) so it can be overridden without a
+    // deploy. The enforced value AND the user-facing error copy are both driven
+    // from this single resolved number so they can never drift.
+    const photoLimitPerUserPerEvent = (await getOperationalLimits()).photoPerUserPerEvent;
     const uploaderUserId = req.userId || null;
     const uploaderGuestId = verifiedGuestId || null;
     const uploaderEmailLower = (uploaderEmail || '').toLowerCase() || null;
@@ -595,9 +601,9 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
           OR: uploaderClauses,
         },
       });
-      if (existingCount >= PHOTO_LIMIT_PER_USER_PER_EVENT) {
+      if (existingCount >= photoLimitPerUserPerEvent) {
         throw new AppError(
-          '30 photo limit per user. Remove photos to make room',
+          `${photoLimitPerUserPerEvent} photo limit per user. Remove photos to make room`,
           400,
           'PHOTO_LIMIT_REACHED'
         );

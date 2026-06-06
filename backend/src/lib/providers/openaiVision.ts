@@ -6,6 +6,7 @@
  */
 
 import { getOpenAI } from '../openai.js';
+import { getLlmModels } from '../privateConfig.js';
 import {
   VisionProvider,
   VisionResult,
@@ -23,8 +24,9 @@ export const openaiVisionProvider: VisionProvider = {
   },
 
   async analyze(imageDataUrl: string, ctx: VisionContext): Promise<VisionResult> {
+    const visionModel = (await getLlmModels()).visionPrimary;
     const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o',
+      model: visionModel,
       messages: [
         { role: 'system', content: VISION_SYSTEM_PROMPT },
         {

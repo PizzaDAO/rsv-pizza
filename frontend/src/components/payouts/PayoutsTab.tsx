@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Loader2, AlertCircle, RefreshCw, ArrowLeft, Info, BadgeDollarSign } from 'lucide-react';
 import { Payout, TaxFormType } from '../../types';
-import { listPayouts } from '../../lib/api';
+import { listPayouts, fetchPayoutSubmissionReadiness } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { getUnderbossContact } from '../../utils/underbossContacts';
@@ -9,6 +10,7 @@ import { PayoutsList } from './PayoutsList';
 import { NewPayoutForm } from './NewPayoutForm';
 import { PayoutDetailModal } from './PayoutDetailModal';
 import { ExpectedGuestsCard } from './ExpectedGuestsCard';
+import { EventPhotosCard } from './EventPhotosCard';
 import { PrepayCheckbox } from './PrepayCheckbox';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { AppealCapModal } from './AppealCapModal';
@@ -54,6 +56,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   reimbursementCapAppealedAt,
   expectedGuests,
 }) => {
+  const { t } = useTranslation('host');
   const { party } = usePizza();
   const partyKitCapUsd = parsePartyKitCapFromTags(party?.eventTags);
   const [view, setView] = useState<View>('list');
@@ -69,6 +72,29 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   // NewPayoutForm's submit hits TAX_FORM_REQUIRED it forwards the requested
   // form type up so the section auto-opens to the right editor.
   const [taxFormAutoOpen, setTaxFormAutoOpen] = useState<TaxFormType | null>(null);
+
+  // calzone-58297: gate state for the (now bottom-of-tab) PaymentDetailsCard.
+  // The card unlocks once all 3 role photos are designated AND at least one
+  // receipt is present — either already on file (server readiness) OR uploaded
+  // live in the NewPayoutForm this session. `allRolesDesignated` is reported
+  // authoritatively by EventPhotosCard; the two receipt flags come from the
+  // readiness fetch + the live form.
+  const [allRolesDesignated, setAllRolesDesignated] = useState(false);
+  const [readinessHasReceipt, setReadinessHasReceipt] = useState(false);
+  const [formHasReceipt, setFormHasReceipt] = useState(false);
+
+  const loadReadiness = useCallback(async () => {
+    try {
+      const readiness = await fetchPayoutSubmissionReadiness(partyId);
+      if (readiness) setReadinessHasReceipt(readiness.hasReceipt);
+    } catch {
+      /* soft-fail — the live form receipt flag still unlocks the card */
+    }
+  }, [partyId]);
+
+  useEffect(() => {
+    loadReadiness();
+  }, [loadReadiness]);
 
   const loadPayouts = useCallback(async () => {
     setLoading(true);
@@ -100,7 +126,20 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     // Optimistic update: prepend to list, then close the form.
     setPayouts(prev => [created, ...prev]);
     setView('list');
+    // calzone-58297: refresh server-side receipt readiness so the
+    // PaymentDetailsCard stays unlocked after the form unmounts (which clears
+    // the live `formHasReceipt` flag).
+    loadReadiness();
   };
+
+  // calzone-58297: PaymentDetailsCard unlocks once all 3 role photos are
+  // designated AND a receipt is present (on file OR uploaded live).
+  const paymentDetailsUnlocked =
+    allRolesDesignated && (readinessHasReceipt || formHasReceipt);
+
+  // calzone-58297: after the event date passes, the top banner relabels
+  // "expected guests" → "estimated guests" (matches ExpectedGuestsCard).
+  const eventHasHappened = party?.date ? new Date(party.date) < new Date() : false;
 
   const handleCancelled = (payoutId: string) => {
     setPayouts(prev => prev.filter(p => p.id !== payoutId));
@@ -156,12 +195,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         const hasCap = typeof effectiveReimbursementCapUsd === 'number' && effectiveReimbursementCapUsd > 0;
 
         if (needsExpectedGuests || needsLocation) {
+          // calzone-58297: relabel "expected" → "estimated" after the event.
+          const guestsLabel = t(eventHasHappened ? 'payouts.bannerEstimatedGuests' : 'payouts.bannerExpectedGuests');
           const msg =
             needsExpectedGuests && needsLocation
-              ? 'Set your expected guests and your location to get your funding approved.'
+              ? t('payouts.bannerSetGuestsAndLocation', { guests: guestsLabel })
               : needsExpectedGuests
-                ? 'Set your expected guests to get your funding approved.'
-                : 'Set your location to get your funding approved.';
+                ? t('payouts.bannerSetGuests', { guests: guestsLabel })
+                : t('payouts.bannerSetLocation');
           return (
             <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
               <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
@@ -174,11 +215,12 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             <div className="card p-4 sm:p-5 border-l-4 border-l-emerald-500 flex items-start gap-3">
               <BadgeDollarSign size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
               <div className="text-sm font-medium text-theme-text">
-                We'll reimburse you for up to ${effectiveReimbursementCapUsd!.toFixed(2)}
-                {partyKitCapUsd != null && (
-                  <> of pizza and up to ${partyKitCapUsd.toFixed(2)} of party kit expenses</>
-                )}
-                .
+                {partyKitCapUsd != null
+                  ? t('payouts.capReimburseWithKit', {
+                      cap: effectiveReimbursementCapUsd!.toFixed(2),
+                      kitCap: partyKitCapUsd.toFixed(2),
+                    })
+                  : t('payouts.capReimburse', { cap: effectiveReimbursementCapUsd!.toFixed(2) })}
                 {/*
                   mascarpone-58927: surface the cap-appeal trigger here so it's
                   discoverable without opening NewPayoutForm. AppealCapModal
@@ -189,7 +231,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                   onClick={() => setShowAppealModal(true)}
                   className="text-emerald-300 hover:underline ml-2 text-sm"
                 >
-                  Appeal
+                  {t('payouts.appeal')}
                 </button>
               </div>
             </div>
@@ -199,13 +241,13 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 flex items-start gap-3">
             <Info size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm font-medium text-theme-text">
-              Your underboss is reviewing your event to set your payment cap.
+              {t('payouts.underbossReviewing')}
               {(() => {
                 const contact = getUnderbossContact(party?.country);
                 if (!contact) return null;
                 return (
                   <>
-                    {' '}Reach them on Telegram:{' '}
+                    {' '}{t('payouts.reachOnTelegram')}{' '}
                     <a
                       href={contact.url}
                       target="_blank"
@@ -228,46 +270,33 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       <ExpectedGuestsCard partyId={partyId} expectedGuests={expectedGuests} />
 
       {/*
-        arugula-38633 v3: persistent payment-method picker. Lives above the
-        receipts list so the host configures once and every future receipt
-        submission reads from the user record (NewPayoutForm no longer asks
-        per-submission). Same vertical band as ExpectedGuestsCard so the
-        "settings vs. activity" split is obvious.
+        calzone-58297: event-level photo designation, hoisted out of
+        NewPayoutForm so it sits ABOVE the receipts area and is visible in both
+        the list and new-payout views. Reports all-designated state up so the
+        PaymentDetailsCard (now at the bottom) can unlock.
       */}
-      <PaymentDetailsCard />
-
-      {/*
-        bottarga-92106: Tax-form section moved out of NewPayoutForm so hosts
-        can see and pre-fill the form before opening a payout request. Only
-        renders when the per-event admin flag is on (default off). The
-        cross-component scroll target id="tax-form-section" inside the
-        component is reused by NewPayoutForm's TAX_FORM_REQUIRED error
-        handler — both live in this tab so scrollIntoView reaches it.
-      */}
-      {party?.taxFormRequired === true && (
-        <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
-      )}
+      <EventPhotosCard partyId={partyId} onRolesChange={setAllRolesDesignated} />
 
       {view === 'list' && (
         <>
           <div className="card p-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h2 className="text-lg font-semibold text-theme-text">Receipts</h2>
+                <h2 className="text-lg font-semibold text-theme-text">{t('payouts.receiptsHeader')}</h2>
               </div>
               <button
                 onClick={() => setView('new')}
                 className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
               >
                 <Plus size={16} />
-                New receipt
+                {t('payouts.newReceipt')}
               </button>
             </div>
             {/* Set host expectations on payout timing — most payouts land ~7
                 days after a receipt is submitted. */}
             <div className="flex items-start gap-2 text-xs text-theme-text-muted">
               <Info size={14} className="mt-0.5 flex-shrink-0" />
-              <span>Most payments will take ~7 days from receipt submission.</span>
+              <span>{t('payouts.payoutTimingNote')}</span>
             </div>
           </div>
 
@@ -299,7 +328,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
           >
             <ArrowLeft size={16} />
-            Back to receipts
+            {t('payouts.backToReceipts')}
           </button>
           <NewPayoutForm
             partyId={partyId}
@@ -311,9 +340,33 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             totalPaidUsd={totalPaidUsd}
             expectedGuests={expectedGuests}
             onTaxFormRequired={(t) => setTaxFormAutoOpen(t)}
+            onReceiptsChange={setFormHasReceipt}
           />
         </>
       )}
+
+      {/*
+        bottarga-92106: Tax-form section. calzone-58297 moved it (and the
+        PaymentDetailsCard) below the receipts area so the "final step" cluster
+        stays together. Only renders when the per-event admin flag is on
+        (default off). The cross-component scroll target id="tax-form-section"
+        inside the component is still reachable from NewPayoutForm's
+        TAX_FORM_REQUIRED handler — both live in this tab.
+      */}
+      {party?.taxFormRequired === true && (
+        <TaxFormSection autoOpenFormType={taxFormAutoOpen} />
+      )}
+
+      {/*
+        calzone-58297: persistent payment-method picker, moved BELOW the
+        receipts area and gated. Stays disabled until the host has designated
+        all 3 role photos (EventPhotosCard above) AND has a receipt on file or
+        uploaded live. A disabled card never auto-saves.
+      */}
+      <PaymentDetailsCard
+        disabled={!paymentDetailsUnlocked}
+        disabledReason={t('payouts.paymentDetailsLocked')}
+      />
 
       {detailPayoutId && (
         <PayoutDetailModal

@@ -47,6 +47,7 @@ import {
   CapInlineEditor,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
+import { AdminAddAttachment } from './AdminAddAttachment';
 import { isSwcHubParty } from '../../utils/swcHub';
 import { isVideoFile } from '../../lib/mediaUtils';
 import {
@@ -157,6 +158,14 @@ interface PayoutsByPartyTableProps {
   onUnapprove?: (id: string) => void;
   onHostClick?: (userId: string) => void;
   onCapUpdated?: (partyId: string) => void;
+  /**
+   * schiacciata-58503: refresh hook called after an admin adds a receipt or
+   * photo to the city's primary payout via the in-panel AdminAddAttachment
+   * controls. Newly-added docs aren't covered by the `receiptOverrides`
+   * local-merge trick (they don't exist on `row.payouts` yet), so the parent
+   * does a real refetch of the by-party feed.
+   */
+  onDocumentsChanged?: (partyId: string) => void;
   /**
    * bocconcini-92103 / pinsa-92103: open MarkPartyPaidModal for the row's
    * party. The modal itself decides whether to flip in-flight payouts to
@@ -955,6 +964,7 @@ function CityExpansion({
   onExecute,
   onMarkPaid,
   onReceiptOverride,
+  onDocumentsChanged,
 }: {
   row: PartyPayoutsRow;
   selectedIds: Set<string>;
@@ -985,6 +995,11 @@ function CityExpansion({
     docId: string,
     override: { ocrAmount: number | null; isDuplicate?: boolean; ineligible?: boolean },
   ) => void;
+  /**
+   * schiacciata-58503: refetch the by-party feed after an admin adds a
+   * receipt / photo via the in-panel AdminAddAttachment controls.
+   */
+  onDocumentsChanged?: (partyId: string) => void;
 }) {
   // Hooks-above-early-returns: all useState / useMemo / useCallback live up
   // front so adding a conditional return below can't change hook order.
@@ -1113,6 +1128,18 @@ function CityExpansion({
   const eventPhotos = useMemo(
     () => allEventPhotos.filter((p) => !isPizzaPhoto(p)),
     [allEventPhotos],
+  );
+
+  // schiacciata-58503: the panel merges receipts/photos across `row.payouts`
+  // (multi-host pot), so there's no single payout. AdminAddAttachment needs
+  // one `payoutId` to attach to — pick the most-recently-created payout as the
+  // target for newly-added docs. Must stay in the hook block (above any
+  // conditional return) per the hooks-above-early-returns rule.
+  const primaryPayout = useMemo(
+    () => [...row.payouts].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0] ?? null,
+    [row.payouts],
   );
 
   // Unified-rollup totals computed client-side from the payouts already on
@@ -2168,12 +2195,30 @@ function CityExpansion({
         </div>
       )}
 
-      {/* Merged receipt grid */}
-      {receiptEntries.length > 0 && (
+      {/* Merged receipt grid. schiacciata-58503: the header (with the admin
+          "Add receipt" control) renders whenever the viewer can edit receipts
+          and there's a target payout — even on an empty city, so the FIRST
+          receipt can be added. Only the thumbnail grid stays gated on count. */}
+      {(receiptEntries.length > 0 || (canEditReceipts && primaryPayout)) && (
         <div>
-          <div className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">
-            Receipts ({receiptEntries.length})
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="text-xs uppercase tracking-wide text-theme-text-muted">
+              Receipts ({receiptEntries.length})
+            </div>
+            {canEditReceipts && primaryPayout && (
+              <AdminAddAttachment
+                payoutId={primaryPayout.id}
+                partyId={row.party.id}
+                mode="receipt"
+                onAdded={() => onDocumentsChanged?.(row.party.id)}
+              />
+            )}
           </div>
+          {receiptEntries.length === 0 ? (
+            <div className="text-sm text-theme-text-faint">
+              No receipts attached.
+            </div>
+          ) : (
           <div className="flex flex-wrap gap-2">
             {receiptEntries.map((e, idx) => {
               // coppa-92105: dim + diagonal-stripe overlay + DUPLICATE pill on
@@ -2257,6 +2302,7 @@ function CityExpansion({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -2389,11 +2435,27 @@ function CityExpansion({
         label="Event photos"
         photos={eventPhotos}
         onThumbClick={(idx) => setLightbox({ bucket: 'event', index: idx })}
+        headerAction={canEditReceipts && primaryPayout ? (
+          <AdminAddAttachment
+            payoutId={primaryPayout.id}
+            partyId={row.party.id}
+            mode="photo"
+            onAdded={() => onDocumentsChanged?.(row.party.id)}
+          />
+        ) : undefined}
       />
       <PhotoPreviewSection
         label="Pizza photos"
         photos={pizzaPhotos}
         onThumbClick={(idx) => setLightbox({ bucket: 'pizza', index: idx })}
+        headerAction={canEditReceipts && primaryPayout ? (
+          <AdminAddAttachment
+            payoutId={primaryPayout.id}
+            partyId={row.party.id}
+            mode="photo"
+            onAdded={() => onDocumentsChanged?.(row.party.id)}
+          />
+        ) : undefined}
       />
 
       {receiptEntries.length === 0
@@ -2461,13 +2523,21 @@ function PhotoPreviewSection({
   label,
   photos,
   onThumbClick,
+  headerAction,
 }: {
   label: string;
   photos: AdminPayoutEventPhoto[];
   onThumbClick: (index: number) => void;
+  /**
+   * schiacciata-58503: optional admin control (AdminAddAttachment) rendered on
+   * the right of the section header. When supplied, the section header renders
+   * even for an empty bucket so the admin can add the FIRST photo; with no
+   * photos and no action we keep returning null to stay hidden.
+   */
+  headerAction?: React.ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  if (photos.length === 0) return null;
+  if (photos.length === 0 && !headerAction) return null;
 
   const visible = expanded ? photos : photos.slice(0, PHOTO_PREVIEW_LIMIT);
   const hasMore = photos.length > PHOTO_PREVIEW_LIMIT;
@@ -2478,18 +2548,22 @@ function PhotoPreviewSection({
         <div className="text-xs uppercase tracking-wide text-theme-text-muted">
           {label} ({photos.length})
         </div>
-        {hasMore && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-xs text-sky-400 hover:text-sky-300 hover:underline"
-          >
-            {expanded
-              ? 'Show less'
-              : `See all (${photos.length})`}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasMore && photos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-xs text-sky-400 hover:text-sky-300 hover:underline"
+            >
+              {expanded
+                ? 'Show less'
+                : `See all (${photos.length})`}
+            </button>
+          )}
+          {headerAction}
+        </div>
       </div>
+      {photos.length === 0 ? null : (
       <div className="flex flex-wrap gap-2">
         {visible.map((p, idx) => {
           const isHidden = p.status !== 'approved';
@@ -2547,6 +2621,7 @@ function PhotoPreviewSection({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -2645,6 +2720,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onSendPayment,
   onScamFlagChanged,
   onCapUpdated,
+  onDocumentsChanged,
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
@@ -3494,6 +3570,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             busyRowId={busyRowId}
                             canEditReceipts={canEditReceipts}
                             canEditAdminNotes={canEditAdminNotes}
+                            onDocumentsChanged={onDocumentsChanged}
                             onApprove={viewerRole === 'admin' ? onApprove : undefined}
                             onExecute={viewerRole === 'admin' ? onExecute : undefined}
                             onMarkPaid={viewerRole === 'admin' ? onMarkPaid : undefined}

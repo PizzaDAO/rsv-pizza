@@ -3,6 +3,7 @@ import { User, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, 
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
 import { LocationAutocomplete } from '../../LocationAutocomplete';
+import { CountryPicker } from './CountryPicker';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
 
 export interface W8BENFormData {
@@ -97,17 +98,10 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
     );
   });
 
-  // crocchetta-92107: default the signature Date field to today (YYYY-MM-DD) on
-  // fresh mount. Saved drafts with an existing date are left untouched; the
-  // effect only fires once so subsequent user edits remain authoritative.
-  useEffect(() => {
-    const v = valueRef.current;
-    if (!v.date || v.date.trim() === '') {
-      const today = new Date().toISOString().slice(0, 10);
-      onChangeRef.current({ ...v, date: today });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // lonza-92106: the today-default for the signature Date field is now seeded
+  // by the parent (TaxFormSection) before this component mounts, so we don't
+  // need (or want) a mount-effect here. The old child-side effect raced with
+  // the parent's draft fetch and got overwritten when the draft arrived.
 
   // The treaty-claim country defaults to permanentCountry (typical case:
   // host is claiming benefits under their country of residence's treaty).
@@ -171,12 +165,13 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
         disabled={disabled}
         required
       />
-      <IconInput
-        icon={Globe}
-        type="text"
-        placeholder="Country of citizenship"
+      {/* bocconcino-92107: searchable country picker replaces a plain text
+          input — ~250 ISO-3166 entries with flag emoji + native-name aliases.
+          Saved value is the full English name (e.g. "Germany"), unchanged. */}
+      <CountryPicker
         value={value.citizenship ?? ''}
-        onChange={(e) => set('citizenship', e.target.value)}
+        onChange={(c) => set('citizenship', c)}
+        placeholder="Country of citizenship"
         disabled={disabled}
         required
       />

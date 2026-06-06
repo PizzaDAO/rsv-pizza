@@ -111,6 +111,11 @@ function isHeic(image: ReceiptLightboxImage | undefined): boolean {
   return name.endsWith('.heic') || name.endsWith('.heif');
 }
 
+// taleggio-71042: backend HEIC->JPEG convert endpoint base. Same VITE_API_URL
+// resolution as frontend/src/lib/api.ts so previews hit the prod backend and
+// local dev hits localhost:3006.
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+
 export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   isOpen,
   images,
@@ -224,43 +229,32 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
   const current = images[index];
   const heic = isHeic(current);
 
-  // stracciatella-71042: HEIC receipts can't render in an <img> natively, so
-  // decode them to a JPEG blob in-browser via heic2any (lazy-loaded so the WASM
-  // codec stays off the main bundle). Hook MUST live above the early return so
-  // the hook order stays stable (adding a hook below a conditional return has
-  // black-screened this app before).
-  const [heicState, setHeicState] = React.useState<
-    { status: 'idle' | 'loading' | 'ready' | 'error'; url?: string }
-  >({ status: 'idle' });
-
+  // taleggio-71042: HEIC receipts can't render in an <img> natively. The old
+  // client-side heic2any WASM decode threw on multi-image / HDR-gain-map iPhone
+  // HEICs, so we now point the <img> at the backend convert endpoint
+  // (/api/heic/convert), which decodes via the pure-JS heic-convert codec and
+  // returns a cached JPEG. The <img> onLoad / onError below drive this state
+  // machine. Hook MUST live above the early return so the hook order stays
+  // stable (adding a hook below a conditional return has black-screened this
+  // app before).
+  const [heicStatus, setHeicStatus] = React.useState<'loading' | 'ready' | 'error'>(
+    'loading'
+  );
+  // Reset to the loading spinner whenever the HEIC source changes (open or
+  // arrow-nav to a different HEIC) so a previously-decoded image doesn't flash
+  // its ready / error state onto the new file before the new <img> loads.
   useEffect(() => {
-    if (!isOpen || !heic || !current) { setHeicState({ status: 'idle' }); return; }
-    let cancelled = false;
-    let objectUrl: string | undefined;
-    setHeicState({ status: 'loading' });
-    (async () => {
-      try {
-        const res = await fetch(current.url);
-        if (!res.ok) throw new Error(`fetch ${res.status}`);
-        const blob = await res.blob();
-        const heic2any = (await import('heic2any')).default;
-        const out = await heic2any({ blob, toType: 'image/jpeg', quality: 0.92 });
-        const outBlob = Array.isArray(out) ? out[0] : out;
-        objectUrl = URL.createObjectURL(outBlob);
-        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
-        setHeicState({ status: 'ready', url: objectUrl });
-      } catch {
-        if (!cancelled) setHeicState({ status: 'error' });
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    if (isOpen && heic) setHeicStatus('loading');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, heic, current?.url]);
 
   if (!isOpen || count === 0 || !current) return null;
+
+  // taleggio-71042: HEIC files are served through the backend converter as
+  // JPEG. encodeURIComponent the storage URL so its query string survives.
+  const convertUrl = heic
+    ? `${API_URL}/api/heic/convert?url=${encodeURIComponent(current.url)}`
+    : '';
 
   // melanzane-92103: when the focused item is a video, render a <video> with
   // controls + autoplay so admins can scrub. `muted` is required for autoplay
@@ -419,38 +413,54 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             </>
           )}
           {heic ? (
-            heicState.status === 'ready' && heicState.url ? (
-              /* stracciatella-71042: decoded HEIC -> JPEG blob URL, shown inline. */
-              <img
-                src={heicState.url}
-                alt={current.fileName}
-                className={`${mediaSizing} object-contain`}
-              />
-            ) : heicState.status === 'loading' ? (
-              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
-                <div className="mx-auto h-8 w-8 rounded-full border-2 border-theme-stroke border-t-[#ff393a] animate-spin" />
-                <p className="text-sm font-semibold">Converting HEIC…</p>
-                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
-              </div>
-            ) : (
-              /* error / idle — fall back to the original open-in-new-tab card. */
-              <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
-                <p className="text-sm font-semibold">Can't preview HEIC files</p>
-                <p className="text-xs text-theme-text-muted">
-                  Your browser doesn't render <span className="font-mono">.heic</span>{' '}
-                  images natively. Open the file in a new tab to download or view it.
-                </p>
-                <a
-                  href={current.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
-                >
-                  Open in new tab <ExternalLink size={14} />
-                </a>
-                <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
-              </div>
-            )
+            /* taleggio-71042: HEIC is converted server-side to JPEG and
+               served by /api/heic/convert. The <img> below always renders
+               (driving onLoad/onError); while it loads we overlay the
+               "Converting HEIC…" spinner, and only on a hard onError do we
+               fall back to the open-in-new-tab card. */
+            <div className="relative flex items-center justify-center">
+              {heicStatus !== 'error' && (
+                <img
+                  key={convertUrl}
+                  src={convertUrl}
+                  alt={current.fileName}
+                  onLoad={() => setHeicStatus('ready')}
+                  onError={() => setHeicStatus('error')}
+                  className={`${mediaSizing} object-contain ${
+                    heicStatus === 'ready' ? '' : 'invisible'
+                  }`}
+                />
+              )}
+              {heicStatus === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                    <div className="mx-auto h-8 w-8 rounded-full border-2 border-theme-stroke border-t-[#ff393a] animate-spin" />
+                    <p className="text-sm font-semibold">Converting HEIC…</p>
+                    <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+                  </div>
+                </div>
+              )}
+              {heicStatus === 'error' && (
+                /* Conversion failed -- fall back to the open-in-new-tab card. */
+                <div className="bg-theme-surface text-theme-text rounded-2xl border border-theme-stroke px-6 py-8 max-w-md text-center space-y-3">
+                  <p className="text-sm font-semibold">Can't preview HEIC files</p>
+                  <p className="text-xs text-theme-text-muted">
+                    This <span className="font-mono">.heic</span> image couldn't be
+                    converted for preview. Open the file in a new tab to download or
+                    view it.
+                  </p>
+                  <a
+                    href={current.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-[#ff393a] hover:underline"
+                  >
+                    Open in new tab <ExternalLink size={14} />
+                  </a>
+                  <p className="text-xs text-theme-text-muted truncate">{current.fileName}</p>
+                </div>
+              )}
+            </div>
           ) : video ? (
             /* melanzane-92103: keying on src so swapping between videos via
                arrow nav cleanly remounts the <video> with the new source. */

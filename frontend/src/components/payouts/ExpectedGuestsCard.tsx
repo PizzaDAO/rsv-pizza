@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, Check, X, Loader2, Pencil } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { updateParty } from '../../lib/supabase';
@@ -25,8 +26,13 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
   partyId,
   expectedGuests,
 }) => {
+  const { t } = useTranslation('host');
   const { party, loadParty, guests } = usePizza();
   const rsvpCount = guests?.length ?? 0;
+  // calzone-58297: after the event date passes, "expected" guests are really
+  // an "estimated" attendance count — relabel the title + CTA accordingly.
+  // Pure wording; the underlying `parties.expected_guests` field is unchanged.
+  const eventHasHappened = party?.date ? new Date(party.date) < new Date() : false;
   // Default suggestion: 40% of current RSVPs (typical no-show buffer for
   // pizza events). Pre-fills the input when no value is saved yet — host
   // can edit before clicking Save; nothing auto-saves.
@@ -62,7 +68,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
     const trimmed = value.trim();
     const parsed = trimmed === '' ? null : parseInt(trimmed, 10);
     if (parsed != null && (!Number.isFinite(parsed) || parsed < 1)) {
-      setError('Enter a positive number');
+      setError(t('payouts.errorPositiveNumber'));
       return;
     }
     setSaving(true);
@@ -70,7 +76,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
     try {
       const ok = await updateParty(partyId, { expected_guests: parsed });
       if (!ok) {
-        setError('Failed to save');
+        setError(t('payouts.errorFailedToSave'));
         return;
       }
       // Reload party so every consumer (NewPayoutForm prompt, pizza order
@@ -80,7 +86,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
       }
       setEditing(false);
     } catch (err: any) {
-      setError(err?.message || 'Failed to save');
+      setError(err?.message || t('payouts.errorFailedToSave'));
     } finally {
       setSaving(false);
     }
@@ -101,7 +107,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-theme-text-muted">
-              Expected guests
+              {t(eventHasHappened ? 'payouts.estimatedGuestsTitle' : 'payouts.expectedGuestsTitle')}
             </div>
             {hasValue && !editing ? (
               <div className="text-lg font-semibold text-theme-text leading-tight">
@@ -109,7 +115,9 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
               </div>
             ) : (
               <div className="text-sm text-theme-text-muted leading-tight">
-                {hasValue ? 'Update your estimate' : 'Set expected guests'}
+                {hasValue
+                  ? t('payouts.updateYourEstimate')
+                  : t(eventHasHappened ? 'payouts.setEstimatedGuests' : 'payouts.setExpectedGuests')}
               </div>
             )}
           </div>
@@ -123,7 +131,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
                   icon={Users}
                   type="number"
                   min={1}
-                  placeholder="e.g. 50"
+                  placeholder={t('payouts.guestsPlaceholder')}
                   value={value}
                   onChange={e => setValue(e.target.value)}
                   disabled={saving}
@@ -167,7 +175,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
 
       {/* RSVP count hint — helps the host estimate */}
       <p className="text-xs text-theme-text-muted mt-2">
-        {rsvpCount === 1 ? '1 RSVP' : `${rsvpCount} RSVPs`} so far.
+        {t('payouts.rsvpHint', { count: rsvpCount })}
       </p>
 
       {error && (

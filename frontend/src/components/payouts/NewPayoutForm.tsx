@@ -1,26 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, StickyNote, BadgeDollarSign, Users, AlertTriangle, ImagePlus, Camera } from 'lucide-react';
+import { Loader2, StickyNote, BadgeDollarSign, Users, AlertTriangle } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePizza } from '../../contexts/PizzaContext';
-import { Payout, Photo } from '../../types';
+import { Payout } from '../../types';
 import {
   createPayout,
-  designatePhotoRole,
   fetchPayoutSubmissionReadiness,
-  getPartyPhotos,
 } from '../../lib/api';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PayoutAmountSummary } from './PayoutAmountSummary';
 import { AppealCapModal } from './AppealCapModal';
-import { RolePhotoPicker, PayoutPhotoRole } from './RolePhotoPicker';
-import { PhotoUpload } from '../photos/PhotoUpload';
 import { TaxFormType } from '../../types';
-
-const PAYOUT_ROLES: PayoutPhotoRole[] = ['group', 'box_stack', 'pizza'];
 
 /**
  * speck-89172: the $675 per-payment hard ceiling is still informative — USDC
@@ -61,6 +55,12 @@ interface NewPayoutFormProps {
    * on the same tab).
    */
   onTaxFormRequired?: (formType: TaxFormType | null) => void;
+  /**
+   * calzone-58297: reports whether at least one receipt is uploaded (live,
+   * pre-submit). The parent PayoutsTab uses this — together with the 3 role
+   * photos — to unlock the PaymentDetailsCard.
+   */
+  onReceiptsChange?: (hasReceipt: boolean) => void;
 }
 
 /**
@@ -90,6 +90,7 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   totalPaidUsd = 0,
   expectedGuests,
   onTaxFormRequired,
+  onReceiptsChange,
 }) => {
   const { t } = useTranslation('host');
   const { user } = useAuth();
@@ -110,71 +111,26 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   const [notes, setNotes] = useState('');
   const [overrideAmount, setOverrideAmount] = useState<number | null>(null);
 
-  // porchetta-58296: the three host-designated event role photos. Each slot
-  // holds the designated Photo (or undefined). Seeded on mount from the
-  // gallery's payoutRole field. The actual designation is persisted via
-  // designatePhotoRole when the host picks/uploads in the RolePhotoPicker.
-  const [roles, setRoles] = useState<Record<PayoutPhotoRole, Photo | undefined>>({
-    group: undefined,
-    box_stack: undefined,
-    pizza: undefined,
-  });
-  const [pickerRole, setPickerRole] = useState<PayoutPhotoRole | null>(null);
-  const [designating, setDesignating] = useState(false);
   // porchetta-58296: host attestation that all receipts are uploaded + itemized.
   const [receiptAttested, setReceiptAttested] = useState(false);
   // Server readiness snapshot (receipt presence carries across page reloads /
   // receipts uploaded on a prior visit via the shared receipts library).
   const [readinessHasReceipt, setReadinessHasReceipt] = useState(false);
-  const [showAdditionalUpload, setShowAdditionalUpload] = useState(false);
 
-  // porchetta-58296: seed the role slots + receipt readiness on mount. Pull the
-  // gallery (host view) and match the photos already carrying each payoutRole,
-  // plus the server-side receipt/role readiness.
+  // calzone-58297: seed receipt readiness on mount. The role-photo seeding
+  // moved to EventPhotosCard (photos are now designated event-level, above the
+  // receipts area, outside this form).
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [photosRes, readiness] = await Promise.all([
-        getPartyPhotos(partyId, { status: 'all', limit: 100 }),
-        fetchPayoutSubmissionReadiness(partyId),
-      ]);
+      const readiness = await fetchPayoutSubmissionReadiness(partyId);
       if (cancelled) return;
-      const photos = photosRes?.photos ?? [];
-      const next: Record<PayoutPhotoRole, Photo | undefined> = {
-        group: undefined,
-        box_stack: undefined,
-        pizza: undefined,
-      };
-      for (const p of photos) {
-        if (p.payoutRole && PAYOUT_ROLES.includes(p.payoutRole as PayoutPhotoRole)) {
-          next[p.payoutRole as PayoutPhotoRole] = p;
-        }
-      }
-      setRoles(next);
       if (readiness) setReadinessHasReceipt(readiness.hasReceipt);
     })();
     return () => {
       cancelled = true;
     };
   }, [partyId]);
-
-  // porchetta-58296: designate (persist) the chosen photo for the open slot.
-  const handleRoleSelect = async (photo: Photo) => {
-    if (!pickerRole) return;
-    setDesignating(true);
-    const updated = await designatePhotoRole(partyId, photo.id, pickerRole);
-    setDesignating(false);
-    if (updated) {
-      setRoles(prev => ({ ...prev, [pickerRole]: updated }));
-      setPickerRole(null);
-    }
-  };
-
-  const roleLabels: Record<PayoutPhotoRole, string> = {
-    group: t('payouts.roles.group'),
-    box_stack: t('payouts.roles.boxStack'),
-    pizza: t('payouts.roles.pizza'),
-  };
 
   // arugula-38633 v3 (follow-up): read payment method + destination from the
   // authenticated user record (saved via PaymentDetailsCard at the top of
@@ -309,22 +265,30 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
   // uploaded in this session OR the server already has one on file.
   const hasReceiptUpload =
     receipts.some(r => r.status === 'done' && !!r.url) || readinessHasReceipt;
-  // porchetta-58296: all three event role photos must be designated.
-  const allRolesDesignated = !!roles.group && !!roles.box_stack && !!roles.pizza;
+
+  // calzone-58297: report receipt presence up to PayoutsTab so the
+  // PaymentDetailsCard can unlock live (pre-submit). Only counts a receipt
+  // uploaded in THIS session — the server-side `readinessHasReceipt` is fetched
+  // independently by the tab.
+  useEffect(() => {
+    onReceiptsChange?.(receipts.some(r => r.status === 'done' && !!r.url));
+  }, [receipts, onReceiptsChange]);
 
   // pizzaiolo-92103: submission now requires a valid saved payment method
   // (gate also enforced backend-side as PAYMENT_METHOD_NOT_SET /
   // PAYMENT_METHOD_INCOMPLETE).
-  // porchetta-58296: also require the 3 designated role photos + a receipt +
-  // the receipts-itemized attestation (all mirrored server-side).
+  // porchetta-58296: also require a receipt + the receipts-itemized attestation
+  // (mirrored server-side). calzone-58297: the 3 designated role photos are
+  // now gated at the PaymentDetailsCard (a valid saved method can only be
+  // entered once photos + receipts are done), so the role check is dropped
+  // here — submit stays naturally gated via userMethodValid.
   const canSubmit = finalAmount > 0
     && attendanceValid
     && !isProcessing
     && !submitting
     && userMethodValid
     && hasReceiptUpload
-    && receiptAttested
-    && allRolesDesignated;
+    && receiptAttested;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -539,76 +503,9 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
         </div>
       </div>
 
-      {/* 2. Event photos — porchetta-58296: three host-designated role photos.
-          Each slot is selected from the gallery (host- or guest-uploaded) or
-          uploaded new. All three are required to submit. */}
-      <div className="card p-6">
-        <div className="mb-3">
-          <h3 className="text-base font-semibold text-theme-text">{t('payouts.eventPhotosTitle')}</h3>
-          <p className="text-xs text-theme-text-muted mt-0.5">
-            {t('payouts.eventPhotosSubtitle')}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {PAYOUT_ROLES.map(role => {
-            const photo = roles[role];
-            const isVideo = photo?.mimeType?.startsWith('video/');
-            return (
-              <button
-                key={role}
-                type="button"
-                onClick={() => setPickerRole(role)}
-                className="relative aspect-square rounded-xl overflow-hidden bg-theme-surface border border-theme-stroke hover:border-[#ff393a]/50 transition-colors text-left"
-              >
-                {photo ? (
-                  <>
-                    {isVideo ? (
-                      <video src={photo.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
-                    ) : (
-                      <img
-                        src={photo.thumbnailUrl || photo.url}
-                        alt={roleLabels[role]}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                      <span className="text-xs font-medium text-white">{roleLabels[role]}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-center">
-                    <ImagePlus size={24} className="text-theme-text-muted" />
-                    <span className="text-xs font-medium text-theme-text">{roleLabels[role]}</span>
-                    <span className="text-[11px] text-theme-text-muted">{t('payouts.selectOrUpload')}</span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Optional additional photos — gallery upload, no role. */}
-        <div className="mt-4">
-          {showAdditionalUpload ? (
-            <PhotoUpload
-              partyId={partyId}
-              isHost
-              uploaderName={user?.name ?? undefined}
-              uploaderEmail={user?.email ?? undefined}
-              onClose={() => setShowAdditionalUpload(false)}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowAdditionalUpload(true)}
-              className="inline-flex items-center gap-2 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
-            >
-              <Camera size={16} />
-              {t('payouts.additionalPhotos')}
-            </button>
-          )}
-        </div>
-      </div>
+      {/* 2. Event photos moved out (calzone-58297) — the three host-designated
+          role photos are now an event-level EventPhotosCard rendered above the
+          receipts area on PayoutsTab, in both list + new views. */}
 
       {/* 3. Notes */}
       <div className="card p-6">
@@ -739,19 +636,6 @@ export const NewPayoutForm: React.FC<NewPayoutFormProps> = ({
             : `Submit $${finalAmount.toFixed(2)} receipt`}
         </button>
       </div>
-
-      {/* porchetta-58296: role photo picker modal (select existing or upload). */}
-      {pickerRole && (
-        <RolePhotoPicker
-          partyId={partyId}
-          role={pickerRole}
-          roleLabel={roleLabels[pickerRole]}
-          eventStart={party?.date ?? null}
-          selectedPhotoId={roles[pickerRole]?.id ?? null}
-          onSelect={designating ? () => {} : handleRoleSelect}
-          onClose={() => setPickerRole(null)}
-        />
-      )}
 
       {showAppealModal && showCapBanner && (
         <AppealCapModal

@@ -142,6 +142,11 @@ export interface W9FormData {
   ein?: string;
   signature: string;
   date: string;
+  // salame-92111: Line 3b (March 2024 W-9 revision) — entities providing this
+  // form to a partnership/trust/estate in which they hold an interest disclose
+  // whether they have any foreign partners, owners, or beneficiaries. Only
+  // meaningful when taxClassification is partnership / trust_estate / llc_p.
+  hasForeignPartnersOrOwners?: boolean;
 }
 
 // prosciutto-92107: compose "City, State ZIP" from the structured fields.
@@ -198,10 +203,18 @@ export async function generateW9PDF(data: W9FormData, refId: string): Promise<Bu
     font,
     color: rgb(0.85, 0.85, 0.85),
   });
-  page.drawText('Rev. October 2018', {
+  // salame-92111: bump revision to the current IRS Form W-9 (Rev. March 2024).
+  page.drawText('Rev. March 2024', {
     x: 340,
     y: 748,
     size: 8,
+    font,
+    color: rgb(0.7, 0.7, 0.7),
+  });
+  page.drawText('Go to www.irs.gov/FormW9 for instructions and the latest information.', {
+    x: 340,
+    y: 738,
+    size: 6.5,
     font,
     color: rgb(0.7, 0.7, 0.7),
   });
@@ -234,9 +247,11 @@ export async function generateW9PDF(data: W9FormData, refId: string): Promise<Bu
   });
   y -= 40;
 
-  // Line 3 - Tax classification
+  // Line 3a - Tax classification. salame-92111: header reworded to match the
+  // March 2024 W-9 revision (numbered 3a, with the "Check only ONE of the
+  // following seven boxes" callout).
   page.drawText(
-    '3  Check appropriate box for federal tax classification of the person whose name is entered on line 1:',
+    '3a Federal tax classification of the person whose name is entered on line 1. Check only ONE of the following seven boxes:',
     { x: 33, y: y - 2, size: 7, font: bold, color: rgb(0.3, 0.3, 0.3) },
   );
   y -= 16;
@@ -262,6 +277,38 @@ export async function generateW9PDF(data: W9FormData, refId: string): Promise<Bu
     cx += font.widthOfTextAtSize(cls.label, 8) + 28;
   }
   y -= 18;
+
+  // Line 3b - salame-92111: foreign partners/owners/beneficiaries checkbox.
+  // Per the March 2024 W-9 revision, this only applies when Line 3a is
+  // Partnership, Trust/Estate, or LLC taxed as Partnership / Trust. The PDF
+  // still renders the box even for individuals (matching the printed IRS
+  // form's layout); the checkbox is only marked when the data warrants it.
+  const isPartnershipOrTrust =
+    data.taxClassification === 'partnership'
+    || data.taxClassification === 'trust_estate'
+    || data.taxClassification === 'llc_p';
+  drawCheckbox(page, {
+    x: 33,
+    y,
+    checked: !!(isPartnershipOrTrust && data.hasForeignPartnersOrOwners),
+    label:
+      '3b If on line 3a you checked "Partnership," "Trust/estate," or "LLC" (Partnership/Trust), AND you are providing',
+    font,
+  });
+  y -= 10;
+  page.drawText(
+    '    this form to a partnership, trust, or estate in which you have an ownership interest, check this box if you have',
+    { x: 33, y: y - 2, size: 7, font, color: rgb(0.3, 0.3, 0.3) },
+  );
+  y -= 10;
+  page.drawText('    any foreign partners, owners, or beneficiaries. See instructions.', {
+    x: 33,
+    y: y - 2,
+    size: 7,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+  y -= 14;
 
   // Line 4 - Exemptions
   drawField(page, {
@@ -416,7 +463,22 @@ export async function generateW9PDF(data: W9FormData, refId: string): Promise<Bu
     boldFont: bold,
   });
 
-  // Footer
+  // Footer. salame-92111: include IRS-style revision footer (Cat. No. +
+  // Form W-9 (Rev. 3-2024)) in addition to our internal submission stamp.
+  page.drawText('Cat. No. 10231X', {
+    x: 30,
+    y: 42,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+  page.drawText('Form W-9 (Rev. 3-2024)', {
+    x: 480,
+    y: 42,
+    size: 7,
+    font: bold,
+    color: rgb(0.4, 0.4, 0.4),
+  });
   page.drawText(`Generated ${todayIso()}  |  Submission #${refId}`, {
     x: 30,
     y: 30,
@@ -489,6 +551,15 @@ export async function generateW8BENPDF(data: W8BENFormData, refId: string): Prom
     x: 340,
     y: 748,
     size: 8,
+    font,
+    color: rgb(0.6, 0.7, 0.8),
+  });
+  // salame-92111: instructions URL line, matches the official Rev. Oct 2021
+  // form header.
+  page.drawText('Go to www.irs.gov/FormW8BEN for instructions and the latest information.', {
+    x: 340,
+    y: 738,
+    size: 6.5,
     font,
     color: rgb(0.6, 0.7, 0.8),
   });
@@ -770,6 +841,22 @@ export async function generateW8BENPDF(data: W8BENFormData, refId: string): Prom
     boldFont: bold,
   });
 
+  // salame-92111: IRS-style revision footer (matches the published Rev. Oct
+  // 2021 form layout).
+  page.drawText('Cat. No. 25047Z', {
+    x: 30,
+    y: 42,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+  page.drawText('Form W-8BEN (Rev. 10-2021)', {
+    x: 470,
+    y: 42,
+    size: 7,
+    font: bold,
+    color: rgb(0.4, 0.4, 0.4),
+  });
   page.drawText(`Generated ${todayIso()}  |  Submission #${refId}`, {
     x: 30,
     y: 30,
@@ -865,6 +952,15 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
     x: 340,
     y: 748,
     size: 8,
+    font,
+    color: rgb(0.6, 0.7, 0.8),
+  });
+  // salame-92111: instructions URL line, matches the official Rev. Oct 2021
+  // form header.
+  page.drawText('Go to www.irs.gov/FormW8BENE for instructions and the latest information.', {
+    x: 340,
+    y: 738,
+    size: 6.5,
     font,
     color: rgb(0.6, 0.7, 0.8),
   });
@@ -1264,13 +1360,42 @@ export async function generateW8BENEPDF(data: W8BENEFormData, refId: string): Pr
   });
 
   // Footer on both pages so the submission id is visible regardless of which
-  // page an admin downloads/prints in isolation.
+  // page an admin downloads/prints in isolation. salame-92111: also include
+  // IRS-style revision footer matching the official Rev. Oct 2021 form.
+  page.drawText('Cat. No. 59689N', {
+    x: 30,
+    y: 42,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+  page.drawText('Form W-8BEN-E (Rev. 10-2021)', {
+    x: 460,
+    y: 42,
+    size: 7,
+    font: bold,
+    color: rgb(0.4, 0.4, 0.4),
+  });
   page.drawText(`Generated ${todayIso()}  |  Submission #${refId}  |  Page 1 of 2`, {
     x: 30,
     y: 30,
     size: 7,
     font,
     color: rgb(0.6, 0.6, 0.6),
+  });
+  page2.drawText('Cat. No. 59689N', {
+    x: 30,
+    y: 42,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+  });
+  page2.drawText('Form W-8BEN-E (Rev. 10-2021)', {
+    x: 460,
+    y: 42,
+    size: 7,
+    font: bold,
+    color: rgb(0.4, 0.4, 0.4),
   });
   page2.drawText(`Generated ${todayIso()}  |  Submission #${refId}  |  Page 2 of 2`, {
     x: 30,
