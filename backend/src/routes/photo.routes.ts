@@ -236,6 +236,10 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
       guest: { id: string; name: string | null } | null;
       source: 'photo' | 'payout';
       payoutId: string | null;
+      // porchetta-58296: surfaced so the payout form can hydrate its role slots.
+      // Declared explicitly (not just carried by ...rest) so a future `select:`
+      // on the photos query can't silently drop this gate-critical field.
+      payoutRole: string | null;
     };
 
     const merged: Merged[] = [
@@ -249,6 +253,7 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
           guest: guest ?? null,
           source: 'photo',
           payoutId: null,
+          payoutRole: rest.payoutRole ?? null,
           votedByMe: req.userId ? (votes?.length ?? 0) > 0 : false,
         };
       }),
@@ -286,6 +291,8 @@ router.get('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Respo
           guest: null,
           source: 'payout',
           payoutId: pd.payoutId,
+          // Payout-sourced rows never carry a gallery role designation.
+          payoutRole: null,
         };
       }),
     ];
