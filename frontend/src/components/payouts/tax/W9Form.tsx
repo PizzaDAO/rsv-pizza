@@ -175,13 +175,22 @@ const getLine1Helper = (
   return "Enter the entity's legal name as registered with the IRS — it must match its EIN.";
 };
 
+// coppa-92107: per the IRS instructions, Line 2 is only filled when the
+// operating / trade name differs from the Line 1 legal name. Sole props with
+// no DBA, single-member LLCs whose name matches the owner, corps without a
+// DBA, etc. should leave it blank. We mark every variant of the placeholder
+// with an explicit "(optional)" suffix EXCEPT the LLC disregarded-entity
+// path, where Line 2 is the place the IRS expects the LLC's name (so it's
+// effectively required *for that classification* — though we still don't
+// gate the submit on it, since the host might be a sole prop misclassified
+// as disregarded; leave the IRS to bounce that, not us).
 const getLine2Placeholder = (
   category: ClassCategory | "",
   llcSub: LlcSub | "",
 ): string => {
   if (category === "llc" && llcSub === "disregarded")
     return "LLC name (the disregarded entity)";
-  return "Business / DBA name (if different from above)";
+  return "Business / DBA name (optional — only if different from above)";
 };
 
 const getLine2Helper = (
@@ -189,11 +198,12 @@ const getLine2Helper = (
   llcSub: LlcSub | "",
 ): string | null => {
   if (category === "llc" && llcSub === "disregarded")
-    return "Enter the LLC's name here. Line 1 above must be the owner's name.";
+    return "The LLC's name. Required if the LLC name differs from the owner's name on Line 1.";
   if (category === "individual")
-    return "Optional. Only fill in if you operate under a DBA / trade name that differs from your legal name.";
+    return "Skip if you don't operate under a different business name (DBA).";
   if (!category) return null;
-  return "Optional. Only fill in if your operating / trade name differs from Line 1.";
+  // C/S corp, partnership, trust/estate, LLC taxed as C/S/P, other.
+  return "Skip if your operating name matches your legal name on Line 1.";
 };
 
 // Line 2 is hidden when it would never apply. Currently we always show it
