@@ -35,6 +35,7 @@ const KEYS = {
   sponsorshipPricing: 'private.sponsorship_pricing',
   gppGlobalEditors: 'private.gpp_global_editors',
   operationalLimits: 'operational.limits',
+  llmModels: 'llm.models',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -409,6 +410,51 @@ export function getOperationalLimits(): Promise<OperationalLimits> {
   return getConfig<OperationalLimits>(KEYS.operationalLimits, {
     importHardCap: 2000,
     photoPerUserPerEvent: 30,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// LLM model identifiers (marinara-71630 P9)
+//
+// The model names used by each AI use-case (receipt OCR, primary receipt-image
+// vision verdict, the event-edit assistant, and the dormant second-opinion
+// vision provider). Moved out of hardcoded `model: '...'` literals scattered
+// across the OCR / vision / assistant code so a model can be swapped or rolled
+// back via an `app_config` row WITHOUT a deploy — model deprecation cadence is
+// faster than our deploy cadence.
+// ---------------------------------------------------------------------------
+
+export interface LlmModels {
+  /** Receipt OCR (OpenAI chat-completions vision, json_object). */
+  ocr: string;
+  /** Primary receipt-image authenticity vision verdict (OpenAI). */
+  visionPrimary: string;
+  /** Event-edit assistant (OpenAI tool-calling). Intentionally the cheaper tier. */
+  assistant: string;
+  /** Dormant second-opinion vision provider (Anthropic). */
+  visionSecondOpinion: string;
+}
+
+/**
+ * LLM model identifiers per use-case. NON-SECRET — these are just the model
+ * names, not sensitive config.
+ *
+ * Fallback = the CURRENT production models. Because the fallback IS the live
+ * value, behavior is identical whether or not an `app_config` row exists;
+ * seeding the `llm.models` row simply lets the team swap a model or roll one
+ * back WITHOUT shipping a deploy (model deprecation cadence > deploy cadence).
+ *
+ * The four are kept as SEPARATE keys even though `ocr` and `visionPrimary`
+ * currently share `gpt-4o` — they must be able to diverge independently. The
+ * per-use-case tier distinction is intentional: the assistant deliberately runs
+ * on the cheaper `gpt-4o-mini` and must NOT be collapsed into one global model.
+ */
+export function getLlmModels(): Promise<LlmModels> {
+  return getConfig<LlmModels>(KEYS.llmModels, {
+    ocr: 'gpt-4o',
+    visionPrimary: 'gpt-4o',
+    assistant: 'gpt-4o-mini',
+    visionSecondOpinion: 'claude-3-5-sonnet-latest',
   });
 }
 
