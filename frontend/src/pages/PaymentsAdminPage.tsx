@@ -1340,6 +1340,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onUnapprove={handleRowUnapprove}
             onHostClick={(userId) => setHostDetailUserId(userId)}
             onCapUpdated={() => refresh()}
+            // schiacciata-58503: refetch after an admin adds a receipt/photo
+            // in the by-party panel. New docs aren't on `row.payouts` yet, so
+            // the local receiptOverrides merge can't surface them.
+            onDocumentsChanged={() => refresh()}
             // bocconcini-92103: bridge the panettone-92103 "Mark party paid"
             // action into the by-city default view. Looks up the row so the
             // modal header can render the city name while the preview
