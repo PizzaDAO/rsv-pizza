@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, FileText, Search, Copy, Check, Twitter, Download } from 'lucide-react';
+import { Loader2, Shield, FileText, Search, Copy, Check, Twitter, Download, Dices } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
-import { fetchAdminMe } from '../lib/api';
+import { fetchAdminMe, getPhotosFeed } from '../lib/api';
+import type { FeedPhoto } from '../lib/api';
 import { getAllParties } from '../lib/supabase';
 import type { DbParty } from '../lib/supabase';
 import { countryNameToFlag } from '../utils/countryFlag';
@@ -100,6 +101,10 @@ export function PostComposerPage() {
   // Data state
   const [events, setEvents] = useState<DbParty[]>([]);
 
+  // calzone-49318: photos from the public feed, grouped by party id.
+  const [partyPhotos, setPartyPhotos] = useState<Map<string, FeedPhoto[]>>(new Map());
+  const [photosLoading, setPhotosLoading] = useState(true);
+
   // Composer state
   const [selectedTemplate, setSelectedTemplate] = useState<string>('molto-benny');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
@@ -137,6 +142,60 @@ export function PostComposerPage() {
     }
     checkAdmin();
   }, []);
+
+  /* ---- calzone-49318: load public photo feed, group by party id ---- */
+  useEffect(() => {
+    if (!isAdminUser) return;
+    let cancelled = false;
+
+    async function fetchFeedPages(year: number | undefined): Promise<FeedPhoto[]> {
+      const collected: FeedPhoto[] = [];
+      let cursor: string | null = null;
+      // Cap at ~5 pages of 100 (≤500 photos) to bound cost.
+      for (let page = 0; page < 5; page++) {
+        const resp = await getPhotosFeed(cursor, 100, {
+          sort: 'random',
+          seed: 'post-composer',
+          ...(typeof year === 'number' ? { year } : {}),
+        });
+        if (!resp) break;
+        collected.push(...resp.photos);
+        cursor = resp.nextCursor;
+        if (!cursor) break;
+      }
+      return collected;
+    }
+
+    async function loadPhotos() {
+      try {
+        let photos = await fetchFeedPages(2026);
+        // If the 2026 pool is empty, retry once with no year (all years).
+        if (photos.length === 0) {
+          photos = await fetchFeedPages(undefined);
+        }
+        if (cancelled) return;
+        const map = new Map<string, FeedPhoto[]>();
+        for (const p of photos) {
+          const id = p.party?.id;
+          if (!id) continue;
+          const arr = map.get(id);
+          if (arr) arr.push(p);
+          else map.set(id, [p]);
+        }
+        setPartyPhotos(map);
+      } catch (err) {
+        // Feed failure must never break the composer.
+        console.error('Error loading post-composer photo feed:', err);
+      } finally {
+        if (!cancelled) setPhotosLoading(false);
+      }
+    }
+
+    loadPhotos();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminUser]);
 
   /* ---- Auto-compose when template or event changes ---- */
   useEffect(() => {
@@ -186,8 +245,24 @@ export function PostComposerPage() {
     URL.revokeObjectURL(obj);
   }
 
+  /* ---- calzone-49318: approved-GPP events that also have feed photos ---- */
+  const photoEventIds = useMemo(
+    () => events.filter((e) => partyPhotos.has(e.id)).map((e) => e.id),
+    [events, partyPhotos],
+  );
+
+  /* ---- calzone-49318: jump to a random city that has photos ---- */
+  function pickRandomCity() {
+    if (photoEventIds.length === 0) return;
+    const id = photoEventIds[Math.floor(Math.random() * photoEventIds.length)];
+    setSelectedEventId(id);
+  }
+
   /* ---- Currently selected event ---- */
   const selectedEvent = events.find((e) => e.id === selectedEventId);
+
+  /* ---- calzone-49318: photos for the selected event ---- */
+  const selectedPhotos = partyPhotos.get(selectedEventId) ?? [];
 
   /* ---- Loading state ---- */
   if (loading) {
@@ -275,6 +350,24 @@ export function PostComposerPage() {
             })}
           </select>
           <p className="text-xs text-white/40">{filteredEvents.length} GPP events</p>
+          {/* calzone-49318: jump to a random city that has photos */}
+          <div className="space-y-1">
+            <button
+              onClick={pickRandomCity}
+              disabled={photosLoading || photoEventIds.length === 0}
+              className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-semibold transition-colors bg-white/10 hover:bg-white/20 border border-white/20 text-inherit disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Dices size={18} />
+              Random city
+            </button>
+            {photosLoading ? (
+              <p className="text-xs text-white/40">Loading photos…</p>
+            ) : photoEventIds.length === 0 ? (
+              <p className="text-xs text-white/40">No events with photos</p>
+            ) : (
+              <p className="text-xs text-white/40">{photoEventIds.length} cities with photos</p>
+            )}
+          </div>
         </div>
 
         {/* Preview */}
@@ -321,8 +414,51 @@ export function PostComposerPage() {
           </button>
         </div>
 
-        {/* Event photo */}
-        {selectedEvent?.event_image_url && (
+        {/* calzone-49318: photo grid for the selected event (falls back to single image) */}
+        {selectedEvent && selectedPhotos.length > 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-white/40">
+                {selectedPhotos.length} photo{selectedPhotos.length === 1 ? '' : 's'} from{' '}
+                {extractCity(selectedEvent.name)}
+              </p>
+              <button
+                onClick={async () => {
+                  for (let i = 0; i < selectedPhotos.length; i++) {
+                    await downloadImage(
+                      selectedPhotos[i].url,
+                      `${extractCity(selectedEvent.name)}-${i + 1}.jpg`,
+                    );
+                  }
+                }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-sky-200 hover:text-white transition-colors"
+              >
+                <Download size={14} />
+                Download all
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {selectedPhotos.map((photo, i) => (
+                <div key={photo.id} className="space-y-1.5">
+                  <img
+                    src={photo.thumbnailUrl ?? photo.url}
+                    alt={`${extractCity(selectedEvent.name)} ${i + 1}`}
+                    className="aspect-square w-full object-cover rounded-lg"
+                  />
+                  <button
+                    onClick={() =>
+                      downloadImage(photo.url, `${extractCity(selectedEvent.name)}-${i + 1}.jpg`)
+                    }
+                    className="w-full flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors bg-sky-500 hover:bg-sky-600 text-white"
+                  >
+                    <Download size={14} />
+                    Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : selectedEvent?.event_image_url ? (
           <div className="space-y-2">
             <img
               src={selectedEvent.event_image_url}
@@ -342,7 +478,7 @@ export function PostComposerPage() {
               Download
             </button>
           </div>
-        )}
+        ) : null}
       </div>
 
       <Footer />
