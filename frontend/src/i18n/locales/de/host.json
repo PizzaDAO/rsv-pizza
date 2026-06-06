@@ -821,6 +821,29 @@
     "ineligiblePill": "Nicht erstattungsfähig",
     "ineligibleLineTag": "nicht erstattungsfähig",
     "lineItemsToggle": "Positionen",
-    "eligibleLineTotal": "Erstattungsfähige Summe"
+    "eligibleLineTotal": "Erstattungsfähige Summe",
+    "receiptAttestation": "Ich habe alle meine Belege eingereicht und sie sind nach Posten aufgeschlüsselt.",
+    "receiptAttestationHelp": "Lade mindestens einen Beleg hoch, um dies zu aktivieren.",
+    "eventPhotosTitle": "Event-Fotos",
+    "eventPhotosSubtitle": "Lege ein Gruppenfoto, ein Foto des Boxstapels und ein Pizza-Foto von deinem Event fest. Wähle sie aus deiner Galerie oder lade neue hoch.",
+    "selectOrUpload": "Auswählen oder hochladen",
+    "additionalPhotos": "Weitere Fotos hinzufügen (optional)",
+    "roles": {
+      "group": "Gruppenfoto",
+      "boxStack": "Foto des Boxstapels",
+      "pizza": "Pizza-Foto"
+    },
+    "rolePicker": {
+      "title": "Wähle dein {{role}}",
+      "subtitle": "Wähle ein Event-Foto aus deiner Galerie oder lade ein neues hoch.",
+      "selectFromGallery": "Aus deiner Galerie auswählen",
+      "uploadNew": "Neu hochladen",
+      "uploading": "Wird hochgeladen…",
+      "empty": "Noch keine Fotos. Lade eines hoch, um zu beginnen.",
+      "ineligibleNote": "Vor Beginn des Events aufgenommen",
+      "invalidType": "Nicht unterstützter Dateityp. Verwende JPEG, PNG, WebP, GIF oder HEIC.",
+      "tooLarge": "Datei zu groß. Maximale Größe ist 25 MB.",
+      "uploadFailed": "Hochladen fehlgeschlagen. Bitte versuche es erneut."
+    }
   }
 }

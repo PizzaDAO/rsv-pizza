@@ -940,6 +940,29 @@
     "ineligiblePill": "Ineligible",
     "ineligibleLineTag": "ineligible",
     "lineItemsToggle": "Line items",
-    "eligibleLineTotal": "Eligible total"
+    "eligibleLineTotal": "Eligible total",
+    "receiptAttestation": "I have submitted all my receipts and they are itemized.",
+    "receiptAttestationHelp": "Upload at least one receipt to enable this.",
+    "eventPhotosTitle": "Event photos",
+    "eventPhotosSubtitle": "Designate a group photo, a box stack photo, and a pizza photo from your event. Select from your gallery or upload new ones.",
+    "selectOrUpload": "Select or upload",
+    "additionalPhotos": "Add more photos (optional)",
+    "roles": {
+      "group": "Group photo",
+      "boxStack": "Box stack photo",
+      "pizza": "Pizza photo"
+    },
+    "rolePicker": {
+      "title": "Choose your {{role}}",
+      "subtitle": "Select an event photo from your gallery or upload a new one.",
+      "selectFromGallery": "Select from your gallery",
+      "uploadNew": "Upload new",
+      "uploading": "Uploading…",
+      "empty": "No photos yet. Upload one to get started.",
+      "ineligibleNote": "Taken before the event started",
+      "invalidType": "Unsupported file type. Use JPEG, PNG, WebP, GIF, or HEIC.",
+      "tooLarge": "File too large. Maximum size is 25 MB.",
+      "uploadFailed": "Upload failed. Please try again."
+    }
   }
 }
