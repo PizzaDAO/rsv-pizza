@@ -141,9 +141,39 @@ router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
           } catch (captureErr: any) {
             console.error('[Telegram Webhook] /register capture failed:', captureErr?.message || captureErr);
           }
+          // /register handled (with reply) — always 200, never fall through.
+          return res.status(200).json({ ok: true });
         }
-        // Group message handled (command or ignored non-command) — always 200,
-        // never fall through to the private-DM path.
+
+        // ── ricotta-58494: passive harvest ───────────────────────────────
+        // Privacy mode is OFF, so every group message already reaches us. For
+        // a non-`/register` group message we silently learn the group's
+        // chat_id the FIRST time we ever see it. To avoid a write firehose
+        // (the bot sits in 466+ groups), do ONE cheap indexed point lookup on
+        // the unique `chat_id`: if a capture row already exists this is a
+        // no-op (no re-upsert, no last_seen). Only a never-before-seen group
+        // triggers a single captureTelegramGroup() — which records it and, on
+        // a title→city match, fill-if-empty write-throughs to
+        // city_telegram_groups; unmatched groups become pending captures for
+        // the /underboss gap tab. No in-group reply (unlike /register).
+        try {
+          const existing = await prisma.telegramGroupCapture.findUnique({
+            where: { chatId: BigInt(msgChat.id) },
+            select: { id: true },
+          });
+          if (!existing) {
+            await captureTelegramGroup({
+              chatId: msgChat.id,
+              title: msgChat.title ?? null,
+              chatType: msgChat.type,
+            });
+          }
+        } catch (passiveErr: any) {
+          console.error('[Telegram Webhook] passive-harvest capture failed:', passiveErr?.message || passiveErr);
+        }
+
+        // Group message fully handled (passive capture or known-group no-op) —
+        // always 200, never fall through to the private-DM path.
         return res.status(200).json({ ok: true });
       }
     }
