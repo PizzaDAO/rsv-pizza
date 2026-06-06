@@ -172,6 +172,57 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   return (
     <div className="space-y-4">
       {/*
+        stromboli-58299: the host's submitted payouts ("pending payments")
+        list moved to the TOP of the tab — above the banners and the
+        expected-guests / photos / payment-details cards — so hosts see their
+        in-flight payments first. List-view only (the new-receipt form replaces
+        it in the 'new' view).
+      */}
+      {view === 'list' && (
+        <>
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-lg font-semibold text-theme-text">{t('payouts.receiptsHeader')}</h2>
+              </div>
+              <button
+                onClick={() => setView('new')}
+                className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
+              >
+                <Plus size={16} />
+                {t('payouts.newReceipt')}
+              </button>
+            </div>
+            {/* Set host expectations on payout timing — most payouts land ~7
+                days after a receipt is submitted. */}
+            <div className="flex items-start gap-2 text-xs text-theme-text-muted">
+              <Info size={14} className="mt-0.5 flex-shrink-0" />
+              <span>{t('payouts.payoutTimingNote')}</span>
+            </div>
+          </div>
+
+          <PayoutsList
+            payouts={payouts}
+            onOpenDetail={id => setDetailPayoutId(id)}
+            onCancelled={handleCancelled}
+            onStartNew={() => setView('new')}
+            partyId={partyId}
+            totalPaidUsd={totalPaidUsd}
+            reimbursementCapUsd={effectiveReimbursementCapUsd ?? null}
+          />
+
+          {/*
+            ravioli-82931: surfaces every receipt the host has uploaded for
+            THIS party across all of their payouts (any status, including
+            withdrawn). Lets hosts see what they've previously submitted even
+            after withdrawing a request — receipts are no longer hard-deleted
+            with the parent payout. Read-only.
+          */}
+          <ReceiptsLibrary partyId={partyId} />
+        </>
+      )}
+
+      {/*
         arugula-38633 v2 follow-up: always-visible expected-guests editor.
         Lives above the view-switch so it appears in BOTH the list and new-
         payment views — it's an event-level setting, not per-form. Reads/
@@ -276,50 +327,6 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         PaymentDetailsCard (now at the bottom) can unlock.
       */}
       <EventPhotosCard partyId={partyId} onRolesChange={setAllRolesDesignated} />
-
-      {view === 'list' && (
-        <>
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h2 className="text-lg font-semibold text-theme-text">{t('payouts.receiptsHeader')}</h2>
-              </div>
-              <button
-                onClick={() => setView('new')}
-                className="btn-primary inline-flex items-center gap-2 text-sm px-4 py-2 whitespace-nowrap"
-              >
-                <Plus size={16} />
-                {t('payouts.newReceipt')}
-              </button>
-            </div>
-            {/* Set host expectations on payout timing — most payouts land ~7
-                days after a receipt is submitted. */}
-            <div className="flex items-start gap-2 text-xs text-theme-text-muted">
-              <Info size={14} className="mt-0.5 flex-shrink-0" />
-              <span>{t('payouts.payoutTimingNote')}</span>
-            </div>
-          </div>
-
-          <PayoutsList
-            payouts={payouts}
-            onOpenDetail={id => setDetailPayoutId(id)}
-            onCancelled={handleCancelled}
-            onStartNew={() => setView('new')}
-            partyId={partyId}
-            totalPaidUsd={totalPaidUsd}
-            reimbursementCapUsd={effectiveReimbursementCapUsd ?? null}
-          />
-
-          {/*
-            ravioli-82931: surfaces every receipt the host has uploaded for
-            THIS party across all of their payouts (any status, including
-            withdrawn). Lets hosts see what they've previously submitted even
-            after withdrawing a request — receipts are no longer hard-deleted
-            with the parent payout. Read-only.
-          */}
-          <ReceiptsLibrary partyId={partyId} />
-        </>
-      )}
 
       {view === 'new' && (
         <>
