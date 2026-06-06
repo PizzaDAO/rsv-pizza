@@ -51,15 +51,24 @@ function partyCity(party: Party): string {
   return party.name.replace(/^Global Pizza Party\s*/i, '').trim() || party.name;
 }
 
+// Picked at random each time the modal opens; host can edit before posting.
+const RECAP_ADJECTIVES = [
+  'great',
+  'awesome',
+  'a blast',
+  'epic',
+];
+
 function buildDefaultText(party: Party): string {
   const flag = countryNameToFlag(party.country);
   const city = partyCity(party);
   const tags = buildPartnerTags(party);
+  const adjective = RECAP_ADJECTIVES[Math.floor(Math.random() * RECAP_ADJECTIVES.length)];
   return (
     `${flag}\u{1F355}\u{1F973}\n` +
-    `We had a blast celebrating Bitcoin Pizza Day in ${city}!\n` +
+    `Bitcoin Pizza Day ${city} was ${adjective}!\n` +
     `\n` +
-    `Thanks ${tags} for supporting the event! See you next year!`
+    `Thanks ${tags} for supporting the event. See you next year!`
   );
 }
 
