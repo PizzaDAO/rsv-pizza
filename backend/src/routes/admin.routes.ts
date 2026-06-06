@@ -1031,4 +1031,336 @@ router.patch('/experiments/flags/:key', requireAuth, async (req: AuthRequest, re
   }
 });
 
+// ── lasagna-49278: RSVP opt-in checkbox config admin ───────────────────────
+// CRUD over the `rsvp_checkboxes` table. Frontend renderer (RsvpCheckboxList)
+// reads rows directly from Supabase via anon SELECT; writes go through here.
+// Schema isn't in Prisma — we use $queryRawUnsafe / $executeRawUnsafe.
+
+// Hardcoded whitelist of allowed `opt_in_fields` values. Mirrors the 8
+// destination columns on `guests`. Adding a 9th = explicit deploy (new
+// Prisma field, new backend whitelist entry, new frontend setter mapping).
+const ALLOWED_OPT_IN_FIELDS = new Set([
+  'mailingListOptIn',
+  'swcOptIn',
+  'swcCaOptIn',
+  'swcAuOptIn',
+  'swcEuOptIn',
+  'swcUkOptIn',
+  'swcBrOptIn',
+  'ethconfOptIn',
+]);
+const ALLOWED_ACCENT_COLORS = new Set(['red', 'purple']);
+// The 8 seeded global IDs. DELETE without party_id on these is rejected —
+// callers must soft-disable (active=false) instead.
+const SEEDED_GLOBAL_IDS = new Set([
+  'mailing_list', 'swc_us', 'swc_ca', 'swc_au', 'swc_eu', 'swc_uk', 'swc_br', 'ethconf',
+]);
+
+interface RsvpCheckboxRow {
+  id: string;
+  party_id: string | null;
+  position: number;
+  active: boolean;
+  required_tags: string[];
+  excluded_tags: string[];
+  always_show: boolean;
+  opt_in_fields: string[];
+  combined_group: string | null;
+  label_i18n_key: string | null;
+  label_default: string | null;
+  label_overrides: Record<string, string>;
+  info_modal_i18n_ns: string | null;
+  info_modal_privacy_url: string | null;
+  info_modal_terms_url: string | null;
+  info_modal_terms_key: string | null;
+  modal_overrides: Record<string, unknown>;
+  accent_color: string;
+  updated_at: Date;
+  updated_by: string | null;
+}
+
+function validateOptInFields(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new AppError('opt_in_fields must be a non-empty array', 400, 'VALIDATION_ERROR');
+  }
+  const out: string[] = [];
+  for (const v of value) {
+    if (typeof v !== 'string' || !ALLOWED_OPT_IN_FIELDS.has(v)) {
+      throw new AppError(
+        `opt_in_fields includes invalid value '${String(v)}'. Allowed: ${Array.from(ALLOWED_OPT_IN_FIELDS).join(', ')}`,
+        400,
+        'VALIDATION_ERROR',
+      );
+    }
+    out.push(v);
+  }
+  return out;
+}
+
+function validateAccentColor(value: unknown): string {
+  if (typeof value !== 'string' || !ALLOWED_ACCENT_COLORS.has(value)) {
+    throw new AppError(
+      `accent_color must be one of ${Array.from(ALLOWED_ACCENT_COLORS).join(', ')}`,
+      400,
+      'VALIDATION_ERROR',
+    );
+  }
+  return value;
+}
+
+function asStringArray(value: unknown, fieldName: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new AppError(`${fieldName} must be an array of strings`, 400, 'VALIDATION_ERROR');
+  }
+  return value.map((v) => {
+    if (typeof v !== 'string') {
+      throw new AppError(`${fieldName} must be an array of strings`, 400, 'VALIDATION_ERROR');
+    }
+    return v;
+  });
+}
+
+function asNullableString(value: unknown, fieldName: string): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new AppError(`${fieldName} must be a string or null`, 400, 'VALIDATION_ERROR');
+  }
+  return value;
+}
+
+function asObject(value: unknown, fieldName: string): Record<string, unknown> {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppError(`${fieldName} must be a JSON object`, 400, 'VALIDATION_ERROR');
+  }
+  return value as Record<string, unknown>;
+}
+
+// GET /api/admin/rsvp-checkboxes?party_id=<id>
+router.get('/rsvp-checkboxes', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const partyId = typeof req.query.party_id === 'string' ? req.query.party_id : null;
+    const rows = partyId
+      ? await prisma.$queryRawUnsafe<RsvpCheckboxRow[]>(
+          `SELECT id, party_id, position, active, required_tags, excluded_tags, always_show,
+                  opt_in_fields, combined_group,
+                  label_i18n_key, label_default, label_overrides,
+                  info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
+                  modal_overrides, accent_color, updated_at, updated_by
+             FROM rsvp_checkboxes
+            WHERE party_id = $1::uuid
+            ORDER BY position`,
+          partyId,
+        )
+      : await prisma.$queryRawUnsafe<RsvpCheckboxRow[]>(
+          `SELECT id, party_id, position, active, required_tags, excluded_tags, always_show,
+                  opt_in_fields, combined_group,
+                  label_i18n_key, label_default, label_overrides,
+                  info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
+                  modal_overrides, accent_color, updated_at, updated_by
+             FROM rsvp_checkboxes
+            ORDER BY party_id NULLS FIRST, position`,
+        );
+    res.set('Cache-Control', 'no-store');
+    res.json({ checkboxes: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/rsvp-checkboxes
+router.post('/rsvp-checkboxes', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const body = req.body ?? {};
+    if (typeof body.id !== 'string' || body.id.length === 0) {
+      throw new AppError('id is required', 400, 'VALIDATION_ERROR');
+    }
+    const optInFields = validateOptInFields(body.opt_in_fields);
+    const accentColor = validateAccentColor(body.accent_color ?? 'red');
+    const partyId = asNullableString(body.party_id, 'party_id');
+    const labelOverrides = asObject(body.label_overrides, 'label_overrides');
+    const modalOverrides = asObject(body.modal_overrides, 'modal_overrides');
+
+    const inserted = await prisma.$queryRawUnsafe<RsvpCheckboxRow[]>(
+      `INSERT INTO rsvp_checkboxes (
+         id, party_id, position, active,
+         required_tags, excluded_tags, always_show,
+         opt_in_fields, combined_group,
+         label_i18n_key, label_default, label_overrides,
+         info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
+         modal_overrides, accent_color,
+         updated_at, updated_by
+       ) VALUES (
+         $1, $2::uuid, $3, $4,
+         $5::text[], $6::text[], $7,
+         $8::text[], $9,
+         $10, $11, $12::jsonb,
+         $13, $14, $15, $16,
+         $17::jsonb, $18,
+         now(), $19
+       )
+       RETURNING id, party_id, position, active, required_tags, excluded_tags, always_show,
+                 opt_in_fields, combined_group,
+                 label_i18n_key, label_default, label_overrides,
+                 info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
+                 modal_overrides, accent_color, updated_at, updated_by`,
+      body.id,
+      partyId,
+      typeof body.position === 'number' ? body.position : 0,
+      body.active === false ? false : true,
+      asStringArray(body.required_tags, 'required_tags'),
+      asStringArray(body.excluded_tags, 'excluded_tags'),
+      body.always_show === true,
+      optInFields,
+      asNullableString(body.combined_group, 'combined_group'),
+      asNullableString(body.label_i18n_key, 'label_i18n_key'),
+      asNullableString(body.label_default, 'label_default'),
+      JSON.stringify(labelOverrides),
+      asNullableString(body.info_modal_i18n_ns, 'info_modal_i18n_ns'),
+      asNullableString(body.info_modal_privacy_url, 'info_modal_privacy_url'),
+      asNullableString(body.info_modal_terms_url, 'info_modal_terms_url'),
+      asNullableString(body.info_modal_terms_key, 'info_modal_terms_key'),
+      JSON.stringify(modalOverrides),
+      accentColor,
+      req.userEmail ?? null,
+    );
+    res.json({ checkbox: inserted[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/rsvp-checkboxes/:id?party_id=<id?>
+router.patch('/rsvp-checkboxes/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const { id } = req.params;
+    const partyId = typeof req.query.party_id === 'string' && req.query.party_id.length > 0
+      ? req.query.party_id
+      : (typeof req.body?.party_id === 'string' ? req.body.party_id : null);
+
+    // Validate any provided fields. Build a dynamic UPDATE set list.
+    const body = req.body ?? {};
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    const add = (sqlExpr: string, value: unknown) => {
+      params.push(value);
+      sets.push(`${sqlExpr} = $${params.length}`);
+    };
+
+    if (body.position !== undefined) add('position', typeof body.position === 'number' ? body.position : 0);
+    if (body.active !== undefined) add('active', body.active === true);
+    if (body.required_tags !== undefined) {
+      params.push(asStringArray(body.required_tags, 'required_tags'));
+      sets.push(`required_tags = $${params.length}::text[]`);
+    }
+    if (body.excluded_tags !== undefined) {
+      params.push(asStringArray(body.excluded_tags, 'excluded_tags'));
+      sets.push(`excluded_tags = $${params.length}::text[]`);
+    }
+    if (body.always_show !== undefined) add('always_show', body.always_show === true);
+    if (body.opt_in_fields !== undefined) {
+      params.push(validateOptInFields(body.opt_in_fields));
+      sets.push(`opt_in_fields = $${params.length}::text[]`);
+    }
+    if (body.combined_group !== undefined) add('combined_group', asNullableString(body.combined_group, 'combined_group'));
+    if (body.label_i18n_key !== undefined) add('label_i18n_key', asNullableString(body.label_i18n_key, 'label_i18n_key'));
+    if (body.label_default !== undefined) add('label_default', asNullableString(body.label_default, 'label_default'));
+    if (body.label_overrides !== undefined) {
+      params.push(JSON.stringify(asObject(body.label_overrides, 'label_overrides')));
+      sets.push(`label_overrides = $${params.length}::jsonb`);
+    }
+    if (body.info_modal_i18n_ns !== undefined) add('info_modal_i18n_ns', asNullableString(body.info_modal_i18n_ns, 'info_modal_i18n_ns'));
+    if (body.info_modal_privacy_url !== undefined) add('info_modal_privacy_url', asNullableString(body.info_modal_privacy_url, 'info_modal_privacy_url'));
+    if (body.info_modal_terms_url !== undefined) add('info_modal_terms_url', asNullableString(body.info_modal_terms_url, 'info_modal_terms_url'));
+    if (body.info_modal_terms_key !== undefined) add('info_modal_terms_key', asNullableString(body.info_modal_terms_key, 'info_modal_terms_key'));
+    if (body.modal_overrides !== undefined) {
+      params.push(JSON.stringify(asObject(body.modal_overrides, 'modal_overrides')));
+      sets.push(`modal_overrides = $${params.length}::jsonb`);
+    }
+    if (body.accent_color !== undefined) add('accent_color', validateAccentColor(body.accent_color));
+
+    // Always stamp updated_at + updated_by.
+    sets.push(`updated_at = now()`);
+    params.push(req.userEmail ?? null);
+    sets.push(`updated_by = $${params.length}`);
+
+    if (sets.length <= 2) {
+      // only the timestamp + actor — no actual field changes
+      throw new AppError('No fields to update', 400, 'VALIDATION_ERROR');
+    }
+
+    // WHERE clause: id + (party_id IS NULL or = $X)
+    params.push(id);
+    const idPlaceholder = `$${params.length}`;
+    let whereClause: string;
+    if (partyId) {
+      params.push(partyId);
+      whereClause = `id = ${idPlaceholder} AND party_id = $${params.length}::uuid`;
+    } else {
+      whereClause = `id = ${idPlaceholder} AND party_id IS NULL`;
+    }
+
+    const updated = await prisma.$queryRawUnsafe<RsvpCheckboxRow[]>(
+      `UPDATE rsvp_checkboxes SET ${sets.join(', ')}
+         WHERE ${whereClause}
+       RETURNING id, party_id, position, active, required_tags, excluded_tags, always_show,
+                 opt_in_fields, combined_group,
+                 label_i18n_key, label_default, label_overrides,
+                 info_modal_i18n_ns, info_modal_privacy_url, info_modal_terms_url, info_modal_terms_key,
+                 modal_overrides, accent_color, updated_at, updated_by`,
+      ...params,
+    );
+    if (updated.length === 0) {
+      throw new AppError('Checkbox row not found', 404, 'NOT_FOUND');
+    }
+    res.json({ checkbox: updated[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/rsvp-checkboxes/:id?party_id=<id?>
+router.delete('/rsvp-checkboxes/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await isAdmin(req.userEmail))) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+    const { id } = req.params;
+    const partyId = typeof req.query.party_id === 'string' && req.query.party_id.length > 0
+      ? req.query.party_id
+      : null;
+
+    // Reject DELETE of seeded global rows — force soft-disable instead.
+    if (!partyId && SEEDED_GLOBAL_IDS.has(id)) {
+      throw new AppError(
+        'Use active=false to soft-disable seeded global rows (delete is reserved for custom checkboxes and per-event overrides)',
+        400,
+        'VALIDATION_ERROR',
+      );
+    }
+
+    const sql = partyId
+      ? `DELETE FROM rsvp_checkboxes WHERE id = $1 AND party_id = $2::uuid`
+      : `DELETE FROM rsvp_checkboxes WHERE id = $1 AND party_id IS NULL`;
+    const params: unknown[] = partyId ? [id, partyId] : [id];
+    const deleted = await prisma.$executeRawUnsafe(sql, ...params);
+    if (deleted === 0) {
+      throw new AppError('Checkbox row not found', 404, 'NOT_FOUND');
+    }
+    res.json({ deleted: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
