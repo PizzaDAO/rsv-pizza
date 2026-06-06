@@ -974,7 +974,11 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // coordinators via a separate flow with no event photos and no receipt
     // attestation, so this gate would always block them. Mirrored client-side
     // as a disabled submit button; enforced here so an API bypass still fails.
-    if (!isShippingPurpose) {
+    // Also exempt admin prepay-for-cohost (bismarck-92103): the admin disburses
+    // after their own review (caps + fake-detection + SWC-hub acks) and is not
+    // the host attesting receipts — consistent with the payout-method and
+    // tax-form gates.
+    if (!isShippingPurpose && !adminPrepayingForCohost) {
       if (receiptAttested !== true) {
         throw new AppError(
           'Confirm your receipts are submitted and itemized before submitting.',
