@@ -5,6 +5,7 @@ import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
 import {
   eventAssistant,
+  eventAssistantFeedback,
   updatePartyApi,
   type AssistantProposedChange,
   type AssistantHistoryTurn,
@@ -41,6 +42,8 @@ export const EventAssistant: React.FC = () => {
   const [instruction, setInstruction] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [proposed, setProposed] = useState<AssistantProposedChange[]>([]);
+  // gricia-58502: log row id for the current proposal, echoed back on apply.
+  const [proposalId, setProposalId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -57,6 +60,7 @@ export const EventAssistant: React.FC = () => {
     setError(null);
     setApplied(false);
     setProposed([]);
+    setProposalId(null);
     setAccepted({});
 
     const history: AssistantHistoryTurn[] = messages.map((m) => ({ role: m.role, content: m.content }));
@@ -70,6 +74,7 @@ export const EventAssistant: React.FC = () => {
         : res.assistantMessage;
       setMessages((prev) => [...prev, { role: 'assistant', content: assistantText }]);
       setProposed(res.proposedChanges || []);
+      setProposalId(res.proposalId ?? null);
       // Default every proposed change to ON.
       const initial: Record<string, boolean> = {};
       for (const c of res.proposedChanges || []) initial[c.key] = true;
@@ -89,6 +94,12 @@ export const EventAssistant: React.FC = () => {
     setError(null);
     setApplied(false);
 
+    // gricia-58502: accepted = toggled ON, rejected = toggled OFF. Captured
+    // before we clear `proposed`/`accepted` so the feedback call has them.
+    const acceptedKeys = proposed.filter((c) => accepted[c.key]).map((c) => c.key);
+    const rejectedKeys = proposed.filter((c) => !accepted[c.key]).map((c) => c.key);
+    const pid = proposalId;
+
     // Build a camelCase patch for the trusted PATCH path. updatePartyApi throws
     // on failure (e.g. custom_url uniqueness), so we surface the message inline.
     const camelPatch: Record<string, unknown> = {};
@@ -100,6 +111,7 @@ export const EventAssistant: React.FC = () => {
       mergeParty(camelPatch as Partial<Party>);
       setApplied(true);
       setProposed([]);
+      setProposalId(null);
       setAccepted({});
       setMessages((prev) => [
         ...prev,
@@ -108,8 +120,28 @@ export const EventAssistant: React.FC = () => {
           content: `Applied ${toApply.length} change${toApply.length === 1 ? '' : 's'}.`,
         },
       ]);
+      // gricia-58502: fire-and-forget success feedback (best-effort, never
+      // awaited in a blocking way; eventAssistantFeedback swallows errors).
+      if (pid) {
+        void eventAssistantFeedback(party.id, {
+          proposalId: pid,
+          acceptedKeys,
+          rejectedKeys,
+          applied: true,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to apply changes.');
+      // gricia-58502: record the apply failure (best-effort, fire-and-forget).
+      if (pid) {
+        void eventAssistantFeedback(party.id, {
+          proposalId: pid,
+          acceptedKeys,
+          rejectedKeys,
+          applied: false,
+          error: e instanceof Error ? e.message : 'Failed to apply changes.',
+        });
+      }
     } finally {
       setApplying(false);
     }

@@ -121,7 +121,114 @@ router.post(
         conversationHistory: history,
       });
 
-      res.json(result);
+      // gricia-58502: best-effort query/result log. NEVER fail the request on a
+      // logging error — wrap the insert and swallow any failure. `proposalId`
+      // is the created row id (or null if the insert failed) so the frontend
+      // can later report accepted/rejected keys + apply outcome via /feedback.
+      let proposalId: string | null = null;
+      try {
+        const logRow = await prisma.eventAssistantLog.create({
+          data: {
+            partyId: id,
+            userId: req.userId ?? null,
+            instruction,
+            history: history.length > 0 ? (history as unknown as object) : undefined,
+            proposedChanges: result.proposedChanges as unknown as object,
+            clarifyingQuestion: result.clarifyingQuestion ?? null,
+            model: result.model,
+            promptTokens: result.usage.promptTokens ?? null,
+            completionTokens: result.usage.completionTokens ?? null,
+            latencyMs: result.latencyMs,
+          },
+          select: { id: true },
+        });
+        proposalId = logRow.id;
+      } catch (logErr) {
+        console.error('[eventAssistant] failed to write proposal log (continuing):', logErr);
+      }
+
+      res.json({
+        assistantMessage: result.assistantMessage,
+        clarifyingQuestion: result.clarifyingQuestion,
+        proposedChanges: result.proposedChanges,
+        proposalId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// gricia-58502: feedback endpoint. The frontend reports which proposed keys the
+// host accepted/rejected and whether the apply (trusted PATCH) succeeded. Same
+// guards as the assistant route: path-scoped requireAuth (above) + canUserEditParty
+// + the Philadelphia ASSISTANT_ENABLED_SLUGS gate. Everything is best-effort: a
+// missing/foreign proposalId is a 204 no-op (never a 500), and the update is
+// wrapped so logging never breaks the host's flow.
+const MAX_APPLY_ERROR_LEN = 1000;
+
+router.post(
+  '/:id/assistant/feedback',
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { proposalId, acceptedKeys, rejectedKeys, applied, error } = req.body || {};
+
+      if (typeof proposalId !== 'string' || proposalId.trim().length === 0) {
+        // Nothing to attribute the feedback to — no-op.
+        return res.status(204).end();
+      }
+
+      const canEdit = await canUserEditParty(id, req.userId, req.userEmail);
+      if (!canEdit) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+
+      // Same test-rollout gate as the assistant route.
+      const slugRow = await prisma.party.findUnique({
+        where: { id },
+        select: { customUrl: true, inviteCode: true },
+      });
+      const cu = slugRow?.customUrl?.toLowerCase();
+      const ic = slugRow?.inviteCode?.toLowerCase();
+      const assistantEnabled =
+        (!!cu && ASSISTANT_ENABLED_SLUGS.has(cu)) || (!!ic && ASSISTANT_ENABLED_SLUGS.has(ic));
+      if (!assistantEnabled) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+
+      // Best-effort update — never throw a 500 from here.
+      try {
+        const logRow = await prisma.eventAssistantLog.findUnique({
+          where: { id: proposalId },
+          select: { id: true, partyId: true },
+        });
+        // No such row, or it belongs to a different party → silent no-op.
+        if (!logRow || logRow.partyId !== id) {
+          return res.status(204).end();
+        }
+
+        const isApplied = applied === true;
+        const applyError =
+          typeof error === 'string' && error.length > 0
+            ? error.slice(0, MAX_APPLY_ERROR_LEN)
+            : null;
+
+        await prisma.eventAssistantLog.update({
+          where: { id: proposalId },
+          data: {
+            acceptedKeys: Array.isArray(acceptedKeys) ? (acceptedKeys as unknown as object) : undefined,
+            rejectedKeys: Array.isArray(rejectedKeys) ? (rejectedKeys as unknown as object) : undefined,
+            applied: isApplied,
+            applyError,
+            appliedAt: isApplied ? new Date() : null,
+          },
+        });
+      } catch (updateErr) {
+        console.error('[eventAssistant] failed to write feedback (continuing):', updateErr);
+      }
+
+      res.json({ ok: true });
     } catch (error) {
       next(error);
     }
