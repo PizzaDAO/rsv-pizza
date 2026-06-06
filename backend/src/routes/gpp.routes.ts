@@ -11,6 +11,7 @@ import { geocodeCity } from '../lib/geocode.js';
 import { haversineKm } from '../lib/distance.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getScoringWeights } from '../lib/privateConfig.js';
+import { publicTags, isInternalTag } from '../lib/eventTags.js';
 
 const router = Router();
 
@@ -622,7 +623,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
         name: party.name,
         inviteCode: party.inviteCode,
         eventType: party.eventType,
-        eventTags: party.eventTags,
+        eventTags: publicTags(party.eventTags),
       },
       hostPageUrl,
       eventPageUrl,
@@ -713,7 +714,7 @@ function formatGppEvent(event: any, callerIsModerator = false) {
     longitude: event.longitude,
     eventImageUrl: event.eventImageUrl,
     eventType: event.eventType,
-    eventTags: event.eventTags,
+    eventTags: publicTags(event.eventTags),
     createdAt: event.createdAt,
     hostName: 'PizzaDAO',
     guestCount: event._count?.guests ?? 0,
@@ -850,7 +851,7 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
         SELECT DISTINCT t AS tag FROM parties, unnest(event_tags) t
         WHERE t LIKE '%swc%' AND t <> 'swc'
       `;
-      const swcTags = swcTagRows.map(r => r.tag);
+      const swcTags = swcTagRows.map(r => r.tag).filter((t) => !isInternalTag(t));
       where = {
         eventType: 'gpp',
         underbossStatus: 'approved',

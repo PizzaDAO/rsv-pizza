@@ -49,6 +49,7 @@ import {
   type RegionalAuthRequest,
 } from '../middleware/regionalUnderboss.js';
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
+import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 
@@ -6623,6 +6624,7 @@ partyMarkPaidRouter.post(
           // pinsa-92103: needed so we don't double-stamp paymentsClosedAt
           // on a city that's already marked closed.
           paymentsClosedAt: true,
+          eventTags: true,
         },
       });
       if (!party) {
@@ -6739,7 +6741,10 @@ partyMarkPaidRouter.post(
           const closedAt = new Date();
           const updated = await prisma.party.update({
             where: { id: partyId },
-            data: { paymentsClosedAt: closedAt },
+            data: {
+              paymentsClosedAt: closedAt,
+              eventTags: withPaidTag(party.eventTags),
+            },
             select: { id: true, name: true, paymentsClosedAt: true },
           });
           res.json({
@@ -6965,7 +6970,10 @@ partyMarkPaidRouter.post(
           if (remainingInflight === 0) {
             await tx.party.update({
               where: { id: partyId },
-              data: { paymentsClosedAt: now },
+              data: {
+                paymentsClosedAt: now,
+                eventTags: withPaidTag(party.eventTags),
+              },
             });
           }
         }
@@ -7031,7 +7039,7 @@ partyMarkPaidRouter.post(
 
       const party = await prisma.party.findUnique({
         where: { id: partyId },
-        select: { id: true, name: true, paymentsClosedAt: true },
+        select: { id: true, name: true, paymentsClosedAt: true, eventTags: true },
       });
       if (!party) {
         throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
@@ -7084,7 +7092,10 @@ partyMarkPaidRouter.post(
 
         await tx.party.update({
           where: { id: partyId },
-          data: { paymentsClosedAt: null },
+          data: {
+            paymentsClosedAt: null,
+            eventTags: withoutPaidTag(party.eventTags),
+          },
         });
       });
 

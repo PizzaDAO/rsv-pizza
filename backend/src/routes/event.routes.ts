@@ -6,6 +6,7 @@ import { GPP_GLOBAL_EDITORS } from '../helpers/partyAccess.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
+import { publicTags } from '../lib/eventTags.js';
 
 const PIZZADAO_AVATAR_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/profile-pictures/cmkgpzby50002f8y1d8md1dzn/1768937020563.jpg';
 
@@ -372,7 +373,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         selectedPizzerias: party.selectedPizzerias,
         eventType: party.eventType,
         underbossStatus: party.underbossStatus,
-        eventTags: party.eventTags,
+        // calzone-50114: strip internal control tags from the public payload.
+        eventTags: publicTags(party.eventTags),
         donationEnabled: party.donationEnabled,
         donationRecipient: party.donationRecipient,
         donationRecipientUrl: party.donationRecipientUrl,
