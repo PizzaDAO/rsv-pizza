@@ -1,9 +1,9 @@
 {
-    "lastCheck":  "2026-05-26T12:33:30.5127050-04:00",
-    "migrationCount":  67,
+    "lastCheck":  "2026-06-06T05:15:25.9461015-04:00",
+    "migrationCount":  79,
     "srcFolders":  [
 
                    ],
     "claudeMdModified":  null,
-    "packageJsonHash":  "15D772D2B766576C"
+    "packageJsonHash":  "BC29E0282492DF5E"
 }

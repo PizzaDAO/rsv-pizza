@@ -1,12 +1,22 @@
 import { Router, Response, NextFunction } from 'express';
+import { customAlphabet } from 'nanoid';
 import { prisma } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
-import { cityKeyFromPartyName, getGppRegionByCityKey } from '../helpers/underbossScope.js';
+import {
+  cityKeyFromPartyName,
+  getGppRegionByCityKey,
+  buildScopedWhereClause,
+  UnderbossScope,
+} from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
 import { withBennySignature } from '../lib/bennySignature.js';
 import { isValidAppTab } from '../lib/broadcastApps.js';
+import {
+  sendConnectInviteEmail,
+  sendBroadcastFallbackEmail,
+} from '../services/hostTelegramEmail.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -84,6 +94,50 @@ function groupInBroadcastScope(
   return allowed.includes(groupCity);
 }
 
+// ─── guanciale-58491: "DM all GPP hosts" helpers ──────────────────────────
+
+// URL-safe nanoid for the host_telegram_link_token — matches the alphabet +
+// length used by host-telegram.routes.ts so minted tokens are interchangeable.
+const generateConnectToken = customAlphabet(
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+  10,
+);
+
+/**
+ * Adapt `req.underboss` (regions/cities arrays + '__admin__' sentinel) to the
+ * canonical `UnderbossScope` used by `buildScopedWhereClause`. This lets the
+ * new host endpoints push scope into the Prisma `where` (no JS post-filter),
+ * exactly like underboss.routes.ts.
+ */
+function scopeFromUnderboss(ub: { regions: string[]; cities?: string[] }): UnderbossScope {
+  if (ub.regions.includes('__admin__')) {
+    return { isAdmin: true, regions: [], cities: [] };
+  }
+  return { isAdmin: false, regions: ub.regions, cities: ub.cities || [] };
+}
+
+/** 'admin' | 'underboss' for the broadcast audit log. */
+function actorKindFromUnderboss(ub: { regions: string[] }): 'admin' | 'underboss' {
+  return ub.regions.includes('__admin__') ? 'admin' : 'underboss';
+}
+
+/** Strip the "Global Pizza Party " prefix for a compact city display name. */
+function cityDisplayName(name: string | null | undefined): string {
+  if (!name) return '';
+  return name.replace(/^Global Pizza Party\s+/i, '').trim() || name;
+}
+
+/**
+ * Build the in-scope GPP audience `where` clause. Mirrors the underboss.routes
+ * GPP filter (eventType='gpp', non-cancelled) and pushes the caller's scope
+ * into Prisma so out-of-scope rows are never fetched.
+ */
+function gppScopedWhere(scope: UnderbossScope) {
+  const scopedWhere = buildScopedWhereClause(scope);
+  const base = { eventType: 'gpp' as const, cancelledAt: null };
+  return scopedWhere ? { AND: [base, scopedWhere] } : base;
+}
+
 // POST /broadcast — Send message to multiple Telegram groups
 router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -140,6 +194,10 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     // ONE party matches a cityKey — ambiguous/no match leaves the token to be
     // stripped, so a broadcast never ships the wrong event's link.
     const usesLinkToken = /\{link\}|\{appLink\}/.test(message);
+    // pesto-58496: track each token independently so per-recipient results can
+    // flag when a USED token resolved to empty (link not added for that city).
+    const usesLink = /\{link\}/.test(message);
+    const usesAppLink = /\{appLink\}/.test(message);
     const partyByCityKey = new Map<string, { customUrl: string | null; inviteCode: string | null } | null>();
     if (usesLinkToken) {
       const cityKeys = Array.from(
@@ -172,7 +230,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       }
     }
 
-    const results: Array<{ chatId: string; city: string; success: boolean; error?: string }> = [];
+    const results: Array<{ chatId: string; city: string; success: boolean; error?: string; linkResolved?: boolean }> = [];
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
@@ -187,6 +245,11 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
       const linkedParty = usesLinkToken ? (partyByCityKey.get((city || '').toLowerCase().trim()) ?? null) : null;
       const linkUrl = publicEventLink(linkedParty);
       const appLinkUrl = appDeepLink(linkedParty, validatedAppTab);
+
+      // pesto-58496: flag a recipient when a USED link token resolved to empty
+      // (the link was stripped, so this recipient got the message without it).
+      // If the message uses no link tokens, never flag (leave true).
+      const linkResolved = !((usesLink && !linkUrl) || (usesAppLink && !appLinkUrl));
 
       // Replace template variables
       let personalizedMessage = message;
@@ -236,14 +299,14 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
             // the group's cityKey (already lowercased) so this updates the
             // existing row rather than creating an orphan. region set in-helper.
             await persistCityGroupMigration((city || '').toLowerCase().trim(), newChatId);
-            results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)` });
+            results.push({ chatId, city: city || '', success: true, error: `Migrated to ${newChatId} (saved automatically)`, linkResolved });
           } else {
-            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry' });
+            results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Failed after migration retry', linkResolved });
           }
         } else if (telegramResult.ok) {
-          results.push({ chatId, city: city || '', success: true });
+          results.push({ chatId, city: city || '', success: true, linkResolved });
         } else {
-          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error' });
+          results.push({ chatId, city: city || '', success: false, error: telegramResult.description || 'Unknown Telegram error', linkResolved });
         }
       } catch (err: any) {
         results.push({
@@ -251,6 +314,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
           city: city || '',
           success: false,
           error: err.message || 'Network error',
+          linkResolved,
         });
       }
 
@@ -271,10 +335,173 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
   }
 });
 
+// GET /host-coverage — guanciale-58491: coverage report over the in-scope GPP
+// audience. Returns total / linked / unlinked counts plus the list of unlinked
+// hosts (those with no host_telegram_chat_id) so the UI can offer "email the
+// deeplink to N unlinked hosts". Scope is pushed into the Prisma where.
+router.get('/host-coverage', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const scope = scopeFromUnderboss(req.underboss!);
+    const parties = await prisma.party.findMany({
+      where: gppScopedWhere(scope),
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        hostTelegramChatId: true,
+        user: { select: { name: true, email: true, telegram: true } },
+      },
+    });
+
+    let linked = 0;
+    let hasHandleNoChat = 0;
+    let noHandleNoChat = 0;
+    const unlinkedHosts: Array<{
+      partyId: string;
+      city: string;
+      hostName: string | null;
+      hostEmail: string | null;
+      hostTelegram: string | null;
+    }> = [];
+
+    for (const p of parties) {
+      const linkedHost = p.hostTelegramChatId !== null;
+      if (linkedHost) {
+        linked++;
+        continue;
+      }
+      const handle = p.user?.telegram || null;
+      if (handle) hasHandleNoChat++;
+      else noHandleNoChat++;
+      unlinkedHosts.push({
+        partyId: p.id,
+        city: p.city || cityDisplayName(p.name),
+        hostName: p.user?.name || null,
+        hostEmail: p.user?.email || null,
+        hostTelegram: handle,
+      });
+    }
+
+    res.json({
+      total: parties.length,
+      linked,
+      unlinked: parties.length - linked,
+      hasHandleNoChat,
+      noHandleNoChat,
+      unlinkedHosts,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /invite-unlinked — guanciale-58491: email every in-scope UNLINKED host
+// (with an email) their personal Telegram connect deeplink. Mints/reuses the
+// host_telegram_link_token (same logic as host-telegram.routes.ts). Idempotent-
+// friendly: reuses an existing token rather than rotating.
+router.post('/invite-unlinked', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const scope = scopeFromUnderboss(req.underboss!);
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
+    if (!botUsername) {
+      throw new AppError('Telegram bot username not configured', 500, 'CONFIG_ERROR');
+    }
+
+    // In-scope, unlinked GPP hosts.
+    const parties = await prisma.party.findMany({
+      where: { AND: [gppScopedWhere(scope), { hostTelegramChatId: null }] },
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        hostTelegramLinkToken: true,
+        user: { select: { name: true, email: true } },
+      },
+    });
+
+    let emailed = 0;
+    let skipped = 0; // had email but Resend rejected
+    let noEmail = 0;
+
+    for (const p of parties) {
+      const toEmail = p.user?.email || null;
+      if (!toEmail) {
+        noEmail++;
+        continue;
+      }
+
+      // Mint/reuse the connect token (idempotent — no rotate).
+      let token = p.hostTelegramLinkToken;
+      if (!token) {
+        token = generateConnectToken();
+        try {
+          await prisma.party.update({
+            where: { id: p.id },
+            data: { hostTelegramLinkToken: token },
+          });
+        } catch (err: any) {
+          console.warn(`[invite-unlinked] failed to mint token for party ${p.id}:`, err?.message || err);
+          skipped++;
+          continue;
+        }
+      }
+
+      const deeplink = `https://t.me/${botUsername}?start=${token}`;
+      const ok = await sendConnectInviteEmail({
+        toEmail,
+        hostName: p.user?.name || null,
+        cityName: p.city || cityDisplayName(p.name),
+        deeplink,
+      });
+      if (ok) emailed++;
+      else skipped++;
+
+      // Light rate-limit so a large invite batch doesn't burst Resend.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    console.log(`[invite-unlinked] ${req.underboss!.email}: emailed=${emailed} skipped=${skipped} noEmail=${noEmail} (of ${parties.length} unlinked)`);
+    res.json({ emailed, skipped, noEmail });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /host-audience — guanciale-58491: the full in-scope LINKED-host list,
+// independent of any client-passed event window. Used by the "All hosts"
+// broadcast entry point so the audience isn't limited to the page's events.
+router.get('/host-audience', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const scope = scopeFromUnderboss(req.underboss!);
+    const parties = await prisma.party.findMany({
+      where: { AND: [gppScopedWhere(scope), { hostTelegramChatId: { not: null } }] },
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        user: { select: { name: true, telegram: true } },
+      },
+      orderBy: { city: 'asc' },
+    });
+
+    res.json({
+      hosts: parties.map((p) => ({
+        partyId: p.id,
+        city: p.city || cityDisplayName(p.name),
+        hostName: p.user?.name || null,
+        hostTelegram: p.user?.telegram || null,
+        connected: true,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /host-broadcast — Send DM to multiple host private chats
 router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { hosts, message, parseMode, appTab } = req.body;
+    const { hosts, message, parseMode, appTab, broadcastId } = req.body;
 
     // parmigiano-58493: validate optional {appLink} target tab (hard 400 if bad).
     const validatedAppTab = validateAppTab(appTab);
@@ -282,8 +509,8 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
     if (!Array.isArray(hosts) || hosts.length === 0) {
       throw new AppError('hosts must be a non-empty array', 400, 'VALIDATION_ERROR');
     }
-    if (hosts.length > 500) {
-      throw new AppError('Maximum 500 hosts per request', 400, 'VALIDATION_ERROR');
+    if (hosts.length > 1000) {
+      throw new AppError('Maximum 1000 hosts per request', 400, 'VALIDATION_ERROR');
     }
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -296,6 +523,30 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
     const validParseModes = ['HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
       throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
+    }
+
+    // guanciale-58491: validate optional client-minted broadcastId (UUID). If a
+    // log row with this id already exists, short-circuit — double-send guard for
+    // accidental resubmits / retries. Return the persisted counts so the UI can
+    // still render the original result.
+    let broadcastIdValid: string | null = null;
+    if (broadcastId !== undefined && broadcastId !== null && broadcastId !== '') {
+      if (typeof broadcastId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(broadcastId)) {
+        throw new AppError('broadcastId must be a UUID', 400, 'VALIDATION_ERROR');
+      }
+      broadcastIdValid = broadcastId.toLowerCase();
+      const existing = await prisma.telegramBroadcastLog.findUnique({
+        where: { id: broadcastIdValid },
+      });
+      if (existing) {
+        return res.json({
+          results: Array.isArray(existing.results) ? existing.results : [],
+          sent: existing.sentCount,
+          failed: existing.failedCount,
+          emailed: existing.emailedCount,
+          duplicate: true,
+        });
+      }
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -312,21 +563,44 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       throw new AppError('No valid partyIds in hosts array', 400, 'VALIDATION_ERROR');
     }
 
+    // guanciale-58491: pull ALL requested parties (not just connected ones) so
+    // the email-the-message fallback can reach hosts whose chat_id is null at
+    // send time. customUrl + inviteCode for {link}/{appLink}; user for email.
+    // pesto-58496: track each link token independently so per-recipient results
+    // can flag when a USED token resolved to empty (link not added).
+    const usesLink = /\{link\}/.test(message);
+    const usesAppLink = /\{appLink\}/.test(message);
+
     const partyRows = await prisma.party.findMany({
-      where: { id: { in: partyIds }, hostTelegramChatId: { not: null } },
-      // parmigiano-58493: customUrl + inviteCode added for {link}/{appLink} tokens.
-      select: { id: true, hostTelegramChatId: true, name: true, customUrl: true, inviteCode: true },
+      where: { id: { in: partyIds } },
+      select: {
+        id: true,
+        hostTelegramChatId: true,
+        name: true,
+        customUrl: true,
+        inviteCode: true,
+        city: true,
+        user: { select: { name: true, email: true } },
+      },
     });
     const chatByPartyId = new Map<string, bigint>();
     const partyMetaById = new Map<string, { customUrl: string | null; inviteCode: string | null }>();
+    const hostContactById = new Map<string, { email: string | null; name: string | null; city: string }>();
     for (const row of partyRows) {
       if (row.hostTelegramChatId !== null) {
         chatByPartyId.set(row.id, row.hostTelegramChatId);
       }
       partyMetaById.set(row.id, { customUrl: row.customUrl, inviteCode: row.inviteCode });
+      hostContactById.set(row.id, {
+        email: row.user?.email || null,
+        name: row.user?.name || null,
+        city: row.city || cityDisplayName(row.name),
+      });
     }
 
-    console.log(`[Telegram Host Broadcast] ${req.underboss!.email} sending to ${hosts.length} hosts (${partyRows.length} connected) at ${new Date().toISOString()}`);
+    console.log(`[Telegram Host Broadcast] ${req.underboss!.email} sending to ${hosts.length} hosts (${chatByPartyId.size} connected) at ${new Date().toISOString()}`);
+
+    let emailedCount = 0;
 
     const results: Array<{
       partyId: string;
@@ -334,6 +608,8 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       hostName: string;
       success: boolean;
       error?: string;
+      emailed?: boolean;
+      linkResolved?: boolean;
     }> = [];
 
     for (let i = 0; i < hosts.length; i++) {
@@ -347,24 +623,48 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         continue;
       }
 
-      const chatId = chatByPartyId.get(partyId);
-      if (chatId === undefined) {
-        results.push({ partyId, city, hostName, success: false, error: 'Host has not connected Telegram' });
-        continue;
-      }
-
       // parmigiano-58493: resolve per-recipient link tokens from the host's party.
       const partyMeta = partyMetaById.get(partyId) ?? null;
       const linkUrl = publicEventLink(partyMeta);
       const appLinkUrl = appDeepLink(partyMeta, validatedAppTab);
 
-      // Replace template variables
-      let personalizedMessage = message;
-      personalizedMessage = personalizedMessage.replace(/\{city\}/g, city);
-      personalizedMessage = personalizedMessage.replace(/\{hostName\}/g, hostName);
-      // Substitute (and strip-if-unresolved) the per-recipient link tokens.
-      personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
-      personalizedMessage = withBennySignature(personalizedMessage);
+      // pesto-58496: flag a recipient when a USED link token resolved to empty.
+      const linkResolved = !((usesLink && !linkUrl) || (usesAppLink && !appLinkUrl));
+
+      // Replace template variables (shared by the Telegram + email paths). The
+      // email path uses this text WITHOUT the Benny signature (TG-only).
+      let baseMessage = message;
+      baseMessage = baseMessage.replace(/\{city\}/g, city);
+      baseMessage = baseMessage.replace(/\{hostName\}/g, hostName);
+      baseMessage = substituteLinkTokens(baseMessage, linkUrl, appLinkUrl);
+
+      const chatId = chatByPartyId.get(partyId);
+      if (chatId === undefined) {
+        // guanciale-58491: email-the-message fallback for not-connected hosts.
+        const contact = hostContactById.get(partyId);
+        let emailed = false;
+        if (contact?.email) {
+          emailed = await sendBroadcastFallbackEmail({
+            toEmail: contact.email,
+            hostName: contact.name ?? hostName,
+            cityName: city || contact.city,
+            message: baseMessage,
+          });
+          if (emailed) emailedCount++;
+        }
+        results.push({
+          partyId,
+          city,
+          hostName,
+          success: false,
+          error: emailed ? 'Not connected — emailed instead' : 'Host has not connected Telegram',
+          emailed,
+          linkResolved,
+        });
+        continue;
+      }
+
+      const personalizedMessage = withBennySignature(baseMessage);
 
       try {
         const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
@@ -384,7 +684,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         const telegramResult = await telegramResponse.json();
 
         if (telegramResult.ok) {
-          results.push({ partyId, city, hostName, success: true });
+          results.push({ partyId, city, hostName, success: true, linkResolved });
         } else {
           const description: string = telegramResult.description || 'Unknown Telegram error';
           const errorCode: number = telegramResult.error_code || telegramResponse.status;
@@ -411,9 +711,10 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
               hostName,
               success: false,
               error: 'Host blocked the bot — disconnected',
+              linkResolved,
             });
           } else {
-            results.push({ partyId, city, hostName, success: false, error: description });
+            results.push({ partyId, city, hostName, success: false, error: description, linkResolved });
           }
         }
       } catch (err: any) {
@@ -423,6 +724,7 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
           hostName,
           success: false,
           error: err?.message || 'Network error',
+          linkResolved,
         });
       }
 
@@ -435,9 +737,32 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
     const sent = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
 
-    console.log(`[Telegram Host Broadcast] Complete: ${sent} sent, ${failed} failed`);
+    console.log(`[Telegram Host Broadcast] Complete: ${sent} sent, ${failed} failed, ${emailedCount} emailed`);
 
-    res.json({ results, sent, failed });
+    // guanciale-58491: persist the broadcast to the audit log. Use the client-
+    // minted broadcastId as the row id (double-send guard); fall back to an
+    // auto-uuid when none was supplied. A log-write failure must NOT fail the
+    // already-sent broadcast, so it's wrapped + swallowed.
+    try {
+      await prisma.telegramBroadcastLog.create({
+        data: {
+          ...(broadcastIdValid ? { id: broadcastIdValid } : {}),
+          actorEmail: req.underboss!.email,
+          actorKind: actorKindFromUnderboss(req.underboss!),
+          channel: 'host_dm',
+          message,
+          audienceCount: hosts.length,
+          sentCount: sent,
+          failedCount: failed,
+          emailedCount,
+          results,
+        },
+      });
+    } catch (logErr: any) {
+      console.warn('[Telegram Host Broadcast] failed to persist log:', logErr?.message || logErr);
+    }
+
+    res.json({ results, sent, failed, emailed: emailedCount });
   } catch (error) {
     next(error);
   }

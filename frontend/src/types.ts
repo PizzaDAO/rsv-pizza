@@ -535,6 +535,8 @@ export interface Photo {
   // provolone-58931: set when the photo has been soft-deleted. Only super-admins
   // ever receive deleted rows; everyone else's list excludes them server-side.
   deletedAt?: string | null;
+  // porchetta-58296: host-designated payout role. One photo per role per event.
+  payoutRole?: 'group' | 'box_stack' | 'pizza' | null;
 }
 
 export interface PhotoStats {

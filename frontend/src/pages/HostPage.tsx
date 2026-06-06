@@ -13,6 +13,7 @@ import { PizzaOrderSummary } from '../components/PizzaOrderSummary';
 import { BeverageSettings } from '../components/BeverageSettings';
 import { DietarySettings } from '../components/DietarySettings';
 import { EventDetailsTab } from '../components/EventDetailsTab';
+import { EventAssistant, isEventAssistantEnabled } from '../components/EventAssistant';
 import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
@@ -320,6 +321,12 @@ function HostPageContent() {
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
+
+        {/* arancini-58492: natural-language event assistant, above the tabs.
+            Philadelphia-only test gate — isEventAssistantEnabled matches the
+            party's customUrl/inviteCode against the allowlist (kept in sync
+            with backend ASSISTANT_ENABLED_SLUGS). */}
+        {canEdit && isEventAssistantEnabled(party) && <EventAssistant />}
 
         <div className="host-tabs border-b border-theme-stroke mb-6 flex gap-8 overflow-x-auto">
           {tabs.map((tab) => {

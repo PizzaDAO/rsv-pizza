@@ -1,12 +1,22 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Download } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Download, Send } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
 import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
+import { SavedViewsMenu } from '../components/SavedViewsMenu';
+// montanara-58497: URL <-> EventTable filters + active tab (de)serializer so a
+// refresh / shared link restores the exact filtered view.
+import {
+  eventTableFiltersToSearchParams,
+  searchParamsToEventTableFilters,
+  type EventTableFilters,
+  type UnderbossTab,
+} from '../components/underboss/underbossTableUrlState';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';
 import { fetchUnderbossDashboard, fetchUnderbossMe, createUnderboss, fetchSponsorUsers } from '../lib/api';
 import type { UnderbossMeResponse } from '../lib/api';
@@ -95,14 +105,51 @@ export function UnderbossDashboard() {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
 
+  // montanara-58497: the URL query string is the source of restore-on-load state
+  // for the active tab + EventTable filters. We parse it ONCE in the lazy
+  // useState initialisers below (via initialUrlStateRef); after mount the
+  // `activeTab` / `tableFilters` state is the single source of truth that PUSHES
+  // to the URL via the sync effect. We never read searchParams back into state on
+  // re-render (that would oscillate). selectedRegions/selectedCities are derived
+  // from the UB's server scope and are intentionally NOT persisted in the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialUrlStateRef = useRef<ReturnType<typeof searchParamsToEventTableFilters> | null>(null);
+  if (initialUrlStateRef.current === null) {
+    initialUrlStateRef.current = searchParamsToEventTableFilters(searchParams);
+  }
+
   // Tab state
-  const [activeTab, setActiveTab] = useState<'events' | 'cities' | 'partners' | 'fake-detection' | 'superlatives' | 'survey' | 'outreach' | 'telegram-groups'>('events');
+  const [activeTab, setActiveTab] = useState<UnderbossTab>(
+    () => initialUrlStateRef.current!.activeTab ?? 'events',
+  );
+
+  // montanara-58497: EventTable filters live here now (controlled), so they can
+  // be serialized to the URL alongside the tab.
+  const [tableFilters, setTableFilters] = useState<EventTableFilters>(
+    () => initialUrlStateRef.current!.filters,
+  );
+
+  // ONE sync effect: serialize {tableFilters, activeTab} into the query string.
+  // tab + table filters share the same params object, so there must be exactly
+  // ONE writer (a second setSearchParams would clobber the first). replace:true
+  // keeps filter tweaks out of the back-stack; guarded so we only write when the
+  // serialized string actually changes.
+  useEffect(() => {
+    const next = eventTableFiltersToSearchParams(tableFilters, activeTab);
+    const nextStr = next.toString();
+    if (nextStr !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [tableFilters, activeTab, searchParams, setSearchParams]);
 
   const [tableFilteredEvents, setTableFilteredEvents] = useState<UnderbossEvent[] | null>(null);
 
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
+  // guanciale-58491: "DM all GPP hosts" entry point — opens the broadcast in
+  // hosts mode with the full in-scope audience loaded server-side.
+  const [broadcastAllHosts, setBroadcastAllHosts] = useState(false);
 
   // Partner tags for EventRow indicator
   const [partnerTags, setPartnerTags] = useState<string[]>([]);
@@ -586,7 +633,16 @@ export function UnderbossDashboard() {
 
         {/* Events / Cities Tabs */}
         <section>
-          <div className="border-b border-theme-stroke mb-4 flex gap-6">
+          <div className="border-b border-theme-stroke mb-4 flex gap-6 items-center">
+            {/* guanciale-58491: "DM all GPP hosts" entry point — loads the full
+                in-scope audience server-side (not just the page's events). */}
+            <button
+              onClick={() => { setBroadcastCities([]); setBroadcastAllHosts(true); setShowBroadcast(true); }}
+              className="ml-auto order-last flex items-center gap-2 bg-[#E52828] hover:bg-[#cc2222] text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors self-center mb-2"
+            >
+              <Send size={14} />
+              {t('underbossDashboard.dmAllHosts', 'DM all hosts')}
+            </button>
             <button
               onClick={() => setActiveTab('events')}
               className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
@@ -708,7 +764,31 @@ export function UnderbossDashboard() {
           </div>
 
           {activeTab === 'events' && (
-            <EventTable events={filteredData.events} showRegion={showRegionColumn} onEventUpdate={handleEventUpdate} onBulkAction={() => loadDashboard(true)} onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }} partnerTags={partnerTags} onFilteredEventsChange={setTableFilteredEvents} isAdmin={isAdmin} />
+            <>
+              <div className="flex items-center justify-end mb-3">
+                <SavedViewsMenu
+                  scope="underboss"
+                  currentParams={eventTableFiltersToSearchParams(tableFilters, activeTab).toString()}
+                  onApply={(p) => {
+                    const { filters: f, activeTab: tabFromView } = searchParamsToEventTableFilters(new URLSearchParams(p));
+                    setTableFilters(f);
+                    if (tabFromView) setActiveTab(tabFromView);
+                  }}
+                />
+              </div>
+              <EventTable
+                events={filteredData.events}
+                showRegion={showRegionColumn}
+                onEventUpdate={handleEventUpdate}
+                onBulkAction={() => loadDashboard(true)}
+                onTelegramBroadcast={(cities) => { setBroadcastCities(cities); setShowBroadcast(true); }}
+                partnerTags={partnerTags}
+                onFilteredEventsChange={setTableFilteredEvents}
+                isAdmin={isAdmin}
+                filters={tableFilters}
+                onFiltersChange={setTableFilters}
+              />
+            </>
           )}
 
           {activeTab === 'cities' && (
@@ -746,7 +826,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); setBroadcastAllHosts(false); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} allHostsMode={broadcastAllHosts} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(

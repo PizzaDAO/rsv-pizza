@@ -777,6 +777,29 @@
     "ineligiblePill": "부적격",
     "ineligibleLineTag": "부적격",
     "lineItemsToggle": "항목",
-    "eligibleLineTotal": "적격 합계"
+    "eligibleLineTotal": "적격 합계",
+    "receiptAttestation": "모든 영수증을 제출했으며 항목별로 정리되어 있습니다.",
+    "receiptAttestationHelp": "이 항목을 활성화하려면 영수증을 하나 이상 업로드하세요.",
+    "eventPhotosTitle": "이벤트 사진",
+    "eventPhotosSubtitle": "이벤트의 단체 사진, 박스 더미 사진, 피자 사진을 지정하세요. 갤러리에서 선택하거나 새로 업로드할 수 있습니다.",
+    "selectOrUpload": "선택 또는 업로드",
+    "additionalPhotos": "사진 추가 (선택 사항)",
+    "roles": {
+      "group": "단체 사진",
+      "boxStack": "박스 더미 사진",
+      "pizza": "피자 사진"
+    },
+    "rolePicker": {
+      "title": "{{role}} 선택",
+      "subtitle": "갤러리에서 이벤트 사진을 선택하거나 새로 업로드하세요.",
+      "selectFromGallery": "갤러리에서 선택",
+      "uploadNew": "새로 업로드",
+      "uploading": "업로드 중…",
+      "empty": "아직 사진이 없습니다. 업로드하여 시작하세요.",
+      "ineligibleNote": "이벤트 시작 전 촬영됨",
+      "invalidType": "지원되지 않는 파일 형식입니다. JPEG, PNG, WebP, GIF 또는 HEIC를 사용하세요.",
+      "tooLarge": "파일이 너무 큽니다. 최대 크기는 25MB입니다.",
+      "uploadFailed": "업로드에 실패했습니다. 다시 시도하세요."
+    }
   }
 }
