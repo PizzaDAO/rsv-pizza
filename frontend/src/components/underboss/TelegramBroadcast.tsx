@@ -4,11 +4,10 @@ import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { TelegramGroup } from '../../lib/telegram';
+import { BROADCAST_APPS } from '../../lib/appDefinitions';
 import {
   sendTelegramBroadcast,
-  sendTelegramTest,
   sendHostTelegramBroadcast,
-  sendHostTelegramTest,
   fetchCityTelegramGroups,
   BroadcastResult,
 } from '../../lib/api';
@@ -162,6 +161,8 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   // Message
   const [message, setMessage] = useState('');
   const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('None');
+  // parmigiano-58493: chosen app for the {appLink} token (value = app `tab`, '' = none).
+  const [selectedAppTab, setSelectedAppTab] = useState<string>('');
 
   // State flow
   const [viewState, setViewState] = useState<ViewState>('compose');
@@ -456,7 +457,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (recipientMode === 'groups' || recipientMode === 'both') {
       if (selectedGroups.length > 0) {
         try {
-          const r = await sendTelegramBroadcast(selectedGroups, message, parseMode);
+          const r = await sendTelegramBroadcast(selectedGroups, message, parseMode, selectedAppTab || null);
           allResults.push(...r.results.map(res => ({ ...res, kind: 'group' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
@@ -469,7 +470,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (recipientMode === 'hosts' || recipientMode === 'both') {
       if (selectedHostsPayload.length > 0) {
         try {
-          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode);
+          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode, selectedAppTab || null);
           allResults.push(...r.results.map(res => ({ ...res, kind: 'host' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
@@ -487,19 +488,28 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     setViewState('results');
   };
 
-  // Send test to a single group
+  // Send test to a single group.
+  // parmigiano-58493: route a single-group test through /broadcast so {link} and
+  // {appLink} are resolved server-side from the group's cityKey-matched party
+  // (the /test endpoint has only a raw chatId and can't resolve them). {city}
+  // and {country} are still resolved server-side by /broadcast as well.
   const handleTest = async (group: TelegramGroup) => {
     setTestingChatId(group.groupId);
     setTestResult(null);
 
-    // Replace template vars for preview
-    let testMsg = message;
-    testMsg = testMsg.replace(/\{city\}/g, group.city);
-    testMsg = testMsg.replace(/\{country\}/g, group.country);
-
     try {
-      const result = await sendTelegramTest(group.groupId, testMsg, parseMode);
-      setTestResult(result);
+      const r = await sendTelegramBroadcast(
+        [{ chatId: group.groupId, city: group.city, country: group.country }],
+        message,
+        parseMode,
+        selectedAppTab || null
+      );
+      const res = r.results[0];
+      setTestResult(
+        res
+          ? { chatId: group.groupId, success: res.success, error: res.error }
+          : { chatId: group.groupId, success: false, error: 'No result returned' }
+      );
     } catch (err: any) {
       setTestResult({ chatId: group.groupId, success: false, error: err.message });
     } finally {
@@ -508,17 +518,26 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   };
 
   // Send a per-row test DM to a single host (sausage-24183).
+  // parmigiano-58493: route through /host-broadcast (single host) so {link} and
+  // {appLink} resolve server-side from the host's party. {city}/{hostName} are
+  // also substituted server-side by /host-broadcast.
   const handleHostTest = async (row: HostRow) => {
     setTestingHostPartyId(row.partyId);
     setTestResult(null);
 
-    let testMsg = message;
-    testMsg = testMsg.replace(/\{city\}/g, row.city);
-    testMsg = testMsg.replace(/\{hostName\}/g, row.hostName);
-
     try {
-      const result = await sendHostTelegramTest(row.partyId, testMsg, parseMode);
-      setTestResult(result);
+      const r = await sendHostTelegramBroadcast(
+        [{ partyId: row.partyId, city: row.city, hostName: row.hostName }],
+        message,
+        parseMode,
+        selectedAppTab || null
+      );
+      const res = r.results[0];
+      setTestResult(
+        res
+          ? { chatId: row.partyId, success: res.success, error: res.error }
+          : { chatId: row.partyId, success: false, error: 'No result returned' }
+      );
     } catch (err: any) {
       setTestResult({ chatId: row.partyId, success: false, error: err.message });
     } finally {
@@ -982,6 +1001,18 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                     <span className="text-xs text-theme-text-faint">
                       {message.length} / 4096
                     </span>
+                    {/* parmigiano-58493: app picker for the {appLink} token. value = app `tab`. */}
+                    <select
+                      value={selectedAppTab}
+                      onChange={(e) => setSelectedAppTab(e.target.value)}
+                      className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
+                      title={t('telegram.appLinkTitle', 'Pick the app the {appLink} token points to') as string}
+                    >
+                      <option value="">{t('telegram.appNone', '— no app —')}</option>
+                      {BROADCAST_APPS.map((a) => (
+                        <option key={a.tab} value={a.tab}>{a.name}</option>
+                      ))}
+                    </select>
                     <select
                       value={parseMode}
                       onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
@@ -1015,6 +1046,25 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                     }}
                   />
                 </p>
+                {/* parmigiano-58493: per-recipient link token chips. Click to insert. */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {(['{link}', '{appLink}'] as const).map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() =>
+                        setMessage((prev) => (prev.length + token.length <= 4096 ? `${prev}${token}` : prev))
+                      }
+                      className="text-xs px-2 py-0.5 rounded-full border border-theme-stroke bg-theme-surface text-theme-text-secondary hover:text-red-500 hover:border-red-500/40 transition-colors"
+                      title={t('telegram.insertToken', 'Insert {{token}}', { token }) as string}
+                    >
+                      <code className="text-red-500/80">{token}</code>
+                    </button>
+                  ))}
+                  <span className="text-xs text-theme-text-faint">
+                    {t('telegram.linkTokenHint', '{link} = event page · {appLink} = chosen app (resolved per recipient)')}
+                  </span>
+                </div>
               </div>
 
               {/* Send button */}

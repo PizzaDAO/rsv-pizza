@@ -6,11 +6,59 @@ import { AppError } from '../middleware/error.js';
 import { cityKeyFromPartyName, getGppRegionByCityKey } from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { isValidAppTab } from '../lib/broadcastApps.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
 
 const router = Router();
+
+// parmigiano-58493 (ported from calzone-58481 / PR #878): per-recipient
+// {link}/{appLink} broadcast tokens. The TABLE REDESIGN from #878 (partyId FK on
+// city_telegram_groups) was intentionally dropped — master keeps the live
+// tonda-58293 city-keyed model — so the group path resolves a party by exact
+// cityKey match (single GPP party) instead of a direct FK. The host path
+// resolves authoritatively from each recipient's partyId.
+
+/** Public event page URL for a party. Mirrors nft.routes.ts. */
+function publicEventLink(party: { customUrl?: string | null; inviteCode?: string | null } | null | undefined): string {
+  if (!party) return '';
+  const slug = party.customUrl || party.inviteCode;
+  return slug ? `https://rsv.pizza/${slug}` : '';
+}
+
+/** Host app deep-link for a party + chosen app tab. */
+function appDeepLink(
+  party: { inviteCode?: string | null } | null | undefined,
+  appTab: string | null | undefined
+): string {
+  if (!party || !party.inviteCode || !appTab) return '';
+  return `https://rsv.pizza/host/${party.inviteCode}/${appTab}`;
+}
+
+/**
+ * Substitute the per-recipient {link} and {appLink} tokens. Always strips any
+ * remaining {link}/{appLink} occurrences so an unresolved token (unlinked
+ * recipient, missing slug, no app chosen) never ships as a literal.
+ */
+function substituteLinkTokens(message: string, linkUrl: string, appLinkUrl: string): string {
+  let out = message;
+  out = out.replace(/\{link\}/g, linkUrl || '');
+  out = out.replace(/\{appLink\}/g, appLinkUrl || '');
+  return out;
+}
+
+/**
+ * parmigiano-58493: validate the optional {appLink} target tab from the request
+ * body. Empty/absent → no app chosen ('' means the {appLink} token resolves to
+ * empty and is stripped). An unrecognized tab is a hard 400 so a literal token
+ * can never ship.
+ */
+function validateAppTab(appTab: unknown): string {
+  if (appTab === undefined || appTab === null || appTab === '') return '';
+  if (isValidAppTab(appTab)) return appTab;
+  throw new AppError('appTab is not a recognized app', 400, 'VALIDATION_ERROR');
+}
 
 /**
  * Check whether a broadcast group is within the UB's city scope.
@@ -39,7 +87,10 @@ function groupInBroadcastScope(
 // POST /broadcast — Send message to multiple Telegram groups
 router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { groups, message, parseMode } = req.body;
+    const { groups, message, parseMode, appTab } = req.body;
+
+    // parmigiano-58493: validate optional {appLink} target tab (hard 400 if bad).
+    const validatedAppTab = validateAppTab(appTab);
 
     // Validate groups
     if (!Array.isArray(groups) || groups.length === 0) {
@@ -82,6 +133,45 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
     console.log(`[Telegram Broadcast] ${req.underboss!.email} sending to ${groups.length} groups at ${new Date().toISOString()}`);
 
+    // parmigiano-58493: resolve each group's event link server-side from a GPP
+    // party matched by cityKey. master's city_telegram_groups has no partyId FK
+    // (the #878 redesign was dropped), so we map the group's cityKey to a GPP
+    // party via cityKeyFromPartyName(party.name). Only substitute when EXACTLY
+    // ONE party matches a cityKey — ambiguous/no match leaves the token to be
+    // stripped, so a broadcast never ships the wrong event's link.
+    const usesLinkToken = /\{link\}|\{appLink\}/.test(message);
+    const partyByCityKey = new Map<string, { customUrl: string | null; inviteCode: string | null } | null>();
+    if (usesLinkToken) {
+      const cityKeys = Array.from(
+        new Set(
+          groups
+            .map((g: any) => (g?.city || '').toLowerCase().trim())
+            .filter((c: string) => c.length > 0)
+        )
+      ) as string[];
+      if (cityKeys.length > 0) {
+        // Pull candidate GPP parties; match by cityKey derived from the name.
+        const candidates = await prisma.party.findMany({
+          where: { name: { startsWith: 'Global Pizza Party', mode: 'insensitive' } },
+          select: { name: true, customUrl: true, inviteCode: true },
+        });
+        const wanted = new Set(cityKeys);
+        const byKey = new Map<string, Array<{ customUrl: string | null; inviteCode: string | null }>>();
+        for (const p of candidates) {
+          const key = cityKeyFromPartyName(p.name);
+          if (!key || !wanted.has(key)) continue;
+          const arr = byKey.get(key) ?? [];
+          arr.push({ customUrl: p.customUrl, inviteCode: p.inviteCode });
+          byKey.set(key, arr);
+        }
+        for (const key of cityKeys) {
+          const arr = byKey.get(key);
+          // Only resolve on an unambiguous single match.
+          partyByCityKey.set(key, arr && arr.length === 1 ? arr[0] : null);
+        }
+      }
+    }
+
     const results: Array<{ chatId: string; city: string; success: boolean; error?: string }> = [];
 
     for (let i = 0; i < groups.length; i++) {
@@ -93,10 +183,17 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
         continue;
       }
 
+      // parmigiano-58493: resolve per-recipient link tokens from the cityKey-matched party.
+      const linkedParty = usesLinkToken ? (partyByCityKey.get((city || '').toLowerCase().trim()) ?? null) : null;
+      const linkUrl = publicEventLink(linkedParty);
+      const appLinkUrl = appDeepLink(linkedParty, validatedAppTab);
+
       // Replace template variables
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city || '');
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
+      // Substitute (and strip-if-unresolved) the per-recipient link tokens.
+      personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
       personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
@@ -177,7 +274,10 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 // POST /host-broadcast — Send DM to multiple host private chats
 router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
-    const { hosts, message, parseMode } = req.body;
+    const { hosts, message, parseMode, appTab } = req.body;
+
+    // parmigiano-58493: validate optional {appLink} target tab (hard 400 if bad).
+    const validatedAppTab = validateAppTab(appTab);
 
     if (!Array.isArray(hosts) || hosts.length === 0) {
       throw new AppError('hosts must be a non-empty array', 400, 'VALIDATION_ERROR');
@@ -214,13 +314,16 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
 
     const partyRows = await prisma.party.findMany({
       where: { id: { in: partyIds }, hostTelegramChatId: { not: null } },
-      select: { id: true, hostTelegramChatId: true, name: true },
+      // parmigiano-58493: customUrl + inviteCode added for {link}/{appLink} tokens.
+      select: { id: true, hostTelegramChatId: true, name: true, customUrl: true, inviteCode: true },
     });
     const chatByPartyId = new Map<string, bigint>();
+    const partyMetaById = new Map<string, { customUrl: string | null; inviteCode: string | null }>();
     for (const row of partyRows) {
       if (row.hostTelegramChatId !== null) {
         chatByPartyId.set(row.id, row.hostTelegramChatId);
       }
+      partyMetaById.set(row.id, { customUrl: row.customUrl, inviteCode: row.inviteCode });
     }
 
     console.log(`[Telegram Host Broadcast] ${req.underboss!.email} sending to ${hosts.length} hosts (${partyRows.length} connected) at ${new Date().toISOString()}`);
@@ -250,10 +353,17 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         continue;
       }
 
+      // parmigiano-58493: resolve per-recipient link tokens from the host's party.
+      const partyMeta = partyMetaById.get(partyId) ?? null;
+      const linkUrl = publicEventLink(partyMeta);
+      const appLinkUrl = appDeepLink(partyMeta, validatedAppTab);
+
       // Replace template variables
       let personalizedMessage = message;
       personalizedMessage = personalizedMessage.replace(/\{city\}/g, city);
       personalizedMessage = personalizedMessage.replace(/\{hostName\}/g, hostName);
+      // Substitute (and strip-if-unresolved) the per-recipient link tokens.
+      personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
       personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
