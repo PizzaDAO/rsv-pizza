@@ -3,6 +3,7 @@ import { User, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, 
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
 import { LocationAutocomplete } from '../../LocationAutocomplete';
+import { CountryPicker } from './CountryPicker';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
 
 export interface W8BENFormData {
@@ -171,12 +172,13 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
         disabled={disabled}
         required
       />
-      <IconInput
-        icon={Globe}
-        type="text"
-        placeholder="Country of citizenship"
+      {/* bocconcino-92107: searchable country picker replaces a plain text
+          input — ~250 ISO-3166 entries with flag emoji + native-name aliases.
+          Saved value is the full English name (e.g. "Germany"), unchanged. */}
+      <CountryPicker
         value={value.citizenship ?? ''}
-        onChange={(e) => set('citizenship', e.target.value)}
+        onChange={(c) => set('citizenship', c)}
+        placeholder="Country of citizenship"
         disabled={disabled}
         required
       />
