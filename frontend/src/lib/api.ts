@@ -3678,6 +3678,10 @@ export interface BroadcastResult {
   city: string;
   success: boolean;
   error?: string;
+  // pesto-58496: false when a USED {link}/{appLink} token resolved to empty for
+  // this recipient (message sent without the link). Older prod backends omit
+  // this field entirely — undefined must NOT be treated as a warning.
+  linkResolved?: boolean;
 }
 
 export interface BroadcastResponse {
