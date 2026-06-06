@@ -573,11 +573,37 @@ router.post(
         where: { id: partyId },
         select: { country: true },
       });
-      const ocr = await analyzeReceipt({
-        imageUrl,
-        partyCountry: partyForCountry?.country ?? null,
-      });
-      const fx = await convertToUSD(ocr.amount, ocr.currency);
+      // scamorza-58296: graceful fallback. A transient OCR/FX failure used to
+      // bubble to next(error) → bare HTTP 500, dead-ending the host with an
+      // "internal server error" on the receipt row. Instead, catch here and
+      // return a shape-compatible 200 that flags OCR_FAILED so the frontend
+      // drops the host into a manual USD-amount entry field (mirrors the
+      // POST /payouts allSettled resilience for the preview path).
+      let ocr: Awaited<ReturnType<typeof analyzeReceipt>>;
+      let fx: Awaited<ReturnType<typeof convertToUSD>>;
+      try {
+        ocr = await analyzeReceipt({
+          imageUrl,
+          partyCountry: partyForCountry?.country ?? null,
+        });
+        fx = await convertToUSD(ocr.amount, ocr.currency);
+      } catch (err) {
+        console.warn(`[ocr-preview] OCR failed for party ${partyId}; returning manual-entry fallback.`, err);
+        return res.json({
+          amount: 0,
+          currency: 'USD',
+          originalAmount: 0,
+          originalCurrency: '',
+          exchangeRate: 0,
+          confidence: 0,
+          items: [],
+          lineItems: null,
+          ocrRaw: null,
+          fxSource: 'unresolved',
+          conversionNote: undefined,
+          ocrError: 'OCR_FAILED',
+        });
+      }
 
       // mortadella-92103: when FX can't resolve (no currency from OCR + no
       // country prior + no override), surface that to the host so they can

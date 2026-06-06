@@ -2351,6 +2351,9 @@ export interface OcrPreviewResult {
   // mortadella-92103: 'CURRENCY_UNRESOLVED' when OCR couldn't pick a code
   // and FX refused to passthrough. Frontend should surface a warning and
   // exclude the receipt from the auto-sum.
+  // scamorza-58296: 'OCR_FAILED' = automatic read failed (transient OCR
+  // error); host must enter the USD amount manually. Returned as a 200 so
+  // the receipt row never dead-ends on an internal server error.
   ocrError?: string | null;
 }
 

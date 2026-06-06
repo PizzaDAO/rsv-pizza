@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
+import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, DollarSign } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
 import { OcrPreviewResult } from '../../types';
 import { CurrencyOverrideSelect } from './CurrencyOverrideSelect';
+import { IconInput } from '../IconInput';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 export interface ReceiptItem {
@@ -175,7 +176,35 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                       <Loader2 size={12} className="animate-spin" /> Reading receipt…
                     </span>
                   )}
-                  {item.status === 'done' && item.ocr && (
+                  {/* scamorza-58296: automatic read failed (transient OCR
+                      error) — arrives as a 200 with ocrError='OCR_FAILED', so
+                      it lands in the done branch. Drop the host into a manual
+                      USD-amount entry instead of dead-ending. */}
+                  {item.status === 'done' && item.ocr?.ocrError === 'OCR_FAILED' && (
+                    <ManualAmountEntry
+                      amount={item.ocr.amount}
+                      onAmount={amount => {
+                        const valid = Number.isFinite(amount) && amount > 0;
+                        const next = updateItem(items, item.id, {
+                          ocr: {
+                            ...item.ocr!,
+                            amount,
+                            originalAmount: amount,
+                            originalCurrency: 'USD',
+                            exchangeRate: 1,
+                            confidence: 1,
+                            fxSource: 'usd-passthrough',
+                            // clear the failure flag once a valid amount is
+                            // entered so submit treats this as a normal USD
+                            // receipt rather than excluding it.
+                            ocrError: valid ? null : 'OCR_FAILED',
+                          },
+                        });
+                        onChange(next);
+                      }}
+                    />
+                  )}
+                  {item.status === 'done' && item.ocr && item.ocr.ocrError !== 'OCR_FAILED' && (
                     <span className="inline-flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1">
                         {item.ocr.confidence >= 0.8
@@ -242,6 +271,45 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 function updateItem(items: ReceiptItem[], id: string, patch: Partial<ReceiptItem>): ReceiptItem[] {
   return items.map(it => (it.id === id ? { ...it, ...patch } : it));
 }
+
+/**
+ * scamorza-58296: manual USD-amount entry shown when the automatic OCR read
+ * failed (transient error). The host types the receipt total themselves and we
+ * persist it through the normal submit-forwarding path as a USD-passthrough
+ * amount. Local text state so partial input ("12.") doesn't fight the parsed
+ * number on every keystroke.
+ */
+const ManualAmountEntry: React.FC<{
+  amount: number;
+  onAmount: (amount: number) => void;
+}> = ({ amount, onAmount }) => {
+  const [raw, setRaw] = useState(amount > 0 ? String(amount) : '');
+
+  return (
+    <span className="block w-full">
+      <div className="max-w-[12rem]">
+        <IconInput
+          icon={DollarSign}
+          type="text"
+          inputMode="decimal"
+          value={raw}
+          placeholder="Enter amount in USD"
+          onChange={e => {
+            const v = e.target.value;
+            // Allow only a number with an optional single decimal point.
+            if (v !== '' && !/^\d*\.?\d*$/.test(v)) return;
+            setRaw(v);
+            onAmount(parseFloat(v));
+          }}
+          className="py-1.5 text-sm"
+        />
+      </div>
+      <span className="block mt-1 text-xs text-theme-text-muted">
+        Couldn't read this receipt automatically — enter the amount in USD.
+      </span>
+    </span>
+  );
+};
 
 /**
  * bocconcino-92104: small thumbnail component for an in-progress upload. PDFs
