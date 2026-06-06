@@ -29,6 +29,15 @@ import {
 const MAX_INSTRUCTION_LEN = 2000;
 const MAX_HISTORY_TURNS = 8; // host+assistant messages retained for follow-ups
 
+// gricia-58502: single source of truth for the model id, so the value we log
+// always matches the value we send to OpenAI.
+const ASSISTANT_MODEL = 'gpt-4o-mini';
+
+// gricia-58502: metadata returned on the short-circuit paths that never reach
+// the OpenAI call (no tokens, no real latency). Keeps the result shape uniform
+// so the route's logging code can read `model`/`usage`/`latencyMs` everywhere.
+const NO_CALL_META = { model: ASSISTANT_MODEL, usage: {}, latencyMs: 0 } as const;
+
 export interface AssistantHistoryTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -38,6 +47,12 @@ export interface EventAssistantResult {
   assistantMessage: string;
   clarifyingQuestion?: string;
   proposedChanges: Array<ProposedChange & { reason?: string }>;
+  // gricia-58502: observability metadata for the query/result log. The model
+  // string + OpenAI token usage + measured round-trip latency (ms). `usage`
+  // fields are optional because the OpenAI response may omit `usage`.
+  model: string;
+  usage: { promptTokens?: number; completionTokens?: number };
+  latencyMs: number;
 }
 
 /* --------------------------- current snapshot ----------------------------- */
@@ -273,12 +288,12 @@ export async function runEventAssistant(params: {
   const instruction = (params.instruction ?? '').trim().slice(0, MAX_INSTRUCTION_LEN);
 
   if (!instruction) {
-    return { assistantMessage: 'Tell me what you would like to change about your event.', proposedChanges: [] };
+    return { assistantMessage: 'Tell me what you would like to change about your event.', proposedChanges: [], ...NO_CALL_META };
   }
 
   const party = await prisma.party.findUnique({ where: { id: partyId } });
   if (!party) {
-    return { assistantMessage: 'Event not found.', proposedChanges: [] };
+    return { assistantMessage: 'Event not found.', proposedChanges: [], ...NO_CALL_META };
   }
 
   const timezone = (party as any).timezone || 'UTC';
@@ -292,6 +307,8 @@ export async function runEventAssistant(params: {
   const tool = buildToolSchema(role);
   const assistantModel = (await getLlmModels()).assistant;
 
+  // gricia-58502: measure round-trip latency around the OpenAI call only.
+  const startedAt = Date.now();
   const response = await getOpenAI().chat.completions.create({
     model: assistantModel,
     messages: [
@@ -305,6 +322,14 @@ export async function runEventAssistant(params: {
     tool_choice: { type: 'function', function: { name: 'propose_event_changes' } },
     max_tokens: 1500,
   });
+  const latencyMs = Date.now() - startedAt;
+
+  // gricia-58502: token usage for the log (may be absent on the response).
+  const usage: { promptTokens?: number; completionTokens?: number } = {
+    promptTokens: response.usage?.prompt_tokens,
+    completionTokens: response.usage?.completion_tokens,
+  };
+  const callMeta = { model: assistantModel, usage, latencyMs };
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
   // The SDK tool-call type is a union (function | custom); narrow to function.
@@ -313,6 +338,7 @@ export async function runEventAssistant(params: {
       assistantMessage:
         "I couldn't turn that into a concrete change. Try rephrasing, e.g. \"change the venue name to The Pizza Loft\".",
       proposedChanges: [],
+      ...callMeta,
     };
   }
 
@@ -323,6 +349,7 @@ export async function runEventAssistant(params: {
     return {
       assistantMessage: 'Sorry — I had trouble formatting that change. Please try again.',
       proposedChanges: [],
+      ...callMeta,
     };
   }
 
@@ -384,7 +411,7 @@ export async function runEventAssistant(params: {
     });
   }
 
-  return { assistantMessage, clarifyingQuestion, proposedChanges };
+  return { assistantMessage, clarifyingQuestion, proposedChanges, ...callMeta };
 }
 
 /* -------------------------------- helpers --------------------------------- */

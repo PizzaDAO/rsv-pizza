@@ -2276,3 +2276,32 @@ model SavedFilterView {
   @@unique([userEmail, scope, name])
   @@map("saved_filter_views")
 }
+
+// gricia-58502: query/result log for the Event Assistant (test phase). One row
+// per proposal, written best-effort at proposal time and updated via the
+// /assistant/feedback endpoint with the host's accepted/rejected keys + apply
+// outcome. NO foreign keys on purpose — party_id/user_id are plain text so a
+// deleted party/user never blocks or cascades into the log. Created in prod
+// manually before merge (no migration auto-apply in this repo).
+model EventAssistantLog {
+  id                 String    @id @default(uuid())
+  partyId            String    @map("party_id")
+  userId             String?   @map("user_id")
+  instruction        String
+  history            Json?
+  proposedChanges    Json      @map("proposed_changes")
+  clarifyingQuestion String?   @map("clarifying_question")
+  model              String
+  promptTokens       Int?      @map("prompt_tokens")
+  completionTokens   Int?      @map("completion_tokens")
+  latencyMs          Int?      @map("latency_ms")
+  acceptedKeys       Json?     @map("accepted_keys")
+  rejectedKeys       Json?     @map("rejected_keys")
+  applied            Boolean   @default(false)
+  applyError         String?   @map("apply_error")
+  appliedAt          DateTime? @map("applied_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([partyId])
+  @@map("event_assistant_log")
+}

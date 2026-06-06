@@ -411,6 +411,10 @@ export interface EventAssistantResponse {
   assistantMessage: string;
   clarifyingQuestion?: string;
   proposedChanges: AssistantProposedChange[];
+  // gricia-58502: server-side log row id for this proposal (null if logging
+  // failed). Echo it back via `eventAssistantFeedback` to record the host's
+  // accepted/rejected keys + apply outcome.
+  proposalId?: string | null;
 }
 
 export interface AssistantHistoryTurn {
@@ -432,6 +436,31 @@ export async function eventAssistant(
     method: 'POST',
     body: { instruction, conversationHistory: history },
   });
+}
+
+/**
+ * gricia-58502: report Event Assistant feedback — which proposed keys the host
+ * accepted/rejected and whether applying them succeeded. Best-effort and
+ * fire-and-forget: errors are swallowed so logging never affects the host's UX.
+ */
+export async function eventAssistantFeedback(
+  partyId: string,
+  body: {
+    proposalId: string;
+    acceptedKeys: string[];
+    rejectedKeys: string[];
+    applied: boolean;
+    error?: string;
+  },
+): Promise<void> {
+  try {
+    await apiRequest(`/api/parties/${partyId}/assistant/feedback`, {
+      method: 'POST',
+      body,
+    });
+  } catch {
+    // Swallow — feedback logging is non-load-bearing.
+  }
 }
 
 /**
