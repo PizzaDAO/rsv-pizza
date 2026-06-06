@@ -27,6 +27,10 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
 }) => {
   const { party, loadParty, guests } = usePizza();
   const rsvpCount = guests?.length ?? 0;
+  // calzone-58297: after the event date passes, "expected" guests are really
+  // an "estimated" attendance count — relabel the title + CTA accordingly.
+  // Pure wording; the underlying `parties.expected_guests` field is unchanged.
+  const eventHasHappened = party?.date ? new Date(party.date) < new Date() : false;
   // Default suggestion: 40% of current RSVPs (typical no-show buffer for
   // pizza events). Pre-fills the input when no value is saved yet — host
   // can edit before clicking Save; nothing auto-saves.
@@ -101,7 +105,7 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-theme-text-muted">
-              Expected guests
+              {eventHasHappened ? 'Estimated guests' : 'Expected guests'}
             </div>
             {hasValue && !editing ? (
               <div className="text-lg font-semibold text-theme-text leading-tight">
@@ -109,7 +113,9 @@ export const ExpectedGuestsCard: React.FC<ExpectedGuestsCardProps> = ({
               </div>
             ) : (
               <div className="text-sm text-theme-text-muted leading-tight">
-                {hasValue ? 'Update your estimate' : 'Set expected guests'}
+                {hasValue
+                  ? 'Update your estimate'
+                  : eventHasHappened ? 'Set estimated guests' : 'Set expected guests'}
               </div>
             )}
           </div>
