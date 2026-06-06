@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { IconInput } from "../../IconInput";
 import { Checkbox } from "../../Checkbox";
+import { LocationAutocomplete } from "../../LocationAutocomplete";
 
 export interface W9FormData {
   name?: string;
@@ -29,6 +30,14 @@ export interface W9FormData {
   exemptPayeeCode?: string;
   fatcaCode?: string;
   address?: string;
+  // prosciutto-92107: split address into structured fields. Old drafts that
+  // saved `cityStateZip` are still accepted server-side via the back-compat
+  // shim, but new submits prefer city/state/zipCode for autofill round-trip
+  // and a cleaner PDF render.
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  /** @deprecated kept on the type for back-compat with pre-prosciutto drafts. */
   cityStateZip?: string;
   accountNumbers?: string;
   ssn?: string;
@@ -415,24 +424,59 @@ export const W9Form: React.FC<W9FormProps> = ({
             </div>
           )}
 
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="Address (number, street, apt / suite)"
+          {/* prosciutto-92107: Google Places autocomplete on the street input.
+              On pick, fills City / State / ZIP from address_components; each
+              field is still individually editable afterwards. */}
+          <LocationAutocomplete
             value={value.address ?? ""}
-            onChange={(e) => set("address", e.target.value)}
-            disabled={disabled}
-            required
+            onChange={(v) => set("address", v)}
+            onCitySelected={(cityData) => {
+              // Compose street if Google parsed one, otherwise leave the
+              // formatted address the user already saw in the input.
+              const nextAddress = cityData.street || value.address || cityData.formattedName || "";
+              // W-9 is US-only — ignore country, keep state as 2-letter code.
+              onChange({
+                ...value,
+                address: nextAddress,
+                city: cityData.cityName || value.city || "",
+                state: cityData.state || value.state || "",
+                zipCode: cityData.postalCode || value.zipCode || "",
+              });
+            }}
+            placeholder="Address (number, street, apt / suite)"
+            // Allow both establishment + geocode picks so users can pick "123
+            // Main St" or "Acme Corp" (the latter still yields address parts).
+            types={['geocode', 'establishment']}
           />
-          <IconInput
-            icon={MapPin}
-            type="text"
-            placeholder="City, state, and ZIP code"
-            value={value.cityStateZip ?? ""}
-            onChange={(e) => set("cityStateZip", e.target.value)}
-            disabled={disabled}
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="City"
+              value={value.city ?? ""}
+              onChange={(e) => set("city", e.target.value)}
+              disabled={disabled}
+              required
+            />
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="State (e.g. CA)"
+              value={value.state ?? ""}
+              onChange={(e) => set("state", e.target.value)}
+              disabled={disabled}
+              required
+            />
+            <IconInput
+              icon={MapPin}
+              type="text"
+              placeholder="ZIP code"
+              value={value.zipCode ?? ""}
+              onChange={(e) => set("zipCode", e.target.value)}
+              disabled={disabled}
+              required
+            />
+          </div>
 
           <div>
             <p className="text-xs text-theme-text-muted mb-2">

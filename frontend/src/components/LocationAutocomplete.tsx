@@ -5,7 +5,13 @@ export interface CityData {
   cityName: string;      // "New York"
   country: string;       // "United States"
   countryCode: string;   // "US"
-  state?: string;        // "NY"
+  state?: string;        // "NY" (administrative_area_level_1 short_name)
+  // prosciutto-92107: structured street + postal code, parsed from Google Places
+  // address_components. Tax forms (W-9 / W-8BEN / W-8BEN-E) wire the
+  // LocationAutocomplete onto their street-address input and split the
+  // returned components into separate City / State / ZIP / Country inputs.
+  street?: string;       // "123 Main St" (street_number + route)
+  postalCode?: string;   // "94103"
   lat: number;
   lng: number;
   formattedName: string; // "New York, NY, USA"
@@ -201,11 +207,19 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             const getComponent = (type: string) =>
               components.find(c => c.types.includes(type));
 
-            const cityComponent = getComponent('locality') || getComponent('sublocality') || getComponent('administrative_area_level_1');
+            const cityComponent = getComponent('locality') || getComponent('postal_town') || getComponent('sublocality') || getComponent('administrative_area_level_1');
             const countryComponent = getComponent('country');
             const stateComponent = getComponent('administrative_area_level_1');
+            // prosciutto-92107: street = street_number + route; postal_code
+            // optional (not present on every pick — e.g. broad city-level picks).
+            const streetNumberComponent = getComponent('street_number');
+            const routeComponent = getComponent('route');
+            const postalCodeComponent = getComponent('postal_code');
+            const street = [streetNumberComponent?.long_name, routeComponent?.long_name]
+              .filter((p): p is string => !!p && p.length > 0)
+              .join(' ');
 
-            if (cityComponent || countryComponent) {
+            if (cityComponent || countryComponent || street) {
               const lat = place.geometry?.location?.lat();
               const lng = place.geometry?.location?.lng();
               onCitySelectedRef.current({
@@ -213,6 +227,8 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
                 country: countryComponent?.long_name || '',
                 countryCode: countryComponent?.short_name || '',
                 state: stateComponent?.short_name,
+                street: street || undefined,
+                postalCode: postalCodeComponent?.long_name || undefined,
                 lat: typeof lat === 'number' ? lat : 0,
                 lng: typeof lng === 'number' ? lng : 0,
                 formattedName: selectedAddress,

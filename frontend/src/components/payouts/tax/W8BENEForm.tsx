@@ -2,7 +2,27 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Building2, Globe, MapPin, Hash, FileSignature, CalendarDays, AlertTriangle, Info } from 'lucide-react';
 import { IconInput } from '../../IconInput';
 import { Checkbox } from '../../Checkbox';
+import { LocationAutocomplete } from '../../LocationAutocomplete';
 import { lookupTreaty, normalizeCountryCode } from '../../../utils/taxTreaties';
+
+// prosciutto-92107: case-insensitive US match for the permanent-residence
+// warning. The IRS treats US territories the same way for W-8 purposes.
+const US_COUNTRY_NAMES = new Set([
+  'united states',
+  'united states of america',
+  'usa',
+  'us',
+  'puerto rico',
+  'guam',
+  'u.s. virgin islands',
+  'us virgin islands',
+  'american samoa',
+  'northern mariana islands',
+]);
+const isUSCountry = (country?: string | null): boolean => {
+  if (!country) return false;
+  return US_COUNTRY_NAMES.has(country.trim().toLowerCase());
+};
 
 export type W8BENEEntityType =
   | 'corporation'
@@ -27,9 +47,14 @@ export interface W8BENEFormData {
   chapter4Status?: W8BENEChapter4Status;
   permanentAddress?: string;
   permanentCity?: string;
+  // prosciutto-92107: split address into structured fields.
+  permanentStateProvince?: string;
+  permanentPostalCode?: string;
   permanentCountry?: string;
   mailingAddress?: string;
   mailingCity?: string;
+  mailingStateProvince?: string;
+  mailingPostalCode?: string;
   mailingCountry?: string;
   usTin?: string;
   giin?: string;
@@ -56,6 +81,12 @@ interface W8BENEFormProps {
   value: W8BENEFormData;
   onChange: (next: W8BENEFormData) => void;
   disabled?: boolean;
+  /**
+   * prosciutto-92107: surfaced when the picked permanent-residence country is
+   * the United States — W-8BEN-E is for foreign entities only. Parent should
+   * discard the W-8BEN-E draft and switch the editor to W-9.
+   */
+  onSwitchFormType?: (target: 'w9') => void;
 }
 
 const ENTITY_TYPES: Array<{ value: W8BENEEntityType; label: string }> = [
@@ -78,7 +109,7 @@ const CHAPTER4: Array<{ value: W8BENEChapter4Status; label: string; hint?: strin
   { value: 'ffi', label: 'FFI', hint: 'Foreign financial institution — paper form required.' },
 ];
 
-export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disabled }) => {
+export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disabled, onSwitchFormType }) => {
   // ----- hooks (declared above any early returns per react-hooks rules) -----
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -231,14 +262,26 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
 
       <div className="space-y-2">
         <p className="text-xs text-theme-text-muted">Permanent residence address</p>
-        <IconInput
-          icon={MapPin}
-          type="text"
-          placeholder="Street, apt / suite"
+        {/* prosciutto-92107: Google Places autocomplete on the street input.
+            On pick, fills City / State or Province / Postal Code / Country.
+            Each field remains individually editable. */}
+        <LocationAutocomplete
           value={value.permanentAddress ?? ''}
-          onChange={(e) => set('permanentAddress', e.target.value)}
+          onChange={(v) => set('permanentAddress', v)}
+          onCitySelected={(cityData) => {
+            const nextAddress = cityData.street || value.permanentAddress || cityData.formattedName || '';
+            onChange({
+              ...value,
+              permanentAddress: nextAddress,
+              permanentCity: cityData.cityName || value.permanentCity || '',
+              permanentStateProvince: cityData.state || value.permanentStateProvince || '',
+              permanentPostalCode: cityData.postalCode || value.permanentPostalCode || '',
+              permanentCountry: cityData.country || value.permanentCountry || '',
+            });
+          }}
           disabled={disabled}
-          required
+          placeholder="Street, apt / suite"
+          types={['geocode', 'establishment']}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <IconInput
@@ -253,6 +296,24 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
           <IconInput
             icon={MapPin}
             type="text"
+            placeholder="State or province"
+            value={value.permanentStateProvince ?? ''}
+            onChange={(e) => set('permanentStateProvince', e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <IconInput
+            icon={MapPin}
+            type="text"
+            placeholder="Postal code"
+            value={value.permanentPostalCode ?? ''}
+            onChange={(e) => set('permanentPostalCode', e.target.value)}
+            disabled={disabled}
+          />
+          <IconInput
+            icon={MapPin}
+            type="text"
             placeholder="Country"
             value={value.permanentCountry ?? ''}
             onChange={(e) => set('permanentCountry', e.target.value)}
@@ -260,17 +321,50 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
             required
           />
         </div>
+        {isUSCountry(value.permanentCountry) && (
+          <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10 mt-2">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-amber-300 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-xs text-amber-100 [.gpp-theme_&]:text-amber-900">
+                  <strong>W-8BEN-E is for foreign entities.</strong> Your
+                  permanent residence can't be in the United States. If the
+                  entity is a US person, use W-9 instead.
+                </div>
+                {onSwitchFormType && (
+                  <button
+                    type="button"
+                    onClick={() => onSwitchFormType('w9')}
+                    className="mt-2 text-xs px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium border border-amber-500/40 [.gpp-theme_&]:text-amber-900 [.gpp-theme_&]:bg-amber-500/30 [.gpp-theme_&]:hover:bg-amber-500/40 [.gpp-theme_&]:border-amber-700/40"
+                  >
+                    Switch to W-9
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
         <p className="text-xs text-theme-text-muted">Mailing address (if different)</p>
-        <IconInput
-          icon={MapPin}
-          type="text"
-          placeholder="Street, apt / suite"
+        <LocationAutocomplete
           value={value.mailingAddress ?? ''}
-          onChange={(e) => set('mailingAddress', e.target.value)}
+          onChange={(v) => set('mailingAddress', v)}
+          onCitySelected={(cityData) => {
+            const nextAddress = cityData.street || value.mailingAddress || cityData.formattedName || '';
+            onChange({
+              ...value,
+              mailingAddress: nextAddress,
+              mailingCity: cityData.cityName || value.mailingCity || '',
+              mailingStateProvince: cityData.state || value.mailingStateProvince || '',
+              mailingPostalCode: cityData.postalCode || value.mailingPostalCode || '',
+              mailingCountry: cityData.country || value.mailingCountry || '',
+            });
+          }}
           disabled={disabled}
+          placeholder="Street, apt / suite"
+          types={['geocode', 'establishment']}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <IconInput
@@ -279,6 +373,24 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
             placeholder="City or town"
             value={value.mailingCity ?? ''}
             onChange={(e) => set('mailingCity', e.target.value)}
+            disabled={disabled}
+          />
+          <IconInput
+            icon={MapPin}
+            type="text"
+            placeholder="State or province"
+            value={value.mailingStateProvince ?? ''}
+            onChange={(e) => set('mailingStateProvince', e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <IconInput
+            icon={MapPin}
+            type="text"
+            placeholder="Postal code"
+            value={value.mailingPostalCode ?? ''}
+            onChange={(e) => set('mailingPostalCode', e.target.value)}
             disabled={disabled}
           />
           <IconInput
