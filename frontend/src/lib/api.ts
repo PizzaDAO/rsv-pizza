@@ -4142,6 +4142,22 @@ export async function updateGppDescription(description: string): Promise<{
   });
 }
 
+// Social Post Recap Copy (grissini-58481)
+
+export async function fetchSocialPostConfig(): Promise<{ template: string; adjectives: string[] }> {
+  return apiRequest<{ template: string; adjectives: string[] }>('/api/config/social-post');
+}
+
+export async function updateSocialPostConfig(body: {
+  template: string;
+  adjectives: string[];
+}): Promise<{ success: boolean; config: { template: string; adjectives: string[] } }> {
+  return apiRequest('/api/admin/social-post', {
+    method: 'PATCH',
+    body,
+  });
+}
+
 // ── QR Peer Attestation Check-In ──
 
 export interface VouchResponse {

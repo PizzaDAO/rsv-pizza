@@ -4,6 +4,7 @@ import { requireAuth, AuthRequest, isAdmin, isSuperAdmin, isPaymentAdmin } from 
 import { AppError } from '../middleware/error.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
+import { getSocialPostConfig, invalidate } from '../lib/privateConfig.js';
 
 const router = Router();
 
@@ -671,6 +672,65 @@ router.patch('/gpp-description', requireAuth, async (req: AuthRequest, res: Resp
       skippedCount,
       newDefault: newDescription,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/social-post — Read current recap template + adjectives
+router.get('/social-post', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+    const { template, adjectives } = await getSocialPostConfig();
+    res.json({ template, adjectives });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/admin/social-post — Update the SocialPostModal recap copy (grissini-58481)
+router.patch('/social-post', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!(await rawIsSuperAdmin(req.userEmail))) {
+      throw new AppError('Super admin access required', 403, 'FORBIDDEN');
+    }
+
+    const { template, adjectives } = req.body;
+
+    if (!template || typeof template !== 'string' || template.trim().length === 0) {
+      throw new AppError('template is required', 400, 'VALIDATION_ERROR');
+    }
+    if (template.length > 1000) {
+      throw new AppError('template must be 1000 characters or fewer', 400, 'VALIDATION_ERROR');
+    }
+    if (!Array.isArray(adjectives)) {
+      throw new AppError('adjectives must be an array', 400, 'VALIDATION_ERROR');
+    }
+
+    const cleanedAdjectives = adjectives
+      .map((a) => (typeof a === 'string' ? a.trim() : ''))
+      .filter((a) => a.length > 0);
+
+    if (cleanedAdjectives.length < 1 || cleanedAdjectives.length > 50) {
+      throw new AppError('adjectives must have between 1 and 50 non-blank entries', 400, 'VALIDATION_ERROR');
+    }
+    if (cleanedAdjectives.some((a) => a.length > 50)) {
+      throw new AppError('each adjective must be 50 characters or fewer', 400, 'VALIDATION_ERROR');
+    }
+
+    const value = JSON.stringify({ template, adjectives: cleanedAdjectives });
+
+    await prisma.appConfig.upsert({
+      where: { key: 'social_post_config' },
+      update: { value, updatedAt: new Date() },
+      create: { key: 'social_post_config', value },
+    });
+
+    invalidate('social_post_config');
+
+    res.json({ success: true, config: { template, adjectives: cleanedAdjectives } });
   } catch (error) {
     next(error);
   }

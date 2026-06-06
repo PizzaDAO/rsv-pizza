@@ -4,7 +4,7 @@ import { X, Megaphone, Copy, Check, Download, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { normalizeHandle } from '../ShareRSVP';
 import { countryNameToFlag } from '../../utils/countryFlag';
-import { getPartyPhotos } from '../../lib/api';
+import { getPartyPhotos, fetchSocialPostConfig } from '../../lib/api';
 import type { Party, Photo } from '../../types';
 
 interface SocialPostModalProps {
@@ -51,25 +51,28 @@ function partyCity(party: Party): string {
   return party.name.replace(/^Global Pizza Party\s*/i, '').trim() || party.name;
 }
 
-// Picked at random each time the modal opens; host can edit before posting.
-const RECAP_ADJECTIVES = [
-  'great',
-  'awesome',
-  'a blast',
-  'epic',
-];
+// In-file fallbacks used if the config fetch fails or returns empty. These MUST
+// stay byte-for-byte identical to the backend SOCIAL_POST_FALLBACK in
+// backend/src/lib/privateConfig.ts (grissini-58481). The real copy is served by
+// GET /api/config/social-post and is editable by a super-admin without a deploy.
+//
+// Template tokens interpolated below: {flag} {city} {adjective} {tags}.
+const FALLBACK_TEMPLATE =
+  '{flag}\u{1F355}\u{1F973}\n' +
+  'Bitcoin Pizza Day {city} was {adjective}!\n' +
+  '\n' +
+  'Thanks {tags} for supporting the event. See you next year!';
 
-function buildDefaultText(party: Party): string {
-  const flag = countryNameToFlag(party.country);
-  const city = partyCity(party);
-  const tags = buildPartnerTags(party);
-  const adjective = RECAP_ADJECTIVES[Math.floor(Math.random() * RECAP_ADJECTIVES.length)];
-  return (
-    `${flag}\u{1F355}\u{1F973}\n` +
-    `Bitcoin Pizza Day ${city} was ${adjective}!\n` +
-    `\n` +
-    `Thanks ${tags} for supporting the event. See you next year!`
-  );
+// Picked at random each time the modal opens; host can edit before posting.
+const FALLBACK_ADJECTIVES = ['great', 'awesome', 'a blast', 'epic'];
+
+function buildDefaultText(party: Party, template: string, adjectives: string[]): string {
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)] ?? '';
+  return template
+    .replaceAll('{flag}', countryNameToFlag(party.country))
+    .replaceAll('{city}', partyCity(party))
+    .replaceAll('{adjective}', adjective)
+    .replaceAll('{tags}', buildPartnerTags(party));
 }
 
 async function downloadImage(url: string, filename: string): Promise<void> {
@@ -93,12 +96,32 @@ export function SocialPostModal({ open, onClose, party }: SocialPostModalProps) 
 
   const city = useMemo(() => partyCity(party), [party]);
 
-  // Re-initialize the editable text whenever the modal (re)opens.
+  // Re-initialize the editable text whenever the modal (re)opens. The recap
+  // template + adjective pool come from app_config (editable by a super-admin
+  // without a deploy); fall back to the in-file constants on error/empty. The
+  // text is re-derived each open, so the random adjective re-rolls (unchanged
+  // behavior when config == fallback).
   useEffect(() => {
-    if (open) {
-      setText(buildDefaultText(party));
-      setCopied(false);
-    }
+    if (!open) return;
+    let cancelled = false;
+    setCopied(false);
+    // Render immediately with the fallback so the modal is never blank, then
+    // swap to the configured copy once it loads.
+    setText(buildDefaultText(party, FALLBACK_TEMPLATE, FALLBACK_ADJECTIVES));
+    fetchSocialPostConfig()
+      .then((cfg) => {
+        if (cancelled) return;
+        const template = cfg?.template || FALLBACK_TEMPLATE;
+        const adjectives =
+          cfg?.adjectives && cfg.adjectives.length > 0 ? cfg.adjectives : FALLBACK_ADJECTIVES;
+        setText(buildDefaultText(party, template, adjectives));
+      })
+      .catch(() => {
+        // Keep the fallback text already set above.
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, party.id]);
 

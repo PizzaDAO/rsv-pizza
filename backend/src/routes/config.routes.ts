@@ -16,6 +16,7 @@ import {
   getReimbursementTiers,
   getReimbursementCapBands,
   getPayoutCaps,
+  getSocialPostConfig,
 } from '../lib/privateConfig.js';
 
 /**
@@ -125,6 +126,27 @@ router.get(
           perAddressHardCapUsd: caps.perAddressHardCapUsd,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/config/social-post — recap template + adjective pool for the
+// SocialPostModal (grissini-58481).
+//
+// Auth: any logged-in user (requireAuth only). The copy is non-sensitive and is
+// interpolated client-side. The accessor always falls back to the original
+// hardcoded copy, so this never 500s on unseeded config.
+// ---------------------------------------------------------------------------
+router.get(
+  '/social-post',
+  requireAuth,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { template, adjectives } = await getSocialPostConfig();
+      res.json({ template, adjectives });
     } catch (error) {
       next(error);
     }

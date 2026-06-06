@@ -382,6 +382,44 @@ export function getGppGlobalEditors(): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Social-post recap copy (grissini-58481)
+//
+// The SocialPostModal recap template + adjective pool used to be hardcoded in
+// the frontend (frontend/src/components/checklist/SocialPostModal.tsx). They now
+// live in `app_config` (key `social_post_config`) so a super-admin can edit the
+// copy without a deploy. Unlike the rest of this module, this copy is NON-
+// sensitive: it is served to any logged-in user and interpolated client-side.
+//
+// Template tokens (replaced client-side): {flag} {city} {adjective} {tags}.
+//
+// The fallback below is the ORIGINAL hardcoded copy and MUST stay byte-for-byte
+// identical to the frontend's in-file FALLBACK constants.
+// ---------------------------------------------------------------------------
+
+export interface SocialPostConfig {
+  template: string;
+  adjectives: string[];
+}
+
+const SOCIAL_POST_FALLBACK: SocialPostConfig = {
+  template:
+    '{flag}\u{1F355}\u{1F973}\n' +
+    'Bitcoin Pizza Day {city} was {adjective}!\n' +
+    '\n' +
+    'Thanks {tags} for supporting the event. See you next year!',
+  adjectives: ['great', 'awesome', 'a blast', 'epic'],
+};
+
+/**
+ * Social-post recap template + adjective pool for the SocialPostModal. Real
+ * value is seeded/edited in `app_config` (key `social_post_config`); the
+ * fallback is the original hardcoded copy. Never throws — getConfig falls back.
+ */
+export function getSocialPostConfig(): Promise<SocialPostConfig> {
+  return getConfig<SocialPostConfig>('social_post_config', SOCIAL_POST_FALLBACK);
+}
+
+// ---------------------------------------------------------------------------
 // Operational quota limits (marinara-71630 P8)
 //
 // Host-facing operational quotas (bulk-import hard cap, per-user-per-event
