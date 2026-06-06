@@ -115,6 +115,7 @@
   },
   "underbossDashboard": {
     "title": "Underboss Dashboard",
+    "dmAllHosts": "DM all hosts",
     "loginPrompt": "Please log in to access the underboss dashboard.",
     "logIn": "Log In",
     "loadingDashboard": "Loading dashboard...",

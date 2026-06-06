@@ -9,7 +9,12 @@ import {
   sendTelegramBroadcast,
   sendHostTelegramBroadcast,
   fetchCityTelegramGroups,
+  fetchHostAudience,
+  fetchHostCoverage,
+  inviteUnlinkedHosts,
   BroadcastResult,
+  HostCoverageResponse,
+  HostAudienceRow,
 } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
 import { GPP_REGIONS } from '../../types';
@@ -42,6 +47,8 @@ interface SendStats {
   sent: number;
   failed: number;
   blockedHosts: number;
+  // guanciale-58491: not-connected hosts who got the message via email fallback.
+  emailed: number;
 }
 
 // Tag results with their bucket so the "Both" mode can render two sections.
@@ -137,19 +144,32 @@ interface TelegramBroadcastProps {
   onClose: () => void;
   preSelectedCities?: string[];
   events?: UnderbossEvent[];
+  // guanciale-58491: when true, the modal opens in "All hosts" mode — it loads
+  // the full in-scope linked-host audience from the backend (host-audience)
+  // rather than deriving hosts from the page's `events`, defaults the recipient
+  // toggle to "hosts", and shows the coverage panel.
+  allHostsMode?: boolean;
 }
 
 type ViewState = 'compose' | 'sending' | 'results';
 
-export function TelegramBroadcast({ onClose, preSelectedCities, events }: TelegramBroadcastProps) {
+export function TelegramBroadcast({ onClose, preSelectedCities, events, allHostsMode }: TelegramBroadcastProps) {
   const { t } = useTranslation('partner');
   // Data loading
   const [groups, setGroups] = useState<TelegramGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Recipient mode (groups, hosts, or both)
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>('groups');
+  // guanciale-58491: "All hosts" mode — full in-scope audience loaded server-side.
+  const [audienceHosts, setAudienceHosts] = useState<HostAudienceRow[]>([]);
+  // Coverage panel data + the invite-deeplink action state.
+  const [coverage, setCoverage] = useState<HostCoverageResponse | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ emailed: number; skipped: number; noEmail: number } | null>(null);
+
+  // Recipient mode (groups, hosts, or both). In all-hosts mode we default to
+  // the hosts tab since that's the point of the entry.
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>(allHostsMode ? 'hosts' : 'groups');
 
   // Selection & filtering
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -167,7 +187,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   // State flow
   const [viewState, setViewState] = useState<ViewState>('compose');
   const [results, setResults] = useState<TaggedResult[]>([]);
-  const [sendStats, setSendStats] = useState<SendStats>({ sent: 0, failed: 0, blockedHosts: 0 });
+  const [sendStats, setSendStats] = useState<SendStats>({ sent: 0, failed: 0, blockedHosts: 0, emailed: 0 });
 
   // Test message (groups + hosts share these states; the active chat/party is keyed by id)
   const [testingChatId, setTestingChatId] = useState<string | null>(null);
@@ -213,6 +233,49 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     }
     load();
   }, []);
+
+  // guanciale-58491: in "All hosts" mode, load the full in-scope linked-host
+  // audience + coverage report from the backend (scoped server-side). These run
+  // independently of the city-group load above.
+  useEffect(() => {
+    if (!allHostsMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [aud, cov] = await Promise.all([fetchHostAudience(), fetchHostCoverage()]);
+        if (cancelled) return;
+        setAudienceHosts(aud);
+        setCoverage(cov);
+      } catch (err: any) {
+        if (!cancelled) setLoadError(err?.message || 'Failed to load host audience');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allHostsMode]);
+
+  // Email the connect deeplink to every in-scope unlinked host (with an email).
+  const handleInviteUnlinked = async () => {
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const r = await inviteUnlinkedHosts();
+      setInviteResult(r);
+      // Refresh coverage so the linked/unlinked counts reflect any change.
+      try {
+        const cov = await fetchHostCoverage();
+        setCoverage(cov);
+      } catch {
+        /* non-fatal */
+      }
+    } catch (err: any) {
+      setInviteResult({ emailed: 0, skipped: 0, noEmail: 0 });
+      setLoadError(err?.message || 'Failed to send invites');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   // Get unique regions for filter
   const regions = useMemo(() => {
@@ -295,16 +358,29 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
   // host has either a Telegram handle or a connected bot chat_id are included
   // (others have no way for an underboss to reach them via this tool).
   const hostRows = useMemo<HostRow[]>(() => {
-    if (!events || events.length === 0) return [];
-    let rows: HostRow[] = events
-      .filter(e => e.host && (e.hostTelegram || e.hostTelegramConnected))
-      .map(e => ({
-        partyId: e.id,
-        city: extractCityFromEvent(e),
-        hostName: e.host?.name || (t('telegram.unknownHost') as string),
-        hostTelegram: e.hostTelegram || null,
-        connected: !!e.hostTelegramConnected,
+    let rows: HostRow[];
+    if (allHostsMode) {
+      // guanciale-58491: source the audience from the backend (already the full
+      // in-scope linked-host list, not limited to the page's events).
+      rows = audienceHosts.map(h => ({
+        partyId: h.partyId,
+        city: h.city,
+        hostName: h.hostName || (t('telegram.unknownHost') as string),
+        hostTelegram: h.hostTelegram,
+        connected: h.connected,
       }));
+    } else {
+      if (!events || events.length === 0) return [];
+      rows = events
+        .filter(e => e.host && (e.hostTelegram || e.hostTelegramConnected))
+        .map(e => ({
+          partyId: e.id,
+          city: extractCityFromEvent(e),
+          hostName: e.host?.name || (t('telegram.unknownHost') as string),
+          hostTelegram: e.hostTelegram || null,
+          connected: !!e.hostTelegramConnected,
+        }));
+    }
 
     // Mirror the groups list: filter by pre-selected cities when present.
     if (preSelectedCities && preSelectedCities.length > 0) {
@@ -321,7 +397,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     }
 
     return rows;
-  }, [events, preSelectedCities, search, t]);
+  }, [allHostsMode, audienceHosts, events, preSelectedCities, search, t]);
 
   // Auto-select hosts whose event city matches one of the pre-selected cities,
   // but only those that are actually connected (disabled checkboxes can't be
@@ -449,10 +525,18 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
 
     setViewState('sending');
 
+    // guanciale-58491: mint a client-side broadcastId per send so the backend
+    // can short-circuit accidental double-sends (double-click / retry).
+    const broadcastId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     const allResults: TaggedResult[] = [];
     let totalSent = 0;
     let totalFailed = 0;
     let blockedHostCount = 0;
+    let emailedCount = 0;
 
     if (recipientMode === 'groups' || recipientMode === 'both') {
       if (selectedGroups.length > 0) {
@@ -470,10 +554,11 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     if (recipientMode === 'hosts' || recipientMode === 'both') {
       if (selectedHostsPayload.length > 0) {
         try {
-          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode, selectedAppTab || null);
+          const r = await sendHostTelegramBroadcast(selectedHostsPayload, message, parseMode, selectedAppTab || null, broadcastId);
           allResults.push(...r.results.map(res => ({ ...res, kind: 'host' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
+          emailedCount += r.emailed ?? 0;
           blockedHostCount = r.results.filter(
             x => x.error === 'Host blocked the bot — disconnected'
           ).length;
@@ -484,7 +569,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
     }
 
     setResults(allResults);
-    setSendStats({ sent: totalSent, failed: totalFailed, blockedHosts: blockedHostCount });
+    setSendStats({ sent: totalSent, failed: totalFailed, blockedHosts: blockedHostCount, emailed: emailedCount });
     setViewState('results');
   };
 
@@ -592,6 +677,60 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
           {/* Compose view */}
           {!loadingGroups && !loadError && viewState === 'compose' && (
             <div className="space-y-6">
+              {/* guanciale-58491: coverage panel (all-hosts mode). "X of Y hosts
+                  linked" + a button to email the connect deeplink to unlinked hosts. */}
+              {allHostsMode && coverage && (
+                <div className="bg-theme-surface border border-theme-stroke rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium text-theme-text">
+                        {t('telegram.coverage.summary', {
+                          linked: coverage.linked,
+                          total: coverage.total,
+                          defaultValue: '{{linked}} of {{total}} hosts linked to Telegram',
+                        })}
+                      </p>
+                      {coverage.unlinked > 0 && (
+                        <p className="text-xs text-theme-text-faint mt-0.5">
+                          {t('telegram.coverage.unlinkedDetail', {
+                            withHandle: coverage.hasHandleNoChat,
+                            noHandle: coverage.noHandleNoChat,
+                            defaultValue: '{{withHandle}} have a TG handle but no bot link · {{noHandle}} have neither',
+                          })}
+                        </p>
+                      )}
+                    </div>
+                    {coverage.unlinked > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleInviteUnlinked}
+                        disabled={inviting}
+                        className="flex items-center gap-2 bg-theme-card hover:bg-theme-surface border border-theme-stroke disabled:opacity-40 disabled:cursor-not-allowed text-theme-text px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        {inviting ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Send size={12} />
+                        )}
+                        {t('telegram.coverage.inviteButton', {
+                          count: coverage.unlinked,
+                          defaultValue: 'Email deeplink to {{count}} unlinked hosts',
+                        })}
+                      </button>
+                    )}
+                  </div>
+                  {inviteResult && (
+                    <div className="mt-2 px-3 py-2 rounded-lg text-xs bg-blue-500/10 text-blue-600">
+                      {t('telegram.coverage.inviteResult', {
+                        emailed: inviteResult.emailed,
+                        noEmail: inviteResult.noEmail,
+                        defaultValue: 'Emailed {{emailed}} hosts · {{noEmail}} had no email on file',
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Recipients toggle (sausage-24183) */}
               <div className="flex items-center gap-1 bg-theme-surface border border-theme-stroke rounded-xl p-1 w-fit">
                 {(['groups', 'hosts', 'both'] as const).map(mode => (
@@ -1124,6 +1263,16 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events }: Telegr
                   <div className="text-2xl font-bold text-red-500">{sendStats.failed}</div>
                   <div className="text-xs text-theme-text-faint">{t('telegram.failed')}</div>
                 </div>
+                {/* guanciale-58491: email-the-message fallback count */}
+                {sendStats.emailed > 0 && (
+                  <>
+                    <div className="w-px h-10 bg-theme-stroke" />
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-500">{sendStats.emailed}</div>
+                      <div className="text-xs text-theme-text-faint">{t('telegram.emailed', 'emailed')}</div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Results list — split into Groups / Hosts sections when mode is "both" */}

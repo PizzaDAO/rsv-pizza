@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Download } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, Check, Download, Send } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
@@ -103,6 +103,9 @@ export function UnderbossDashboard() {
   // Telegram broadcast modal state
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastCities, setBroadcastCities] = useState<string[]>([]);
+  // guanciale-58491: "DM all GPP hosts" entry point — opens the broadcast in
+  // hosts mode with the full in-scope audience loaded server-side.
+  const [broadcastAllHosts, setBroadcastAllHosts] = useState(false);
 
   // Partner tags for EventRow indicator
   const [partnerTags, setPartnerTags] = useState<string[]>([]);
@@ -586,7 +589,16 @@ export function UnderbossDashboard() {
 
         {/* Events / Cities Tabs */}
         <section>
-          <div className="border-b border-theme-stroke mb-4 flex gap-6">
+          <div className="border-b border-theme-stroke mb-4 flex gap-6 items-center">
+            {/* guanciale-58491: "DM all GPP hosts" entry point — loads the full
+                in-scope audience server-side (not just the page's events). */}
+            <button
+              onClick={() => { setBroadcastCities([]); setBroadcastAllHosts(true); setShowBroadcast(true); }}
+              className="ml-auto order-last flex items-center gap-2 bg-[#E52828] hover:bg-[#cc2222] text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors self-center mb-2"
+            >
+              <Send size={14} />
+              {t('underbossDashboard.dmAllHosts', 'DM all hosts')}
+            </button>
             <button
               onClick={() => setActiveTab('events')}
               className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
@@ -746,7 +758,7 @@ export function UnderbossDashboard() {
       <Footer />
 
       {/* Telegram Broadcast Modal */}
-      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} />}
+      {showBroadcast && <TelegramBroadcast onClose={() => { setShowBroadcast(false); setBroadcastCities([]); setBroadcastAllHosts(false); }} preSelectedCities={broadcastCities} events={filteredData?.events ?? []} allHostsMode={broadcastAllHosts} />}
 
       {/* Add Underboss Modal */}
       {showAddUnderboss && createPortal(
