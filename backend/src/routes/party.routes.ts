@@ -8,6 +8,7 @@ import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
 import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { setDeleteContext } from '../helpers/auditContext.js';
+import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import {
   capValuesDiffer,
@@ -888,14 +889,35 @@ async function softCancelParty(
   userEmail: string | undefined,
   reason: string | null,
 ) {
-  return prisma.party.update({
-    where: { id: partyId },
-    data: {
-      cancelledAt: new Date(),
-      cancelledBy: userEmail || 'unknown',
-      cancellationReason:
-        reason && reason.trim() ? reason.trim().slice(0, 500) : null,
-    },
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.party.findUnique({
+      where: { id: partyId },
+      select: { underbossStatus: true },
+    });
+    const downgrade =
+      !!current && ['approved', 'listed'].includes(current.underbossStatus);
+    const updated = await tx.party.update({
+      where: { id: partyId },
+      data: {
+        cancelledAt: new Date(),
+        cancelledBy: userEmail || 'unknown',
+        cancellationReason:
+          reason && reason.trim() ? reason.trim().slice(0, 500) : null,
+        ...(downgrade ? { underbossStatus: 'pending' } : {}),
+      },
+    });
+    if (downgrade) {
+      await writeStatusAudit(
+        tx,
+        partyId,
+        current!.underbossStatus,
+        'pending',
+        userEmail || 'unknown',
+        'owner',
+        'auto-unapproved on host cancel',
+      );
+    }
+    return updated;
   });
 }
 

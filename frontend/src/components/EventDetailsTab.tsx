@@ -471,11 +471,18 @@ export const EventDetailsTab: React.FC = () => {
       const success = await cancelParty(party.id, cancelReason);
       if (success) {
         const trimmed = cancelReason.trim().slice(0, 500) || null;
+        // stracotto-58498: cancelling un-approves an approved/listed event on
+        // the backend; mirror that optimistically so the UI never shows
+        // approved+cancelled.
+        const downgrade = ['approved', 'listed'].includes(
+          party.underbossStatus || '',
+        );
         // Merge in-place so the dashboard renders the cancelled state without
         // re-fetching — same pattern as `arugula-38633` v2 / `burrata-72104`.
         mergeParty({
           cancelledAt: new Date().toISOString(),
           cancellationReason: trimmed,
+          ...(downgrade ? { underbossStatus: 'pending' } : {}),
         });
         setShowCancelPrompt(false);
         setCancelReason('');

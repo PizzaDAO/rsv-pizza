@@ -1221,13 +1221,40 @@ router.delete('/events/bulk-delete', requireAuth, requireUnderbossAuth, async (r
     // ziti-58475: soft-cancel instead of hard delete. The party row, its
     // guests/sponsors/RSVPs, and the public URL all stay intact; events can be
     // reinstated. Only flip events that aren't already cancelled (idempotent).
-    const result = await prisma.party.updateMany({
+    const targets = await prisma.party.findMany({
       where: { id: { in: partyIds }, cancelledAt: null },
-      data: {
-        cancelledAt: new Date(),
-        cancelledBy: req.userEmail || 'underboss_bulk',
-        cancellationReason: null,
-      },
+      select: { id: true, underbossStatus: true },
+    });
+    const result = await prisma.$transaction(async (tx) => {
+      const cancelled = await tx.party.updateMany({
+        where: { id: { in: partyIds }, cancelledAt: null },
+        data: {
+          cancelledAt: new Date(),
+          cancelledBy: req.userEmail || 'underboss_bulk',
+          cancellationReason: null,
+        },
+      });
+      const toUnapprove = targets.filter((p) =>
+        ['approved', 'listed'].includes(p.underbossStatus),
+      );
+      if (toUnapprove.length) {
+        await tx.party.updateMany({
+          where: { id: { in: toUnapprove.map((p) => p.id) } },
+          data: { underbossStatus: 'pending' },
+        });
+        for (const p of toUnapprove) {
+          await writeStatusAudit(
+            tx,
+            p.id,
+            p.underbossStatus,
+            'pending',
+            req.userEmail || 'underboss_bulk',
+            'underboss',
+            'auto-unapproved on bulk cancel',
+          );
+        }
+      }
+      return cancelled;
     });
 
     res.json({ cancelled: result.count });
