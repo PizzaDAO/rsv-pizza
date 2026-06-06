@@ -11,7 +11,7 @@ import { OptinABTab } from '../components/underboss/OptinABTab';
 import { RsvpCheckboxesTab } from '../components/admin/RsvpCheckboxesTab';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
-  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight,
+  Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight, Megaphone,
 } from 'lucide-react';
 import {
   fetchAdminMe, fetchAdminList, addAdmin, removeAdmin,
@@ -20,6 +20,7 @@ import {
   fetchChecklistDefaults, updateChecklistDefaults, addChecklistDefault, deleteChecklistDefault,
   fetchSponsorUsers, createSponsorUser, deleteSponsorUser,
   fetchGppDescription, updateGppDescription,
+  fetchSocialPostConfig, updateSocialPostConfig,
   fetchUnderbossDashboard,
   fetchGraphicsAdminList, addGraphicsAdmin, removeGraphicsAdmin,
 } from '../lib/api';
@@ -123,6 +124,14 @@ export function AdminPage() {
   const [descMessage, setDescMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCustomized, setShowCustomized] = useState(false);
 
+  // Social Post Template state (grissini-58481)
+  const [socialTemplate, setSocialTemplate] = useState('');
+  const [socialTemplateOriginal, setSocialTemplateOriginal] = useState('');
+  const [socialAdjectivesText, setSocialAdjectivesText] = useState('');
+  const [socialAdjectivesOriginal, setSocialAdjectivesOriginal] = useState('');
+  const [savingSocial, setSavingSocial] = useState(false);
+  const [socialMessage, setSocialMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const [activeTab, setActiveTab] = useState<'admin' | 'experiments' | 'rsvpCheckboxes'>('admin');
 
   const isSuperAdmin = currentRole === 'super_admin';
@@ -147,7 +156,7 @@ export function AdminPage() {
         setCurrentEmail(me.email || '');
 
         const isSA = me.role === 'super_admin';
-        const [adminList, ubList, nftSettings, clDefaults, spList, gppDescData, gaList] = await Promise.all([
+        const [adminList, ubList, nftSettings, clDefaults, spList, gppDescData, gaList, socialCfg] = await Promise.all([
           fetchAdminList(),
           fetchUnderbossList(),
           fetchGppNftSettings(),
@@ -155,6 +164,7 @@ export function AdminPage() {
           fetchSponsorUsers(),
           isSA ? fetchGppDescription().catch(() => null) : Promise.resolve(null),
           fetchGraphicsAdminList(),
+          isSA ? fetchSocialPostConfig().catch(() => null) : Promise.resolve(null),
         ]);
         setAdmins(adminList);
         setUnderbosses(ubList);
@@ -169,6 +179,13 @@ export function AdminPage() {
           setGppCustomEvents(gppDescData.customizedEvents);
           setGppTotalEvents(gppDescData.totalGppEvents);
           setGppDefaultCount(gppDescData.defaultCount);
+        }
+        if (socialCfg) {
+          const adjText = (socialCfg.adjectives || []).join('\n');
+          setSocialTemplate(socialCfg.template);
+          setSocialTemplateOriginal(socialCfg.template);
+          setSocialAdjectivesText(adjText);
+          setSocialAdjectivesOriginal(adjText);
         }
       } catch (err: any) {
         setError(err.message || 'Failed to check admin status');
@@ -227,6 +244,13 @@ export function AdminPage() {
       return () => clearTimeout(t);
     }
   }, [descMessage]);
+
+  useEffect(() => {
+    if (socialMessage) {
+      const t = setTimeout(() => setSocialMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [socialMessage]);
 
   async function handleExportEventsCsv() {
     setExportingCsv(true);
@@ -288,6 +312,31 @@ export function AdminPage() {
       setDescMessage({ type: 'error', text: err.message || 'Failed to update' });
     } finally {
       setSavingDesc(false);
+    }
+  }
+
+  // Parse the one-per-line adjectives textarea into a clean array.
+  function parseSocialAdjectives(raw: string): string[] {
+    return raw.split('\n').map((s) => s.trim()).filter(Boolean);
+  }
+
+  async function handleSaveSocialPost() {
+    const adjectives = parseSocialAdjectives(socialAdjectivesText);
+    if (!socialTemplate.trim() || adjectives.length === 0) return;
+    setSavingSocial(true);
+    setSocialMessage(null);
+    try {
+      const result = await updateSocialPostConfig({ template: socialTemplate, adjectives });
+      const savedAdjText = result.config.adjectives.join('\n');
+      setSocialTemplate(result.config.template);
+      setSocialTemplateOriginal(result.config.template);
+      setSocialAdjectivesText(savedAdjText);
+      setSocialAdjectivesOriginal(savedAdjText);
+      setSocialMessage({ type: 'success', text: 'Social post template saved.' });
+    } catch (err: any) {
+      setSocialMessage({ type: 'error', text: err.message || 'Failed to update' });
+    } finally {
+      setSavingSocial(false);
     }
   }
 
@@ -1427,6 +1476,80 @@ export function AdminPage() {
               )}
             </section>
           )}
+
+          {/* Social Post Template — super admin only */}
+          {isSuperAdmin && (() => {
+            const previewAdjectives = parseSocialAdjectives(socialAdjectivesText);
+            const previewAdjective =
+              previewAdjectives[Math.floor(Math.random() * previewAdjectives.length)] ?? previewAdjectives[0] ?? '';
+            const previewText = socialTemplate
+              .replaceAll('{flag}', '\u{1F1FA}\u{1F1F8}')
+              .replaceAll('{city}', 'Philadelphia')
+              .replaceAll('{adjective}', previewAdjective)
+              .replaceAll('{tags}', '@Pizza_DAO');
+            const socialUnchanged =
+              socialTemplate === socialTemplateOriginal && socialAdjectivesText === socialAdjectivesOriginal;
+            const socialInvalid = !socialTemplate.trim() || previewAdjectives.length === 0;
+            return (
+            <section className="card p-6 mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Megaphone size={20} className="text-theme-text-secondary" />
+                <h2 className="text-lg font-semibold text-theme-text">Social Post Template</h2>
+              </div>
+
+              <p className="text-sm text-theme-text-muted mb-4">
+                The recap copy hosts see in the "Post about the party on socials" modal. Edit it here without a deploy.
+              </p>
+
+              {socialMessage && (
+                <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+                  socialMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+                }`}>
+                  {socialMessage.text}
+                </div>
+              )}
+
+              <IconInput
+                icon={Megaphone}
+                multiline
+                rows={6}
+                placeholder="{flag}🍕🥳&#10;Bitcoin Pizza Day {city} was {adjective}!"
+                value={socialTemplate}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSocialTemplate(e.target.value)}
+              />
+              <p className="text-xs text-white/40 mt-1 mb-4">
+                Available tokens: {'{flag}'} {'{city}'} {'{adjective}'} {'{tags}'}
+              </p>
+
+              <IconInput
+                icon={ListChecks}
+                multiline
+                rows={5}
+                placeholder="great&#10;awesome&#10;a blast&#10;epic"
+                value={socialAdjectivesText}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSocialAdjectivesText(e.target.value)}
+              />
+              <p className="text-xs text-white/40 mt-1 mb-4">
+                Adjectives — one per line. One is picked at random each time the modal opens.
+              </p>
+
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-theme-text mb-2">Live preview</h3>
+                <div className="px-4 py-3 rounded-lg bg-white/30 border border-theme-stroke text-sm text-theme-text whitespace-pre-wrap">
+                  {previewText || <span className="text-theme-text-muted">Nothing to preview yet.</span>}
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveSocialPost}
+                disabled={socialUnchanged || socialInvalid || savingSocial}
+                className="px-6 py-2 bg-[#E52828] text-white rounded-xl text-sm font-medium hover:bg-[#CC2020] transition-colors disabled:opacity-50"
+              >
+                {savingSocial ? 'Saving…' : 'Save'}
+              </button>
+            </section>
+            );
+          })()}
 
           {/* GPP NFT Settings — super admin only */}
           {isSuperAdmin && (
