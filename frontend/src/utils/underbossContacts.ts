@@ -20,18 +20,25 @@ const register = (handle: string, countries: string[]) => {
 // South Africa specifically (not other Southern African countries)
 register('@pnsibanda', ['South Africa']);
 
-// West, East, North, and other African countries share one underboss.
+// Northeast Africa (East Africa + Egypt/Sudan) — Peri Peri Pacino
+register('@azizmotomoto', [
+  // East Africa
+  'Kenya', 'Tanzania', 'Uganda', 'Ethiopia', 'Eritrea', 'Djibouti',
+  'Somalia', 'Rwanda', 'Burundi', 'South Sudan',
+  // Northeast / Nile
+  'Egypt', 'Sudan',
+]);
+
+// West Africa + remaining North Africa (Libya/Tunisia/Algeria/Morocco) + other
+// sub-Saharan African countries (except South Africa & Northeast Africa).
 register('@BuildwithMc', [
   // West Africa
   'Nigeria', 'Ghana', 'Senegal', "Côte d'Ivoire", "Cote d'Ivoire", 'Ivory Coast',
   'Mali', 'Burkina Faso', 'Niger', 'Gambia', 'The Gambia', 'Guinea',
   'Liberia', 'Sierra Leone', 'Togo', 'Benin', 'Mauritania',
   'Guinea-Bissau', 'Cabo Verde', 'Cape Verde',
-  // East Africa
-  'Kenya', 'Tanzania', 'Uganda', 'Ethiopia', 'Eritrea', 'Djibouti',
-  'Somalia', 'Rwanda', 'Burundi', 'South Sudan',
   // North Africa
-  'Egypt', 'Libya', 'Tunisia', 'Algeria', 'Morocco', 'Sudan',
+  'Libya', 'Tunisia', 'Algeria', 'Morocco',
   // Other African countries — default into this bucket since only South Africa
   // is explicitly carved out
   'Botswana', 'Lesotho', 'Eswatini', 'Swaziland', 'Namibia', 'Zimbabwe',
