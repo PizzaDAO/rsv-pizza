@@ -80,7 +80,10 @@ export function buildSurveyEmail(
 // Reuses the bulk-invite batching pattern (groups of 10, 500ms delay, max 500).
 // Returns { sent, failed, skipped } counts.
 // ---------------------------------------------------------------------------
-async function sendSurveyToParty(partyId: string): Promise<{
+async function sendSurveyToParty(
+  partyId: string,
+  audience: 'rsvped' | 'checkedin' | 'approved' = 'rsvped'
+): Promise<{
   sent: number;
   failed: number;
   skipped: number;
@@ -93,10 +96,31 @@ async function sendSurveyToParty(partyId: string): Promise<{
     throw new AppError('Party not found', 404, 'NOT_FOUND');
   }
 
-  // Transactional email — RSVP'd-yes guests only (status CONFIRMED) with an
-  // email. We intentionally ignore mailing_list_opt_in here.
+  // Build the recipient filter from the chosen audience. We intentionally
+  // ignore mailing_list_opt_in here.
+  //   rsvped    → everyone who RSVP'd yes, excluding rejected guests
+  //   checkedin → only guests checked in at the event, excluding rejected
+  //   approved  → only host-approved guests
+  // NOTE: `OR: [{ approved: true }, { approved: null }]` (NOT
+  // `approved: { not: false }`) excludes only rejected (approved=false) while
+  // keeping pending (null) — Prisma 3VL makes `{ not: false }` drop NULL rows.
+  const where =
+    audience === 'checkedin'
+      ? {
+          partyId,
+          checkedInAt: { not: null },
+          OR: [{ approved: true }, { approved: null }],
+        }
+      : audience === 'approved'
+        ? { partyId, status: 'CONFIRMED' as const, approved: true }
+        : {
+            partyId,
+            status: 'CONFIRMED' as const,
+            OR: [{ approved: true }, { approved: null }],
+          };
+
   const guests = await prisma.guest.findMany({
-    where: { partyId, status: 'CONFIRMED' },
+    where,
     select: { id: true, name: true, email: true, surveyToken: true },
   });
 
@@ -298,7 +322,11 @@ hostRouter.post('/:partyId/survey/send', async (req: AuthRequest, res: Response,
     const { partyId } = req.params;
     await assertSurveyTabAccess(req, partyId);
 
-    const result = await sendSurveyToParty(partyId);
+    const requested = (req.body as { audience?: unknown })?.audience;
+    const audience: 'rsvped' | 'checkedin' | 'approved' =
+      requested === 'checkedin' || requested === 'approved' ? requested : 'rsvped';
+
+    const result = await sendSurveyToParty(partyId, audience);
 
     // Manual path may re-send even if survey_sent_at is already set.
     await prisma.party.update({

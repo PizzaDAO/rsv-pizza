@@ -6736,13 +6736,14 @@ export async function submitSurvey(
   });
 }
 
-// Host — send the survey email to all CONFIRMED guests with an email.
+// Host — send the survey email to the chosen audience of guests with an email.
 export async function sendSurvey(
-  partyId: string
+  partyId: string,
+  audience: 'rsvped' | 'checkedin' | 'approved' = 'rsvped'
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   return apiRequest<{ sent: number; failed: number; skipped: number }>(
     `/api/parties/${partyId}/survey/send`,
-    { method: 'POST', requireAuth: true }
+    { method: 'POST', body: { audience }, requireAuth: true }
   );
 }
 

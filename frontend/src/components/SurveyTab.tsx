@@ -23,6 +23,7 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ partyId, surveyEnabled: in
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null);
+  const [audience, setAudience] = useState<'rsvped' | 'checkedin' | 'approved'>('rsvped');
 
   const loadResults = useCallback(async () => {
     setLoading(true);
@@ -58,7 +59,7 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ partyId, surveyEnabled: in
     setSendResult(null);
     setError(null);
     try {
-      const r = await sendSurvey(partyId);
+      const r = await sendSurvey(partyId, audience);
       setSendResult(r);
       await loadResults();
     } catch (e) {
@@ -88,7 +89,37 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ partyId, surveyEnabled: in
           label="Survey enabled for this event"
         />
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-5">
+          <div className="inline-flex flex-wrap gap-2">
+            {([
+              ['rsvped', "RSVP'd yes"],
+              ['checkedin', 'Checked-in'],
+              ['approved', 'Approved only'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setAudience(value)}
+                className={
+                  audience === value
+                    ? 'btn-primary text-sm px-3 py-1.5'
+                    : 'text-sm px-3 py-1.5 rounded-lg border border-white/10 text-theme-text-muted hover:text-theme-text'
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-theme-text-muted">
+            {audience === 'checkedin'
+              ? 'Sends only to guests checked in at the event.'
+              : audience === 'approved'
+                ? 'Sends only to host-approved guests.'
+                : "Sends to everyone who RSVP'd yes (excludes rejected guests)."}
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={handleSend}
