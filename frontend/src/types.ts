@@ -1876,6 +1876,13 @@ export interface Payout {
    * feature shipped and on shipping-coordinator receipts.
    */
   taxFormId?: string | null;
+  /**
+   * ziti-58300: host "Submit for review" toggle timestamp on the rolling
+   * per-(party,host) reimbursement record. Null until the host signals their
+   * reimbursement is ready for admin review; reversible while non-terminal.
+   * Optional on the wire for backward-compat with cached payloads.
+   */
+  submittedForReviewAt?: string | null;
 }
 
 // ============================================
