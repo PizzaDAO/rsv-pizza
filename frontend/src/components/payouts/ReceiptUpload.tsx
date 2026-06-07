@@ -305,9 +305,16 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                       />
                     )}
 
+                    {/* grissini-58511: an errored upload/OCR row is NOT saved
+                        and is NOT submitted — make that unambiguous so the host
+                        removes + re-uploads instead of assuming it counted. */}
                     {item.status === 'error' && (
-                      <span className="inline-flex items-center gap-1 text-red-400">
-                        <AlertCircle size={12} /> {item.error || 'Failed'}
+                      <span className="inline-flex items-start gap-1 text-red-400">
+                        <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                        <span>
+                          This receipt didn't save — remove it and re-upload.
+                          {item.error ? ` (${item.error})` : ''}
+                        </span>
                       </span>
                     )}
                   </div>
