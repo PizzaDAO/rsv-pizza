@@ -52,7 +52,7 @@ import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
-import { sanitizePgString } from '../lib/sanitizePg.js';
+import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 
 const router = Router();
 
@@ -5946,9 +5946,9 @@ router.post(
           await prisma.payoutDocument.update({
             where: { id: docId },
             data: {
-              ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              ocrLineItems: sanitizeForPg((result.lineItems ?? []) as unknown as Prisma.InputJsonValue),
               ocrConfidence: new Decimal(result.confidence),
-              ocrRaw: { ocr: result.raw, fx: { source: fx.source, rate: fx.exchangeRate } } as Prisma.InputJsonValue,
+              ocrRaw: sanitizeForPg({ ocr: result.raw, fx: { source: fx.source, rate: fx.exchangeRate } } as Prisma.InputJsonValue),
               // Even unresolved rows keep originalAmount — the admin needs to
               // see what the receipt said so they can pick the right currency.
               originalAmount: new Decimal(fx.originalAmount),
@@ -6201,12 +6201,12 @@ router.post(
           });
           const fx = await convertToUSD(result.amount, result.currency);
           const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
-          ocrLineItems = (result.lineItems ?? []) as unknown as Prisma.InputJsonValue;
+          ocrLineItems = sanitizeForPg((result.lineItems ?? []) as unknown as Prisma.InputJsonValue);
           ocrConfidence = new Decimal(result.confidence);
-          ocrRaw = {
+          ocrRaw = sanitizeForPg({
             ocr: result.raw,
             fx: { source: fx.source, rate: fx.exchangeRate },
-          } as Prisma.InputJsonValue;
+          } as Prisma.InputJsonValue);
           // Keep originalAmount even when unresolved so the admin sees what the
           // receipt said and can pick the right currency in the edit modal.
           originalAmount = new Decimal(fx.originalAmount);
