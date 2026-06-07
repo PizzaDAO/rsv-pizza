@@ -312,6 +312,7 @@ model Party {
   reimbursementCapAudits  ReimbursementCapAudit[]
   surveyResponses         SurveyResponse[]
 
+  @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
   @@map("parties")
 }
 
