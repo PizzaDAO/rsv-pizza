@@ -835,6 +835,7 @@
     "eventPhotosSubtitle": "Lege ein Gruppenfoto, ein Foto des Boxstapels und ein Pizza-Foto von deinem Event fest. Wähle sie aus deiner Galerie oder lade neue hoch.",
     "selectOrUpload": "Auswählen oder hochladen",
     "additionalPhotos": "Weitere Fotos hinzufügen (optional)",
+    "viewAllPhotos": "Alle anzeigen ({{count}})",
     "roles": {
       "group": "Gruppenfoto",
       "boxStack": "Foto des Boxstapels",

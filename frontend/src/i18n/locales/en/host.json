@@ -954,6 +954,7 @@
     "eventPhotosSubtitle": "Designate a group photo, a box stack photo, and a pizza photo from your event. Select from your gallery or upload new ones.",
     "selectOrUpload": "Select or upload",
     "additionalPhotos": "Add more photos (optional)",
+    "viewAllPhotos": "View all ({{count}})",
     "roles": {
       "group": "Group photo",
       "boxStack": "Box stack photo",
