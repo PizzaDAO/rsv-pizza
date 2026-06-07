@@ -492,7 +492,9 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         </div>
       )}
 
-      <PrepayCheckbox partyId={partyId} />
+      {/* rigatoni-58301: 50% prepayment only makes sense before the event —
+          hide the opt-in once the event date has passed. */}
+      {!eventHasHappened && <PrepayCheckbox partyId={partyId} />}
 
       {/* ===== 2. Estimated attendance (hard requirement) ===== */}
       <div className="relative">
