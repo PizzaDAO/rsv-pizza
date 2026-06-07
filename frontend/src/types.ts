@@ -2159,6 +2159,12 @@ export interface AdminPayoutFilters {
   country?: string;
   /** mascarpone-49102: event-tag filter — single tag "has" match on `parties.event_tags`. `'all'` / undefined = no filter. */
   tag?: string;
+  /** cornetto-58510: tri-state event-tag filter (by-city view, client-side). include = has ALL; exclude = has NONE. */
+  tagIncludes?: string[];
+  tagExcludes?: string[];
+  /** cornetto-58510: tri-state country filter (by-city view, client-side). include = OR (any); exclude = NONE. */
+  countryIncludes?: string[];
+  countryExcludes?: string[];
   /**
    * argentina-92103: regional scope for regional /payments portals (e.g.
    * `/payments/latam` -> `['central-america','south-america']`). When set,
