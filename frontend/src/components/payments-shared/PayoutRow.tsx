@@ -4,6 +4,7 @@ import { AlertTriangle, Flag } from 'lucide-react';
 import type { AdminPayout, Payout } from '../../types';
 import { ClickableEmail } from '../ClickableEmail';
 import { PayoutStatusPill } from './PayoutStatusPill';
+import { SubmittedForReviewBadge } from './SubmittedForReviewBadge';
 import { PayoutMethodIcon } from './PayoutMethodIcon';
 import { formatPayoutAmount, formatOriginalCurrency } from './formatPayoutAmount';
 import { CapInlineEditor } from './CapInlineEditor';
@@ -284,8 +285,12 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
       </td>
 
       <td className="px-3 py-3">
-        <div className="inline-flex items-center gap-1.5">
+        <div className="inline-flex items-center gap-1.5 flex-wrap">
           <PayoutStatusPill status={payout.status} />
+          {/* ziti-58300: amber "Submitted" pill when the co-host has flipped
+              their rolling reimbursement's "Submit for review" toggle. Helps
+              admins prioritise host-ready records over still-rolling ones. */}
+          <SubmittedForReviewBadge submittedForReviewAt={payout.submittedForReviewAt} compact />
           {/* argentina-92103: green Flag icon when a regional underboss (or
               admin) has marked the row "ready for payment". Tooltip carries
               the actor email + timestamp. Sticky until the row is paid /

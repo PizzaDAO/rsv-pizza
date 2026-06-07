@@ -788,6 +788,13 @@ function serializePayout(row: any): any {
     extractedAmountUsd: Number(row.extractedAmountUsd),
     finalAmountUsd: Number(row.finalAmountUsd),
     status: row.status,
+    // ziti-58300: host-signaled "ready for review" timestamp on the rolling
+    // per-(party,host) reimbursement record. Status stays 'pending' while
+    // this is set; admin /payments surfaces it as a "Submitted" badge so
+    // host-ready reimbursements can be prioritized. Null = still rolling.
+    submittedForReviewAt: row.submittedForReviewAt
+      ? row.submittedForReviewAt.toISOString()
+      : null,
     payoutMethod: row.payoutMethod,
     payoutWalletAddress: row.payoutWalletAddress,
     // caciotta-92104: original ENS input (e.g. `puebla.eth`) when the
