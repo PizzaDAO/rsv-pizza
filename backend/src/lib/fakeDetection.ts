@@ -153,7 +153,6 @@ export const WEIGHTS = {
   // guests.checked_in_at / checked_in_by.
   checkin_velocity_superhuman: 0,
   checkin_timestamp_collapse: 0,
-  single_checker_dominance: 0,
   checkin_ratio_extreme: 0,
 } as const;
 
@@ -1166,40 +1165,6 @@ export function checkCheckinTimestampCollapse(guests: FakeDetectionGuest[]): Fla
 }
 
 /**
- * single_checker_dominance — one account (`checked_in_by`) performed ≥95% of
- * all check-ins. Null/undefined checkers bucket under the literal "__null__".
- */
-export function checkSingleCheckerDominance(guests: FakeDetectionGuest[]): FlagResult {
-  const id = 'single_checker_dominance';
-  const checkedIn = checkedInGuests(guests);
-  const n = checkedIn.length;
-  if (n < 20) return flag(id, false, `n=${n} below 20`);
-  const counts = new Map<string, number>();
-  for (const g of checkedIn) {
-    const key = g.checkedInBy ?? '__null__';
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  let maxCount = 0;
-  let topKey = '';
-  for (const [key, c] of counts) {
-    if (c > maxCount) {
-      maxCount = c;
-      topKey = key;
-    }
-  }
-  const topShare = maxCount / n;
-  const distinctCheckers = counts.size;
-  const dominantIsNull = topKey === '__null__';
-  const fired = topShare >= 0.95;
-  return flag(
-    id,
-    fired,
-    `topShare=${(topShare * 100).toFixed(1)}%, distinctCheckers=${distinctCheckers}, dominantIsNull=${dominantIsNull}`,
-    { n, topShare, distinctCheckers, dominantIsNull },
-  );
-}
-
-/**
  * checkin_ratio_extreme — ≥95% of the entire RSVP roster is marked checked-in.
  * Real events have no-shows; a near-100% attendance rate is a fraud tell.
  */
@@ -1281,7 +1246,6 @@ export function scoreEvent(
     // check-ins can land on invite/host rows, not just direct RSVPs.
     checkCheckinVelocitySuperhuman(allGuests),
     checkCheckinTimestampCollapse(allGuests),
-    checkSingleCheckerDominance(allGuests),
     checkCheckinRatioExtreme(allGuests),
   ];
 

@@ -33,7 +33,6 @@ import {
   checkHighBounceRate,
   checkCheckinVelocitySuperhuman,
   checkCheckinTimestampCollapse,
-  checkSingleCheckerDominance,
   checkCheckinRatioExtreme,
   scoreEvent,
   buildSybilWalletSet,
@@ -93,7 +92,6 @@ const TEST_WEIGHTS: Record<keyof typeof WEIGHTS, number> = {
   high_bounce_rate: SYNTH_W,
   checkin_velocity_superhuman: SYNTH_CHECKIN_W,
   checkin_timestamp_collapse: SYNTH_CHECKIN_W,
-  single_checker_dominance: SYNTH_CHECKIN_W,
   checkin_ratio_extreme: SYNTH_CHECKIN_W,
 };
 
@@ -1449,32 +1447,6 @@ describe('checkCheckinTimestampCollapse', () => {
   });
 });
 
-describe('checkSingleCheckerDominance', () => {
-  it('fires when one checker performed ≥95% of check-ins', () => {
-    const guests = fraudCheckinRoster(40, 3600, 'host-1');
-    const r = checkSingleCheckerDominance(guests);
-    expect(r.fired).toBe(true);
-    expect((r.evidence as { distinctCheckers: number }).distinctCheckers).toBe(1);
-  });
-
-  it('treats null checker as a single dominant bucket', () => {
-    const guests = fraudCheckinRoster(40, 3600, null);
-    const r = checkSingleCheckerDominance(guests);
-    expect(r.fired).toBe(true);
-    expect((r.evidence as { dominantIsNull: boolean }).dominantIsNull).toBe(true);
-  });
-
-  it('collapses (not fired) below n=20', () => {
-    const guests = fraudCheckinRoster(19, 3600, 'host-1');
-    expect(checkSingleCheckerDominance(guests).fired).toBe(false);
-  });
-
-  it('does not fire with multiple distinct checkers', () => {
-    const guests = healthyCheckinRoster(40, 40); // 4 rotating checkers → topShare 25%
-    expect(checkSingleCheckerDominance(guests).fired).toBe(false);
-  });
-});
-
 describe('checkCheckinRatioExtreme', () => {
   it('fires when ≥95% of the roster is checked in', () => {
     // 78 checked in + 3 not = 81 total → 96%.
@@ -1507,7 +1479,6 @@ describe('scoreEvent — check-in heuristics integration', () => {
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).toContain('checkin_velocity_superhuman');
     expect(firedIds).toContain('checkin_timestamp_collapse');
-    expect(firedIds).toContain('single_checker_dominance');
     expect(firedIds).toContain('checkin_ratio_extreme');
     expect(row.score).toBeGreaterThanOrEqual(
       TEST_WEIGHTS.checkin_velocity_superhuman + TEST_WEIGHTS.checkin_ratio_extreme,
@@ -1521,7 +1492,6 @@ describe('scoreEvent — check-in heuristics integration', () => {
     const firedIds = row.flags.filter(f => f.fired).map(f => f.id);
     expect(firedIds).not.toContain('checkin_velocity_superhuman');
     expect(firedIds).not.toContain('checkin_timestamp_collapse');
-    expect(firedIds).not.toContain('single_checker_dominance');
     expect(firedIds).not.toContain('checkin_ratio_extreme');
   });
 });
