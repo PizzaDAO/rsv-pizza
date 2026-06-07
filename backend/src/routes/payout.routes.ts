@@ -32,6 +32,10 @@ import {
   getYtdPayoutTotalUsd,
 } from './tax-form.routes.js';
 import { getPayoutCaps } from '../lib/privateConfig.js';
+import {
+  NON_TERMINAL_PAYOUT_STATUSES,
+  payoutRowSnapshotFromUser,
+} from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -2598,7 +2602,8 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
 
 // Non-terminal statuses: a rolling record is "active" while in one of these.
 // Terminal = paid | completed | withdrawn | rejected | failed.
-const NON_TERMINAL_PAYOUT_STATUSES = ['pending', 'approved', 'queued'] as const;
+// ricotta-58512: moved to services/payout-snapshot.ts so user.routes.ts can
+// reuse it without a require cycle; re-imported above.
 
 /**
  * ziti-58300: find the caller's active rolling reimbursement record for an
@@ -2958,6 +2963,18 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
         // Create a fresh rolling record. finalAmountUsd is set after we know
         // the eligible sum; seed FX headline from the first resolved receipt.
         const firstResolved = docsToCreate.find((d) => d.ocrAmount != null);
+        // ricotta-58512: snapshot the uploader's payout method/wallet onto the
+        // new rolling row so the execute/send path (which reads the row, not the
+        // host profile) can pay it. Covers "host set payment details first, then
+        // uploaded receipts, admin approved the rolling row without a submit."
+        const uploader = await tx.user.findUnique({
+          where: { id: uploaderUserId },
+          select: {
+            preferredPayoutMethod: true,
+            payoutWalletAddress: true,
+            payoutBankDetails: true,
+          },
+        });
         const created = await tx.payout.create({
           data: {
             partyId,
@@ -2969,6 +2986,7 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
             extractedAmountUsd: new Decimal(0),
             finalAmountUsd: new Decimal(0),
             status: 'pending',
+            ...(uploader ? payoutRowSnapshotFromUser(uploader) : {}),
             documents: { create: stampedDocs },
           },
           include: { documents: true },
@@ -3168,9 +3186,25 @@ router.post('/:partyId/reimbursement/submit', async (req: AuthRequest, res: Resp
       );
     }
 
+    // ricotta-58512: snapshot the submitting host's payout method/wallet onto
+    // the row at submit time so the execute/send path can pay it (it reads the
+    // row, not the host profile). The host is who entered payment details, so a
+    // submit is the authoritative point to re-stamp it.
+    const submitter = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        preferredPayoutMethod: true,
+        payoutWalletAddress: true,
+        payoutBankDetails: true,
+      },
+    });
+
     const updated = await prisma.payout.update({
       where: { id: record.id },
-      data: { submittedForReviewAt: new Date() },
+      data: {
+        submittedForReviewAt: new Date(),
+        ...(submitter ? payoutRowSnapshotFromUser(submitter) : {}),
+      },
       include: {
         host: { select: { id: true, name: true, email: true } },
         documents: {
