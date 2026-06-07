@@ -18,6 +18,7 @@ export type UnderbossTab =
   | 'fake-detection'
   | 'superlatives'
   | 'survey'
+  | 'survey-responses'
   | 'outreach'
   | 'telegram-groups';
 
@@ -28,6 +29,7 @@ const UNDERBOSS_TABS: UnderbossTab[] = [
   'fake-detection',
   'superlatives',
   'survey',
+  'survey-responses',
   'outreach',
   'telegram-groups',
 ];
