@@ -37,6 +37,89 @@ export function cityKeyFromPartyName(name: string | null | undefined): string | 
 }
 
 /**
+ * provola-58507: normalize a free-text city label (a moltobene captured-group
+ * TITLE, a moltobene `/city/groups` cityName, OR an rsvpizza-derived cityKey)
+ * down to a comparable "core" city name, so the same city expressed two
+ * different ways collapses to ONE string for exact-equality matching.
+ *
+ * This is the heart of the missing-chat_id backfill. It is deliberately
+ * CONSERVATIVE: it only strips well-known boilerplate / decoration. It never
+ * does fuzzy/substring matching — callers compare the RESULT with `===`. A
+ * wrong match routes Telegram reminders to the wrong group, so we prefer to
+ * miss a match (leave the city without a chat_id) over guessing.
+ *
+ * Pipeline (order matters):
+ *   1. lowercase + strip diacritics/accents (NFD + combining-mark removal)
+ *   2. remove parentheticals `(...)` and bracketed `[...]` (qualifiers like
+ *      "(dadiangas)" or "(+18)").
+ *   3. split on `|` / `:` qualifier separators into segments. We do NOT blindly
+ *      keep the first segment, because the city can be on EITHER side
+ *      ("madrid | no kids allowed" has the city first; "gpp: tokyo" has it
+ *      second). Instead we clean EACH segment (noise + year strip) and keep the
+ *      one whose cleaned core is LONGEST — the noise-only segment ("no kids
+ *      allowed", "gpp") cleans to '' and loses, so the real city survives
+ *      regardless of side. Hyphens are NOT segment separators: "raleigh -
+ *      durham" stays "raleigh durham" (a real two-name metro) — splitting it
+ *      would silently truncate a legitimate hyphenated city.
+ *   4. (per segment) remove noise phrases: "global pizza party", "bitcoin
+ *      pizza", "pizza party", "gpp", "telegram", "group", "official", "no kids
+ *      allowed"; remove 4-digit years; strip non-alphanumeric/space (emoji,
+ *      symbols, leftover punctuation/separators); collapse whitespace.
+ *
+ * Returns '' when nothing recognizable remains — callers MUST treat '' as a
+ * non-match (never index the missing-cities map by an empty key).
+ */
+function cleanCityCore(segment: string): string {
+  let s = segment;
+  // Hyphen-joined metros -> space-joined ("raleigh - durham").
+  s = s.replace(/[–—-]+/g, ' ');
+  // Noise phrases. Longest first so "global pizza party" is removed before the
+  // shorter "pizza party". Word-bounded to avoid eating real substrings.
+  const noisePhrases = [
+    'global pizza party',
+    'bitcoin pizza',
+    'pizza party',
+    'no kids allowed',
+    'official',
+    'telegram',
+    'group',
+    'gpp',
+  ];
+  for (const phrase of noisePhrases) {
+    const re = new RegExp(`\\b${phrase.replace(/\s+/g, '\\s+')}\\b`, 'g');
+    s = s.replace(re, ' ');
+  }
+  // Remove 4-digit years (2019–2099 era).
+  s = s.replace(/\b(19|20)\d{2}\b/g, ' ');
+  // Strip everything that isn't a letter, digit, or space (emoji, symbols,
+  // leftover punctuation/separators). \p{L}/\p{N} keep non-latin scripts.
+  s = s.replace(/[^\p{L}\p{N} ]+/gu, ' ');
+  // Collapse whitespace.
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+export function normalizeCityName(input: string | null | undefined): string {
+  if (!input) return '';
+
+  // 1. lowercase + strip diacritics/accents.
+  let s = String(input).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  // 2. remove parentheticals / brackets entirely.
+  s = s.replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');
+
+  // 3. split on |/: qualifier separators; clean each segment; keep the longest
+  //    cleaned core. (No split = single segment = the whole string.)
+  const segments = s.split(/[|:]/);
+  let best = '';
+  for (const seg of segments) {
+    const cleaned = cleanCityCore(seg);
+    if (cleaned.length > best.length) best = cleaned;
+  }
+
+  return best;
+}
+
+/**
  * tonda-58293 FIX #1: build a map of GPP cityKey → region (GPP slug).
  *
  * `city_telegram_groups.region`, `parties.region`, and `underbosses.regions`

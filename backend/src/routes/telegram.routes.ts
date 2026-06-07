@@ -19,6 +19,7 @@ import {
 import {
   syncCityGroupsFromMoltobene,
   refreshCityGroupFromMoltobene,
+  syncFromCapturedGroups,
 } from '../services/moltobeneSync.js';
 
 // Alias to keep the routes that were ported in from master readable.
@@ -1321,8 +1322,16 @@ router.post('/sync-from-moltobene', requireAuth, requireUnderbossAuth, async (re
       throw new AppError('Admin access required', 403, 'FORBIDDEN');
     }
 
-    const result = await syncCityGroupsFromMoltobene();
-    res.json(result);
+    // provola-58507: run BOTH backfill paths and return both reports.
+    //  - cityGroups: moltobene's curated `/city/groups` (now with normalized
+    //    name-matching fallback for messy party names).
+    //  - capturedGroups: moltobene's `/captured-groups` (every group the bot is
+    //    in) matched by normalized title against approved cities missing a
+    //    chat_id. Each is best-effort and reports {ok:false,reason} on its own
+    //    config/endpoint gap without failing the other.
+    const cityGroups = await syncCityGroupsFromMoltobene();
+    const capturedGroups = await syncFromCapturedGroups();
+    res.json({ ...cityGroups, cityGroups, capturedGroups });
   } catch (error) {
     next(error);
   }
