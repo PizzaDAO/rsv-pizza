@@ -92,7 +92,7 @@ export function SavedViewsMenu({ scope, currentParams, onApply }: SavedViewsMenu
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 z-50 mt-1 w-72 rounded-lg border border-theme-stroke bg-theme-card py-1 shadow-xl">
+          <div className="absolute top-full right-0 z-50 mt-1 w-72 rounded-lg border border-theme-stroke bg-theme-header py-1 shadow-xl">
             {/* List */}
             <div className="max-h-72 overflow-y-auto">
               {loading ? (
