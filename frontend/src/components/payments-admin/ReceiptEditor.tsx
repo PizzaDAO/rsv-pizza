@@ -150,6 +150,14 @@ function draftSubtotalSum(drafts: LineItemDraft[] | undefined): number {
   return sum;
 }
 
+// panino-58508: shared short-date formatter for receipt upload attribution.
+// Matches ReceiptsLibrary's "MMM D, YYYY" format.
+function formatUploadedAt(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
+
 export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   doc,
   draft,
@@ -190,6 +198,8 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
     authenticityVerdict === 'suspicious' || authenticityVerdict === 'likely_fake';
   const conf = doc.ocrConfidence ?? 0;
   const lowConf = conf > 0 && conf < 0.8;
+  // panino-58508: per-doc uploader attribution for the receipt header.
+  const uploader = doc.uploadedByName || doc.uploadedByEmail || null;
   const lineSum = draftSubtotalSum(lineItemDrafts);
   // The "Sum" label uses the receipt's original currency if known so it
   // matches what admins are typing into the per-line subtotals.
@@ -296,6 +306,13 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           <p className="text-xs text-theme-text-muted truncate" title={doc.fileName}>
             {doc.fileName}
           </p>
+          {/* panino-58508: receipt upload attribution — "Uploaded {date} by {name}". */}
+          {(doc.createdAt || uploader) && (
+            <p className="text-xs text-white/40 mt-0.5">
+              {doc.createdAt && <>Uploaded {formatUploadedAt(doc.createdAt)}</>}
+              {uploader && <>{doc.createdAt ? ' by ' : 'Uploaded by '}{uploader}</>}
+            </p>
+          )}
           {/* stracciatella-92114: multi-receipt-per-photo label. Only when a
               single photo resolved to >1 detected receipts. */}
           {doc.sourceReceiptCount != null && doc.sourceReceiptCount > 1 && (

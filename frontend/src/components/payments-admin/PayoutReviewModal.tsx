@@ -34,6 +34,14 @@ function stripGppPrefix(name: string): string {
   return name.replace(/^Global Pizza Party\s+/i, '');
 }
 
+// panino-58508: shared short-date formatter for receipt upload attribution.
+// Matches ReceiptsLibrary's "MMM D, YYYY" format.
+function formatUploadedAt(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
+
 /**
  * taleggio-58499: IconInput defaults to the global dark-theme input styling
  * (near-white text on translucent dark bg from index.css). Inside the
@@ -2017,6 +2025,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     // DUPLICATE pill) so the grid stays scannable. Admin
                     // can still un-toggle either flag from the editor.
                     const isIne = doc.ineligible === true && !isDup;
+                    // panino-58508: second tooltip line — "Uploaded {date} by {name}".
+                    const uploadedLine = (doc.createdAt || doc.uploadedByName || doc.uploadedByEmail)
+                      ? `\nUploaded ${doc.createdAt ? formatUploadedAt(doc.createdAt) : ''}${
+                          (doc.uploadedByName || doc.uploadedByEmail)
+                            ? `${doc.createdAt ? ' by ' : 'by '}${doc.uploadedByName || doc.uploadedByEmail}` : ''}`
+                      : '';
                     return (
                       <button
                         key={doc.id}
@@ -2048,10 +2062,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         }`}
                         title={
                           isDup
-                            ? `[DUPLICATE — excluded from totals] ${doc.fileName}`
+                            ? `[DUPLICATE — excluded from totals] ${doc.fileName}${uploadedLine}`
                             : isIne
-                              ? `[INELIGIBLE — excluded from totals] ${doc.fileName}`
-                              : doc.fileName
+                              ? `[INELIGIBLE — excluded from totals] ${doc.fileName}${uploadedLine}`
+                              : `${doc.fileName}${uploadedLine}`
                         }
                       >
                         {isVideoFile(doc) ? (
@@ -2557,7 +2571,20 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                               'bg-gray-400'
                             }`}
                           />
-                          <span className="text-theme-text-muted flex-1 truncate">{r.fileName}</span>
+                          {/* panino-58508: filename + upload attribution stacked
+                              so "Uploaded {date} by {name}" sits under the name
+                              without breaking the inline-edit flex row. */}
+                          <span className="flex-1 min-w-0 flex flex-col">
+                            <span className="text-theme-text-muted truncate">{r.fileName}</span>
+                            {(r.createdAt || r.uploadedByName || r.uploadedByEmail) && (
+                              <span className="text-[10px] text-white/40 truncate">
+                                {r.createdAt && <>Uploaded {formatUploadedAt(r.createdAt)}</>}
+                                {(r.uploadedByName || r.uploadedByEmail) && (
+                                  <>{r.createdAt ? ' by ' : 'Uploaded by '}{r.uploadedByName || r.uploadedByEmail}</>
+                                )}
+                              </span>
+                            )}
+                          </span>
                           {canEditReceipts ? (
                             <>
                               {/*
