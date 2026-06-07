@@ -62,9 +62,10 @@ export function cityKeyFromPartyName(name: string | null | undefined): string | 
  *      durham" stays "raleigh durham" (a real two-name metro) — splitting it
  *      would silently truncate a legitimate hyphenated city.
  *   4. (per segment) remove noise phrases: "global pizza party", "bitcoin
- *      pizza", "pizza party", "gpp", "telegram", "group", "official", "no kids
- *      allowed"; remove 4-digit years; strip non-alphanumeric/space (emoji,
- *      symbols, leftover punctuation/separators); collapse whitespace.
+ *      pizza", "pizza party", "pizza dao", "pizzadao", "gpp", "telegram",
+ *      "group", "official", "no kids allowed"; remove 4-digit years; strip
+ *      non-alphanumeric/space (emoji, symbols, leftover punctuation/separators);
+ *      collapse whitespace.
  *
  * Returns '' when nothing recognizable remains — callers MUST treat '' as a
  * non-match (never index the missing-cities map by an empty key).
@@ -79,11 +80,13 @@ function cleanCityCore(segment: string): string {
     'global pizza party',
     'bitcoin pizza',
     'pizza party',
+    'pizza dao',
     'no kids allowed',
     'official',
     'telegram',
     'group',
     'gpp',
+    'pizzadao',
   ];
   for (const phrase of noisePhrases) {
     const re = new RegExp(`\\b${phrase.replace(/\s+/g, '\\s+')}\\b`, 'g');
