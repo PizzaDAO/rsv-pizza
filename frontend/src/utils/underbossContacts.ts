@@ -18,7 +18,7 @@ const register = (handle: string, countries: string[]) => {
 };
 
 // South Africa specifically (not other Southern African countries)
-register('@pnsibanda', ['South Africa']);
+register('@pnsibanda', ['South Africa', 'Zimbabwe']);
 
 // Northeast Africa (East Africa + Egypt/Sudan) — Peri Peri Pacino
 register('@azizmotomoto', [
@@ -41,7 +41,7 @@ register('@BuildwithMc', [
   'Libya', 'Tunisia', 'Algeria', 'Morocco',
   // Other African countries — default into this bucket since only South Africa
   // is explicitly carved out
-  'Botswana', 'Lesotho', 'Eswatini', 'Swaziland', 'Namibia', 'Zimbabwe',
+  'Botswana', 'Lesotho', 'Eswatini', 'Swaziland', 'Namibia',
   'Zambia', 'Malawi', 'Mozambique', 'Madagascar', 'Mauritius', 'Seychelles',
   'Comoros', 'Angola', 'Democratic Republic of the Congo', 'DRC', 'Congo',
   'Republic of the Congo', 'Gabon', 'Equatorial Guinea', 'Cameroon',
