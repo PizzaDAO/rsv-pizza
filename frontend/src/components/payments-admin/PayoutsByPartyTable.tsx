@@ -456,6 +456,7 @@ function CityActionsMenu({
   customTags,
   tagBusy,
   receiptsReminderSentAt,
+  walletReminderSentAt,
   paymentsApprovedUsd,
   receiptsTotalUsd,
 }: {
@@ -504,6 +505,7 @@ function CityActionsMenu({
   /** panuozzo-58217: an add/remove is in flight for this party. */
   tagBusy: boolean;
   receiptsReminderSentAt?: string | null;
+  walletReminderSentAt?: string | null;
   paymentsApprovedUsd?: number | null;
   paymentsApprovedAt?: string | null;
   /** Receipts total for default approval amount. */
@@ -826,8 +828,8 @@ function CityActionsMenu({
                 {/* Send wallet reminder — sibling of the receipts reminder.
                     DMs the host + posts to the city group telling them to
                     submit their payout wallet address. Same two-click confirm
-                    (DMs can't be unsent). No last-sent sub-label (not
-                    persisted). */}
+                    (DMs can't be unsent). Shows a last-sent sub-label from
+                    `walletReminderSentAt`, mirroring the receipts reminder. */}
                 {canSendWalletReminder && (
                   <button
                     type="button"
@@ -857,9 +859,18 @@ function CityActionsMenu({
                         }
                       />
                     )}
-                    {confirmWalletReminder
-                      ? 'Click again to confirm'
-                      : 'Send wallet reminder'}
+                    <span className="flex flex-col items-start">
+                      <span>
+                        {confirmWalletReminder
+                          ? 'Click again to confirm'
+                          : 'Send wallet reminder'}
+                      </span>
+                      {walletReminderSentAt && !confirmWalletReminder && (
+                        <span className="text-xs text-theme-text-muted">
+                          Sent {new Date(walletReminderSentAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 )}
                 {/* panuozzo-58217: free-text custom tags. Admins + underbosses
@@ -3524,6 +3535,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           reopenBusy={reopenBusyPartyId === row.party.id}
                           approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
+                          walletReminderSentAt={row.party.walletReminderSentAt}
                           paymentsApprovedUsd={row.party.paymentsApprovedUsd}
                           paymentsApprovedAt={row.party.paymentsApprovedAt}
                           receiptsTotalUsd={receiptUsdTotal}
