@@ -53,13 +53,15 @@ const COUNTRY_NAME_TO_CODE = {
   angola: 'AO', 'antigua and barbuda': 'AG', argentina: 'AR',
   armenia: 'AM', australia: 'AU', austria: 'AT', azerbaijan: 'AZ',
   // B
-  bahamas: 'BS', bahrain: 'BH', bangladesh: 'BD', barbados: 'BB',
+  bahamas: 'BS', 'the bahamas': 'BS',
+  bahrain: 'BH', bangladesh: 'BD', barbados: 'BB',
   belarus: 'BY', belgium: 'BE', belize: 'BZ', benin: 'BJ',
   bhutan: 'BT', bolivia: 'BO', 'bosnia and herzegovina': 'BA',
   botswana: 'BW', brazil: 'BR', brunei: 'BN', bulgaria: 'BG',
   'burkina faso': 'BF', burundi: 'BI',
   // C
   cambodia: 'KH', cameroon: 'CM', canada: 'CA', 'cape verde': 'CV',
+  'cayman islands': 'KY',
   'central african republic': 'CF', chad: 'TD', chile: 'CL',
   china: 'CN', colombia: 'CO', comoros: 'KM',
   congo: 'CG',
@@ -138,6 +140,7 @@ const COUNTRY_NAME_TO_CODE = {
   'united kingdom': 'GB', uk: 'GB', 'great britain': 'GB',
   'united states': 'US', usa: 'US', 'united states of america': 'US',
   'u.s. virgin islands': 'VI', 'us virgin islands': 'VI',
+  'united states virgin islands': 'VI',
   uruguay: 'UY', uzbekistan: 'UZ',
   // V
   vanuatu: 'VU', 'vatican city': 'VA', venezuela: 'VE', vietnam: 'VN',
@@ -148,29 +151,35 @@ const COUNTRY_NAME_TO_CODE = {
 };
 
 const COUNTRY_ALIASES = {
-  // German
+  // German / Dutch / Danish (shared spelling)
   deutschland: 'DE', österreich: 'AT', schweiz: 'CH',
+  polen: 'PL',
   // Spanish
   españa: 'ES', méxico: 'MX', perú: 'PE', alemania: 'DE',
   francia: 'FR', suiza: 'CH', 'república dominicana': 'DO',
   // Portuguese
-  brasil: 'BR',
+  brasil: 'BR', índia: 'IN',
   // Italian
   italia: 'IT',
   // French
   algérie: 'DZ', maroc: 'MA',
   'république démocratique du congo': 'CD',
   'république du congo': 'CG',
+  malaisie: 'MY',
   // Dutch
   nederland: 'NL',
   // Danish
   danmark: 'DK',
+  // Swedish
+  sverige: 'SE',
   // Polish
   polska: 'PL', 'wielka brytania': 'GB',
   // Hungarian
-  szlovákia: 'SK',
+  szlovákia: 'SK', magyarország: 'HU',
   // Romanian
   románia: 'RO',
+  // Bosnian
+  'bosna i hercegovina': 'BA',
   // Turkish
   türkiye: 'TR',
   // Vietnamese
@@ -178,12 +187,14 @@ const COUNTRY_ALIASES = {
   // Bulgarian
   българия: 'BG',
   // Russian
-  грузия: 'GE',
+  грузия: 'GE', турция: 'TR',
   // Arabic
   الجزائر: 'DZ',
   السعودية: 'SA',
   العراق: 'IQ',
   مصر: 'EG',
+  // Hebrew
+  ישראל: 'IL',
   // CJK
   中国: 'CN',
   日本: 'JP',
@@ -210,6 +221,7 @@ const OVERRIDES = {
   CG: 'Congo',
   PS: 'Palestine',
   ST: 'São Tomé and Príncipe',
+  TR: 'Turkey',
 };
 
 const ENGLISH_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });

@@ -21,10 +21,11 @@ describe('canonicalizeCountryName', () => {
     expect(canonicalizeCountryName('Italia')).toBe('Italy');
     expect(canonicalizeCountryName('Perú')).toBe('Peru');
     expect(canonicalizeCountryName('Österreich')).toBe('Austria');
-    // Note: Intl.DisplayNames in Node 22+ uses modern CLDR which returns
-    // "Türkiye" (not "Turkey") for TR; this matches official ISO usage.
-    expect(canonicalizeCountryName('Turkey')).toBe('Türkiye');
-    expect(canonicalizeCountryName('Türkiye')).toBe('Türkiye');
+    // Snax-decision (2026-06-06): override Intl's modern CLDR "Türkiye" back
+    // to American "Turkey" via the OVERRIDES map. Both input spellings now
+    // canonicalize to "Turkey".
+    expect(canonicalizeCountryName('Turkey')).toBe('Turkey');
+    expect(canonicalizeCountryName('Türkiye')).toBe('Turkey');
   });
 
   it('applies overrides for codes where Intl is non-American', () => {
@@ -50,6 +51,9 @@ describe('canonicalizeCountryName', () => {
     expect(canonicalizeCountryName('São Tomé and Príncipe')).toBe(
       'São Tomé and Príncipe',
     );
+    // TR -> Intl uses modern CLDR "Türkiye"; override to American "Turkey"
+    expect(canonicalizeCountryName('Turkey')).toBe('Turkey');
+    expect(canonicalizeCountryName('Türkiye')).toBe('Turkey');
   });
 
   it("normalizes Intl's curly apostrophe in Côte d'Ivoire", () => {

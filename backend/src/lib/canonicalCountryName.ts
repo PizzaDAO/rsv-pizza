@@ -32,6 +32,7 @@ const ENGLISH_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
  *   CG -> Intl says "Congo - Brazzaville" -> "Congo"
  *   PS -> Intl says "Palestinian Territories" -> "Palestine"
  *   ST -> Intl says "São Tomé & Príncipe" -> "São Tomé and Príncipe"
+ *   TR -> Intl says "Türkiye" (modern CLDR) -> "Turkey" (American English)
  *
  * CI is NOT in this map: Intl returns "Côte d’Ivoire" (curly apostrophe);
  * we normalize the apostrophe to ASCII below.
@@ -44,6 +45,7 @@ const OVERRIDES: Record<string, string> = {
   CG: 'Congo',
   PS: 'Palestine',
   ST: 'São Tomé and Príncipe',
+  TR: 'Turkey',
 };
 
 export function canonicalizeCountryName(
