@@ -17,6 +17,7 @@ import {
   sendConnectInviteEmail,
   sendBroadcastFallbackEmail,
 } from '../services/hostTelegramEmail.js';
+import { syncCityGroupsFromMoltobene } from '../services/moltobeneSync.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -446,7 +447,9 @@ router.post('/invite-unlinked', requireAuth, requireUnderbossAuth, async (req: U
         }
       }
 
-      const deeplink = `https://t.me/${botUsername}?start=${token}`;
+      // provola-58505 (Step 3): namespace the start-payload with the `rsvp_`
+      // prefix so moltobene's @Start() handler can route it. Token unchanged.
+      const deeplink = `https://t.me/${botUsername}?start=rsvp_${token}`;
       const ok = await sendConnectInviteEmail({
         toEmail,
         hostName: p.user?.name || null,
@@ -1370,6 +1373,28 @@ router.post('/groups/:cityKey/refresh', requireAuth, requireUnderbossAuth, async
         lastVerifiedAt: updated.lastVerifiedAt,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── provola-58505 (Step 2): admin-triggered moltobene city-group sync ──────
+//
+// POST /sync-from-moltobene — pull moltobene's `GET /city/groups` and reconcile
+// chat_ids into city_telegram_groups (match-by-chat_id identity). Admin-only:
+// reuses the requireAuth + requireUnderbossAuth chain like the other telegram
+// routes, then gates on the '__admin__' sentinel (the same admin-only pattern
+// used by /api/underboss/superlatives). Returns the sync counts JSON. The cron
+// variant lives at GET /api/cron/sync-telegram-groups.
+router.post('/sync-from-moltobene', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const isAdminUser = req.underboss!.regions.includes('__admin__');
+    if (!isAdminUser) {
+      throw new AppError('Admin access required', 403, 'FORBIDDEN');
+    }
+
+    const result = await syncCityGroupsFromMoltobene();
+    res.json(result);
   } catch (error) {
     next(error);
   }
