@@ -19,6 +19,7 @@ import { autoPopulatePizzerias } from '../lib/autoPopulatePizzerias.js';
 import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
 import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
+import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -320,7 +321,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         address: address || null,
         latitude: latitude !== null && latitude !== undefined ? Number(latitude) : null,
         longitude: longitude !== null && longitude !== undefined ? Number(longitude) : null,
-        country: country || null,
+        country: canonicalizeCountryName(country) ?? country ?? null,
         placeId: placeId || null,
         venueName: venueName || null,
         city: city || null,
@@ -726,7 +727,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(address !== undefined && { address, addressIsCityDefault: false }),
         ...(latitude !== undefined && { latitude: latitude !== null ? Number(latitude) : null }),
         ...(longitude !== undefined && { longitude: longitude !== null ? Number(longitude) : null }),
-        ...(country !== undefined && { country: country || null }),
+        ...(country !== undefined && {
+          country: canonicalizeCountryName(country) ?? country ?? null,
+        }),
         ...(city !== undefined && { city: city || null }),
         ...(placeId !== undefined && { placeId: placeId || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
