@@ -17,7 +17,12 @@ import { DonationSettings } from './DonationSettings';
 import { HostsManager } from './HostsManager';
 import { DescriptionEditor } from './DescriptionEditor';
 import { triggerFlyerRegen } from './flyer/autoRegenFlyer';
+import { getUnderbossContact } from '../utils/underbossContacts';
 import type { Party } from '../types';
+
+// tigella-58513: GPP events may not exceed 3 hours. Compared with a tiny
+// epsilon so an exactly-3h block (from floating-point ms math) isn't rejected.
+const GPP_MAX_DURATION_HOURS = 3;
 
 export const EventDetailsTab: React.FC = () => {
   const { t } = useTranslation('host');
@@ -106,6 +111,8 @@ export const EventDetailsTab: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [toast, setToast] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  // tigella-58513: error shown in the Event Time modal when a GPP edit exceeds 3h.
+  const [dateTimeError, setDateTimeError] = useState<string | null>(null);
 
   // Pending lat/lng from LocationAutocomplete (fires before onPlaceSelected)
   const pendingCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -590,8 +597,8 @@ export const EventDetailsTab: React.FC = () => {
     }
   };
 
-  // Save date/time
-  const saveDateTime = async () => {
+  // Save date/time. Returns true on a successful save, false when blocked or failed.
+  const saveDateTime = async (): Promise<boolean> => {
     let calculatedDuration: number | null = null;
     let startDateTime: string | null = null;
 
@@ -606,6 +613,22 @@ export const EventDetailsTab: React.FC = () => {
       startDateTime = start.toISOString();
     } else if (startDate && startTime) {
       startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
+    }
+
+    // tigella-58513: GPP events are capped at 3h. Reject (don't clamp) and tell
+    // the host to ask their regional underboss for an exception.
+    if (
+      party?.eventType === 'gpp' &&
+      calculatedDuration != null &&
+      calculatedDuration > GPP_MAX_DURATION_HOURS + 1e-6
+    ) {
+      const handle = getUnderbossContact(party.country)?.handle;
+      setDateTimeError(
+        handle
+          ? `GPP events are limited to 3 hours. Ask your underboss ${handle} if you want an exception.`
+          : `GPP events are limited to 3 hours. Ask your underboss if you want an exception.`,
+      );
+      return false;
     }
 
     const success = await saveField(
@@ -642,6 +665,7 @@ export const EventDetailsTab: React.FC = () => {
         );
       }
     }
+    return success;
   };
 
   // Save description
@@ -834,7 +858,7 @@ export const EventDetailsTab: React.FC = () => {
         {/* Change Date Button */}
         <button
           type="button"
-          onClick={() => setShowDateTimeModal(true)}
+          onClick={() => { setDateTimeError(null); setShowDateTimeModal(true); }}
           className="w-full bg-theme-surface border border-theme-stroke rounded-xl p-4 text-left hover:bg-theme-surface-hover transition-colors"
         >
           <div className="flex items-center justify-between">
@@ -1326,16 +1350,19 @@ export const EventDetailsTab: React.FC = () => {
       {/* Mobile Date/Time Modal */}
       {showDateTimeModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/70" onClick={async () => {
-          if (
+          const changed =
             originalValues && (
               startDate !== originalValues.startDate ||
               startTime !== originalValues.startTime ||
               endDate !== originalValues.endDate ||
               endTime !== originalValues.endTime ||
               timezone !== originalValues.timezone
-            )
-          ) {
-            await saveDateTime();
+            );
+          if (changed) {
+            // tigella-58513: keep the modal open on a rejected/failed save so the
+            // host sees the underboss-exception message instead of auto-dismissing.
+            const ok = await saveDateTime();
+            if (!ok) return;
           }
           setShowDateTimeModal(false);
         }}>
@@ -1353,6 +1380,7 @@ export const EventDetailsTab: React.FC = () => {
                   type="date"
                   value={startDate}
                   onChange={(e) => {
+                    setDateTimeError(null);
                     setStartDate(e.target.value);
                     if (!endDate) setEndDate(e.target.value);
                   }}
@@ -1368,7 +1396,7 @@ export const EventDetailsTab: React.FC = () => {
                 <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">Start Time</span>
                 <TimePickerInput
                   value={startTime}
-                  onChange={setStartTime}
+                  onChange={(v) => { setDateTimeError(null); setStartTime(v); }}
                   placeholder="12:00 PM"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -1383,7 +1411,7 @@ export const EventDetailsTab: React.FC = () => {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => { setDateTimeError(null); setEndDate(e.target.value); }}
                   min={startDate || undefined}
                   max={party?.eventType === 'gpp' ? '2026-05-23' : undefined}
                   onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
@@ -1397,7 +1425,7 @@ export const EventDetailsTab: React.FC = () => {
                 <span className="text-xs text-theme-text-muted mb-1 block ml-0.5">End Time</span>
                 <TimePickerInput
                   value={endTime}
-                  onChange={setEndTime}
+                  onChange={(v) => { setDateTimeError(null); setEndTime(v); }}
                   placeholder="1:00 PM"
                   className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
                 />
@@ -1410,14 +1438,24 @@ export const EventDetailsTab: React.FC = () => {
                   onChange={setTimezone}
                 />
               </div>
+
+              {/* tigella-58513: always-on GPP 3h cap reminder */}
+              {party?.eventType === 'gpp' && (
+                <p className="text-xs text-white/40">GPP events are limited to 3 hours.</p>
+              )}
             </div>
+
+            {/* tigella-58513: GPP 3h cap rejection message */}
+            {dateTimeError && (
+              <p className="text-xs text-red-400 mt-3">{dateTimeError}</p>
+            )}
 
             {/* Done Button */}
             <button
               type="button"
               onClick={async () => {
-                await saveDateTime();
-                setShowDateTimeModal(false);
+                const ok = await saveDateTime();
+                if (ok) setShowDateTimeModal(false);
               }}
               disabled={savingField === 'dateTime'}
               className="w-full mt-4 bg-[#ff393a] hover:bg-[#ff5a5b] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
