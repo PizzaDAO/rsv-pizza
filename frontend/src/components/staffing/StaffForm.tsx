@@ -200,7 +200,7 @@ export const StaffForm: React.FC<StaffFormProps> = ({
             className="w-full bg-theme-surface border border-theme-stroke rounded-xl px-4 py-3 text-theme-text text-sm focus:outline-none focus:border-[#ff393a]/50"
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} className="bg-theme-header text-theme-text">
+              <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}

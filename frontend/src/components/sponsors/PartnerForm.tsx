@@ -573,9 +573,9 @@ export function PartnerForm({
             className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
             style={{ colorScheme: 'dark' }}
           >
-            <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+            <option value="">Category</option>
             {SPONSOR_CATEGORIES.map(opt => (
-              <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
+              <option key={opt.id} value={opt.id}>
                 {opt.label}
               </option>
             ))}
@@ -670,7 +670,7 @@ export function PartnerForm({
                 style={{ colorScheme: 'dark' }}
               >
                 {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
+                  <option key={opt.value} value={opt.value}>
                     {t(opt.labelKey)}
                   </option>
                 ))}
@@ -684,9 +684,9 @@ export function PartnerForm({
                 className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
-                <option value="" className="bg-theme-header text-theme-text-muted">Category</option>
+                <option value="">Category</option>
                 {SPONSOR_CATEGORIES.map(opt => (
-                  <option key={opt.id} value={opt.id} className="bg-theme-header text-theme-text">
+                  <option key={opt.id} value={opt.id}>
                     {opt.label}
                   </option>
                 ))}
@@ -729,9 +729,9 @@ export function PartnerForm({
                 className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
-                <option value="" className="bg-theme-header text-theme-text-muted">{t('sponsors.contributionType')}</option>
+                <option value="">{t('sponsors.contributionType')}</option>
                 {TYPE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
+                  <option key={opt.value} value={opt.value}>
                     {t(opt.labelKey)}
                   </option>
                 ))}
@@ -764,9 +764,9 @@ export function PartnerForm({
                 className="w-full !pl-14 bg-theme-input border border-theme-stroke rounded-xl text-theme-text focus:outline-none focus:ring-1 focus:ring-[#ff393a] appearance-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               >
-                <option value="" className="bg-theme-header text-theme-text-muted">{t('sponsors.contributionType')}</option>
+                <option value="">{t('sponsors.contributionType')}</option>
                 {TYPE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value} className="bg-theme-header text-theme-text">
+                  <option key={opt.value} value={opt.value}>
                     {t(opt.labelKey)}
                   </option>
                 ))}

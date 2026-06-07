@@ -178,7 +178,7 @@ export const BudgetItemForm: React.FC<BudgetItemFormProps> = ({
                 className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text text-sm focus:outline-none focus:ring-1 focus:ring-[#ff393a] focus:border-[#ff393a]"
               >
                 {BUDGET_CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id} className="bg-theme-header">
+                  <option key={cat.id} value={cat.id}>
                     {cat.label}
                   </option>
                 ))}

@@ -80,7 +80,7 @@ export const VenuePhotoUpload: React.FC<VenuePhotoUploadProps> = ({ partyId, ven
           style={{ colorScheme: 'dark' }}
         >
           {CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value} className="bg-theme-header">
+            <option key={cat.value} value={cat.value}>
               {t(cat.labelKey)}
             </option>
           ))}

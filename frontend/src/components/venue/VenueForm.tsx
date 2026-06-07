@@ -329,7 +329,7 @@ const EditVenueForm: React.FC<VenueFormProps> = ({ venue, onSave, onClose }) => 
                 style={{ colorScheme: 'dark' }}
               >
                 {venueStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-theme-header">
+                  <option key={option.value} value={option.value}>
                     {t(option.labelKey)}
                   </option>
                 ))}

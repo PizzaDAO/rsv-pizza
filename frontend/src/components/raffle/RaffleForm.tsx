@@ -69,10 +69,10 @@ export function RaffleForm({ raffle, onSubmit, onClose, isLoading }: RaffleFormP
               onChange={(e) => setEntriesPerGuest(parseInt(e.target.value, 10))}
               className="w-full bg-theme-surface border border-theme-stroke rounded-xl px-4 py-3 text-theme-text text-sm focus:outline-none focus:border-[#ff393a]/50"
             >
-              <option value={1} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_1')}</option>
-              <option value={2} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_2')}</option>
-              <option value={3} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_3')}</option>
-              <option value={5} className="bg-theme-header text-theme-text">{t('raffle.entriesPerGuest_5')}</option>
+              <option value={1}>{t('raffle.entriesPerGuest_1')}</option>
+              <option value={2}>{t('raffle.entriesPerGuest_2')}</option>
+              <option value={3}>{t('raffle.entriesPerGuest_3')}</option>
+              <option value={5}>{t('raffle.entriesPerGuest_5')}</option>
             </select>
           </div>
 
