@@ -120,8 +120,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   // Event-level roll-up (read-only).
   const [eventCohosts, setEventCohosts] = useState<EventReimbursementCohost[] | null>(null);
 
-  const loadMine = useCallback(async () => {
-    setLoading(true);
+  // ziti-58300 hotfix: `silent` skips the page-level `loading` toggle. The full
+  // `loading` spinner unmounts the page body (see the early return below), which
+  // unmounts EventPhotosCard — and its mount effect calls `onRolesChange`. If a
+  // refresh flips `loading`, EventPhotosCard remounts → onRolesChange → refresh
+  // → loading → remount … an infinite reimbursement/me + photos loop (429).
+  // Background refreshes (role change) must be silent so the body stays mounted.
+  const loadMine = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetchMyReimbursement(partyId);
@@ -129,7 +135,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     } catch (err: any) {
       setError(err?.message || 'Failed to load your reimbursement');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [partyId]);
 
@@ -141,6 +147,16 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       /* soft-fail — the roll-up is a secondary read-only view */
     }
   }, [partyId]);
+
+  // ziti-58300 hotfix: STABLE callback for EventPhotosCard.onRolesChange.
+  // Previously an inline `() => loadMine()` was passed — a new reference every
+  // render. EventPhotosCard's effect deps include onRolesChange, so it re-fired
+  // every render → loadMine → setState → re-render → … request storm. Stable +
+  // silent breaks both the unstable-dep loop and the loading-remount loop.
+  const handleRolesChange = useCallback(() => {
+    loadMine(true);
+    loadEvent();
+  }, [loadMine, loadEvent]);
 
   useEffect(() => {
     loadMine();
@@ -496,7 +512,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             {t('payouts.eventPhotosDone')}
           </div>
         )}
-        <EventPhotosCard partyId={partyId} onRolesChange={() => loadMine()} />
+        <EventPhotosCard partyId={partyId} onRolesChange={handleRolesChange} />
       </div>
 
       {/* ===== 4. Receipts (rolling, auto-saved) ===== */}
