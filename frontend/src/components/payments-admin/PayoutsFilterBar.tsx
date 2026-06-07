@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
+import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
 import type { AdminPayoutFilters, PayoutMethod, PayoutPurpose, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 import {
@@ -24,6 +25,17 @@ interface PayoutsFilterBarProps {
    * `PaymentsAdminPage`. Sorted ascending.
    */
   availableTags: string[];
+  /**
+   * cornetto-58510: distinct `party.country` values across the loaded by-city
+   * rows. Powers the tri-state Country dropdown (by-city view only). Sorted.
+   */
+  availableCountries: string[];
+  /**
+   * cornetto-58510: when true (by-city view), replace the single-select Tag
+   * dropdown with tri-state Tag + Country dropdowns (client-side filtering).
+   * When false (by-payment / ledger), keep the legacy single-select Tag select.
+   */
+  showTriStateFilters?: boolean;
   /**
    * pinsa-92103: when true, render the "Hide closed cities" checkbox.
    * Only meaningful on the by-city view (`paymentsClosedAt` lives at the
@@ -146,6 +158,10 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   // when at least one portal is selected (regardless of how many).
   if (Array.isArray(filters.regionPortals) && filters.regionPortals.length > 0) n += 1;
   if (filters.tag && filters.tag !== 'all') n += 1;
+  // cornetto-58510: tri-state tag/country (by-city view) each count as one
+  // active filter when any include/exclude is selected.
+  if ((filters.tagIncludes?.length ?? 0) + (filters.tagExcludes?.length ?? 0) > 0) n += 1;
+  if ((filters.countryIncludes?.length ?? 0) + (filters.countryExcludes?.length ?? 0) > 0) n += 1;
   if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
   if (filters.dateTo) n += 1;
@@ -178,6 +194,8 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   onChange,
   onReset,
   availableTags,
+  availableCountries,
+  showTriStateFilters,
   showHideClosedToggle,
   showHideScamsToggle,
   showHideUsToggle,
@@ -373,22 +391,58 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             </div>
           )}
 
-          {/* mascarpone-49102: Tag dropdown — populated from event_tags
-              flattened across the loaded payout set. Backend filters
-              `party.eventTags` via Prisma `{ has: tag }`. */}
-          <div>
-            <select
-              value={filters.tag ?? 'all'}
-              onChange={(e) => update({ tag: e.target.value })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by tag"
-            >
-              <option value="all">All tags</option>
-              {availableTags.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
+          {/* cornetto-58510: by-city view uses tri-state Tag + Country dropdowns
+              (client-side filtering). Other views keep the legacy single-select
+              Tag dropdown (mascarpone-49102), which is filtered server-side via
+              Prisma `{ has: tag }`. */}
+          {showTriStateFilters ? (
+            <>
+              <div>
+                <TriStateFilterDropdown
+                  label="Tags"
+                  className="w-full"
+                  items={availableTags}
+                  includes={filters.tagIncludes ?? []}
+                  excludes={filters.tagExcludes ?? []}
+                  onChange={({ includes, excludes }) => update({ tagIncludes: includes, tagExcludes: excludes })}
+                  searchPlaceholder="Search tags…"
+                  noMatchesLabel="No tags"
+                  clearLabel="Clear"
+                  includeLabel="Include (must have)"
+                  excludeLabel="Exclude (must not have)"
+                />
+              </div>
+              <div>
+                <TriStateFilterDropdown
+                  label="Country"
+                  className="w-full"
+                  items={availableCountries}
+                  includes={filters.countryIncludes ?? []}
+                  excludes={filters.countryExcludes ?? []}
+                  onChange={({ includes, excludes }) => update({ countryIncludes: includes, countryExcludes: excludes })}
+                  searchPlaceholder="Search countries…"
+                  noMatchesLabel="No countries"
+                  clearLabel="Clear"
+                  includeLabel="Include (must have)"
+                  excludeLabel="Exclude (must not have)"
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <select
+                value={filters.tag ?? 'all'}
+                onChange={(e) => update({ tag: e.target.value })}
+                className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                aria-label="Filter by tag"
+              >
+                <option value="all">All tags</option>
+                {availableTags.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* salumi-89172: Purpose dropdown — Event reimbursements vs
               Shipping coordinator receipts. Default 'all' shows both. */}

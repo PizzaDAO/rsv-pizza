@@ -68,6 +68,13 @@ export function filtersToSearchParams(
   const tag = filters.tag ?? DEFAULTS.tag;
   if (tag !== DEFAULTS.tag) params.set('tag', String(tag));
 
+  // cornetto-58510: tri-state tag/country filters (by-city view, client-side).
+  // Only emitted when non-empty so the default view stays param-free.
+  if (filters.tagIncludes && filters.tagIncludes.length) params.set('tagInc', filters.tagIncludes.join(','));
+  if (filters.tagExcludes && filters.tagExcludes.length) params.set('tagExc', filters.tagExcludes.join(','));
+  if (filters.countryIncludes && filters.countryIncludes.length) params.set('countryInc', filters.countryIncludes.join(','));
+  if (filters.countryExcludes && filters.countryExcludes.length) params.set('countryExc', filters.countryExcludes.join(','));
+
   const purpose = filters.purpose ?? DEFAULTS.purpose;
   if (purpose !== DEFAULTS.purpose) params.set('purpose', String(purpose));
 
@@ -115,6 +122,11 @@ export function searchParamsToFilters(
     currency: 'all',
     country: 'all',
     tag: DEFAULTS.tag,
+    // cornetto-58510: tri-state tag/country arrays default empty (no filter).
+    tagIncludes: [],
+    tagExcludes: [],
+    countryIncludes: [],
+    countryExcludes: [],
     purpose: DEFAULTS.purpose,
     hideClosed: DEFAULTS.hideClosed,
     hideScams: DEFAULTS.hideScams,
@@ -147,6 +159,16 @@ export function searchParamsToFilters(
 
   const tag = params.get('tag');
   if (tag) filters.tag = tag;
+
+  // cornetto-58510: parse tri-state tag/country lists from the URL.
+  const parseList = (key: string) => {
+    const raw = params.get(key);
+    return raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  };
+  filters.tagIncludes = parseList('tagInc');
+  filters.tagExcludes = parseList('tagExc');
+  filters.countryIncludes = parseList('countryInc');
+  filters.countryExcludes = parseList('countryExc');
 
   const purposeRaw = params.get('purpose');
   if (purposeRaw && PURPOSE_VALUES.has(purposeRaw)) {

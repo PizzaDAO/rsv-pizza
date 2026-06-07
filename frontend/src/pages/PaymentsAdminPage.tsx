@@ -106,6 +106,11 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   country: 'all',
   // mascarpone-49102: tag filter default — 'all' means no filter.
   tag: 'all',
+  // cornetto-58510: tri-state tag/country filters (by-city view, client-side).
+  tagIncludes: [],
+  tagExcludes: [],
+  countryIncludes: [],
+  countryExcludes: [],
   // salumi-89172: purpose filter default — 'all' shows both event and
   // shipping payouts so the existing admin queue is unchanged out of box.
   purpose: 'all',
@@ -592,6 +597,34 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     return Array.from(set).sort();
   }, [payouts]);
 
+  // cornetto-58510: distinct `party.country` values across the by-city rows.
+  // Powers the tri-state Country dropdown (by-city view only). Derived from the
+  // COMPLETE per-city rollup so the dropdown lists every loaded city's country.
+  const availableCountries = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of byPartyRows) {
+      if (p.party.country) set.add(p.party.country);
+    }
+    return Array.from(set).sort();
+  }, [byPartyRows]);
+
+  // cornetto-58510: tag list for the by-city tri-state Tag dropdown. Derived
+  // from `byPartyRows` (the COMPLETE per-city rollup) rather than `payouts` —
+  // in by-city view `payouts` holds only the first per-payment page (no
+  // load-more), so it would miss tags. The legacy by-payment single-select
+  // keeps using `availableTags` (sourced from the paginated `payouts`).
+  const availableTagsByParty = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of byPartyRows) {
+      if (Array.isArray(p.party.eventTags)) {
+        for (const t of p.party.eventTags) {
+          if (t && typeof t === 'string') set.add(t);
+        }
+      }
+    }
+    return Array.from(set).sort();
+  }, [byPartyRows]);
+
   // siciliana-69183: derive the AdminPayout objects matching `selectedIds` for
   // the Safe-export modal. The modal itself filters non-USDC / missing-wallet
   // rows; we just hand it the full selection.
@@ -630,10 +663,22 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     // provatura-92107: hide US cities (region 'usa') when the toggle is on.
     // Admin dashboard only — regional portals are already region-scoped and
     // never apply this.
-    const rows =
+    let rows =
       !isRegionalPortal && filters.hideUsCities
         ? filtered.filter((row) => row.party.region !== 'usa')
         : filtered;
+
+    // cornetto-58510: client-side tri-state tag/country filter (by-city view).
+    // Tags: include = must have ALL; exclude = must have NONE. Country (single-
+    // valued per party): include = OR (any selected); exclude = NONE.
+    const tagInc = filters.tagIncludes ?? [];
+    const tagExc = filters.tagExcludes ?? [];
+    const ctryInc = filters.countryIncludes ?? [];
+    const ctryExc = filters.countryExcludes ?? [];
+    if (tagInc.length) rows = rows.filter((r) => tagInc.every((tg) => r.party.eventTags?.includes(tg)));
+    if (tagExc.length) rows = rows.filter((r) => tagExc.every((tg) => !r.party.eventTags?.includes(tg)));
+    if (ctryInc.length) rows = rows.filter((r) => !!r.party.country && ctryInc.includes(r.party.country));
+    if (ctryExc.length) rows = rows.filter((r) => !r.party.country || !ctryExc.includes(r.party.country));
 
     // "Oldest/Newest first" in the by-city view should order cities by their
     // host UPLOAD time, not lastActivityAt. The /by-party endpoint doesn't
@@ -702,7 +747,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       return [...rows].sort((a, b) => (asc ? pick(a) - pick(b) : pick(b) - pick(a)));
     }
     return rows;
-  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal]);
+  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal, filters.tagIncludes, filters.tagExcludes, filters.countryIncludes, filters.countryExcludes]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -1191,7 +1236,15 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // portals so Reset can't silently widen a regional underboss's view.
           // The URL sync effect then clears the query string automatically.
           onReset={() => setFilters(regions ? { ...DEFAULT_FILTERS, regions } : DEFAULT_FILTERS)}
-          availableTags={availableTags}
+          // cornetto-58510: in by-city the tri-state Tag dropdown needs the
+          // COMPLETE tag set (byPartyRows); by-payment's single-select keeps
+          // the paginated `payouts`-derived list.
+          availableTags={viewMode === 'by-city' ? availableTagsByParty : availableTags}
+          // cornetto-58510: by-city tri-state Tag + Country dropdowns. Country
+          // list + the tri-state UI render only on the by-city view (the
+          // filtering is client-side over byPartyRows).
+          availableCountries={availableCountries}
+          showTriStateFilters={viewMode === 'by-city'}
           // pinsa-92103: Hide closed cities only makes sense on the by-city
           // view (paymentsClosedAt is a party-level signal). The per-payment
           // view has no party-row, so the toggle would be confusing there.
