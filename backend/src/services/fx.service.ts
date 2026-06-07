@@ -193,14 +193,18 @@ export async function convertToUSD(
     };
   }
 
-  // 4. Last resort: rate=1 passthrough. Caller should flag this.
-  console.warn(`[fx] Could not convert ${normalizedCurrency} to USD; no rate available, returning passthrough`);
+  // 4. Could not resolve via any source. Do NOT silently stamp the foreign
+  // amount as 1:1 USD (mortadella-92103: never auto-convert when unsure) —
+  // flag UNRESOLVED so the row surfaces a manual currency picker instead of a
+  // wrong USD total.
+  console.warn(`[fx] Could not convert ${normalizedCurrency} to USD; no rate available — flagging CURRENCY_UNRESOLVED`);
   return {
-    usdAmount: round2(amount),
-    exchangeRate: 1,
+    usdAmount: null,
+    exchangeRate: null,
     originalAmount: amount,
-    originalCurrency: normalizedCurrency,
-    source: 'unknown',
+    originalCurrency: null,
+    source: 'unresolved',
+    error: 'CURRENCY_UNRESOLVED',
   };
 }
 
