@@ -6,7 +6,8 @@
  * (`paid` or `failed`).
  *
  * Hosts opt in by linking their Telegram account via the bot's
- * `/start <token>` deeplink (see backend/src/routes/telegram-webhook.routes.ts).
+ * `/start rsvp_<token>` deeplink, handled by moltobene which calls back to
+ * `POST /api/telegram/link-host` (see telegram-link-callback.routes.ts).
  * When `parties.host_telegram_chat_id` is null, this helper silently no-ops.
  *
  * Fire-and-forget: callers should NOT await this function. We catch every

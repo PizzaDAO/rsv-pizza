@@ -6357,10 +6357,11 @@ router.post(
 //
 // Sends a Telegram nudge via the Molto Benny bot (`TELEGRAM_BOT_TOKEN`) to:
 //   1. The host's private DM, using `parties.host_telegram_chat_id` — set
-//      when the host links Telegram via the `/start <token>` deeplink (see
-//      backend/src/routes/telegram-webhook.routes.ts). When null, the host
-//      DM is silently skipped and `hostDmSent=false` with a reason returned
-//      to the caller.
+//      when the host links Telegram via the `/start rsvp_<token>` deeplink,
+//      handled by moltobene which calls back to POST /api/telegram/link-host
+//      (see telegram-link-callback.routes.ts). When null, the host DM is
+//      silently skipped and `hostDmSent=false` with a reason returned to the
+//      caller.
 //   2. The city's Telegram group chat — chat_id passed in the request body
 //      as `groupChatId`, resolved client-side from the same GPP sheet that
 //      powers the /underboss broadcast tooling (`fetchSheetCities` →

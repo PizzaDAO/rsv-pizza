@@ -6,7 +6,6 @@ import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underb
 import { AppError } from '../middleware/error.js';
 import {
   cityKeyFromPartyName,
-  getGppRegionByCityKey,
   buildScopedWhereClause,
   UnderbossScope,
 } from '../helpers/underbossScope.js';
@@ -17,7 +16,10 @@ import {
   sendConnectInviteEmail,
   sendBroadcastFallbackEmail,
 } from '../services/hostTelegramEmail.js';
-import { syncCityGroupsFromMoltobene } from '../services/moltobeneSync.js';
+import {
+  syncCityGroupsFromMoltobene,
+  refreshCityGroupFromMoltobene,
+} from '../services/moltobeneSync.js';
 
 // Alias to keep the routes that were ported in from master readable.
 type UnderbossRequest = UnderbossAuthRequest;
@@ -1128,99 +1130,13 @@ router.get('/groups/status', requireAuth, requireUnderbossAuth, async (req: Unde
         };
       });
 
-    // Pending captures (unassigned). tonda-58293 FIX #8: admins see all; scoped
-    // (region/city) UBs get an EMPTY list. An orphan capture's city is unknown
-    // by definition, so showing every pending capture to a scoped UB was a
-    // cross-region info leak (group titles from other regions). Assignment of an
-    // orphan is therefore an admin-only action via /groups/assign.
-    const pending = scope.admin
-      ? await prisma.telegramGroupCapture.findMany({
-          where: { assignedCityKey: null },
-          orderBy: { lastSeenAt: 'desc' },
-        })
-      : [];
-
-    res.json({
-      cities,
-      pendingCaptures: pending.map((c) => ({
-        chatId: c.chatId.toString(),
-        title: c.title,
-        chatType: c.chatType,
-        firstSeenAt: c.firstSeenAt,
-        lastSeenAt: c.lastSeenAt,
-      })),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /groups/assign — assign a pending capture to a city. Stamps the capture
-// and writes through to city_telegram_groups (source='manual').
-router.post('/groups/assign', requireAuth, requireUnderbossAuth, async (req: UnderbossAuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const ub = req.underboss!;
-    const { chatId, cityKey } = req.body || {};
-
-    if (chatId === undefined || chatId === null || `${chatId}`.trim() === '') {
-      throw new AppError('chatId is required', 400, 'VALIDATION_ERROR');
-    }
-    const key = typeof cityKey === 'string' ? cityKey.toLowerCase().trim() : '';
-    if (!key) {
-      throw new AppError('cityKey is required', 400, 'VALIDATION_ERROR');
-    }
-
-    let chatIdBig: bigint;
-    try {
-      chatIdBig = BigInt(`${chatId}`.trim());
-    } catch {
-      throw new AppError('chatId must be an integer', 400, 'VALIDATION_ERROR');
-    }
-
-    if (!(await callerOwnsCity(ub, key))) {
-      throw new AppError('That city is outside your assigned scope', 403, 'FORBIDDEN');
-    }
-
-    const capture = await prisma.telegramGroupCapture.findUnique({
-      where: { chatId: chatIdBig },
-    });
-    if (!capture) {
-      throw new AppError('Capture not found', 404, 'NOT_FOUND');
-    }
-
-    const isSupergroup = capture.chatType === 'supergroup';
-    // tonda-58293 FIX #1: populate region (GPP slug) so the new row is visible
-    // to region-scoped underbosses. This is an explicit admin/scoped assign, so
-    // it intentionally overwrites any existing chat_id for the city.
-    const region = await getGppRegionByCityKey(key);
-
-    await prisma.telegramGroupCapture.update({
-      where: { chatId: chatIdBig },
-      data: { assignedCityKey: key, autoMatched: false },
-    });
-
-    await prisma.cityTelegramGroup.upsert({
-      where: { cityKey: key },
-      create: {
-        cityKey: key,
-        chatId: chatIdBig,
-        title: capture.title,
-        isSupergroup,
-        source: 'manual',
-        region,
-        lastVerifiedAt: new Date(),
-      },
-      update: {
-        chatId: chatIdBig,
-        title: capture.title,
-        isSupergroup,
-        source: 'manual',
-        ...(region ? { region } : {}),
-        lastVerifiedAt: new Date(),
-      },
-    });
-
-    res.json({ ok: true, cityKey: key, chatId: chatIdBig.toString() });
+    // provola-58505: the inbound capture suite was retired (the bot token is
+    // owned by moltobene, so rsvpizza never received updates). There are no
+    // pending captures anymore; the gap report is purely the cities-missing-
+    // chat_id view. Missing cities are now filled lazily on demand from
+    // moltobene (see sendToCityGroup) or via the admin sync-from-moltobene
+    // backfill — not by assigning orphaned captures.
+    res.json({ cities });
   } catch (error) {
     next(error);
   }
@@ -1274,10 +1190,19 @@ router.post('/groups/:cityKey/refresh', requireAuth, requireUnderbossAuth, async
       throw new AppError('Telegram bot token not configured', 500, 'CONFIG_ERROR');
     }
 
-    const row = await prisma.cityTelegramGroup.findUnique({
+    let row = await prisma.cityTelegramGroup.findUnique({
       where: { cityKey: key },
       select: { chatId: true },
     });
+    // provola-58505: if we have nothing on file, try pulling this city's id
+    // from moltobene on demand before giving up. Best-effort — a null result
+    // (config gap / not in moltobene) falls through to the NO_CHAT_ID skip.
+    if (!row || row.chatId === null) {
+      const refreshed = await refreshCityGroupFromMoltobene(key);
+      if (refreshed !== null) {
+        row = { chatId: refreshed };
+      }
+    }
     if (!row || row.chatId === null) {
       // No id to refresh — make the skip explicit for the UI.
       return res.status(400).json({
@@ -1378,14 +1303,17 @@ router.post('/groups/:cityKey/refresh', requireAuth, requireUnderbossAuth, async
   }
 });
 
-// ─── provola-58505 (Step 2): admin-triggered moltobene city-group sync ──────
+// ─── provola-58505: admin-triggered moltobene city-group full backfill ──────
 //
 // POST /sync-from-moltobene — pull moltobene's `GET /city/groups` and reconcile
 // chat_ids into city_telegram_groups (match-by-chat_id identity). Admin-only:
 // reuses the requireAuth + requireUnderbossAuth chain like the other telegram
 // routes, then gates on the '__admin__' sentinel (the same admin-only pattern
-// used by /api/underboss/superlatives). Returns the sync counts JSON. The cron
-// variant lives at GET /api/cron/sync-telegram-groups.
+// used by /api/underboss/superlatives). Returns the sync counts JSON.
+//
+// This is an OPTIONAL manual backfill. The scheduled cron was retired — city
+// groups are now synced lazily, per city, on demand (see sendToCityGroup +
+// refreshCityGroupFromMoltobene).
 router.post('/sync-from-moltobene', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
   try {
     const isAdminUser = req.underboss!.regions.includes('__admin__');

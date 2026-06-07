@@ -25,7 +25,6 @@
       "path": "/api/cron/send-surveys",
       "schedule": "0 * * * *"
     },
-    { "path": "/api/cron/event-reminders", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/sync-telegram-groups", "schedule": "0 * * * *" }
+    { "path": "/api/cron/event-reminders", "schedule": "*/15 * * * *" }
   ]
 }

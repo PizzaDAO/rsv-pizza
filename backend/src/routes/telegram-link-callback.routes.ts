@@ -12,13 +12,15 @@
  *       - env unset → 503 { ok:false, reason:'not configured' }
  *       - mismatch  → 401
  *     Body: { token: string, chatId: number|string }
- *     Logic mirrors the webhook /start branch: look up the party by
- *     `hostTelegramLinkToken`; if none → 200 { ok:false, reason:'invalid token' }
- *     (a missing/expired token is not an error, just a no-op); else set
- *     `hostTelegramChatId = BigInt(chatId)` and return { ok:true, partyName }.
+ *     Look up the party by `hostTelegramLinkToken`; if none → 200
+ *     { ok:false, reason:'invalid token' } (a missing/expired token is not an
+ *     error, just a no-op); else set `hostTelegramChatId = BigInt(chatId)` and
+ *     return { ok:true, partyName }.
  *
- * NOTE: this does NOT retire the existing inbound webhook /start branch — that
- * lives on in telegram-webhook.routes.ts and is removed in a later chunk.
+ * provola-58505: this is now the ONLY host-link path. The old inbound webhook
+ * (`telegram-webhook.routes.ts`, with its `/start` branch) was retired — the
+ * bot token is owned by moltobene, which handles `/start rsvp_<token>` and
+ * calls back here.
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';

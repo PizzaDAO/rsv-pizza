@@ -208,3 +208,103 @@ export async function syncCityGroupsFromMoltobene(): Promise<MoltobeneSyncResult
     skipped,
   };
 }
+
+/**
+ * provola-58505 (lazy on-demand sync): refresh ONE city's group from moltobene.
+ *
+ * The scheduled bulk sync was retired in favour of a lazy, per-city pull driven
+ * by `sendToCityGroup`: when a city's `city_telegram_groups` row is missing/has
+ * a null chat_id, OR a send fails with a chat-not-found error, we call this once
+ * to ask moltobene (the authoritative owner of the bot's group membership) for
+ * that city's current chat_id, upsert it, and let the caller retry the send.
+ *
+ * Best-effort by contract — NEVER throws:
+ *   - `MOLTOBENE_BASE_URL`/`MOLTOBENE_API_KEY` unset → return null.
+ *   - moltobene unreachable / non-2xx / city not present → return null.
+ *   - on success → upsert the row (chatId, chatUrl, country, isSupergroup,
+ *     source='moltobene-sync', region via getGppRegionByCityKey,
+ *     lastVerifiedAt=now()) and return the chatId as a bigint.
+ *
+ * Returns the resolved chat_id so the caller can retry without a re-read.
+ */
+export async function refreshCityGroupFromMoltobene(
+  cityKey: string,
+): Promise<bigint | null> {
+  const key = (cityKey || '').toLowerCase().trim();
+  if (!key) return null;
+
+  const baseUrl = process.env.MOLTOBENE_BASE_URL;
+  const apiKey = process.env.MOLTOBENE_API_KEY;
+  if (!baseUrl || !apiKey) {
+    // Config gap → graceful no-op (matches the bulk sync's degrade behavior).
+    return null;
+  }
+
+  let payload: MoltobeneGroupsResponse;
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}/city/groups`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'x-api-key': apiKey },
+    });
+    if (!resp.ok) {
+      console.warn(
+        `[provola-58505][moltobene-refresh] moltobene responded ${resp.status} for "${key}"`,
+      );
+      return null;
+    }
+    payload = (await resp.json()) as MoltobeneGroupsResponse;
+  } catch (err: any) {
+    console.warn(
+      `[provola-58505][moltobene-refresh] fetch failed for "${key}":`,
+      err?.message || err,
+    );
+    return null;
+  }
+
+  const cities = Array.isArray(payload?.cities) ? payload.cities : [];
+  // Find the city whose normalized name matches the requested key.
+  const match = cities.find((c) => {
+    const name = typeof c.cityName === 'string' ? c.cityName : '';
+    return name.toLowerCase().trim() === key;
+  });
+  if (!match) return null;
+
+  const chatIdBig = parseGroupId(match.groupId);
+  if (chatIdBig === null) return null;
+
+  const groupIdStr = `${match.groupId}`.trim();
+  const isSupergroup = groupIdStr.startsWith('-100');
+  const chatUrl = typeof match.telegramLink === 'string' ? match.telegramLink : null;
+  const country = typeof match.countryName === 'string' ? match.countryName : null;
+  // region = GPP region SLUG resolved from our own parties — NOT moltobene's
+  // display regionName.
+  const region = await getGppRegionByCityKey(key);
+
+  const writeData = {
+    chatId: chatIdBig,
+    chatUrl,
+    country,
+    isSupergroup,
+    source: 'moltobene-sync',
+    // Only write region when we resolved one — never clobber an existing slug.
+    ...(region ? { region } : {}),
+    lastVerifiedAt: new Date(),
+  };
+
+  try {
+    await prisma.cityTelegramGroup.upsert({
+      where: { cityKey: key },
+      create: { cityKey: key, ...writeData },
+      update: writeData,
+    });
+  } catch (err: any) {
+    console.error(
+      `[provola-58505][moltobene-refresh] failed to upsert "${key}":`,
+      err?.message || err,
+    );
+    return null;
+  }
+
+  return chatIdBig;
+}

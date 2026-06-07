@@ -17,6 +17,7 @@
 import { prisma } from '../config/database.js';
 import { getGppRegionByCityKey } from '../helpers/underbossScope.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { refreshCityGroupFromMoltobene } from './moltobeneSync.js';
 
 const BOT_API = 'https://api.telegram.org';
 
@@ -107,18 +108,30 @@ export async function sendToCityGroup(
     select: { chatId: true },
   });
 
-  if (!row || row.chatId === null) {
-    return { ok: false, skipped: true, reason: 'no city TG group set' };
+  // provola-58505 (lazy on-demand sync): the scheduled bulk sync was retired.
+  // If there's no row / null chat_id, ask moltobene (the authoritative owner of
+  // the bot's group membership) for this city's chat_id exactly ONCE. If it
+  // can't tell us, fall back to the existing skip result.
+  let chatId: bigint | null = row?.chatId ?? null;
+  // Guard so we only ever hit moltobene one time per send (here OR after a
+  // not-found send failure below — never both).
+  let refreshAttempted = false;
+  if (chatId === null) {
+    refreshAttempted = true;
+    chatId = await refreshCityGroupFromMoltobene(key);
+    if (chatId === null) {
+      return { ok: false, skipped: true, reason: 'no city TG group set' };
+    }
   }
 
   const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
 
-  const send = async (chatId: string) => {
+  const send = async (sendChatId: string) => {
     const resp = await fetch(`${BOT_API}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: sendChatId,
         text: withBennySignature(text),
         disable_web_page_preview: true,
         ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
@@ -127,7 +140,20 @@ export async function sendToCityGroup(
     return resp.json() as Promise<any>;
   };
 
-  const originalChatId = row.chatId.toString();
+  // provola-58505: a chat-not-found style failure means our stored id is stale
+  // (group recreated/migrated and re-reported by moltobene under a new id). We
+  // re-pull from moltobene once and retry. "bot was kicked" is NOT included —
+  // a fresh id won't fix a removed bot.
+  const isChatNotFound = (result: any): boolean => {
+    const code = result?.error_code;
+    const desc: string = result?.description || '';
+    return (
+      code === 400 &&
+      /chat not found|chat_id is empty|group chat was deactivated|peer_id_invalid/i.test(desc)
+    );
+  };
+
+  let originalChatId = chatId.toString();
 
   try {
     let result = await send(originalChatId);
@@ -151,6 +177,20 @@ export async function sendToCityGroup(
         reason: result.description || 'Failed after migration retry',
         chatId: newChatId,
       };
+    }
+
+    // provola-58505: stale-id recovery. If the send failed because the chat is
+    // gone, re-pull this city's id from moltobene once and retry the send.
+    if (!result.ok && !refreshAttempted && isChatNotFound(result)) {
+      refreshAttempted = true;
+      const refreshed = await refreshCityGroupFromMoltobene(key);
+      if (refreshed !== null && refreshed.toString() !== originalChatId) {
+        console.log(
+          `[provola-58505][city-group] ${key} chat not found; refreshed id -> ${refreshed}, retrying...`,
+        );
+        originalChatId = refreshed.toString();
+        result = await send(originalChatId);
+      }
     }
 
     if (result.ok) {
