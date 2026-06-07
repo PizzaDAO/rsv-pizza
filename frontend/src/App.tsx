@@ -35,6 +35,7 @@ import { AsiaPaymentsPage } from './pages/AsiaPaymentsPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
+import { PartnerBizdevPage } from './pages/PartnerBizdevPage';
 import { PostComposerPage } from './pages/PostComposerPage';
 import { OneSheetPage } from './pages/OneSheetPage';
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
@@ -125,6 +126,8 @@ function App() {
             <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner/report" element={<ConsolidatedReportPage />} />
+            {/* soppressata-72251: per-partner BizDev industry report — before /:slug catch-all */}
+            <Route path="/partner/bizdev" element={<PartnerBizdevPage />} />
             <Route path="/partner-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
