@@ -52,6 +52,7 @@ import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
+import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 
 const router = Router();
 
@@ -5141,7 +5142,9 @@ router.patch(
           );
         }
         const e = raw as Record<string, unknown>;
-        const name = typeof e.name === 'string' ? e.name.trim() : '';
+        // fontina-58504: admin-supplied free-form name → ocrLineItems JSONB;
+        // strip NUL / unpaired surrogates first (mirrors stracchino-49640).
+        const name = typeof e.name === 'string' ? sanitizePgString(e.name.trim()) : '';
 
         const qtyNum = Number(e.qty);
         if (!Number.isFinite(qtyNum) || qtyNum < 0) {
@@ -5229,7 +5232,9 @@ router.patch(
         if (body.ocrCurrency === null) {
           data.ocrCurrency = null;
         } else {
-          const c = String(body.ocrCurrency).trim();
+          // fontina-58504: strip NUL / unpaired surrogates from the admin-
+          // supplied currency before it's persisted (mirrors stracchino-49640).
+          const c = sanitizePgString(String(body.ocrCurrency).trim());
           if (c.length === 0 || c.length > 8) {
             throw new AppError(
               'ocrCurrency must be a non-empty string of 1-8 characters or null',
@@ -5425,7 +5430,8 @@ router.patch(
         }
         data.ocrAmount = fx.usdAmount;
         data.originalAmount = originalAmount;
-        data.originalCurrency = fx.originalCurrency;
+        // fontina-58504: defensively sanitize the model/FX-derived currency code.
+        data.originalCurrency = fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency;
         data.exchangeRate = fx.exchangeRate;
       } else if (
         body.originalAmount !== undefined
@@ -5474,7 +5480,8 @@ router.patch(
         }
         data.ocrAmount = fx.usdAmount;
         data.originalAmount = n;
-        data.originalCurrency = fx.originalCurrency;
+        // fontina-58504: defensively sanitize the model/FX-derived currency code.
+        data.originalCurrency = fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency;
         data.exchangeRate = fx.exchangeRate;
       }
 
@@ -5955,14 +5962,15 @@ router.post(
           await prisma.payoutDocument.update({
             where: { id: docId },
             data: {
-              ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              ocrLineItems: sanitizeForPg((result.lineItems ?? []) as unknown as Prisma.InputJsonValue),
               ocrConfidence: new Decimal(result.confidence),
-              ocrRaw: { ocr: result.raw, fx: { source: fx.source, rate: fx.exchangeRate } } as Prisma.InputJsonValue,
+              ocrRaw: sanitizeForPg({ ocr: result.raw, fx: { source: fx.source, rate: fx.exchangeRate } } as Prisma.InputJsonValue),
               // Even unresolved rows keep originalAmount — the admin needs to
               // see what the receipt said so they can pick the right currency.
               originalAmount: new Decimal(fx.originalAmount),
               ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
-              ocrCurrency: unresolved ? null : fx.originalCurrency,
+              // fontina-58504: currency codes are model-derived; sanitize defensively.
+              ocrCurrency: unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency),
               exchangeRate: unresolved
                 ? null
                 : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
@@ -6143,8 +6151,11 @@ router.post(
       }
       const docKind = kind as AdminDocKind;
 
+      // fontina-58504: sanitize host/admin-supplied fileName (NUL / unpaired
+      // surrogates) before it's persisted to payout_documents + photos
+      // (mirrors stracchino-49640).
       const fileName = typeof body.fileName === 'string' && body.fileName.length > 0
-        ? body.fileName
+        ? sanitizePgString(body.fileName)
         : 'upload';
       const fileSize = typeof body.fileSize === 'number' && Number.isFinite(body.fileSize)
         ? body.fileSize
@@ -6206,17 +6217,18 @@ router.post(
           });
           const fx = await convertToUSD(result.amount, result.currency);
           const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
-          ocrLineItems = (result.lineItems ?? []) as unknown as Prisma.InputJsonValue;
+          ocrLineItems = sanitizeForPg((result.lineItems ?? []) as unknown as Prisma.InputJsonValue);
           ocrConfidence = new Decimal(result.confidence);
-          ocrRaw = {
+          ocrRaw = sanitizeForPg({
             ocr: result.raw,
             fx: { source: fx.source, rate: fx.exchangeRate },
-          } as Prisma.InputJsonValue;
+          } as Prisma.InputJsonValue);
           // Keep originalAmount even when unresolved so the admin sees what the
           // receipt said and can pick the right currency in the edit modal.
           originalAmount = new Decimal(fx.originalAmount);
           ocrAmount = unresolved ? null : new Decimal(fx.usdAmount!);
-          ocrCurrency = unresolved ? null : fx.originalCurrency;
+          // fontina-58504: currency codes are model-derived; sanitize defensively.
+          ocrCurrency = unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency);
           exchangeRate = unresolved
             ? null
             : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null);

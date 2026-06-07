@@ -1345,17 +1345,20 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           docsToCreate.push({
             kind: 'receipt',
             url: doc.url,
-            fileName: doc.fileName || extractFileName(doc.url),
+            // fontina-58504: host-supplied fileName can carry NUL/surrogate
+            // bytes; sanitize before it hits the text column (stracchino-49640).
+            fileName: sanitizePgString(doc.fileName || extractFileName(doc.url)),
             fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
             mimeType: doc.mimeType || 'image/jpeg',
             ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
-            ocrCurrency: unresolved ? null : fx.originalCurrency,
+            // fontina-58504: currency codes are model-derived; sanitize defensively.
+            ocrCurrency: unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency),
             ocrConfidence: new Decimal(ocr.confidence),
             // mortadella-92103: persist the raw foreign-currency amount + ISO
             // code + locked rate per receipt. Even unresolved rows carry
             // originalAmount (the host needs to see what the receipt said).
             originalAmount: new Decimal(fx.originalAmount),
-            originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+            originalCurrency: unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : null),
             exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
             ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
             // formaggi-89172: structured per-line items for pizza-price analytics.
@@ -1380,7 +1383,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
         docsToCreate.push({
           kind: 'receipt',
           url: doc.url,
-          fileName: doc.fileName || extractFileName(doc.url),
+          // fontina-58504: sanitize host-supplied fileName before the text insert.
+          fileName: sanitizePgString(doc.fileName || extractFileName(doc.url)),
           fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
           mimeType: doc.mimeType || 'image/jpeg',
           ocrAmount: null,
@@ -2170,14 +2174,16 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         newReceiptDocs.push({
           kind: 'receipt',
           url: doc.url,
-          fileName: doc.fileName || extractFileName(doc.url),
+          // fontina-58504: sanitize host-supplied fileName before the text insert.
+          fileName: sanitizePgString(doc.fileName || extractFileName(doc.url)),
           fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
           mimeType: doc.mimeType || 'image/jpeg',
           ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
-          ocrCurrency: unresolved ? null : fx.originalCurrency,
+          // fontina-58504: currency codes are model-derived; sanitize defensively.
+          ocrCurrency: unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : fx.originalCurrency),
           ocrConfidence: new Decimal(ocr.confidence),
           originalAmount: new Decimal(fx.originalAmount),
-          originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+          originalCurrency: unresolved ? null : (fx.originalCurrency ? sanitizePgString(fx.originalCurrency) : null),
           exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
           ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
           // formaggi-89172: structured per-line items for pizza-price analytics.
@@ -2191,7 +2197,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
         newReceiptDocs.push({
           kind: 'receipt',
           url: doc.url,
-          fileName: doc.fileName || extractFileName(doc.url),
+          // fontina-58504: sanitize host-supplied fileName before the text insert.
+          fileName: sanitizePgString(doc.fileName || extractFileName(doc.url)),
           fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
           mimeType: doc.mimeType || 'image/jpeg',
           ocrAmount: null,
@@ -2212,7 +2219,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     const newPizzaDocs = newPizza.map((p, i) => ({
       kind: 'pizza',
       url: p.url,
-      fileName: p.fileName || extractFileName(p.url),
+      // fontina-58504: sanitize host-supplied fileName before the text insert.
+      fileName: sanitizePgString(p.fileName || extractFileName(p.url)),
       fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
       mimeType: p.mimeType || 'image/jpeg',
       ocrAmount: null,
@@ -2236,7 +2244,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
     const newEventDocs = newEvent.map((p, i) => ({
       kind: 'event',
       url: p.url,
-      fileName: p.fileName || extractFileName(p.url),
+      // fontina-58504: sanitize host-supplied fileName before the text insert.
+      fileName: sanitizePgString(p.fileName || extractFileName(p.url)),
       fileSize: typeof p.fileSize === 'number' ? p.fileSize : 0,
       mimeType: p.mimeType || 'image/jpeg',
       ocrAmount: null,
