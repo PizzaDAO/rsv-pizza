@@ -50,7 +50,7 @@ import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
-import telegramWebhookRoutes from './routes/telegram-webhook.routes.js';
+import telegramLinkCallbackRoutes from './routes/telegram-link-callback.routes.js'; // provola-58505: moltobene host-link callback
 import hostTelegramRoutes from './routes/host-telegram.routes.js';
 import underbossRoutes from './routes/underboss.routes.js';
 import shippingRoutes from './routes/shipping.routes.js';
@@ -164,7 +164,7 @@ app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
 app.use('/api/saved-views', savedViewsRoutes); // montanara-58497: per-account saved filter views (/payments + /underboss)
-app.use('/api/telegram/webhook', telegramWebhookRoutes); // Telegram inbound webhook (no auth — secret-token header gate)
+app.use('/api/telegram', telegramLinkCallbackRoutes); // provola-58505: moltobene host-link callback (x-api-key gate)
 app.use('/api/underboss/telegram', telegramRoutes); // Telegram broadcast (before underboss catch-all)
 app.use('/api/underboss', underbossRoutes); // Underboss dashboard (token auth + admin routes)
 app.use('/api/sponsor-users', sponsorUserAdminRouter); // Sponsor user admin management

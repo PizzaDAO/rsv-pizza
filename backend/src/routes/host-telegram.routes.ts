@@ -52,8 +52,11 @@ router.post(
       }
 
       const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
+      // provola-58505 (Step 3): namespace the start-payload with the `rsvp_`
+      // prefix so moltobene's @Start() handler can route it. The token itself is
+      // unchanged — only the deep-link payload carries the prefix.
       const deeplink = botUsername
-        ? `https://t.me/${botUsername}?start=${token}`
+        ? `https://t.me/${botUsername}?start=rsvp_${token}`
         : null;
 
       res.json({ token, deeplink });

@@ -653,37 +653,17 @@ export interface TelegramGroupCityStatus {
   country: string | null;
 }
 
-export interface TelegramPendingCapture {
-  chatId: string;
-  title: string | null;
-  chatType: string | null;
-  firstSeenAt: string | null;
-  lastSeenAt: string | null;
-}
-
+// provola-58505: inbound capture suite retired — no more pending captures. The
+// gap report is purely the cities-missing-chat_id view; missing cities are now
+// filled lazily on demand from moltobene (server-side in sendToCityGroup).
 export interface TelegramGroupsStatus {
   cities: TelegramGroupCityStatus[];
-  pendingCaptures: TelegramPendingCapture[];
 }
 
 export async function fetchTelegramGroupsStatus(): Promise<TelegramGroupsStatus> {
   return apiRequest<TelegramGroupsStatus>(
     `/api/underboss/telegram/groups/status`,
     { method: 'GET', requireAuth: true },
-  );
-}
-
-/**
- * Assign a pending capture (by chatId) to a city. Writes through to
- * `city_telegram_groups` so reminders/broadcasts can use it immediately.
- */
-export async function assignTelegramGroup(
-  chatId: string,
-  cityKey: string,
-): Promise<{ ok: boolean; cityKey: string; chatId: string }> {
-  return apiRequest(
-    `/api/underboss/telegram/groups/assign`,
-    { method: 'POST', requireAuth: true, body: { chatId, cityKey } },
   );
 }
 
