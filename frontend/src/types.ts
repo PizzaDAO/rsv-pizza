@@ -340,6 +340,7 @@ export interface Party {
   hostTelegramChatId?: string | null;
   hostTelegramLinkToken?: string | null;
   receiptsReminderSentAt?: string | null;
+  walletReminderSentAt?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
   // romana-61204: post-event survey toggle
@@ -2457,6 +2458,8 @@ export interface PartyPayoutsRow {
     adminNotes?: string | null;
     /** ISO timestamp of when the TG receipts reminder was last sent. */
     receiptsReminderSentAt?: string | null;
+    /** ISO timestamp of when the TG wallet reminder was last sent. */
+    walletReminderSentAt?: string | null;
     /** City-level approved payment amount. */
     paymentsApprovedUsd?: number | null;
     /** ISO timestamp of when the city payment was approved. */

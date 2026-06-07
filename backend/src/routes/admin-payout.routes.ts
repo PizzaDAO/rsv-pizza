@@ -290,6 +290,8 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   adminNotes: true,
   // Track when the TG receipts reminder was last sent for this city.
   receiptsReminderSentAt: true,
+  // Track when the TG wallet reminder was last sent for this city.
+  walletReminderSentAt: true,
   // City-level payment approval fields.
   paymentsApprovedUsd: true,
   paymentsApprovedAt: true,
@@ -2149,6 +2151,10 @@ router.get(
             // When the TG receipts reminder was last sent.
             receiptsReminderSentAt: b.partyMeta.receiptsReminderSentAt
               ? b.partyMeta.receiptsReminderSentAt.toISOString()
+              : null,
+            // When the TG wallet reminder was last sent.
+            walletReminderSentAt: b.partyMeta.walletReminderSentAt
+              ? b.partyMeta.walletReminderSentAt.toISOString()
               : null,
             // City-level payment approval.
             paymentsApprovedUsd: b.partyMeta.paymentsApprovedUsd
@@ -6540,8 +6546,9 @@ router.post(
 // is linked) and posts to the city's GPP group chat, telling the host to
 // submit their payout wallet address on the host page's Payments tab. Same
 // per-channel send + skip-reason contract; the only differences are the
-// message text + target URL. We don't persist a "sent at" timestamp for this
-// one (no DB column), so unlike receipts there's no last-sent sub-label.
+// message text + target URL. Persists `parties.wallet_reminder_sent_at` on
+// success, mirroring the receipts reminder, so the menu can show a last-sent
+// sub-label.
 router.post(
   '/:partyId/tg-wallet-reminder',
   requireAuth,
@@ -6588,6 +6595,14 @@ router.post(
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
       const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+
+      // Record when the reminder was sent (if at least one message succeeded).
+      if (hostDmSent || groupSent) {
+        await prisma.party.update({
+          where: { id: partyId },
+          data: { walletReminderSentAt: new Date() },
+        });
+      }
 
       console.log(
         `[tg-wallet-reminder] party=${party.id} slug=${slug} host_dm=${
