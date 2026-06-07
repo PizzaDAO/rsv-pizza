@@ -17,13 +17,15 @@
 const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   // A
   'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'andorra': 'AD',
-  'angola': 'AO', 'antigua and barbuda': 'AG', 'argentina': 'AR',
+  'angola': 'AO', 'antigua and barbuda': 'AG', 'antigua & barbuda': 'AG',
+  'argentina': 'AR',
   'armenia': 'AM', 'australia': 'AU', 'austria': 'AT', 'azerbaijan': 'AZ',
   // B
   'bahamas': 'BS', 'the bahamas': 'BS',
   'bahrain': 'BH', 'bangladesh': 'BD', 'barbados': 'BB',
   'belarus': 'BY', 'belgium': 'BE', 'belize': 'BZ', 'benin': 'BJ',
   'bhutan': 'BT', 'bolivia': 'BO', 'bosnia and herzegovina': 'BA',
+  'bosnia & herzegovina': 'BA',
   'botswana': 'BW', 'brazil': 'BR', 'brunei': 'BN', 'bulgaria': 'BG',
   'burkina faso': 'BF', 'burundi': 'BI',
   // C
@@ -100,7 +102,8 @@ const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   // T
   'taiwan': 'TW', 'tajikistan': 'TJ', 'tanzania': 'TZ', 'thailand': 'TH',
   'timor-leste': 'TL', 'east timor': 'TL', 'togo': 'TG', 'tonga': 'TO',
-  'trinidad and tobago': 'TT', 'tunisia': 'TN', 'turkey': 'TR',
+  'trinidad and tobago': 'TT', 'trinidad & tobago': 'TT',
+  'tunisia': 'TN', 'turkey': 'TR',
   'turkmenistan': 'TM', 'tuvalu': 'TV',
   // U
   'uganda': 'UG', 'ukraine': 'UA', 'united arab emirates': 'AE',
