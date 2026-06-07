@@ -2252,6 +2252,15 @@ export interface AdminPayoutFilters {
    * regional portals). Default true.
    */
   hideUsCities?: boolean;
+  /**
+   * tigella-58512: surface approved events tagged `tbd` that have submitted
+   * NOTHING yet (zero payouts + zero payout documents). These produce no
+   * grouped rows normally, so the backend injects synthetic by-party rows
+   * when this is set. By-city endpoint only; OFF by default — when false the
+   * `showTbdUnsubmitted` query param is omitted entirely (byte-identical to
+   * prior behavior).
+   */
+  showTbdUnsubmitted?: boolean;
 }
 
 export interface AdminPayoutTotals {
@@ -2512,8 +2521,14 @@ export interface PartyPayoutsRow {
     completedNoProofUsd?: number;
     /** payout_documents rows where kind='receipt' for this party. */
     totalReceiptCount: number;
-    /** ISO timestamp — max(updated_at) across this party's payouts. */
-    lastActivityAt: string;
+    /**
+     * ISO timestamp — max(updated_at) across this party's payouts.
+     * tigella-58512: null on synthetic "TBD / no submission" rows (events
+     * tagged `tbd` with zero payouts + zero documents) injected by the
+     * by-party endpoint when `showTbdUnsubmitted` is on — they have no
+     * payout activity to derive a timestamp from.
+     */
+    lastActivityAt: string | null;
     /** Count of payouts whose sticky `flaggedReady` is currently true (argentina-92103). */
     flaggedReadyCount: number;
   };

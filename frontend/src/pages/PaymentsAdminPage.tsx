@@ -121,6 +121,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // provatura-92107: hide US cities (party.region === 'usa') by default on the
   // admin /payments by-city dashboard.
   hideUsCities: true,
+  // tigella-58512: surface approved `tbd` events with zero submissions —
+  // OFF by default so the default request is byte-identical to before.
+  showTbdUnsubmitted: false,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -721,7 +724,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     // work and stay in lockstep with the lastActivityAt the column renders.
     if (sort === 'activity_asc' || sort === 'activity_desc') {
       const activity = (r: PartyPayoutsRow) =>
-        new Date(r.aggregates.lastActivityAt).getTime();
+        // tigella-58512: synthetic TBD rows have lastActivityAt=null → sort to
+        // the bottom (0 = epoch) the same way the backend orders them.
+        r.aggregates.lastActivityAt
+          ? new Date(r.aggregates.lastActivityAt).getTime()
+          : 0;
       return [...rows].sort((a, b) =>
         sort === 'activity_asc' ? activity(a) - activity(b) : activity(b) - activity(a),
       );
@@ -1251,6 +1258,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           showHideClosedToggle={viewMode === 'by-city'}
           // stracchino-92108: Hide possible scams, by-city view only (same as above).
           showHideScamsToggle={viewMode === 'by-city'}
+          // tigella-58512: Show TBD (no submission) — by-city view only. These
+          // synthetic rows come from the by-party endpoint, which is the only
+          // place a zero-payout party can surface.
+          showTbdToggle={viewMode === 'by-city'}
           // provatura-92107: Hide US cities — by-city view + admin dashboard
           // only (regional portals are already region-scoped).
           showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}

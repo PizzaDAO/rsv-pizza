@@ -4929,6 +4929,11 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.provenOnly) {
     params.set('provenOnly', 'true');
   }
+  // tigella-58512: surface approved `tbd` events with zero submissions on the
+  // by-city view. Only set when ON so the default request is byte-identical.
+  if (filters.showTbdUnsubmitted) {
+    params.set('showTbdUnsubmitted', '1');
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
