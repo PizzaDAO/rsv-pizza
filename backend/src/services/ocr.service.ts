@@ -17,6 +17,7 @@
 import { getOpenAI } from '../lib/openai.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getLlmModels } from '../lib/privateConfig.js';
+import { sanitizePgString } from '../lib/sanitizePg.js';
 
 // formaggi-89172: allowed categories. Keep in sync with the system prompt
 // and the sanitizer below. `other` is the safe fallback for anything else.
@@ -218,9 +219,11 @@ function sanitizeLineItems(raw: unknown): OcrLineItem[] {
     const e = entry as Record<string, unknown>;
 
     // Name is required; coerce non-strings, fall back to placeholder.
+    // fontina-58504: sanitize NUL / unpaired surrogates so the line-item name
+    // can't 500 the payout_documents JSONB insert (mirrors stracchino-49640).
     const rawName = e.name;
     const name = typeof rawName === 'string' && rawName.trim().length > 0
-      ? rawName.trim()
+      ? sanitizePgString(rawName.trim())
       : '[illegible]';
 
     const qtyNum = Number(e.qty);
@@ -297,15 +300,18 @@ export function parseSingleReceipt(parsed: any): OcrResult {
 
   // formaggi-89172: merchant + receiptDate are best-effort. Coerce missing/
   // empty strings to null so the JSONB row has consistent shape.
+  // fontina-58504: run free-form model strings through sanitizePgString at the
+  // source so every consumer that persists ocr.merchant / ocr.boundingHint to
+  // payout_documents gets NUL/surrogate-free values (mirrors stracchino-49640).
   const merchant = typeof parsed?.merchant === 'string' && parsed.merchant.trim().length > 0
-    ? parsed.merchant.trim()
+    ? sanitizePgString(parsed.merchant.trim())
     : null;
   const receiptDate = typeof parsed?.receiptDate === 'string' && parsed.receiptDate.trim().length > 0
     ? parsed.receiptDate.trim()
     : null;
   // stracciatella-92114: optional locator for multi-receipt photos.
   const boundingHint = typeof parsed?.boundingHint === 'string' && parsed.boundingHint.trim().length > 0
-    ? parsed.boundingHint.trim().slice(0, 120)
+    ? sanitizePgString(parsed.boundingHint.trim().slice(0, 120))
     : null;
 
   // stracciatella-92114: truncate per-receipt line items to keep token + DB
@@ -316,7 +322,9 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     amount,
     currency,
     confidence,
-    items: Array.isArray(parsed?.items) ? parsed.items.filter((s: unknown) => typeof s === 'string') : undefined,
+    items: Array.isArray(parsed?.items)
+      ? parsed.items.filter((s: unknown): s is string => typeof s === 'string').map((s: string) => sanitizePgString(s))
+      : undefined,
     lineItems,
     merchant,
     receiptDate,
