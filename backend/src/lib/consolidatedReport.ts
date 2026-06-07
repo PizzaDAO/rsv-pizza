@@ -119,7 +119,75 @@ function emptyReport(): ConsolidatedReportJSON {
   };
 }
 
+// ricotta-58507: short-TTL in-memory cache for the consolidated report.
+//
+// buildConsolidatedReport runs several heavy page_views / link_clicks
+// COUNT(DISTINCT visitor_hash) aggregations (measured ~0.35-0.57s EACH) on
+// every partner Consolidated Report load — both GET /api/sponsor/report and
+// the read-only AI-share /api/sponsor/report/ai/:token. Each holds a pooled
+// DB connection ~half a second, draining the 5-connection pool (P2024).
+//
+// This is analytics that tolerates short staleness, so we read-through cache
+// the fully-built report keyed by the inputs that affect the payload. A 2-min
+// TTL means a partner refreshing their report reuses a recent result instead
+// of re-running the aggregations; no explicit invalidation is needed (worst
+// case, new pageviews/RSVPs show up ≤2 min late). Style mirrors the
+// survey-config cache in lib/surveyQuestions.ts (loadQuestionSet).
+const CONSOLIDATED_REPORT_TTL_MS = 120_000; // 2 min — staleness ⇄ pool-pressure tradeoff.
+const CONSOLIDATED_REPORT_CACHE_MAX = 200; // bound the map so it can't grow unbounded.
+const consolidatedReportCache = new Map<
+  string,
+  { value: ConsolidatedReportJSON; expires: number }
+>();
+
+// Stable cache key: only the opts fields that change the payload, normalized so
+// two callers with equivalent inputs share a key. (sponsorUser affects link
+// filtering for non-admin views, so its id is included; the display name does
+// not change the key since it's re-derived from the id.)
+function consolidatedReportCacheKey(opts: BuildConsolidatedReportOpts): string {
+  return JSON.stringify({
+    tag: opts.tag?.trim().toLowerCase() || null,
+    isAdminViewing: !!opts.isAdminViewing,
+    approvedOnly: !!opts.approvedOnly,
+    sponsorUserId: opts.sponsorUser?.id ?? null,
+  });
+}
+
 export async function buildConsolidatedReport(
+  opts: BuildConsolidatedReportOpts
+): Promise<ConsolidatedReportJSON> {
+  const cacheKey = consolidatedReportCacheKey(opts);
+  const now = Date.now();
+  const cached = consolidatedReportCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    // Callers only read/serialize the returned report (res.json / markdown
+    // renderer) and never mutate it, so sharing the cached object is safe.
+    return cached.value;
+  }
+  if (cached) consolidatedReportCache.delete(cacheKey); // evict the stale entry.
+
+  const value = await buildConsolidatedReportUncached(opts);
+
+  // Only cache a successfully-built report (errors above propagate, never cached).
+  // Bound the map: when at/over cap, drop expired entries first, then the oldest.
+  if (consolidatedReportCache.size >= CONSOLIDATED_REPORT_CACHE_MAX) {
+    for (const [k, v] of consolidatedReportCache) {
+      if (v.expires <= now) consolidatedReportCache.delete(k);
+    }
+    while (consolidatedReportCache.size >= CONSOLIDATED_REPORT_CACHE_MAX) {
+      const oldest = consolidatedReportCache.keys().next().value;
+      if (oldest === undefined) break;
+      consolidatedReportCache.delete(oldest);
+    }
+  }
+  consolidatedReportCache.set(cacheKey, {
+    value,
+    expires: Date.now() + CONSOLIDATED_REPORT_TTL_MS,
+  });
+  return value;
+}
+
+async function buildConsolidatedReportUncached(
   opts: BuildConsolidatedReportOpts
 ): Promise<ConsolidatedReportJSON> {
   const tag = opts.tag?.trim().toLowerCase() || undefined;
