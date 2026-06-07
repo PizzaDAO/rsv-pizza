@@ -75,6 +75,7 @@ import {
   surveyQuestionsAdminRouter,
   surveyQuestionSetsAdminRouter,
 } from './routes/admin/surveyQuestions.routes.js';
+import { surveyResponsesAdminRouter } from './routes/admin/surveyResponses.routes.js'; // gnocchi-58507: admin survey responses feed
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
@@ -160,6 +161,7 @@ app.use('/api/admin/parties', adminPartyRoutes); // fontina-91827: admin party-m
 app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-61455: image-authenticity check — before /api/admin catch-all
 app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-58297: survey question CRUD — before /api/admin catch-all
 app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
+app.use('/api/admin/survey-responses', surveyResponsesAdminRouter); // gnocchi-58507: admin survey responses feed — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)

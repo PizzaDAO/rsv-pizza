@@ -6953,6 +6953,39 @@ export async function updateAdminSurveyQuestionSet(
   );
 }
 
+// gnocchi-58507: admin-only feed of all post-event survey responses across all
+// events (one row per respondent). Region + text filters and CSV export are
+// built client-side from this single payload.
+export interface AdminSurveyResponseRow {
+  id: string;
+  submittedAt: string;
+  updatedAt: string | null;
+  questionSetVersion: number;
+  email: string | null;
+  guestName: string;
+  event: {
+    name: string;
+    slug: string;
+    region: string | null;
+  };
+  answers: SurveyAnswers;
+}
+
+export interface AdminSurveyResponsesResponse {
+  questionSet: SurveyQuestion[];
+  questionSetVersion: number;
+  truncated: boolean;
+  summary: {
+    responseCount: number;
+    ratings: Record<string, { average: number | null; count: number }>;
+  };
+  responses: AdminSurveyResponseRow[];
+}
+
+export async function getAdminSurveyResponses(): Promise<AdminSurveyResponsesResponse> {
+  return apiRequest<AdminSurveyResponsesResponse>('/api/admin/survey-responses', { requireAuth: true });
+}
+
 // ============================================
 // Tax forms (salame-92110)
 // ============================================

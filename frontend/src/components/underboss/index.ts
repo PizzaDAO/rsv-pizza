@@ -11,6 +11,7 @@ export { CityScopePicker } from './CityScopePicker';
 export { FakeDetectionTable } from './FakeDetectionTable';
 export { SuperlativesTab } from './SuperlativesTab';
 export { SurveyQuestionsTab } from './SurveyQuestionsTab';
+export { SurveyResponsesTab } from './SurveyResponsesTab';
 export { OutreachTab } from './OutreachTab';
 export { TelegramGroupsTab } from './TelegramGroupsTab';
 export { ReimbursementCapCell } from './ReimbursementCapCell';
