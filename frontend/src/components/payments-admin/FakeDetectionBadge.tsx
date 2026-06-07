@@ -103,7 +103,13 @@ export function FakeDetectionBadge({
         ref={buttonRef}
         type="button"
         className={className}
-        onClick={() => setOpen(o => !o)}
+        onClick={e => {
+          // Stop the click from bubbling to the by-city row's onClick (which
+          // toggles row expansion in PayoutsByPartyTable) — otherwise the row
+          // expands instead of (just) opening the flag popover.
+          e.stopPropagation();
+          setOpen(o => !o);
+        }}
         aria-expanded={open}
       >
         <AlertTriangle size={11} />
