@@ -40,6 +40,10 @@ const router = Router();
 // it), so an unconditioned `router.use(...)` here would gate every
 // /api/parties/* request — which broke host guest approvals system-wide.
 router.use('/:partyId/payouts', requireAuth);
+// ziti-58300: path-scope auth on the new rolling-reimbursement endpoints too.
+// Same caveat as above — the router is mounted at /api/parties, so this must be
+// path-scoped to /:partyId/reimbursement and never an unconditioned router.use.
+router.use('/:partyId/reimbursement', requireAuth);
 
 // Aggressive rate limit on the OCR-preview endpoint to prevent OpenAI quota abuse.
 // 20 calls/hour/user, keyed by userId (falls back to IP).
@@ -148,6 +152,9 @@ function serializePayout(p: any) {
     // salame-92110: snapshot of the host's tax form at submission time.
     // Null on pre-feature payouts and on shipping-coordinator receipts.
     taxFormId: p.taxFormId ?? null,
+    // ziti-58300: host "Submit for review" toggle timestamp on the rolling
+    // reimbursement record. Null until the host signals ready.
+    submittedForReviewAt: p.submittedForReviewAt ? p.submittedForReviewAt.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     documents: Array.isArray(p.documents) ? p.documents.map(serializeDocument) : undefined,
@@ -2564,6 +2571,735 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
     });
 
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =============================================================================
+// ziti-58300: event-level rolling reimbursements
+// =============================================================================
+//
+// Mental model: a host has ONE rolling reimbursement per (party, hostUserId,
+// purpose='event') while the record is non-terminal. Receipts are appended to
+// that record (attributed to the uploading co-host). The explicit host
+// "Submit for review" toggle is tracked by `submittedForReviewAt`, NOT a status
+// change (status stays 'pending'). The old POST /:partyId/payouts create stays
+// untouched for admin prepay-for-cohost + purpose='shipping' back-compat.
+
+// Non-terminal statuses: a rolling record is "active" while in one of these.
+// Terminal = paid | completed | withdrawn | rejected | failed.
+const NON_TERMINAL_PAYOUT_STATUSES = ['pending', 'approved', 'queued'] as const;
+
+/**
+ * ziti-58300: find the caller's active rolling reimbursement record for an
+ * event. At most one is expected per (party, host, purpose) while non-terminal,
+ * but legacy data may carry several (forward-only — no migration). We pick the
+ * most-recently-created one so the rolling UI converges on a single record.
+ */
+async function findActiveRollingPayout(
+  partyId: string,
+  hostUserId: string,
+  purpose: 'event' | 'shipping' = 'event',
+) {
+  return prisma.payout.findFirst({
+    where: {
+      partyId,
+      hostUserId,
+      purpose,
+      status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
+    },
+    include: {
+      host: { select: { id: true, name: true, email: true } },
+      documents: {
+        orderBy: { sortOrder: 'asc' },
+        include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/**
+ * ziti-58300: sum the eligible receipt USD amounts on a payout. Mirrors the
+ * host-PATCH recompute filter (provolone-39042 / culatello-92104 / provola-92106):
+ * exclude admin-flagged duplicate + ineligible rows and currency-unresolved rows
+ * (ocrAmount null). Returns the sum, clamped to the party's effective cap.
+ */
+async function recomputeRollingFinalAmountUsd(
+  partyId: string,
+  documents: Array<{ kind: string; isDuplicate?: boolean | null; ineligible?: boolean | null; ocrAmount: Decimal | null }>,
+): Promise<number> {
+  const ocrSum = documents.reduce((sum, d) => {
+    if (d.kind !== 'receipt') return sum;
+    if (d.isDuplicate || d.ineligible) return sum;
+    return sum + (d.ocrAmount != null ? Number(d.ocrAmount.toString()) : 0);
+  }, 0);
+
+  // crocchetta-92103: clamp to the party's effective cap (the per-record ceiling
+  // now applies to the aggregate per co-host — that's intended for ziti-58300).
+  const partyForCap = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { reimbursementCapUsd: true, eventTags: true },
+  });
+  const cap = computeEffectiveCapUsd({
+    reimbursementCapUsd: partyForCap?.reimbursementCapUsd,
+    eventTags: partyForCap?.eventTags,
+  });
+  if (typeof cap === 'number' && cap > 0 && ocrSum > cap) {
+    return cap;
+  }
+  return ocrSum;
+}
+
+/**
+ * ziti-58300: readiness booleans for the caller's rolling reimbursement.
+ * Reuses the porchetta-58296 photo+receipt readiness query and mirrors the
+ * pizzaiolo-92103 host method-valid check (`assertUserHasValidPayoutMethod`).
+ */
+async function getReimbursementReadiness(partyId: string, userId: string) {
+  const [party, photoReadiness, user] = await Promise.all([
+    prisma.party.findUnique({ where: { id: partyId }, select: { expectedGuests: true } }),
+    getPayoutSubmissionReadiness(partyId),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        preferredPayoutMethod: true,
+        payoutWalletAddress: true,
+        payoutBankDetails: true,
+      },
+    }),
+  ]);
+
+  const attendanceSet = (party?.expectedGuests ?? 0) > 0;
+
+  // Mirror assertUserHasValidPayoutMethod's "valid" definition without throwing.
+  let paymentMethodValid = false;
+  const m = user?.preferredPayoutMethod ?? null;
+  if (m === 'mercury_card') {
+    paymentMethodValid = true;
+  } else if (m === 'usdc_base') {
+    paymentMethodValid = (user?.payoutWalletAddress ?? '').trim().length > 0;
+  } else if (m === 'wire') {
+    const bank = user?.payoutBankDetails as { email?: unknown } | null;
+    const email = bank && typeof bank.email === 'string' ? bank.email : '';
+    paymentMethodValid = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  const readyToSubmit =
+    attendanceSet &&
+    photoReadiness.hasGroupPhoto &&
+    photoReadiness.hasBoxStackPhoto &&
+    photoReadiness.hasPizzaPhoto &&
+    photoReadiness.hasReceipt &&
+    paymentMethodValid;
+
+  return {
+    attendanceSet,
+    hasGroupPhoto: photoReadiness.hasGroupPhoto,
+    hasBoxStackPhoto: photoReadiness.hasBoxStackPhoto,
+    hasPizzaPhoto: photoReadiness.hasPizzaPhoto,
+    hasReceipt: photoReadiness.hasReceipt,
+    paymentMethodValid,
+    readyToSubmit,
+  };
+}
+
+// ---------- GET /:partyId/reimbursement/me ----------
+
+/**
+ * ziti-58300: the caller's active rolling reimbursement record (or null), its
+ * receipt documents, the running eligible total, and readiness booleans that
+ * drive the host "Submit for review" gate.
+ */
+router.get('/:partyId/reimbursement/me', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+
+    const record = await findActiveRollingPayout(partyId, req.userId, 'event');
+    const readiness = await getReimbursementReadiness(partyId, req.userId);
+
+    // Running eligible total. Prefer the record's persisted finalAmountUsd when
+    // it has one; else recompute live from its receipts so a brand-new (or
+    // recently-edited) record reads correctly even before the next write.
+    const receipts = record ? record.documents.filter((d) => d.kind === 'receipt') : [];
+    const eligibleTotalUsd = record
+      ? await recomputeRollingFinalAmountUsd(partyId, record.documents)
+      : 0;
+
+    res.json({
+      reimbursement: record ? serializePayout(record) : null,
+      receipts: receipts.map(serializeDocument),
+      eligibleTotalUsd,
+      submittedForReviewAt: record?.submittedForReviewAt
+        ? record.submittedForReviewAt.toISOString()
+        : null,
+      ...readiness,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- POST /:partyId/reimbursement/receipts ----------
+
+/**
+ * ziti-58300: find-or-create the caller's active rolling event reimbursement
+ * and append the uploaded receipt document(s). Runs/forwards OCR exactly like
+ * POST /:partyId/payouts (provolone-49301 forwarded-payload fast path +
+ * analyzeReceiptMulti fallback), then recomputes + persists finalAmountUsd from
+ * the eligible receipts. Caps are advisory here (warn, don't hard-block) to
+ * match current host-side behavior (speck-89172).
+ */
+router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { receiptPhotos = [] } = req.body || {};
+
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+
+    // bresaola-49185: block on unapproved parties (mutates Payout rows).
+    await assertPartyApproved(partyId);
+
+    if (!Array.isArray(receiptPhotos)) {
+      throw new AppError('receiptPhotos must be an array', 400, 'INVALID_RECEIPTS');
+    }
+    if (receiptPhotos.length === 0) {
+      throw new AppError('Upload at least one receipt', 400, 'NO_RECEIPTS');
+    }
+    if (receiptPhotos.length > 100) {
+      throw new AppError('Max 100 receipts', 400, 'TOO_MANY_RECEIPTS');
+    }
+    for (const r of receiptPhotos as IncomingDocument[]) {
+      if (!r || typeof r.url !== 'string') {
+        throw new AppError('Each receiptPhoto must have a url', 400, 'INVALID_RECEIPT');
+      }
+      assertSupabasePayoutUrl(r.url, partyId);
+    }
+
+    // mortadella-92103: country prior for ambiguous-symbol receipts.
+    const partyForOcr = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { country: true },
+    });
+    const partyCountry = partyForOcr?.country ?? null;
+
+    // Run/forward OCR per receipt entry — identical strategy to POST /payouts.
+    type ReceiptUnit = { ocr: any; fx: any };
+    const ocrResults = await Promise.allSettled(
+      (receiptPhotos as IncomingDocument[]).map(async (r) => {
+        try {
+          if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
+            const ocr = {
+              amount: r.ocrOriginalAmount as number,
+              currency: (typeof r.ocrOriginalCurrency === 'string' && r.ocrOriginalCurrency.trim()) ? r.ocrOriginalCurrency.trim().slice(0, 8) : null,
+              confidence: Math.min(1, Math.max(0, Number(r.ocrConfidence) || 0)),
+              lineItems: Array.isArray(r.ocrLineItems) ? (r.ocrLineItems as any[]).slice(0, 100) : undefined,
+              raw: r.ocrRaw ?? null,
+            };
+            const fx = await convertToUSD(ocr.amount, ocr.currency);
+            return { ok: true as const, doc: r, units: [{ ocr, fx }] as ReceiptUnit[] };
+          }
+          const ocrList = await analyzeReceiptMulti({
+            imageUrl: deriveOcrUrl(r),
+            partyCountry,
+          });
+          if (ocrList.length === 0) {
+            return { ok: false as const, doc: r, error: 'NO_RECEIPT_DETECTED' };
+          }
+          const units = await Promise.all(
+            ocrList.map(async (ocr) => {
+              const fx = await convertToUSD(ocr.amount, ocr.currency);
+              return { ocr, fx } as ReceiptUnit;
+            }),
+          );
+          return { ok: true as const, doc: r, units };
+        } catch (err: any) {
+          return { ok: false as const, doc: r, error: err?.message || 'OCR failed' };
+        }
+      }),
+    );
+
+    // Build the payout_documents creates (one row per detected receipt unit).
+    const docsToCreate: Array<{
+      kind: string;
+      url: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      ocrAmount: Decimal | null;
+      ocrCurrency: string | null;
+      ocrConfidence: Decimal | null;
+      originalAmount: Decimal | null;
+      originalCurrency: string | null;
+      exchangeRate: Decimal | null;
+      ocrRaw: any;
+      ocrLineItems: any;
+      ocrError: string | null;
+      sortOrder: number;
+      sourceReceiptIndex: number | null;
+      sourceReceiptCount: number | null;
+      boundingHint: string | null;
+    }> = [];
+
+    let idx = 0;
+    for (const settled of ocrResults) {
+      const result = settled.status === 'fulfilled' ? settled.value : null;
+      const doc = (receiptPhotos as IncomingDocument[])[idx];
+      if (result && result.ok) {
+        const units = result.units;
+        const forwardedCount =
+          typeof doc.sourceReceiptCount === 'number' && doc.sourceReceiptCount > 1
+            ? doc.sourceReceiptCount
+            : null;
+        const sourceReceiptCount = units.length > 1 ? units.length : (forwardedCount ?? units.length);
+        units.forEach((unit, receiptIndex) => {
+          const { ocr, fx } = unit;
+          const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
+          docsToCreate.push({
+            kind: 'receipt',
+            url: doc.url,
+            fileName: doc.fileName || extractFileName(doc.url),
+            fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
+            mimeType: doc.mimeType || 'image/jpeg',
+            ocrAmount: unresolved ? null : new Decimal(fx.usdAmount!),
+            ocrCurrency: unresolved ? null : fx.originalCurrency,
+            ocrConfidence: new Decimal(ocr.confidence),
+            originalAmount: new Decimal(fx.originalAmount),
+            originalCurrency: unresolved ? null : (fx.originalCurrency ?? null),
+            exchangeRate: unresolved ? null : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
+            ocrRaw: sanitizeForPg({ ocr: ocr.raw, fx: { source: fx.source, rate: fx.exchangeRate } }),
+            ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
+            ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
+            sortOrder: idx * 100 + receiptIndex,
+            sourceReceiptIndex:
+              sourceReceiptCount > 1
+                ? (typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : receiptIndex)
+                : null,
+            sourceReceiptCount: sourceReceiptCount > 1 ? sourceReceiptCount : null,
+            boundingHint: typeof ocr.boundingHint === 'string' ? ocr.boundingHint : null,
+          });
+        });
+      } else {
+        const err = result && !result.ok ? result.error : 'Unexpected OCR result';
+        docsToCreate.push({
+          kind: 'receipt',
+          url: doc.url,
+          fileName: doc.fileName || extractFileName(doc.url),
+          fileSize: typeof doc.fileSize === 'number' ? doc.fileSize : 0,
+          mimeType: doc.mimeType || 'image/jpeg',
+          ocrAmount: null,
+          ocrCurrency: null,
+          ocrConfidence: null,
+          originalAmount: null,
+          originalCurrency: null,
+          exchangeRate: null,
+          ocrRaw: null,
+          ocrLineItems: null,
+          ocrError: err,
+          sortOrder: idx * 100,
+          sourceReceiptIndex: typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : null,
+          sourceReceiptCount: null,
+          boundingHint: null,
+        });
+      }
+      idx++;
+    }
+
+    const uploaderUserId = req.userId;
+    const uploaderEmail = req.userEmail ?? null;
+
+    // Find-or-create the caller's active rolling record, append the docs, then
+    // recompute finalAmountUsd from ALL eligible receipts on the record.
+    const updated = await prisma.$transaction(async (tx) => {
+      let record = await tx.payout.findFirst({
+        where: {
+          partyId,
+          hostUserId: uploaderUserId,
+          purpose: 'event',
+          status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { documents: true },
+      });
+
+      // Stamp partyId + uploader on every new doc (agnolotti-58291 + pancetta-37195).
+      const stampedDocs = docsToCreate.map((d) => ({
+        ...d,
+        partyId,
+        uploadedByUserId: uploaderUserId,
+        uploadedByEmail: uploaderEmail,
+        photoId: null as string | null,
+      }));
+
+      if (!record) {
+        // Create a fresh rolling record. finalAmountUsd is set after we know
+        // the eligible sum; seed FX headline from the first resolved receipt.
+        const firstResolved = docsToCreate.find((d) => d.ocrAmount != null);
+        const created = await tx.payout.create({
+          data: {
+            partyId,
+            hostUserId: uploaderUserId,
+            purpose: 'event',
+            originalAmount: firstResolved?.originalAmount ?? new Decimal(0),
+            originalCurrency: firstResolved?.originalCurrency ?? 'USD',
+            exchangeRate: firstResolved?.exchangeRate ?? new Decimal(1),
+            extractedAmountUsd: new Decimal(0),
+            finalAmountUsd: new Decimal(0),
+            status: 'pending',
+            documents: { create: stampedDocs },
+          },
+          include: { documents: true },
+        });
+        record = created;
+      } else {
+        await tx.payoutDocument.createMany({
+          data: stampedDocs.map((d) => ({
+            ...d,
+            payoutId: record!.id,
+            ocrRaw: d.ocrRaw === null ? Prisma.JsonNull : (d.ocrRaw as Prisma.InputJsonValue),
+            ocrLineItems: d.ocrLineItems == null ? Prisma.JsonNull : (d.ocrLineItems as Prisma.InputJsonValue),
+          })),
+        });
+      }
+
+      // Recompute from the full set of receipts now on the record.
+      const allDocs = await tx.payoutDocument.findMany({
+        where: { payoutId: record.id },
+        select: { kind: true, isDuplicate: true, ineligible: true, ocrAmount: true },
+      });
+      const extractedSum = allDocs.reduce(
+        (s, d) =>
+          s +
+          (d.kind === 'receipt' && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
+            ? Number(d.ocrAmount.toString())
+            : 0),
+        0,
+      );
+      const finalUsd = await recomputeRollingFinalAmountUsd(partyId, allDocs);
+
+      return tx.payout.update({
+        where: { id: record.id },
+        data: {
+          extractedAmountUsd: new Decimal(extractedSum),
+          // Keep finalAmountUsd >= 0; rolling records can legitimately read $0
+          // (e.g. every receipt currency-unresolved) until the host fixes them.
+          finalAmountUsd: new Decimal(finalUsd),
+        },
+        include: {
+          host: { select: { id: true, name: true, email: true } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
+        },
+      });
+    }, { timeout: 20000, maxWait: 10000 });
+
+    // Advisory cap warning (non-blocking, matches host behavior). Surfaced so
+    // the UI can show an over-cap nudge without rejecting the upload.
+    let capWarning: string | null = null;
+    try {
+      const partyForCap = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: { reimbursementCapUsd: true, eventTags: true },
+      });
+      const cap = computeEffectiveCapUsd({
+        reimbursementCapUsd: partyForCap?.reimbursementCapUsd,
+        eventTags: partyForCap?.eventTags,
+      });
+      const extracted = Number(updated.extractedAmountUsd.toString());
+      if (typeof cap === 'number' && cap > 0 && extracted > cap) {
+        capWarning = `Receipts total $${extracted.toFixed(2)}, which exceeds the event's $${cap.toFixed(2)} cap. Your reimbursement will be capped at $${cap.toFixed(2)}.`;
+      }
+    } catch {
+      // Non-fatal — the upload succeeded.
+    }
+
+    res.status(201).json({
+      reimbursement: serializePayout(updated),
+      receipts: updated.documents.filter((d) => d.kind === 'receipt').map(serializeDocument),
+      eligibleTotalUsd: Number(updated.finalAmountUsd.toString()),
+      capWarning,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- DELETE /:partyId/reimbursement/receipts/:docId ----------
+
+/**
+ * ziti-58300: remove a receipt from the caller's active rolling record, then
+ * recompute finalAmountUsd. Only allowed when the doc belongs to the caller's
+ * own active (non-terminal) record — terminal records are frozen.
+ */
+router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, docId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+
+    const record = await findActiveRollingPayout(partyId, req.userId, 'event');
+    if (!record) {
+      throw new AppError('No active reimbursement to edit', 404, 'NO_ACTIVE_REIMBURSEMENT');
+    }
+    const doc = record.documents.find((d) => d.id === docId);
+    if (!doc) {
+      throw new AppError('Receipt not found on your active reimbursement', 404, 'NOT_FOUND');
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.payoutDocument.deleteMany({ where: { id: docId, payoutId: record.id } });
+      const allDocs = await tx.payoutDocument.findMany({
+        where: { payoutId: record.id },
+        select: { kind: true, isDuplicate: true, ineligible: true, ocrAmount: true },
+      });
+      const extractedSum = allDocs.reduce(
+        (s, d) =>
+          s +
+          (d.kind === 'receipt' && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
+            ? Number(d.ocrAmount.toString())
+            : 0),
+        0,
+      );
+      const finalUsd = await recomputeRollingFinalAmountUsd(partyId, allDocs);
+      return tx.payout.update({
+        where: { id: record.id },
+        data: {
+          extractedAmountUsd: new Decimal(extractedSum),
+          finalAmountUsd: new Decimal(finalUsd),
+        },
+        include: {
+          host: { select: { id: true, name: true, email: true } },
+          documents: {
+            orderBy: { sortOrder: 'asc' },
+            include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+          },
+        },
+      });
+    });
+
+    res.json({
+      reimbursement: serializePayout(updated),
+      receipts: updated.documents.filter((d) => d.kind === 'receipt').map(serializeDocument),
+      eligibleTotalUsd: Number(updated.finalAmountUsd.toString()),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- POST /:partyId/reimbursement/submit ----------
+
+/**
+ * ziti-58300: host "Submit for review" toggle. Enforces server-side that the
+ * record is ready (all of attendance + 3 photos + receipt + payment method)
+ * AND the host attested ("receipts submitted + itemized"). Sets
+ * `submittedForReviewAt = now()`. Status stays 'pending'.
+ */
+router.post('/:partyId/reimbursement/submit', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const { attested } = req.body || {};
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+    await assertPartyApproved(partyId);
+
+    const record = await findActiveRollingPayout(partyId, req.userId, 'event');
+    if (!record) {
+      throw new AppError('No active reimbursement to submit', 404, 'NO_ACTIVE_REIMBURSEMENT');
+    }
+
+    if (attested !== true) {
+      throw new AppError(
+        'Confirm your receipts are submitted and itemized before submitting.',
+        400,
+        'ATTESTATION_REQUIRED',
+      );
+    }
+
+    const readiness = await getReimbursementReadiness(partyId, req.userId);
+    if (!readiness.readyToSubmit) {
+      // Report the first missing requirement so the client can highlight it.
+      let missing = 'unknown';
+      if (!readiness.attendanceSet) missing = 'attendance';
+      else if (!readiness.hasGroupPhoto) missing = 'groupPhoto';
+      else if (!readiness.hasBoxStackPhoto) missing = 'boxStackPhoto';
+      else if (!readiness.hasPizzaPhoto) missing = 'pizzaPhoto';
+      else if (!readiness.hasReceipt) missing = 'receipt';
+      else if (!readiness.paymentMethodValid) missing = 'paymentMethod';
+      throw new AppError(
+        `Your reimbursement is not ready to submit (missing: ${missing}).`,
+        400,
+        'NOT_READY',
+      );
+    }
+
+    const updated = await prisma.payout.update({
+      where: { id: record.id },
+      data: { submittedForReviewAt: new Date() },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+
+    res.json({ reimbursement: serializePayout(updated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- POST /:partyId/reimbursement/unsubmit ----------
+
+/**
+ * ziti-58300: clear `submittedForReviewAt` so the host can reopen their rolling
+ * record to add more receipts. Only allowed while the record is non-terminal
+ * (an admin acting on it advances the status, which terminates the rolling
+ * window — at which point findActiveRollingPayout returns null and this 404s).
+ */
+router.post('/:partyId/reimbursement/unsubmit', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    if (!req.userId) {
+      throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
+    }
+
+    const record = await findActiveRollingPayout(partyId, req.userId, 'event');
+    if (!record) {
+      throw new AppError('No active reimbursement to reopen', 404, 'NO_ACTIVE_REIMBURSEMENT');
+    }
+
+    const updated = await prisma.payout.update({
+      where: { id: record.id },
+      data: { submittedForReviewAt: null },
+      include: {
+        host: { select: { id: true, name: true, email: true } },
+        documents: {
+          orderBy: { sortOrder: 'asc' },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+
+    res.json({ reimbursement: serializePayout(updated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- GET /:partyId/reimbursement/event ----------
+
+/**
+ * ziti-58300: event-level read model. All receipt documents for the party
+ * grouped by co-host (uploadedByUserId) with per-co-host totals, plus each
+ * co-host's rolling record status + submittedForReviewAt.
+ *
+ * NOTE (repo precedent — feedback_verify_raw_sql_by_executing): the $queryRaw
+ * below MUST be executed against prod to confirm it's valid before relying on
+ * it. tsc cannot type-check SQL semantics.
+ */
+router.get('/:partyId/reimbursement/event', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+
+    // Per-co-host receipt rollup. Group by uploader; sum only eligible
+    // (non-duplicate, non-ineligible, currency-resolved) receipt OCR amounts.
+    // u.name/u.email come from the uploader join (cached email fallback handled
+    // client-side); the active rolling record's status + submitted_for_review_at
+    // is pulled via a LATERAL subquery scoped to the same (party, host).
+    const rows = await prisma.$queryRaw<Array<{
+      uploaded_by_user_id: string | null;
+      uploaded_by_email: string | null;
+      uploaded_by_name: string | null;
+      receipt_count: bigint;
+      eligible_total_usd: number | null;
+      record_status: string | null;
+      submitted_for_review_at: Date | null;
+    }>>(Prisma.sql`
+      SELECT
+        pd.uploaded_by_user_id,
+        COALESCE(u.email, pd.uploaded_by_email) AS uploaded_by_email,
+        u.name                                   AS uploaded_by_name,
+        COUNT(*)                                 AS receipt_count,
+        COALESCE(SUM(
+          CASE
+            WHEN pd.is_duplicate IS NOT TRUE
+             AND pd.ineligible   IS NOT TRUE
+             AND pd.ocr_amount IS NOT NULL
+            THEN pd.ocr_amount
+            ELSE 0
+          END
+        ), 0)::float8                            AS eligible_total_usd,
+        active.status                            AS record_status,
+        active.submitted_for_review_at           AS submitted_for_review_at
+      FROM payout_documents pd
+      LEFT JOIN "User" u ON u.id = pd.uploaded_by_user_id
+      LEFT JOIN LATERAL (
+        SELECT p.status, p.submitted_for_review_at
+        FROM payouts p
+        WHERE p.party_id = ${partyId}::uuid
+          AND p.host_user_id = pd.uploaded_by_user_id
+          AND p.purpose = 'event'
+          AND p.status IN ('pending', 'approved', 'queued')
+        ORDER BY p.created_at DESC
+        LIMIT 1
+      ) active ON TRUE
+      WHERE pd.party_id = ${partyId}::uuid
+        AND pd.kind = 'receipt'
+      GROUP BY pd.uploaded_by_user_id, u.email, pd.uploaded_by_email, u.name,
+               active.status, active.submitted_for_review_at
+      ORDER BY eligible_total_usd DESC
+    `);
+
+    res.json({
+      cohosts: rows.map((r) => ({
+        uploadedByUserId: r.uploaded_by_user_id,
+        uploadedByName: r.uploaded_by_name,
+        uploadedByEmail: r.uploaded_by_email,
+        receiptCount: Number(r.receipt_count),
+        eligibleTotalUsd: r.eligible_total_usd != null ? Number(r.eligible_total_usd) : 0,
+        recordStatus: r.record_status,
+        submittedForReviewAt: r.submitted_for_review_at
+          ? r.submitted_for_review_at.toISOString()
+          : null,
+      })),
+    });
   } catch (error) {
     next(error);
   }

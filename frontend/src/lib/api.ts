@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, TaxForm, TaxFormType, TaxFormStatus } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -6140,6 +6140,135 @@ export async function cancelPayout(partyId: string, payoutId: string): Promise<b
     { method: 'DELETE', requireAuth: true }
   );
   return true;
+}
+
+// =============================================================================
+// ziti-58300: Event-level rolling reimbursements
+// =============================================================================
+//
+// A host has ONE rolling reimbursement record per (party, host) while
+// non-terminal. Receipts are appended to it (attributed to the uploading
+// co-host); the host then flips an explicit "Submit for review" toggle. These
+// functions back the Phase 3/4 host + admin UI. Reuses the existing `Payout`
+// and `PayoutDocument` types; `Payout` gained `submittedForReviewAt`.
+
+/** Readiness booleans returned alongside the caller's rolling reimbursement. */
+export interface ReimbursementReadiness {
+  /** party.expectedGuests > 0 (event-level, shared across co-hosts). */
+  attendanceSet: boolean;
+  hasGroupPhoto: boolean;
+  hasBoxStackPhoto: boolean;
+  hasPizzaPhoto: boolean;
+  /** This co-host has at least one receipt on the event. */
+  hasReceipt: boolean;
+  /** The caller's saved payment method is valid (mirrors PaymentDetailsCard). */
+  paymentMethodValid: boolean;
+  /** All of the above — the "Submit for review" toggle is enabled when true. */
+  readyToSubmit: boolean;
+}
+
+export interface MyReimbursementResponse extends ReimbursementReadiness {
+  /** The caller's active rolling record, or null if they have none yet. */
+  reimbursement: Payout | null;
+  /** This co-host's receipt documents on the event (kind='receipt'). */
+  receipts: PayoutDocument[];
+  /** Running eligible total in USD (clamped to the event cap). */
+  eligibleTotalUsd: number;
+  /** Host "Submit for review" timestamp (null until submitted). */
+  submittedForReviewAt: string | null;
+}
+
+/** Shape returned by the receipt add/remove mutations. */
+export interface ReimbursementMutationResponse {
+  reimbursement: Payout;
+  receipts: PayoutDocument[];
+  eligibleTotalUsd: number;
+  /** Advisory over-cap warning (non-blocking); only present on add. */
+  capWarning?: string | null;
+}
+
+/** Per-co-host row in the event-level reimbursement roll-up. */
+export interface EventReimbursementCohost {
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
+  receiptCount: number;
+  eligibleTotalUsd: number;
+  /** The co-host's active rolling record status (null if none active). */
+  recordStatus: PayoutStatus | null;
+  submittedForReviewAt: string | null;
+}
+
+export interface EventReimbursementResponse {
+  cohosts: EventReimbursementCohost[];
+}
+
+/** The caller's active rolling reimbursement + readiness for an event. */
+export async function fetchMyReimbursement(partyId: string): Promise<MyReimbursementResponse> {
+  return apiRequest<MyReimbursementResponse>(
+    `/api/parties/${partyId}/reimbursement/me`,
+    { requireAuth: true }
+  );
+}
+
+/**
+ * Append one or more receipt documents to the caller's active rolling record
+ * (find-or-create). Same per-receipt input shape as `createPayout`
+ * (`CreatePayoutPhotoInput`, incl. forwarded preview-OCR payload).
+ */
+export async function addReimbursementReceipts(
+  partyId: string,
+  docs: CreatePayoutPhotoInput[]
+): Promise<ReimbursementMutationResponse> {
+  return apiRequest<ReimbursementMutationResponse>(
+    `/api/parties/${partyId}/reimbursement/receipts`,
+    { method: 'POST', body: { receiptPhotos: docs }, requireAuth: true }
+  );
+}
+
+/** Remove a receipt from the caller's active rolling record + recompute. */
+export async function removeReimbursementReceipt(
+  partyId: string,
+  docId: string
+): Promise<ReimbursementMutationResponse> {
+  return apiRequest<ReimbursementMutationResponse>(
+    `/api/parties/${partyId}/reimbursement/receipts/${docId}`,
+    { method: 'DELETE', requireAuth: true }
+  );
+}
+
+/**
+ * Flip the host "Submit for review" toggle. Backend enforces `readyToSubmit`
+ * AND `attested === true` (NOT_READY / ATTESTATION_REQUIRED otherwise).
+ */
+export async function submitReimbursement(
+  partyId: string,
+  attested: boolean
+): Promise<{ reimbursement: Payout }> {
+  return apiRequest<{ reimbursement: Payout }>(
+    `/api/parties/${partyId}/reimbursement/submit`,
+    { method: 'POST', body: { attested }, requireAuth: true }
+  );
+}
+
+/** Reopen the rolling record (clears submittedForReviewAt) to add more receipts. */
+export async function unsubmitReimbursement(
+  partyId: string
+): Promise<{ reimbursement: Payout }> {
+  return apiRequest<{ reimbursement: Payout }>(
+    `/api/parties/${partyId}/reimbursement/unsubmit`,
+    { method: 'POST', requireAuth: true }
+  );
+}
+
+/** Event-level roll-up of all co-hosts' receipts grouped by uploader. */
+export async function fetchEventReimbursements(
+  partyId: string
+): Promise<EventReimbursementResponse> {
+  return apiRequest<EventReimbursementResponse>(
+    `/api/parties/${partyId}/reimbursement/event`,
+    { requireAuth: true }
+  );
 }
 
 // ============================================================

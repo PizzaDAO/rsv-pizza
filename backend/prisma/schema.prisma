@@ -1909,6 +1909,14 @@ model Payout {
   taxFormId String?  @map("tax_form_id") @db.Uuid
   taxForm   TaxForm? @relation(fields: [taxFormId], references: [id], onDelete: SetNull)
 
+  // ziti-58300: host "Submit for review" toggle on the rolling per-(party,host)
+  // reimbursement record. Tracked as a separate timestamp, NOT a status change
+  // (status stays 'pending' while rolling). Null = host has not yet signalled
+  // ready; a non-null value = host marked their reimbursement ready for review.
+  // Reversible while the record is non-terminal (host can unsubmit to add more
+  // receipts until an admin acts).
+  submittedForReviewAt DateTime? @map("submitted_for_review_at") @db.Timestamptz
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
