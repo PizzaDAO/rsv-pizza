@@ -862,6 +862,9 @@ function serializePayout(row: any): any {
       uploadedByUserId: d.uploadedByUserId ?? null,
       uploadedByName: d.uploadedBy?.name ?? null,
       uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
+      // panino-58508: per-doc upload timestamp so admin /payments can show
+      // "Uploaded {date} by {name}".
+      createdAt: d.createdAt ? d.createdAt.toISOString() : null,
     })),
     party: row.party
       ? {

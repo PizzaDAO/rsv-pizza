@@ -1741,6 +1741,8 @@ export interface PayoutDocument {
   uploadedByUserId?: string | null;
   uploadedByName?: string | null;
   uploadedByEmail?: string | null;
+  // panino-58508: per-doc upload timestamp (ISO). Null/omitted on older payloads.
+  createdAt?: string | null;
 }
 
 /**
