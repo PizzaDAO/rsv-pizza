@@ -27,7 +27,11 @@
  * admin endpoints can degrade gracefully.
  */
 import { prisma } from '../config/database.js';
-import { getGppRegionByCityKey } from '../helpers/underbossScope.js';
+import {
+  getGppRegionByCityKey,
+  cityKeyFromPartyName,
+  normalizeCityName,
+} from '../helpers/underbossScope.js';
 
 interface MoltobeneCity {
   cityName?: unknown;
@@ -58,12 +62,118 @@ export interface MoltobeneSyncResult {
   upserted?: number;
   /** Of `upserted`, how many were matched by chat_id (vs cityKey upsert). */
   matchedByChatId?: number;
+  /**
+   * provola-58507: of the rows written, how many had their target cityKey
+   * recovered via normalized-core name matching (bucket C) rather than the raw
+   * lower(trim(cityName)) key.
+   */
+  matchedByNormalized?: number;
   /** cityKey conflicts that were skipped (different existing chat_id). */
   collisions?: MoltobeneSyncCollision[];
   /** Records whose groupId was not a valid integer string. */
   invalidGroupId?: number;
   /** Records skipped for any reason (missing cityName, collision, invalid). */
   skipped?: number;
+}
+
+/**
+ * provola-58507: the canonical cityKey for a GPP party, mirroring the
+ * `sendToCityGroup` caller in admin-payout.routes.ts:
+ *   cityKeyFromPartyName(name) ?? name.toLowerCase().trim()
+ * The first form is for canonical "Global Pizza Party {City}" names; the raw
+ * fallback covers messy names ("portland, or", "quito global pizza party").
+ * This MUST match what the sender uses, or a filled chat_id is never read.
+ */
+function canonicalCityKey(name: string | null | undefined): string {
+  const derived = cityKeyFromPartyName(name);
+  if (derived) return derived;
+  return (name ?? '').toLowerCase().trim();
+}
+
+/**
+ * provola-58507: a missing approved GPP city — one whose canonical cityKey has
+ * NO row in city_telegram_groups, or a row with a NULL chatId.
+ */
+export interface MissingApprovedCity {
+  cityKey: string;
+  /** normalizeCityName(cityKey) — the comparable core used for matching. */
+  normalized: string;
+}
+
+/**
+ * provola-58507: build the set of approved GPP cities that still LACK a
+ * resolvable Telegram chat_id, plus a `normalizedCore -> cityKey` index for
+ * exact-equality matching against moltobene titles/cityNames.
+ *
+ * Approval gate pushed into Prisma (NO post-query JS filter on the party set):
+ *   eventType='gpp', cancelledAt IS NULL, underbossStatus='approved'.
+ *
+ * "Missing" = the canonical cityKey has no city_telegram_groups row OR that
+ * row's chatId is null. We read the groups table once and diff in memory
+ * (the groups table is small — one row per known city).
+ *
+ * When two distinct cityKeys normalize to the SAME core (e.g. a real
+ * collision), the core is marked AMBIGUOUS and excluded from the index — we
+ * never auto-fill an ambiguous core (would risk the wrong group). Such cores
+ * are returned in `ambiguousNormalized` for reporting.
+ */
+export async function buildMissingApprovedCityIndex(): Promise<{
+  missing: MissingApprovedCity[];
+  /** normalizedCore -> cityKey, ambiguous cores removed. */
+  byNormalized: Map<string, string>;
+  /** normalized cores that >1 missing cityKey share (excluded from byNormalized). */
+  ambiguousNormalized: string[];
+}> {
+  // Approved, non-cancelled GPP parties — gate in the DB, not in JS.
+  const parties = await prisma.party.findMany({
+    where: {
+      eventType: 'gpp',
+      cancelledAt: null,
+      underbossStatus: 'approved',
+    },
+    select: { name: true },
+  });
+
+  // Distinct canonical cityKeys of approved cities.
+  const approvedKeys = new Set<string>();
+  for (const p of parties) {
+    const key = canonicalCityKey(p.name);
+    if (key) approvedKeys.add(key);
+  }
+
+  // Which of those already have a resolvable chat_id?
+  const groups = await prisma.cityTelegramGroup.findMany({
+    select: { cityKey: true, chatId: true },
+  });
+  const resolved = new Set<string>();
+  for (const g of groups) {
+    if (g.chatId !== null) resolved.add(g.cityKey);
+  }
+
+  const missing: MissingApprovedCity[] = [];
+  // normalizedCore -> Set<cityKey> so we can detect ambiguity.
+  const coreToKeys = new Map<string, Set<string>>();
+  for (const cityKey of approvedKeys) {
+    if (resolved.has(cityKey)) continue;
+    const normalized = normalizeCityName(cityKey);
+    missing.push({ cityKey, normalized });
+    if (!normalized) continue; // empty core is never indexable.
+    const set = coreToKeys.get(normalized) ?? new Set<string>();
+    set.add(cityKey);
+    coreToKeys.set(normalized, set);
+  }
+
+  const byNormalized = new Map<string, string>();
+  const ambiguousNormalized: string[] = [];
+  for (const [core, keys] of coreToKeys) {
+    if (keys.size === 1) {
+      byNormalized.set(core, [...keys][0]);
+    } else {
+      ambiguousNormalized.push(core);
+    }
+  }
+
+  return { missing, byNormalized, ambiguousNormalized };
 }
 
 /** Validate that a value is a base-10 integer string Telegram chat_ids use. */
@@ -107,14 +217,49 @@ export async function syncCityGroupsFromMoltobene(): Promise<MoltobeneSyncResult
   let matchedByChatId = 0;
   let invalidGroupId = 0;
   let skipped = 0;
+  let matchedByNormalized = 0;
   const collisions: MoltobeneSyncCollision[] = [];
+
+  // provola-58507 (bucket C): fallback name-matching. Build the missing-
+  // approved-city index ONCE so a moltobene cityName whose raw lower(trim) key
+  // doesn't directly match an approved city can still be re-targeted to the
+  // approved cityKey via exact normalized-core equality. Conservative: only a
+  // UNIQUE missing approved city per normalized core is eligible.
+  const { byNormalized: missingByNormalized } =
+    await buildMissingApprovedCityIndex();
+  // Track normalized cores already consumed in THIS run so two different
+  // moltobene cities can't both claim the same missing approved city.
+  const consumedNormalized = new Set<string>();
 
   for (const c of cities) {
     const cityName = typeof c.cityName === 'string' ? c.cityName : '';
-    const cityKey = cityName.toLowerCase().trim();
+    let cityKey = cityName.toLowerCase().trim();
     if (!cityKey) {
       skipped++;
       continue;
+    }
+
+    // Bucket C fallback: if the raw key isn't itself a missing approved city,
+    // try to recover the approved cityKey by exact normalized-core equality.
+    // Only retarget when:
+    //   - the raw key is NOT already an approved missing city under its own
+    //     normalized core (i.e. the direct path would miss), AND
+    //   - the normalized core maps to exactly ONE missing approved cityKey, AND
+    //   - that core hasn't already been claimed this run.
+    // This NEVER clobbers — the downstream chat_id/cityKey collision guards
+    // still apply.
+    const normalizedIncoming = normalizeCityName(cityName);
+    if (normalizedIncoming) {
+      const target = missingByNormalized.get(normalizedIncoming);
+      if (
+        target &&
+        target !== cityKey &&
+        !consumedNormalized.has(normalizedIncoming)
+      ) {
+        cityKey = target;
+        consumedNormalized.add(normalizedIncoming);
+        matchedByNormalized++;
+      }
     }
 
     const chatIdBig = parseGroupId(c.groupId);
@@ -203,6 +348,7 @@ export async function syncCityGroupsFromMoltobene(): Promise<MoltobeneSyncResult
     fetched: cities.length,
     upserted,
     matchedByChatId,
+    matchedByNormalized,
     collisions,
     invalidGroupId,
     skipped,
@@ -263,12 +409,78 @@ export async function refreshCityGroupFromMoltobene(
   }
 
   const cities = Array.isArray(payload?.cities) ? payload.cities : [];
-  // Find the city whose normalized name matches the requested key.
-  const match = cities.find((c) => {
+  // Find the city whose normalized name matches the requested key. First try
+  // the exact raw key (preserves existing behavior), then fall back to exact
+  // normalized-core equality so a messy cityKey can still recover its group.
+  const wantNorm = normalizeCityName(key);
+  let match = cities.find((c) => {
     const name = typeof c.cityName === 'string' ? c.cityName : '';
     return name.toLowerCase().trim() === key;
   });
-  if (!match) return null;
+  if (!match && wantNorm) {
+    const normMatches = cities.filter((c) => {
+      const name = typeof c.cityName === 'string' ? c.cityName : '';
+      return normalizeCityName(name) === wantNorm;
+    });
+    // Conservative: only accept a UNIQUE normalized match.
+    if (normMatches.length === 1) match = normMatches[0];
+  }
+  if (!match) {
+    // provola-58507 (bucket D): /city/groups missed — try /captured-groups
+    // (every group the bot is in). Conservative unique normalized match.
+    const captures = await fetchCapturedGroups(baseUrl, apiKey);
+    if (captures && wantNorm) {
+      const capMatches = captures.filter(
+        (g) =>
+          normalizeCityName(typeof g.title === 'string' ? g.title : '') ===
+          wantNorm,
+      );
+      if (capMatches.length === 1) {
+        const cap = capMatches[0];
+        const capChatId = parseGroupId(cap.chatId);
+        if (capChatId !== null) {
+          const region = await getGppRegionByCityKey(key);
+          const writeData = {
+            chatId: capChatId,
+            chatUrl: null,
+            isSupergroup: `${cap.chatId}`.trim().startsWith('-100'),
+            title: typeof cap.title === 'string' ? cap.title : null,
+            source: 'moltobene-capture',
+            ...(region ? { region } : {}),
+            lastVerifiedAt: new Date(),
+          };
+          // Don't clobber a row that already holds this chatId under a
+          // different cityKey.
+          const byChatId = await prisma.cityTelegramGroup.findFirst({
+            where: { chatId: capChatId },
+            select: { id: true, cityKey: true },
+          });
+          try {
+            if (byChatId && byChatId.cityKey !== key) {
+              await prisma.cityTelegramGroup.update({
+                where: { id: byChatId.id },
+                data: writeData,
+              });
+            } else {
+              await prisma.cityTelegramGroup.upsert({
+                where: { cityKey: key },
+                create: { cityKey: key, ...writeData },
+                update: writeData,
+              });
+            }
+            return capChatId;
+          } catch (err: any) {
+            console.error(
+              `[provola-58507][moltobene-refresh] capture upsert failed for "${key}":`,
+              err?.message || err,
+            );
+            return null;
+          }
+        }
+      }
+    }
+    return null;
+  }
 
   const chatIdBig = parseGroupId(match.groupId);
   if (chatIdBig === null) return null;
@@ -307,4 +519,250 @@ export async function refreshCityGroupFromMoltobene(
   }
 
   return chatIdBig;
+}
+
+// ─── provola-58507: captured-groups backfill ───────────────────────────────
+//
+// moltobene's NEW `GET /captured-groups` returns EVERY group the bot is in —
+// `{ groups: [{ chatId, title, chatType, lastSeenAt }] }` — including groups
+// that aren't in moltobene's curated `city` table (so they never came back
+// from `/city/groups`, e.g. "goshen"). Same `x-api-key`/MOLTOBENE_API_KEY
+// auth. We match each captured group's TITLE (normalized) against the
+// normalized core of approved GPP cities that still lack a chat_id, and
+// fill-if-empty. Conservative: exact normalized-core equality only, unique on
+// both sides, never clobber an existing chat_id.
+
+interface MoltobeneCapturedGroup {
+  chatId?: unknown;
+  title?: unknown;
+  chatType?: unknown;
+  lastSeenAt?: unknown;
+}
+
+interface MoltobeneCapturedGroupsResponse {
+  groups?: MoltobeneCapturedGroup[];
+}
+
+/** Normalized captured group with a parsed chat_id (null entries dropped). */
+interface NormalizedCapture {
+  chatId: bigint;
+  rawChatId: string;
+  title: string;
+  normalized: string;
+}
+
+/**
+ * Fetch the raw captured-groups list from moltobene. Best-effort: returns null
+ * on any config gap / non-2xx / fetch error (callers degrade gracefully).
+ */
+async function fetchCapturedGroups(
+  baseUrl: string,
+  apiKey: string,
+): Promise<MoltobeneCapturedGroup[] | null> {
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}/captured-groups`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'x-api-key': apiKey },
+    });
+    if (!resp.ok) {
+      console.warn(
+        `[provola-58507][captured-groups] moltobene responded ${resp.status}`,
+      );
+      return null;
+    }
+    const payload = (await resp.json()) as MoltobeneCapturedGroupsResponse;
+    return Array.isArray(payload?.groups) ? payload.groups : [];
+  } catch (err: any) {
+    console.warn(
+      '[provola-58507][captured-groups] fetch failed:',
+      err?.message || err,
+    );
+    return null;
+  }
+}
+
+export interface CapturedAmbiguity {
+  /** The normalized core that was ambiguous. */
+  normalized: string;
+  /** Why it was skipped: a city or a title matched more than once. */
+  reason: 'multiple-titles-match-city' | 'title-matches-multiple-cities';
+  /** Sample cityKeys / titles involved (for the human-readable report). */
+  cityKeys?: string[];
+  titles?: string[];
+}
+
+export interface CapturedGroupsSyncResult {
+  ok: boolean;
+  reason?: string;
+  /** Captured groups received from moltobene. */
+  fetched?: number;
+  /** Approved GPP cities that lacked a chat_id at the start of the run. */
+  missingApproved?: number;
+  /** Cities filled (1:1 unambiguous normalized-core matches). */
+  matched?: number;
+  /** cityKeys that were filled this run. */
+  filledCityKeys?: string[];
+  /** Ambiguous matches that were NOT auto-applied (need a human). */
+  ambiguous?: CapturedAmbiguity[];
+  /** Captured groups whose title matched no missing approved city. */
+  unmatchedCaptureCount?: number;
+}
+
+/**
+ * provola-58507: fill missing approved-city chat_ids from moltobene's
+ * `GET /captured-groups`.
+ *
+ * Algorithm (all matching is exact normalized-core equality — NO fuzzy/substr):
+ *   1. Build the missing-approved-city index (normalizedCore -> cityKey),
+ *      already excluding cores shared by >1 missing city (ambiguous, skipped).
+ *   2. Fetch captured groups; normalize each title and group them by core.
+ *      A core mapped to by >1 DISTINCT captured chat_id is ambiguous → skip.
+ *   3. For each missing city whose core maps to EXACTLY ONE captured group:
+ *      fill-if-empty into city_telegram_groups (chatId, title, isSupergroup,
+ *      region via GPP slug, source='moltobene-capture', chatUrl=null). Guard:
+ *      if that chatId already lives under a DIFFERENT cityKey, skip (don't
+ *      create a duplicate); if a row already holds this cityKey WITH a
+ *      chatId, skip (fill-if-empty only).
+ *
+ * Returns counts + the ambiguous list + unmatched capture count for the admin
+ * report. Never throws — returns `{ ok:false, reason }` on config gaps.
+ */
+export async function syncFromCapturedGroups(): Promise<CapturedGroupsSyncResult> {
+  const baseUrl = process.env.MOLTOBENE_BASE_URL;
+  const apiKey = process.env.MOLTOBENE_API_KEY;
+  if (!baseUrl || !apiKey) {
+    return { ok: false, reason: 'moltobene sync not configured' };
+  }
+
+  const { missing, byNormalized, ambiguousNormalized } =
+    await buildMissingApprovedCityIndex();
+
+  const rawGroups = await fetchCapturedGroups(baseUrl, apiKey);
+  if (rawGroups === null) {
+    return { ok: false, reason: 'captured-groups fetch failed' };
+  }
+
+  // Normalize captures, dropping invalid chat_ids / empty titles.
+  const captures: NormalizedCapture[] = [];
+  for (const g of rawGroups) {
+    const chatId = parseGroupId(g.chatId);
+    if (chatId === null) continue;
+    const title = typeof g.title === 'string' ? g.title : '';
+    const normalized = normalizeCityName(title);
+    if (!normalized) continue;
+    captures.push({
+      chatId,
+      rawChatId: `${g.chatId}`.trim(),
+      title,
+      normalized,
+    });
+  }
+
+  // core -> distinct captured groups (dedupe by chatId).
+  const coreToCaptures = new Map<string, Map<string, NormalizedCapture>>();
+  for (const cap of captures) {
+    const byId = coreToCaptures.get(cap.normalized) ?? new Map<string, NormalizedCapture>();
+    if (!byId.has(cap.rawChatId)) byId.set(cap.rawChatId, cap);
+    coreToCaptures.set(cap.normalized, byId);
+  }
+
+  const ambiguous: CapturedAmbiguity[] = [];
+
+  // Report the city-side ambiguities surfaced by the index build (>1 missing
+  // city sharing a normalized core).
+  for (const core of ambiguousNormalized) {
+    ambiguous.push({
+      normalized: core,
+      reason: 'title-matches-multiple-cities',
+    });
+  }
+
+  const filledCityKeys: string[] = [];
+  let matched = 0;
+  const matchedCores = new Set<string>();
+
+  for (const [core, cityKey] of byNormalized) {
+    const capById = coreToCaptures.get(core);
+    if (!capById || capById.size === 0) continue; // no captured group for this city.
+
+    if (capById.size > 1) {
+      // The same normalized core is held by multiple distinct captured groups
+      // — we can't tell which one is the real city. Skip + report.
+      ambiguous.push({
+        normalized: core,
+        reason: 'multiple-titles-match-city',
+        cityKeys: [cityKey],
+        titles: [...capById.values()].map((c) => c.title),
+      });
+      continue;
+    }
+
+    const cap = [...capById.values()][0];
+
+    try {
+      // Don't duplicate a chatId already owned by a different cityKey.
+      const byChatId = await prisma.cityTelegramGroup.findFirst({
+        where: { chatId: cap.chatId },
+        select: { id: true, cityKey: true },
+      });
+      if (byChatId && byChatId.cityKey !== cityKey) {
+        console.warn(
+          `[provola-58507][captured-groups] chat_id ${cap.chatId} already on ` +
+            `cityKey "${byChatId.cityKey}" — skipping fill for "${cityKey}".`,
+        );
+        continue;
+      }
+
+      // Fill-if-empty: skip if a row already holds this cityKey WITH a chatId.
+      const existing = await prisma.cityTelegramGroup.findUnique({
+        where: { cityKey },
+        select: { chatId: true },
+      });
+      if (existing && existing.chatId !== null) {
+        continue;
+      }
+
+      const region = await getGppRegionByCityKey(cityKey);
+      const writeData = {
+        chatId: cap.chatId,
+        chatUrl: null,
+        title: cap.title || null,
+        isSupergroup: cap.rawChatId.startsWith('-100'),
+        source: 'moltobene-capture',
+        ...(region ? { region } : {}),
+        lastVerifiedAt: new Date(),
+      };
+
+      await prisma.cityTelegramGroup.upsert({
+        where: { cityKey },
+        create: { cityKey, ...writeData },
+        update: writeData,
+      });
+      matched++;
+      matchedCores.add(core);
+      filledCityKeys.push(cityKey);
+    } catch (err: any) {
+      console.error(
+        `[provola-58507][captured-groups] fill failed for "${cityKey}":`,
+        err?.message || err,
+      );
+    }
+  }
+
+  // Unmatched captures = captured cores that didn't fill any missing city.
+  let unmatchedCaptureCount = 0;
+  for (const core of coreToCaptures.keys()) {
+    if (!matchedCores.has(core)) unmatchedCaptureCount++;
+  }
+
+  return {
+    ok: true,
+    fetched: rawGroups.length,
+    missingApproved: missing.length,
+    matched,
+    filledCityKeys,
+    ambiguous,
+    unmatchedCaptureCount,
+  };
 }
