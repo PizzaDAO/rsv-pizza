@@ -45,6 +45,7 @@ import {
   formatUsd,
   computePartyTotals,
   CapInlineEditor,
+  SubmittedForReviewBadge,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { AdminAddAttachment } from './AdminAddAttachment';
@@ -1241,13 +1242,37 @@ function CityExpansion({
 
   // Hosts — derived from the underlying payouts. Multi-host parties merge
   // into a deduplicated list keyed on the host user-id.
+  // ziti-58300: also capture the most-recent `submittedForReviewAt` across the
+  // host's active (non-terminal) rolling records so the chip can show which
+  // co-hosts have signalled "ready for review" vs still rolling.
+  const TERMINAL_STATUSES = ['paid', 'completed', 'withdrawn', 'rejected'];
   const hosts = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string | null; email: string | null }>();
+    const seen = new Map<
+      string,
+      { id: string; name: string | null; email: string | null; submittedForReviewAt: string | null }
+    >();
     for (const p of row.payouts) {
       const h = p.host;
       if (!h?.id) continue;
-      if (seen.has(h.id)) continue;
-      seen.set(h.id, { id: h.id, name: h.name, email: h.email });
+      // Only an active (non-terminal) rolling record counts as host-ready.
+      const submitted =
+        !TERMINAL_STATUSES.includes(p.status) && p.submittedForReviewAt
+          ? p.submittedForReviewAt
+          : null;
+      const existing = seen.get(h.id);
+      if (existing) {
+        // Keep the latest submitted timestamp if more than one active record.
+        if (submitted && (!existing.submittedForReviewAt || submitted > existing.submittedForReviewAt)) {
+          existing.submittedForReviewAt = submitted;
+        }
+        continue;
+      }
+      seen.set(h.id, {
+        id: h.id,
+        name: h.name,
+        email: h.email,
+        submittedForReviewAt: submitted,
+      });
     }
     return Array.from(seen.values());
   }, [row.payouts]);
@@ -1924,6 +1949,11 @@ function CityExpansion({
                       <ClickableEmail email={h.email} />
                     </span>
                   )}
+                  {/* ziti-58300: amber pill on the co-host chip when they've
+                      flipped their rolling reimbursement's "Submit for review"
+                      toggle — distinguishes host-ready co-hosts from those
+                      still rolling. */}
+                  <SubmittedForReviewBadge submittedForReviewAt={h.submittedForReviewAt} compact />
                 </span>
               ))}
             </div>
@@ -2116,6 +2146,12 @@ function CityExpansion({
                       className="flex-1 flex items-center gap-3 text-left min-w-0"
                     >
                       <PayoutStatusPill status={p.status} />
+                      {/* ziti-58300: host-signaled "ready for review" pill on
+                          the per-payout ledger row inside the expansion. */}
+                      <SubmittedForReviewBadge
+                        submittedForReviewAt={p.submittedForReviewAt}
+                        compact
+                      />
                       <span className="text-theme-text-secondary text-xs min-w-[5.5rem] shrink-0">
                         {formatLedgerDate(p.createdAt)}
                       </span>

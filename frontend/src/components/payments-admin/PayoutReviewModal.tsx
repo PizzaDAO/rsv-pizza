@@ -19,6 +19,7 @@ import {
   formatOriginalCurrency,
   ReceiptLightbox,
   AuthenticityPanel,
+  SubmittedForReviewBadge,
 } from '../payments-shared';
 import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
@@ -1766,6 +1767,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 Payment {payout.id.slice(0, 8)}
               </h2>
               <PayoutStatusPill status={payout.status} size="md" />
+              {/* ziti-58300: amber "Submitted {date}" pill in the review header
+                  so the reviewer sees the co-host explicitly marked their
+                  rolling reimbursement ready for review. */}
+              <SubmittedForReviewBadge submittedForReviewAt={payout.submittedForReviewAt} />
               <PayoutMethodIcon method={payout.payoutMethod} showLabel />
             </div>
             <div className="text-xs text-theme-text-muted mt-0.5">
