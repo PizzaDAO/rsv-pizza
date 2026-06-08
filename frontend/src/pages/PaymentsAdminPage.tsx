@@ -124,6 +124,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // tigella-58512: surface approved `tbd` events with zero submissions —
   // OFF by default so the default request is byte-identical to before.
   showTbdUnsubmitted: false,
+  // pinsa-58293: surface approved cities with zero payouts (e.g. Houston) —
+  // OFF by default so the default request is byte-identical to before.
+  showUnsubmitted: false,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -1262,6 +1265,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // synthetic rows come from the by-party endpoint, which is the only
           // place a zero-payout party can surface.
           showTbdToggle={viewMode === 'by-city'}
+          // pinsa-58293: Show cities without submissions — by-city view only.
+          // These synthetic zero-payout rows come from the by-party endpoint.
+          showUnsubmittedToggle={viewMode === 'by-city'}
           // provatura-92107: Hide US cities — by-city view + admin dashboard
           // only (regional portals are already region-scoped).
           showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}

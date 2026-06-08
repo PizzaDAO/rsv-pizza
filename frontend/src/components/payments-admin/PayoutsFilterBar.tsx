@@ -62,6 +62,14 @@ interface PayoutsFilterBarProps {
    */
   showTbdToggle?: boolean;
   /**
+   * pinsa-58293: when true, render the "Show cities without submissions"
+   * checkbox. By-city view only (the synthetic zero-payout rows it reveals only
+   * exist on the by-party endpoint). OFF by default — turning it on asks the
+   * backend to inject every approved city that has zero payouts (e.g. Houston)
+   * so an admin can record an external payment for them. Defaults to false.
+   */
+  showUnsubmittedToggle?: boolean;
+  /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
    * hard-scoped by their `regionFilter` prop). Defaults to false.
@@ -184,6 +192,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideUsCities) n += 1;
   // tigella-58512: count Show TBD (no submission) when the admin turns it on.
   if (filters.showTbdUnsubmitted) n += 1;
+  // pinsa-58293: count Show cities without submissions when turned on.
+  if (filters.showUnsubmitted) n += 1;
   return n;
 }
 
@@ -210,6 +220,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showHideScamsToggle,
   showHideUsToggle,
   showTbdToggle,
+  showUnsubmittedToggle,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -557,6 +568,20 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.showTbdUnsubmitted}
                 onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
                 label="Show TBD (no submission)"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* pinsa-58293: Show approved cities that have submitted no payouts
+                at all (e.g. Houston). By-city view only; OFF by default. The
+                backend injects synthetic zero-payout rows on /by-party when
+                `includeUnsubmitted` is set, so an admin can record an external
+                payment for them. */}
+            {showUnsubmittedToggle && (
+              <Checkbox
+                checked={!!filters.showUnsubmitted}
+                onChange={() => update({ showUnsubmitted: !filters.showUnsubmitted })}
+                label="Show cities without submissions"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />
