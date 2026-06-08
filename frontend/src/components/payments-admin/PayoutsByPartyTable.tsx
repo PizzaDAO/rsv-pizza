@@ -99,6 +99,55 @@ function isPizzaPhoto(p: AdminPayoutEventPhoto): boolean {
 const PHOTO_PREVIEW_LIMIT = 4;
 
 /**
+ * nduja-58514: mirror the receipt "uploaded by {name|email} · {date}" surfacing
+ * for event/pizza photos on /payments. Receipts already show uploader + date in
+ * their thumbnail tooltip + lightbox; photos didn't. These two helpers produce
+ * the tooltip suffix (appended to the thumbnail title) and the lightbox caption
+ * line from a photo's uploader fields. Same date format as ReceiptsLibrary
+ * (toLocaleDateString { year, month: 'short', day }). Guards invalid/missing
+ * createdAt so we never render "Invalid Date" or "by undefined".
+ */
+function formatPhotoDate(createdAt: string | null | undefined): string | null {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+interface PhotoUploaderMeta {
+  uploaderName?: string | null;
+  uploaderEmail?: string | null;
+  createdAt?: string | null;
+}
+
+/**
+ * Tooltip suffix appended to a thumbnail `title`. Always includes the date when
+ * present; prepends " — uploaded by {name|email}" only when a name or email
+ * exists. Returns '' when there's no usable date (nothing to append).
+ */
+function photoUploaderTooltipSuffix(p: PhotoUploaderMeta): string {
+  const date = formatPhotoDate(p.createdAt);
+  if (!date) return '';
+  const who = (p.uploaderName || p.uploaderEmail || '').trim();
+  return who ? ` — uploaded by ${who} · ${date}` : ` · ${date}`;
+}
+
+/**
+ * Lightbox caption line: "Uploaded {date}" plus " by {name|email}" when known.
+ * Returns '' when there's no usable date (caption omitted).
+ */
+function photoUploaderCaption(p: PhotoUploaderMeta): string {
+  const date = formatPhotoDate(p.createdAt);
+  if (!date) return '';
+  const who = (p.uploaderName || p.uploaderEmail || '').trim();
+  return who ? `Uploaded ${date} by ${who}` : `Uploaded ${date}`;
+}
+
+/**
  * mostarda-92103: rework of the /payments by-city expanded row. Each city
  * (party) now renders as a single rolled-up panel — Receipt total + Approved
  * + Paid + Outstanding — instead of enumerating per-host claim splits. The
@@ -1306,6 +1355,8 @@ function CityExpansion({
         url: p.url,
         fileName: p.fileName,
         mimeType: p.mimeType,
+        // nduja-58514: surface uploader + timestamp in the lightbox footer.
+        caption: photoUploaderCaption(p),
       })),
     [eventPhotos],
   );
@@ -1315,6 +1366,8 @@ function CityExpansion({
         url: p.url,
         fileName: p.fileName,
         mimeType: p.mimeType,
+        // nduja-58514: surface uploader + timestamp in the lightbox footer.
+        caption: photoUploaderCaption(p),
       })),
     [pizzaPhotos],
   );
@@ -2621,7 +2674,7 @@ function PhotoPreviewSection({
               type="button"
               onClick={() => onThumbClick(idx)}
               className="relative w-16 h-16 rounded-md overflow-hidden border border-theme-stroke hover:border-theme-stroke-hover group"
-              title={p.caption || p.fileName}
+              title={`${p.caption || p.fileName}${photoUploaderTooltipSuffix(p)}`}
             >
               {/* melanzane-92103 / focaccia-92104: video photos render as
                   <video preload=metadata> so the browser pulls the first

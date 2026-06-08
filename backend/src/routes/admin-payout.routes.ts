@@ -1962,6 +1962,7 @@ router.get(
             starred: true,
             tags: true,
             uploaderName: true,
+            uploaderEmail: true,
             createdAt: true,
           },
         });
@@ -1982,6 +1983,7 @@ router.get(
             starred: p.starred,
             tags: p.tags,
             uploaderName: p.uploaderName,
+            uploaderEmail: p.uploaderEmail,
             createdAt: p.createdAt.toISOString(),
           });
           eventPhotosByParty.set(p.partyId, list);
@@ -3147,6 +3149,7 @@ router.get(
           starred: true,
           tags: true,
           uploaderName: true,
+          uploaderEmail: true,
           createdAt: true,
         },
       });
@@ -3161,6 +3164,7 @@ router.get(
         starred: p.starred,
         tags: p.tags,
         uploaderName: p.uploaderName,
+        uploaderEmail: p.uploaderEmail,
         createdAt: p.createdAt.toISOString(),
       }));
 

@@ -42,6 +42,31 @@ function formatUploadedAt(iso: string): string {
   });
 }
 
+// nduja-58514: photo uploader attribution helpers, mirroring receipts. Guards
+// missing / invalid createdAt so we never render "Invalid Date" or
+// "by undefined". Works off either a PayoutDocument (uploadedByName/Email) or
+// an AdminPayoutEventPhoto (uploaderName/Email) — pass the resolved values.
+function safePhotoDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
+function photoTooltipSuffix(who: string | null | undefined, iso: string | null | undefined): string {
+  const date = safePhotoDate(iso);
+  if (!date) return '';
+  const name = (who || '').trim();
+  return name ? ` — uploaded by ${name} · ${date}` : ` · ${date}`;
+}
+function photoCaption(who: string | null | undefined, iso: string | null | undefined): string {
+  const date = safePhotoDate(iso);
+  if (!date) return '';
+  const name = (who || '').trim();
+  return name ? `Uploaded ${date} by ${name}` : `Uploaded ${date}`;
+}
+
 /**
  * taleggio-58499: IconInput defaults to the global dark-theme input styling
  * (near-white text on translucent dark bg from index.css). Inside the
@@ -720,12 +745,17 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
+        // nduja-58514: uploader + timestamp caption in the lightbox footer.
+        caption: photoCaption(d.uploadedByName || d.uploadedByEmail, d.createdAt),
       })),
       ...eventDocs.map((d) => ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
+        caption: photoCaption(d.uploadedByName || d.uploadedByEmail, d.createdAt),
       })),
+      // Receipts intentionally render without a caption — they already surface
+      // uploader attribution elsewhere in the modal.
       ...receipts.map((d) => ({
         url: d.url,
         fileName: d.fileName,
@@ -735,11 +765,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         url: p.url,
         fileName: p.fileName,
         mimeType: p.mimeType,
+        caption: photoCaption(p.uploaderName || p.uploaderEmail, p.createdAt),
       })),
       ...eventPhotos.map((p) => ({
         url: p.url,
         fileName: p.fileName,
         mimeType: p.mimeType,
+        caption: photoCaption(p.uploaderName || p.uploaderEmail, p.createdAt),
       })),
     ],
     [pizzas, eventDocs, receipts, pizzaPhotos, eventPhotos],
@@ -1881,7 +1913,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         type="button"
                         onClick={() => setLightboxIndex(carouselIdx)}
                         className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                        title={p.caption || p.fileName}
+                        title={`${p.caption || p.fileName}${photoTooltipSuffix(p.uploaderName || p.uploaderEmail, p.createdAt)}`}
                       >
                         {/* melanzane-92103: video event-photos render as
                             <video preload=metadata> so the browser pulls the
@@ -1965,7 +1997,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         type="button"
                         onClick={() => setLightboxIndex(carouselIdx)}
                         className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                        title={p.caption || p.fileName}
+                        title={`${p.caption || p.fileName}${photoTooltipSuffix(p.uploaderName || p.uploaderEmail, p.createdAt)}`}
                       >
                         {isVideoFile(p) ? (
                           <>
@@ -3071,7 +3103,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       type="button"
                       onClick={() => setLightboxIndex(idx)}
                       className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                      title={doc.fileName}
+                      title={`${doc.fileName}${photoTooltipSuffix(doc.uploadedByName || doc.uploadedByEmail, doc.createdAt)}`}
                     >
                       {isVideoFile(doc) ? (
                         <>
@@ -3116,7 +3148,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       type="button"
                       onClick={() => setLightboxIndex(pizzas.length + idx)}
                       className="relative aspect-square rounded-lg overflow-hidden border border-theme-stroke group"
-                      title={doc.fileName}
+                      title={`${doc.fileName}${photoTooltipSuffix(doc.uploadedByName || doc.uploadedByEmail, doc.createdAt)}`}
                     >
                       {isVideoFile(doc) ? (
                         <>

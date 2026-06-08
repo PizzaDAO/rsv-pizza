@@ -32,6 +32,14 @@ export interface ReceiptLightboxImage {
   url: string;
   fileName: string;
   mimeType?: string;
+  /**
+   * nduja-58514: optional muted caption line shown in the footer under the
+   * file name (e.g. "Uploaded Jun 7, 2026 by Jane"). Receipts pass none;
+   * event/pizza photos pass an uploader+timestamp string so the /payments
+   * photo lightbox mirrors what receipts already surface. Additive — images
+   * without a caption render exactly as before.
+   */
+  caption?: string;
 }
 
 interface ReceiptLightboxProps {
@@ -529,6 +537,11 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
           </span>
         )}
         <span className="truncate">{current.fileName}</span>
+        {/* nduja-58514: muted uploader + timestamp caption for event/pizza
+            photos. Receipts pass no caption and render unchanged. */}
+        {current.caption && (
+          <span className="truncate text-white/60">· {current.caption}</span>
+        )}
       </div>
     </div>,
     document.body,
