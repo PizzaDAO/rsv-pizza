@@ -2207,6 +2207,130 @@ router.get(
         };
       });
 
+      // tigella-58512: optional `?showTbdUnsubmitted=1` injects synthetic
+      // by-party rows for approved events tagged `tbd` that have submitted
+      // NOTHING yet (zero payouts AND zero payout documents of any kind).
+      // Because these parties have zero payouts they produce zero grouped
+      // `rows` above, so they're invisible on /payments without this. OFF by
+      // default — when the param is absent the response is byte-identical to
+      // before. Scoped to the by-city view (this endpoint) only.
+      const showTbdUnsubmitted =
+        req.query.showTbdUnsubmitted === '1' || req.query.showTbdUnsubmitted === 'true';
+      if (showTbdUnsubmitted) {
+        // Reuse the SAME party-level scope this handler already computed in
+        // `buildPayoutWhere` (underbossStatus 'approved' + optional
+        // country/tag/region/closed clauses live on `where.party`; the search
+        // partyId set lives on `where.OR` / `where.partyId`). We do NOT apply
+        // any payout-level filters (status/method/purpose/currency/date) —
+        // these rows have no payouts. The tbd + zero-submission predicates are
+        // AND'd on top via an explicit AND array so a `tag` filter on
+        // `where.party.eventTags` is preserved rather than clobbered.
+        const partyScope: any = { ...(where.party ?? {}) };
+        const andParts: any[] = [
+          { eventTags: { hasSome: ['tbd', 'TBD'] } },
+          { payouts: { none: {} } },
+          { payoutDocuments: { none: {} } },
+        ];
+        // Respect the unified search scope (salame-83472 / diavola-83147):
+        // `where.OR` restricts to a partyId set; only the partyId arm applies
+        // at the party level (hostUserId is a payout column).
+        if (Array.isArray(where.OR)) {
+          const searchPartyIds = where.OR
+            .map((o: any) => o?.partyId?.in)
+            .find((v: any) => Array.isArray(v));
+          if (Array.isArray(searchPartyIds)) {
+            andParts.push({ id: { in: searchPartyIds } });
+          }
+        }
+        // Single-partyId filter (where.partyId is a payout column, but the
+        // same id is the party id we want to scope to).
+        if (typeof where.partyId === 'string' && where.partyId.length > 0) {
+          andParts.push({ id: where.partyId });
+        }
+        // Defensively exclude any party already present in `rows`.
+        const existingPartyIds = new Set(rows.map((r) => r.party.id));
+        if (existingPartyIds.size > 0) {
+          andParts.push({ id: { notIn: Array.from(existingPartyIds) } });
+        }
+        partyScope.AND = [...(Array.isArray(partyScope.AND) ? partyScope.AND : []), ...andParts];
+
+        const tbdParties = await prisma.party.findMany({
+          where: partyScope,
+          select: PAYOUT_PARTY_SELECT,
+        });
+
+        for (const partyMeta of tbdParties as any[]) {
+          const partyId = partyMeta.id;
+          // Synthetic by-party row in the EXACT shape the real rows use, with
+          // every count/usd aggregate = 0 and no payouts/photos. Keys mirror
+          // the serializer above field-for-field so the frontend renders these
+          // with NO special-casing. Cast to the row element type because the
+          // real rows infer `lastActivityAt: string` whereas these are null.
+          rows.push({
+            party: {
+              id: partyId,
+              name: partyMeta.name,
+              customUrl: partyMeta.customUrl ?? null,
+              inviteCode: partyMeta.inviteCode ?? null,
+              country: partyMeta.country ?? null,
+              region: (partyMeta.region as string | null) ?? null,
+              effectiveReimbursementCapUsd: computeEffectiveCapUsd({
+                reimbursementCapUsd: partyMeta.reimbursementCapUsd,
+                eventTags: partyMeta.eventTags,
+              }),
+              eventTags: Array.isArray(partyMeta.eventTags) ? partyMeta.eventTags : [],
+              primaryHostInCohosts: isPrimaryHostInCohosts(partyMeta),
+              userId: partyMeta.userId ?? null,
+              paymentsClosedAt: partyMeta.paymentsClosedAt
+                ? partyMeta.paymentsClosedAt.toISOString()
+                : null,
+              taxFormRequired: partyMeta.taxFormRequired === true,
+              adminNotes:
+                req.viewerRole === 'admin'
+                  ? (partyMeta.adminNotes ?? null)
+                  : null,
+              receiptsReminderSentAt: partyMeta.receiptsReminderSentAt
+                ? partyMeta.receiptsReminderSentAt.toISOString()
+                : null,
+              walletReminderSentAt: partyMeta.walletReminderSentAt
+                ? partyMeta.walletReminderSentAt.toISOString()
+                : null,
+              paymentsApprovedUsd: partyMeta.paymentsApprovedUsd
+                ? Number(partyMeta.paymentsApprovedUsd)
+                : null,
+              paymentsApprovedAt: partyMeta.paymentsApprovedAt
+                ? partyMeta.paymentsApprovedAt.toISOString()
+                : null,
+            },
+            aggregates: {
+              pendingCount: 0,
+              pendingUsd: 0,
+              approvedCount: 0,
+              approvedUsd: 0,
+              paidCount: 0,
+              paidUsd: 0,
+              paidNoProofCount: 0,
+              paidNoProofUsd: 0,
+              rejectedCount: 0,
+              rejectedUsd: 0,
+              failedCount: 0,
+              failedUsd: 0,
+              withdrawnCount: 0,
+              withdrawnUsd: 0,
+              completedCount: 0,
+              completedUsd: 0,
+              completedNoProofCount: 0,
+              completedNoProofUsd: 0,
+              totalReceiptCount: 0,
+              lastActivityAt: null,
+              flaggedReadyCount: 0,
+            },
+            payouts: [],
+            eventPhotos: [],
+          } as (typeof rows)[number]);
+        }
+      }
+
       // pinsa-92103: optional `?hideClosed=true` filters out rows the admin
       // has explicitly closed out (Ekiti, Tangier). Doing this server-side
       // (vs. in the table component) keeps row counts honest and is cheap —

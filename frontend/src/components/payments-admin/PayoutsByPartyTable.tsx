@@ -3512,9 +3512,16 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                     </td>
                     <td className="px-3 py-3 text-sm text-theme-text-secondary">
                       <div className="flex items-center justify-between gap-2">
-                        <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
-                          {relativeTime(new Date(row.aggregates.lastActivityAt))}
-                        </div>
+                        {/* tigella-58512: synthetic TBD rows have no payout
+                            activity (lastActivityAt=null) → show an em dash
+                            instead of a 1969 epoch date. */}
+                        {row.aggregates.lastActivityAt ? (
+                          <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
+                            {relativeTime(new Date(row.aggregates.lastActivityAt))}
+                          </div>
+                        ) : (
+                          <div className="text-theme-text-faint">—</div>
+                        )}
                         <CityActionsMenu
                           canMarkPaid={showMarkPartyPaid}
                           canAddExternal={canAddExternal}

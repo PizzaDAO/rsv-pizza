@@ -34,6 +34,8 @@ const DEFAULTS = {
   hideClosed: true,
   hideScams: true,
   hideUsCities: true,
+  // tigella-58512: default-FALSE — only emitted (as `tbd=1`) when turned ON.
+  showTbdUnsubmitted: false,
 };
 const DEFAULT_VIEW: ViewMode = 'by-city';
 
@@ -94,6 +96,9 @@ export function filtersToSearchParams(
   if (filters.hideScams === false) params.set('hideScams', '0');
   if (filters.hideUsCities === false) params.set('hideUsCities', '0');
 
+  // tigella-58512: default-FALSE toggle — only emit when turned ON.
+  if (filters.showTbdUnsubmitted === true) params.set('tbd', '1');
+
   if (viewMode !== DEFAULT_VIEW) params.set('view', viewMode);
 
   return params;
@@ -131,6 +136,7 @@ export function searchParamsToFilters(
     hideClosed: DEFAULTS.hideClosed,
     hideScams: DEFAULTS.hideScams,
     hideUsCities: DEFAULTS.hideUsCities,
+    showTbdUnsubmitted: DEFAULTS.showTbdUnsubmitted,
     sort: DEFAULTS.sort,
     ...(regions ? { regions } : {}),
   };
@@ -199,6 +205,10 @@ export function searchParamsToFilters(
   if (params.has('hideClosed')) filters.hideClosed = params.get('hideClosed') !== '0';
   if (params.has('hideScams')) filters.hideScams = params.get('hideScams') !== '0';
   if (params.has('hideUsCities')) filters.hideUsCities = params.get('hideUsCities') !== '0';
+
+  // tigella-58512: default-FALSE toggle — present `tbd=1` => true; absent =>
+  // leave the default (false). Any non-`1` value is treated as false.
+  if (params.has('tbd')) filters.showTbdUnsubmitted = params.get('tbd') === '1';
 
   const viewRaw = params.get('view');
   const viewMode: ViewMode | null =

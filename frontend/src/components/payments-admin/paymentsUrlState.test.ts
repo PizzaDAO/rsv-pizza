@@ -70,6 +70,21 @@ describe('filtersToSearchParams', () => {
     expect(off.get('hideClosed')).toBe('0');
     expect(off.get('hideScams')).toBe('0');
   });
+
+  // tigella-58512: default-FALSE toggle — emit `tbd=1` only when ON.
+  it('showTbdUnsubmitted: emits tbd=1 only when ON, nothing by default', () => {
+    // default (false / undefined) -> no key
+    expect(
+      filtersToSearchParams(DEFAULT_FILTERS, 'by-city').get('tbd'),
+    ).toBeNull();
+    expect(
+      filtersToSearchParams({ ...DEFAULT_FILTERS, showTbdUnsubmitted: false }, 'by-city').get('tbd'),
+    ).toBeNull();
+    // turned on -> tbd=1
+    expect(
+      filtersToSearchParams({ ...DEFAULT_FILTERS, showTbdUnsubmitted: true }, 'by-city').get('tbd'),
+    ).toBe('1');
+  });
 });
 
 describe('searchParamsToFilters', () => {
@@ -125,6 +140,21 @@ describe('searchParamsToFilters', () => {
     );
     expect(filters.hideClosed).toBe(false);
     expect(filters.hideScams).toBe(false);
+  });
+
+  // tigella-58512: default-FALSE toggle round-trip.
+  it('showTbdUnsubmitted: tbd=1 parses to true; absent stays false', () => {
+    const on = searchParamsToFilters(new URLSearchParams('tbd=1'), undefined);
+    expect(on.filters.showTbdUnsubmitted).toBe(true);
+    // absent -> default false
+    const off = searchParamsToFilters(new URLSearchParams(), undefined);
+    expect(off.filters.showTbdUnsubmitted).toBe(false);
+    // round-trip: ON serializes and parses back to ON
+    const params = filtersToSearchParams(
+      { ...DEFAULT_FILTERS, showTbdUnsubmitted: true },
+      'by-city',
+    );
+    expect(searchParamsToFilters(params, undefined).filters.showTbdUnsubmitted).toBe(true);
   });
 
   it('unknown enum values silently fall back to defaults', () => {

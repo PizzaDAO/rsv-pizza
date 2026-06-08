@@ -54,6 +54,14 @@ interface PayoutsFilterBarProps {
    */
   showHideUsToggle?: boolean;
   /**
+   * tigella-58512: when true, render the "Show TBD (no submission)" checkbox.
+   * By-city view only (the synthetic rows it reveals only exist on the
+   * by-party endpoint). OFF by default — turning it on asks the backend to
+   * inject approved `tbd`-tagged events that have submitted nothing yet.
+   * Defaults to false.
+   */
+  showTbdToggle?: boolean;
+  /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
    * hard-scoped by their `regionFilter` prop). Defaults to false.
@@ -174,6 +182,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideScams) n += 1;
   // provatura-92107: count Hide US cities alongside the other hide toggles.
   if (filters.hideUsCities) n += 1;
+  // tigella-58512: count Show TBD (no submission) when the admin turns it on.
+  if (filters.showTbdUnsubmitted) n += 1;
   return n;
 }
 
@@ -199,6 +209,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showHideClosedToggle,
   showHideScamsToggle,
   showHideUsToggle,
+  showTbdToggle,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -533,6 +544,19 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.hideUsCities}
                 onChange={() => update({ hideUsCities: !filters.hideUsCities })}
                 label="Hide US cities"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* tigella-58512: Show approved `tbd` events that have submitted
+                nothing yet (zero payouts + zero documents). By-city view only;
+                OFF by default. The backend injects synthetic rows on /by-party
+                when `showTbdUnsubmitted` is set. */}
+            {showTbdToggle && (
+              <Checkbox
+                checked={!!filters.showTbdUnsubmitted}
+                onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
+                label="Show TBD (no submission)"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />
