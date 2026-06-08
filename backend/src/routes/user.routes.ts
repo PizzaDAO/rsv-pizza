@@ -5,6 +5,7 @@ import { resolveWalletInput } from '../services/ens.service.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { getReimbursementRules } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
+import { payoutRowSnapshotFromUser } from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -165,6 +166,39 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
         payoutBankDetails: true,
       },
     });
+
+    // ricotta-58512: when the host edits their payout prefs, mirror the UPDATED
+    // profile onto their non-terminal rolling event payouts. The execute/send
+    // path reads the payout ROW (no host fallback), so without this a host who
+    // fixes their wallet AFTER the rolling row exists (incl. after an admin has
+    // approved it) stays un-payable. Only re-stamp rows it's safe to touch:
+    // 'pending' and 'approved'. We deliberately EXCLUDE 'queued' (an in-flight
+    // send must not have its target wallet swapped mid-flight) even though it's
+    // in NON_TERMINAL_PAYOUT_STATUSES, and never touch terminal rows
+    // (paid/withdrawn/rejected/failed/completed). The mercury_card guard avoids
+    // clobbering an admin-issued Mercury card with the host's self-serve prefs.
+    if (
+      preferredPayoutMethod !== undefined
+      || payoutWalletAddress !== undefined
+      || payoutBankDetails !== undefined
+    ) {
+      try {
+        const snap = payoutRowSnapshotFromUser(user);
+        await prisma.payout.updateMany({
+          where: {
+            hostUserId: req.userId,
+            purpose: 'event',
+            status: { in: ['pending', 'approved'] },
+            NOT: { payoutMethod: 'mercury_card' },
+          },
+          data: snap,
+        });
+      } catch (err) {
+        // Non-fatal — the profile save itself succeeded; the row sync is a
+        // best-effort convenience so a stale rolling row doesn't strand a host.
+        console.warn('[user] failed to sync payout prefs onto rolling rows:', err);
+      }
+    }
 
     res.json({ user });
   } catch (error) {
