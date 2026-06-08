@@ -109,6 +109,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [capWarning, setCapWarning] = useState<string | null>(null);
 
+  // grissini-58511: silent receipt-save failures. The automatic auto-save pass
+  // must NOT keep re-POSTing failed items on its own (render loop), so we track
+  // the ids of items whose save attempt failed and exclude them from the
+  // AUTOMATIC `ready` set. The explicit Retry button bumps `retryNonce`, which
+  // bypasses the failed-flag for one pass.
+  const [failedSaveIds, setFailedSaveIds] = useState<Set<string>>(new Set());
+  const [retryNonce, setRetryNonce] = useState(0);
+
   // porchetta-58296: receipts-itemized attestation (re-used key).
   const [attested, setAttested] = useState(false);
 
@@ -199,9 +207,23 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   // least one detected receipt), append it to the rolling record and remove it
   // from the live buffer. Rows still uploading/ocring stay in the buffer; error
   // rows stay so the host can see + remove them.
+  // grissini-58511: an item is "ready to persist" when OCR finished, it has a
+  // url + at least one detected receipt, AND its head receipt is not still in
+  // the OCR_FAILED dead-state (the host hasn't entered a manual amount yet —
+  // entering one clears `ocrError` to null). Without this guard the synthetic
+  // OCR_FAILED $0 receipt gets auto-persisted before the host can fix it.
+  const isReadyItem = useCallback((r: ReceiptItem): boolean => {
+    if (r.status !== 'done' || !r.url || (r.receipts?.length ?? 0) === 0) return false;
+    const head = r.receipts?.[0];
+    if (head && head.ocrError === 'OCR_FAILED') return false; // grissini-58511
+    return true;
+  }, []);
+
   useEffect(() => {
+    // Automatic pass: exclude items whose previous save attempt failed so we
+    // don't loop. The Retry button bumps `retryNonce` to bypass the flag.
     const ready = uploadItems.filter(
-      (r) => r.status === 'done' && !!r.url && (r.receipts?.length ?? 0) > 0
+      (r) => isReadyItem(r) && !failedSaveIds.has(r.id)
     );
     if (ready.length === 0 || addingReceipts) return;
 
@@ -209,13 +231,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     (async () => {
       setAddingReceipts(true);
       setReceiptError(null);
+      const attemptedIds = ready.map((r) => r.id);
       try {
         const docs = ready.flatMap(buildDocsFromItem);
         const res = await addReimbursementReceipts(partyId, docs);
         if (cancelled) return;
         setCapWarning(res.capWarning ?? null);
         // Remove the appended rows from the live buffer.
-        const appendedIds = new Set(ready.map((r) => r.id));
+        const appendedIds = new Set(attemptedIds);
         setUploadItems((prev) => prev.filter((r) => !appendedIds.has(r.id)));
         // Refresh the rolling record + event roll-up from the server.
         setData((prev) =>
@@ -233,7 +256,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         loadEvent();
       } catch (err: any) {
         if (cancelled) return;
+        // grissini-58511: keep the failed items in the buffer (don't drop them)
+        // and flag them so the automatic pass stops retrying. The Retry button
+        // clears these flags for one pass.
         setReceiptError(err?.message || 'Failed to add receipt');
+        setFailedSaveIds((prev) => {
+          const next = new Set(prev);
+          attemptedIds.forEach((id) => next.add(id));
+          return next;
+        });
       } finally {
         if (!cancelled) setAddingReceipts(false);
       }
@@ -242,7 +273,22 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadItems, addingReceipts, partyId, buildDocsFromItem]);
+  }, [uploadItems, addingReceipts, partyId, buildDocsFromItem, isReadyItem, failedSaveIds, retryNonce]);
+
+  // grissini-58511: explicit Retry — clear the failed flags so the auto-save
+  // effect re-attempts the now-unblocked items on its next run, and bump the
+  // nonce to guarantee the effect re-fires even if `failedSaveIds` was already
+  // empty (e.g. a transient render).
+  const retrySave = useCallback(() => {
+    setReceiptError(null);
+    setFailedSaveIds(new Set());
+    setRetryNonce((n) => n + 1);
+  }, []);
+
+  // grissini-58511: are there local uploads that haven't been persisted yet?
+  // (still uploading/ocring, in error, or done-but-pending/failed save). Used to
+  // swap the misleading "upload a receipt" attestation helper.
+  const hasUnsavedUploads = uploadItems.length > 0;
 
   const handleRemoveReceipt = async (docId: string) => {
     setRemovingDocId(docId);
@@ -536,8 +582,32 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             <Loader2 size={12} className="animate-spin" /> {t('payouts.savingReceipt')}
           </p>
         )}
+        {/* grissini-58511: loud + sticky + retryable auto-save failure. The
+            backend always writes a row on a successful POST, so a missing row
+            means this POST genuinely failed — surface it prominently and let
+            the host retry instead of silently leaving receipts unsubmitted. */}
         {receiptError && (
-          <p className="text-xs text-[#ff393a] mt-2">{receiptError}</p>
+          <div className="mt-3 card p-3 border-l-4 border-l-amber-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm font-medium text-theme-text">
+                {t('payouts.receiptsSaveFailedBanner')}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={retrySave}
+              disabled={addingReceipts}
+              className="btn-secondary inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap disabled:opacity-50"
+            >
+              {addingReceipts ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              {t('payouts.receiptsRetrySave')}
+            </button>
+          </div>
         )}
         {capWarning && (
           <div className="mt-3 card p-3 border-l-4 border-l-amber-500 bg-amber-50 text-sm text-amber-800">
@@ -625,7 +695,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           label={t('payouts.receiptAttestation')}
         />
         {!readiness?.hasReceipt && (
-          <p className="text-xs text-theme-text-muted mt-1">{t('payouts.receiptAttestationHelp')}</p>
+          <p className="text-xs text-theme-text-muted mt-1">
+            {/* grissini-58511: if the host has local uploads that haven't been
+                persisted (still saving, or a failed save), the server-truth
+                "upload a receipt" helper is misleading — point them at the
+                unresolved uploads above instead. */}
+            {hasUnsavedUploads
+              ? t('payouts.receiptAttestationUnsaved')
+              : t('payouts.receiptAttestationHelp')}
+          </p>
         )}
       </div>
 
