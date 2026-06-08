@@ -109,6 +109,25 @@ export function SurveyResponsesTab() {
     });
   }, [data, regionFilter, search]);
 
+  // Summary stats recomputed from the currently-visible (filtered) rows so the
+  // header tracks the active region/search filters instead of global totals.
+  const summaryStats = useMemo(() => {
+    const ratings: Record<string, { average: number | null; count: number }> = {};
+    for (const q of ratingQuestions) {
+      let sum = 0,
+        count = 0;
+      for (const r of filtered) {
+        const v = r.answers[q.id];
+        if (typeof v === 'number') {
+          sum += v;
+          count += 1;
+        }
+      }
+      ratings[q.id] = { count, average: count > 0 ? Math.round((sum / count) * 100) / 100 : null };
+    }
+    return { responseCount: filtered.length, ratings };
+  }, [filtered, ratingQuestions]);
+
   const handleExport = () => {
     const header: string[] = [
       'event_name',
@@ -176,7 +195,10 @@ export function SurveyResponsesTab() {
       <div className="border border-theme-stroke rounded-xl p-4 space-y-2">
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-theme-text">
-            {data.summary.responseCount} response{data.summary.responseCount === 1 ? '' : 's'}
+            {summaryStats.responseCount} response{summaryStats.responseCount === 1 ? '' : 's'}
+            {summaryStats.responseCount !== data.responses.length && (
+              <span className="text-theme-text-faint font-normal"> of {data.responses.length}</span>
+            )}
           </h3>
           {data.truncated && (
             <span className="text-xs text-theme-text-faint">Showing first 5000 responses.</span>
@@ -184,7 +206,7 @@ export function SurveyResponsesTab() {
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           {ratingQuestions.map((q) => {
-            const stat = data.summary.ratings[q.id];
+            const stat = summaryStats.ratings[q.id];
             if (!stat || stat.average === null) return null;
             return (
               <div key={q.id} className="text-xs text-theme-text-muted">
