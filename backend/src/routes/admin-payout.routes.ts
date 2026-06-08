@@ -43,6 +43,7 @@ import { isMercuryBlocked } from '../lib/mercuryBlockedCountries.js';
 import { notifyHostOfPaymentExecution } from '../services/payoutTelegramNotify.js';
 import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 import { notifyPaymentsTeam } from '../services/paymentsTeamNotify.js';
+import { payoutHasReceipt } from '../services/payout-receipts.js';
 import {
   requireAdminOrRegionalUnderboss,
   parseRegionsQuery,
@@ -3450,6 +3451,12 @@ router.post(
       // separate /execute call that carries its own ack).
       const allowOverPerAddressCap = !!(req.body && req.body.allowOverPerAddressCap);
 
+      // bottarga-58513: admin-class can acknowledge "pay without a receipt" via
+      // `allowMissingReceipts` (mirrors the over-cap override). The receipt gate
+      // is enforced both here (so a payout can't be approved undocumented) and
+      // inside executePayout (the money chokepoint).
+      const allowMissingReceipts = !!(req.body && req.body.allowMissingReceipts);
+
       // bocconcini-49102: re-run the per-submission + per-party cap checks at
       // approve time so rows created/edited BEFORE the cap rules landed (or
       // rows whose party's cap was tightened after creation) can't be pushed
@@ -3467,6 +3474,21 @@ router.post(
           Number(existing.finalAmountUsd),
           existing.id,
         );
+      }
+
+      // bottarga-58513: block approving a payout with no receipt unless the
+      // admin ticked the "pay without a receipt" ack. Runs before the status
+      // flip so an undocumented row never reaches `approved` (and from there to
+      // `paid`). The same gate runs again inside executePayout.
+      if (!allowMissingReceipts) {
+        const hasReceipt = await payoutHasReceipt(prisma, existing);
+        if (!hasReceipt) {
+          throw new AppError(
+            'This payout has no receipt uploaded. Upload a receipt or acknowledge to pay without one.',
+            400,
+            'MISSING_RECEIPT',
+          );
+        }
       }
 
       const { note, autoExecute } = req.body || {};
@@ -3544,6 +3566,9 @@ router.post(
               // inline USDC send can bypass the per-address hard cap when the
               // admin acked the by-city Send modal's per-address warning.
               allowOverPerAddressCap,
+              // bottarga-58513: forward the no-receipt ack so approve+autoExecute
+              // with the checkbox ticked doesn't re-block at the execute gate.
+              allowMissingReceipts,
             });
             autoExecuted = true;
           } catch (err: any) {
@@ -4486,8 +4511,22 @@ async function executePayout(params: {
    * checkbox has been ticked. Audited via the mark_paid note suffix.
    */
   allowOverPartyCap?: boolean;
+  /**
+   * bottarga-58513: when true, skip the receipt gate so an admin can pay a
+   * payout that has no receipt uploaded. The admin UI sets this only when the
+   * "Pay without a receipt" acknowledgement checkbox has been ticked. Audited
+   * via the mark_paid note suffix (mirrors the `allowOverPartyCap` pattern).
+   */
+  allowMissingReceipts?: boolean;
 }) {
-  const { payoutId, actor, body, allowOverPerAddressCap, allowOverPartyCap } = params;
+  const {
+    payoutId,
+    actor,
+    body,
+    allowOverPerAddressCap,
+    allowOverPartyCap,
+    allowMissingReceipts,
+  } = params;
 
   const existing = await prisma.payout.findUnique({
     where: { id: payoutId },
@@ -4546,6 +4585,26 @@ async function executePayout(params: {
       'MISSING_PAYOUT_METHOD',
     );
   }
+
+  // bottarga-58513: hard money stop — a payout must have a receipt before it
+  // can be paid. A receipt is either linked to the payout directly or to the
+  // same party by the same host (legacy/admin-added receipts stamp party_id,
+  // not payout_id). Admin-class can override via the acknowledgement checkbox
+  // (`allowMissingReceipts`), audited via the mark_paid note suffix below.
+  const hasReceipt = await payoutHasReceipt(prisma, existing);
+  const noReceiptOverride = !hasReceipt && !!allowMissingReceipts;
+  if (!hasReceipt && !allowMissingReceipts) {
+    throw new AppError(
+      'This payout has no receipt uploaded. Upload a receipt or acknowledge to pay without one.',
+      400,
+      'MISSING_RECEIPT',
+    );
+  }
+  // Audit suffix appended to every payout-method's mark_paid note when the
+  // receipt gate was overridden (mirrors salame-92103's `[override: party cap]`).
+  const noReceiptNote = noReceiptOverride
+    ? ` [paid without receipt — ack by ${actor.email}]`
+    : '';
 
   if (existing.payoutMethod === 'usdc_base') {
     if (!existing.payoutWalletAddress) {
@@ -4616,7 +4675,8 @@ async function executePayout(params: {
               (result.resolvedFromEns
                 ? ` [resolved ENS ${result.resolvedFromEns.input} -> ${result.resolvedFromEns.address}]`
                 : '') +
-              (allowOverPartyCap ? ' [override: party cap]' : ''),
+              (allowOverPartyCap ? ' [override: party cap]' : '') +
+              noReceiptNote,
           },
         });
         return row;
@@ -4790,7 +4850,8 @@ async function executePayout(params: {
           // salame-92103: append override marker when per-party cap was bypassed.
           note: `Wire executed out-of-band, reference: ${wireRef}` +
             (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : '') +
-            (allowOverPartyCap ? ' [override: party cap]' : ''),
+            (allowOverPartyCap ? ' [override: party cap]' : '') +
+            noReceiptNote,
         },
       });
       return row;
@@ -4845,7 +4906,8 @@ async function executePayout(params: {
           note: `Mercury card issued via dashboard, last4=${last4Raw}` +
             (cardId ? `, id=${cardId}` : '') +
             (typeof body?.note === 'string' && body.note ? ` — ${body.note}` : '') +
-            (allowOverPartyCap ? ' [override: party cap]' : ''),
+            (allowOverPartyCap ? ' [override: party cap]' : '') +
+            noReceiptNote,
         },
       });
       return row;
@@ -4993,6 +5055,8 @@ router.post(
           payoutWalletAddress: true,
           finalAmountUsd: true,
           hostUserId: true,
+          // bottarga-58513: needed for the per-row receipt gate below.
+          partyId: true,
         },
       });
 
@@ -5066,7 +5130,18 @@ router.post(
 
       // SEQUENTIAL execution — nonce safety. Do NOT switch to Promise.all.
       const results: BulkSendResult[] = [];
+      // bottarga-58513: bulk has NO per-row override. Skip any row with no
+      // receipt and report the ids back so the admin can send them
+      // individually (where the no-receipt ack is available). Don't silently
+      // drop them.
+      const skippedNoReceipt: string[] = [];
       for (const row of eligible) {
+        // bottarga-58513: receipt gate, no override in bulk.
+        const hasReceipt = await payoutHasReceipt(prisma, row);
+        if (!hasReceipt) {
+          skippedNoReceipt.push(row.id);
+          continue;
+        }
         const priorStatus = row.status; // 'approved' or 'failed' (passata-49102)
         try {
           const updated = await executePayout({
@@ -5127,7 +5202,9 @@ router.post(
         }
       }
 
-      res.json({ results });
+      // bottarga-58513: include the skipped (no-receipt) ids so the UI can tell
+      // the admin which rows were not sent and need a receipt / individual send.
+      res.json({ results, skippedNoReceipt });
     } catch (error) {
       next(error);
     }
