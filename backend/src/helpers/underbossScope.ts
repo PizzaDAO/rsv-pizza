@@ -123,6 +123,107 @@ export function normalizeCityName(input: string | null | undefined): string {
 }
 
 /**
+ * provola-58509: curated city EXONYM alias map for the moltobene matcher.
+ *
+ * The bot's captured-group titles use LOCAL city names ("Göteborg",
+ * "München"), but approved GPP cities are stored with ENGLISH names
+ * ("Gothenburg", "Munich"). After `normalizeCityName` lowercases and strips
+ * accents, the two forms still differ (`goteborg` ≠ `gothenburg`), so the
+ * exact-equality matcher misses. This map collapses each well-established 1:1
+ * exonym↔English pair to ONE canonical normalized form.
+ *
+ * CONTRACT (must be upheld so `canonicalCityName` stays correct):
+ *   - Both KEYS and VALUES are in the SAME normalized form `normalizeCityName`
+ *     produces: lowercased + de-accented + de-noised. (e.g. "goteborg", never
+ *     "Göteborg".) Verify any new entry by running it through
+ *     `normalizeCityName` first.
+ *   - Every entry maps the NON-canonical form → the canonical form. The
+ *     canonical form itself is NOT a key (it already canonicalizes to itself
+ *     via the `?? normalizeCityName(input)` fallback in `canonicalCityName`),
+ *     EXCEPT when we deliberately collapse a pair where BOTH names are still in
+ *     active use (e.g. bengaluru↔bangalore) — then we add BOTH directions
+ *     pointing at the chosen canonical so the comparison is symmetric no matter
+ *     which side the data uses.
+ *
+ * CONSERVATIVE by design: ONLY true same-city aliases of long standing. Never
+ * add near-homonyms of DIFFERENT cities — a wrong entry would silently route a
+ * Telegram group to the wrong city. When in doubt, leave it out.
+ *
+ * Notes on the curated set below:
+ *   - German: München→Munich, Köln→Cologne, Nürnberg→Nuremberg.
+ *   - Iberian: Lisboa→Lisbon, Sevilla→Seville. (Porto, Madrid, Barcelona
+ *     unchanged — same in both languages.)
+ *   - Italian: Napoli→Naples, Roma→Rome, Milano→Milan, Torino→Turin,
+ *     Venezia→Venice, Firenze→Florence, Genova→Genoa.
+ *   - Central/Eastern Europe: Praha→Prague, Warszawa→Warsaw, Wien→Vienna.
+ *     (Kraków normalizes to "krakow" and is the same in English — no entry.)
+ *   - Low Countries: Bruxelles→Brussels, Antwerpen→Antwerp, Gent→Ghent,
+ *     Den Haag→The Hague.
+ *   - Swiss/Nordic: Genève→Geneva, Göteborg→Gothenburg. (Zürich normalizes to
+ *     "zurich" and is the same in English — no entry.)
+ *   - Russian (Latin transliteration): Moskva→Moscow,
+ *     Sankt Peterburg→Saint Petersburg.
+ *   - Indian renamings (BOTH directions → single canonical, since the GPP data
+ *     may use either): Bengaluru/Bangalore → "bangalore"; Mumbai/Bombay →
+ *     "mumbai"; Kolkata/Calcutta → "kolkata"; Chennai/Madras → "chennai".
+ *     Canonical chosen as the form most likely present in current GPP city
+ *     data (modern official name, except Bangalore where the English-common
+ *     form is retained).
+ */
+export const CITY_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  // German
+  munchen: 'munich',
+  koln: 'cologne',
+  nurnberg: 'nuremberg',
+  // Iberian
+  lisboa: 'lisbon',
+  sevilla: 'seville',
+  // Italian
+  napoli: 'naples',
+  roma: 'rome',
+  milano: 'milan',
+  torino: 'turin',
+  venezia: 'venice',
+  firenze: 'florence',
+  genova: 'genoa',
+  // Central/Eastern Europe
+  praha: 'prague',
+  warszawa: 'warsaw',
+  wien: 'vienna',
+  // Low Countries
+  bruxelles: 'brussels',
+  antwerpen: 'antwerp',
+  gent: 'ghent',
+  'den haag': 'the hague',
+  // Swiss / Nordic
+  geneve: 'geneva',
+  goteborg: 'gothenburg',
+  // Russian (Latin transliteration)
+  moskva: 'moscow',
+  'sankt peterburg': 'saint petersburg',
+  // Indian renamings — BOTH directions collapse to one canonical.
+  bengaluru: 'bangalore',
+  bombay: 'mumbai',
+  calcutta: 'kolkata',
+  madras: 'chennai',
+});
+
+/**
+ * provola-58509: normalize an input, then map it through `CITY_ALIASES` to its
+ * canonical city form. This is the function the moltobene matcher should use on
+ * BOTH sides of an equality comparison (the approved-city index keys AND the
+ * captured-title/cityName lookups) so local↔English exonyms resolve to one
+ * canonical string.
+ *
+ * Returns '' for empty/unrecognizable input (same as `normalizeCityName`) —
+ * callers MUST treat '' as a non-match.
+ */
+export function canonicalCityName(input: string | null | undefined): string {
+  const normalized = normalizeCityName(input);
+  return CITY_ALIASES[normalized] ?? normalized;
+}
+
+/**
  * tonda-58293 FIX #1: build a map of GPP cityKey → region (GPP slug).
  *
  * `city_telegram_groups.region`, `parties.region`, and `underbosses.regions`
