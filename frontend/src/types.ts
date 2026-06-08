@@ -2114,6 +2114,7 @@ export interface AdminPayoutEventPhoto {
    */
   tags?: string[];
   uploaderName: string | null;
+  uploaderEmail: string | null;
   createdAt: string;
 }
 
