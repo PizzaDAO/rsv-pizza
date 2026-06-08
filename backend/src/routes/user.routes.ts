@@ -5,7 +5,7 @@ import { resolveWalletInput } from '../services/ens.service.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { getReimbursementRules } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
-import { payoutRowSnapshotFromUser } from '../services/payout-snapshot.js';
+import { payoutRowSnapshotFromUser, NON_TERMINAL_PAYOUT_STATUSES } from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -171,12 +171,17 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
     // profile onto their non-terminal rolling event payouts. The execute/send
     // path reads the payout ROW (no host fallback), so without this a host who
     // fixes their wallet AFTER the rolling row exists (incl. after an admin has
-    // approved it) stays un-payable. Only re-stamp rows it's safe to touch:
-    // 'pending' and 'approved'. We deliberately EXCLUDE 'queued' (an in-flight
-    // send must not have its target wallet swapped mid-flight) even though it's
-    // in NON_TERMINAL_PAYOUT_STATUSES, and never touch terminal rows
-    // (paid/withdrawn/rejected/failed/completed). The mercury_card guard avoids
-    // clobbering an admin-issued Mercury card with the host's self-serve prefs.
+    // approved it) stays un-payable.
+    // tortano-58516: re-stamp across ALL non-terminal statuses
+    // (NON_TERMINAL_PAYOUT_STATUSES = pending/approved/queued), now INCLUDING
+    // 'queued'. This matches the receipt-upload snapshot path in
+    // payout.routes.ts (which already uses NON_TERMINAL_PAYOUT_STATUSES), so an
+    // admin who marks a payout 'queued' before the host has finalized their
+    // wallet/method no longer strands it un-payable when the host later fixes
+    // their profile. Terminal rows (paid/completed/withdrawn/rejected/failed)
+    // stay excluded because NON_TERMINAL_PAYOUT_STATUSES lists only the three
+    // non-terminal statuses. The mercury_card guard avoids clobbering an
+    // admin-issued Mercury card with the host's self-serve prefs.
     if (
       preferredPayoutMethod !== undefined
       || payoutWalletAddress !== undefined
@@ -188,7 +193,7 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
           where: {
             hostUserId: req.userId,
             purpose: 'event',
-            status: { in: ['pending', 'approved'] },
+            status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
             NOT: { payoutMethod: 'mercury_card' },
           },
           data: snap,
