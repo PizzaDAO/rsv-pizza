@@ -1650,6 +1650,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                   // backend skips its bocconcini-49102 recheck + records the
                   // override marker on the audit row.
                   ...(opts?.allowOverPartyCap ? { allowOverPartyCap: true } : {}),
+                  // bottarga-58513: forward the no-receipt override ack so the
+                  // backend skips the receipt gate + audits the override.
+                  ...(opts?.allowMissingReceipts ? { allowMissingReceipts: true } : {}),
                 });
                 const fresh = await getAdminPayout(detail.id, regions ? { regions } : undefined);
                 setDetail(fresh);

@@ -81,7 +81,7 @@ interface PayoutReviewModalProps {
    */
   onApprove: (
     note?: string,
-    opts?: { allowOverPartyCap?: boolean },
+    opts?: { allowOverPartyCap?: boolean; allowMissingReceipts?: boolean },
   ) => Promise<void> | void;
   /**
    * gouda-92103: optional second arg lets the admin opt into a silent
@@ -178,6 +178,12 @@ interface PayoutReviewModalProps {
      * `[override: party cap]` to the audit row's note.
      */
     allowOverPartyCap?: boolean;
+    /**
+     * bottarga-58513: forwarded when the admin has ticked the "pay without a
+     * receipt" override checkbox. Server bypasses the receipt gate and appends
+     * `[paid without receipt — ack by <email>]` to the audit row's note.
+     */
+    allowMissingReceipts?: boolean;
   }) => Promise<void> | void;
   /**
    * Optional fetcher for the USDC daily-cap-remaining hint. Only called when
@@ -456,6 +462,14 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // never share a render path, but the ack lifecycles are independent.
   const [approveOverridePartyCap, setApproveOverridePartyCap] = useState(false);
 
+  // bottarga-58513: no-receipt ack. Distinct acks for the Execute (Send) path
+  // and the Approve path — same rationale as the per-party cap acks above
+  // (the two transitions never share a render path but have independent
+  // lifecycles). Surfaces an amber warning + ack when this payout has no
+  // receipt; the Send / Approve buttons stay disabled until ticked.
+  const [overrideNoReceipt, setOverrideNoReceipt] = useState(false);
+  const [approveOverrideNoReceipt, setApproveOverrideNoReceipt] = useState(false);
+
   // parmigiana-92104: SWC Hub ack. Reimbursement for SWC Hub parties is
   // processed through SWC, not rsv.pizza — admin reimbursement actions
   // (Approve, Execute, Mark paid manual) stay disabled until the admin ticks
@@ -644,6 +658,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           };
         }),
     [payout.documents, receiptOverrides],
+  );
+  // bottarga-58513: a payout is "documented" if it has any receipt-kind
+  // document. Drives the no-receipt amber warning + ack on Approve/Send.
+  const hasReceipt = useMemo(
+    () => payout.documents.some((d) => d.kind === 'receipt'),
+    [payout.documents],
   );
   const pizzas = useMemo(
     () => payout.documents.filter((d) => d.kind === 'pizza'),
@@ -3345,6 +3365,37 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   </div>
                 )}
 
+                {/* bottarga-58513: no-receipt warning for the Execute (Send)
+                    path. Surfaces when the payout has no receipt document; the
+                    admin must explicitly take responsibility before the Send
+                    button enables. Mirrors the per-party cap amber-panel + ack
+                    pattern above (solid dark amber shades read on the light
+                    emerald execute panel in both themes). */}
+                {!hasReceipt && (
+                  <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
+                      <div className="flex-1 text-sm">
+                        <div className="font-medium text-amber-900 mb-1">
+                          No receipt uploaded for this payout
+                        </div>
+                        <div className="text-amber-800 text-xs">
+                          This payout has no receipt. Paying without documentation
+                          should be rare — prefer asking the host to upload one.
+                        </div>
+                        <div className="mt-3">
+                          <Checkbox
+                            checked={overrideNoReceipt}
+                            onChange={() => setOverrideNoReceipt((v) => !v)}
+                            label="Pay without a receipt — I take responsibility"
+                            labelClassName="text-sm text-amber-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {payout.payoutMethod === 'usdc_base' && (
                   <div className="space-y-2">
                     <p className="text-emerald-900">
@@ -3504,6 +3555,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                       if (partyWouldExceedCap && !overridePartyCap) {
                         return;
                       }
+                      // bottarga-58513: block submit if there's no receipt and
+                      // the admin hasn't ticked the "pay without a receipt" ack.
+                      if (!hasReceipt && !overrideNoReceipt) {
+                        return;
+                      }
                       await onExecute({
                         wireReference: payout.payoutMethod === 'wire' ? execWireRef.trim() : undefined,
                         mercuryCardLast4:
@@ -3523,6 +3579,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         // the server bypasses its own per-party cap check + adds
                         // `[override: party cap]` to the audit row's note.
                         allowOverPartyCap: partyWouldExceedCap ? overridePartyCap : undefined,
+                        // bottarga-58513: forward the no-receipt ack so the
+                        // server bypasses the receipt gate + audits the override.
+                        allowMissingReceipts: !hasReceipt ? overrideNoReceipt : undefined,
                       });
                       setShowExecuteForm(false);
                     }}
@@ -3538,6 +3597,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         !overrideCap) ||
                       // salame-92103: disabled until ack when the per-party cap would exceed.
                       (partyWouldExceedCap && !overridePartyCap) ||
+                      // bottarga-58513: disabled until ack when there's no receipt.
+                      (!hasReceipt && !overrideNoReceipt) ||
                       // parmigiana-92104: disabled until ack when the party is an SWC Hub
                       // party (reimbursement should be processed via SWC, not rsv.pizza).
                       swcBlocked
@@ -3681,6 +3742,34 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               </div>
             </div>
           )}
+          {/* bottarga-58513: no-receipt warning for the Approve transition.
+              The backend now blocks approving an undocumented payout unless the
+              admin acks. Mirrors the per-party cap amber-panel + ack pattern
+              above. */}
+          {isPending && !hasReceipt && (
+            <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0" size={16} />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                    No receipt uploaded for this payout
+                  </div>
+                  <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                    This payout has no receipt. Approving without documentation
+                    should be rare — prefer asking the host to upload one.
+                  </div>
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={approveOverrideNoReceipt}
+                      onChange={() => setApproveOverrideNoReceipt((v) => !v)}
+                      label="Pay without a receipt — I take responsibility"
+                      labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
           {isPending && (
             <>
@@ -3690,12 +3779,25 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   // nduja-92106: block submit if the per-party cap would
                   // exceed and the admin hasn't ticked the override.
                   if (partyWouldExceedCap && !approveOverridePartyCap) return;
-                  // nduja-92106: forward the admin's acknowledgement so the
-                  // server skips its bocconcini-49102 recheck + records
-                  // `[override: party cap]` on the audit row.
+                  // bottarga-58513: block submit if there's no receipt and the
+                  // admin hasn't ticked the no-receipt ack.
+                  if (!hasReceipt && !approveOverrideNoReceipt) return;
+                  // nduja-92106 / bottarga-58513: forward the admin's
+                  // acknowledgements so the server skips its rechecks + records
+                  // the override markers on the audit row. Both flags can be
+                  // sent together when both warnings apply.
                   onApprove(
                     undefined,
-                    partyWouldExceedCap ? { allowOverPartyCap: approveOverridePartyCap } : undefined,
+                    partyWouldExceedCap || !hasReceipt
+                      ? {
+                          ...(partyWouldExceedCap
+                            ? { allowOverPartyCap: approveOverridePartyCap }
+                            : {}),
+                          ...(!hasReceipt
+                            ? { allowMissingReceipts: approveOverrideNoReceipt }
+                            : {}),
+                        }
+                      : undefined,
                   );
                 }}
                 disabled={
@@ -3703,7 +3805,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                   selfPayoutBlocked ||
                   swcBlocked ||
                   // nduja-92106: disabled until ack when the per-party cap would exceed.
-                  (partyWouldExceedCap && !approveOverridePartyCap)
+                  (partyWouldExceedCap && !approveOverridePartyCap) ||
+                  // bottarga-58513: disabled until ack when there's no receipt.
+                  (!hasReceipt && !approveOverrideNoReceipt)
                 }
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
               >

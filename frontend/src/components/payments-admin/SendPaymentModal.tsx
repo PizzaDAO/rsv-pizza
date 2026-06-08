@@ -265,6 +265,17 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   const [fakeAck, setFakeAck] = useState(false);
   const isFlagged = fakeTier === 'medium' || fakeTier === 'high';
 
+  // bottarga-58513: no-receipt ack. This by-city Send flow creates a fresh
+  // payout with `receiptPhotos: []`, so when the city has no receipts on file
+  // (receiptsTotalUsd <= 0) the new payout is undocumented and the backend's
+  // receipt gate (at approve + execute) would block it. Surface an amber
+  // warning + ack so the admin explicitly takes responsibility; forward
+  // `allowMissingReceipts` when ticked. When the city already has receipts
+  // (receiptsTotalUsd > 0) the gate keys on party+host and passes, so no ack
+  // is needed.
+  const [noReceiptAck, setNoReceiptAck] = useState(false);
+  const cityHasReceipts = receiptsTotalUsd > 0;
+
   // Close on Escape.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -393,6 +404,9 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
     (!swcHub || swcAck) &&
     // bufalina-60733: flagged (medium/high fake-detection) requires explicit ack.
     (!isFlagged || fakeAck) &&
+    // bottarga-58513: when the city has no receipts on file, the no-receipt
+    // ack is required (the created payout would be undocumented).
+    (cityHasReceipts || noReceiptAck) &&
     !submitting &&
     !candidatesLoading;
 
@@ -454,6 +468,11 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       const allowOverPerAddressCap = walletPaidTotal?.wouldExceed
         ? overridePerAddressCap
         : undefined;
+      // bottarga-58513: forward the no-receipt ack to BOTH approve and execute
+      // so the new (undocumented) payout passes the receipt gate. Only sent
+      // when the city has no receipts on file AND the admin acked.
+      const allowMissingReceipts =
+        !cityHasReceipts && noReceiptAck ? true : undefined;
       if (method === 'usdc_base') {
         // guanciale-49340: the approve handler runs executePayout server-side
         // for USDC and keeps the HTTP 200 contract even when the on-chain send
@@ -468,6 +487,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
           note: note.trim() || undefined,
           allowOverPartyCap,
           allowOverPerAddressCap,
+          allowMissingReceipts,
         });
         if (res.autoExecuted !== true) {
           throw new Error(
@@ -479,6 +499,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
         await approveAdminPayout(payoutId, {
           note: note.trim() || undefined,
           allowOverPartyCap,
+          allowMissingReceipts,
         });
         await executeAdminPayout(payoutId, {
           wireReference:
@@ -497,6 +518,8 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
           // guanciale-49340: forward the per-address ($676) cap ack so the
           // wire/mercury execute path bypasses the per-address hard cap too.
           allowOverPerAddressCap,
+          // bottarga-58513: forward the no-receipt ack to the execute path too.
+          allowMissingReceipts,
         });
       }
 
@@ -854,6 +877,39 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
                       checked={fakeAck}
                       onChange={() => setFakeAck((v) => !v)}
                       label="I've reviewed this event's fake-detection flags"
+                      labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* bottarga-58513: no-receipt warning + ack. This by-city Send
+              creates a fresh payout with no receipt; when the city has no
+              receipts on file the row is undocumented and the backend gate
+              would block it. Mirrors the fake-detection ack card above. */}
+          {!cityHasReceipts && (
+            <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className="text-amber-300 [.gpp-theme_&]:text-amber-700 mt-0.5 flex-shrink-0"
+                  size={16}
+                />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
+                    No receipt uploaded for {cleanName}
+                  </div>
+                  <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
+                    This city has no receipts on file. Paying without
+                    documentation should be rare — prefer asking the host to
+                    upload one first.
+                  </div>
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={noReceiptAck}
+                      onChange={() => setNoReceiptAck((v) => !v)}
+                      label="Pay without a receipt — I take responsibility"
                       labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
                     />
                   </div>

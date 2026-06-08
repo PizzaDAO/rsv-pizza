@@ -63,9 +63,14 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
   // Eligibility filter — keep in sync with backend bulk-execute filter
   // (USDC + approved-or-failed + valid 0x wallet). passata-49102 added
   // failed-status retry. Anything not matching is shown as "skipped".
-  const { eligible, skippedCount, totalUsd, distinctRecipients } = useMemo(() => {
+  const { eligible, skippedCount, noReceiptCount, totalUsd, distinctRecipients } = useMemo(() => {
     const e: AdminPayout[] = [];
     let skipped = 0;
+    // bottarga-58513: rows with no receipt are excluded from bulk send — bulk
+    // has NO per-row no-receipt override (the backend skips them too). The
+    // admin must send those individually where the "pay without a receipt"
+    // ack is available. Detected from the row's own `documents` (kind:'receipt').
+    let noReceipt = 0;
     const recipients = new Set<string>();
     for (const p of selectedPayouts) {
       if (
@@ -74,6 +79,11 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
         p.payoutWalletAddress &&
         WALLET_RE.test(p.payoutWalletAddress)
       ) {
+        const rowHasReceipt = (p.documents || []).some((d) => d.kind === 'receipt');
+        if (!rowHasReceipt) {
+          noReceipt += 1;
+          continue;
+        }
         e.push(p);
         recipients.add(p.payoutWalletAddress.toLowerCase());
       } else {
@@ -84,6 +94,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
     return {
       eligible: e,
       skippedCount: skipped,
+      noReceiptCount: noReceipt,
       totalUsd: sum,
       distinctRecipients: recipients.size,
     };
@@ -347,6 +358,17 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                   <span>
                     {skippedCount} selected payout{skippedCount === 1 ? '' : 's'} skipped (non-USDC,
                     wrong status, or invalid wallet).
+                  </span>
+                </div>
+              )}
+              {/* bottarga-58513: receiptless rows are hidden from bulk send —
+                  no bulk override. Direct the admin to send them individually
+                  where the "pay without a receipt" ack is available. */}
+              {noReceiptCount > 0 && (
+                <div className="flex items-start gap-1.5 mt-2 text-xs text-amber-500/90">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  <span>
+                    {noReceiptCount} hidden — no receipt; send individually.
                   </span>
                 </div>
               )}

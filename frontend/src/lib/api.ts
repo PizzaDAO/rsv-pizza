@@ -5251,6 +5251,14 @@ export async function approveAdminPayout(
      * Checkbox has been ticked.
      */
     allowOverPerAddressCap?: boolean;
+    /**
+     * bottarga-58513: admin-class only. When true, the backend skips the
+     * receipt gate (added at approve + execute) so an undocumented payout can
+     * be approved/paid. The PayoutReviewModal Approve button sets this when the
+     * amber "no receipt" warning's ack Checkbox has been ticked; passes through
+     * to the autoExecute branch as well.
+     */
+    allowMissingReceipts?: boolean;
   },
 ): Promise<{
   payout: AdminPayout;
@@ -5265,6 +5273,7 @@ export async function approveAdminPayout(
       autoExecute: opts?.autoExecute,
       allowOverPartyCap: opts?.allowOverPartyCap,
       allowOverPerAddressCap: opts?.allowOverPerAddressCap,
+      allowMissingReceipts: opts?.allowMissingReceipts,
     },
   });
 }
@@ -5659,6 +5668,12 @@ export async function executeAdminPayout(
     note?: string;
     allowOverPerAddressCap?: boolean;
     allowOverPartyCap?: boolean;
+    /**
+     * bottarga-58513: forwarded to bypass the receipt gate when the admin has
+     * acknowledged the "no receipt" warning. The server appends
+     * `[paid without receipt — ack by <email>]` to the audit row's note.
+     */
+    allowMissingReceipts?: boolean;
   } = {},
 ): Promise<AdminPayout> {
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {

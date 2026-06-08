@@ -1458,6 +1458,26 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // finalUsd as both originalAmount and extractedAmountUsd so the row reads
     // cleanly in the admin UI.)
     const noReceiptsFallback = receiptPhotos.length === 0;
+
+    // bottarga-58513: close the zero-receipt creation path. A host can no
+    // longer submit a payout with no receipt — those rows were the source of
+    // the undocumented money-path. PRESERVE the bismarck-92103 admin-on-behalf
+    // override: an admin creating a prepayment for another host
+    // (`recipientHostUserId`) may still submit with zero receipts. The
+    // `skipPartyEditCheck` admin path (shipping) is also exempt — shipping
+    // receipts are handled by their own flow.
+    if (noReceiptsFallback) {
+      const adminOnBehalf =
+        recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
+      if (!adminOnBehalf && !isShippingPurpose) {
+        throw new AppError(
+          'Upload at least one receipt before submitting a payout.',
+          400,
+          'NO_RECEIPTS',
+        );
+      }
+    }
+
     const effectiveExtractedUsd = noReceiptsFallback ? finalUsd : extractedUsdSum;
     const effectiveOriginalAmount = noReceiptsFallback
       ? finalUsd
