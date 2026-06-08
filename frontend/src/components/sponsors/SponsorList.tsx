@@ -4,16 +4,19 @@ import {
   ChevronUp, ChevronDown, Edit2, Trash2, ExternalLink,
   Mail, Phone, User, Building2, Calendar, Globe, Lock, X
 } from 'lucide-react';
-import { Sponsor, SponsorStatus, SPONSOR_CATEGORIES } from '../../types';
+import { Sponsor, SponsorStatus, Invoice, SPONSOR_CATEGORIES } from '../../types';
 import { PartnerIntakeButton } from './PartnerIntakeButton';
+import { InvoiceButton } from './InvoiceButton';
 import { cdnUrl } from '../../lib/supabase';
 
 interface SponsorListProps {
   sponsors: Sponsor[];
   partyId: string;
+  invoices?: Invoice[];
   onEdit: (sponsor: Sponsor) => void;
   onDelete: (sponsorId: string) => void;
   onSponsorUpdate: (sponsor: Sponsor) => void;
+  onInvoiceUpdate?: (invoice: Invoice) => void;
   onStatusChange: (sponsor: Sponsor, newStatus: SponsorStatus) => void;
   isLoading?: boolean;
   avatarUrls?: Record<string, string>;
@@ -45,7 +48,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpdate, onStatusChange, isLoading, avatarUrls, isPrivileged = false }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, invoices = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, onStatusChange, isLoading, avatarUrls, isPrivileged = false }: SponsorListProps) {
   const { t } = useTranslation('host');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -361,6 +364,13 @@ export function SponsorList({ sponsors, partyId, onEdit, onDelete, onSponsorUpda
                   {/* Actions */}
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
+                      <InvoiceButton
+                        sponsor={sponsor}
+                        partyId={partyId}
+                        invoice={invoices.find(inv => inv.sponsorId === sponsor.id) || null}
+                        onInvoiceUpdate={(inv) => onInvoiceUpdate?.(inv)}
+                        onSponsorUpdate={onSponsorUpdate}
+                      />
                       {!isLocked && (
                         <PartnerIntakeButton
                           sponsor={sponsor}
