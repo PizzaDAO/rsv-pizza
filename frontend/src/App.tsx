@@ -28,6 +28,8 @@ import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
 import { SouthAfricaPaymentsPage } from './pages/SouthAfricaPaymentsPage';
 import { AfricaPaymentsPage } from './pages/AfricaPaymentsPage';
+import { WestAfricaPaymentsPage } from './pages/WestAfricaPaymentsPage';
+import { EastAfricaPaymentsPage } from './pages/EastAfricaPaymentsPage';
 import { NaPaymentsPage } from './pages/NaPaymentsPage';
 import { EuropePaymentsPage } from './pages/EuropePaymentsPage';
 import { IndiaPaymentsPage } from './pages/IndiaPaymentsPage';
@@ -97,6 +99,8 @@ function App() {
                 with a fixed regionFilter + portalSlug. Must come before /:slug. */}
             <Route path="/payments/southafrica" element={<SouthAfricaPaymentsPage />} />
             <Route path="/payments/africa" element={<AfricaPaymentsPage />} />
+            <Route path="/payments/westafrica" element={<WestAfricaPaymentsPage />} />
+            <Route path="/payments/eastafrica" element={<EastAfricaPaymentsPage />} />
             <Route path="/payments/na" element={<NaPaymentsPage />} />
             <Route path="/payments/europe" element={<EuropePaymentsPage />} />
             <Route path="/payments/india" element={<IndiaPaymentsPage />} />

@@ -12,6 +12,8 @@
  *   /payments/southafrica  → @pnsibanda (South Africa country)
  *   /payments/africa       → @BuildwithMc + @PeriPeriPacino (West / East /
  *                            South Africa region slugs)
+ *   /payments/westafrica   → West Africa region slug only (tigella-58512)
+ *   /payments/eastafrica   → East Africa region slug only (tigella-58512)
  *   /payments/na           → @cauleneamagi (USA + Canada)
  *   /payments/europe       → @APlazzi (Western + Eastern Europe)
  *   /payments/india        → @simarpreet_019 (India)
@@ -28,6 +30,8 @@
 
 export const LATAM_REGIONS = ['central-america', 'south-america'] as const;
 export const SOUTHAFRICA_REGIONS = ['south-africa'] as const;
+export const EASTAFRICA_REGIONS = ['east-africa'] as const;
+export const WESTAFRICA_REGIONS = ['west-africa'] as const;
 export const AFRICA_REGIONS = ['west-africa', 'east-africa', 'south-africa'] as const;
 export const NA_REGIONS = ['usa', 'canada'] as const;
 export const EUROPE_REGIONS = ['western-europe', 'eastern-europe'] as const;
@@ -38,6 +42,8 @@ export type PaymentsRegionPortal =
   | 'latam'
   | 'southafrica'
   | 'africa'
+  | 'eastafrica'
+  | 'westafrica'
   | 'na'
   | 'europe'
   | 'india'
@@ -47,6 +53,8 @@ export const PAYMENTS_REGION_LABELS: Record<PaymentsRegionPortal, string> = {
   latam: 'LATAM',
   southafrica: 'South Africa',
   africa: 'Africa',
+  eastafrica: 'East Africa',
+  westafrica: 'West Africa',
   na: 'North America',
   europe: 'Europe',
   india: 'India',
@@ -57,6 +65,8 @@ export const PAYMENTS_REGION_SCOPES: Record<PaymentsRegionPortal, readonly strin
   latam: LATAM_REGIONS,
   southafrica: SOUTHAFRICA_REGIONS,
   africa: AFRICA_REGIONS,
+  eastafrica: EASTAFRICA_REGIONS,
+  westafrica: WESTAFRICA_REGIONS,
   na: NA_REGIONS,
   europe: EUROPE_REGIONS,
   india: INDIA_REGIONS,
@@ -73,6 +83,8 @@ export const PAYMENTS_REGION_DISPLAY_ORDER: PaymentsRegionPortal[] = [
   'na',
   'europe',
   'africa',
+  'westafrica',
+  'eastafrica',
   'southafrica',
   'india',
   'asia',
