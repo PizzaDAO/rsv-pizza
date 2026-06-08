@@ -85,6 +85,21 @@ describe('filtersToSearchParams', () => {
       filtersToSearchParams({ ...DEFAULT_FILTERS, showTbdUnsubmitted: true }, 'by-city').get('tbd'),
     ).toBe('1');
   });
+
+  // pinsa-58293: default-FALSE toggle — emit `unsub=1` only when ON.
+  it('showUnsubmitted: emits unsub=1 only when ON, nothing by default', () => {
+    // default (false / undefined) -> no key
+    expect(
+      filtersToSearchParams(DEFAULT_FILTERS, 'by-city').get('unsub'),
+    ).toBeNull();
+    expect(
+      filtersToSearchParams({ ...DEFAULT_FILTERS, showUnsubmitted: false }, 'by-city').get('unsub'),
+    ).toBeNull();
+    // turned on -> unsub=1
+    expect(
+      filtersToSearchParams({ ...DEFAULT_FILTERS, showUnsubmitted: true }, 'by-city').get('unsub'),
+    ).toBe('1');
+  });
 });
 
 describe('searchParamsToFilters', () => {
@@ -155,6 +170,21 @@ describe('searchParamsToFilters', () => {
       'by-city',
     );
     expect(searchParamsToFilters(params, undefined).filters.showTbdUnsubmitted).toBe(true);
+  });
+
+  // pinsa-58293: default-FALSE toggle round-trip.
+  it('showUnsubmitted: unsub=1 parses to true; absent stays false', () => {
+    const on = searchParamsToFilters(new URLSearchParams('unsub=1'), undefined);
+    expect(on.filters.showUnsubmitted).toBe(true);
+    // absent -> default false
+    const off = searchParamsToFilters(new URLSearchParams(), undefined);
+    expect(off.filters.showUnsubmitted).toBe(false);
+    // round-trip: ON serializes and parses back to ON
+    const params = filtersToSearchParams(
+      { ...DEFAULT_FILTERS, showUnsubmitted: true },
+      'by-city',
+    );
+    expect(searchParamsToFilters(params, undefined).filters.showUnsubmitted).toBe(true);
   });
 
   it('unknown enum values silently fall back to defaults', () => {

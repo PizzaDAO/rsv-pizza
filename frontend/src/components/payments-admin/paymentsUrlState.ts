@@ -36,6 +36,8 @@ const DEFAULTS = {
   hideUsCities: true,
   // tigella-58512: default-FALSE — only emitted (as `tbd=1`) when turned ON.
   showTbdUnsubmitted: false,
+  // pinsa-58293: default-FALSE — only emitted (as `unsub=1`) when turned ON.
+  showUnsubmitted: false,
 };
 const DEFAULT_VIEW: ViewMode = 'by-city';
 
@@ -99,6 +101,9 @@ export function filtersToSearchParams(
   // tigella-58512: default-FALSE toggle — only emit when turned ON.
   if (filters.showTbdUnsubmitted === true) params.set('tbd', '1');
 
+  // pinsa-58293: default-FALSE toggle — only emit when turned ON.
+  if (filters.showUnsubmitted === true) params.set('unsub', '1');
+
   if (viewMode !== DEFAULT_VIEW) params.set('view', viewMode);
 
   return params;
@@ -137,6 +142,7 @@ export function searchParamsToFilters(
     hideScams: DEFAULTS.hideScams,
     hideUsCities: DEFAULTS.hideUsCities,
     showTbdUnsubmitted: DEFAULTS.showTbdUnsubmitted,
+    showUnsubmitted: DEFAULTS.showUnsubmitted,
     sort: DEFAULTS.sort,
     ...(regions ? { regions } : {}),
   };
@@ -209,6 +215,10 @@ export function searchParamsToFilters(
   // tigella-58512: default-FALSE toggle — present `tbd=1` => true; absent =>
   // leave the default (false). Any non-`1` value is treated as false.
   if (params.has('tbd')) filters.showTbdUnsubmitted = params.get('tbd') === '1';
+
+  // pinsa-58293: default-FALSE toggle — present `unsub=1` => true; absent =>
+  // leave the default (false). Any non-`1` value is treated as false.
+  if (params.has('unsub')) filters.showUnsubmitted = params.get('unsub') === '1';
 
   const viewRaw = params.get('view');
   const viewMode: ViewMode | null =

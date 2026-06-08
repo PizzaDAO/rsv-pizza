@@ -2262,6 +2262,17 @@ export interface AdminPayoutFilters {
    * prior behavior).
    */
   showTbdUnsubmitted?: boolean;
+  /**
+   * pinsa-58293: surface EVERY approved city that has submitted no payouts at
+   * all (zero rows in the payout table) — e.g. Houston — so an admin can record
+   * an external payment for them. Broader than `showTbdUnsubmitted` (not tag-
+   * restricted, only checks for zero payouts). Produces no grouped rows
+   * normally, so the backend injects synthetic by-party rows when this is set.
+   * By-city endpoint only; OFF by default — when false the `includeUnsubmitted`
+   * query param is omitted entirely (byte-identical to prior behavior). Only
+   * honored when no payout-status filter is active.
+   */
+  showUnsubmitted?: boolean;
 }
 
 export interface AdminPayoutTotals {

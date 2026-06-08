@@ -4934,6 +4934,12 @@ function buildPayoutQuery(filters: AdminPayoutFilters | undefined): string {
   if (filters.showTbdUnsubmitted) {
     params.set('showTbdUnsubmitted', '1');
   }
+  // pinsa-58293: surface every approved city with zero payouts (e.g. Houston)
+  // on the by-city view so an admin can log an external payment. Only set when
+  // ON so the default request is byte-identical.
+  if (filters.showUnsubmitted) {
+    params.set('includeUnsubmitted', 'true');
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
