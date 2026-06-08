@@ -37,6 +37,7 @@ import { AsiaPaymentsPage } from './pages/AsiaPaymentsPage';
 import { PartnerIntakePage } from './pages/PartnerIntakePage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { InvoicePage } from './pages/InvoicePage';
+import { MouPage } from './pages/MouPage';
 import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
 import { PartnerBizdevPage } from './pages/PartnerBizdevPage';
 import { PostComposerPage } from './pages/PostComposerPage';
@@ -137,6 +138,7 @@ function App() {
             <Route path="/sponsor-dashboard" element={<Navigate to="/partner" replace />} />
             <Route path="/partner-intake/:token" element={<PartnerIntakePage />} />
             <Route path="/invoice/:viewToken" element={<InvoicePage />} />
+            <Route path="/mou/:viewToken" element={<MouPage />} />
             <Route path="/sponsor-intake/:token" element={<SponsorIntakeRedirect />} />
             <Route path="/graphics" element={<Suspense fallback={null}><GraphicsDashboard /></Suspense>} />
             <Route path="/graphics/:slug/edit" element={<Suspense fallback={null}><GraphicsFlyerEdit /></Suspense>} />

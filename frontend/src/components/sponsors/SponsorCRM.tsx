@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, RefreshCw, GripVertical, FileText, Globe } from 'lucide-react';
-import { Sponsor, SponsorStats, SponsorStatus, UnifiedPartner, Invoice } from '../../types';
+import { Sponsor, SponsorStats, SponsorStatus, UnifiedPartner, Invoice, Mou } from '../../types';
 import {
   getSponsors,
   getSponsorStats,
@@ -15,6 +15,7 @@ import {
   updateSponsorUser,
   fetchUnderbossMe,
   getInvoices,
+  getMous,
 } from '../../lib/api';
 import { SponsorPipeline } from './SponsorPipeline';
 import { SponsorList } from './SponsorList';
@@ -35,6 +36,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [stats, setStats] = useState<SponsorStats | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [mous, setMous] = useState<Mou[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,10 +69,11 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
     setError(null);
 
     try {
-      const [sponsorsResult, statsResult, invoicesResult] = await Promise.all([
+      const [sponsorsResult, statsResult, invoicesResult, mousResult] = await Promise.all([
         getSponsors(partyId),
         getSponsorStats(partyId),
         getInvoices(partyId),
+        getMous(partyId),
       ]);
 
       if (sponsorsResult) {
@@ -81,6 +84,9 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       }
       if (invoicesResult) {
         setInvoices(invoicesResult.invoices);
+      }
+      if (mousResult) {
+        setMous(mousResult.mous);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sponsors');
@@ -425,6 +431,15 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
           }
           return [invoice, ...prev];
         })}
+        mous={mous}
+        onMouUpdate={(mou) => setMous(prev => {
+          const existing = prev.findIndex(m => m.id === mou.id);
+          if (existing >= 0) {
+            return prev.map(m => m.id === mou.id ? mou : m);
+          }
+          return [mou, ...prev];
+        })}
+        onMouDelete={(mouId) => setMous(prev => prev.filter(m => m.id !== mouId))}
         onStatusChange={handleStatusChange}
         isLoading={isRefreshing}
         avatarUrls={sponsorAvatarUrls}

@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -1920,6 +1920,130 @@ export async function payInvoice(
     });
   } catch (error) {
     console.error('Error paying invoice:', error);
+    throw error; // Re-throw so callers can show the error message
+  }
+}
+
+// ============================================
+// MOU API functions
+// ============================================
+
+// Get all MOUs for a party
+export async function getMous(partyId: string): Promise<{ mous: Mou[] } | null> {
+  try {
+    return await apiRequest<{ mous: Mou[] }>(`/api/parties/${partyId}/mous`, {
+      method: 'GET',
+    });
+  } catch (error) {
+    console.error('Error fetching MOUs:', error);
+    return null;
+  }
+}
+
+// Get single MOU
+export async function getMou(partyId: string, mouId: string): Promise<{ mou: Mou } | null> {
+  try {
+    return await apiRequest<{ mou: Mou }>(`/api/parties/${partyId}/mous/${mouId}`, {
+      method: 'GET',
+    });
+  } catch (error) {
+    console.error('Error fetching MOU:', error);
+    return null;
+  }
+}
+
+// Create a new MOU
+export async function createMou(partyId: string, data: CreateMouData): Promise<{ mou: Mou } | null> {
+  try {
+    return await apiRequest<{ mou: Mou }>(`/api/parties/${partyId}/mous`, {
+      method: 'POST',
+      body: data,
+    });
+  } catch (error) {
+    console.error('Error creating MOU:', error);
+    return null;
+  }
+}
+
+// Update an MOU
+export async function updateMou(partyId: string, mouId: string, data: UpdateMouData): Promise<{ mou: Mou } | null> {
+  try {
+    return await apiRequest<{ mou: Mou }>(`/api/parties/${partyId}/mous/${mouId}`, {
+      method: 'PATCH',
+      body: data,
+    });
+  } catch (error) {
+    console.error('Error updating MOU:', error);
+    return null;
+  }
+}
+
+// Delete a draft MOU
+export async function deleteMou(partyId: string, mouId: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/parties/${partyId}/mous/${mouId}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting MOU:', error);
+    return false;
+  }
+}
+
+// Send an MOU
+export async function sendMou(partyId: string, mouId: string, resend = false, issuerName?: string): Promise<{ mou: Mou; emailSent: boolean } | null> {
+  try {
+    return await apiRequest<{ mou: Mou; emailSent: boolean }>(`/api/parties/${partyId}/mous/${mouId}/send`, {
+      method: 'POST',
+      body: { resend, issuerName },
+    });
+  } catch (error) {
+    console.error('Error sending MOU:', error);
+    return null;
+  }
+}
+
+// Get public MOU by view token (no auth required)
+export async function getPublicMou(viewToken: string): Promise<{ mou: Mou } | null> {
+  try {
+    return await apiRequest<{ mou: Mou }>(`/api/mou/${viewToken}`, {
+      method: 'GET',
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error fetching public MOU:', error);
+    return null;
+  }
+}
+
+// Record MOU view (no auth required)
+export async function recordMouView(viewToken: string): Promise<boolean> {
+  try {
+    await apiRequest<{ success: boolean }>(`/api/mou/${viewToken}/record-view`, {
+      method: 'POST',
+      requireAuth: false,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error recording MOU view:', error);
+    return false;
+  }
+}
+
+// Sign an MOU (public, token-gated — no auth required)
+export async function signMou(
+  viewToken: string,
+  data: { signerName: string; agree: boolean }
+): Promise<{ mou: Mou } | null> {
+  try {
+    return await apiRequest<{ mou: Mou }>(`/api/mou/${viewToken}/sign`, {
+      method: 'POST',
+      body: data,
+      requireAuth: false,
+    });
+  } catch (error) {
+    console.error('Error signing MOU:', error);
     throw error; // Re-throw so callers can show the error message
   }
 }

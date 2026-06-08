@@ -671,6 +671,66 @@ export interface CreateInvoiceData {
 
 export interface UpdateInvoiceData extends Partial<Omit<CreateInvoiceData, 'sponsorId'>> {}
 
+// MOU (Memorandum of Understanding) types
+export type MouStatus = 'draft' | 'issued' | 'viewed' | 'signed' | 'cancelled';
+
+export interface Mou {
+  id: string;
+  partyId: string;
+  sponsorId: string;
+  mouNumber: string;
+  viewToken: string;
+  counterpartyCompany: string | null;
+  counterpartyContact: string | null;
+  counterpartyEmail: string;
+  ccEmails: string[];
+  title: string;
+  bodyMarkdown: string;
+  effectiveDate: string | null;
+  termText: string | null;
+  status: MouStatus;
+  signerName: string | null;
+  signerEmail: string | null;
+  signedAt: string | null;
+  issuerName: string | null;
+  issuerSignedAt: string | null;
+  sentAt: string | null;
+  viewedAt: string | null;
+  attachments: Array<{ name: string; url: string }>;
+  createdAt: string;
+  updatedAt: string;
+  sponsor?: {
+    id: string;
+    name: string;
+    contactEmail: string | null;
+    logoUrl: string | null;
+  };
+  party?: {
+    name: string;
+    eventImageUrl?: string | null;
+  };
+}
+
+export interface CreateMouData {
+  sponsorId: string;
+  counterpartyCompany?: string;
+  counterpartyContact?: string;
+  counterpartyEmail?: string;
+  ccEmails?: string[];
+  title?: string;
+  bodyMarkdown?: string;
+  effectiveDate?: string;
+  termText?: string;
+  attachments?: Array<{ name: string; url: string }>;
+}
+
+export interface UpdateMouData extends Partial<Omit<CreateMouData, 'sponsorId'>> {}
+
+export interface SignMouData {
+  signerName: string;
+  agree: boolean;
+}
+
 // Music/DJ Lineup types
 export type PerformerType = 'dj' | 'live_band' | 'solo' | 'playlist';
 export type PerformerStatus = 'pending' | 'confirmed' | 'cancelled';

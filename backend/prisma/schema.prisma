@@ -287,6 +287,7 @@ model Party {
   venues                  Venue[]
   sponsors                Sponsor[]
   invoices                Invoice[]
+  mous                    Mou[]
   budgetItems             BudgetItem[]
   checklistItems          ChecklistItem[]
   socialPosts             SocialPost[]
@@ -1224,6 +1225,7 @@ model Sponsor {
   quizQuestions QuizQuestion[]
 
   invoices          Invoice[]
+  mous              Mou[]
 
   @@index([partyId, status])
   @@index([partyId, createdAt])
@@ -2351,4 +2353,48 @@ model Invoice {
   @@index([sponsorId])
   @@index([partyId, status])
   @@map("invoices")
+}
+
+model Mou {
+  id             String    @id @default(uuid()) @db.Uuid
+  partyId        String    @map("party_id") @db.Uuid
+  party          Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  sponsorId      String    @map("sponsor_id") @db.Uuid
+  sponsor        Sponsor   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  mouNumber      String    @map("mou_number")
+  viewToken      String    @unique @map("view_token")
+
+  counterpartyCompany String? @map("counterparty_company")
+  counterpartyContact String? @map("counterparty_contact")
+  counterpartyEmail   String  @map("counterparty_email")
+  ccEmails       String[]  @map("cc_emails")
+
+  title          String
+  bodyMarkdown   String    @map("body_markdown")
+  effectiveDate  DateTime? @map("effective_date") @db.Date
+  termText       String?   @map("term_text")
+
+  status         String    @default("draft")
+
+  signerName     String?   @map("signer_name")
+  signerEmail    String?   @map("signer_email")
+  signedAt       DateTime? @map("signed_at") @db.Timestamptz
+  signerIp       String?   @map("signer_ip")
+
+  issuerName     String?   @map("issuer_name")
+  issuerSignedAt DateTime? @map("issuer_signed_at") @db.Timestamptz
+
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz
+  viewedAt       DateTime? @map("viewed_at") @db.Timestamptz
+
+  attachments    Json      @default("[]")
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@index([sponsorId])
+  @@index([partyId, status])
+  @@map("mous")
 }
