@@ -17,6 +17,9 @@ const mockPrisma = vi.hoisted(() => ({
   admin: {
     findUnique: vi.fn(),
   },
+  payout: {
+    updateMany: vi.fn(),
+  },
 }));
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
@@ -112,6 +115,7 @@ describe('PATCH /api/user/me — payout-method gating (marinara-71630 P7b)', () 
     vi.clearAllMocks();
     mockCanUserEditParty.mockResolvedValue(true);
     mockPrisma.user.update.mockResolvedValue(UPDATED_USER);
+    mockPrisma.payout.updateMany.mockResolvedValue({ count: 0 });
   });
 
   function patch(body: any) {
@@ -182,6 +186,27 @@ describe('PATCH /api/user/me — payout-method gating (marinara-71630 P7b)', () 
     expect(mockGetReimbursementRules).not.toHaveBeenCalled();
     expect(mockPrisma.party.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-stamps non-terminal payouts INCLUDING queued, excluding mercury_card (tortano-58516)', async () => {
+    // A profile save that touches a payout pref triggers the ricotta-58512
+    // re-stamp. tortano-58516 widened it from ['pending','approved'] to the
+    // shared NON_TERMINAL_PAYOUT_STATUSES (which adds 'queued'), so an admin who
+    // queues a payout before the host finalizes their wallet no longer strands
+    // it un-payable.
+    const res = await patch({
+      payoutWalletAddress: '0x2222222222222222222222222222222222222222',
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.payout.updateMany).toHaveBeenCalledTimes(1);
+
+    const where = mockPrisma.payout.updateMany.mock.calls[0][0].where;
+    expect(where.status.in).toContain('queued');
+    expect(where.status.in).toContain('pending');
+    expect(where.status.in).toContain('approved');
+    // Mercury-card rows stay excluded so an admin-issued card isn't clobbered.
+    expect(where.NOT.payoutMethod).toBe('mercury_card');
   });
 
   it('fails OPEN when the config is unseeded — even mercury_card in a blocked country (200)', async () => {
