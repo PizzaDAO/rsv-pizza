@@ -30,7 +30,7 @@ import { prisma } from '../config/database.js';
 import {
   getGppRegionByCityKey,
   cityKeyFromPartyName,
-  normalizeCityName,
+  canonicalCityName,
 } from '../helpers/underbossScope.js';
 
 interface MoltobeneCity {
@@ -96,7 +96,7 @@ function canonicalCityKey(name: string | null | undefined): string {
  */
 export interface MissingApprovedCity {
   cityKey: string;
-  /** normalizeCityName(cityKey) — the comparable core used for matching. */
+  /** canonicalCityName(cityKey) — the comparable core used for matching. */
   normalized: string;
 }
 
@@ -155,7 +155,10 @@ export async function buildMissingApprovedCityIndex(): Promise<{
   const coreToKeys = new Map<string, Set<string>>();
   for (const cityKey of approvedKeys) {
     if (resolved.has(cityKey)) continue;
-    const normalized = normalizeCityName(cityKey);
+    // provola-58509: canonicalize through the exonym alias map so a captured
+    // group's LOCAL name ("Göteborg") resolves to the same core as the approved
+    // ENGLISH city ("Gothenburg").
+    const normalized = canonicalCityName(cityKey);
     missing.push({ cityKey, normalized });
     if (!normalized) continue; // empty core is never indexable.
     const set = coreToKeys.get(normalized) ?? new Set<string>();
@@ -248,7 +251,9 @@ export async function syncCityGroupsFromMoltobene(): Promise<MoltobeneSyncResult
     //   - that core hasn't already been claimed this run.
     // This NEVER clobbers — the downstream chat_id/cityKey collision guards
     // still apply.
-    const normalizedIncoming = normalizeCityName(cityName);
+    // provola-58509: canonicalize through the exonym alias map (same as the
+    // index keys) so LOCAL incoming names match ENGLISH approved cities.
+    const normalizedIncoming = canonicalCityName(cityName);
     if (normalizedIncoming) {
       const target = missingByNormalized.get(normalizedIncoming);
       if (
@@ -412,7 +417,10 @@ export async function refreshCityGroupFromMoltobene(
   // Find the city whose normalized name matches the requested key. First try
   // the exact raw key (preserves existing behavior), then fall back to exact
   // normalized-core equality so a messy cityKey can still recover its group.
-  const wantNorm = normalizeCityName(key);
+  // provola-58509: canonicalize through the exonym alias map on both sides so a
+  // LOCAL cityKey ("goteborg") matches an ENGLISH /city/groups name
+  // ("Gothenburg") and vice-versa.
+  const wantNorm = canonicalCityName(key);
   let match = cities.find((c) => {
     const name = typeof c.cityName === 'string' ? c.cityName : '';
     return name.toLowerCase().trim() === key;
@@ -420,7 +428,7 @@ export async function refreshCityGroupFromMoltobene(
   if (!match && wantNorm) {
     const normMatches = cities.filter((c) => {
       const name = typeof c.cityName === 'string' ? c.cityName : '';
-      return normalizeCityName(name) === wantNorm;
+      return canonicalCityName(name) === wantNorm;
     });
     // Conservative: only accept a UNIQUE normalized match.
     if (normMatches.length === 1) match = normMatches[0];
@@ -432,7 +440,7 @@ export async function refreshCityGroupFromMoltobene(
     if (captures && wantNorm) {
       const capMatches = captures.filter(
         (g) =>
-          normalizeCityName(typeof g.title === 'string' ? g.title : '') ===
+          canonicalCityName(typeof g.title === 'string' ? g.title : '') ===
           wantNorm,
       );
       if (capMatches.length === 1) {
@@ -649,7 +657,9 @@ export async function syncFromCapturedGroups(): Promise<CapturedGroupsSyncResult
     const chatId = parseGroupId(g.chatId);
     if (chatId === null) continue;
     const title = typeof g.title === 'string' ? g.title : '';
-    const normalized = normalizeCityName(title);
+    // provola-58509: canonicalize captured titles through the exonym alias map
+    // so LOCAL group names match the canonical core of ENGLISH approved cities.
+    const normalized = canonicalCityName(title);
     if (!normalized) continue;
     captures.push({
       chatId,
