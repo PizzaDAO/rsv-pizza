@@ -2261,6 +2261,13 @@ export interface AdminPayoutFilters {
    * prior behavior).
    */
   showTbdUnsubmitted?: boolean;
+  /**
+   * bombolone-58515: filter the by-city /payments view by receipt presence.
+   * 'all' = no filter, 'has' = cities with >=1 receipt document,
+   * 'missing' = cities with zero receipt documents. Client-side over
+   * aggregates.totalReceiptCount. By-city view only. Default 'all'.
+   */
+  receipts?: 'all' | 'has' | 'missing';
 }
 
 export interface AdminPayoutTotals {
