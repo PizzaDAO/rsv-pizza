@@ -218,19 +218,24 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         onUploadComplete?.(result.photo);
       } catch (error) {
         console.error('Upload error:', error);
-        // Surface the 30-photo limit message verbatim (snax requested exact copy)
+        // mortadella-58517: surface the backend's real message verbatim. The
+        // per-user photo cap is config-driven, so detect it via the structured
+        // error code (PHOTO_LIMIT_REACHED) rather than a hardcoded "30" string;
+        // keep a message-substring fallback for resilience.
         const message = error instanceof Error ? error.message : String(error);
+        const code = (error as { code?: string } | null)?.code;
+        const isLimitError = code === 'PHOTO_LIMIT_REACHED' || /photo limit per user/i.test(message);
         setFiles(prev => {
           const newFiles = [...prev];
           newFiles[fileIndex] = {
             ...newFiles[fileIndex],
             status: 'error',
-            error: message.includes('30 photo limit') ? message : (message || 'Upload failed'),
+            error: message || 'Upload failed',
           };
           return newFiles;
         });
         // If hit the per-user limit, stop trying further files (they'd all fail)
-        if (message.includes('30 photo limit')) break;
+        if (isLimitError) break;
       }
     }
   };

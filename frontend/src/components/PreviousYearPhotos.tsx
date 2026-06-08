@@ -238,15 +238,21 @@ export function PreviousYearPhotos() {
 
         const result = await uploadEventPhoto(file, party.id);
         if (result) {
-          await uploadPhoto(party.id, {
-            url: result.url,
-            fileName: result.fileName,
-            fileSize: result.fileSize,
-            mimeType: result.mimeType,
-            width: result.width,
-            height: result.height,
-            photoYear: eventYear,
-          });
+          try {
+            await uploadPhoto(party.id, {
+              url: result.url,
+              fileName: result.fileName,
+              fileSize: result.fileSize,
+              mimeType: result.mimeType,
+              width: result.width,
+              height: result.height,
+              photoYear: eventYear,
+            });
+          } catch (err) {
+            // mortadella-58517: uploadPhoto now throws (e.g. per-user photo cap).
+            // Skip the failed file and keep going so the batch + spinner don't hang.
+            console.error('Previous-year photo upload failed:', err);
+          }
         }
       }
 

@@ -1267,16 +1267,16 @@ export async function uploadPhoto(
   partyId: string,
   data: PhotoUploadData
 ): Promise<{ photo: Photo } | null> {
-  try {
-    return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos`, {
-      method: 'POST',
-      body: data,
-      requireAuth: false,
-    });
-  } catch (error) {
-    console.error('Error uploading photo:', error);
-    return null;
-  }
+  // mortadella-58517: do NOT swallow errors here. apiRequest throws an Error
+  // carrying the backend message + structured `.code` (e.g. PHOTO_LIMIT_REACHED).
+  // Callers wrap this in try/catch and surface err.message, so re-throw to let
+  // the real reason (per-user photo cap, etc.) reach the user instead of a
+  // generic "upload failed". (Previously this returned null on any error.)
+  return await apiRequest<{ photo: Photo }>(`/api/parties/${partyId}/photos`, {
+    method: 'POST',
+    body: data,
+    requireAuth: false,
+  });
 }
 
 // Get single photo details
