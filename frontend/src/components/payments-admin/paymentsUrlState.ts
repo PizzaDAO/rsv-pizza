@@ -14,6 +14,7 @@ import {
   METHOD_VALUES as METHOD_OPTION_VALUES,
   PURPOSE_VALUES as PURPOSE_OPTION_VALUES,
   SORT_VALUES as SORT_OPTION_VALUES,
+  RECEIPTS_VALUES as RECEIPTS_OPTION_VALUES,
   type SortValue,
 } from './paymentsFilterOptions';
 
@@ -36,6 +37,8 @@ const DEFAULTS = {
   hideUsCities: true,
   // tigella-58512: default-FALSE — only emitted (as `tbd=1`) when turned ON.
   showTbdUnsubmitted: false,
+  // bombolone-58515: by-city receipt-presence filter — 'all' = no filter.
+  receipts: 'all' as NonNullable<AdminPayoutFilters['receipts']>,
 };
 const DEFAULT_VIEW: ViewMode = 'by-city';
 
@@ -45,6 +48,7 @@ const STATUS_VALUES = new Set<string>(STATUS_TAB_VALUES.map(String));
 const METHOD_VALUES = new Set<string>(METHOD_OPTION_VALUES.map(String));
 const PURPOSE_VALUES = new Set<string>(PURPOSE_OPTION_VALUES.map(String));
 const SORT_VALUES = new Set<string>(SORT_OPTION_VALUES.map(String));
+const RECEIPTS_VALUES = new Set<string>(RECEIPTS_OPTION_VALUES.map(String));
 
 /**
  * Serialize the active filters + view mode to a URLSearchParams. A key is
@@ -90,6 +94,10 @@ export function filtersToSearchParams(
 
   const sort = filters.sort ?? DEFAULTS.sort;
   if (sort !== DEFAULTS.sort) params.set('sort', String(sort));
+
+  // bombolone-58515: receipt-presence filter — only emit when not the default.
+  const receipts = filters.receipts ?? DEFAULTS.receipts;
+  if (receipts !== DEFAULTS.receipts) params.set('receipts', String(receipts));
 
   // Default-TRUE booleans: only emit when the user turned them OFF.
   if (filters.hideClosed === false) params.set('hideClosed', '0');
@@ -138,6 +146,8 @@ export function searchParamsToFilters(
     hideUsCities: DEFAULTS.hideUsCities,
     showTbdUnsubmitted: DEFAULTS.showTbdUnsubmitted,
     sort: DEFAULTS.sort,
+    // bombolone-58515: receipt-presence filter seeds to its default.
+    receipts: DEFAULTS.receipts,
     ...(regions ? { regions } : {}),
   };
 
@@ -198,6 +208,13 @@ export function searchParamsToFilters(
   const sortRaw = params.get('sort');
   if (sortRaw && SORT_VALUES.has(sortRaw)) {
     filters.sort = sortRaw as SortValue;
+  }
+
+  // bombolone-58515: receipt-presence filter — validate against RECEIPTS_VALUES
+  // so a hand-mangled URL falls back to the default ('all').
+  const receiptsRaw = params.get('receipts');
+  if (receiptsRaw && RECEIPTS_VALUES.has(receiptsRaw)) {
+    filters.receipts = receiptsRaw as AdminPayoutFilters['receipts'];
   }
 
   // Default-TRUE booleans: when the param is present, `0` => false, anything

@@ -124,6 +124,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // tigella-58512: surface approved `tbd` events with zero submissions —
   // OFF by default so the default request is byte-identical to before.
   showTbdUnsubmitted: false,
+  // bombolone-58515: by-city receipt-presence filter — 'all' = no filter.
+  receipts: 'all',
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
@@ -671,6 +673,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         ? filtered.filter((row) => row.party.region !== 'usa')
         : filtered;
 
+    // bombolone-58515: filter by receipt presence (by-city only).
+    const receipts = filters.receipts ?? 'all';
+    if (receipts === 'has') {
+      rows = rows.filter((row) => row.aggregates.totalReceiptCount > 0);
+    } else if (receipts === 'missing') {
+      rows = rows.filter((row) => row.aggregates.totalReceiptCount === 0);
+    }
+
     // cornetto-58510: client-side tri-state tag/country filter (by-city view).
     // Tags: include = must have ALL; exclude = must have NONE. Country (single-
     // valued per party): include = OR (any selected); exclude = NONE.
@@ -754,7 +764,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       return [...rows].sort((a, b) => (asc ? pick(a) - pick(b) : pick(b) - pick(a)));
     }
     return rows;
-  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal, filters.tagIncludes, filters.tagExcludes, filters.countryIncludes, filters.countryExcludes]);
+  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, filters.receipts, isRegionalPortal, filters.tagIncludes, filters.tagExcludes, filters.countryIncludes, filters.countryExcludes]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -1262,6 +1272,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // synthetic rows come from the by-party endpoint, which is the only
           // place a zero-payout party can surface.
           showTbdToggle={viewMode === 'by-city'}
+          // bombolone-58515: Receipt-presence filter — by-city view only
+          // (client-side over aggregates.totalReceiptCount). Applies on
+          // regional portals too, like showHideClosedToggle.
+          showReceiptsFilter={viewMode === 'by-city'}
           // provatura-92107: Hide US cities — by-city view + admin dashboard
           // only (regional portals are already region-scoped).
           showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}

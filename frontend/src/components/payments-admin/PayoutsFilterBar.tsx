@@ -13,7 +13,7 @@ import {
 } from '../../utils/regions';
 // panuozzo-92114: canonical filter VALUE lists live in the React-free options
 // module so PayoutsFilterBar and the URL (de)serializer can't drift.
-import type { SortValue, StatusTabValue } from './paymentsFilterOptions';
+import type { SortValue, StatusTabValue, ReceiptsValue } from './paymentsFilterOptions';
 
 interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
@@ -61,6 +61,13 @@ interface PayoutsFilterBarProps {
    * Defaults to false.
    */
   showTbdToggle?: boolean;
+  /**
+   * bombolone-58515: when true, render the receipt-presence filter dropdown
+   * (All / Has receipts / Missing receipts). By-city view only — the filter is
+   * client-side over `aggregates.totalReceiptCount`, which only exists on the
+   * by-city rows. Defaults to false.
+   */
+  showReceiptsFilter?: boolean;
   /**
    * pancetta-92103: when true, render the Regions multi-select dropdown
    * (admin /payments). Hidden on regional sub-portals (which are already
@@ -116,6 +123,16 @@ const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = 
   { value: 'all', label: 'All purposes' },
   { value: 'event', label: 'Event' },
   { value: 'shipping', label: 'Shipping' },
+];
+
+// bombolone-58515: receipt-presence filter — by-city view only. Filters cities
+// client-side on `aggregates.totalReceiptCount`. Values validated against
+// RECEIPTS_VALUES in paymentsFilterOptions.ts (the URL serializer's source of
+// truth) — keep this list and that one in sync.
+const RECEIPTS_OPTIONS: Array<{ value: ReceiptsValue; label: string }> = [
+  { value: 'all', label: 'All receipts' },
+  { value: 'has', label: 'Has receipts' },
+  { value: 'missing', label: 'Missing receipts' },
 ];
 
 // arancino-92103: sort order for the payouts list. `created_desc` is the
@@ -184,6 +201,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideUsCities) n += 1;
   // tigella-58512: count Show TBD (no submission) when the admin turns it on.
   if (filters.showTbdUnsubmitted) n += 1;
+  // bombolone-58515: count the receipt-presence filter when it's not 'all'.
+  if (filters.receipts && filters.receipts !== 'all') n += 1;
   return n;
 }
 
@@ -210,6 +229,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showHideScamsToggle,
   showHideUsToggle,
   showTbdToggle,
+  showReceiptsFilter,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -469,6 +489,24 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               ))}
             </select>
           </div>
+
+          {/* bombolone-58515: Receipts dropdown — filter the by-city view by
+              receipt presence (All / Has receipts / Missing receipts). Gated to
+              the by-city view, where `aggregates.totalReceiptCount` exists. */}
+          {showReceiptsFilter && (
+            <div>
+              <select
+                value={filters.receipts ?? 'all'}
+                onChange={(e) => update({ receipts: e.target.value as ReceiptsValue })}
+                className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                aria-label="Filter by receipts"
+              >
+                {RECEIPTS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* arancino-92103: Sort dropdown — controls the row order of the
               payouts table. Default is `created_desc` (newest submitted

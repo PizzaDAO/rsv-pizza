@@ -35,6 +35,12 @@ export const METHOD_VALUES: Array<PayoutMethod | 'all'> = [
 
 export const PURPOSE_VALUES: Array<PayoutPurpose | 'all'> = ['all', 'event', 'shipping'];
 
+// bombolone-58515: by-city receipt-presence filter values. Client-side over
+// aggregates.totalReceiptCount; labels live in PayoutsFilterBar at render time.
+export type ReceiptsValue = NonNullable<AdminPayoutFilters['receipts']>;
+
+export const RECEIPTS_VALUES: ReceiptsValue[] = ['all', 'has', 'missing'];
+
 export type SortValue = NonNullable<AdminPayoutFilters['sort']>;
 
 export const SORT_VALUES: SortValue[] = [
