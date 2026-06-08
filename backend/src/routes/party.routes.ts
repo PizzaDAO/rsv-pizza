@@ -715,6 +715,47 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // tigella-58513: authoritative guard — GPP events are capped at 3 hours.
+    // The frontend block is UX only; this also covers the NL Event Assistant
+    // path (arancini-58492), which writes through this same PATCH endpoint.
+    // We only enforce when the editor is a plain host — admins and underbosses
+    // can grant the "ask your underboss for an exception" override. eventType is
+    // read from the PRE-update party in the DB, never trusted from req.body.
+    {
+      const isGppEdit =
+        (duration !== undefined && duration != null) ||
+        (date && endTime);
+      if (isGppEdit) {
+        const existing = await prisma.party.findUnique({
+          where: { id },
+          select: { eventType: true },
+        });
+        if (existing?.eventType === 'gpp') {
+          const privileged = (await isSuperAdmin(req.userEmail))
+            || (await isAdmin(req.userEmail))
+            || (await isUnderboss(req.userEmail));
+          if (!privileged) {
+            // Effective new duration: explicit `duration` wins; otherwise derive
+            // from date+endTime when both are present. (3_600_000 ms = 1 hour.)
+            let effectiveDuration: number | null = null;
+            if (duration !== undefined && duration != null) {
+              effectiveDuration = Number(duration);
+            } else if (date && endTime) {
+              effectiveDuration =
+                (new Date(endTime).getTime() - new Date(date).getTime()) / 3_600_000;
+            }
+            // epsilon so an exactly-3h block isn't falsely rejected.
+            if (effectiveDuration != null && effectiveDuration > 3 + 1e-6) {
+              return res.status(400).json({
+                error: 'GPP_DURATION_EXCEEDED',
+                message: 'GPP events are limited to 3 hours.',
+              });
+            }
+          }
+        }
+      }
+    }
+
     const party = await prisma.party.update({
       where: { id },
       data: {
