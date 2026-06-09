@@ -124,11 +124,11 @@ export const HotWalletCard: React.FC<HotWalletCardProps> = ({ readOnly = false }
       {errorMsg ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-2">
           <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-200">
+          <div className="text-sm text-amber-200 [.gpp-theme_&]:text-amber-900">
             <div className="font-medium">Hot wallet unavailable</div>
-            <div className="text-amber-200/80 mt-0.5 break-words">{errorMsg}</div>
+            <div className="text-amber-200/80 [.gpp-theme_&]:text-amber-900/80 mt-0.5 break-words">{errorMsg}</div>
             {isUnconfigured && (
-              <div className="text-xs text-amber-200/70 mt-1">
+              <div className="text-xs text-amber-200/70 [.gpp-theme_&]:text-amber-900/70 mt-1">
                 Set <span className="font-mono">USDC_PAYOUT_WALLET_PRIVATE_KEY</span> on backend Vercel
                 and redeploy.
               </div>

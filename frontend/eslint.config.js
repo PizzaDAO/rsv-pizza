@@ -3,6 +3,7 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
+import gppTextContrast from './eslint-rules/gpp-theme-text-contrast.js';
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -24,5 +25,20 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
     },
+  },
+  {
+    // gpp-theme surfaces only: these render under the light .gpp-theme where
+    // near-white amber text washes out. Keep this scope tight to avoid noise.
+    files: [
+      'src/components/payouts/**/*.{ts,tsx}',
+      'src/components/payments-admin/**/*.{ts,tsx}',
+      'src/components/payments-shared/**/*.{ts,tsx}',
+      'src/pages/GPP27CreatePage.tsx',
+      'src/pages/ConsolidatedReportPage.tsx',
+      'src/pages/AdminPage.tsx',
+      'src/pages/DJPage.tsx',
+    ],
+    plugins: { gpp: { rules: { 'text-contrast': gppTextContrast } } },
+    rules: { 'gpp/text-contrast': 'error' },
   }
 );

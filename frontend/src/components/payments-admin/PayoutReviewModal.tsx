@@ -2323,7 +2323,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           <div className="flex items-start gap-2.5">
                             <AlertTriangle className="text-amber-300 mt-0.5 flex-shrink-0" size={16} />
                             <div className="flex-1 text-sm">
-                              <div className="font-medium text-amber-200 mb-1">
+                              <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
                                 Heads-up: over per-submission soft cap
                               </div>
                               <div className="text-theme-text-secondary text-xs">
