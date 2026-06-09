@@ -350,7 +350,7 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
           <div className="flex items-start gap-2.5">
             <AlertTriangle size={16} className="text-amber-300 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-amber-100">
+            <div className="text-xs text-amber-100 [.gpp-theme_&]:text-amber-900">
               FFIs need to submit a paper form via our admin team; the auto-generated PDF won't satisfy reporting requirements.
             </div>
           </div>
@@ -672,7 +672,7 @@ export const W8BENEForm: React.FC<W8BENEFormProps> = ({ value, onChange, disable
         )}
         {treatyKey && treatyEntry && !treatyEntry.hasTreaty && (
           <div className="card p-2.5 border-l-4 border-l-amber-500 bg-amber-500/10">
-            <div className="flex items-start gap-2 text-[11px] text-amber-100">
+            <div className="flex items-start gap-2 text-[11px] text-amber-100 [.gpp-theme_&]:text-amber-900">
               <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
               <span>
                 No US tax treaty in force with {treatyKey} — leave the treaty fields blank; default

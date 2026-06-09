@@ -505,7 +505,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                         className="flex items-baseline gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20"
                       >
                         <AlertTriangle size={10} className="text-amber-400 shrink-0 self-center" />
-                        <span className="font-mono text-[11px] text-amber-100">{shortAddr}</span>
+                        <span className="font-mono text-[11px] text-amber-100 [.gpp-theme_&]:text-amber-900">{shortAddr}</span>
                         <span className="text-theme-text-muted">
                           ${Number(p.finalAmountUsd).toFixed(2)}
                         </span>

@@ -428,7 +428,7 @@ export const W8BENForm: React.FC<W8BENFormProps> = ({ value, onChange, disabled,
         )}
         {treatyKey && treatyEntry && !treatyEntry.hasTreaty && (
           <div className="card p-2.5 border-l-4 border-l-amber-500 bg-amber-500/10">
-            <div className="flex items-start gap-2 text-[11px] text-amber-100">
+            <div className="flex items-start gap-2 text-[11px] text-amber-100 [.gpp-theme_&]:text-amber-900">
               <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
               <span>
                 No US tax treaty in force with {treatyKey} — leave the treaty fields blank; default

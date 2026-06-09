@@ -87,7 +87,7 @@ export const TaxFormReviewPanel: React.FC<TaxFormReviewPanelProps> = ({ taxFormI
   if (!taxFormId) {
     return (
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-        <div className="flex items-start gap-2 text-xs text-amber-100">
+        <div className="flex items-start gap-2 text-xs text-amber-100 [.gpp-theme_&]:text-amber-900">
           <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-amber-300" />
           <div>
             <span className="font-semibold">Tax form</span> — host has not submitted a tax form for this payment.
