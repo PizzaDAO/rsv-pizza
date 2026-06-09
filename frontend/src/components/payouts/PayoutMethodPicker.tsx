@@ -142,10 +142,31 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
   const methodOptions = (options ?? []).filter((o) => o.kind === 'method');
   const externalOptions = (options ?? []).filter((o) => o.kind === 'external');
 
+  // stromboli-58518: when the host's saved method is no longer among the
+  // OFFERED options (e.g. their saved preference is `wire` but config now only
+  // returns usdc_base), fall back to the first enabled method so the picker
+  // never renders a stale sub-form for an unavailable method.
+  const enabledMethodIds = methodOptions.filter((o) => o.enabled).map((o) => o.id);
+  const methodAvailable = enabledMethodIds.includes(method);
+  const fallbackMethodId = enabledMethodIds[0];
+  const effectiveMethod = (methodAvailable ? method : (fallbackMethodId ?? method)) as PayoutMethod;
+
+  // stromboli-58518: migrate the saved selection forward when it's unavailable.
+  React.useEffect(() => {
+    if (options === null) return;            // options still loading
+    if (methodOptions.length === 0) return;  // nothing selectable
+    if (methodAvailable) return;             // saved method is still offered
+    if (!fallbackMethodId) return;
+    onMethodChange(fallbackMethodId as PayoutMethod);
+    // onMethodChange is a stable-enough parent setter; re-running per render is
+    // guarded by methodAvailable, so exclude it from deps to avoid churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, method]);
+
   // taleggio-30219: debounced ENS preview state for the USDC sub-form.
   const [ensPreview, setEnsPreview] = React.useState<EnsPreviewState>({ kind: 'idle' });
   React.useEffect(() => {
-    if (method !== 'usdc_base') {
+    if (effectiveMethod !== 'usdc_base') {
       setEnsPreview({ kind: 'idle' });
       return;
     }
@@ -169,21 +190,21 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [method, walletAddress]);
+  }, [effectiveMethod, walletAddress]);
 
   // For wire: prefill the field from the user's auth email if no saved value.
   // We mirror this into bankDetails on first render of the wire branch so the
   // auto-save persists it even if the host doesn't touch the field.
   const wireEmail = bankDetails.email ?? userEmail ?? '';
   React.useEffect(() => {
-    if (method !== 'wire') return;
+    if (effectiveMethod !== 'wire') return;
     if (bankDetails.email !== undefined) return; // already set (incl. empty string)
     if (!userEmail) return;
     onBankDetailsChange({ ...bankDetails, email: userEmail });
     // We only want to seed on the first transition into wire mode; deps below
     // intentionally exclude bankDetails/onBankDetailsChange so we don't loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, userEmail]);
+  }, [effectiveMethod, userEmail]);
 
   const Option: React.FC<{
     value: PayoutMethod;
@@ -193,7 +214,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     disabled?: boolean;
     disabledReason?: string;
   }> = ({ value, icon, title, description, disabled, disabledReason }) => {
-    const active = method === value;
+    const active = effectiveMethod === value;
     return (
       <button
         type="button"
@@ -301,7 +322,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
         </div>
       )}
 
-      {method === 'mercury_card' && (
+      {effectiveMethod === 'mercury_card' && (
         <div className="rounded-xl border border-theme-stroke bg-theme-surface p-4 text-sm text-theme-text-secondary">
           <p>
             We'll issue you a Mercury virtual debit card
@@ -316,7 +337,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
         </div>
       )}
 
-      {method === 'usdc_base' && (
+      {effectiveMethod === 'usdc_base' && (
         <div className="space-y-2">
           <IconInput
             icon={Wallet}
@@ -349,7 +370,7 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
         </div>
       )}
 
-      {method === 'wire' && (
+      {effectiveMethod === 'wire' && (
         <div className="space-y-2">
           <IconInput
             icon={Mail}
