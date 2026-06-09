@@ -1593,6 +1593,30 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 result.hostDmSent || result.groupSent ? 'success' : 'error';
               pushToast(`Wallet reminder: ${hostLabel} | ${groupLabel}`, tone);
             }}
+            // Photo reminder — same per-channel success/skip toast as the
+            // receipts reminder.
+            onTgPhotoReminderResult={(_partyId, result) => {
+              if ('error' in result) {
+                pushToast(
+                  `Could not send photo reminder: ${result.error}`,
+                  'error',
+                );
+                return;
+              }
+              const hostLabel = result.hostDmSent
+                ? 'DM ✓'
+                : `DM skipped${
+                    result.hostDmReason ? ` (${result.hostDmReason})` : ''
+                  }`;
+              const groupLabel = result.groupSent
+                ? 'Group ✓'
+                : `Group skipped${
+                    result.groupReason ? ` (${result.groupReason})` : ''
+                  }`;
+              const tone =
+                result.hostDmSent || result.groupSent ? 'success' : 'error';
+              pushToast(`Photo reminder: ${hostLabel} | ${groupLabel}`, tone);
+            }}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}

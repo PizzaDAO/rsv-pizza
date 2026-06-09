@@ -26,6 +26,7 @@ import {
   ThumbsUp,
   RotateCcw,
   Wallet,
+  Camera,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -65,6 +66,7 @@ import {
   CUSTOM_TAG_PREFIX,
   sendTgReceiptsReminder,
   sendTgWalletReminder,
+  sendTgPhotoReminder,
   setCityAdminNotes,
   approveCity,
   reopenParty,
@@ -287,6 +289,19 @@ interface PayoutsByPartyTableProps {
     } | { error: string },
   ) => void;
   /**
+   * Toast callback for the Send photo reminder action — same per-channel
+   * success/skip shape as `onTgReminderResult`. The menu owns the API call.
+   */
+  onTgPhotoReminderResult?: (
+    partyId: string,
+    result: {
+      hostDmSent: boolean;
+      hostDmReason?: string;
+      groupSent: boolean;
+      groupReason?: string;
+    } | { error: string },
+  ) => void;
+  /**
    * bufalina-60733: fake-detection risk scores keyed by party id. Only
    * medium/high (≥30) parties are present; an absent key means "no badge".
    * Rendered as a caution pill in the city header strip.
@@ -482,6 +497,7 @@ function CityActionsMenu({
   onToggleScamFlag,
   onSendTgReminder,
   onSendWalletReminder,
+  onSendPhotoReminder,
   onApproveCity,
   onReopen,
   onAddCustomTag,
@@ -492,6 +508,7 @@ function CityActionsMenu({
   canToggleScamFlag,
   canSendTgReminder,
   canSendWalletReminder,
+  canSendPhotoReminder,
   canApproveCity,
   canReopen,
   canManageTags,
@@ -500,12 +517,14 @@ function CityActionsMenu({
   scamFlagBusy,
   tgReminderBusy,
   walletReminderBusy,
+  photoReminderBusy,
   reopenBusy,
   approveBusy,
   customTags,
   tagBusy,
   receiptsReminderSentAt,
   walletReminderSentAt,
+  photoReminderSentAt,
   paymentsApprovedUsd,
   receiptsTotalUsd,
 }: {
@@ -524,6 +543,11 @@ function CityActionsMenu({
    * two-click confirm pattern as the receipts reminder).
    */
   onSendWalletReminder?: () => void;
+  /**
+   * Fires after the second click on the Send photo reminder menu item (same
+   * two-click confirm pattern as the receipts reminder).
+   */
+  onSendPhotoReminder?: () => void;
   /** Approve city payment amount. Called with the amount to approve. */
   onApproveCity?: (amountUsd: number | null) => void;
   /** Reopen a closed city (undo the close). */
@@ -538,6 +562,7 @@ function CityActionsMenu({
   canToggleScamFlag: boolean;
   canSendTgReminder: boolean;
   canSendWalletReminder: boolean;
+  canSendPhotoReminder: boolean;
   canApproveCity: boolean;
   canReopen: boolean;
   /** panuozzo-58217: admins + underbosses may add/view/remove custom tags. */
@@ -547,6 +572,7 @@ function CityActionsMenu({
   scamFlagBusy: boolean;
   tgReminderBusy: boolean;
   walletReminderBusy: boolean;
+  photoReminderBusy: boolean;
   reopenBusy: boolean;
   approveBusy: boolean;
   /** panuozzo-58217: current custom-tag display labels (no `custom:` prefix). */
@@ -555,6 +581,7 @@ function CityActionsMenu({
   tagBusy: boolean;
   receiptsReminderSentAt?: string | null;
   walletReminderSentAt?: string | null;
+  photoReminderSentAt?: string | null;
   paymentsApprovedUsd?: number | null;
   paymentsApprovedAt?: string | null;
   /** Receipts total for default approval amount. */
@@ -572,6 +599,9 @@ function CityActionsMenu({
   // Same two-click confirm, separate state so the wallet + receipts items
   // don't share a confirm flag.
   const [confirmWalletReminder, setConfirmWalletReminder] = useState(false);
+  // Same two-click confirm, separate state so the photo + wallet + receipts
+  // items don't share a confirm flag.
+  const [confirmPhotoReminder, setConfirmPhotoReminder] = useState(false);
   // panuozzo-58217: the custom-tag add field. Declared above the no-actions
   // early return so the conditional return can't reorder hooks.
   const [tagDraft, setTagDraft] = useState('');
@@ -618,6 +648,7 @@ function CityActionsMenu({
     canToggleScamFlag ||
     canSendTgReminder ||
     canSendWalletReminder ||
+    canSendPhotoReminder ||
     canReopen ||
     canManageTags;
   // Nothing to show at all — render nothing.
@@ -719,6 +750,7 @@ function CityActionsMenu({
                 } else {
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
+                  setConfirmPhotoReminder(false);
                   setMenuPos(null);
                 }
                 return next;
@@ -741,6 +773,7 @@ function CityActionsMenu({
                   setMenuOpen(false);
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
+                  setConfirmPhotoReminder(false);
                   setMenuPos(null);
                 }}
               />
@@ -917,6 +950,54 @@ function CityActionsMenu({
                       {walletReminderSentAt && !confirmWalletReminder && (
                         <span className="text-xs text-theme-text-muted">
                           Sent {new Date(walletReminderSentAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )}
+                {/* Send photo reminder — sibling of the receipts reminder.
+                    DMs the host + posts to the city group telling them to
+                    upload their event photos. Same two-click confirm
+                    (DMs can't be unsent). Shows a last-sent sub-label from
+                    `photoReminderSentAt`, mirroring the receipts reminder. */}
+                {canSendPhotoReminder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={photoReminderBusy}
+                    onClick={() => {
+                      if (!confirmPhotoReminder) {
+                        setConfirmPhotoReminder(true);
+                        return;
+                      }
+                      setMenuOpen(false);
+                      setConfirmPhotoReminder(false);
+                      onSendPhotoReminder?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {photoReminderBusy ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-theme-text-muted"
+                      />
+                    ) : (
+                      <Camera
+                        size={14}
+                        className={
+                          confirmPhotoReminder ? 'text-amber-400' : 'text-sky-400'
+                        }
+                      />
+                    )}
+                    <span className="flex flex-col items-start">
+                      <span>
+                        {confirmPhotoReminder
+                          ? 'Click again to confirm'
+                          : 'Send photo reminder'}
+                      </span>
+                      {photoReminderSentAt && !confirmPhotoReminder && (
+                        <span className="text-xs text-theme-text-muted">
+                          Sent {new Date(photoReminderSentAt).toLocaleDateString()}
                         </span>
                       )}
                     </span>
@@ -2824,6 +2905,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onTagsChanged,
   onTgReminderResult,
   onTgWalletReminderResult,
+  onTgPhotoReminderResult,
   fakeScores,
   viewerRole = 'admin',
   busyRowId,
@@ -2866,6 +2948,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const [walletReminderBusyPartyId, setWalletReminderBusyPartyId] = useState<
     string | null
   >(null);
+  // Per-row busy spinner for the Send photo reminder action.
+  const [photoReminderBusyPartyId, setPhotoReminderBusyPartyId] = useState<
+    string | null
+  >(null);
   // City-level approval busy spinner.
   const [approveBusyPartyId, setApproveBusyPartyId] = useState<string | null>(null);
   // Per-row busy spinner for the Reopen city action.
@@ -2893,6 +2979,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const canToggleTaxFormRequired = viewerRole === 'admin';
   // Wallet reminder shares the same admin-only gate as the receipts reminder.
   const canSendWalletReminder = viewerRole === 'admin';
+  // Photo reminder shares the same admin-only gate as the receipts reminder.
+  const canSendPhotoReminder = viewerRole === 'admin';
   // City-level approval is admin-only.
   const canApproveCity = viewerRole === 'admin';
   // Reopen (undo a close) is admin-only — the endpoint enforces
@@ -3138,6 +3226,26 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   }
 
   /**
+   * Sibling of {@link handleSendTgReminder}: dispatch the photo reminder POST
+   * and forward the per-channel outcome via `onTgPhotoReminderResult`. Group
+   * chat_id resolved server-side (tonda-58293) — no client groupChatId.
+   */
+  async function handleSendPhotoReminder(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    setPhotoReminderBusyPartyId(partyId);
+    try {
+      const result = await sendTgPhotoReminder(partyId);
+      onTgPhotoReminderResult?.(partyId, result);
+    } catch (err) {
+      onTgPhotoReminderResult?.(partyId, {
+        error: (err as Error)?.message ?? 'Could not send reminder',
+      });
+    } finally {
+      setPhotoReminderBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
    * City-level payment approval. Approves the receipts total as the payment
    * amount (or clears approval when amountUsd is null).
    */
@@ -3269,6 +3377,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
               const tgReminderBusy = tgReminderBusyPartyId === row.party.id;
               const walletReminderBusy =
                 walletReminderBusyPartyId === row.party.id;
+              const photoReminderBusy =
+                photoReminderBusyPartyId === row.party.id;
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
               // pinsa-92103: ALSO show the button when the city has paid
@@ -3582,6 +3692,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canToggleScamFlag={canToggleScamFlag}
                           canSendTgReminder={canSendTgReminder}
                           canSendWalletReminder={canSendWalletReminder}
+                          canSendPhotoReminder={canSendPhotoReminder}
                           canApproveCity={canApproveCity}
                           canReopen={isClosed && canReopenCap}
                           canManageTags={canManageTags}
@@ -3592,10 +3703,12 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           scamFlagBusy={scamFlagBusy}
                           tgReminderBusy={tgReminderBusy}
                           walletReminderBusy={walletReminderBusy}
+                          photoReminderBusy={photoReminderBusy}
                           reopenBusy={reopenBusyPartyId === row.party.id}
                           approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
                           walletReminderSentAt={row.party.walletReminderSentAt}
+                          photoReminderSentAt={row.party.photoReminderSentAt}
                           paymentsApprovedUsd={row.party.paymentsApprovedUsd}
                           paymentsApprovedAt={row.party.paymentsApprovedAt}
                           receiptsTotalUsd={receiptUsdTotal}
@@ -3642,6 +3755,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onSendWalletReminder={
                             canSendWalletReminder
                               ? () => handleSendWalletReminder(row)
+                              : undefined
+                          }
+                          onSendPhotoReminder={
+                            canSendPhotoReminder
+                              ? () => handleSendPhotoReminder(row)
                               : undefined
                           }
                           onReopen={

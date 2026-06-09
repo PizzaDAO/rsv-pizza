@@ -173,6 +173,7 @@ model Party {
   hostTelegramLinkToken   String?   @unique @map("host_telegram_link_token") @db.VarChar // nanoid(10) token for host /start deeplink
   receiptsReminderSentAt  DateTime? @map("receipts_reminder_sent_at") @db.Timestamptz // When admin sent TG receipts reminder
   walletReminderSentAt    DateTime? @map("wallet_reminder_sent_at") @db.Timestamptz // When admin sent TG wallet reminder
+  photoReminderSentAt     DateTime? @map("photo_reminder_sent_at") @db.Timestamptz // When admin sent TG photo reminder
   poapEventId             String?   @map("poap_event_id") // POAP event ID
   poapMints             Int?    @map("poap_mints") // POAP mint count
   poapMoments           Int?    @map("poap_moments") // POAP moments count
