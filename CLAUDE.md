@@ -69,7 +69,7 @@ Use **`mcp__supabase-pizzadao__`** for this project (not `supabase-snax`).
 ## CI gates & migration safety
 - **Apply Prisma migrations to prod BEFORE merging the schema change.** The backend auto-deploys from `master` within ~1 min, and Prisma SELECTs every declared field, so a `schema.prisma` field-add merged ahead of its column 500s every query on that model (incident 2026-05-17, PR #356 / arugula-38633).
 - **`scripts/check-schema-drift.js`** (run via `npm --prefix backend run check:schema-drift`, needs `DATABASE_URL`) is the read-only guard for the above. CI runs it on every PR touching the schema/migrations (`.github/workflows/schema-drift.yml`). It only `SELECT`s `information_schema` — never add writes.
-- **`.github/workflows/lint.yml`** runs `npm run lint` on frontend PRs. `rules-of-hooks` is error-level, so hooks declared below an early return fail CI here (they build fine but black-screen at runtime — arugula-38633 v2). `vite build` does NOT lint, so this gate is the only automated lint.
+- **`.github/workflows/lint.yml`** runs **only `react-hooks/rules-of-hooks`** over `frontend/src` on PRs (via `frontend/eslint.hooks.config.js`). That's the high-value class: a hook below an early return builds fine but black-screens at runtime (arugula-38633 v2). It's scoped this tight because full `npm run lint` carries ~678 pre-existing debt items (`no-explicit-any`, `no-unused-vars`); pay that down before widening the gate. `vite build` does NOT lint, so this is the only automated lint.
 
 ## Realtime
 

@@ -1,24 +1,26 @@
-name: Lint (frontend)
+name: Hooks lint (frontend)
 
-# Runs `npm run lint` (ESLint) on PRs that touch the frontend. The repo already
-# enables react-hooks/rules-of-hooks (error) via the recommended config, but
-# nothing ran it: build/deploy only fire on push to master, vite build does not
-# lint, and a hooks-order violation usually still BUILDS yet crashes at runtime
-# (black-screen). This gate catches that class before merge.
+# Runs ONLY react-hooks/rules-of-hooks over frontend/src on PRs that touch it.
 #
-# ESLint exits non-zero only on error-level rules (rules-of-hooks). exhaustive-deps
-# and react-refresh are warnings and do NOT fail the job, so this is not noisy.
-# Incident this guards: arugula-38633 v2 — useMemo added below an early return
-# black-screened HostPage (2026-05-19).
+# Why focused and not `npm run lint`: the full lint carries ~678 pre-existing debt
+# items (no-explicit-any, no-unused-vars, exhaustive-deps warnings) so it can't gate
+# PRs yet. But rules-of-hooks is the high-value incident class — a hook declared
+# below an early return builds fine yet black-screens at runtime (arugula-38633 v2,
+# 2026-05-19). This gate blocks that one class without the debt noise.
+#
+# Config: frontend/eslint.hooks.config.js (e2e/ excluded — Playwright's `use` param
+# false-positives the rule). To later enforce full lint, pay down the debt and point
+# this at `npm run lint`.
 
 on:
   pull_request:
     paths:
-      - 'frontend/**'
+      - 'frontend/src/**'
+      - 'frontend/eslint.hooks.config.js'
       - '.github/workflows/lint.yml'
 
 jobs:
-  lint:
+  hooks-lint:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,6 +39,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Lint
+      - name: Lint hooks rules (src only)
         working-directory: frontend
-        run: npm run lint
+        run: npx eslint --config eslint.hooks.config.js "src/**/*.{ts,tsx}"
