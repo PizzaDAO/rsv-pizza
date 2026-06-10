@@ -2304,8 +2304,12 @@ router.get(
       });
 
       // tigella-58512: optional `?showTbdUnsubmitted=1` injects synthetic
-      // by-party rows for approved events tagged `tbd` that have submitted
-      // NOTHING yet (zero payouts AND zero payout documents of any kind).
+      // by-party rows for approved events that have submitted NOTHING yet
+      // (zero payouts AND zero payout documents of any kind).
+      // polpetta-58528: the `tbd`-tag scope was REMOVED — the injection now
+      // covers ANY approved city with no submission, regardless of tag, so
+      // already-settled GPP hubs (e.g. tagged `paid` but with no payout row)
+      // also surface instead of being silently hidden.
       // Because these parties have zero payouts they produce zero grouped
       // `rows` above, so they're invisible on /payments without this. OFF by
       // default — when the param is absent the response is byte-identical to
@@ -2318,12 +2322,11 @@ router.get(
         // country/tag/region/closed clauses live on `where.party`; the search
         // partyId set lives on `where.OR` / `where.partyId`). We do NOT apply
         // any payout-level filters (status/method/purpose/currency/date) —
-        // these rows have no payouts. The tbd + zero-submission predicates are
+        // these rows have no payouts. The zero-submission predicates are
         // AND'd on top via an explicit AND array so a `tag` filter on
         // `where.party.eventTags` is preserved rather than clobbered.
         const partyScope: any = { ...(where.party ?? {}) };
         const andParts: any[] = [
-          { eventTags: { hasSome: ['tbd', 'TBD'] } },
           { payouts: { none: {} } },
           { payoutDocuments: { none: {} } },
         ];

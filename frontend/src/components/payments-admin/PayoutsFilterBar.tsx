@@ -556,7 +556,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               <Checkbox
                 checked={!!filters.showTbdUnsubmitted}
                 onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
-                label="Show TBD (no submission)"
+                label="Show unsubmitted cities"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />
