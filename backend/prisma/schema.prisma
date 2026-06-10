@@ -174,6 +174,7 @@ model Party {
   receiptsReminderSentAt  DateTime? @map("receipts_reminder_sent_at") @db.Timestamptz // When admin sent TG receipts reminder
   walletReminderSentAt    DateTime? @map("wallet_reminder_sent_at") @db.Timestamptz // When admin sent TG wallet reminder
   photoReminderSentAt     DateTime? @map("photo_reminder_sent_at") @db.Timestamptz // When admin sent TG photo reminder
+  attendanceReminderSentAt DateTime? @map("attendance_reminder_sent_at") @db.Timestamptz // When admin sent TG attendance reminder
   poapEventId             String?   @map("poap_event_id") // POAP event ID
   poapMints             Int?    @map("poap_mints") // POAP mint count
   poapMoments           Int?    @map("poap_moments") // POAP moments count

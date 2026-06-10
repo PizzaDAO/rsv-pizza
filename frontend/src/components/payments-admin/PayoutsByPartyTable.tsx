@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Wallet,
   Camera,
+  Users,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -67,6 +68,7 @@ import {
   sendTgReceiptsReminder,
   sendTgWalletReminder,
   sendTgPhotoReminder,
+  sendTgAttendanceReminder,
   setCityAdminNotes,
   approveCity,
   reopenParty,
@@ -302,6 +304,19 @@ interface PayoutsByPartyTableProps {
     } | { error: string },
   ) => void;
   /**
+   * Toast callback for the Send attendance reminder action — same per-channel
+   * success/skip shape as `onTgReminderResult`. The menu owns the API call.
+   */
+  onTgAttendanceReminderResult?: (
+    partyId: string,
+    result: {
+      hostDmSent: boolean;
+      hostDmReason?: string;
+      groupSent: boolean;
+      groupReason?: string;
+    } | { error: string },
+  ) => void;
+  /**
    * bufalina-60733: fake-detection risk scores keyed by party id. Only
    * medium/high (≥30) parties are present; an absent key means "no badge".
    * Rendered as a caution pill in the city header strip.
@@ -498,6 +513,7 @@ function CityActionsMenu({
   onSendTgReminder,
   onSendWalletReminder,
   onSendPhotoReminder,
+  onSendAttendanceReminder,
   onApproveCity,
   onReopen,
   onAddCustomTag,
@@ -509,6 +525,7 @@ function CityActionsMenu({
   canSendTgReminder,
   canSendWalletReminder,
   canSendPhotoReminder,
+  canSendAttendanceReminder,
   canApproveCity,
   canReopen,
   canManageTags,
@@ -518,6 +535,7 @@ function CityActionsMenu({
   tgReminderBusy,
   walletReminderBusy,
   photoReminderBusy,
+  attendanceReminderBusy,
   reopenBusy,
   approveBusy,
   customTags,
@@ -525,6 +543,7 @@ function CityActionsMenu({
   receiptsReminderSentAt,
   walletReminderSentAt,
   photoReminderSentAt,
+  attendanceReminderSentAt,
   paymentsApprovedUsd,
   receiptsTotalUsd,
 }: {
@@ -548,6 +567,11 @@ function CityActionsMenu({
    * two-click confirm pattern as the receipts reminder).
    */
   onSendPhotoReminder?: () => void;
+  /**
+   * Fires after the second click on the Send attendance reminder menu item (same
+   * two-click confirm pattern as the receipts reminder).
+   */
+  onSendAttendanceReminder?: () => void;
   /** Approve city payment amount. Called with the amount to approve. */
   onApproveCity?: (amountUsd: number | null) => void;
   /** Reopen a closed city (undo the close). */
@@ -563,6 +587,7 @@ function CityActionsMenu({
   canSendTgReminder: boolean;
   canSendWalletReminder: boolean;
   canSendPhotoReminder: boolean;
+  canSendAttendanceReminder: boolean;
   canApproveCity: boolean;
   canReopen: boolean;
   /** panuozzo-58217: admins + underbosses may add/view/remove custom tags. */
@@ -573,6 +598,7 @@ function CityActionsMenu({
   tgReminderBusy: boolean;
   walletReminderBusy: boolean;
   photoReminderBusy: boolean;
+  attendanceReminderBusy: boolean;
   reopenBusy: boolean;
   approveBusy: boolean;
   /** panuozzo-58217: current custom-tag display labels (no `custom:` prefix). */
@@ -582,6 +608,7 @@ function CityActionsMenu({
   receiptsReminderSentAt?: string | null;
   walletReminderSentAt?: string | null;
   photoReminderSentAt?: string | null;
+  attendanceReminderSentAt?: string | null;
   paymentsApprovedUsd?: number | null;
   paymentsApprovedAt?: string | null;
   /** Receipts total for default approval amount. */
@@ -602,6 +629,9 @@ function CityActionsMenu({
   // Same two-click confirm, separate state so the photo + wallet + receipts
   // items don't share a confirm flag.
   const [confirmPhotoReminder, setConfirmPhotoReminder] = useState(false);
+  // Same two-click confirm, separate state so the attendance + photo + wallet +
+  // receipts items don't share a confirm flag.
+  const [confirmAttendanceReminder, setConfirmAttendanceReminder] = useState(false);
   // panuozzo-58217: the custom-tag add field. Declared above the no-actions
   // early return so the conditional return can't reorder hooks.
   const [tagDraft, setTagDraft] = useState('');
@@ -649,6 +679,7 @@ function CityActionsMenu({
     canSendTgReminder ||
     canSendWalletReminder ||
     canSendPhotoReminder ||
+    canSendAttendanceReminder ||
     canReopen ||
     canManageTags;
   // Nothing to show at all — render nothing.
@@ -751,6 +782,7 @@ function CityActionsMenu({
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
                   setConfirmPhotoReminder(false);
+                  setConfirmAttendanceReminder(false);
                   setMenuPos(null);
                 }
                 return next;
@@ -774,6 +806,7 @@ function CityActionsMenu({
                   setConfirmTgReminder(false);
                   setConfirmWalletReminder(false);
                   setConfirmPhotoReminder(false);
+                  setConfirmAttendanceReminder(false);
                   setMenuPos(null);
                 }}
               />
@@ -998,6 +1031,54 @@ function CityActionsMenu({
                       {photoReminderSentAt && !confirmPhotoReminder && (
                         <span className="text-xs text-theme-text-muted">
                           Sent {new Date(photoReminderSentAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )}
+                {/* Send attendance reminder — sibling of the photo reminder.
+                    DMs the host + posts to the city group telling them to
+                    submit their event's estimated attendance. Same two-click
+                    confirm (DMs can't be unsent). Shows a last-sent sub-label
+                    from `attendanceReminderSentAt`, mirroring the photo reminder. */}
+                {canSendAttendanceReminder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={attendanceReminderBusy}
+                    onClick={() => {
+                      if (!confirmAttendanceReminder) {
+                        setConfirmAttendanceReminder(true);
+                        return;
+                      }
+                      setMenuOpen(false);
+                      setConfirmAttendanceReminder(false);
+                      onSendAttendanceReminder?.();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {attendanceReminderBusy ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-theme-text-muted"
+                      />
+                    ) : (
+                      <Users
+                        size={14}
+                        className={
+                          confirmAttendanceReminder ? 'text-amber-400' : 'text-sky-400'
+                        }
+                      />
+                    )}
+                    <span className="flex flex-col items-start">
+                      <span>
+                        {confirmAttendanceReminder
+                          ? 'Click again to confirm'
+                          : 'Send attendance reminder'}
+                      </span>
+                      {attendanceReminderSentAt && !confirmAttendanceReminder && (
+                        <span className="text-xs text-theme-text-muted">
+                          Sent {new Date(attendanceReminderSentAt).toLocaleDateString()}
                         </span>
                       )}
                     </span>
@@ -2906,6 +2987,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onTgReminderResult,
   onTgWalletReminderResult,
   onTgPhotoReminderResult,
+  onTgAttendanceReminderResult,
   fakeScores,
   viewerRole = 'admin',
   busyRowId,
@@ -2952,6 +3034,9 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const [photoReminderBusyPartyId, setPhotoReminderBusyPartyId] = useState<
     string | null
   >(null);
+  const [attendanceReminderBusyPartyId, setAttendanceReminderBusyPartyId] = useState<
+    string | null
+  >(null);
   // City-level approval busy spinner.
   const [approveBusyPartyId, setApproveBusyPartyId] = useState<string | null>(null);
   // Per-row busy spinner for the Reopen city action.
@@ -2981,6 +3066,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   const canSendWalletReminder = viewerRole === 'admin';
   // Photo reminder shares the same admin-only gate as the receipts reminder.
   const canSendPhotoReminder = viewerRole === 'admin';
+  // Attendance reminder shares the same admin-only gate as the photo reminder.
+  const canSendAttendanceReminder = viewerRole === 'admin';
   // City-level approval is admin-only.
   const canApproveCity = viewerRole === 'admin';
   // Reopen (undo a close) is admin-only — the endpoint enforces
@@ -3246,6 +3333,26 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   }
 
   /**
+   * Sibling of {@link handleSendPhotoReminder}: dispatch the attendance reminder
+   * POST and forward the per-channel outcome via `onTgAttendanceReminderResult`.
+   * Group chat_id resolved server-side (tonda-58293) — no client groupChatId.
+   */
+  async function handleSendAttendanceReminder(row: PartyPayoutsRow) {
+    const partyId = row.party.id;
+    setAttendanceReminderBusyPartyId(partyId);
+    try {
+      const result = await sendTgAttendanceReminder(partyId);
+      onTgAttendanceReminderResult?.(partyId, result);
+    } catch (err) {
+      onTgAttendanceReminderResult?.(partyId, {
+        error: (err as Error)?.message ?? 'Could not send reminder',
+      });
+    } finally {
+      setAttendanceReminderBusyPartyId((id) => (id === partyId ? null : id));
+    }
+  }
+
+  /**
    * City-level payment approval. Approves the receipts total as the payment
    * amount (or clears approval when amountUsd is null).
    */
@@ -3379,6 +3486,8 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 walletReminderBusyPartyId === row.party.id;
               const photoReminderBusy =
                 photoReminderBusyPartyId === row.party.id;
+              const attendanceReminderBusy =
+                attendanceReminderBusyPartyId === row.party.id;
               const hasInFlight =
                 row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
               // pinsa-92103: ALSO show the button when the city has paid
@@ -3693,6 +3802,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           canSendTgReminder={canSendTgReminder}
                           canSendWalletReminder={canSendWalletReminder}
                           canSendPhotoReminder={canSendPhotoReminder}
+                          canSendAttendanceReminder={canSendAttendanceReminder}
                           canApproveCity={canApproveCity}
                           canReopen={isClosed && canReopenCap}
                           canManageTags={canManageTags}
@@ -3704,11 +3814,13 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           tgReminderBusy={tgReminderBusy}
                           walletReminderBusy={walletReminderBusy}
                           photoReminderBusy={photoReminderBusy}
+                          attendanceReminderBusy={attendanceReminderBusy}
                           reopenBusy={reopenBusyPartyId === row.party.id}
                           approveBusy={approveBusyPartyId === row.party.id}
                           receiptsReminderSentAt={row.party.receiptsReminderSentAt}
                           walletReminderSentAt={row.party.walletReminderSentAt}
                           photoReminderSentAt={row.party.photoReminderSentAt}
+                          attendanceReminderSentAt={row.party.attendanceReminderSentAt}
                           paymentsApprovedUsd={row.party.paymentsApprovedUsd}
                           paymentsApprovedAt={row.party.paymentsApprovedAt}
                           receiptsTotalUsd={receiptUsdTotal}
@@ -3760,6 +3872,11 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           onSendPhotoReminder={
                             canSendPhotoReminder
                               ? () => handleSendPhotoReminder(row)
+                              : undefined
+                          }
+                          onSendAttendanceReminder={
+                            canSendAttendanceReminder
+                              ? () => handleSendAttendanceReminder(row)
                               : undefined
                           }
                           onReopen={
