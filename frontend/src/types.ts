@@ -606,6 +606,133 @@ export interface SponsorStats {
   statusCounts: Record<SponsorStatus, number>;
 }
 
+// Invoice types
+export type InvoiceStatus = 'draft' | 'issued' | 'viewed' | 'paid' | 'cancelled';
+
+export interface InvoiceLineItem {
+  description: string;
+  amount: number; // in cents
+}
+
+export interface Invoice {
+  id: string;
+  partyId: string;
+  sponsorId: string;
+  invoiceNumber: string;
+  viewToken: string;
+  billToCompany: string | null;
+  billToContact: string | null;
+  billToAddress: string | null;
+  billToEmail: string;
+  ccEmails: string[];
+  lineItems: InvoiceLineItem[];
+  total: number; // in cents
+  currency: string;
+  paymentTerms: string | null;
+  paymentInstructions: string | null;
+  dueDate: string | null;
+  memo: string | null;
+  status: InvoiceStatus;
+  paidAt: string | null;
+  paidAmount: number | null;
+  paymentMethod: string | null;
+  paymentRef: string | null;
+  sentAt: string | null;
+  viewedAt: string | null;
+  attachments: Array<{ name: string; url: string }>;
+  createdAt: string;
+  updatedAt: string;
+  sponsor?: {
+    id: string;
+    name: string;
+    contactEmail: string | null;
+    logoUrl: string | null;
+  };
+  party?: {
+    name: string;
+    eventImageUrl?: string | null;
+  };
+}
+
+export interface CreateInvoiceData {
+  sponsorId: string;
+  billToCompany?: string;
+  billToContact?: string;
+  billToAddress?: string;
+  billToEmail?: string;
+  ccEmails?: string[];
+  lineItems?: InvoiceLineItem[];
+  total?: number;
+  currency?: string;
+  paymentTerms?: string;
+  paymentInstructions?: string;
+  dueDate?: string;
+  memo?: string;
+  attachments?: Array<{ name: string; url: string }>;
+}
+
+export interface UpdateInvoiceData extends Partial<Omit<CreateInvoiceData, 'sponsorId'>> {}
+
+// MOU (Memorandum of Understanding) types
+export type MouStatus = 'draft' | 'issued' | 'viewed' | 'signed' | 'cancelled';
+
+export interface Mou {
+  id: string;
+  partyId: string;
+  sponsorId: string;
+  mouNumber: string;
+  viewToken: string;
+  counterpartyCompany: string | null;
+  counterpartyContact: string | null;
+  counterpartyEmail: string;
+  ccEmails: string[];
+  title: string;
+  bodyMarkdown: string;
+  effectiveDate: string | null;
+  termText: string | null;
+  status: MouStatus;
+  signerName: string | null;
+  signerEmail: string | null;
+  signedAt: string | null;
+  issuerName: string | null;
+  issuerSignedAt: string | null;
+  sentAt: string | null;
+  viewedAt: string | null;
+  attachments: Array<{ name: string; url: string }>;
+  createdAt: string;
+  updatedAt: string;
+  sponsor?: {
+    id: string;
+    name: string;
+    contactEmail: string | null;
+    logoUrl: string | null;
+  };
+  party?: {
+    name: string;
+    eventImageUrl?: string | null;
+  };
+}
+
+export interface CreateMouData {
+  sponsorId: string;
+  counterpartyCompany?: string;
+  counterpartyContact?: string;
+  counterpartyEmail?: string;
+  ccEmails?: string[];
+  title?: string;
+  bodyMarkdown?: string;
+  effectiveDate?: string;
+  termText?: string;
+  attachments?: Array<{ name: string; url: string }>;
+}
+
+export interface UpdateMouData extends Partial<Omit<CreateMouData, 'sponsorId'>> {}
+
+export interface SignMouData {
+  signerName: string;
+  agree: boolean;
+}
+
 // Music/DJ Lineup types
 export type PerformerType = 'dj' | 'live_band' | 'solo' | 'playlist';
 export type PerformerStatus = 'pending' | 'confirmed' | 'cancelled';

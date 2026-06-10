@@ -61,6 +61,8 @@ import imageAuthenticityRoutes from './routes/imageAuthenticity.routes.js'; // m
 import graphicsAdminRoutes from './routes/graphics-admin.routes.js';
 import logoAuditRoutes from './routes/logoAudit.routes.js';
 import { sponsorUserAdminRouter, sponsorDashboardRouter, partnerAiShareRouter } from './routes/sponsor-user.routes.js';
+import { invoiceHostRoutes, invoicePublicRoutes } from './routes/invoice.routes.js';
+import { mouHostRoutes, mouPublicRoutes } from './routes/mou.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
 import quizTemplateRoutes from './routes/quiz-template.routes.js';
 import { quizHostRouter, quizPublicRouter } from './routes/quiz.routes.js';
@@ -194,6 +196,10 @@ app.use('/api/parties', venuePhotoRoutes); // Venue photo routes (host only)
 app.use('/api/parties', venueReportRoutes); // Venue report routes (includes public)
 app.use('/api/parties', venueRoutes); // Venue routes (host only)
 app.use('/api/partner-intake', partnerIntakeRoutes); // Public partner intake form routes
+app.use('/api/invoice', invoicePublicRoutes); // Public invoice view routes (token-gated)
+app.use('/api/parties', invoiceHostRoutes); // Invoice host routes (before sponsorRoutes)
+app.use('/api/mou', mouPublicRoutes); // Public MOU view + sign routes (token-gated)
+app.use('/api/parties', mouHostRoutes); // MOU host routes (before sponsorRoutes)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
 app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
