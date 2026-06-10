@@ -2655,6 +2655,12 @@ export interface PartyPayoutsRow {
     paymentsApprovedUsd?: number | null;
     /** ISO timestamp of when the city payment was approved. */
     paymentsApprovedAt?: string | null;
+    /** cappelletti-58525: host-submitted estimated attendance (null when unsubmitted). */
+    estimatedAttendance?: number | null;
+    /** cappelletti-58525: count of non-invited guests (status != INVITED). */
+    rsvpCount?: number;
+    /** cappelletti-58525: count of guests with a check-in timestamp. */
+    checkInCount?: number;
   };
   aggregates: {
     pendingCount: number;

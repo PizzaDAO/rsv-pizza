@@ -266,6 +266,9 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   // toggle can filter rows where party.region === 'usa'.
   region: true,
   expectedGuests: true,
+  // cappelletti-58525: host-submitted estimated attendance, surfaced on the
+  // /payments by-city line (distinct from expectedGuests).
+  estimatedAttendance: true,
   // arugula-38633 v2 follow-up: surface the effective reimbursement cap on
   // the /payments admin dashboard. Raw `reimbursementCapUsd` + `eventTags`
   // are selected here so `serializePayout` can resolve them via the shared
@@ -1937,6 +1940,33 @@ router.get(
         }
       }
 
+      // cappelletti-58525: per-party RSVP + check-in counts for the by-city
+      // line. RSVPs = all non-invited guests (matches /underboss guestCount);
+      // check-ins = guests with a check-in timestamp. Two batched groupBys
+      // over the same party id set, mirroring the receiptCounts pattern.
+      const rsvpCounts = new Map<string, number>();
+      const checkInCounts = new Map<string, number>();
+      if (uniquePartyIds.length > 0) {
+        const [rsvpRows, checkInRows] = await Promise.all([
+          prisma.guest.groupBy({
+            by: ['partyId'],
+            where: { partyId: { in: uniquePartyIds }, status: { not: 'INVITED' } },
+            _count: { id: true },
+          }),
+          prisma.guest.groupBy({
+            by: ['partyId'],
+            where: { partyId: { in: uniquePartyIds }, checkedInAt: { not: null } },
+            _count: { id: true },
+          }),
+        ]);
+        for (const r of rsvpRows) {
+          rsvpCounts.set(r.partyId, r._count.id);
+        }
+        for (const r of checkInRows) {
+          checkInCounts.set(r.partyId, r._count.id);
+        }
+      }
+
       // ricotta-92104: per-party event photos for the by-city expansion's
       // Event/Pizza preview sections. Mirrors the same select shape as the
       // per-payout serializer (admin-payout.routes.ts ~line 2189) so the
@@ -2185,6 +2215,11 @@ router.get(
             paymentsApprovedAt: b.partyMeta.paymentsApprovedAt
               ? b.partyMeta.paymentsApprovedAt.toISOString()
               : null,
+            // cappelletti-58525: est. attendance + RSVP + check-in counts for
+            // the by-city line.
+            estimatedAttendance: b.partyMeta.estimatedAttendance ?? null,
+            rsvpCount: rsvpCounts.get(partyId) ?? 0,
+            checkInCount: checkInCounts.get(partyId) ?? 0,
           },
           aggregates: {
             pendingCount: b.pendingCount,
@@ -2325,6 +2360,13 @@ router.get(
               paymentsApprovedAt: partyMeta.paymentsApprovedAt
                 ? partyMeta.paymentsApprovedAt.toISOString()
                 : null,
+              // cappelletti-58525: keep the shape consistent with real rows.
+              // tbd/unsubmitted events surface their real est. attendance (if
+              // any); RSVP/check-in counts default to 0 (these are
+              // zero-submission events and not in the groupBy id set).
+              estimatedAttendance: partyMeta.estimatedAttendance ?? null,
+              rsvpCount: 0,
+              checkInCount: 0,
             },
             aggregates: {
               pendingCount: 0,
