@@ -20,6 +20,7 @@ import { renderAnnouncementBodyHtml } from '../lib/markdownLinks.js';
 import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
+import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -864,6 +865,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         actorKind,
         note: 'PATCH /api/parties/:id',
       });
+      // stromboli-58523: notify host of reimbursement-cap change (fire-and-forget)
+      void emailHostOfCapChange(id, priorCapUsd, reimbursementCapUsdToWrite);
     }
 
     // Trigger webhook for party update
