@@ -75,7 +75,7 @@ export async function sendConnectInviteEmail(params: {
 <p>Connect your Telegram${cityLine} so PizzaDAO can send you host announcements and reminders directly via @MoltoBeneBot.</p>
 <p><a href="${deeplink}">Tap here to connect on Telegram</a></p>
 <p style="color:#888;font-size:12px;">If the button doesn't work, open this link in Telegram: ${escapeHtml(deeplink)}</p>
-<p>— Pizza DAO</p>`;
+<p>Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>`;
 
   return resendSend(toEmail, subject, html);
 }
@@ -104,7 +104,7 @@ export async function sendBroadcastFallbackEmail(params: {
   const html = `<p>Hey ${greet},</p>
 <p>${body}</p>
 <p style="color:#888;font-size:12px;">You're getting this by email because your Telegram isn't connected to @MoltoBeneBot yet. Connect it to receive these directly on Telegram next time.</p>
-<p>— Pizza DAO</p>`;
+<p>Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>`;
 
   return resendSend(toEmail, subject, html);
 }
