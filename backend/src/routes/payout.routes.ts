@@ -1713,6 +1713,21 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
 
     res.status(201).json({ payout: serializePayout(payout) });
   } catch (error) {
+    // tortellini-58520: structured capture so the next prod 500 on payout
+    // submit is diagnosable from Vercel logs (cause was opaque before).
+    const e = error as any;
+    const b = (req.body || {}) as any;
+    console.error('[payouts] POST submit failed', {
+      partyId: req.params.partyId,
+      userId: req.userId,
+      code: e?.code,
+      statusCode: e?.statusCode,
+      message: e?.message,
+      pizzaPhotos: Array.isArray(b.pizzaPhotos) ? b.pizzaPhotos.length : undefined,
+      eventPhotos: Array.isArray(b.eventPhotos) ? b.eventPhotos.length : undefined,
+      receiptPhotos: Array.isArray(b.receiptPhotos) ? b.receiptPhotos.length : undefined,
+      stack: e?.stack,
+    });
     next(error);
   }
 });
