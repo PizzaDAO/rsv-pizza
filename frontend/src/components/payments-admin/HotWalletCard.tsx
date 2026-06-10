@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wallet, RefreshCcw, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { fetchPayoutWalletInfo, type PayoutWalletInfo } from '../../lib/api';
 
@@ -47,9 +47,14 @@ interface HotWalletCardProps {
    * two balance tiles still render.
    */
   readOnly?: boolean;
+  /**
+   * margherita-58526: parent bumps this to a new truthy value after a USDC
+   * send so the card re-fetches its balances in place (no manual refresh).
+   */
+  refreshSignal?: number;
 }
 
-export const HotWalletCard: React.FC<HotWalletCardProps> = ({ readOnly = false }) => {
+export const HotWalletCard: React.FC<HotWalletCardProps> = ({ readOnly = false, refreshSignal }) => {
   const [info, setInfo] = useState<PayoutWalletInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -72,6 +77,16 @@ export const HotWalletCard: React.FC<HotWalletCardProps> = ({ readOnly = false }
   useEffect(() => {
     load();
   }, [load]);
+
+  const prevSignalRef = useRef<number | undefined>(refreshSignal);
+  useEffect(() => {
+    // margherita-58526: parent bumps refreshSignal after a USDC send so the
+    // balance updates in place without a manual refresh. Skip the initial
+    // value — the mount effect above already does the first fetch.
+    if (prevSignalRef.current === refreshSignal) return;
+    prevSignalRef.current = refreshSignal;
+    if (refreshSignal) load();
+  }, [refreshSignal, load]);
 
   const handleCopy = useCallback(async () => {
     if (!info?.address) return;
