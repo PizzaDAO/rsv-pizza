@@ -1662,6 +1662,45 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 result.hostDmSent || result.groupSent ? 'success' : 'error';
               pushToast(`Photo reminder: ${hostLabel} | ${groupLabel}`, tone);
             }}
+            // Attendance reminder — same per-channel success/skip toast as the
+            // photo reminder.
+            onTgAttendanceReminderResult={(partyId, result) => {
+              if ('error' in result) {
+                pushToast(
+                  `Could not send attendance reminder: ${result.error}`,
+                  'error',
+                );
+                return;
+              }
+              if (result.hostDmSent || result.groupSent) {
+                setByPartyRows((prev) =>
+                  prev.map((r) =>
+                    r.party.id === partyId
+                      ? {
+                          ...r,
+                          party: {
+                            ...r.party,
+                            attendanceReminderSentAt: new Date().toISOString(),
+                          },
+                        }
+                      : r,
+                  ),
+                );
+              }
+              const hostLabel = result.hostDmSent
+                ? 'DM ✓'
+                : `DM skipped${
+                    result.hostDmReason ? ` (${result.hostDmReason})` : ''
+                  }`;
+              const groupLabel = result.groupSent
+                ? 'Group ✓'
+                : `Group skipped${
+                    result.groupReason ? ` (${result.groupReason})` : ''
+                  }`;
+              const tone =
+                result.hostDmSent || result.groupSent ? 'success' : 'error';
+              pushToast(`Attendance reminder: ${hostLabel} | ${groupLabel}`, tone);
+            }}
             viewerRole={viewerKind}
             busyRowId={rowBusyId}
             loading={loading}

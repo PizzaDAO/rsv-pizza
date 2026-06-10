@@ -342,6 +342,7 @@ export interface Party {
   receiptsReminderSentAt?: string | null;
   walletReminderSentAt?: string | null;
   photoReminderSentAt?: string | null;
+  attendanceReminderSentAt?: string | null;
   underbossStatus?: UnderbossStatus | null;
   turtleRolesEnabled?: boolean;
   // romana-61204: post-event survey toggle
@@ -2481,6 +2482,8 @@ export interface PartyPayoutsRow {
     walletReminderSentAt?: string | null;
     /** ISO timestamp of when the TG photo reminder was last sent. */
     photoReminderSentAt?: string | null;
+    /** ISO timestamp of when the TG attendance reminder was last sent. */
+    attendanceReminderSentAt?: string | null;
     /** City-level approved payment amount. */
     paymentsApprovedUsd?: number | null;
     /** ISO timestamp of when the city payment was approved. */

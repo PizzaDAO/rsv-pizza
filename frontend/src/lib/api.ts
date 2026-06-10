@@ -627,6 +627,25 @@ export async function sendTgPhotoReminder(
 }
 
 /**
+ * Sibling of {@link sendTgPhotoReminder}: sends a "submit your event's
+ * estimated attendance at rsv.pizza/<slug>" reminder via the Molto Benny
+ * Telegram bot — DM to the primary host + post to the city's group chat. Same
+ * per-channel success + skip-reason contract. Persists a sent-at timestamp on
+ * success. tonda-58293: group chat_id resolved server-side; no `groupChatId` arg.
+ */
+export async function sendTgAttendanceReminder(
+  partyId: string,
+): Promise<SendTgReceiptsReminderResponse> {
+  return apiRequest<SendTgReceiptsReminderResponse>(
+    `/api/admin/payouts/${partyId}/tg-attendance-reminder`,
+    {
+      method: 'POST',
+      requireAuth: true,
+    },
+  );
+}
+
+/**
  * tonda-58293: DB-first read of the city → Telegram group mapping. Replaces
  * the client-side Google Sheet fetch (`fetchTelegramGroups()`) for sends.
  * Returns rows from `city_telegram_groups` scoped to the caller's cities

@@ -296,6 +296,8 @@ const PAYOUT_PARTY_SELECT: Prisma.PartySelect = {
   walletReminderSentAt: true,
   // Track when the TG photo reminder was last sent for this city.
   photoReminderSentAt: true,
+  // Track when the TG attendance reminder was last sent for this city.
+  attendanceReminderSentAt: true,
   // City-level payment approval fields.
   paymentsApprovedUsd: true,
   paymentsApprovedAt: true,
@@ -2169,6 +2171,10 @@ router.get(
             photoReminderSentAt: b.partyMeta.photoReminderSentAt
               ? b.partyMeta.photoReminderSentAt.toISOString()
               : null,
+            // When the TG attendance reminder was last sent.
+            attendanceReminderSentAt: b.partyMeta.attendanceReminderSentAt
+              ? b.partyMeta.attendanceReminderSentAt.toISOString()
+              : null,
             // City-level payment approval.
             paymentsApprovedUsd: b.partyMeta.paymentsApprovedUsd
               ? Number(b.partyMeta.paymentsApprovedUsd)
@@ -2306,6 +2312,9 @@ router.get(
                 : null,
               photoReminderSentAt: partyMeta.photoReminderSentAt
                 ? partyMeta.photoReminderSentAt.toISOString()
+                : null,
+              attendanceReminderSentAt: partyMeta.attendanceReminderSentAt
+                ? partyMeta.attendanceReminderSentAt.toISOString()
                 : null,
               paymentsApprovedUsd: partyMeta.paymentsApprovedUsd
                 ? Number(partyMeta.paymentsApprovedUsd)
@@ -6916,6 +6925,87 @@ router.post(
 
       console.log(
         `[tg-photo-reminder] party=${party.id} slug=${slug} host_dm=${
+          hostDmSent ? 'ok' : `skipped:${hostDmReason ?? 'unknown'}`
+        } group=${groupSent ? 'ok' : `skipped:${groupReason ?? 'unknown'}`}`,
+      );
+
+      res.json({
+        hostDmSent,
+        ...(hostDmReason ? { hostDmReason } : {}),
+        groupSent,
+        ...(groupReason ? { groupReason } : {}),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// POST /:partyId/tg-attendance-reminder
+//
+// Sibling of tg-photo-reminder: DMs the primary host (when their Telegram
+// is linked) and posts to the city's GPP group chat, telling the host to
+// submit their event's estimated attendance. Same per-channel send +
+// skip-reason contract; the only differences are the message text + target
+// URL. Persists `parties.attendance_reminder_sent_at` on success, mirroring the
+// photo reminder, so the menu can show a last-sent sub-label.
+router.post(
+  '/:partyId/tg-attendance-reminder',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+
+      const party = await prisma.party.findUnique({
+        where: { id: partyId },
+        select: {
+          id: true,
+          customUrl: true,
+          inviteCode: true,
+          name: true,
+          hostTelegramChatId: true,
+        },
+      });
+      if (!party) {
+        throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+      }
+
+      const slug = party.customUrl || party.inviteCode;
+      const text = `Please submit your event's estimated attendance at rsv.pizza/${slug}`;
+
+      let hostDmSent = false;
+      let hostDmReason: string | undefined;
+      if (party.hostTelegramChatId) {
+        const result = await sendTelegramMessage(
+          party.hostTelegramChatId.toString(),
+          text,
+        );
+        if (result.ok) {
+          hostDmSent = true;
+        } else {
+          hostDmReason = result.reason;
+        }
+      } else {
+        hostDmReason = 'Host has not linked Telegram (no host_telegram_chat_id on file)';
+      }
+
+      // Group chat — tonda-58293: resolved server-side from
+      // `city_telegram_groups` via `sendToCityGroup` (adds the migration
+      // retry+persist this endpoint previously lacked). FIX #4: shared helper
+      // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+
+      // Record when the reminder was sent (if at least one message succeeded).
+      if (hostDmSent || groupSent) {
+        await prisma.party.update({
+          where: { id: partyId },
+          data: { attendanceReminderSentAt: new Date() },
+        });
+      }
+
+      console.log(
+        `[tg-attendance-reminder] party=${party.id} slug=${slug} host_dm=${
           hostDmSent ? 'ok' : `skipped:${hostDmReason ?? 'unknown'}`
         } group=${groupSent ? 'ok' : `skipped:${groupReason ?? 'unknown'}`}`,
       );
