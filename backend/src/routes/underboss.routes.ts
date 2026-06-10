@@ -9,6 +9,7 @@ import { addPartnerToParty, removePartnerFromParty, getAutoCoHostPartners } from
 import { buildScopedWhereClause, partyMatchesScope, UnderbossScope } from '../helpers/underbossScope.js';
 import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
 import { scorePartiesByIds, buildSybilWalletSetFromDb } from '../lib/fakeDetectionScan.js';
+import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 
 // Re-export the request type under the local name used throughout this file
 type UnderbossRequest = UnderbossAuthRequest;
@@ -1166,7 +1167,7 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
     const isAdminUser = await isAdmin(email);
     const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
 
-    const updatedCount = await prisma.$transaction(async (tx) => {
+    const { count: updatedCount, ids: changedIds } = await prisma.$transaction(async (tx) => {
       const before = await tx.party.findMany({
         where: { id: { in: partyIds } },
         select: { id: true, underbossStatus: true },
@@ -1183,8 +1184,13 @@ router.patch('/events/bulk-status', requireAuth, requireUnderbossAuth, async (re
       for (const p of changing) {
         await writeStatusAudit(tx, p.id, p.underbossStatus, status, email, actorKind);
       }
-      return changing.length;
+      return { count: changing.length, ids: changing.map(p => p.id) };
     });
+
+    // stromboli-58523: notify each host of approve/reject (fire-and-forget)
+    if (status === 'approved' || status === 'rejected') {
+      for (const cid of changedIds) void emailHostOfStatusChange(cid, status);
+    }
 
     res.json({ updated: updatedCount });
   } catch (error) {
@@ -1463,12 +1469,14 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
       }
       // Underboss/admin: allow all statuses
       const actorKind: ActorKind = isAdminUser ? 'admin' : 'underboss';
+      let priorStatus: string | null = null;
       const party = await prisma.$transaction(async (tx) => {
         const before = await tx.party.findUnique({
           where: { id: partyId },
           select: { underbossStatus: true },
         });
         if (!before) throw new AppError('Party not found', 404, 'NOT_FOUND');
+        priorStatus = before.underbossStatus;
 
         const updated = await tx.party.update({
           where: { id: partyId },
@@ -1479,6 +1487,10 @@ router.patch('/event/:partyId/status', requireAuth, async (req: AuthRequest, res
         await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, actorKind);
         return updated;
       });
+      // stromboli-58523: notify host of approve/reject (fire-and-forget, only on real change)
+      if ((status === 'approved' || status === 'rejected') && priorStatus !== status) {
+        void emailHostOfStatusChange(partyId, status);
+      }
       return res.json({ party });
     }
 
