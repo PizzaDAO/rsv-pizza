@@ -2358,6 +2358,8 @@ model Invoice {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  mercuryWireMatches MercuryWireMatch[]
+
   @@index([partyId])
   @@index([sponsorId])
   @@index([partyId, status])
@@ -2406,4 +2408,28 @@ model Mou {
   @@index([sponsorId])
   @@index([partyId, status])
   @@map("mous")
+}
+
+// stromboli-58524: Mercury incoming-wire reconciliation
+model MercuryWireMatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  mercuryTxnId   String    @unique @map("mercury_txn_id")
+  invoiceId      String?   @map("invoice_id") @db.Uuid
+  invoice        Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  amount         Int
+  currency       String?
+  memo           String?
+  counterparty   String?
+  postedAt       DateTime? @map("posted_at") @db.Timestamptz
+
+  // status: auto_paid | needs_review | unmatched
+  status         String    @default("unmatched")
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([invoiceId])
+  @@map("mercury_wire_matches")
 }

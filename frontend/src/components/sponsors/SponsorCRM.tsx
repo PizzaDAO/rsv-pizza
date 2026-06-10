@@ -23,6 +23,7 @@ import { PartnerForm, extractSponsorData } from './PartnerForm';
 import type { PartnerFormData } from './PartnerForm';
 import { usePizza } from '../../contexts/PizzaContext';
 import { triggerFlyerRegen, FLYER_SPONSOR_STATUSES } from '../flyer/autoRegenFlyer';
+import { MercuryReconcilePanel } from './MercuryReconcilePanel';
 import { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
 
 interface SponsorCRMProps {
@@ -445,6 +446,19 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         avatarUrls={sponsorAvatarUrls}
         isPrivileged={isPrivileged}
       />
+
+      {/* Mercury wire reconciliation (admin only) */}
+      {isPrivileged && (
+        <MercuryReconcilePanel
+          invoices={invoices}
+          onInvoiceUpdate={(updatedId) => {
+            // Reload invoices to get fresh paid status
+            getInvoices(partyId).then((result) => {
+              if (result) setInvoices(result.invoices);
+            });
+          }}
+        />
+      )}
 
       {/* Brand Description Order (Unified) */}
       {unifiedPartners.length > 1 && (

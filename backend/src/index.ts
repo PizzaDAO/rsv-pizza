@@ -83,6 +83,7 @@ import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
+import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -164,6 +165,7 @@ app.use('/api/admin/image-authenticity', imageAuthenticityRoutes); // marinara-6
 app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-58297: survey question CRUD — before /api/admin catch-all
 app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
 app.use('/api/admin/survey-responses', surveyResponsesAdminRouter); // gnocchi-58507: admin survey responses feed — before /api/admin catch-all
+app.use('/api/admin/mercury', adminMercuryRoutes); // stromboli-58524: Mercury wire reconciliation — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)

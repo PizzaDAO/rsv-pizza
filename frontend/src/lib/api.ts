@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData, MercuryWireMatch, MercuryReconcileResult } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -1976,6 +1976,41 @@ export async function getMous(partyId: string): Promise<{ mous: Mou[] } | null> 
     console.error('Error fetching MOUs:', error);
     return null;
   }
+}
+
+// ============================================
+// Mercury wire reconciliation (stromboli-58524)
+// ============================================
+
+// Trigger Mercury poll + reconcile — returns counts + needs_review rows
+export async function reconcileMercuryWires(): Promise<MercuryReconcileResult> {
+  return apiRequest<MercuryReconcileResult>('/api/admin/mercury/reconcile', {
+    method: 'POST',
+  });
+}
+
+// List match rows (optionally filtered by status)
+export async function getMercuryMatches(
+  status?: string
+): Promise<{ matches: MercuryWireMatch[] }> {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiRequest<{ matches: MercuryWireMatch[] }>(`/api/admin/mercury/matches${qs}`, {
+    method: 'GET',
+  });
+}
+
+// Manually resolve a needs_review/unmatched match by linking to an invoice
+export async function resolveMercuryMatch(
+  matchId: string,
+  invoiceId: string
+): Promise<{ match: MercuryWireMatch }> {
+  return apiRequest<{ match: MercuryWireMatch }>(
+    `/api/admin/mercury/matches/${encodeURIComponent(matchId)}/resolve`,
+    {
+      method: 'POST',
+      body: { invoiceId },
+    }
+  );
 }
 
 // Get single MOU

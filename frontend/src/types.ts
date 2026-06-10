@@ -673,6 +673,39 @@ export interface CreateInvoiceData {
 
 export interface UpdateInvoiceData extends Partial<Omit<CreateInvoiceData, 'sponsorId'>> {}
 
+// Mercury wire-reconciliation types (stromboli-58524)
+export type MercuryWireMatchStatus = 'auto_paid' | 'needs_review' | 'unmatched';
+
+export interface MercuryWireMatch {
+  id: string;
+  mercuryTxnId: string;
+  invoiceId: string | null;
+  amount: number; // cents
+  currency: string | null;
+  memo: string | null;
+  counterparty: string | null;
+  postedAt: string | null;
+  status: MercuryWireMatchStatus;
+  createdAt: string;
+  updatedAt: string;
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    billToCompany: string | null;
+    total: number;
+    status: string;
+    sponsor: { name: string } | null;
+    party: { name: string } | null;
+  } | null;
+}
+
+export interface MercuryReconcileResult {
+  autoPaid: number;
+  needsReview: number;
+  unmatched: number;
+  needsReviewRows: MercuryWireMatch[];
+}
+
 // MOU (Memorandum of Understanding) types
 export type MouStatus = 'draft' | 'issued' | 'viewed' | 'signed' | 'cancelled';
 
