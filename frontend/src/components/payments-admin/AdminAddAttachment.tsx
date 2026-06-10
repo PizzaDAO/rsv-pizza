@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, Plus, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, RotateCw } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { addAdminPayoutDocument } from '../../lib/api';
 
@@ -39,12 +39,22 @@ export const AdminAddAttachment: React.FC<AdminAddAttachmentProps> = ({
   const [photoKind, setPhotoKind] = useState<'pizza' | 'event'>('pizza');
   const [status, setStatus] = useState<'idle' | 'uploading' | 'reading'>('idle');
   const [error, setError] = useState<string | null>(null);
+  // focaccia-58519: keep the last picked file so a transient failure can be
+  // retried without re-selecting it.
+  const lastFileRef = useRef<File | null>(null);
 
   const kind: 'receipt' | 'pizza' | 'event' =
     mode === 'receipt' ? 'receipt' : photoKind;
   const busy = status !== 'idle';
 
+  // focaccia-58519: deterministic local-validation rejections aren't retryable.
+  const retryable =
+    !!error &&
+    !error.startsWith('File is too large') &&
+    !error.startsWith('Unsupported file type');
+
   const handleFile = async (file: File) => {
+    lastFileRef.current = file;
     setError(null);
     setStatus('uploading');
     try {
@@ -138,9 +148,23 @@ export const AdminAddAttachment: React.FC<AdminAddAttachmentProps> = ({
       </div>
 
       {error && (
-        <span className="inline-flex items-center gap-1 text-xs text-red-400">
-          <AlertCircle size={12} /> {error}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs text-red-400 max-w-[16rem] truncate" title={error}>
+            <AlertCircle size={12} className="flex-shrink-0" /> {error}
+          </span>
+          {retryable && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (lastFileRef.current) handleFile(lastFileRef.current);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 disabled:opacity-50 transition-colors"
+            >
+              <RotateCw size={11} /> Retry
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

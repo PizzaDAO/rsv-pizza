@@ -18,6 +18,7 @@ import {
   Check,
   AlertTriangle,
   Star,
+  RotateCw,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { SwcHubWarning } from './SwcHubWarning';
@@ -110,6 +111,9 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
   const [uploadedProofUrl, setUploadedProofUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // focaccia-58519: keep the last picked file so a transient upload failure can
+  // be retried without re-selecting it.
+  const lastUploadFileRef = useRef<File | null>(null);
 
   const [adminNotes, setAdminNotes] = useState('');
 
@@ -257,14 +261,12 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
     setSwcAck(false);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadProofFile(file: File) {
     if (!partyId.trim()) {
       setUploadError('Pick a party first so we can group the upload correctly.');
-      e.target.value = '';
       return;
     }
+    lastUploadFileRef.current = file;
     setUploadError(null);
     setUploading(true);
     try {
@@ -277,9 +279,22 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
       setUploadError(err?.message || 'Upload failed');
     } finally {
       setUploading(false);
-      e.target.value = '';
     }
   }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await uploadProofFile(file);
+  }
+
+  // focaccia-58519: deterministic local-validation rejections aren't retryable.
+  const uploadRetryable =
+    !!uploadError &&
+    !uploadError.startsWith('File is too large') &&
+    !uploadError.startsWith('Unsupported file type') &&
+    !uploadError.startsWith('Pick a party first');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -709,7 +724,21 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               />
             </label>
             {uploadError && (
-              <p className="text-xs text-red-400">{uploadError}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-red-400" title={uploadError}>{uploadError}</p>
+                {uploadRetryable && (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => {
+                      if (lastUploadFileRef.current) uploadProofFile(lastUploadFileRef.current);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 disabled:opacity-50 transition-colors"
+                  >
+                    <RotateCw size={11} /> Retry
+                  </button>
+                )}
+              </div>
             )}
             {uploadedProofUrl && (
               <p className="text-xs text-emerald-500 break-all">

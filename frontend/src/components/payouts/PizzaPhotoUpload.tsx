@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, AlertCircle } from 'lucide-react';
+import { Loader2, X, Upload, AlertCircle, RotateCw } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 
 export interface PizzaPhotoItem {
@@ -10,6 +10,25 @@ export interface PizzaPhotoItem {
   fileSize: number;
   mimeType: string;
   error?: string;
+  /**
+   * focaccia-58519: the original File, kept in memory so a failed tile can be
+   * retried without re-picking. Not serialized anywhere (lives only on the
+   * in-flight client item).
+   */
+  file?: File;
+}
+
+/**
+ * focaccia-58519: a failure is retryable unless it's a deterministic
+ * local-validation rejection (too large / unsupported type). Those carry a
+ * known prefix from `uploadPayoutPhoto`'s pre-upload checks.
+ */
+function isRetryableError(error?: string): boolean {
+  if (!error) return true;
+  return !(
+    error.startsWith('File is too large') ||
+    error.startsWith('Unsupported file type')
+  );
 }
 
 interface PizzaPhotoUploadProps {
@@ -51,6 +70,43 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
   const noun = kind === 'event' ? 'event' : 'pizza';
   const remaining = Math.max(0, maxItems - existingCount - items.length);
 
+  /**
+   * focaccia-58519: keep the original File objects reachable for retry, keyed
+   * by item id. Lives in a ref (not serialized into the item list that flows to
+   * the parent). Populated on add; read on retry.
+   */
+  const filesRef = useRef<Map<string, File>>(new Map());
+
+  // Always read the freshest items via a ref so async work that resolves after
+  // multiple onChange calls doesn't clobber sibling updates with a stale list.
+  const itemsRef = useRef<PizzaPhotoItem[]>(items);
+  itemsRef.current = items;
+
+  const patchItem = (itemId: string, patch: Partial<PizzaPhotoItem>) => {
+    const next = itemsRef.current.map(it => (it.id === itemId ? { ...it, ...patch } : it));
+    itemsRef.current = next;
+    onChange(next);
+  };
+
+  const uploadOne = async (file: File, itemId: string) => {
+    try {
+      const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, kind);
+      patchItem(itemId, {
+        status: 'done',
+        url: uploaded.url,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize,
+        mimeType: uploaded.mimeType,
+        error: undefined,
+      });
+    } catch (err) {
+      patchItem(itemId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Upload failed',
+      });
+    }
+  };
+
   const handleFiles = async (files: FileList | File[]) => {
     const fileArr = Array.from(files).slice(0, remaining);
     if (fileArr.length === 0) return;
@@ -62,26 +118,23 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
       fileSize: f.size,
       mimeType: f.type,
     }));
-    let nextItems = [...items, ...newItems];
+    fileArr.forEach((f, i) => filesRef.current.set(newItems[i].id, f));
+    const nextItems = [...itemsRef.current, ...newItems];
+    itemsRef.current = nextItems;
     onChange(nextItems);
 
-    await Promise.all(fileArr.map(async (file, i) => {
-      const itemId = newItems[i].id;
-      try {
-        const uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, kind);
-        nextItems = nextItems.map(it => it.id === itemId
-          ? { ...it, status: 'done' as const, url: uploaded.url,
-              fileName: uploaded.fileName, fileSize: uploaded.fileSize, mimeType: uploaded.mimeType }
-          : it);
-      } catch (err) {
-        nextItems = nextItems.map(it => it.id === itemId
-          ? { ...it, status: 'error' as const, error: err instanceof Error ? err.message : 'Upload failed' } : it);
-      }
-      onChange(nextItems);
-    }));
+    await Promise.all(fileArr.map((file, i) => uploadOne(file, newItems[i].id)));
+  };
+
+  const handleRetry = (itemId: string) => {
+    const file = filesRef.current.get(itemId);
+    if (!file) return;
+    patchItem(itemId, { status: 'uploading', error: undefined });
+    void uploadOne(file, itemId);
   };
 
   const handleRemove = (id: string) => {
+    filesRef.current.delete(id);
     onChange(items.filter(i => i.id !== id));
   };
 
@@ -141,8 +194,25 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
               {item.url ? (
                 <img src={item.url} alt="" className="w-full h-full object-cover" />
               ) : item.status === 'error' ? (
-                <div className="w-full h-full flex items-center justify-center text-red-400">
-                  <AlertCircle size={20} />
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1 text-red-400 text-center">
+                  <AlertCircle size={18} className="flex-shrink-0" />
+                  {item.error && (
+                    <span
+                      className="text-[10px] leading-tight text-red-400 line-clamp-2 w-full"
+                      title={item.error}
+                    >
+                      {item.error}
+                    </span>
+                  )}
+                  {isRetryableError(item.error) && (
+                    <button
+                      type="button"
+                      onClick={() => handleRetry(item.id)}
+                      className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors"
+                    >
+                      <RotateCw size={10} /> Retry
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-theme-text-muted">
