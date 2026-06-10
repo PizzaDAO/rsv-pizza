@@ -349,6 +349,10 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     | null
   >(null);
 
+  // margherita-58526: bumped after a USDC-on-Base send to drive HotWalletCard's
+  // re-fetch so the live balance updates in place (no manual refresh / reload).
+  const [walletRefreshKey, setWalletRefreshKey] = useState(0);
+
   // lardo-58294: local-only substring filter for the prepay queue. Cleared
   // on tab refresh — no persistence.
   const [prepaySearch, setPrepaySearch] = useState('');
@@ -1158,7 +1162,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             argentina-92103: read-only for regional underbosses — they can
             see balances but the refresh button + low-gas warning + "Base
             only" caption are hidden. */}
-        <HotWalletCard readOnly={isUnderboss} />
+        <HotWalletCard readOnly={isUnderboss} refreshSignal={walletRefreshKey} />
 
         <PaymentsStatsCards totals={totals} loading={loading && !totals} />
 
@@ -2105,6 +2109,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 'success',
               );
               await Promise.all([refresh(), loadPrepayQueue()]);
+              // margherita-58526: only USDC-on-Base sends move the hot wallet; wire /
+              // mercury_card don't, so don't refetch the balance for them.
+              if (method === 'usdc_base') setWalletRefreshKey((k) => k + 1);
             }}
           />
         )}
@@ -2226,6 +2233,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             );
             clearSelection();
             await Promise.all([refresh(), loadPrepayQueue()]);
+            // margherita-58526: bulk send is USDC-on-Base — refresh the hot wallet balance.
+            if (paid > 0) setWalletRefreshKey((k) => k + 1);
           }}
         />
 
