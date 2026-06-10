@@ -168,6 +168,7 @@ export interface PayoutCaps {
   dailyCapUsd: number;
   w9ThresholdUsd: number;
   hardPerTxCeilingUsd: number;
+  underbossOverPartyCapMaxUsd: number;
 }
 
 /**
@@ -191,6 +192,7 @@ export function getPayoutCaps(): Promise<PayoutCaps> {
     dailyCapUsd: 100,
     w9ThresholdUsd: 100,
     hardPerTxCeilingUsd: 100,
+    underbossOverPartyCapMaxUsd: 675,
   });
 }
 
