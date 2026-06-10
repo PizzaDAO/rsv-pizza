@@ -97,7 +97,7 @@ interface ReceiptUploadProps {
   partyId: string;
   payoutTempId: string;
   items: ReceiptItem[];
-  onChange: (items: ReceiptItem[]) => void;
+  onChange: React.Dispatch<React.SetStateAction<ReceiptItem[]>>;
   maxItems?: number;
 }
 
@@ -125,15 +125,13 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
    */
   const filesRef = useRef<Map<string, File>>(new Map());
 
-  // Read freshest items via a ref so async upload/OCR work that resolves out of
-  // order doesn't clobber sibling updates with a stale list snapshot.
-  const itemsRef = useRef<ReceiptItem[]>(items);
-  itemsRef.current = items;
-
+  // sfogliatella-58523: patch a single item via a FUNCTIONAL updater so async
+  // upload/OCR work that resolves out of order always reads the freshest list
+  // (including concurrent parent removals of saved rows) instead of a stale
+  // snapshot. The old itemsRef-snapshot approach re-inserted rows the parent had
+  // already removed, churning uploadItems and tripping the auto-save guard.
   const patchItem = (itemId: string, patch: Partial<ReceiptItem>) => {
-    const next = updateItem(itemsRef.current, itemId, patch);
-    itemsRef.current = next;
-    onChange(next);
+    onChange((prev) => updateItem(prev, itemId, patch));
   };
 
   // Upload a single file then run OCR. Reused for the initial parallel pass and
@@ -193,9 +191,9 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       mimeType: f.type,
     }));
     fileArr.forEach((f, i) => filesRef.current.set(newItems[i].id, f));
-    const nextItems = [...itemsRef.current, ...newItems];
-    itemsRef.current = nextItems;
-    onChange(nextItems);
+    // sfogliatella-58523: functional updater — append placeholders to the
+    // freshest list instead of a captured snapshot.
+    onChange((prev) => [...prev, ...newItems]);
 
     // Upload each file in parallel, then run OCR.
     await Promise.all(fileArr.map((file, i) => uploadOne(file, newItems[i].id)));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Loader2,
@@ -117,6 +117,19 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [failedSaveIds, setFailedSaveIds] = useState<Set<string>>(new Set());
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // sfogliatella-58523: ref-based in-flight guard for the auto-save effect. The
+  // previous `addingReceipts`-state + `cancelled`-cleanup guard leaked: during a
+  // multi-file upload every finished file mutated `uploadItems`, the effect
+  // cleanup flipped `cancelled = true` on the in-flight save, the POST still
+  // persisted server-side, but the continuation bailed BEFORE removing the saved
+  // rows / refetching AND left `addingReceipts === true` forever → permanent
+  // deadlock until reload. `savingRef` is the re-entrancy guard now and ALWAYS
+  // releases in `finally`; `addingReceipts` state only drives the "Saving…" UI.
+  // `inFlightIdsRef` excludes ids already mid-POST from the next `ready` filter
+  // so a re-run mid-save can't double-write payout_documents (no backend dedup).
+  const savingRef = useRef(false);
+  const inFlightIdsRef = useRef<Set<string>>(new Set());
+
   // porchetta-58296: receipts-itemized attestation (re-used key).
   const [attested, setAttested] = useState(false);
 
@@ -220,26 +233,32 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   }, []);
 
   useEffect(() => {
-    // Automatic pass: exclude items whose previous save attempt failed so we
-    // don't loop. The Retry button bumps `retryNonce` to bypass the flag.
+    // sfogliatella-58523: re-entrancy guard is `savingRef` (NOT `addingReceipts`
+    // state) so it can never get stuck true. Automatic pass: exclude items whose
+    // previous save attempt failed (so we don't loop — Retry bumps `retryNonce`
+    // to bypass the flag) and items already mid-POST (`inFlightIdsRef`).
+    if (savingRef.current) return;
     const ready = uploadItems.filter(
-      (r) => isReadyItem(r) && !failedSaveIds.has(r.id)
+      (r) => isReadyItem(r) && !failedSaveIds.has(r.id) && !inFlightIdsRef.current.has(r.id)
     );
-    if (ready.length === 0 || addingReceipts) return;
+    if (ready.length === 0) return;
 
-    let cancelled = false;
+    savingRef.current = true;
+    const attemptedIds = ready.map((r) => r.id);
+    attemptedIds.forEach((id) => inFlightIdsRef.current.add(id));
+    setAddingReceipts(true);
+    setReceiptError(null);
+
     (async () => {
-      setAddingReceipts(true);
-      setReceiptError(null);
-      const attemptedIds = ready.map((r) => r.id);
       try {
         const docs = ready.flatMap(buildDocsFromItem);
         const res = await addReimbursementReceipts(partyId, docs);
-        if (cancelled) return;
+        // The POST persisted server-side, so ALWAYS reconcile (no cancellation
+        // bail-out) — that bail-out is what lost the UI before.
         setCapWarning(res.capWarning ?? null);
         // Remove the appended rows from the live buffer.
-        const appendedIds = new Set(attemptedIds);
-        setUploadItems((prev) => prev.filter((r) => !appendedIds.has(r.id)));
+        const appended = new Set(attemptedIds);
+        setUploadItems((prev) => prev.filter((r) => !appended.has(r.id)));
         // Refresh the rolling record + event roll-up from the server.
         setData((prev) =>
           prev
@@ -252,10 +271,11 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
               }
             : prev
         );
-        loadMine();
+        // ziti-58300: silent refresh — the loud `loading` spinner remounts the
+        // body (and EventPhotosCard), tripping the onRolesChange refetch loop.
+        loadMine(true);
         loadEvent();
       } catch (err: any) {
-        if (cancelled) return;
         // grissini-58511: keep the failed items in the buffer (don't drop them)
         // and flag them so the automatic pass stops retrying. The Retry button
         // clears these flags for one pass.
@@ -266,14 +286,13 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           return next;
         });
       } finally {
-        if (!cancelled) setAddingReceipts(false);
+        attemptedIds.forEach((id) => inFlightIdsRef.current.delete(id));
+        savingRef.current = false;
+        setAddingReceipts(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadItems, addingReceipts, partyId, buildDocsFromItem, isReadyItem, failedSaveIds, retryNonce]);
+  }, [uploadItems, partyId, buildDocsFromItem, isReadyItem, failedSaveIds, retryNonce, loadMine, loadEvent]);
 
   // grissini-58511: explicit Retry — clear the failed flags so the auto-save
   // effect re-attempts the now-unblocked items on its next run, and bump the
