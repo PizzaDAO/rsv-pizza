@@ -298,7 +298,7 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
     return null;
   }
 
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  const maxSize = 25 * 1024 * 1024; // 25MB
   if (file.size > maxSize) {
     console.error('Receipt file too large:', file.size);
     return null;
@@ -386,10 +386,10 @@ export async function uploadPayoutPhoto(
     console.error('Invalid file type for payout photo:', file.type);
     throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: JPEG, PNG, WebP, HEIC, PDF.`);
   }
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  const maxSize = 25 * 1024 * 1024; // 25MB
   if (file.size > maxSize) {
     console.error('Payout photo too large:', file.size);
-    throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 10MB.`);
+    throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 25MB.`);
   }
 
   // schiacciata-71042: convert HEIC->JPEG client-side before upload. iPhone
@@ -421,14 +421,64 @@ export async function uploadPayoutPhoto(
     const rand = Math.random().toString(36).substring(7);
     const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
 
-    const { error } = await supabase.storage
-      .from('event-images')
-      .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
+    // focaccia-58519: transient Supabase Storage blips (HTTP 520, network
+    // hiccups) were surfacing to the host as a bare red error icon with no
+    // retry. Wrap the upload in a small retry loop that ONLY re-attempts
+    // transient failures (5xx / network / timeout). Deterministic failures
+    // (413 too-large, 415 unsupported-type) throw immediately.
+    async function uploadWithRetry(): Promise<void> {
+      const maxAttempts = 3; // initial + 2 retries
+      const backoffs = [600, 1800]; // ms before retry 1 and retry 2
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let uploadError: any = null;
+        try {
+          const { error } = await supabase.storage
+            .from('event-images')
+            .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
+          uploadError = error;
+        } catch (netErr) {
+          // A thrown error (network/fetch failure) is treated like a transient
+          // upload error so the same classification + retry logic applies.
+          uploadError = netErr;
+        }
 
-    if (error) {
-      console.error('Error uploading payout photo:', error);
-      throw new Error(error.message);
+        if (!uploadError) return; // success
+
+        // Classify. statusCode may be a string ("520") or number; message may
+        // hint at a transient failure even when the status is unknown.
+        const rawStatus = (uploadError as any)?.statusCode ?? (uploadError as any)?.status;
+        const status = rawStatus != null ? parseInt(String(rawStatus), 10) : NaN;
+        const message = String((uploadError as any)?.message ?? '');
+        const lowerMsg = message.toLowerCase();
+
+        // Deterministic — never retry.
+        if (status === 413 || status === 415) {
+          console.error('Error uploading payout photo (non-retryable):', uploadError);
+          throw new Error(message || 'Upload failed');
+        }
+
+        const transientByStatus = status >= 500 && status <= 599; // includes 520
+        const transientByMessage =
+          /520|fetch|network|timeout/.test(lowerMsg) ||
+          (Number.isNaN(status) && lowerMsg !== '');
+        const isTransient = transientByStatus || transientByMessage;
+
+        const isLastAttempt = attempt === maxAttempts;
+        if (!isTransient || isLastAttempt) {
+          console.error('Error uploading payout photo:', uploadError);
+          throw new Error(message || 'Upload failed');
+        }
+
+        // Transient + attempts remaining — back off and retry.
+        console.warn(
+          `Transient payout photo upload error (attempt ${attempt}/${maxAttempts}), retrying:`,
+          message || uploadError,
+        );
+        await new Promise(r => setTimeout(r, backoffs[attempt - 1] ?? 1800));
+      }
     }
+
+    await uploadWithRetry();
 
     const { data: urlData } = supabase.storage
       .from('event-images')

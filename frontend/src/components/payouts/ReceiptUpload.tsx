@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, DollarSign, GitMerge, Layers } from 'lucide-react';
+import { Loader2, X, Upload, Receipt as ReceiptIcon, AlertCircle, CheckCircle2, FileText, DollarSign, GitMerge, Layers, RotateCw } from 'lucide-react';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { previewReceiptOCR } from '../../lib/api';
 import { OcrPreviewResult, OcrReceiptPreview } from '../../types';
@@ -80,6 +80,19 @@ function toReceiptArray(ocr: OcrPreviewResult): OcrReceiptPreview[] {
   ];
 }
 
+/**
+ * focaccia-58519: a failure is retryable unless it's a deterministic
+ * local-validation rejection (too large / unsupported type) from
+ * `uploadPayoutPhoto`'s pre-upload checks.
+ */
+function isRetryableError(error?: string): boolean {
+  if (!error) return true;
+  return !(
+    error.startsWith('File is too large') ||
+    error.startsWith('Unsupported file type')
+  );
+}
+
 interface ReceiptUploadProps {
   partyId: string;
   payoutTempId: string;
@@ -105,6 +118,68 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 
   const remaining = maxItems - items.length;
 
+  /**
+   * focaccia-58519: keep the original File objects reachable for per-tile
+   * retry, keyed by item id. Lives in a ref (never serialized into the item
+   * list that flows to the parent).
+   */
+  const filesRef = useRef<Map<string, File>>(new Map());
+
+  // Read freshest items via a ref so async upload/OCR work that resolves out of
+  // order doesn't clobber sibling updates with a stale list snapshot.
+  const itemsRef = useRef<ReceiptItem[]>(items);
+  itemsRef.current = items;
+
+  const patchItem = (itemId: string, patch: Partial<ReceiptItem>) => {
+    const next = updateItem(itemsRef.current, itemId, patch);
+    itemsRef.current = next;
+    onChange(next);
+  };
+
+  // Upload a single file then run OCR. Reused for the initial parallel pass and
+  // for retrying one failed tile.
+  const uploadOne = async (file: File, itemId: string) => {
+    let uploaded: Awaited<ReturnType<typeof uploadPayoutPhoto>>;
+    try {
+      uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, 'receipt');
+    } catch (err) {
+      patchItem(itemId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Upload failed',
+      });
+      return;
+    }
+    patchItem(itemId, {
+      status: 'ocring',
+      url: uploaded.url,
+      fileName: uploaded.fileName,
+      fileSize: uploaded.fileSize,
+      mimeType: uploaded.mimeType,
+      error: undefined,
+    });
+
+    try {
+      // bocconcino-92104: PDFs can't be OCR'd directly by gpt-4o vision
+      // (image-only). Hand the OCR pipeline the convention-derived
+      // `.thumb.png` rendered at upload time instead. The backend uses the
+      // same derivation in its ocr-preview / POST /payouts handlers.
+      const ocrUrl = uploaded.mimeType === 'application/pdf'
+        ? derivePdfThumbnailUrl(uploaded.url)
+        : uploaded.url;
+      const ocr = await previewReceiptOCR(partyId, ocrUrl);
+      patchItem(itemId, {
+        status: 'done',
+        receipts: toReceiptArray(ocr),
+        error: undefined,
+      });
+    } catch (err: any) {
+      patchItem(itemId, {
+        status: 'error',
+        error: err?.message || 'OCR failed',
+      });
+    }
+  };
+
   const handleFiles = async (files: FileList | File[]) => {
     const fileArr = Array.from(files).slice(0, remaining);
     if (fileArr.length === 0) return;
@@ -117,57 +192,24 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       fileSize: f.size,
       mimeType: f.type,
     }));
-    let nextItems = [...items, ...newItems];
+    fileArr.forEach((f, i) => filesRef.current.set(newItems[i].id, f));
+    const nextItems = [...itemsRef.current, ...newItems];
+    itemsRef.current = nextItems;
     onChange(nextItems);
 
     // Upload each file in parallel, then run OCR.
-    await Promise.all(fileArr.map(async (file, i) => {
-      const itemId = newItems[i].id;
-      let uploaded: Awaited<ReturnType<typeof uploadPayoutPhoto>>;
-      try {
-        uploaded = await uploadPayoutPhoto(file, partyId, payoutTempId, 'receipt');
-      } catch (err) {
-        nextItems = updateItem(nextItems, itemId, {
-          status: 'error',
-          error: err instanceof Error ? err.message : 'Upload failed',
-        });
-        onChange(nextItems);
-        return;
-      }
-      nextItems = updateItem(nextItems, itemId, {
-        status: 'ocring',
-        url: uploaded.url,
-        fileName: uploaded.fileName,
-        fileSize: uploaded.fileSize,
-        mimeType: uploaded.mimeType,
-      });
-      onChange(nextItems);
+    await Promise.all(fileArr.map((file, i) => uploadOne(file, newItems[i].id)));
+  };
 
-      try {
-        // bocconcino-92104: PDFs can't be OCR'd directly by gpt-4o vision
-        // (image-only). Hand the OCR pipeline the convention-derived
-        // `.thumb.png` rendered at upload time instead. The backend uses the
-        // same derivation in its ocr-preview / POST /payouts handlers.
-        const ocrUrl = uploaded.mimeType === 'application/pdf'
-          ? derivePdfThumbnailUrl(uploaded.url)
-          : uploaded.url;
-        const ocr = await previewReceiptOCR(partyId, ocrUrl);
-        nextItems = updateItem(nextItems, itemId, {
-          status: 'done',
-          receipts: toReceiptArray(ocr),
-        });
-        onChange(nextItems);
-      } catch (err: any) {
-        nextItems = updateItem(nextItems, itemId, {
-          status: 'error',
-          error: err?.message || 'OCR failed',
-        });
-        onChange(nextItems);
-      }
-    }));
+  const handleRetry = (itemId: string) => {
+    const file = filesRef.current.get(itemId);
+    if (!file) return;
+    patchItem(itemId, { status: 'uploading', error: undefined });
+    void uploadOne(file, itemId);
   };
 
   const handleRemove = (id: string) => {
+    filesRef.current.delete(id);
     onChange(items.filter(i => i.id !== id));
   };
 
@@ -309,12 +351,25 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                         and is NOT submitted — make that unambiguous so the host
                         removes + re-uploads instead of assuming it counted. */}
                     {item.status === 'error' && (
-                      <span className="inline-flex items-start gap-1 text-red-400">
-                        <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
-                        <span>
-                          This receipt didn't save — remove it and re-upload.
-                          {item.error ? ` (${item.error})` : ''}
+                      <span className="flex flex-col items-start gap-1 text-red-400">
+                        <span className="inline-flex items-start gap-1">
+                          <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                          <span className="truncate" title={item.error || undefined}>
+                            {isRetryableError(item.error)
+                              ? "This receipt didn't save — retry or remove it."
+                              : "This receipt didn't save — remove it and re-upload."}
+                            {item.error ? ` (${item.error})` : ''}
+                          </span>
                         </span>
+                        {isRetryableError(item.error) && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(item.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-[#ff393a]/15 text-[#ff393a] hover:bg-[#ff393a]/25 transition-colors"
+                          >
+                            <RotateCw size={11} /> Retry
+                          </button>
+                        )}
                       </span>
                     )}
                   </div>
