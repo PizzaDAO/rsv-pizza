@@ -1095,6 +1095,33 @@ router.get(
         cohostUserByEmail.set(u.email.toLowerCase(), u);
       }
 
+      const candidateEmails = Array.from(
+        new Set<string>([
+          ...Array.from(allCohostEmails),
+          ...(parties
+            .map((p) => p.user?.email?.trim().toLowerCase())
+            .filter(Boolean) as string[]),
+        ]),
+      );
+      // rigatoni-58527: admins and underbosses must never be reimbursement
+      // recipients. Batch-resolve which candidate emails are org insiders so we can
+      // drop them from every party's hostCandidates list below.
+      const [adminRows, activeUnderbossRows] = candidateEmails.length
+        ? await Promise.all([
+            prisma.admin.findMany({
+              where: { email: { in: candidateEmails } },
+              select: { email: true },
+            }),
+            prisma.underboss.findMany({
+              where: { email: { in: candidateEmails }, isActive: true },
+              select: { email: true },
+            }),
+          ])
+        : [[], []];
+      const insiderEmails = new Set<string>();
+      for (const a of adminRows) insiderEmails.add(a.email.toLowerCase());
+      for (const u of activeUnderbossRows) insiderEmails.add(u.email.toLowerCase());
+
       const results = parties
         // Skip parties with no linked main host — Payout.hostUserId is FK NOT NULL
         // and the modal needs a default selection. (Vanishingly rare in practice.)
@@ -1107,13 +1134,16 @@ router.get(
             role: 'host' | 'cohost';
           }> = [];
 
-          // Main host always first.
-          hostCandidates.push({
-            userId: p.user!.id,
-            name: p.user!.name,
-            email: p.user!.email,
-            role: 'host',
-          });
+          // Main host always first — unless they're an org insider (admin /
+          // active underboss), in which case they're dropped as a recipient.
+          if (!insiderEmails.has(p.user!.email.toLowerCase())) {
+            hostCandidates.push({
+              userId: p.user!.id,
+              name: p.user!.name,
+              email: p.user!.email,
+              role: 'host',
+            });
+          }
 
           const cohostList = Array.isArray(p.coHosts) ? (p.coHosts as any[]) : [];
           const seenUserIds = new Set<string>([p.user!.id]);
@@ -1121,6 +1151,8 @@ router.get(
             if (!ch || typeof ch !== 'object') continue;
             const email = typeof ch.email === 'string' ? ch.email.trim().toLowerCase() : '';
             if (!email) continue;
+            // Org insiders (admin / active underboss) can't be recipients.
+            if (insiderEmails.has(email)) continue;
             const u = cohostUserByEmail.get(email);
             // Cohosts without a matching User record (or no email at all) are
             // silently excluded — the modal can only set Payout.hostUserId to
