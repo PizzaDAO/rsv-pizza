@@ -1033,7 +1033,7 @@ function CityActionsMenu({
                               aria-label={`Remove tag ${label}`}
                               disabled={tagBusy}
                               onClick={() => onRemoveCustomTag?.(label)}
-                              className="text-indigo-300/70 hover:text-indigo-200 disabled:opacity-50"
+                              className="text-indigo-300/70 hover:text-indigo-200 [.gpp-theme_&]:text-indigo-700 [.gpp-theme_&]:hover:text-indigo-900 disabled:opacity-50"
                             >
                               <XCircle size={12} />
                             </button>

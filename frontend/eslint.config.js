@@ -38,7 +38,10 @@ export default tseslint.config(
       'src/pages/AdminPage.tsx',
       'src/pages/DJPage.tsx',
     ],
-    plugins: { gpp: { rules: { 'text-contrast': gppTextContrast } } },
-    rules: { 'gpp/text-contrast': 'error' },
+    plugins: { gpp: { rules: gppTextContrast.rules } },
+    rules: {
+      'gpp/text-contrast': 'error',
+      'gpp/text-contrast-300': 'warn',
+    },
   }
 );
