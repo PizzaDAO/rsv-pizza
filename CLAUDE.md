@@ -66,6 +66,11 @@ Use **`mcp__supabase-pizzadao__`** for this project (not `supabase-snax`).
 - Supabase storage buckets must be created via dashboard, not code
 - **Preview deploys share production backend + DB.** Frontend previews auto-deploy per branch, but the backend only deploys from `master` and the database is a single Supabase instance. New DB columns and backend endpoints must be applied to production **before** they'll work on preview branches.
 
+## CI gates & migration safety
+- **Apply Prisma migrations to prod BEFORE merging the schema change.** The backend auto-deploys from `master` within ~1 min, and Prisma SELECTs every declared field, so a `schema.prisma` field-add merged ahead of its column 500s every query on that model (incident 2026-05-17, PR #356 / arugula-38633).
+- **`scripts/check-schema-drift.js`** (run via `npm --prefix backend run check:schema-drift`, needs `DATABASE_URL`) is the read-only guard for the above. CI runs it on every PR touching the schema/migrations (`.github/workflows/schema-drift.yml`). It only `SELECT`s `information_schema` — never add writes.
+- **`.github/workflows/lint.yml`** runs `npm run lint` on frontend PRs. `rules-of-hooks` is error-level, so hooks declared below an early return fail CI here (they build fine but black-screen at runtime — arugula-38633 v2). `vite build` does NOT lint, so this gate is the only automated lint.
+
 ## Realtime
 
 - The `guests` table is the only app table in the `supabase_realtime` publication.

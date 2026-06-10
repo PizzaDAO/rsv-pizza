@@ -1,0 +1,42 @@
+name: Lint (frontend)
+
+# Runs `npm run lint` (ESLint) on PRs that touch the frontend. The repo already
+# enables react-hooks/rules-of-hooks (error) via the recommended config, but
+# nothing ran it: build/deploy only fire on push to master, vite build does not
+# lint, and a hooks-order violation usually still BUILDS yet crashes at runtime
+# (black-screen). This gate catches that class before merge.
+#
+# ESLint exits non-zero only on error-level rules (rules-of-hooks). exhaustive-deps
+# and react-refresh are warnings and do NOT fail the job, so this is not noisy.
+# Incident this guards: arugula-38633 v2 — useMemo added below an early return
+# black-screened HostPage (2026-05-19).
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lint.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
