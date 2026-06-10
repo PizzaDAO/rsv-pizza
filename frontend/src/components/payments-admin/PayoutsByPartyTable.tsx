@@ -3581,6 +3581,15 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                           {row.party.country}
                         </div>
                       )}
+                      {/* cappelletti-58525: est. attendance + RSVP + check-in
+                          counts as a compact sub-line on each city row. */}
+                      <div className="text-xs text-theme-text-muted mt-0.5 flex flex-wrap items-center gap-x-2">
+                        <span title="Host-estimated attendance">Est. {row.party.estimatedAttendance ?? '—'}</span>
+                        <span aria-hidden>·</span>
+                        <span title="RSVPs (non-invited guests)">{row.party.rsvpCount ?? 0} RSVP{(row.party.rsvpCount ?? 0) === 1 ? '' : 's'}</span>
+                        <span aria-hidden>·</span>
+                        <span title="Checked-in guests">{row.party.checkInCount ?? 0} check-in{(row.party.checkInCount ?? 0) === 1 ? '' : 's'}</span>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {/* parmigiana-92104: tiny SWC Hub pill so admins notice
                             before they expand the row + click into a modal. The
