@@ -1088,7 +1088,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // caprino-92104: line items are in the receipt's ORIGINAL currency (see
   // `sumCurrency` in ReceiptEditor), so the sum maps to `originalAmount`,
   // not the USD value.
-  function useLineSumForAmount(docId: string) {
+  function applyLineSumToAmount(docId: string) {
     const drafts = lineItemDrafts[docId];
     const sum = draftSubtotalSum(drafts);
     setReceiptDrafts((m) => {
@@ -1540,7 +1540,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           }
           saveLineItemsEdit(r.id);
         }}
-        onUseLineSumForAmount={() => useLineSumForAmount(r.id)}
+        onUseLineSumForAmount={() => applyLineSumToAmount(r.id)}
         hasOcrError={!!localOcrError}
         retrying={retryingDocId === r.id}
         retryError={retryErrors[r.id]}
@@ -2973,7 +2973,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => useLineSumForAmount(r.id)}
+                                      onClick={() => applyLineSumToAmount(r.id)}
                                       className="px-2 py-1 rounded border border-theme-stroke text-theme-text text-xs inline-flex items-center gap-1 hover:bg-theme-surface"
                                       title="Copy the line sum into the receipt total above"
                                       disabled={(drafts ?? []).length === 0}

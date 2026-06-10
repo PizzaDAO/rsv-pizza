@@ -1836,7 +1836,7 @@ function CityExpansion({
     });
   }, []);
 
-  const useLineSumForAmount = useCallback((docId: string) => {
+  const applyLineSumToAmount = useCallback((docId: string) => {
     const drafts = lineItemDrafts[docId] ?? [];
     let sum = 0;
     for (const d of drafts) {
@@ -2122,7 +2122,7 @@ function CityExpansion({
           }
           saveLineItemsEdit(r.id);
         }}
-        onUseLineSumForAmount={() => useLineSumForAmount(r.id)}
+        onUseLineSumForAmount={() => applyLineSumToAmount(r.id)}
         hasOcrError={!!localOcrError}
         retrying={retryingDocId === r.id}
         retryError={retryErrors[r.id]}
