@@ -491,6 +491,7 @@ async function assertWithinPartyCap(
   partyId: string,
   proposedUsd: number,
   ignorePayoutId?: string,
+  ceilingOverrideUsd?: number,
 ): Promise<void> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
@@ -503,7 +504,15 @@ async function assertWithinPartyCap(
     reimbursementCapUsd: party.reimbursementCapUsd,
     eventTags: party.eventTags,
   });
-  if (effectiveCap == null) return;
+  // margherita-58526: an underboss bounded override (ceilingOverrideUsd set)
+  // ignores the event cap and enforces a config-driven per-party-TOTAL ceiling
+  // instead — never MORE restrictive than the plain event-cap path, and it
+  // bounds an otherwise-uncapped party. The no-override path is unchanged.
+  const ceiling =
+    ceilingOverrideUsd != null
+      ? Math.max(effectiveCap ?? 0, ceilingOverrideUsd)
+      : effectiveCap;
+  if (ceiling == null) return;
 
   // prosciutto-92106: cap math splits paid rows into proven vs zombie. Zombie
   // status='paid' rows (no transaction_hash / wire_reference / mercury card /
@@ -541,13 +550,15 @@ async function assertWithinPartyCap(
     (provenPaidAgg._sum.finalAmountUsd
       ? Number(provenPaidAgg._sum.finalAmountUsd.toString())
       : 0);
-  const remainingUsd = Math.max(0, effectiveCap - usedUsd);
+  const remainingUsd = Math.max(0, ceiling - usedUsd);
 
-  if (usedUsd + proposedUsd > effectiveCap + 1e-9) {
+  if (usedUsd + proposedUsd > ceiling + 1e-9) {
     throw new AppError(
-      `This payment would exceed the party's $${effectiveCap.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
+      ceilingOverrideUsd != null
+        ? `This would exceed the $${ceiling.toFixed(2)} underboss limit. $${remainingUsd.toFixed(2)} remaining — ask an admin to approve a higher amount.`
+        : `This payment would exceed the party's $${ceiling.toFixed(2)} cap. $${remainingUsd.toFixed(2)} remaining.`,
       409,
-      'PARTY_CAP_EXCEEDED',
+      ceilingOverrideUsd != null ? 'UNDERBOSS_CAP_EXCEEDED' : 'PARTY_CAP_EXCEEDED',
     );
   }
 }
@@ -3501,13 +3512,20 @@ router.post(
 
       // nduja-92106: admin-class can opt to bypass the per-party cap at
       // approve time via `allowOverPartyCap` (mirrors salame-92103's existing
-      // override on /execute). Underbosses can NEVER skip the cap — only the
-      // four admin-class roles (admin / super_admin / payment_admin) get the
-      // ack pathway. The per-submission ceiling, per-address cap, and daily
-      // cap are unchanged.
-      const allowOverPartyCap =
-        actor.actorKind !== 'underboss' &&
-        !!(req.body && req.body.allowOverPartyCap);
+      // override on /execute). The four admin-class roles
+      // (admin / super_admin / payment_admin) get an UNBOUNDED bypass.
+      //
+      // margherita-58526: underbosses can now ALSO tick the over-cap ack, but
+      // their override is BOUNDED to a config-driven per-party-TOTAL ceiling
+      // (underbossOverPartyCapMaxUsd, default $675). Above the ceiling the
+      // override stays admin-only (UNDERBOSS_CAP_EXCEEDED). The per-submission
+      // ceiling, per-address cap, and daily cap are unchanged.
+      const wantsOverride = !!(req.body && req.body.allowOverPartyCap);
+      const isAdminClass = actor.actorKind !== 'underboss';
+      // `allowOverPartyCap` keeps its original meaning here — admin-class
+      // FULL bypass — so the autoExecute forward into executePayout below and
+      // the audit-note suffix preserve current behavior for admins.
+      const allowOverPartyCap = wantsOverride && isAdminClass;
 
       // guanciale-49340: admin-class can also opt to bypass the per-address
       // hard cap in the inline autoExecute usdc_base branch via
@@ -3533,9 +3551,24 @@ router.post(
       // nduja-92106: skip the per-party throw when the admin has ticked the
       // override checkbox in PayoutReviewModal. Per-submission ceiling stays.
       // marinara-71630 P2: per-submission cap from app_config (env-free).
-      const { perSubmissionMaxUsd: approvePerSubmissionMaxUsd } = await getPayoutCaps();
-      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), approvePerSubmissionMaxUsd);
-      if (!allowOverPartyCap) {
+      // margherita-58526: one getPayoutCaps() call, reused for both the
+      // per-submission ceiling and the underboss bounded-override ceiling.
+      const caps = await getPayoutCaps();
+      const underbossCeiling = caps.underbossOverPartyCapMaxUsd ?? 675; // ?? guards an unseeded prod blob
+      assertWithinPerSubmissionCap(Number(existing.finalAmountUsd), caps.perSubmissionMaxUsd);
+
+      if (wantsOverride && isAdminClass) {
+        // admin-class full bypass of the per-party cap — unchanged behavior
+      } else if (wantsOverride && !isAdminClass) {
+        // underboss bounded override: ignore the event cap, enforce the
+        // config-driven $675 party-total ceiling instead.
+        await assertWithinPartyCap(
+          existing.partyId,
+          Number(existing.finalAmountUsd),
+          existing.id,
+          underbossCeiling,
+        );
+      } else {
         await assertWithinPartyCap(
           existing.partyId,
           Number(existing.finalAmountUsd),
@@ -3582,9 +3615,17 @@ router.post(
         // nduja-92106: append `[override: party cap]` so the audit row
         // captures that the per-party cap was bypassed at approve time. Mirrors
         // salame-92103's mark_paid suffix on /execute.
+        // margherita-58526: distinguish the admin FULL bypass from the underboss
+        // BOUNDED (≤$675) override. The marker is null when no override applied.
+        const overrideMarker =
+          wantsOverride && isAdminClass
+            ? '[override: party cap]'
+            : wantsOverride && !isAdminClass
+              ? `[override: party cap ≤$${underbossCeiling} underboss]`
+              : null;
         const baseNote = typeof note === 'string' && note ? note : null;
-        const auditNote = allowOverPartyCap
-          ? (baseNote ? `${baseNote} [override: party cap]` : '[override: party cap]')
+        const auditNote = overrideMarker
+          ? (baseNote ? `${baseNote} ${overrideMarker}` : overrideMarker)
           : baseNote;
         await tx.payoutAudit.create({
           data: {

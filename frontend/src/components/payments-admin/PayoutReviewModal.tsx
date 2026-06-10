@@ -3830,7 +3830,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                     <Checkbox
                       checked={approveOverridePartyCap}
                       onChange={() => setApproveOverridePartyCap((v) => !v)}
-                      label="I acknowledge — proceed anyway"
+                      label={
+                        isAdminViewer
+                          ? 'I acknowledge — proceed anyway'
+                          : 'I acknowledge — approve over the event cap (underboss limit $675)'
+                      }
                       labelClassName="text-sm text-amber-100 [.gpp-theme_&]:text-amber-900"
                     />
                   </div>
