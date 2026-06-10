@@ -1738,6 +1738,13 @@ export interface PayoutDocument {
   sourceReceiptIndex?: number | null;
   sourceReceiptCount?: number | null;
   boundingHint?: string | null;
+  // bruschetta-58519: OCR-supplied ISO-639-1 language of the receipt's PRINTED
+  // text ("en","es","ja","uk"...) and a short ≤140-char ENGLISH summary of what
+  // the receipt is for. Both null on historical rows until backfilled via the
+  // admin "Summarize" control. Surfaced on every receipt in the lightbox +
+  // admin editor; non-English receipts show a 🌐 language tag.
+  ocrLanguage?: string | null;
+  ocrSummary?: string | null;
   // pancetta-37195: per-doc uploader attribution. Null on historical rows
   // created before this feature shipped.
   uploadedByUserId?: string | null;

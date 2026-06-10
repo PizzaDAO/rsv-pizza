@@ -5214,6 +5214,9 @@ export async function retryPayoutDocumentOcr(
     ocrAttemptCount: number;
     ocrLineItems: ReceiptLineItem[] | null;
     sortOrder: number;
+    // bruschetta-58519: the inline re-read also refreshes language + summary.
+    ocrLanguage?: string | null;
+    ocrSummary?: string | null;
   } | null;
   ranInline: boolean;
   inlineError: string | null;
@@ -5221,6 +5224,21 @@ export async function retryPayoutDocumentOcr(
   return apiRequest(
     `/api/admin/payouts/documents/${docId}/retry-ocr`,
     { method: 'POST', body: { runNow: opts?.runNow ?? true } },
+  );
+}
+
+/**
+ * bruschetta-58519: admin on-demand "Summarize" backfill. Re-runs OCR on a
+ * single receipt and updates ONLY `ocrLanguage` + `ocrSummary` (preserving any
+ * admin-edited amount/currency/lineItems). Used to populate the new language +
+ * English-summary fields on historical rows that predate the feature.
+ */
+export async function summarizePayoutDocument(
+  docId: string,
+): Promise<{ ocrLanguage: string | null; ocrSummary: string | null }> {
+  return apiRequest(
+    `/api/admin/payouts/documents/${docId}/summarize`,
+    { method: 'POST' },
   );
 }
 

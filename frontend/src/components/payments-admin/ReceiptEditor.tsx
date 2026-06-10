@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Receipt } from 'lucide-react';
+import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Receipt, Languages, Sparkles } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { CurrencyPicker } from './CurrencyPicker';
@@ -107,6 +107,18 @@ interface ReceiptEditorProps {
   retryError?: string;
   onRetryOcr?: () => void;
 
+  /**
+   * bruschetta-58519: on-demand "Summarize" backfill. When the receipt has no
+   * `ocrSummary` yet (historical rows predating the feature), the editor shows
+   * a Summarize button wired to this callback. The parent calls
+   * summarizePayoutDocument(doc.id) and merges {ocrLanguage,ocrSummary} into its
+   * local doc state (no reload). Optional so non-receipt / non-admin callsites
+   * can omit it.
+   */
+  onSummarize?: () => void;
+  summarizing?: boolean;
+  summarizeError?: string;
+
   /** Whether the draft differs from persisted values (drives Save button). */
   isDirty: boolean;
 
@@ -186,6 +198,9 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   retrying,
   retryError,
   onRetryOcr,
+  onSummarize,
+  summarizing,
+  summarizeError,
   isDirty,
   authenticityPanel,
   authenticityVerdict,
@@ -331,6 +346,55 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
           >
             {(conf * 100).toFixed(0)}% confidence
           </span>
+        )}
+      </div>
+
+      {/* bruschetta-58519: compact Summary block. Shows the OCR English summary
+          (with a 🌐 language tag when the receipt isn't in English) so admins can
+          tell at a glance what a non-English receipt is for. When there's no
+          summary yet (historical rows), a Summarize button backfills it via
+          analyzeReceipt — language/summary only, never amount/currency. */}
+      <div className="relative z-10 rounded-lg border border-theme-stroke bg-theme-bg p-3 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-theme-text-faint flex items-center gap-1.5">
+            <Sparkles size={12} /> Summary
+          </h4>
+          {doc.ocrLanguage && doc.ocrLanguage !== 'en' && (
+            <span
+              className="text-[10px] text-theme-text-muted inline-flex items-center gap-1"
+              title="Receipt printed language (ISO-639-1)"
+            >
+              <Languages size={11} /> {doc.ocrLanguage.toUpperCase()}
+            </span>
+          )}
+        </div>
+        {doc.ocrSummary ? (
+          <p className="text-xs text-theme-text">{doc.ocrSummary}</p>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-theme-text-faint">
+              No summary yet.
+            </p>
+            {onSummarize && (
+              <button
+                type="button"
+                onClick={onSummarize}
+                disabled={summarizing}
+                className="px-2.5 py-1 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center gap-1.5"
+                title="Re-run OCR to extract a one-line English summary + language (does not change amount/currency)"
+              >
+                {summarizing ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                Summarize
+              </button>
+            )}
+            {summarizeError && (
+              <div className="text-xs text-red-300">{summarizeError}</div>
+            )}
+          </div>
         )}
       </div>
 

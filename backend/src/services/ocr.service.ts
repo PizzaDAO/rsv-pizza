@@ -14,6 +14,7 @@
  * prices by country/city. Stored on `payout_documents.ocr_line_items` JSONB.
  */
 
+import sharp from 'sharp';
 import { getOpenAI } from '../lib/openai.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getLlmModels } from '../lib/privateConfig.js';
@@ -58,6 +59,13 @@ export interface OcrResult {
   // so the host can map each detected receipt back to its position in a
   // multi-receipt photo. Null for single-receipt images / older callers.
   boundingHint?: string | null;
+  // bruschetta-58519: ISO-639-1 code of the receipt's PRINTED language
+  // ("en","es","ja","uk"...); null if undeterminable. Lowercased.
+  language?: string | null;
+  // bruschetta-58519: ONE short ENGLISH sentence (≤140 chars from the model,
+  // hard-capped 280) describing what the receipt is for, regardless of the
+  // receipt's printed language. Null if undeterminable.
+  summary?: string | null;
   raw: unknown;
 }
 
@@ -66,6 +74,21 @@ export interface OcrResult {
 // receipts; cap defensively and truncate per-receipt line items.
 const MAX_DETECTED_RECEIPTS = 10;
 const MAX_LINE_ITEMS_PER_RECEIPT = 60;
+
+// bruschetta-58519 (Part A): downscale + auto-rotate target for the vision call.
+// gpt-4o's high-detail tiling tops out well below this; 1568px on the long edge
+// is OpenAI's recommended max useful dimension and shrinks tokens/cost without
+// losing legibility. JPEG q85 is a good size/quality tradeoff for receipts.
+const OCR_MAX_DIMENSION = 1568;
+const OCR_JPEG_QUALITY = 85;
+
+// bruschetta-58519 (Part C): sum(lineItems) vs reported amount cross-check.
+// If the summed subtotals diverge from the grand total by more than this
+// fraction, the extraction is suspect → clamp confidence so the row routes to
+// low-confidence review AND triggers the cheap→strong model escalation.
+const LINE_ITEM_SUM_TOLERANCE = 0.2;
+// Confidence ceiling applied when the sum/total cross-check fails.
+const LINE_ITEM_MISMATCH_CONFIDENCE_CAP = 0.49;
 
 // mortadella-92103: ISO-2 country → primary ISO-4217 currency. Used as a
 // strong currency prior when the receipt symbol is ambiguous (most LATAM
@@ -114,6 +137,8 @@ Return ONLY a JSON object with these fields:
 - confidence: number (0-1, your confidence in the total extraction)
 - merchant: string (restaurant/store name if visible, else null)
 - receiptDate: string (YYYY-MM-DD if visible, else null)
+- language: string (ISO-639-1 code of the receipt's PRINTED language, e.g. "en", "es", "ja", "uk"; null if you cannot determine it)
+- summary: string (ONE short sentence IN ENGLISH, at most 140 characters, describing what was purchased / what this receipt is for — ALWAYS in English regardless of the receipt's printed language; null if undeterminable)
 - lineItems: Array<{
     name: string,            // the item as printed on the receipt
     qty: number,             // quantity (default 1 if not visible)
@@ -172,7 +197,7 @@ export function buildMultiSystemPrompt(partyCountry?: string | null): string {
 Return ONLY a JSON object of the form:
 { "receipts": Receipt[] }
 
-Each Receipt object has EXACTLY the fields described below (amount, currency, confidence, merchant, receiptDate, lineItems, items), PLUS one optional field:
+Each Receipt object has EXACTLY the fields described below (amount, currency, confidence, merchant, receiptDate, language, summary, lineItems, items), PLUS one optional field:
 - boundingHint: string | null (a short human locator for where this receipt sits in the image, e.g. "left half", "top", "right receipt". Null if there is only one receipt or you can't tell.)
 
 CRITICAL splitting rules (UNDER-SPLIT — when unsure, MERGE):
@@ -201,9 +226,37 @@ async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
     throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${imageUrl}`);
   }
   const arrayBuf = await response.arrayBuffer();
-  const base64 = Buffer.from(arrayBuf).toString('base64');
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
-  return `data:${contentType};base64,${base64}`;
+  const originalContentType = response.headers.get('content-type') || 'image/jpeg';
+  const originalBuf = Buffer.from(arrayBuf);
+
+  // bruschetta-58519 (Part A): downscale + auto-rotate before sending to the
+  // vision model. `.rotate()` (no arg) applies the EXIF orientation so sideways
+  // phone photos read upright; resize-inside caps the long edge at 1568px; jpeg
+  // q85 shrinks the payload. Cheaper tokens + more reliable extraction.
+  //
+  // LANDMINE: sharp CANNOT decode HEIC on Vercel (libheif not bundled). ANY
+  // failure here MUST fall back to the ORIGINAL bytes + content-type so OCR
+  // still runs — preprocessing must never break extraction.
+  try {
+    const processed = await sharp(originalBuf)
+      .rotate()
+      .resize({
+        width: OCR_MAX_DIMENSION,
+        height: OCR_MAX_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: OCR_JPEG_QUALITY })
+      .toBuffer();
+    return `data:image/jpeg;base64,${processed.toString('base64')}`;
+  } catch (err) {
+    // sharp couldn't decode (HEIC/HDR/corrupt) — send the original untouched.
+    console.warn(
+      `[ocr] sharp preprocess failed for ${imageUrl}; falling back to original bytes (${originalContentType}):`,
+      err instanceof Error ? err.message : err,
+    );
+    return `data:${originalContentType};base64,${originalBuf.toString('base64')}`;
+  }
 }
 
 /**
@@ -291,8 +344,10 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     ? Math.max(0, Math.min(1, parsed.confidence))
     : 0;
   // Clamp confidence to 0.49 when currency is unresolved so the UI consistently
-  // surfaces it as "low" and asks for review.
-  const confidence = currency === null ? Math.min(modelConfidence, 0.49) : modelConfidence;
+  // surfaces it as "low" and asks for review. bruschetta-58519: this is the
+  // pre-sum-check confidence; the Part-C line-item cross-check may clamp it
+  // further below (after lineItems are computed).
+  const confidenceBeforeSumCheck = currency === null ? Math.min(modelConfidence, 0.49) : modelConfidence;
 
   if (!Number.isFinite(amount)) {
     throw new Error(`OpenAI returned non-numeric amount: ${JSON.stringify(parsed)}`);
@@ -314,9 +369,35 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     ? sanitizePgString(parsed.boundingHint.trim().slice(0, 120))
     : null;
 
+  // bruschetta-58519 (Part B): receipt language (ISO-639-1) + English summary.
+  // Sanitize free-form model strings (NUL/surrogate JSONB-500 guard), lowercase
+  // the language code, and hard-cap the summary at 280 chars (the model is asked
+  // for ≤140 but we defend against runaway output before it hits ocr_summary).
+  const rawLanguage = typeof parsed?.language === 'string' ? parsed.language.trim() : '';
+  const language: string | null =
+    rawLanguage.length > 0 ? sanitizePgString(rawLanguage.toLowerCase()) : null;
+  const rawSummary = typeof parsed?.summary === 'string' ? parsed.summary.trim() : '';
+  const summary: string | null =
+    rawSummary.length > 0 ? sanitizePgString(rawSummary.slice(0, 280)) : null;
+
   // stracciatella-92114: truncate per-receipt line items to keep token + DB
   // sizes bounded when several receipts share one image.
   const lineItems = sanitizeLineItems(parsed?.lineItems).slice(0, MAX_LINE_ITEMS_PER_RECEIPT);
+
+  // bruschetta-58519 (Part C): sum(lineItems) ≈ amount cross-check. When we have
+  // both line items and a positive total, a large divergence between the summed
+  // subtotals and the reported grand total signals a misread total (or missed
+  // lines). Clamp confidence so the row routes to low-confidence review and the
+  // cheap→strong model escalation fires. We deliberately do NOT mutate `amount`
+  // — the model's grand total is usually the most reliable single number, and we
+  // never want a silent money change.
+  let confidence = confidenceBeforeSumCheck;
+  if (lineItems.length > 0 && amount > 0) {
+    const sum = lineItems.reduce((acc, li) => acc + (Number.isFinite(li.subtotal) ? li.subtotal : 0), 0);
+    if (Math.abs(sum - amount) / amount > LINE_ITEM_SUM_TOLERANCE) {
+      confidence = Math.min(confidence, LINE_ITEM_MISMATCH_CONFIDENCE_CAP);
+    }
+  }
 
   return {
     amount,
@@ -329,6 +410,8 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     merchant,
     receiptDate,
     boundingHint,
+    language,
+    summary,
     raw: parsed,
   };
 }
@@ -350,16 +433,95 @@ export function parseSingleReceipt(parsed: any): OcrResult {
  * Does NOT do currency conversion — call `convertToUSD` per element.
  * Throws only on network/auth/non-JSON errors (parity with `analyzeReceipt`).
  */
-export async function analyzeReceiptMulti(
-  arg: string | { imageUrl: string; partyCountry?: string | null },
-): Promise<OcrResult[]> {
-  const imageUrl = typeof arg === 'string' ? arg : arg.imageUrl;
-  const partyCountry = typeof arg === 'string' ? null : (arg.partyCountry ?? null);
-  const base64Image = await imageUrlToBase64DataUrl(imageUrl);
-  const ocrModel = (await getLlmModels()).ocr;
+/**
+ * bruschetta-58519 (Part D): strict Structured-Outputs JSON schema for the
+ * multi-receipt envelope `{ receipts: Receipt[] }`. Strict mode requires:
+ *   - `additionalProperties: false` on EVERY object,
+ *   - EVERY property listed in `required`,
+ *   - nullable fields typed as `["string","null"]` / `["number","null"]`.
+ * The model is forced to emit exactly this shape; our bare-object/bare-array
+ * fallback in the parser stays as insurance against provider drift.
+ */
+const RECEIPTS_JSON_SCHEMA: {
+  name: string;
+  strict: boolean;
+  schema: Record<string, unknown>;
+} = {
+  name: 'receipts_envelope',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['receipts'],
+    properties: {
+      receipts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'amount',
+            'currency',
+            'confidence',
+            'merchant',
+            'receiptDate',
+            'boundingHint',
+            'language',
+            'summary',
+            'lineItems',
+            'items',
+          ],
+          properties: {
+            amount: { type: 'number' },
+            currency: { type: ['string', 'null'] },
+            confidence: { type: 'number' },
+            merchant: { type: ['string', 'null'] },
+            receiptDate: { type: ['string', 'null'] },
+            boundingHint: { type: ['string', 'null'] },
+            language: { type: ['string', 'null'] },
+            summary: { type: ['string', 'null'] },
+            lineItems: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['name', 'qty', 'unitPrice', 'subtotal', 'category'],
+                properties: {
+                  name: { type: 'string' },
+                  qty: { type: 'number' },
+                  unitPrice: { type: 'number' },
+                  subtotal: { type: 'number' },
+                  category: {
+                    type: 'string',
+                    enum: [...ALLOWED_CATEGORIES],
+                  },
+                },
+              },
+            },
+            items: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
+/**
+ * bruschetta-58519 (Part E): run ONE vision pass with a specific model and
+ * return the parsed `OcrResult[]`. Shared by the cheap first pass and the
+ * strong escalation pass so both use the identical prompt + strict schema +
+ * normalization/fallback logic.
+ */
+async function runOcrPass(
+  model: string,
+  base64Image: string,
+  partyCountry: string | null,
+): Promise<OcrResult[]> {
   const response = await getOpenAI().chat.completions.create({
-    model: ocrModel,
+    model,
     messages: [
       { role: 'system', content: buildMultiSystemPrompt(partyCountry) },
       {
@@ -376,7 +538,12 @@ export async function analyzeReceiptMulti(
     // stracciatella-92114: bumped 1500 → 4000 to fit multiple receipts each
     // with their own per-line items array without mid-JSON truncation.
     max_tokens: 4000,
-    response_format: { type: 'json_object' },
+    // bruschetta-58519 (Part D): strict Structured Outputs. The bare-object /
+    // bare-array parse fallback below remains as insurance.
+    response_format: {
+      type: 'json_schema',
+      json_schema: RECEIPTS_JSON_SCHEMA,
+    },
   });
 
   const content = response.choices[0]?.message?.content;
@@ -420,6 +587,55 @@ export async function analyzeReceiptMulti(
 }
 
 /**
+ * bruschetta-58519 (Part E): decide whether the cheap first pass is weak enough
+ * to justify re-running on the stronger model. ESCALATE when ANY parsed receipt
+ * has a missing/non-positive amount, null currency, sub-0.6 confidence (which
+ * also captures the Part-C sum/total mismatch, since that clamps confidence to
+ * 0.49), OR when zero receipts were parsed at all.
+ */
+function shouldEscalateOcr(results: OcrResult[]): boolean {
+  if (results.length === 0) return true;
+  return results.some(
+    (r) =>
+      !(typeof r.amount === 'number' && r.amount > 0) ||
+      r.currency === null ||
+      r.confidence < 0.6,
+  );
+}
+
+export async function analyzeReceiptMulti(
+  arg: string | { imageUrl: string; partyCountry?: string | null },
+): Promise<OcrResult[]> {
+  const imageUrl = typeof arg === 'string' ? arg : arg.imageUrl;
+  const partyCountry = typeof arg === 'string' ? null : (arg.partyCountry ?? null);
+  const base64Image = await imageUrlToBase64DataUrl(imageUrl);
+  const models = await getLlmModels();
+
+  // bruschetta-58519 (Part E): cost routing. First pass on the cheap model;
+  // escalate to the strong `ocr` model only when the cheap result looks weak.
+  // KILL SWITCH: when app_config sets `llm.models.ocrCheap` == `ocr` ("gpt-4o"),
+  // the first pass is already strong, so nothing escalates — routing is
+  // effectively disabled with no deploy.
+  const firstPass = await runOcrPass(models.ocrCheap, base64Image, partyCountry);
+
+  if (models.ocrCheap !== models.ocr && shouldEscalateOcr(firstPass)) {
+    try {
+      return await runOcrPass(models.ocr, base64Image, partyCountry);
+    } catch (err) {
+      // Escalation failed (network/auth/parse) — keep the cheap result rather
+      // than failing the whole image.
+      console.warn(
+        `[ocr] escalation to ${models.ocr} failed for ${imageUrl}; keeping cheap (${models.ocrCheap}) result:`,
+        err instanceof Error ? err.message : err,
+      );
+      return firstPass;
+    }
+  }
+
+  return firstPass;
+}
+
+/**
  * Send a single receipt image to gpt-4o and return ONE `OcrResult`.
  *
  * stracciatella-92114: now a thin wrapper over `analyzeReceiptMulti` that
@@ -445,6 +661,8 @@ export async function analyzeReceipt(
       merchant: null,
       receiptDate: null,
       boundingHint: null,
+      language: null,
+      summary: null,
       raw: { receipts: [] },
     };
   }

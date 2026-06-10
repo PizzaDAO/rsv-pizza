@@ -2062,6 +2062,13 @@ model PayoutDocument {
   sourceReceiptIndex Int?    @map("source_receipt_index")
   sourceReceiptCount Int?    @map("source_receipt_count")
   boundingHint       String? @map("bounding_hint")
+  // bruschetta-58519: OCR-supplied ISO-639-1 language of the receipt's PRINTED
+  // text ("en","es","ja","uk"...) and a short ≤140-char ENGLISH summary of what
+  // the receipt is for. Both nullable; populated at OCR time + on-demand via the
+  // admin "Summarize" backfill endpoint. Non-English receipts surface the
+  // language tag + English summary on /payments so admins can review at a glance.
+  ocrLanguage        String? @map("ocr_language")
+  ocrSummary         String? @map("ocr_summary")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in

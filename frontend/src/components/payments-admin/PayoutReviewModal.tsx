@@ -6,7 +6,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
@@ -552,6 +552,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     originalAmount?: number | null;
     originalCurrency?: string | null;
     exchangeRate?: number | null;
+    // bruschetta-58519: post-Summarize fields so the editor + lightbox footer
+    // show the new summary/language immediately without a parent refetch.
+    ocrLanguage?: string | null;
+    ocrSummary?: string | null;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
@@ -586,6 +590,13 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // ocrError from `payout.documents` once retry succeeds. We only set true
   // on success; failures still surface a per-row error chip.
   const [retryClearedErrors, setRetryClearedErrors] = useState<Record<string, boolean>>({});
+
+  // bruschetta-58519: per-row "Summarize" backfill state (language + English
+  // summary). Mirrors the retry-OCR state shape — one in-flight docId + a
+  // per-doc error map. Result is merged into receiptOverrides so the editor +
+  // lightbox footer reflect the new summary without a parent refetch.
+  const [summarizingDocId, setSummarizingDocId] = useState<string | null>(null);
+  const [summarizeErrors, setSummarizeErrors] = useState<Record<string, string>>({});
 
   // taralli-92104: per-receipt line-item editor state.
   //
@@ -680,6 +691,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               ov.originalCurrency !== undefined ? ov.originalCurrency : d.originalCurrency,
             exchangeRate:
               ov.exchangeRate !== undefined ? ov.exchangeRate : d.exchangeRate,
+            // bruschetta-58519: layer the Summarize backfill result.
+            ocrLanguage:
+              ov.ocrLanguage !== undefined ? ov.ocrLanguage : d.ocrLanguage,
+            ocrSummary:
+              ov.ocrSummary !== undefined ? ov.ocrSummary : d.ocrSummary,
           };
         }),
     [payout.documents, receiptOverrides],
@@ -760,6 +776,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         url: d.url,
         fileName: d.fileName,
         mimeType: d.mimeType,
+        // bruschetta-58519: surface OCR English summary + language tag.
+        ocrSummary: d.ocrSummary ?? null,
+        ocrLanguage: d.ocrLanguage ?? null,
       })),
       ...pizzaPhotos.map((p) => ({
         url: p.url,
@@ -949,6 +968,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             originalAmount: fresh.originalAmount,
             originalCurrency: fresh.originalCurrency,
             exchangeRate: fresh.exchangeRate,
+            // bruschetta-58519: the full re-read also refreshes language + summary.
+            ocrLanguage: fresh.ocrLanguage,
+            ocrSummary: fresh.ocrSummary,
           },
         }));
         // Re-seed line item drafts from the fresh array.
@@ -977,6 +999,43 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       }));
     } finally {
       setRetryingDocId(null);
+    }
+  }
+
+  // bruschetta-58519: on-demand Summarize backfill. Re-runs OCR and writes ONLY
+  // language + English summary (amount/currency/lineItems preserved). Merge the
+  // result into receiptOverrides so the editor + lightbox footer update in place.
+  async function summarizeDoc(docId: string) {
+    setSummarizingDocId(docId);
+    setSummarizeErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    const prior = receipts.find((r) => r.id === docId);
+    try {
+      const res = await summarizePayoutDocument(docId);
+      setReceiptOverrides((m) => {
+        const cur = m[docId] ?? {
+          ocrAmount: prior?.ocrAmount ?? null,
+          ocrCurrency: prior?.ocrCurrency ?? null,
+        };
+        return {
+          ...m,
+          [docId]: {
+            ...cur,
+            ocrLanguage: res.ocrLanguage,
+            ocrSummary: res.ocrSummary,
+          },
+        };
+      });
+    } catch (err: any) {
+      setSummarizeErrors((m) => ({
+        ...m,
+        [docId]: err?.message || 'Summarize failed',
+      }));
+    } finally {
+      setSummarizingDocId(null);
     }
   }
 
@@ -1545,6 +1604,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         retrying={retryingDocId === r.id}
         retryError={retryErrors[r.id]}
         onRetryOcr={() => retryOcr(r.id)}
+        onSummarize={() => summarizeDoc(r.id)}
+        summarizing={summarizingDocId === r.id}
+        summarizeError={summarizeErrors[r.id]}
         authenticityVerdict={authChecks[r.url]?.verdict ?? null}
         authenticityPanel={
           <AuthenticityPanel
@@ -1581,6 +1643,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     retryingDocId,
     retryErrors,
     retryClearedErrors,
+    summarizingDocId,
+    summarizeErrors,
     authChecks,
   ]);
 
