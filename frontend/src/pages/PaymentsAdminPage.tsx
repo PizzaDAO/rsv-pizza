@@ -2153,8 +2153,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 key={t.id}
                 className={`pointer-events-auto rounded-lg px-4 py-3 text-sm shadow-lg border-l-4 ${
                   t.kind === 'success'
-                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-100'
-                    : 'bg-red-500/15 border-red-500 text-red-100'
+                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-100 [.gpp-theme_&]:text-emerald-800'
+                    : 'bg-red-500/15 border-red-500 text-red-100 [.gpp-theme_&]:text-red-800'
                 }`}
               >
                 {t.message}

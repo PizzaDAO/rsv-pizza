@@ -2345,7 +2345,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                         <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10">
                           <div className="flex items-start gap-2.5">
                             <AlertTriangle className="text-red-300 mt-0.5 flex-shrink-0" size={16} />
-                            <div className="flex-1 text-sm text-red-100">
+                            <div className="flex-1 text-sm text-red-100 [.gpp-theme_&]:text-red-800">
                               {saveAmountError}
                             </div>
                           </div>
@@ -3667,7 +3667,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               // LIGHT_PANEL_INPUT on the inputs here — they use the native dark
               // styling.
               <div className="rounded-xl border border-blue-500/30 p-3 bg-blue-500/10 text-sm space-y-2">
-                <h3 className="font-semibold text-blue-200 mb-1">Mark as paid (manual)</h3>
+                <h3 className="font-semibold text-blue-200 [.gpp-theme_&]:text-blue-800 mb-1">Mark as paid (manual)</h3>
                 {payout.payoutMethod === 'wire' && (
                   <IconInput
                     icon={Pencil}

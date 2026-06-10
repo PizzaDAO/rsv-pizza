@@ -626,8 +626,8 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                     key={r.id}
                     className={`flex items-start gap-2 px-3 py-2 rounded-lg text-sm border ${
                       isPaid
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-100'
-                        : 'bg-red-500/10 border-red-500/30 text-red-100'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-100 [.gpp-theme_&]:text-emerald-800'
+                        : 'bg-red-500/10 border-red-500/30 text-red-100 [.gpp-theme_&]:text-red-800'
                     }`}
                   >
                     {isPaid ? (
@@ -651,7 +651,7 @@ export const BulkSendModal: React.FC<BulkSendModalProps> = ({
                         )}
                       </div>
                       {!isPaid && r.error && (
-                        <p className="text-xs mt-1 break-words text-red-200/90">{r.error}</p>
+                        <p className="text-xs mt-1 break-words text-red-200/90 [.gpp-theme_&]:text-red-800/90">{r.error}</p>
                       )}
                     </div>
                   </li>

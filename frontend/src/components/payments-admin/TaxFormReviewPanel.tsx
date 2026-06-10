@@ -152,7 +152,7 @@ export const TaxFormReviewPanel: React.FC<TaxFormReviewPanelProps> = ({ taxFormI
             <div className="text-xs text-theme-text-muted">No PDF available.</div>
           )}
           {form.status === 'rejected' && form.rejectedReason && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-200">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-200 [.gpp-theme_&]:text-red-800">
               Rejection reason: {form.rejectedReason}
             </div>
           )}
@@ -229,9 +229,9 @@ export const TaxFormReviewPanel: React.FC<TaxFormReviewPanelProps> = ({ taxFormI
 const StatusPill: React.FC<{ status: TaxForm['status'] }> = ({ status }) => {
   const styles: Record<TaxForm['status'], string> = {
     draft: 'bg-theme-surface-hover text-theme-text-muted',
-    submitted: 'bg-blue-500/15 text-blue-200',
-    verified: 'bg-emerald-500/15 text-emerald-200',
-    rejected: 'bg-red-500/15 text-red-200',
+    submitted: 'bg-blue-500/15 text-blue-200 [.gpp-theme_&]:text-blue-800',
+    verified: 'bg-emerald-500/15 text-emerald-200 [.gpp-theme_&]:text-emerald-800',
+    rejected: 'bg-red-500/15 text-red-200 [.gpp-theme_&]:text-red-800',
   };
   return (
     <span

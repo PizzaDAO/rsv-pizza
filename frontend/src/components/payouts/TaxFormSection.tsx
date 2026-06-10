@@ -214,7 +214,7 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
         </div>
         {editorBody}
         {error && (
-          <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10 text-xs text-red-200">
+          <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10 text-xs text-red-200 [.gpp-theme_&]:text-red-800">
             {error}
           </div>
         )}
@@ -324,7 +324,7 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
               </div>
             )}
             {rejected && currentForm.rejectedReason && (
-              <div className="text-xs text-red-200 mt-1">
+              <div className="text-xs text-red-200 [.gpp-theme_&]:text-red-800 mt-1">
                 Reason: {currentForm.rejectedReason}
               </div>
             )}
@@ -375,7 +375,7 @@ export const TaxFormSection: React.FC<TaxFormSectionProps> = ({ autoOpenFormType
       </div>
       {error && !editingType && (
         <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10">
-          <div className="flex items-start gap-2 text-xs text-red-200">
+          <div className="flex items-start gap-2 text-xs text-red-200 [.gpp-theme_&]:text-red-800">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <div>{error}</div>
           </div>

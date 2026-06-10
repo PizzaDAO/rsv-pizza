@@ -37,19 +37,19 @@ const VERDICT_META: Record<
   authentic: {
     label: 'Likely authentic',
     Icon: ShieldCheck,
-    classes: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300',
+    classes: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 [.gpp-theme_&]:text-emerald-800',
     dot: 'bg-emerald-500',
   },
   suspicious: {
     label: 'Suspicious — needs review',
     Icon: ShieldAlert,
-    classes: 'bg-purple-500/15 border-purple-500/40 text-purple-200',
+    classes: 'bg-purple-500/15 border-purple-500/40 text-purple-200 [.gpp-theme_&]:text-purple-800',
     dot: 'bg-purple-500',
   },
   likely_fake: {
     label: 'Likely AI-generated / doctored',
     Icon: ShieldX,
-    classes: 'bg-fuchsia-600/20 border-fuchsia-500/50 text-fuchsia-200',
+    classes: 'bg-fuchsia-600/20 border-fuchsia-500/50 text-fuchsia-200 [.gpp-theme_&]:text-fuchsia-800',
     dot: 'bg-fuchsia-500',
   },
 };
@@ -125,14 +125,14 @@ export const AuthenticityPanel: React.FC<AuthenticityPanelProps> = ({
     return (
       <div className={`rounded-lg border border-purple-500/30 bg-purple-500/5 ${pad} space-y-1.5`}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-purple-200 inline-flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-purple-200 [.gpp-theme_&]:text-purple-800 inline-flex items-center gap-1.5">
             <Sparkles size={12} /> Image authenticity
           </span>
           <button
             type="button"
             onClick={() => run(false)}
             disabled={loading}
-            className="px-2.5 py-1 rounded border border-purple-500/40 text-purple-200 text-xs disabled:opacity-40 inline-flex items-center gap-1.5 hover:bg-purple-500/10"
+            className="px-2.5 py-1 rounded border border-purple-500/40 text-purple-200 [.gpp-theme_&]:text-purple-800 text-xs disabled:opacity-40 inline-flex items-center gap-1.5 hover:bg-purple-500/10"
             title="Run an AI-generated / doctored check on this image"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
