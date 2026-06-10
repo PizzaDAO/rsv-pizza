@@ -189,6 +189,9 @@ function serializeDocument(d: any) {
     sourceReceiptIndex: d.sourceReceiptIndex ?? null,
     sourceReceiptCount: d.sourceReceiptCount ?? null,
     boundingHint: d.boundingHint ?? null,
+    // bruschetta-58519: OCR language (ISO-639-1) + English summary.
+    ocrLanguage: d.ocrLanguage ?? null,
+    ocrSummary: d.ocrSummary ?? null,
     // soppressata-92110: surface admin exclusion flags read-only so hosts can
     // see which receipts / OCR line items were excluded from their total.
     isDuplicate: d.isDuplicate ?? false,
@@ -657,6 +660,9 @@ router.post(
             ocrRaw: ocr.raw ?? null,
             merchant: ocr.merchant ?? null,
             boundingHint: ocr.boundingHint ?? null,
+            // bruschetta-58519: surface OCR language + English summary in preview.
+            ocrLanguage: ocr.language ?? null,
+            ocrSummary: ocr.summary ?? null,
             fxSource: fx.source,
             conversionNote: unresolved
               ? `Currency could not be determined automatically — please pick the correct currency to convert ${fx.originalAmount.toLocaleString()} to USD.`
@@ -1301,6 +1307,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       sourceReceiptIndex: number | null;
       sourceReceiptCount: number | null;
       boundingHint: string | null;
+      // bruschetta-58519: OCR language + English summary.
+      ocrLanguage: string | null;
+      ocrSummary: string | null;
       // napoletana-58211: filled in below for kind='pizza' docs after we
       // insert the canonical photos row. Receipts keep this null.
       photoId: string | null;
@@ -1379,6 +1388,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
                 : null,
             sourceReceiptCount: sourceReceiptCount > 1 ? sourceReceiptCount : null,
             boundingHint: typeof ocr.boundingHint === 'string' ? ocr.boundingHint : null,
+            // bruschetta-58519: persist OCR language + English summary (sanitized
+            // at the OCR source; defensively re-sanitize here before the insert).
+            ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
+            ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
             photoId: null,
           });
         });
@@ -1404,6 +1417,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           sourceReceiptIndex: typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : null,
           sourceReceiptCount: null,
           boundingHint: null,
+          // bruschetta-58519: OCR errored — no language/summary available.
+          ocrLanguage: null,
+          ocrSummary: null,
           photoId: null,
         });
       }
@@ -2177,6 +2193,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrLineItems: any;
       ocrError: string | null;
       sortOrder: number;
+      // bruschetta-58519: OCR language + English summary.
+      ocrLanguage: string | null;
+      ocrSummary: string | null;
       // napoletana-58211: kept here for shape parity with newPizzaDocs so the
       // combined createMany call below has a uniform input type. Receipts
       // always carry null.
@@ -2229,6 +2248,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrLineItems: ocr.lineItems && ocr.lineItems.length > 0 ? sanitizeForPg(ocr.lineItems) : null,
           ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
           sortOrder: i,
+          // bruschetta-58519: persist OCR language + English summary (sanitized).
+          ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
+          ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
           photoId: null,
         });
       } else {
@@ -2250,6 +2272,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrLineItems: null,
           ocrError: err,
           sortOrder: i,
+          // bruschetta-58519: OCR errored — no language/summary.
+          ocrLanguage: null,
+          ocrSummary: null,
           photoId: null,
         });
       }
@@ -2273,6 +2298,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrLineItems: null,
       ocrError: null,
       sortOrder: i,
+      // bruschetta-58519: pizza photos have no OCR language/summary.
+      ocrLanguage: null as string | null,
+      ocrSummary: null as string | null,
       // napoletana-58211: filled in inside the transaction below — we
       // insert the canonical photos row first, then attach its id.
       photoId: null as string | null,
@@ -2297,6 +2325,9 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       ocrLineItems: null,
       ocrError: null,
       sortOrder: i,
+      // bruschetta-58519: event photos have no OCR language/summary.
+      ocrLanguage: null as string | null,
+      ocrSummary: null as string | null,
       photoId: null as string | null,
     }));
 
@@ -2902,6 +2933,9 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
       sourceReceiptIndex: number | null;
       sourceReceiptCount: number | null;
       boundingHint: string | null;
+      // bruschetta-58519: OCR language + English summary.
+      ocrLanguage: string | null;
+      ocrSummary: string | null;
     }> = [];
 
     let idx = 0;
@@ -2940,6 +2974,9 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
                 : null,
             sourceReceiptCount: sourceReceiptCount > 1 ? sourceReceiptCount : null,
             boundingHint: typeof ocr.boundingHint === 'string' ? ocr.boundingHint : null,
+            // bruschetta-58519: persist OCR language + English summary (sanitized).
+            ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
+            ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
           });
         });
       } else {
@@ -2963,6 +3000,9 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
           sourceReceiptIndex: typeof doc.sourceReceiptIndex === 'number' ? doc.sourceReceiptIndex : null,
           sourceReceiptCount: null,
           boundingHint: null,
+          // bruschetta-58519: OCR errored — no language/summary.
+          ocrLanguage: null,
+          ocrSummary: null,
         });
       }
       idx++;

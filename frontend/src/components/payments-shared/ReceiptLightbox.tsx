@@ -40,6 +40,14 @@ export interface ReceiptLightboxImage {
    * without a caption render exactly as before.
    */
   caption?: string;
+  /**
+   * bruschetta-58519: OCR English summary (≤140 chars) + ISO-639-1 language of
+   * the receipt's printed text. Shown as a muted line under the file name; when
+   * the language is non-English a 🌐 tag is prefixed. Both optional — images
+   * without them render exactly as before.
+   */
+  ocrSummary?: string | null;
+  ocrLanguage?: string | null;
 }
 
 interface ReceiptLightboxProps {
@@ -541,6 +549,15 @@ export const ReceiptLightbox: React.FC<ReceiptLightboxProps> = ({
             photos. Receipts pass no caption and render unchanged. */}
         {current.caption && (
           <span className="truncate text-white/60">· {current.caption}</span>
+        )}
+        {/* bruschetta-58519: OCR English summary + non-English language tag. */}
+        {current.ocrSummary && (
+          <span className="truncate text-white/60">
+            {current.ocrLanguage && current.ocrLanguage !== 'en' && (
+              <span className="mr-1">🌐 {current.ocrLanguage.toUpperCase()}</span>
+            )}
+            {current.ocrSummary}
+          </span>
         )}
       </div>
     </div>,

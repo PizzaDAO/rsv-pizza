@@ -856,6 +856,9 @@ function serializePayout(row: any): any {
       sourceReceiptIndex: d.sourceReceiptIndex ?? null,
       sourceReceiptCount: d.sourceReceiptCount ?? null,
       boundingHint: d.boundingHint ?? null,
+      // bruschetta-58519: OCR language (ISO-639-1) + English summary.
+      ocrLanguage: d.ocrLanguage ?? null,
+      ocrSummary: d.ocrSummary ?? null,
       // culatello-92104: admin-flagged duplicate receipts. Reviewer modal
       // dims these rows + excludes them from the OCR sum + the host PATCH
       // finalAmountUsd recompute path.
@@ -5926,6 +5929,9 @@ router.patch(
           sourceReceiptIndex: updated.sourceReceiptIndex ?? null,
           sourceReceiptCount: updated.sourceReceiptCount ?? null,
           boundingHint: updated.boundingHint ?? null,
+          // bruschetta-58519: echo OCR language + English summary.
+          ocrLanguage: updated.ocrLanguage ?? null,
+          ocrSummary: updated.ocrSummary ?? null,
           uploadedByUserId: updated.uploadedByUserId ?? null,
         },
       });
@@ -6047,6 +6053,10 @@ router.post(
             where: { id: doc.id },
             data: {
               ocrLineItems: (result.lineItems ?? []) as unknown as Prisma.InputJsonValue,
+              // bruschetta-58519: additive — populate language + English summary
+              // alongside line items (new columns, no prior admin value to clobber).
+              ocrLanguage: result.language ? sanitizePgString(result.language) : null,
+              ocrSummary: result.summary ? sanitizePgString(result.summary) : null,
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
               ocrError: null,
@@ -6197,6 +6207,10 @@ router.post(
               exchangeRate: unresolved
                 ? null
                 : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null),
+              // bruschetta-58519: refresh OCR language + English summary on a
+              // full re-read (sanitized).
+              ocrLanguage: result.language ? sanitizePgString(result.language) : null,
+              ocrSummary: result.summary ? sanitizePgString(result.summary) : null,
               ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
@@ -6240,6 +6254,9 @@ router.post(
           sourceReceiptIndex: true,
           sourceReceiptCount: true,
           boundingHint: true,
+          // bruschetta-58519: surface OCR language + English summary.
+          ocrLanguage: true,
+          ocrSummary: true,
         },
       });
 
@@ -6271,10 +6288,69 @@ router.post(
           sourceReceiptIndex: updated.sourceReceiptIndex ?? null,
           sourceReceiptCount: updated.sourceReceiptCount ?? null,
           boundingHint: updated.boundingHint ?? null,
+          // bruschetta-58519
+          ocrLanguage: updated.ocrLanguage ?? null,
+          ocrSummary: updated.ocrSummary ?? null,
         },
         ranInline,
         inlineError,
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
+// bruschetta-58519: POST /api/admin/payouts/documents/:docId/summarize
+//
+// Admin-only on-demand backfill: re-run OCR on a single receipt and write ONLY
+// the `ocrLanguage` + `ocrSummary` columns. Mirrors the auth of
+// /documents/:docId/retry-ocr (requireAuth + requireAnyAdminOrPaymentAdmin).
+//
+// Crucially this does NOT touch ocr_amount / ocr_currency / ocr_line_items /
+// ocr_confidence / FX — preserving any admin corrections. It's for populating
+// the new language/summary on historical rows (which predate this feature) so
+// /payments can show a one-line English description + a non-English tag.
+//
+// Returns: { ocrLanguage, ocrSummary }
+// ============================================
+router.post(
+  '/documents/:docId/summarize',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { docId } = req.params;
+
+      const existing = await prisma.payoutDocument.findUnique({
+        where: { id: docId },
+        select: { id: true, url: true, party: { select: { country: true } } },
+      });
+      if (!existing) {
+        throw new AppError('Document not found', 404, 'NOT_FOUND');
+      }
+      if (!existing.url) {
+        throw new AppError('Document has no image URL to summarize', 400, 'NO_URL');
+      }
+
+      const { analyzeReceipt } = await import('../services/ocr.service.js');
+      const result = await analyzeReceipt({
+        imageUrl: existing.url,
+        partyCountry: existing.party?.country ?? null,
+      });
+
+      // bruschetta-58519: write ONLY language + summary (sanitized). Do not
+      // touch amount/currency/lineItems — those may carry admin edits.
+      const ocrLanguage = result.language ? sanitizePgString(result.language) : null;
+      const ocrSummary = result.summary ? sanitizePgString(result.summary) : null;
+
+      await prisma.payoutDocument.update({
+        where: { id: docId },
+        data: { ocrLanguage, ocrSummary },
+      });
+
+      res.json({ ocrLanguage, ocrSummary });
     } catch (err) {
       next(err);
     }
@@ -6426,6 +6502,9 @@ router.post(
       let ocrError: string | null = null;
       let ocrAttemptedAt: Date | null = null;
       let ocrAttemptCount = 0;
+      // bruschetta-58519: OCR language + English summary.
+      let ocrLanguage: string | null = null;
+      let ocrSummary: string | null = null;
 
       if (docKind === 'receipt') {
         const { analyzeReceipt } = await import('../services/ocr.service.js');
@@ -6455,6 +6534,9 @@ router.post(
           exchangeRate = unresolved
             ? null
             : (fx.exchangeRate != null ? new Decimal(fx.exchangeRate) : null);
+          // bruschetta-58519: capture language + English summary (sanitized).
+          ocrLanguage = result.language ? sanitizePgString(result.language) : null;
+          ocrSummary = result.summary ? sanitizePgString(result.summary) : null;
           ocrError = unresolved ? 'CURRENCY_UNRESOLVED' : null;
         } catch (err: any) {
           // Don't fail the request — persist the doc with the error so the
@@ -6524,6 +6606,9 @@ router.post(
             ocrError,
             ocrAttemptedAt,
             ocrAttemptCount,
+            // bruschetta-58519: persist OCR language + English summary.
+            ocrLanguage,
+            ocrSummary,
           },
           select: {
             id: true,
@@ -6546,6 +6631,9 @@ router.post(
             sourceReceiptIndex: true,
             sourceReceiptCount: true,
             boundingHint: true,
+            // bruschetta-58519
+            ocrLanguage: true,
+            ocrSummary: true,
             uploadedByUserId: true,
           },
         });
@@ -6594,6 +6682,9 @@ router.post(
           sourceReceiptIndex: created.sourceReceiptIndex ?? null,
           sourceReceiptCount: created.sourceReceiptCount ?? null,
           boundingHint: created.boundingHint ?? null,
+          // bruschetta-58519
+          ocrLanguage: created.ocrLanguage ?? null,
+          ocrSummary: created.ocrSummary ?? null,
           uploadedByUserId: created.uploadedByUserId ?? null,
         },
       });

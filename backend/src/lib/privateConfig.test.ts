@@ -284,6 +284,8 @@ describe('getLlmModels', () => {
     mockPrisma.appConfig.findUnique.mockResolvedValue(null);
     expect(await getLlmModels()).toEqual({
       ocr: 'gpt-4o',
+      // bruschetta-58519: cheap first-pass OCR model (cost routing).
+      ocrCheap: 'gpt-4o-mini',
       visionPrimary: 'gpt-4o',
       assistant: 'gpt-4o-mini',
       visionSecondOpinion: 'claude-3-5-sonnet-latest',

@@ -465,6 +465,15 @@ export function getOperationalLimits(): Promise<OperationalLimits> {
 export interface LlmModels {
   /** Receipt OCR (OpenAI chat-completions vision, json_object). */
   ocr: string;
+  /**
+   * bruschetta-58519: cheaper first-pass receipt OCR model (cost routing). The
+   * OCR service runs this first and ESCALATES to `ocr` only when the cheap pass
+   * looks weak (null/≤0 amount, null currency, confidence<0.6, sum(lineItems)
+   * vs amount mismatch, or zero receipts parsed). KILL SWITCH: set this equal to
+   * `ocr` ("gpt-4o") in app_config and the first pass is already strong, so
+   * nothing escalates — model routing is effectively disabled with no deploy.
+   */
+  ocrCheap: string;
   /** Primary receipt-image authenticity vision verdict (OpenAI). */
   visionPrimary: string;
   /** Event-edit assistant (OpenAI tool-calling). Intentionally the cheaper tier. */
@@ -490,6 +499,9 @@ export interface LlmModels {
 export function getLlmModels(): Promise<LlmModels> {
   return getConfig<LlmModels>(KEYS.llmModels, {
     ocr: 'gpt-4o',
+    // bruschetta-58519: cheap first-pass OCR (cost routing). Set equal to `ocr`
+    // in app_config to disable routing (no escalation) without a deploy.
+    ocrCheap: 'gpt-4o-mini',
     visionPrimary: 'gpt-4o',
     assistant: 'gpt-4o-mini',
     visionSecondOpinion: 'claude-3-5-sonnet-latest',
