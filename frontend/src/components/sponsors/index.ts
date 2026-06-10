@@ -5,3 +5,4 @@ export { PartnerForm, extractSponsorData } from './PartnerForm';
 export type { PartnerFormData } from './PartnerForm';
 export { PartnerIntakeButton } from './PartnerIntakeButton';
 export { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
+export { MercuryReconcilePanel } from './MercuryReconcilePanel';
