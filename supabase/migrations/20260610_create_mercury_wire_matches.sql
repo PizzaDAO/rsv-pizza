@@ -5,7 +5,8 @@ CREATE TABLE mercury_wire_matches (
   mercury_txn_id  TEXT UNIQUE NOT NULL,
   invoice_id      UUID NULL REFERENCES invoices(id) ON DELETE SET NULL,
 
-  amount          INTEGER NOT NULL,   -- cents
+  -- amount in cents
+  amount          INTEGER NOT NULL,
   currency        TEXT,
   memo            TEXT,
   counterparty    TEXT,
