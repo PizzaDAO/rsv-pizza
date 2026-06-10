@@ -2366,6 +2366,15 @@ model Invoice {
   @@map("invoices")
 }
 
+model InvoiceCounter {
+  scope   String  @db.Text
+  year    Int
+  nextVal Int     @default(0) @map("next_val")
+
+  @@id([scope, year])
+  @@map("invoice_counters")
+}
+
 model Mou {
   id             String    @id @default(uuid()) @db.Uuid
   partyId        String    @map("party_id") @db.Uuid
