@@ -1547,13 +1547,28 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             // each channel as a "✓"/"–" so the admin can see at a glance
             // whether both messages went out, or just the group post when
             // the host hasn't linked TG yet.
-            onTgReminderResult={(_partyId, result) => {
+            onTgReminderResult={(partyId, result) => {
               if ('error' in result) {
                 pushToast(
                   `Could not send reminder: ${result.error}`,
                   'error',
                 );
                 return;
+              }
+              if (result.hostDmSent || result.groupSent) {
+                setByPartyRows((prev) =>
+                  prev.map((r) =>
+                    r.party.id === partyId
+                      ? {
+                          ...r,
+                          party: {
+                            ...r.party,
+                            receiptsReminderSentAt: new Date().toISOString(),
+                          },
+                        }
+                      : r,
+                  ),
+                );
               }
               const hostLabel = result.hostDmSent
                 ? 'DM ✓'
@@ -1571,13 +1586,28 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             }}
             // Wallet reminder — same per-channel success/skip toast as the
             // receipts reminder.
-            onTgWalletReminderResult={(_partyId, result) => {
+            onTgWalletReminderResult={(partyId, result) => {
               if ('error' in result) {
                 pushToast(
                   `Could not send wallet reminder: ${result.error}`,
                   'error',
                 );
                 return;
+              }
+              if (result.hostDmSent || result.groupSent) {
+                setByPartyRows((prev) =>
+                  prev.map((r) =>
+                    r.party.id === partyId
+                      ? {
+                          ...r,
+                          party: {
+                            ...r.party,
+                            walletReminderSentAt: new Date().toISOString(),
+                          },
+                        }
+                      : r,
+                  ),
+                );
               }
               const hostLabel = result.hostDmSent
                 ? 'DM ✓'
@@ -1595,13 +1625,28 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             }}
             // Photo reminder — same per-channel success/skip toast as the
             // receipts reminder.
-            onTgPhotoReminderResult={(_partyId, result) => {
+            onTgPhotoReminderResult={(partyId, result) => {
               if ('error' in result) {
                 pushToast(
                   `Could not send photo reminder: ${result.error}`,
                   'error',
                 );
                 return;
+              }
+              if (result.hostDmSent || result.groupSent) {
+                setByPartyRows((prev) =>
+                  prev.map((r) =>
+                    r.party.id === partyId
+                      ? {
+                          ...r,
+                          party: {
+                            ...r.party,
+                            photoReminderSentAt: new Date().toISOString(),
+                          },
+                        }
+                      : r,
+                  ),
+                );
               }
               const hostLabel = result.hostDmSent
                 ? 'DM ✓'
