@@ -104,7 +104,9 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
 
   React.useEffect(() => {
     if (optionsProp !== undefined && optionsProp !== null) {
-      // Parent supplies options; don't fetch.
+      // Parent supplies options; don't fetch (and don't leave the spinner stuck
+      // if a self-fetch was already in flight when the prop arrived).
+      setOptionsLoading(false);
       return;
     }
     if (!partyId) {
@@ -162,6 +164,21 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
     // guarded by methodAvailable, so exclude it from deps to avoid churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, method]);
+
+  // girasole-58537: when there is exactly one method option (rendered as a
+  // static card, not a radio), auto-select it so the wallet sub-form shows and
+  // the parent save-guard passes. Only when it's enabled and differs from the
+  // current selection (guarded against a render loop). Never auto-select a
+  // disabled lone option.
+  const loneMethod = methodOptions.length === 1 ? methodOptions[0] : null;
+  React.useEffect(() => {
+    if (!loneMethod) return;
+    if (!loneMethod.enabled) return;
+    if (method === loneMethod.id) return;
+    onMethodChange(loneMethod.id as PayoutMethod);
+    // onMethodChange excluded intentionally; guarded by the id comparison above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loneMethod?.id, loneMethod?.enabled, method]);
 
   // taleggio-30219: debounced ENS preview state for the USDC sub-form.
   const [ensPreview, setEnsPreview] = React.useState<EnsPreviewState>({ kind: 'idle' });
@@ -267,7 +284,40 @@ export const PayoutMethodPicker: React.FC<PayoutMethodPickerProps> = ({
 
   return (
     <div className="space-y-4">
-      {methodOptions.length > 0 && (
+      {/*
+        girasole-58537: a single payment option isn't a choice — render it as a
+        static, non-interactive card (icon + label + description) with no radio
+        circle and no button/click/hover affordance. The auto-select effect
+        above keeps `method` in sync so the sub-form + save-guard work.
+      */}
+      {methodOptions.length === 1 && (() => {
+        const opt = methodOptions[0];
+        const disabled = !opt.enabled;
+        return (
+          <div
+            className={`w-full rounded-xl border p-4 ${
+              disabled
+                ? 'border-theme-stroke bg-theme-surface opacity-60'
+                : 'border-[#ff393a] bg-[#ff393a]/5'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`mt-0.5 ${disabled ? 'text-theme-text-muted' : 'text-[#ff393a]'}`}>
+                {METHOD_ICONS[opt.id] ?? <Coins size={18} />}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-theme-text">{opt.label}</div>
+                <div className="text-xs text-theme-text-muted mt-0.5">{opt.description ?? ''}</div>
+                {disabled && opt.disabledReason && (
+                  <div className="text-[10px] text-amber-300 mt-1">{opt.disabledReason}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {methodOptions.length > 1 && (
         <div
           className={`grid gap-3 ${
             methodOptions.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
