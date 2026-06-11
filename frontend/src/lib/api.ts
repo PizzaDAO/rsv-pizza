@@ -7,6 +7,8 @@ import { PAYMENTS_REGION_SCOPES, type PaymentsRegionPortal } from '../utils/regi
 // Authenticated API helper functions
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
 
+const DEFAULT_API_TIMEOUT_MS = 30_000;
+
 function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
 }
@@ -15,6 +17,12 @@ interface ApiOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: any;
   requireAuth?: boolean;
+  /**
+   * Client-side request timeout in ms. Defaults to DEFAULT_API_TIMEOUT_MS (30s).
+   * Pass `null` (or 0) to disable the timeout for known long-running calls
+   * (on-chain payout execution, bulk jobs, exports, OCR).
+   */
+  timeoutMs?: number | null;
 }
 
 // Custom event name for auth expiration
@@ -25,6 +33,7 @@ export async function apiRequest<T>(
   options: ApiOptions = {}
 ): Promise<T> {
   const { method = 'GET', body, requireAuth = true } = options;
+  const timeoutMs = options.timeoutMs === undefined ? DEFAULT_API_TIMEOUT_MS : options.timeoutMs;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -44,11 +53,22 @@ export async function apiRequest<T>(
     }
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      ...(timeoutMs && timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+    });
+  } catch (e: any) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+      const err = new Error('Request timed out — please check your connection and try again.') as Error & { code?: string };
+      err.code = 'TIMEOUT';
+      throw err;
+    }
+    throw e; // genuine network error (offline/DNS/CORS) — preserve original
+  }
 
   if (!response.ok) {
     // Handle 401 Unauthorized - token expired or invalid
@@ -435,6 +455,7 @@ export async function eventAssistant(
   return apiRequest<EventAssistantResponse>(`/api/parties/${partyId}/assistant`, {
     method: 'POST',
     body: { instruction, conversationHistory: history },
+    timeoutMs: null, // LLM proposal generation — never abort client-side
   });
 }
 
@@ -924,6 +945,7 @@ export async function importGuestsApi(
   return apiRequest<ImportGuestsResult>(`/api/parties/${partyId}/guests/import`, {
     method: 'POST',
     body: data,
+    timeoutMs: null, // bulk guest import — never abort client-side
   });
 }
 
@@ -959,6 +981,7 @@ export async function bulkInviteGuests(
     {
       method: 'POST',
       body: { guests, customMessage, ...(testOnly && { testOnly: true }) },
+      timeoutMs: null, // bulk invite send — never abort client-side
     }
   );
 }
@@ -1408,6 +1431,7 @@ export async function batchReviewPhotos(
       method: 'POST',
       body: { photoIds, status },
       requireAuth: true,
+      timeoutMs: null, // bulk photo review — never abort client-side
     });
   } catch (error) {
     console.error('Error batch reviewing photos:', error);
@@ -1986,6 +2010,7 @@ export async function getMous(partyId: string): Promise<{ mous: Mou[] } | null> 
 export async function reconcileMercuryWires(): Promise<MercuryReconcileResult> {
   return apiRequest<MercuryReconcileResult>('/api/admin/mercury/reconcile', {
     method: 'POST',
+    timeoutMs: null, // external Mercury poll + reconcile — never abort client-side
   });
 }
 
@@ -3676,6 +3701,7 @@ export async function bulkUpdateUnderbossStatus(partyIds: string[], status: 'pen
   await apiRequest('/api/underboss/events/bulk-status', {
     method: 'PATCH',
     body: { partyIds, status },
+    timeoutMs: null, // bulk multi-party status update — never abort client-side
   });
 }
 
@@ -3687,6 +3713,7 @@ export async function bulkDeleteEvents(partyIds: string[]): Promise<void> {
   await apiRequest('/api/underboss/events/bulk-delete', {
     method: 'DELETE',
     body: { partyIds },
+    timeoutMs: null, // bulk multi-party soft-cancel — never abort client-side
   });
 }
 
@@ -3699,6 +3726,7 @@ export async function bulkUpdateEventTags(
   await apiRequest('/api/underboss/events/bulk-event-tags', {
     method: 'PATCH',
     body: { partyIds, tags, action },
+    timeoutMs: null, // bulk multi-party tag update — never abort client-side
   });
 }
 
@@ -3787,6 +3815,7 @@ export async function bulkUpdateShippingKits(kitIds: string[], updates: {
   return apiRequest<{ updated: number }>('/api/shipping/kits/bulk-update', {
     method: 'PATCH',
     body: { kitIds, updates },
+    timeoutMs: null, // bulk multi-kit update — never abort client-side
   });
 }
 
@@ -3795,6 +3824,7 @@ export async function importShippingTracking(items: { kitId: string; trackingNum
   return apiRequest<{ updated: number; skipped: number; notFound: string[] }>('/api/shipping/kits/import-tracking', {
     method: 'POST',
     body: { items },
+    timeoutMs: null, // bulk CSV tracking import — never abort client-side
   });
 }
 
@@ -4130,7 +4160,7 @@ export async function inviteUnlinkedHosts(): Promise<{
   skipped: number;
   noEmail: number;
 }> {
-  return apiRequest('/api/underboss/telegram/invite-unlinked', { method: 'POST' });
+  return apiRequest('/api/underboss/telegram/invite-unlinked', { method: 'POST', timeoutMs: null }); // bulk host emailing — never abort client-side
 }
 
 export async function fetchHostAudience(): Promise<HostAudienceRow[]> {
@@ -4151,6 +4181,7 @@ export async function sendTelegramBroadcast(
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/broadcast', {
     method: 'POST',
     body: { groups, message, parseMode, appTab },
+    timeoutMs: null, // multi-group Telegram broadcast — never abort client-side
   });
 }
 
@@ -4185,6 +4216,7 @@ export async function sendHostTelegramBroadcast(
   return apiRequest<BroadcastResponse>('/api/underboss/telegram/host-broadcast', {
     method: 'POST',
     body: { hosts, message, parseMode, appTab, broadcastId },
+    timeoutMs: null, // multi-host Telegram broadcast — never abort client-side
   });
 }
 
@@ -5169,6 +5201,7 @@ export async function applyLogoBgFix(
       method: 'POST',
       requireAuth: true,
       body: { logoUrl },
+      timeoutMs: null, // server-side image processing — never abort client-side
     }
   );
 }
@@ -5212,6 +5245,7 @@ export async function applyLogoBgFixUpload(
         fileBase64,
         contentType: file.type,
       },
+      timeoutMs: null, // base64 image upload + server processing — never abort client-side
     }
   );
 }
@@ -5491,7 +5525,7 @@ export async function verifyImageAuthenticity(params: {
 }): Promise<{ check: ImageAuthenticityCheck; cached: boolean }> {
   return apiRequest<{ check: ImageAuthenticityCheck; cached: boolean }>(
     '/api/admin/image-authenticity',
-    { method: 'POST', body: params },
+    { method: 'POST', body: params, timeoutMs: null }, // AI image scorer — never abort client-side
   );
 }
 
@@ -5549,7 +5583,7 @@ export async function retryPayoutDocumentOcr(
 }> {
   return apiRequest(
     `/api/admin/payouts/documents/${docId}/retry-ocr`,
-    { method: 'POST', body: { runNow: opts?.runNow ?? true } },
+    { method: 'POST', body: { runNow: opts?.runNow ?? true }, timeoutMs: null }, // inline OCR re-run — never abort client-side
   );
 }
 
@@ -5564,7 +5598,7 @@ export async function summarizePayoutDocument(
 ): Promise<{ ocrLanguage: string | null; ocrSummary: string | null }> {
   return apiRequest(
     `/api/admin/payouts/documents/${docId}/summarize`,
-    { method: 'POST' },
+    { method: 'POST', timeoutMs: null }, // OCR + summary backfill — never abort client-side
   );
 }
 
@@ -5588,6 +5622,7 @@ export async function addAdminPayoutDocument(
   return apiRequest(`/api/admin/payouts/${payoutId}/documents`, {
     method: 'POST',
     body,
+    timeoutMs: null, // backend OCRs receipts inline — never abort client-side
   });
 }
 
@@ -5977,6 +6012,7 @@ export async function markPartyPaid(
     {
       method: 'POST',
       body: body ?? {},
+      timeoutMs: null, // closes out a whole city's payout rows — never abort client-side
     },
   );
 }
@@ -6002,6 +6038,7 @@ export async function reopenParty(
     {
       method: 'POST',
       body: note ? { note } : {},
+      timeoutMs: null, // reverts a whole city's payout rows — never abort client-side
     },
   );
 }
@@ -6042,6 +6079,7 @@ export async function executeAdminPayout(
   const res = await apiRequest<{ payout: AdminPayout }>(`/api/admin/payouts/${id}/execute`, {
     method: 'POST',
     body,
+    timeoutMs: null, // single on-chain USDC send — never abort client-side
   });
   return res.payout;
 }
@@ -6081,6 +6119,7 @@ export async function bulkExecutePayouts(
   const res = await apiRequest<{ results: BulkSendResult[] }>(`/api/admin/payouts/bulk-execute`, {
     method: 'POST',
     body,
+    timeoutMs: null, // on-chain USDC sends run sequentially — never abort client-side
   });
   return res.results;
 }
@@ -6358,7 +6397,7 @@ export async function createPayout(
 ): Promise<Payout> {
   const res = await apiRequest<{ payout: Payout }>(
     `/api/parties/${partyId}/payouts`,
-    { method: 'POST', body: data, requireAuth: true }
+    { method: 'POST', body: data, requireAuth: true, timeoutMs: null } // backend OCRs receipts inline — never abort client-side
   );
   return res.payout;
 }
@@ -6492,7 +6531,7 @@ export async function updatePayout(
 ): Promise<Payout> {
   const res = await apiRequest<{ payout: Payout }>(
     `/api/parties/${partyId}/payouts/${payoutId}`,
-    { method: 'PATCH', body: data, requireAuth: true }
+    { method: 'PATCH', body: data, requireAuth: true, timeoutMs: null } // backend OCRs new receipts inline — never abort client-side
   );
   return res.payout;
 }
@@ -6587,7 +6626,7 @@ export async function addReimbursementReceipts(
 ): Promise<ReimbursementMutationResponse> {
   return apiRequest<ReimbursementMutationResponse>(
     `/api/parties/${partyId}/reimbursement/receipts`,
-    { method: 'POST', body: { receiptPhotos: docs }, requireAuth: true }
+    { method: 'POST', body: { receiptPhotos: docs }, requireAuth: true, timeoutMs: null } // backend OCRs appended receipts inline — never abort client-side
   );
 }
 
@@ -6702,7 +6741,7 @@ export async function previewReceiptOCR(
 ): Promise<OcrPreviewResult> {
   return apiRequest<OcrPreviewResult>(
     `/api/parties/${partyId}/payouts/ocr-preview`,
-    { method: 'POST', body: { imageUrl }, requireAuth: true }
+    { method: 'POST', body: { imageUrl }, requireAuth: true, timeoutMs: null } // vision-model OCR — never abort client-side
   );
 }
 
@@ -6858,6 +6897,7 @@ export async function sendDayOfAnnouncement(
     method: 'POST',
     body: payload,
     requireAuth: true,
+    timeoutMs: null, // multi-guest email/Telegram announcement — never abort client-side
   });
 }
 
@@ -7237,7 +7277,7 @@ export async function sendSurvey(
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   return apiRequest<{ sent: number; failed: number; skipped: number }>(
     `/api/parties/${partyId}/survey/send`,
-    { method: 'POST', body: { audience }, requireAuth: true }
+    { method: 'POST', body: { audience }, requireAuth: true, timeoutMs: null } // bulk survey email send — never abort client-side
   );
 }
 
@@ -7422,6 +7462,7 @@ export async function sendHostSurvey(body: {
     method: 'POST',
     body,
     requireAuth: true,
+    timeoutMs: null, // bulk host-survey email send — never abort client-side
   });
 }
 
