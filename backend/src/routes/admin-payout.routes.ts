@@ -900,6 +900,9 @@ function serializePayout(row: any): any {
           name: row.party.name,
           inviteCode: row.party.inviteCode,
           customUrl: row.party.customUrl,
+          // malfatti-58532: event start, so the admin "Add photo" modal can apply
+          // the same post-event-start photo cutoff hosts use (RolePhotoPicker).
+          date: row.party.date ? row.party.date.toISOString() : null,
           // bruschetta-58291: surface the party's country on the wire so the
           // /payments queue can render it as a subtitle and populate the
           // Country filter dropdown.
@@ -2209,6 +2212,9 @@ router.get(
             name: b.partyMeta.name,
             customUrl: b.partyMeta.customUrl ?? null,
             inviteCode: b.partyMeta.inviteCode ?? null,
+            // malfatti-58532: event start, so the admin "Add photo" modal can apply
+            // the same post-event-start photo cutoff hosts use (RolePhotoPicker).
+            date: b.partyMeta.date ? b.partyMeta.date.toISOString() : null,
             country: b.partyMeta.country ?? null,
             // provatura-92107: region now selected via PAYOUT_PARTY_SELECT so
             // the by-city "Hide US cities" toggle can filter party.region.
@@ -2374,6 +2380,8 @@ router.get(
               name: partyMeta.name,
               customUrl: partyMeta.customUrl ?? null,
               inviteCode: partyMeta.inviteCode ?? null,
+              // malfatti-58532: keep field-for-field parity with the real row.
+              date: partyMeta.date ? partyMeta.date.toISOString() : null,
               country: partyMeta.country ?? null,
               region: (partyMeta.region as string | null) ?? null,
               effectiveReimbursementCapUsd: computeEffectiveCapUsd({

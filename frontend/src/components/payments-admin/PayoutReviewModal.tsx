@@ -4326,12 +4326,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       />
 
       {/* provolone-58531: admin/underboss Add-photos modal (host-style role
-          slots + additional photos). AdminPayout.party carries no date field,
-          so the event-start cutoff is disabled (eventStart={null}). */}
+          slots + additional photos). malfatti-58532: pass the event start so the
+          role-picker applies the same post-event-start cutoff hosts get. */}
       {showAddPhotos && (
         <AdminAddPhotosModal
           partyId={payout.partyId}
-          eventStart={null}
+          eventStart={payout.party.date ?? null}
           partyName={payout.party.name}
           onClose={() => setShowAddPhotos(false)}
           onAdded={handlePhotosAdded}
