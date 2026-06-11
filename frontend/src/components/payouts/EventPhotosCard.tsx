@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Camera } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { usePizza } from '../../contexts/PizzaContext';
+import { PizzaContext } from '../../contexts/PizzaContext';
 import { Photo } from '../../types';
 import { designatePhotoRole, getPartyPhotos } from '../../lib/api';
 import { RolePhotoPicker, PayoutPhotoRole } from './RolePhotoPicker';
@@ -25,6 +25,20 @@ interface EventPhotosCardProps {
    * now requires >=5 additional event photos beyond the 3 role photos.
    */
   onPhotosChange?: () => void;
+  /**
+   * provolone-58531: when this card is rendered in an admin context (the party
+   * being reviewed is NOT the PizzaContext party), pass the reviewed party's
+   * start date so the role-picker cutoff + additional-photo eligibility use it
+   * instead of `party?.date`. Omitted on the host call site → falls back to the
+   * PizzaContext party's date.
+   */
+  eventStartDate?: string | null;
+  /**
+   * provolone-58531: admin-context uploader identity. When provided, photos are
+   * attributed to this name/email instead of the logged-in `useAuth()` user.
+   */
+  uploaderName?: string;
+  uploaderEmail?: string;
 }
 
 /**
@@ -42,10 +56,27 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
   partyId,
   onRolesChange,
   onPhotosChange,
+  eventStartDate,
+  uploaderName,
+  uploaderEmail,
 }) => {
   const { t } = useTranslation('host');
   const { user } = useAuth();
-  const { party } = usePizza();
+  // provolone-58531: read PizzaContext OPTIONALLY (not via usePizza(), which
+  // throws outside a PizzaProvider). The /payments admin pages mount this card
+  // inside AdminAddPhotosModal WITHOUT a PizzaProvider, so the hard hook would
+  // crash there. In admin context the reviewed party's start date arrives via
+  // `eventStartDate` instead.
+  const pizza = useContext(PizzaContext);
+  const party = pizza?.party;
+
+  // provolone-58531: prefer the explicit admin-context start date; fall back to
+  // the PizzaContext party's date for the host call site.
+  const effectiveEventStart = eventStartDate ?? party?.date ?? null;
+  // provolone-58531: uploader identity — explicit admin props win over the
+  // logged-in user.
+  const effectiveUploaderName = uploaderName ?? user?.name ?? undefined;
+  const effectiveUploaderEmail = uploaderEmail ?? user?.email ?? undefined;
 
   // porchetta-58296: the three host-designated event role photos. Each slot
   // holds the designated Photo (or undefined). Seeded on mount from the
@@ -103,7 +134,7 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
   // gate (getPayoutSubmissionReadiness) and the RolePhotoPicker cutoff. The
   // preview grid above still shows ALL additional photos; only this count drives
   // the progress line so it never reads "5 of 5" while the server still blocks.
-  const cutoff = party?.date ? new Date(party.date).getTime() : null;
+  const cutoff = effectiveEventStart ? new Date(effectiveEventStart).getTime() : null;
   const eligibleAdditionalCount = additionalPhotos.filter(
     p => cutoff == null || new Date(p.createdAt).getTime() >= cutoff
   ).length;
@@ -229,8 +260,8 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
           <PhotoUpload
             partyId={partyId}
             isHost
-            uploaderName={user?.name ?? undefined}
-            uploaderEmail={user?.email ?? undefined}
+            uploaderName={effectiveUploaderName}
+            uploaderEmail={effectiveUploaderEmail}
             onUploadComplete={() => loadPhotos()}
             onClose={() => setShowAdditionalUpload(false)}
           />
@@ -252,7 +283,7 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
           partyId={partyId}
           role={pickerRole}
           roleLabel={roleLabels[pickerRole]}
-          eventStart={party?.date ?? null}
+          eventStart={effectiveEventStart}
           selectedPhotoId={roles[pickerRole]?.id ?? null}
           onSelect={designating ? () => {} : handleRoleSelect}
           onClose={() => setPickerRole(null)}

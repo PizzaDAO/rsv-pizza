@@ -5,13 +5,16 @@ import { addAdminPayoutDocument } from '../../lib/api';
 
 /**
  * sfincione-58500: a small self-contained uploader that lets a full payment
- * admin attach a receipt / pizza-proof / event-proof to an existing payout
- * straight from the /payments review modal.
+ * admin attach a receipt to an existing payout straight from the /payments
+ * review modal.
  *
- * Upload flow: `uploadPayoutPhoto(file, partyId, payoutId, kind)` (the real
+ * Upload flow: `uploadPayoutPhoto(file, partyId, payoutId, 'receipt')` (the real
  * payoutId is fine as the storage path segment) → `addAdminPayoutDocument(...)`
- * → `onAdded()`. The backend OCRs receipts inline and mirrors pizza/event docs
- * into the gallery, so callers just re-fetch the payout detail in `onAdded`.
+ * → `onAdded()`. The backend OCRs receipts inline, so callers just re-fetch the
+ * payout detail in `onAdded`.
+ *
+ * provolone-58531: this control is now RECEIPT-ONLY. Admin photo attachment
+ * moved onto the host role model via AdminAddPhotosModal (EventPhotosCard).
  *
  * Rendered only for full payment admins — the parent hides it for regional
  * underbosses.
@@ -19,32 +22,29 @@ import { addAdminPayoutDocument } from '../../lib/api';
 
 const RECEIPT_ACCEPT =
   'image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf';
-const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 interface AdminAddAttachmentProps {
   payoutId: string;
   partyId: string;
-  mode: 'receipt' | 'photo';
+  // provolone-58531: kept for call-site compatibility, but only 'receipt' is
+  // used now (the 'photo' branch was removed).
+  mode?: 'receipt';
   onAdded: () => void;
 }
 
 export const AdminAddAttachment: React.FC<AdminAddAttachmentProps> = ({
   payoutId,
   partyId,
-  mode,
   onAdded,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  // photo mode picks between pizza / event proof; receipt mode is fixed.
-  const [photoKind, setPhotoKind] = useState<'pizza' | 'event'>('pizza');
   const [status, setStatus] = useState<'idle' | 'uploading' | 'reading'>('idle');
   const [error, setError] = useState<string | null>(null);
   // focaccia-58519: keep the last picked file so a transient failure can be
   // retried without re-selecting it.
   const lastFileRef = useRef<File | null>(null);
 
-  const kind: 'receipt' | 'pizza' | 'event' =
-    mode === 'receipt' ? 'receipt' : photoKind;
+  const kind = 'receipt' as const;
   const busy = status !== 'idle';
 
   // focaccia-58519: deterministic local-validation rejections aren't retryable.
@@ -61,7 +61,7 @@ export const AdminAddAttachment: React.FC<AdminAddAttachmentProps> = ({
       const uploaded = await uploadPayoutPhoto(file, partyId, payoutId, kind);
       // Receipts get OCR'd server-side — surface a "reading" state so the
       // admin knows the request is still in flight after the upload finishes.
-      if (kind === 'receipt') setStatus('reading');
+      setStatus('reading');
       await addAdminPayoutDocument(payoutId, {
         kind,
         url: uploaded.url,
@@ -77,43 +77,12 @@ export const AdminAddAttachment: React.FC<AdminAddAttachmentProps> = ({
     }
   };
 
-  const accept = mode === 'receipt' ? RECEIPT_ACCEPT : PHOTO_ACCEPT;
-  const buttonLabel =
-    mode === 'receipt' ? 'Add receipt' : 'Add photo';
+  const accept = RECEIPT_ACCEPT;
+  const buttonLabel = 'Add receipt';
 
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex items-center gap-2">
-        {/* photo mode: two-way kind picker (Pizza proof | Event proof). */}
-        {mode === 'photo' && (
-          <div className="inline-flex rounded-lg border border-theme-stroke overflow-hidden text-xs">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPhotoKind('pizza')}
-              className={`px-2.5 py-1.5 transition-colors ${
-                photoKind === 'pizza'
-                  ? 'bg-[#ff393a] text-white'
-                  : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
-              }`}
-            >
-              Pizza proof
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPhotoKind('event')}
-              className={`px-2.5 py-1.5 transition-colors ${
-                photoKind === 'event'
-                  ? 'bg-[#ff393a] text-white'
-                  : 'bg-theme-surface text-theme-text-muted hover:text-theme-text'
-              }`}
-            >
-              Event proof
-            </button>
-          </div>
-        )}
-
         <input
           ref={inputRef}
           type="file"
