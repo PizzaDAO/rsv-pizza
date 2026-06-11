@@ -1,9 +1,27 @@
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFString, PDFName } from 'pdf-lib';
-import { PIZZADAO_LOGO_JPG_BASE64 } from '../assets/pizzadaoLogo.js';
+import sharp from 'sharp';
+import { PIZZADAO_LOGO_SVG } from '../assets/pizzadaoLogoSvg.js';
+
+// ── Issuer constants ──────────────────────────────────────────────────────────
+const ISSUER = {
+  name: 'Rare Pizzas, LLC',
+  addressLines: ['30 N Gould St.', 'Sheridan, WY 82801'],
+  phone: '1 (267) 603-7264',
+  cryptoEns: 'dreadpizzaroberts.eth',
+  cryptoAddress: '0xF41a98D4F2E52aa1ccB48F0b6539e955707b8F7a',
+};
+
+// ── Logo cache (render once, reuse) ───────────────────────────────────────────
+let _logoPng: Buffer | null = null;
+async function getLogoPng(): Promise<Buffer> {
+  if (_logoPng) return _logoPng;
+  const blackSvg = PIZZADAO_LOGO_SVG.replace(/fill="white"/g, 'fill="black"');
+  _logoPng = await sharp(Buffer.from(blackSvg)).resize({ width: 760 }).png().toBuffer();
+  return _logoPng;
+}
 
 /**
  * Format cents as a currency string (e.g. 150000 → "$1,500.00").
- * Matches the formatAmount helper in invoice.routes.ts.
  */
 function formatAmount(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-US', {
@@ -14,19 +32,27 @@ function formatAmount(cents: number, currency: string): string {
 }
 
 /**
- * Wrap text into lines that fit within maxWidth using the given font+size.
- * Returns an array of strings.
+ * Format a date value as M/D/YYYY.
  */
-async function wrapText(
+function formatDate(val: string | number | Date | null | undefined): string {
+  if (!val) return 'Upon Receipt';
+  const d = new Date(val as any);
+  if (isNaN(d.getTime())) return 'Upon Receipt';
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
+/**
+ * Wrap text into lines that fit within maxWidth using the given font+size.
+ */
+function wrapText(
   text: string,
   maxWidth: number,
-  font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+  font: any,
   fontSize: number,
-): Promise<string[]> {
+): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
   let current = '';
-
   for (const word of words) {
     const test = current ? `${current} ${word}` : word;
     const width = font.widthOfTextAtSize(test, fontSize);
@@ -42,324 +68,339 @@ async function wrapText(
 }
 
 /**
- * Generate a PDF invoice using pdf-lib (pure JS, no Chromium/Puppeteer).
+ * Generate a PDF invoice matching the PizzaDAO invoice template design.
  * Returns a Buffer containing the PDF bytes.
  */
 export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  const fontRegular = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  // ── Colours ──────────────────────────────────────────────────────────────
-  const navy = rgb(0.102, 0.102, 0.180);   // #1a1a2e
-  const red  = rgb(1.0,  0.224, 0.227);    // #ff393a
-  const grey = rgb(0.4,  0.4,   0.4);
-  const lightGrey = rgb(0.88, 0.88, 0.88);
-  const black = rgb(0,   0,     0);
-  const white = rgb(1,   1,     1);
+  // ── Fonts (monospace = typewriter look) ─────────────────────────────────────
+  const fontRegular = await doc.embedFont(StandardFonts.Courier);
+  const fontBold    = await doc.embedFont(StandardFonts.CourierBold);
+  const fontFallback = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  // ── Page setup ───────────────────────────────────────────────────────────
-  // Letter: 612 × 792 pt
-  const [pageW, pageH] = PageSizes.Letter;
-  const margin = 50;
-  const contentW = pageW - margin * 2;
+  // ── Colours ──────────────────────────────────────────────────────────────────
+  const orange     = rgb(0.93, 0.415, 0.10);   // #ED6A1A
+  const greyColor  = rgb(0.53, 0.53,  0.53);
+  const lightGrey  = rgb(0.82, 0.82,  0.82);
+  const black      = rgb(0,    0,     0);
+  const white      = rgb(1,    1,     1);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
-  let page = doc.addPage([pageW, pageH]);
+  // ── Page setup ───────────────────────────────────────────────────────────────
+  const [pageW, pageH] = PageSizes.Letter; // 612 × 792
+  const margin    = 50;
+  const contentW  = pageW - margin * 2;   // 512
+  const page      = doc.addPage([pageW, pageH]);
 
-  /** Draw text at (x, y) from TOP of page (pdf-lib origin is bottom-left). */
-  function drawText(
-    text: string,
-    x: number,
-    yFromTop: number,
-    opts: {
-      font?: typeof fontRegular;
-      size?: number;
-      color?: ReturnType<typeof rgb>;
-      maxWidth?: number;
-    } = {},
-  ) {
-    const font = opts.font ?? fontRegular;
-    const size = opts.size ?? 10;
-    const color = opts.color ?? black;
-    page.drawText(text, { x, y: pageH - yFromTop, font, size, color });
-  }
-
-  function drawLine(x1: number, y1FromTop: number, x2: number, y2FromTop: number, color = lightGrey, thickness = 0.5) {
-    page.drawLine({
-      start: { x: x1, y: pageH - y1FromTop },
-      end:   { x: x2, y: pageH - y2FromTop },
-      thickness,
-      color,
-    });
-  }
-
-  function drawRect(x: number, yFromTop: number, w: number, h: number, color: ReturnType<typeof rgb>) {
-    page.drawRectangle({ x, y: pageH - yFromTop - h, width: w, height: h, color });
-  }
-
-  // ── Currency & data ───────────────────────────────────────────────────────
-  const currency = invoice.currency || 'usd';
-  const fmt = (cents: number) => formatAmount(cents, currency);
+  // ── Data extraction ───────────────────────────────────────────────────────────
+  const currency  = invoice.currency || 'usd';
+  const fmt       = (cents: number) => formatAmount(cents, currency);
   const lineItems: Array<{ description: string; amount: number }> =
     Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
 
-  // Dates
-  const issueDate = (invoice.sentAt ? new Date(invoice.sentAt) : new Date(invoice.createdAt ?? Date.now()))
-    .toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const appUrl  = process.env.FRONTEND_URL || process.env.APP_URL || 'https://rsv.pizza';
+  const payUrl  = `${appUrl}/invoice/${invoice.viewToken}`;
 
-  const dueDateText = invoice.dueDate
-    ? new Date(invoice.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : null;
+  const issueDate  = formatDate(invoice.sentAt ?? invoice.createdAt ?? Date.now());
+  const dueDate    = invoice.dueDate ? formatDate(invoice.dueDate) : 'Upon Receipt';
+  const invoiceNum = invoice.invoiceNumber ?? '';
 
-  // App URL for footer
-  const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://rsv.pizza';
-  const payUrl = `${appUrl}/invoice/${invoice.viewToken}`;
+  const company  = invoice.billToCompany || invoice.sponsor?.name || '';
+  const contact  = invoice.billToContact || '';
+  const email    = invoice.billToEmail   || '';
 
-  // ── Layout: track cursor position (yFromTop) ──────────────────────────────
-  let y = margin; // y from top of page
-
-  // ── HEADER BAND ───────────────────────────────────────────────────────────
-  const headerH = 70;
-  drawRect(0, 0, pageW, headerH, navy);
-
-  // Logo (try/catch — skip on failure, still produce the PDF)
-  try {
-    const logoImg = await doc.embedJpg(Buffer.from(PIZZADAO_LOGO_JPG_BASE64, 'base64'));
-    // Center vertically in the 70pt band: band top=0, band bottom=70 (from top)
-    // Logo is 36×36, so top of logo = (70-36)/2 = 17 from top of band = yFromTop=17
-    page.drawImage(logoImg, { x: margin, y: pageH - 53, width: 36, height: 36 });
-  } catch (_) {
-    // Logo embed failed — continue without it
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  /** Draw text with y measured from the TOP of the page. */
+  function dt(
+    text: string,
+    x: number,
+    yTop: number,
+    opts: { font?: any; size?: number; color?: ReturnType<typeof rgb> } = {},
+  ) {
+    const f    = opts.font  ?? fontRegular;
+    const sz   = opts.size  ?? 10;
+    const col  = opts.color ?? black;
+    page.drawText(text, { x, y: pageH - yTop, font: f, size: sz, color: col });
   }
 
-  // "INVOICE" title — shifted right of the logo (x ≈ margin + 48)
-  const titleX = margin + 48;
-  page.drawText('INVOICE', {
-    x: titleX,
-    y: pageH - margin - 14,
+  function line(x1: number, y1: number, x2: number, y2: number, color = lightGrey, thickness = 0.5) {
+    page.drawLine({
+      start: { x: x1, y: pageH - y1 },
+      end:   { x: x2, y: pageH - y2 },
+      thickness, color,
+    });
+  }
+
+  function rect(x: number, yTop: number, w: number, h: number, color: ReturnType<typeof rgb>) {
+    page.drawRectangle({ x, y: pageH - yTop - h, width: w, height: h, color });
+  }
+
+  // ── 1. TOP ORANGE BAR ─────────────────────────────────────────────────────────
+  rect(margin, 30, contentW, 7, orange);
+
+  let y = 30; // cursor from top
+
+  // ── 2. HEADER ROW: logo (left) + pay button (right) ──────────────────────────
+  y += 7 + 12; // 12pt gap below bar
+
+  // Logo
+  const logoTargetW = 190;
+  const logoAspect  = 490 / 80;
+  const logoH       = logoTargetW / logoAspect; // ≈31pt
+
+  let logoDrawn = false;
+  try {
+    const logoPngBuf = await getLogoPng();
+    // Sanity-check: mean brightness < 250 means it has dark content
+    const stats = await sharp(logoPngBuf).stats();
+    const mean = stats.channels.reduce((s, c) => s + c.mean, 0) / stats.channels.length;
+    if (mean < 250) {
+      const logoImg = await doc.embedPng(logoPngBuf);
+      page.drawImage(logoImg, { x: margin, y: pageH - y - logoH, width: logoTargetW, height: logoH });
+      logoDrawn = true;
+    }
+  } catch (_) {
+    // fall through to text fallback
+  }
+  if (!logoDrawn) {
+    dt('PizzaDAO', margin, y + logoH * 0.6, { font: fontFallback, size: 22, color: black });
+  }
+
+  // Pay Invoice Online button (right side)
+  const btnW = 170, btnH = 34;
+  const btnX = pageW - margin - btnW;
+  const btnY = y - 2; // align top with header row
+
+  // Orange filled rectangle for the button
+  page.drawRectangle({
+    x: btnX, y: pageH - btnY - btnH,
+    width: btnW, height: btnH,
+    color: orange,
+  });
+
+  const btnLabel = 'Pay Invoice Online';
+  const btnLabelSz = 10;
+  const btnLabelW = fontBold.widthOfTextAtSize(btnLabel, btnLabelSz);
+  page.drawText(btnLabel, {
+    x: btnX + (btnW - btnLabelW) / 2,
+    y: pageH - btnY - btnH / 2 - btnLabelSz * 0.38,
     font: fontBold,
-    size: 22,
+    size: btnLabelSz,
     color: white,
   });
 
-  // Invoice number below title
-  const invoiceNumLabel = `#${invoice.invoiceNumber ?? ''}`;
-  page.drawText(invoiceNumLabel, {
-    x: titleX,
-    y: pageH - margin - 32,
-    font: fontRegular,
-    size: 11,
-    color: rgb(0.8, 0.8, 0.8),
-  });
-
-  // Party name (right-aligned in header)
-  const partyName = invoice.party?.name ?? '';
-  if (partyName) {
-    const partyW = fontRegular.widthOfTextAtSize(partyName, 10);
-    page.drawText(partyName, {
-      x: pageW - margin - partyW,
-      y: pageH - margin - 14,
-      font: fontRegular,
-      size: 10,
-      color: rgb(0.8, 0.8, 0.8),
+  // Link annotation on button
+  try {
+    const annot = doc.context.obj({
+      Type:    PDFName.of('Annot'),
+      Subtype: PDFName.of('Link'),
+      Rect:    doc.context.obj([btnX, pageH - btnY - btnH, btnX + btnW, pageH - btnY]),
+      Border:  doc.context.obj([0, 0, 0]),
+      A: doc.context.obj({
+        Type: PDFName.of('Action'),
+        S:    PDFName.of('URI'),
+        URI:  PDFString.of(payUrl),
+      }),
     });
+    const ref = doc.context.register(annot);
+    const ex  = page.node.Annots();
+    if (ex) ex.push(ref);
+    else page.node.set(PDFName.of('Annots'), doc.context.obj([ref]));
+  } catch (_) {
+    // Annotation unavailable — button is still visible
   }
 
-  // Issue date + due date (right side of header)
-  const dateLabel = `Date: ${issueDate}`;
-  const dateLabelW = fontRegular.widthOfTextAtSize(dateLabel, 9);
-  page.drawText(dateLabel, {
-    x: pageW - margin - dateLabelW,
-    y: pageH - margin - 30,
-    font: fontRegular,
-    size: 9,
-    color: rgb(0.7, 0.7, 0.7),
-  });
+  y += Math.max(logoH, btnH) + 30;
 
-  if (dueDateText) {
-    const dueLabel = `Due: ${dueDateText}`;
-    const dueLabelW = fontRegular.widthOfTextAtSize(dueLabel, 9);
-    page.drawText(dueLabel, {
-      x: pageW - margin - dueLabelW,
-      y: pageH - margin - 43,
-      font: fontRegular,
-      size: 9,
-      color: rgb(0.7, 0.7, 0.7),
-    });
-  }
+  // ── 3. TWO-COLUMN INFO ROW ───────────────────────────────────────────────────
+  // LEFT col: issuer address + crypto
+  // RIGHT col: invoice metadata + bill-to (form-style underlines)
 
-  y = headerH + 24; // cursor after header
+  const colMid = margin + contentW * 0.45; // split point
+  const rightColX = colMid + 10;
+  const rightValX = rightColX + 120;
 
-  // ── BILL TO ───────────────────────────────────────────────────────────────
-  drawText('BILL TO', margin, y, { font: fontBold, size: 8, color: grey });
+  // LEFT: Mailing Address
+  dt('Mailing Address', margin, y, { font: fontBold, size: 9, color: black });
   y += 14;
+  dt(ISSUER.name, margin, y, { size: 9 });
+  y += 12;
+  for (const addrLine of ISSUER.addressLines) {
+    dt(addrLine, margin, y, { size: 9 });
+    y += 12;
+  }
+  dt(ISSUER.phone, margin, y, { size: 9 });
+  const yAfterAddr = y + 12;
 
-  const billToLines: string[] = [];
-  const company = invoice.billToCompany || invoice.sponsor?.name || '';
-  if (company) billToLines.push(company);
-  if (invoice.billToContact) billToLines.push(`ATTN: ${invoice.billToContact}`);
-  if (invoice.billToEmail) billToLines.push(invoice.billToEmail);
-  if (invoice.billToAddress) {
-    const addrLines = invoice.billToAddress.split(';').map((l: string) => l.trim()).filter(Boolean);
-    billToLines.push(...addrLines);
+  // LEFT: Crypto address block (starts at yAfterAddr + gap)
+  const cryptoY = yAfterAddr + 8;
+  dt('Address (Mainnet or L2)', margin, cryptoY, { font: fontBold, size: 9, color: black });
+  const ensText = ISSUER.cryptoEns;
+  dt(ensText, margin, cryptoY + 13, { font: fontBold, size: 9, color: orange });
+  dt('full address:', margin, cryptoY + 25, { size: 8, color: greyColor });
+  dt(ISSUER.cryptoAddress, margin, cryptoY + 36, { size: 7, color: black });
+
+  // RIGHT: Invoice metadata
+  let ry = y - 14 * 4 - 12; // align with first row of left col (Mailing Address label)
+
+  const labelSz = 9;
+  const valSz   = 9;
+
+  function drawMetaRow(label: string, value: string, rowY: number) {
+    dt(label, rightColX, rowY, { font: fontBold, size: labelSz, color: greyColor });
+    dt(value, rightValX, rowY, { size: valSz, color: black });
   }
 
-  for (let i = 0; i < billToLines.length; i++) {
-    const isFirst = i === 0;
-    drawText(billToLines[i], margin, y, {
-      font: isFirst ? fontBold : fontRegular,
-      size: isFirst ? 11 : 10,
-      color: black,
-    });
-    y += isFirst ? 16 : 14;
+  drawMetaRow('Invoice Number:', invoiceNum, ry);
+  ry += 14;
+  drawMetaRow('Issue Date:', issueDate, ry);
+  ry += 14;
+  drawMetaRow('Due Date:', dueDate, ry);
+  ry += 20;
+
+  // Bill To
+  dt('Bill to:', rightColX, ry, { font: fontBold, size: labelSz, color: black });
+  ry += 14;
+
+  const billToRows: string[] = [];
+  if (company) billToRows.push(company);
+  if (contact) billToRows.push(`ATTN: ${contact}`);
+  if (email)   billToRows.push(email);
+
+  for (const row of billToRows) {
+    dt(row, rightColX, ry, { size: valSz, color: black });
+    ry += 14;
+    // thin grey underline beneath each bill-to line (form style)
+    line(rightColX, ry - 2, pageW - margin, ry - 2, greyColor, 0.4);
   }
 
-  y += 18;
+  // Advance y past the two-column block
+  y = Math.max(cryptoY + 36 + 14, ry) + 16;
 
-  // ── LINE ITEMS TABLE ───────────────────────────────────────────────────────
-  const colDescX = margin;
-  const colAmtX = margin + contentW; // right edge
-  const tableRowH = 20;
+  // ── 4. DETAILS TABLE ─────────────────────────────────────────────────────────
+  const tableLeft  = margin;
+  const tableRight = margin + contentW;
+  const amtColW    = 100; // right column width
+  const descColX   = tableLeft + 8;
+  const amtColX    = tableRight - amtColW; // left edge of amount column
+  const tableHeaderH = 20;
 
-  // Table header row
-  drawRect(margin, y, contentW, 22, navy);
-  page.drawText('Description', { x: colDescX + 8, y: pageH - y - 15, font: fontBold, size: 9, color: white });
-  const amtHead = 'Amount';
-  const amtHeadW = fontBold.widthOfTextAtSize(amtHead, 9);
-  page.drawText(amtHead, { x: colAmtX - amtHeadW - 8, y: pageH - y - 15, font: fontBold, size: 9, color: white });
-  y += 22;
+  // Grey header row
+  rect(tableLeft, y, contentW, tableHeaderH, rgb(0.85, 0.85, 0.85));
+  // Vertical divider between desc and amount in header
+  line(amtColX, y, amtColX, y + tableHeaderH, greyColor, 0.5);
 
-  // Line item rows
-  for (let i = 0; i < lineItems.length; i++) {
-    const item = lineItems[i];
-    const isEven = i % 2 === 0;
+  dt('Details', descColX, y + 13, { font: fontBold, size: 9, color: black });
+  const amtHdr = 'Amount';
+  const amtHdrW = fontBold.widthOfTextAtSize(amtHdr, 9);
+  dt(amtHdr, tableRight - amtHdrW - 8, y + 13, { font: fontBold, size: 9, color: black });
 
-    // Wrap long descriptions
-    const descLines = await wrapText(item.description, contentW - 100, fontRegular, 10);
-    const rowH = Math.max(tableRowH, descLines.length * 14 + 8);
+  y += tableHeaderH;
 
-    if (isEven) {
-      drawRect(margin, y, contentW, rowH, rgb(0.97, 0.97, 0.97));
-    }
+  // Table border (will be drawn as lines after rows)
+  const tableTopY = y - tableHeaderH;
 
-    // Description
+  // Row height
+  const rowH = 20;
+
+  for (const item of lineItems) {
+    const descLines = wrapText(item.description, amtColX - descColX - 8, fontRegular, 9);
+    const thisRowH  = Math.max(rowH, descLines.length * 12 + 8);
+
+    // Outer border lines
+    line(tableLeft, y, tableRight, y, greyColor, 0.4);
+
+    // Vertical divider in row
+    line(amtColX, y, amtColX, y + thisRowH, greyColor, 0.5);
+
+    // Description (wrapped)
     for (let li = 0; li < descLines.length; li++) {
-      page.drawText(descLines[li], {
-        x: colDescX + 8,
-        y: pageH - y - 14 - li * 14,
-        font: fontRegular,
-        size: 10,
-        color: black,
-      });
+      dt(descLines[li], descColX, y + 12 + li * 12, { size: 9 });
     }
 
     // Amount (right-aligned)
     const amtStr = fmt(item.amount);
-    const amtW = fontRegular.widthOfTextAtSize(amtStr, 10);
-    page.drawText(amtStr, {
-      x: colAmtX - amtW - 8,
-      y: pageH - y - 14,
-      font: fontRegular,
-      size: 10,
-      color: black,
-    });
+    const amtW   = fontRegular.widthOfTextAtSize(amtStr, 9);
+    dt(amtStr, tableRight - amtW - 8, y + 12, { size: 9 });
 
-    y += rowH;
-    drawLine(margin, y, margin + contentW, y, lightGrey, 0.3);
+    y += thisRowH;
   }
 
-  // Total row
-  drawRect(margin, y, contentW, 26, navy);
-  page.drawText('Total', { x: colDescX + 8, y: pageH - y - 17, font: fontBold, size: 11, color: white });
-  const totalStr = fmt(invoice.total ?? 0);
-  const totalW = fontBold.widthOfTextAtSize(totalStr, 11);
-  page.drawText(totalStr, {
-    x: colAmtX - totalW - 8,
-    y: pageH - y - 17,
-    font: fontBold,
-    size: 11,
-    color: white,
+  // Bottom border of last data row
+  line(tableLeft, y, tableRight, y, greyColor, 0.4);
+
+  // Subtotal row
+  const subtotalH = 20;
+  line(amtColX, y, amtColX, y + subtotalH, greyColor, 0.5);
+  const subtotalStr = fmt(invoice.total ?? 0);
+  const subtotalW   = fontBold.widthOfTextAtSize(subtotalStr, 10);
+  dt('Subtotal', descColX, y + 13, { font: fontBold, size: 9, color: black });
+  dt(subtotalStr, tableRight - subtotalW - 8, y + 13, { font: fontBold, size: 10, color: black });
+  y += subtotalH;
+
+  // Right border + left border of table
+  line(tableLeft,  tableTopY, tableLeft,  y, greyColor, 0.4);
+  line(tableRight, tableTopY, tableRight, y, greyColor, 0.4);
+
+  y += 18;
+
+  // ── 5. AMOUNT DUE ─────────────────────────────────────────────────────────────
+  dt('Amount Due', margin, y, { font: fontBold, size: 16, color: orange });
+
+  const amtDueStr = fmt(invoice.total ?? 0);
+  const amtDueSz  = 16;
+  const amtDueW   = fontBold.widthOfTextAtSize(amtDueStr, amtDueSz);
+  const amtDueX   = pageW - margin - amtDueW;
+  dt(amtDueStr, amtDueX, y, { font: fontBold, size: amtDueSz, color: black });
+
+  // Thick black underline under the amount
+  y += 4;
+  line(amtDueX, y, pageW - margin, y, black, 2);
+
+  y += 22;
+
+  // ── 6. NOTES ──────────────────────────────────────────────────────────────────
+  dt('Notes:', margin, y, { size: 8, color: greyColor });
+  y += 13;
+
+  const notesBoxH = 60;
+  page.drawRectangle({
+    x: margin,
+    y: pageH - y - notesBoxH,
+    width: contentW,
+    height: notesBoxH,
+    borderColor: greyColor,
+    borderWidth: 0.5,
+    color: rgb(1, 1, 1),
   });
-  y += 30;
 
-  // ── PAYMENT INFO ──────────────────────────────────────────────────────────
-  if (invoice.paymentInstructions || invoice.paymentTerms || invoice.memo) {
-    y += 10;
-    drawLine(margin, y, margin + contentW, y, lightGrey);
-    y += 14;
-
-    if (invoice.paymentInstructions) {
-      drawText('Payment Instructions', margin, y, { font: fontBold, size: 9, color: grey });
-      y += 13;
-      // Wrap long payment instructions
-      const instrLines = invoice.paymentInstructions.split('\n');
-      for (const rawLine of instrLines) {
-        const wrapped = await wrapText(rawLine || ' ', contentW, fontRegular, 9);
-        for (const wl of wrapped) {
-          drawText(wl, margin, y, { size: 9, color: black });
-          y += 13;
-        }
-      }
-      y += 4;
-    }
-
-    if (invoice.paymentTerms) {
-      drawText(`Terms: ${invoice.paymentTerms}`, margin, y, { size: 9, color: grey });
-      y += 13;
-    }
-
-    if (invoice.memo) {
-      drawText(`Note: ${invoice.memo}`, margin, y, { size: 9, color: grey });
-      y += 13;
+  if (invoice.memo) {
+    const memoLines = wrapText(invoice.memo, contentW - 16, fontRegular, 8);
+    for (let mi = 0; mi < memoLines.length && mi < 4; mi++) {
+      dt(memoLines[mi], margin + 8, y + 12 + mi * 12, { size: 8, color: black });
     }
   }
 
-  // ── FOOTER ────────────────────────────────────────────────────────────────
-  // All footer coordinates are yFromTop = distance from TOP of page.
-  // The footer sits near the BOTTOM: pageH - 66 from top = 66pt from top = 726pt from bottom.
-  // Separator line just above the footer text
-  drawLine(margin, pageH - 66, margin + contentW, pageH - 66, lightGrey, 0.5);
+  y += notesBoxH + 20;
 
-  // "Pay this invoice online →" in red at bottom-left (yFromTop = pageH - 50 = near bottom)
-  const linkText = 'Pay this invoice online >';
-  const linkTextSize = 9;
-  drawText(linkText, margin, pageH - 50, { font: fontRegular, size: linkTextSize, color: red });
+  // ── 7. FOOTER ─────────────────────────────────────────────────────────────────
+  // Centered thanks text
+  const thanksText = 'Thanks for helping us pizza the planet!';
+  const thanksSz   = 9;
+  const thanksW    = fontBold.widthOfTextAtSize(thanksText, thanksSz);
+  const footerTextY = 52; // 52pt from bottom (native pdf-lib y is from bottom)
+  page.drawText(thanksText, {
+    x: (pageW - thanksW) / 2,
+    y: footerTextY,
+    font: fontBold,
+    size: thanksSz,
+    color: black,
+  });
 
-  // Attempt to add a clickable hyperlink annotation for the pay URL
-  try {
-    const linkW = fontRegular.widthOfTextAtSize(linkText, linkTextSize);
-    // PDF coord from bottom: baseline at y=50, so rect spans y=48 to y=60
-    const yBottom = 48;
-    const yTop = 60;
-    const annotDict = doc.context.obj({
-      Type: PDFName.of('Annot'),
-      Subtype: PDFName.of('Link'),
-      Rect: doc.context.obj([margin, yBottom, margin + linkW, yTop]),
-      Border: doc.context.obj([0, 0, 0]),
-      A: doc.context.obj({
-        Type: PDFName.of('Action'),
-        S: PDFName.of('URI'),
-        URI: PDFString.of(payUrl),
-      }),
-    });
-    const annotRef = doc.context.register(annotDict);
-    const existing = page.node.Annots();
-    if (existing) {
-      existing.push(annotRef);
-    } else {
-      page.node.set(PDFName.of('Annots'), doc.context.obj([annotRef]));
-    }
-  } catch (_) {
-    // Annotation failed — the red text link is still visible in the PDF
-  }
+  // Bottom orange bar
+  page.drawRectangle({ x: margin, y: 30, width: contentW, height: 7, color: orange });
 
-  // "Sent via RSV.Pizza" right-aligned
-  const sentLabel = 'Sent via RSV.Pizza';
-  const sentW = fontRegular.widthOfTextAtSize(sentLabel, 8);
-  drawText(sentLabel, pageW - margin - sentW, pageH - 50, { font: fontRegular, size: 8, color: grey });
-
-  // ── Serialize ─────────────────────────────────────────────────────────────
+  // ── Serialize ─────────────────────────────────────────────────────────────────
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);
 }
