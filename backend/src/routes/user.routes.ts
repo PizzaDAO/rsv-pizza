@@ -5,7 +5,7 @@ import { resolveWalletInput } from '../services/ens.service.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { getReimbursementRules } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
-import { payoutRowSnapshotFromUser, NON_TERMINAL_PAYOUT_STATUSES } from '../services/payout-snapshot.js';
+import { restampHostNonTerminalPayouts } from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -187,22 +187,9 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
       || payoutWalletAddress !== undefined
       || payoutBankDetails !== undefined
     ) {
-      try {
-        const snap = payoutRowSnapshotFromUser(user);
-        await prisma.payout.updateMany({
-          where: {
-            hostUserId: req.userId,
-            purpose: 'event',
-            status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
-            NOT: { payoutMethod: 'mercury_card' },
-          },
-          data: snap,
-        });
-      } catch (err) {
-        // Non-fatal — the profile save itself succeeded; the row sync is a
-        // best-effort convenience so a stale rolling row doesn't strand a host.
-        console.warn('[user] failed to sync payout prefs onto rolling rows:', err);
-      }
+      // ricotta-58512 / tortano-58516: shared re-stamp (also used by the
+      // Telegram wallet-via-DM path) so both write IDENTICAL row snapshots.
+      await restampHostNonTerminalPayouts(user);
     }
 
     res.json({ user });

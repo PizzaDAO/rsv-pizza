@@ -42,6 +42,8 @@ import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 import { rasterizePdfFirstPage } from '../services/pdfRasterize.js';
+import { resolveWalletInput, looksLikeEnsName } from '../services/ens.service.js';
+import { saveHostPayoutWallet } from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -95,6 +97,21 @@ async function uploadPayoutBuffer(
 /** Event year for photoYear: event date year ?? null (upload-time fallback handled by NULL). */
 function partyEventYear(p: HostInboundParty): number | null {
   return p.date ? p.date.getUTCFullYear() : null;
+}
+
+// suppli-58533: classifiers for the host TEXT path.
+//   number  → attendance (1–6 digits; a bare positive headcount).
+//   EVM     → a 0x-prefixed 40-hex wallet address.
+//   ENS     → a `*.eth` name (resolved to 0x via the website's resolveWalletInput).
+const ATTENDANCE_RE = /^\d{1,6}$/;
+const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const ENS_ETH_RE = /^[a-z0-9-]+\.eth$/i;
+
+/** Mask the middle of a 0x wallet for the confirmation reply: 0x1234…abcd. */
+function maskWallet(addr: string): string {
+  const a = addr.trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(a)) return a;
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
 router.post(
@@ -170,36 +187,95 @@ router.post(
           });
         }
         const trimmed = typeof text === 'string' ? text.trim() : '';
-        // Same validation as party.routes.ts attendance: a bare positive int.
-        if (!/^\d+$/.test(trimmed)) {
-          const slug = party.customUrl || party.inviteCode;
+        const slug = party.customUrl || party.inviteCode;
+
+        // ---------------------------------------------------------------
+        // ATTENDANCE: a bare positive int (same validation as party.routes).
+        // ---------------------------------------------------------------
+        if (ATTENDANCE_RE.test(trimmed)) {
+          const n = Number(trimmed);
+          if (!Number.isInteger(n) || n < 1) {
+            return res.status(200).json({
+              ok: true,
+              action: 'ignored',
+              partyName: party.name,
+              reason: 'invalid-number',
+            });
+          }
+          await prisma.party.update({
+            where: { id: party.id },
+            data: { estimatedAttendance: n },
+          });
+          await sendTelegramMessage(chatIdStr, `✅ Set headcount for ${party.name} to ${n}.`);
+          return res.status(200).json({ ok: true, action: 'attendance', partyName: party.name });
+        }
+
+        // ---------------------------------------------------------------
+        // suppli-58533: WALLET. An EVM 0x-address, or an ENS *.eth name. We
+        // resolve + save through the EXACT website path (saveHostPayoutWallet),
+        // which re-stamps the host's non-terminal rolling payout rows so the
+        // payout stays payable (ricotta-58512). Never 500 — invalid → helpful
+        // reply + action:'ignored'.
+        // ---------------------------------------------------------------
+        const looksWallet = EVM_ADDRESS_RE.test(trimmed) || ENS_ETH_RE.test(trimmed);
+        if (looksWallet) {
+          // ENS is accepted by the website (resolveWalletInput resolves *.eth),
+          // so we accept it here too. If resolution fails (or a 0x is malformed),
+          // reply helpfully and ignore.
+          let resolvedWallet: string;
+          try {
+            resolvedWallet = await resolveWalletInput(trimmed);
+          } catch (err: any) {
+            const hint = looksLikeEnsName(trimmed)
+              ? `I couldn't resolve "${trimmed}" to a wallet address. Double-check the ENS name, or send your 0x… address instead — or add it at rsv.pizza/host/${slug}/payments`
+              : `That doesn't look like a valid wallet address. Send a 0x… address (or an ENS name like alice.eth), or add it at rsv.pizza/host/${slug}/payments`;
+            await sendTelegramMessage(chatIdStr, hint);
+            return res.status(200).json({
+              ok: true,
+              action: 'ignored',
+              partyName: party.name,
+              reason: 'wallet_invalid',
+            });
+          }
+
+          const hostUserId = party.user?.id ?? null;
+          if (!hostUserId) {
+            // No linked host User to attach the wallet to — shouldn't happen for
+            // a role:'host' context, but guard rather than crash.
+            await sendTelegramMessage(
+              chatIdStr,
+              `I couldn't save that wallet — please add it at rsv.pizza/host/${slug}/payments`,
+            );
+            return res.status(200).json({
+              ok: true,
+              action: 'ignored',
+              partyName: party.name,
+              reason: 'no_host_user',
+            });
+          }
+
+          await saveHostPayoutWallet(hostUserId, resolvedWallet);
           await sendTelegramMessage(
             chatIdStr,
-            `I can add a receipt photo, an event photo, or a headcount number for ${party.name}. ` +
-              `For anything else, head to rsv.pizza/host/${slug}/payments`,
+            `✅ Saved your payout wallet (${maskWallet(resolvedWallet)}) for ${party.name}.`,
           );
-          return res.status(200).json({
-            ok: true,
-            action: 'ignored',
-            partyName: party.name,
-            reason: 'non-numeric',
-          });
+          return res.status(200).json({ ok: true, action: 'wallet', partyName: party.name });
         }
-        const n = Number(trimmed);
-        if (!Number.isInteger(n) || n < 1) {
-          return res.status(200).json({
-            ok: true,
-            action: 'ignored',
-            partyName: party.name,
-            reason: 'invalid-number',
-          });
-        }
-        await prisma.party.update({
-          where: { id: party.id },
-          data: { estimatedAttendance: n },
+
+        // ---------------------------------------------------------------
+        // Anything else → the existing pointer reply.
+        // ---------------------------------------------------------------
+        await sendTelegramMessage(
+          chatIdStr,
+          `I can add a receipt photo, an event photo, a headcount number, or your payout wallet for ${party.name}. ` +
+            `For anything else, head to rsv.pizza/host/${slug}/payments`,
+        );
+        return res.status(200).json({
+          ok: true,
+          action: 'ignored',
+          partyName: party.name,
+          reason: 'non-numeric',
         });
-        await sendTelegramMessage(chatIdStr, `✅ Set headcount for ${party.name} to ${n}.`);
-        return res.status(200).json({ ok: true, action: 'attendance', partyName: party.name });
       }
 
       // =====================================================================
