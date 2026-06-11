@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Receipt, Languages, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Receipt, Languages, Sparkles, RotateCcw, RotateCw } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { CurrencyPicker } from './CurrencyPicker';
@@ -108,6 +108,16 @@ interface ReceiptEditorProps {
   onRetryOcr?: () => void;
 
   /**
+   * farinata-58536: optional rotate affordance. When provided, the editor
+   * header shows rotate-left (−90°) / rotate-right (+90°) icon buttons. The
+   * parent persists the rotation server-side and repoints the doc url. Same
+   * spinner/disabled-in-flight + inline-error pattern as retry-OCR.
+   */
+  onRotate?: (degrees: 90 | -90 | 180) => void;
+  rotating?: boolean;
+  rotateError?: string;
+
+  /**
    * bruschetta-58519: on-demand "Summarize" backfill. When the receipt has no
    * `ocrSummary` yet (historical rows predating the feature), the editor shows
    * a Summarize button wired to this callback. The parent calls
@@ -198,6 +208,9 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   retrying,
   retryError,
   onRetryOcr,
+  onRotate,
+  rotating,
+  rotateError,
   onSummarize,
   summarizing,
   summarizeError,
@@ -337,16 +350,58 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
             </p>
           )}
         </div>
-        {conf > 0 && (
-          <span
-            className={`text-xs whitespace-nowrap ${
-              lowConf ? 'text-amber-500' : 'text-theme-text-faint'
-            }`}
-            title="OCR confidence"
-          >
-            {(conf * 100).toFixed(0)}% confidence
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {/* farinata-58536: rotate a sideways receipt. Persisted server-side
+                so the next Re-run OCR reads the corrected orientation. Same
+                style/disabled/spinner pattern as the Re-run OCR button. */}
+            {onRotate && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onRotate(-90)}
+                  disabled={rotating}
+                  title="Rotate left 90°"
+                  className="px-1.5 py-1 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center justify-center flex-shrink-0"
+                >
+                  {rotating ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RotateCcw size={12} />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRotate(90)}
+                  disabled={rotating}
+                  title="Rotate right 90°"
+                  className="px-1.5 py-1 rounded border border-theme-stroke text-theme-text text-xs disabled:opacity-40 inline-flex items-center justify-center flex-shrink-0"
+                >
+                  {rotating ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RotateCw size={12} />
+                  )}
+                </button>
+              </div>
+            )}
+            {conf > 0 && (
+              <span
+                className={`text-xs whitespace-nowrap ${
+                  lowConf ? 'text-amber-500' : 'text-theme-text-faint'
+                }`}
+                title="OCR confidence"
+              >
+                {(conf * 100).toFixed(0)}% confidence
+              </span>
+            )}
+          </div>
+          {onRotate && rotateError && (
+            <div className="text-xs text-red-300 text-right max-w-[200px]">
+              {rotateError}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* bruschetta-58519: compact Summary block. Shows the OCR English summary

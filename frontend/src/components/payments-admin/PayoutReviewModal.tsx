@@ -6,7 +6,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, rotatePayoutDocument, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
@@ -567,6 +567,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // show the new summary/language immediately without a parent refetch.
     ocrLanguage?: string | null;
     ocrSummary?: string | null;
+    // farinata-58536: post-rotate url so the lightbox image re-renders rotated
+    // immediately (backend repoints the doc url to a fresh storage object).
+    url?: string;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
@@ -601,6 +604,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // ocrError from `payout.documents` once retry succeeds. We only set true
   // on success; failures still surface a per-row error chip.
   const [retryClearedErrors, setRetryClearedErrors] = useState<Record<string, boolean>>({});
+
+  // farinata-58536: per-row "Rotate" state. Admin can rotate a sideways receipt
+  // image so it's readable + so the next Re-run OCR reads the corrected
+  // orientation. Mirrors the retry-OCR state shape.
+  const [rotatingDocId, setRotatingDocId] = useState<string | null>(null);
+  const [rotateErrors, setRotateErrors] = useState<Record<string, string>>({});
 
   // bruschetta-58519: per-row "Summarize" backfill state (language + English
   // summary). Mirrors the retry-OCR state shape — one in-flight docId + a
@@ -707,6 +716,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               ov.ocrLanguage !== undefined ? ov.ocrLanguage : d.ocrLanguage,
             ocrSummary:
               ov.ocrSummary !== undefined ? ov.ocrSummary : d.ocrSummary,
+            // farinata-58536: layer the rotated url so the lightbox shows the
+            // corrected orientation immediately.
+            url: ov.url !== undefined ? ov.url : d.url,
           };
         }),
     [payout.documents, receiptOverrides],
@@ -1010,6 +1022,32 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
       }));
     } finally {
       setRetryingDocId(null);
+    }
+  }
+
+  // farinata-58536: rotate a sideways receipt image. The backend persists the
+  // rotation to a new storage object and repoints the doc url; we merge the new
+  // url into receiptOverrides so the lightbox image re-renders upright in place.
+  async function rotateDoc(docId: string, degrees: 90 | -90 | 180) {
+    setRotatingDocId(docId);
+    setRotateErrors((m) => {
+      const next = { ...m };
+      delete next[docId];
+      return next;
+    });
+    try {
+      const res = await rotatePayoutDocument(docId, degrees);
+      setReceiptOverrides((m) => ({
+        ...m,
+        [docId]: { ...m[docId], url: res.document.url },
+      }));
+    } catch (err: any) {
+      setRotateErrors((m) => ({
+        ...m,
+        [docId]: err?.message ? String(err.message) : 'Rotate failed',
+      }));
+    } finally {
+      setRotatingDocId(null);
     }
   }
 
@@ -1615,6 +1653,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
         retrying={retryingDocId === r.id}
         retryError={retryErrors[r.id]}
         onRetryOcr={() => retryOcr(r.id)}
+        onRotate={(deg) => rotateDoc(r.id, deg)}
+        rotating={rotatingDocId === r.id}
+        rotateError={rotateErrors[r.id]}
         onSummarize={() => summarizeDoc(r.id)}
         summarizing={summarizingDocId === r.id}
         summarizeError={summarizeErrors[r.id]}
@@ -1654,6 +1695,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     retryingDocId,
     retryErrors,
     retryClearedErrors,
+    rotatingDocId,
+    rotateErrors,
     summarizingDocId,
     summarizeErrors,
     authChecks,

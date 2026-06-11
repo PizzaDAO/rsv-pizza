@@ -5554,6 +5554,21 @@ export async function retryPayoutDocumentOcr(
 }
 
 /**
+ * farinata-58536: admin rotates a sideways receipt image. The backend persists
+ * the rotation to a NEW storage object and repoints the doc's url (so a
+ * subsequent "Re-run OCR" reads the corrected orientation). Only changes url.
+ */
+export async function rotatePayoutDocument(
+  docId: string,
+  degrees: 90 | -90 | 180,
+): Promise<{ document: { id: string; url: string } }> {
+  return apiRequest(
+    `/api/admin/payouts/documents/${docId}/rotate`,
+    { method: 'POST', body: { degrees } },
+  );
+}
+
+/**
  * bruschetta-58519: admin on-demand "Summarize" backfill. Re-runs OCR on a
  * single receipt and updates ONLY `ocrLanguage` + `ocrSummary` (preserving any
  * admin-edited amount/currency/lineItems). Used to populate the new language +
