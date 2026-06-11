@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
   Shield, ShieldCheck, Loader2, MapPin, User, Mail, Send, DollarSign,
-  Pizza, CheckCircle, ExternalLink, AlertTriangle,
+  Pizza, CheckCircle, ExternalLink, AlertTriangle, ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -13,8 +13,8 @@ import { Checkbox } from '../components/Checkbox';
 import { LocationAutocomplete, CityData } from '../components/LocationAutocomplete';
 import {
   fetchAdminMe, fetchUnderbossMe,
-  createGpp27Event, fetchGpp27BudgetSuggestion, setGpp27Budget,
-  fetchGpp27Agreement, acceptGpp27Agreement,
+  createGpp27Event, fetchGpp27BudgetSuggestion,
+  fetchGpp27Agreement,
   fetchGpp27PublishStatus, publishGpp27Event,
   type Gpp27CreateEventResponse, type Gpp27BudgetSuggestion,
   type Gpp27AgreementClause, type Gpp27PublishStatus,
@@ -37,28 +37,29 @@ export function GPP27CreatePage() {
   const [authorized, setAuthorized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Create form
+  // Create form. tortellini-58539: a 2-step wizard — step 1 collects details,
+  // step 2 reviews budget + confirms the agreement, and ONLY the step-2 confirm
+  // persists the party. `step` toggles 1 | 2 (no router change).
+  const [step, setStep] = useState<1 | 2>(1);
   const [city, setCity] = useState('');
   const [hostName, setHostName] = useState('');
   const [email, setEmail] = useState('');
   const [telegram, setTelegram] = useState('');
   const [timezone, setTimezone] = useState<string | null>(null);
   const [cityData, setCityData] = useState<CityData | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [created, setCreated] = useState<Gpp27CreateEventResponse | null>(null);
 
-  // Budget
+  // Budget (pre-fetched in step 1, reviewed/edited in step 2 before create)
   const [budget, setBudget] = useState<Gpp27BudgetSuggestion | null>(null);
   const [capInput, setCapInput] = useState<string>('');
-  const [savingBudget, setSavingBudget] = useState(false);
-  const [budgetSaved, setBudgetSaved] = useState(false);
 
-  // Agreement
+  // Agreement (pre-fetched in step 1, confirmed in step 2 before create)
   const [agreementVersion, setAgreementVersion] = useState<string | null>(null);
   const [clauses, setClauses] = useState<Gpp27AgreementClause[]>([]);
   const [acked, setAcked] = useState<Record<string, boolean>>({});
-  const [savingAck, setSavingAck] = useState(false);
 
   // Publish gates
   const [publishStatus, setPublishStatus] = useState<Gpp27PublishStatus | null>(null);
@@ -107,13 +108,40 @@ export function GPP27CreatePage() {
 
   const allAcked = renderedClauses.length > 0 && renderedClauses.every((c) => acked[c.id]);
 
-  async function handleCreate(e: React.FormEvent) {
+  // Step 1 → 2: validate the details, then fetch the budget suggestion +
+  // agreement clauses (NO party row exists yet — budget-suggestion takes only a
+  // city, agreement is auth-scoped). Nothing is persisted here.
+  async function handleProceedToReview(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
     if (!city.trim() || !hostName.trim() || !email.trim() || !telegram.trim()) {
       setCreateError('City, host name, email, and Telegram are required.');
       return;
     }
+    setLoadingReview(true);
+    try {
+      const [b, a] = await Promise.all([
+        fetchGpp27BudgetSuggestion(city.trim()),
+        fetchGpp27Agreement(),
+      ]);
+      setBudget(b);
+      setCapInput(String(b.suggestedCapUsd));
+      setAgreementVersion(a.version);
+      setClauses(a.clauses);
+      setAcked({});
+      setStep(2);
+    } catch (err: any) {
+      setCreateError(err?.message || 'Failed to load the budget + agreement. Please try again.');
+    } finally {
+      setLoadingReview(false);
+    }
+  }
+
+  // Step 2 confirm: persist the event with the approved cap + confirmed
+  // agreement. This is the FIRST write to the parties table in the flow.
+  async function handleCreate() {
+    setCreateError(null);
+    if (!allAcked || !agreementVersion) return;
     setSubmitting(true);
     try {
       const resp = await createGpp27Event({
@@ -122,6 +150,9 @@ export function GPP27CreatePage() {
         email: email.trim(),
         telegram: telegram.trim(),
         timezone: timezone || undefined,
+        reimbursementCapUsd: Number(capInput) || 0,
+        agreementVersion,
+        acceptedClauseIds: Object.keys(acked).filter((id) => acked[id]),
         ...(cityData && {
           country: cityData.country,
           countryCode: cityData.countryCode,
@@ -132,50 +163,13 @@ export function GPP27CreatePage() {
       });
       setCreated(resp);
 
-      // Load budget suggestion + agreement + publish status for the new party.
-      const [b, a, ps] = await Promise.all([
-        fetchGpp27BudgetSuggestion(resp.event.city || city.trim(), resp.event.id).catch(() => null),
-        fetchGpp27Agreement().catch(() => null),
-        fetchGpp27PublishStatus(resp.event.id).catch(() => null),
-      ]);
-      if (b) { setBudget(b); setCapInput(String(b.suggestedCapUsd)); }
-      if (a) { setAgreementVersion(a.version); setClauses(a.clauses); }
+      // Load publish status for the freshly-created party.
+      const ps = await fetchGpp27PublishStatus(resp.event.id).catch(() => null);
       if (ps) setPublishStatus(ps);
     } catch (err: any) {
       setCreateError(err?.message || 'Failed to create event.');
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleSaveBudget() {
-    if (!created) return;
-    const val = Number(capInput);
-    if (!Number.isFinite(val) || val < 0) return;
-    setSavingBudget(true);
-    setBudgetSaved(false);
-    try {
-      const res = await setGpp27Budget(created.event.id, val);
-      setCapInput(String(res.reimbursementCapUsd));
-      setBudgetSaved(true);
-    } catch (err: any) {
-      setCreateError(err?.message || 'Failed to save budget.');
-    } finally {
-      setSavingBudget(false);
-    }
-  }
-
-  async function handleAcceptAgreement() {
-    if (!created || !allAcked) return;
-    setSavingAck(true);
-    try {
-      await acceptGpp27Agreement(created.event.id);
-      const ps = await fetchGpp27PublishStatus(created.event.id);
-      setPublishStatus(ps);
-    } catch (err: any) {
-      setCreateError(err?.message || 'Failed to record agreement.');
-    } finally {
-      setSavingAck(false);
     }
   }
 
@@ -223,7 +217,7 @@ export function GPP27CreatePage() {
   }
 
   const capValue = Number(capInput);
-  const capPending = !created || budget == null || !(Number.isFinite(capValue) && capValue > 0);
+  const capPending = budget == null || !(Number.isFinite(capValue) && capValue > 0);
 
   return (
     <div className={`min-h-screen ${themeClass} relative overflow-hidden`} style={backgroundStyle}>
@@ -245,8 +239,9 @@ export function GPP27CreatePage() {
             </div>
           </div>
 
-          {!created && (
-            <form onSubmit={handleCreate} className="space-y-4">
+          {/* Step 1 — Details */}
+          {!created && step === 1 && (
+            <form onSubmit={handleProceedToReview} className="space-y-4">
               <LocationAutocomplete
                 value={city}
                 onChange={(v) => { setCity(v); setCityData(null); setTimezone(null); }}
@@ -282,33 +277,32 @@ export function GPP27CreatePage() {
 
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={loadingReview}
                 className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white font-semibold rounded-xl py-3 transition-colors"
               >
-                {submitting ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
-                {submitting ? 'Creating…' : 'Create 2027 event'}
+                {loadingReview ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                {loadingReview ? 'Loading…' : 'Next: review & confirm'}
               </button>
             </form>
           )}
 
-          {created && (
+          {/* Step 2 — Review budget + confirm the agreement (nothing persisted yet) */}
+          {!created && step === 2 && (
             <div className="space-y-8">
-              {/* Created confirmation */}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 text-emerald-700 font-semibold mb-1">
-                  <CheckCircle size={18} /> Event created: {created.event.name}
-                </div>
-                <div className="text-sm text-gray-700 flex flex-wrap items-center gap-3">
-                  <Link to={created.hostPageUrl} className="inline-flex items-center gap-1 text-red-600 hover:underline">
-                    Host dashboard <ExternalLink size={14} />
-                  </Link>
-                  <Link to={created.eventPageUrl} className="inline-flex items-center gap-1 text-red-600 hover:underline">
-                    Event page (gated preview) <ExternalLink size={14} />
-                  </Link>
-                </div>
+              <button
+                type="button"
+                onClick={() => { setStep(1); setCreateError(null); }}
+                className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+              >
+                <ArrowLeft size={14} /> Back to details
+              </button>
+
+              <div className="text-sm text-gray-700">
+                Creating <strong>Global Pizza Party {city.trim()}</strong> for{' '}
+                <strong>{hostName.trim()}</strong> ({email.trim()}).
               </div>
 
-              {/* Slice 4: pizza-only + reimbursement-model host messaging */}
+              {/* pizza-only + reimbursement-model host messaging */}
               <section className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, #E52828 0%, #CC2020 100%)' }}>
                 <div className={`flex items-center gap-2 font-bold text-lg ${WHITE}`}>
                   <Pizza size={20} /> We reimburse pizza only
@@ -319,17 +313,17 @@ export function GPP27CreatePage() {
                 </p>
                 <p className={`mt-3 text-sm ${WHITE}`}>
                   {capPending ? (
-                    <>Your approved amount is <strong>pending review</strong>. You can still host —
-                    we'll confirm your pizza reimbursement budget shortly.</>
+                    <>The approved amount is <strong>pending</strong>. You can still create the event —
+                    the pizza reimbursement budget can be confirmed shortly.</>
                   ) : (
-                    <>You're approved to spend up to <strong>${capValue}</strong> on pizza
+                    <>Approved to spend up to <strong>${capValue}</strong> on pizza
                     (max ${budget?.ceilingUsd ?? 625} per event).</>
                   )}
                 </p>
                 <p className={`mt-3 text-xs ${WHITE} opacity-90`}>{TIMELINE_COPY}</p>
               </section>
 
-              {/* Slice 3: budget approval — transparent inputs + editable cap */}
+              {/* budget approval — transparent inputs + editable cap */}
               <section>
                 <h2 className="flex items-center gap-2 text-lg font-bold mb-3">
                   <DollarSign size={18} /> Budget approval
@@ -357,26 +351,14 @@ export function GPP27CreatePage() {
                       Formula: tier rate × max(last-year attendance, 0.40 × current RSVPs), clamped to ${budget.ceilingUsd}.
                       {budget.lastYearEstimatedAttendance == null && ' New city — no 2026 event, so the suggestion starts at $0. Enter an amount manually.'}
                     </p>
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1">
-                        <IconInput
-                          icon={DollarSign}
-                          type="number"
-                          min={0}
-                          value={capInput}
-                          onChange={(e) => { setCapInput(e.target.value); setBudgetSaved(false); }}
-                          placeholder="Approved reimbursement cap (USD)"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleSaveBudget}
-                        disabled={savingBudget}
-                        className="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white font-semibold rounded-xl px-4 py-3 transition-colors whitespace-nowrap"
-                      >
-                        {savingBudget ? 'Saving…' : budgetSaved ? 'Saved ✓' : 'Save cap'}
-                      </button>
-                    </div>
+                    <IconInput
+                      icon={DollarSign}
+                      type="number"
+                      min={0}
+                      value={capInput}
+                      onChange={(e) => setCapInput(e.target.value)}
+                      placeholder="Approved reimbursement cap (USD)"
+                    />
                     {capValue > (budget.ceilingUsd ?? 625) && (
                       <p className="text-xs text-amber-700">
                         Amounts above ${budget.ceilingUsd} will be clamped to ${budget.ceilingUsd} on save.
@@ -388,11 +370,11 @@ export function GPP27CreatePage() {
                 )}
               </section>
 
-              {/* Slice 5: City Host Agreement (data-driven) */}
+              {/* City Host Agreement (data-driven) — must be confirmed before create */}
               <section>
                 <h2 className="text-lg font-bold mb-1">City Host Agreement</h2>
                 <p className="text-sm text-gray-600 mb-3">
-                  Before this RSVP page can be published, confirm the following
+                  Confirm every condition below before creating this event
                   {agreementVersion ? ` (${agreementVersion})` : ''}:
                 </p>
                 <div className="space-y-3">
@@ -409,15 +391,47 @@ export function GPP27CreatePage() {
                     <p className="text-sm text-gray-500">No active agreement configured.</p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAcceptAgreement}
-                  disabled={!allAcked || savingAck}
-                  className="mt-4 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-2.5 transition-colors"
-                >
-                  {savingAck ? 'Recording…' : 'Record agreement sign-off'}
-                </button>
               </section>
+
+              {createError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {createError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={submitting || !allAcked}
+                className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold rounded-xl py-3 transition-colors"
+              >
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
+                {submitting ? 'Creating…' : 'Create 2027 event'}
+              </button>
+              {!allAcked && renderedClauses.length > 0 && (
+                <p className="text-xs text-gray-500 -mt-4">
+                  Confirm every City Host Agreement condition above to enable creation.
+                </p>
+              )}
+            </div>
+          )}
+
+          {created && (
+            <div className="space-y-8">
+              {/* Created confirmation */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center gap-2 text-emerald-700 font-semibold mb-1">
+                  <CheckCircle size={18} /> Event created: {created.event.name}
+                </div>
+                <div className="text-sm text-gray-700 flex flex-wrap items-center gap-3">
+                  <Link to={created.hostPageUrl} className="inline-flex items-center gap-1 text-red-600 hover:underline">
+                    Host dashboard <ExternalLink size={14} />
+                  </Link>
+                  <Link to={created.eventPageUrl} className="inline-flex items-center gap-1 text-red-600 hover:underline">
+                    Event page (gated preview) <ExternalLink size={14} />
+                  </Link>
+                </div>
+              </div>
 
               {/* Publish gates */}
               <section className="rounded-xl border border-theme-stroke bg-white p-4">
