@@ -2431,6 +2431,12 @@ export interface AdminPayoutFilters {
    * prior behavior).
    */
   showTbdUnsubmitted?: boolean;
+  /**
+   * farinata-58532: by-city toggle — when true, show only parties with at least
+   * one submitted receipt (aggregates.totalReceiptCount > 0). Client-side filter
+   * over byPartyRows; OFF/undefined = show all. By-city view only.
+   */
+  hasReceipts?: boolean;
 }
 
 export interface AdminPayoutTotals {
