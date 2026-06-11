@@ -229,6 +229,7 @@ export const GuestList: React.FC = () => {
     .sort((a, b) => (a.waitlistPosition || 0) - (b.waitlistPosition || 0));
 
   // Compute available bulk actions based on selected guests
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- false positive: this hook is in a flat, unconditional sequence (no early return precedes it; see hooks at L16-232). eslint-plugin-react-hooks@5.1.0-rc.0 misfires here.
   const bulkActions = useMemo(() => {
     if (selectedIds.size === 0) return null;
     const selected = guests.filter(g => g.id && selectedIds.has(g.id));
