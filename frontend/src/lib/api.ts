@@ -7661,6 +7661,11 @@ export interface Gpp27CreateEventInput {
   cityLat?: number;
   cityLng?: number;
   timezone?: string;
+  // tortellini-58539: the agreement is now confirmed BEFORE the event is
+  // persisted, so the cap + agreement ack travel with the create request.
+  reimbursementCapUsd?: number;
+  agreementVersion: string;
+  acceptedClauseIds: string[];
 }
 
 export interface Gpp27CreateEventResponse {
@@ -7693,12 +7698,6 @@ export async function setGpp27Budget(
     method: 'PATCH',
     body: { reimbursementCapUsd },
   });
-}
-
-export async function acceptGpp27Agreement(
-  partyId: string,
-): Promise<{ success: boolean; agreementVersion: string; agreementAcceptedAt: string }> {
-  return apiRequest(`/api/gpp27/parties/${partyId}/agreement/accept`, { method: 'POST' });
 }
 
 export interface Gpp27PublishStatus {

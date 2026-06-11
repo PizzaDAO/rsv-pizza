@@ -155,7 +155,7 @@ router.get('/budget-suggestion', requireAuth, async (req: AuthRequest, res: Resp
 // ---------------------------------------------------------------------------
 router.post('/events', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { city, hostName, email, telegram, country, countryCode, cityFormattedName, cityLat, cityLng, timezone } = req.body || {};
+    const { city, hostName, email, telegram, country, countryCode, cityFormattedName, cityLat, cityLng, timezone, reimbursementCapUsd, agreementVersion, acceptedClauseIds } = req.body || {};
 
     if (!city || typeof city !== 'string' || city.trim().length === 0) {
       throw new AppError('City is required', 400, 'VALIDATION_ERROR');
@@ -174,6 +174,44 @@ router.post('/events', requireAuth, async (req: AuthRequest, res: Response, next
 
     // Server-side scope gate: admin OR underboss in scope for this city.
     await assertGpp27Authorized(req.userEmail, { city: normalizedCity });
+
+    // tortellini-58539: confirm the City Host Agreement BEFORE persisting any
+    // row. Validate the posted version + required clause acks up front so a
+    // stale client can never mint a hidden, half-configured event.
+    if (!agreementVersion || typeof agreementVersion !== 'string') {
+      throw new AppError('agreementVersion is required', 400, 'VALIDATION_ERROR');
+    }
+    if (!Array.isArray(acceptedClauseIds) || !acceptedClauseIds.every((id) => typeof id === 'string')) {
+      throw new AppError('acceptedClauseIds must be an array of strings', 400, 'VALIDATION_ERROR');
+    }
+
+    const activeClauses = await prisma.gppAgreementClause.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, version: true, requiresAck: true },
+    });
+    if (activeClauses.length === 0) {
+      throw new AppError('No active agreement is configured', 409, 'NO_ACTIVE_AGREEMENT');
+    }
+    const currentAgreementVersion = activeClauses[0].version;
+    if (agreementVersion !== currentAgreementVersion) {
+      throw new AppError('The agreement has changed — please reload and re-confirm.', 409, 'AGREEMENT_VERSION_STALE');
+    }
+    const ackedSet = new Set(acceptedClauseIds);
+    const allRequiredAcked = activeClauses
+      .filter((c) => c.requiresAck === true)
+      .every((c) => ackedSet.has(c.id));
+    if (!allRequiredAcked) {
+      throw new AppError('All required agreement clauses must be confirmed.', 409, 'AGREEMENT_NOT_ACCEPTED');
+    }
+
+    // Clamp the operator-approved reimbursement cap to the configured ceiling.
+    // Omitted / 0 / non-number → 0 (new cities legitimately start pending).
+    const { ceilingUsd } = await getReimbursementTiers();
+    const rawCap = reimbursementCapUsd;
+    const clampedCapUsd = (typeof rawCap === 'number' && Number.isFinite(rawCap) && rawCap > 0)
+      ? Math.min(Math.round(rawCap), ceilingUsd)
+      : 0;
 
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedHostName = hostName.trim();
@@ -282,6 +320,11 @@ router.post('/events', requireAuth, async (req: AuthRequest, res: Response, next
           ...underbossCoHosts,
         ],
         userId: user.id,
+        // tortellini-58539: persist the confirmed agreement + approved cap at
+        // create time (was previously a separate post-create step).
+        agreementAcceptedAt: new Date(),
+        agreementVersion: currentAgreementVersion,
+        reimbursementCapUsd: clampedCapUsd,
       },
     });
 
