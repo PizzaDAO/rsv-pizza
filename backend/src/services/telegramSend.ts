@@ -16,11 +16,16 @@ import { withBennySignature } from '../lib/bennySignature.js';
 export async function sendTelegramMessage(
   chatId: string,
   text: string,
+  // suppli-58533: optional Telegram parse_mode ('HTML' | 'Markdown'). Default
+  // stays plain text so existing callers are unchanged; the per-type reminder
+  // builders pass 'HTML' so the inline "DM them to me" link renders.
+  parseMode?: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     return { ok: false, reason: 'TELEGRAM_BOT_TOKEN not configured' };
   }
+  const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
   try {
     const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
@@ -29,6 +34,7 @@ export async function sendTelegramMessage(
         chat_id: chatId,
         text: withBennySignature(text),
         disable_web_page_preview: true,
+        ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
       }),
     });
     if (!resp.ok) {

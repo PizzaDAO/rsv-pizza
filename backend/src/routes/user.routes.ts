@@ -5,7 +5,7 @@ import { resolveWalletInput } from '../services/ens.service.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { getReimbursementRules } from '../lib/privateConfig.js';
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
-import { payoutRowSnapshotFromUser, NON_TERMINAL_PAYOUT_STATUSES } from '../services/payout-snapshot.js';
+import { restampHostRollingPayoutRows } from '../services/payout-snapshot.js';
 
 const router = Router();
 
@@ -172,37 +172,18 @@ router.patch('/me', async (req: AuthRequest, res: Response, next: NextFunction) 
     // path reads the payout ROW (no host fallback), so without this a host who
     // fixes their wallet AFTER the rolling row exists (incl. after an admin has
     // approved it) stays un-payable.
-    // tortano-58516: re-stamp across ALL non-terminal statuses
-    // (NON_TERMINAL_PAYOUT_STATUSES = pending/approved/queued), now INCLUDING
-    // 'queued'. This matches the receipt-upload snapshot path in
-    // payout.routes.ts (which already uses NON_TERMINAL_PAYOUT_STATUSES), so an
-    // admin who marks a payout 'queued' before the host has finalized their
-    // wallet/method no longer strands it un-payable when the host later fixes
-    // their profile. Terminal rows (paid/completed/withdrawn/rejected/failed)
-    // stay excluded because NON_TERMINAL_PAYOUT_STATUSES lists only the three
-    // non-terminal statuses. The mercury_card guard avoids clobbering an
-    // admin-issued Mercury card with the host's self-serve prefs.
+    // tortano-58516 / suppli-58533: re-stamp across ALL non-terminal statuses
+    // (NON_TERMINAL_PAYOUT_STATUSES = pending/approved/queued, incl. 'queued').
+    // Extracted into restampHostRollingPayoutRows so the wallet-via-DM path
+    // (telegram-inbound.routes.ts) re-stamps via the identical code. The helper
+    // re-reads the just-updated profile, applies the mercury_card guard, and is
+    // best-effort (never throws). Terminal rows stay excluded.
     if (
       preferredPayoutMethod !== undefined
       || payoutWalletAddress !== undefined
       || payoutBankDetails !== undefined
     ) {
-      try {
-        const snap = payoutRowSnapshotFromUser(user);
-        await prisma.payout.updateMany({
-          where: {
-            hostUserId: req.userId,
-            purpose: 'event',
-            status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
-            NOT: { payoutMethod: 'mercury_card' },
-          },
-          data: snap,
-        });
-      } catch (err) {
-        // Non-fatal — the profile save itself succeeded; the row sync is a
-        // best-effort convenience so a stale rolling row doesn't strand a host.
-        console.warn('[user] failed to sync payout prefs onto rolling rows:', err);
-      }
+      await restampHostRollingPayoutRows(req.userId!, user);
     }
 
     res.json({ user });

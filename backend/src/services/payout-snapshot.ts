@@ -13,6 +13,8 @@
  * to avoid a require cycle between those two route files.
  */
 import { Prisma } from '@prisma/client';
+import { prisma } from '../config/database.js';
+import { resolveWalletInput } from './ens.service.js';
 
 // Non-terminal statuses: a rolling record is "active" while in one of these.
 // Terminal = paid | completed | withdrawn | rejected | failed.
@@ -39,4 +41,85 @@ export function payoutRowSnapshotFromUser(u: {
         ? (u.payoutBankDetails as Prisma.InputJsonValue)
         : Prisma.JsonNull,
   };
+}
+
+/**
+ * suppli-58533 / tortano-58516: re-stamp the host's CURRENT profile payout
+ * prefs onto their non-terminal rolling `event` payout rows.
+ *
+ * EXTRACTED verbatim from the PATCH /api/user/me handler (user.routes.ts) so the
+ * wallet-via-DM path (telegram-inbound.routes.ts) writes the row snapshot via
+ * the identical code — the execute/send path reads the payout ROW with no host
+ * fallback, so a wallet saved only on the User profile leaves the host
+ * un-payable (ricotta-58512 incident). The mercury_card guard avoids clobbering
+ * an admin-issued Mercury card with the host's self-serve prefs. Best-effort:
+ * never throws — the caller's profile save already succeeded.
+ */
+export async function restampHostRollingPayoutRows(
+  userId: string,
+  // Optional already-loaded profile snapshot. user.routes.ts passes the user it
+  // just updated (no extra query); the DM path omits it so we re-read here.
+  preloaded?: {
+    preferredPayoutMethod: string | null;
+    payoutWalletAddress: string | null;
+    payoutBankDetails: Prisma.JsonValue | null;
+  },
+): Promise<void> {
+  try {
+    const user =
+      preloaded ??
+      (await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          preferredPayoutMethod: true,
+          payoutWalletAddress: true,
+          payoutBankDetails: true,
+        },
+      }));
+    if (!user) return;
+    const snap = payoutRowSnapshotFromUser(user);
+    await prisma.payout.updateMany({
+      where: {
+        hostUserId: userId,
+        purpose: 'event',
+        status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
+        NOT: { payoutMethod: 'mercury_card' },
+      },
+      data: snap,
+    });
+  } catch (err) {
+    console.warn('[payout-snapshot] failed to re-stamp rolling payout rows:', err);
+  }
+}
+
+/**
+ * suppli-58533: save a host's payout wallet exactly like the website does
+ * (PATCH /api/user/me wallet path) and re-stamp their rolling payout rows.
+ *
+ *   1. Resolve the input via the SAME `resolveWalletInput` (accepts a 0x… EVM
+ *      address OR an ENS name; throws on anything else — caller surfaces a
+ *      friendly message).
+ *   2. Persist the resolved 0x onto `User.payoutWalletAddress`.
+ *   3. Re-stamp non-terminal rolling rows (the un-payable-without-this step).
+ *
+ * Returns the resolved 0x address. Throws (with the resolver's message) on an
+ * unresolvable input so the DM handler can reply a helpful rejection.
+ */
+export async function saveHostPayoutWalletAndRestamp(
+  userId: string,
+  walletInput: string,
+): Promise<string> {
+  // (1) Resolve — identical boundary to user.routes.ts (ENS → 0x or 0x verbatim).
+  const resolved = await resolveWalletInput(String(walletInput));
+
+  // (2) Persist onto the host profile (the website's source of truth).
+  await prisma.user.update({
+    where: { id: userId },
+    data: { payoutWalletAddress: resolved },
+  });
+
+  // (3) Re-stamp the rolling rows so the wallet is actually payable.
+  await restampHostRollingPayoutRows(userId);
+
+  return resolved;
 }
