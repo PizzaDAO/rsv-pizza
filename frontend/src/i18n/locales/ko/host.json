@@ -841,6 +841,8 @@
     "missingGroupPhoto": "단체 사진",
     "missingBoxStackPhoto": "박스 더미 사진",
     "missingPizzaPhoto": "피자 사진",
+    "missingAdditionalPhotos": "추가 사진 {{count}}/{{required}}장",
+    "additionalPhotosProgress": "추가 사진: {{count}}/{{required}}장",
     "missingReceipt": "영수증 1장 이상",
     "missingPaymentMethod": "결제 수단",
     "submitForReview": "검토를 위해 제출",

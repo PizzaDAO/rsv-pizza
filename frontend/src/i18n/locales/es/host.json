@@ -885,6 +885,8 @@
     "missingGroupPhoto": "Foto grupal",
     "missingBoxStackPhoto": "Foto de la pila de cajas",
     "missingPizzaPhoto": "Foto de la pizza",
+    "missingAdditionalPhotos": "{{count}}/{{required}} fotos adicionales",
+    "additionalPhotosProgress": "Fotos adicionales: {{count}} de {{required}}",
     "missingReceipt": "Al menos un recibo",
     "missingPaymentMethod": "Método de pago",
     "submitForReview": "Enviar para revisión",

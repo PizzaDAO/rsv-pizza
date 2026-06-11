@@ -886,6 +886,8 @@
     "missingGroupPhoto": "Gruppenfoto",
     "missingBoxStackPhoto": "Foto vom Kartonstapel",
     "missingPizzaPhoto": "Pizzafoto",
+    "missingAdditionalPhotos": "{{count}}/{{required}} zusätzliche Fotos",
+    "additionalPhotosProgress": "Zusätzliche Fotos: {{count}} von {{required}}",
     "missingReceipt": "Mindestens ein Beleg",
     "missingPaymentMethod": "Zahlungsmethode",
     "submitForReview": "Zur Prüfung einreichen",

@@ -885,6 +885,8 @@
     "missingGroupPhoto": "集合写真",
     "missingBoxStackPhoto": "箱を積んだ写真",
     "missingPizzaPhoto": "ピザの写真",
+    "missingAdditionalPhotos": "追加写真 {{count}}/{{required}} 枚",
+    "additionalPhotosProgress": "追加写真：{{count}}/{{required}} 枚",
     "missingReceipt": "領収書を1枚以上",
     "missingPaymentMethod": "支払い方法",
     "submitForReview": "審査のため提出",

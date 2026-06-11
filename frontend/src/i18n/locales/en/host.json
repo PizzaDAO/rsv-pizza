@@ -1008,6 +1008,8 @@
     "missingGroupPhoto": "Group photo",
     "missingBoxStackPhoto": "Box stack photo",
     "missingPizzaPhoto": "Pizza photo",
+    "missingAdditionalPhotos": "{{count}}/{{required}} additional photos",
+    "additionalPhotosProgress": "Additional photos: {{count}} of {{required}}",
     "missingReceipt": "At least one receipt",
     "missingPaymentMethod": "Payment method",
     "submitForReview": "Submit for review",
