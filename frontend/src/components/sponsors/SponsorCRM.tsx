@@ -331,7 +331,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         p => p.source === 'underboss' && !p.sponsorId && p.sponsorUserId
       );
 
-      let sponsorIdMap: Record<string, string> = {};
+      const sponsorIdMap: Record<string, string> = {};
 
       if (underbossOnly.length > 0) {
         const result = await ensureUnderbossSponsors(
