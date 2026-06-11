@@ -10,6 +10,8 @@ import { buildScopedWhereClause, partyMatchesScope, UnderbossScope } from '../he
 import { writeStatusAudit, ActorKind } from '../helpers/statusAudit.js';
 import { scorePartiesByIds, buildSybilWalletSetFromDb } from '../lib/fakeDetectionScan.js';
 import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
+import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
+import { loadHostQuestionSet } from '../lib/hostSurveyQuestions.js';
 
 // Re-export the request type under the local name used throughout this file
 type UnderbossRequest = UnderbossAuthRequest;
@@ -2218,5 +2220,242 @@ router.get('/funnel-stats', requireAuth, requireUnderbossAuth, async (req: Under
     next(error);
   }
 });
+
+// ============================================
+// panzerotti-58527: HOST survey — send + responses (city-scoped)
+// ============================================
+
+// Concurrency pool (mirrors reminder.routes.ts runWithConcurrency).
+async function runHostSurveyConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<Array<{ ok: true; value: R } | { ok: false; error: unknown }>> {
+  const results: Array<{ ok: true; value: R } | { ok: false; error: unknown }> = new Array(
+    items.length,
+  );
+  let next = 0;
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  const workers: Array<Promise<void>> = [];
+  for (let w = 0; w < workerCount; w++) {
+    workers.push(
+      (async () => {
+        while (true) {
+          const i = next++;
+          if (i >= items.length) return;
+          try {
+            results[i] = { ok: true, value: await fn(items[i]) };
+          } catch (error) {
+            results[i] = { ok: false, error };
+          }
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+  return results;
+}
+
+// POST /api/underboss/host-survey/send
+//   Body: { scope: 'all' | 'city' | 'status', cityIds?: string[], statuses?: string[] }
+//   Sends the host survey email to the primary host of each target party
+//   (city-scoped for non-admins). Stamps host_survey_sent_at on success so the
+//   cron won't double-send. Returns { sent, skipped, failed }.
+router.post(
+  '/host-survey/send',
+  requireAuth,
+  requireUnderbossAuth,
+  async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+    try {
+      const scope = scopeFromReq(req);
+      const body = (req.body ?? {}) as {
+        scope?: unknown;
+        cityIds?: unknown;
+        statuses?: unknown;
+      };
+
+      const sendScope =
+        body.scope === 'city' || body.scope === 'status' ? body.scope : 'all';
+
+      // Base where: constrain to the UB's region/city scope (null for admins).
+      const scopedWhere = buildScopedWhereClause(scope);
+      const where: any = scopedWhere ? { ...scopedWhere } : {};
+      where.cancelledAt = null;
+
+      if (sendScope === 'city') {
+        const cityIds = Array.isArray(body.cityIds)
+          ? body.cityIds.filter((c): c is string => typeof c === 'string' && c.trim() !== '')
+          : [];
+        if (cityIds.length === 0) {
+          throw new AppError('No cities selected', 400, 'VALIDATION_ERROR');
+        }
+        where.OR = cityIds.map((c) => ({
+          city: { equals: c.trim(), mode: 'insensitive' as const },
+        }));
+      } else if (sendScope === 'status') {
+        const valid = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
+        const statuses = Array.isArray(body.statuses)
+          ? body.statuses.filter((s): s is string => typeof s === 'string' && valid.includes(s))
+          : [];
+        if (statuses.length === 0) {
+          throw new AppError('No statuses selected', 400, 'VALIDATION_ERROR');
+        }
+        where.underbossStatus = { in: statuses };
+      }
+
+      const parties = await prisma.party.findMany({
+        where,
+        select: { id: true, user: { select: { email: true } } },
+        take: 2000,
+      });
+
+      // No host email = skipped (counts as skipped, never sent).
+      let skipped = 0;
+      const sendable = parties.filter((p) => {
+        if (p.user?.email) return true;
+        skipped += 1;
+        return false;
+      });
+
+      const results = await runHostSurveyConcurrency(sendable, 5, async (p) => {
+        const ok = await sendHostSurveyEmail(p.id);
+        if (ok) {
+          // Stamp so the morning-after cron won't double-send a hand-sent event.
+          await prisma.party.update({
+            where: { id: p.id },
+            data: { hostSurveySentAt: new Date() },
+          });
+        }
+        return ok;
+      });
+
+      let sent = 0;
+      let failed = 0;
+      for (const r of results) {
+        if (r.ok && r.value) sent += 1;
+        else failed += 1;
+      }
+
+      res.json({ sent, skipped, failed });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// GET /api/underboss/host-survey/responses[?format=csv]
+//   City-scoped per-respondent host survey responses (one row per party).
+router.get(
+  '/host-survey/responses',
+  requireAuth,
+  requireUnderbossAuth,
+  async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+    try {
+      const scope = scopeFromReq(req);
+      const scopedWhere = buildScopedWhereClause(scope);
+
+      const rows = await prisma.hostSurveyResponse.findMany({
+        where: {
+          submittedAt: { not: null },
+          ...(scopedWhere ? { party: scopedWhere } : {}),
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 5001,
+        select: {
+          id: true,
+          submittedAt: true,
+          questionSetVersion: true,
+          answers: true,
+          host: { select: { name: true, email: true } },
+          party: {
+            select: {
+              name: true,
+              customUrl: true,
+              inviteCode: true,
+              region: true,
+              city: true,
+            },
+          },
+        },
+      });
+
+      const truncated = rows.length > 5000;
+      const page = rows.slice(0, 5000);
+
+      const set = await loadHostQuestionSet().catch(() => ({ version: 1, questions: [] as any[] }));
+
+      const mapped = page.map((r) => ({
+        id: r.id,
+        submittedAt: r.submittedAt,
+        questionSetVersion: r.questionSetVersion,
+        hostName: r.host?.name ?? '',
+        email: r.host?.email ?? '',
+        event: {
+          name: r.party?.name ?? '',
+          slug: r.party?.customUrl || r.party?.inviteCode || '',
+          region: r.party?.region ?? null,
+          city: r.party?.city ?? null,
+        },
+        answers: (r.answers ?? {}) as Record<string, unknown>,
+      }));
+
+      if ((req.query.format as string) === 'csv') {
+        const questions = set.questions;
+        const csvCell = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+        const answerToCsv = (value: unknown): string => {
+          if (value === undefined || value === null) return '';
+          if (Array.isArray(value)) return value.join('; ');
+          if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+          return String(value);
+        };
+        const header = [
+          'event_name',
+          'event_slug',
+          'region',
+          'city',
+          'host_name',
+          'email',
+          'submitted_at',
+          'question_set_version',
+        ];
+        for (const q of questions) {
+          header.push(q.id);
+          if (q.allowOther) header.push(`${q.id}_other`);
+        }
+        const lines = [header.map(csvCell).join(',')];
+        for (const r of mapped) {
+          const cells = [
+            r.event.name,
+            r.event.slug,
+            r.event.region ?? '',
+            r.event.city ?? '',
+            r.hostName,
+            r.email,
+            r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
+            String(r.questionSetVersion ?? ''),
+          ];
+          for (const q of questions) {
+            cells.push(answerToCsv(r.answers[q.id]));
+            if (q.allowOther) cells.push(answerToCsv(r.answers[`${q.id}_other`]));
+          }
+          lines.push(cells.map(csvCell).join(','));
+        }
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="host-survey-responses.csv"');
+        res.send(lines.join('\r\n'));
+        return;
+      }
+
+      res.json({
+        questionSet: set.questions,
+        questionSetVersion: set.version,
+        truncated,
+        responses: mapped,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

@@ -73,6 +73,7 @@ import configRoutes from './routes/config.routes.js'; // marinara-71630 P5: admi
 import resendWebhookRouter from './routes/webhooks.resend.routes.js';
 import ensRoutes from './routes/ens.routes.js';
 import { surveyPublicRouter, surveyHostRouter, cronRouter } from './routes/survey.routes.js';
+import { hostSurveyPublicRouter } from './routes/hostSurvey.routes.js'; // panzerotti-58527: public host survey (no auth)
 import {
   surveyQuestionsAdminRouter,
   surveyQuestionSetsAdminRouter,
@@ -231,6 +232,7 @@ app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
+app.use('/api/host-survey', hostSurveyPublicRouter); // panzerotti-58527: public token-based host survey (no auth)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/bizdev', bizdevRoutes); // soppressata-72251: per-partner BizDev industry report (auth-gated per-route)

@@ -7371,6 +7371,105 @@ export async function getAdminSurveyResponses(): Promise<AdminSurveyResponsesRes
   return apiRequest<AdminSurveyResponsesResponse>('/api/admin/survey-responses', { requireAuth: true });
 }
 
+// ===========================================================================
+// panzerotti-58527: post-event HOST survey
+// ===========================================================================
+
+export interface HostSurveyFetchResponse {
+  eventName: string;
+  eventSlug: string;
+  firstName: string;
+  eventImageUrl: string | null;
+  questionSet: SurveyQuestion[];
+  questionSetVersion: number;
+  alreadySubmitted: boolean;
+  answers: SurveyAnswers | null;
+}
+
+// Public (token-based) — fetch the host survey for a /host-survey/:token link.
+export async function fetchHostSurvey(token: string): Promise<HostSurveyFetchResponse> {
+  return apiRequest<HostSurveyFetchResponse>(`/api/host-survey/${token}`, {
+    method: 'GET',
+    requireAuth: false,
+  });
+}
+
+// Public (token-based) — submit (or resubmit) host survey answers.
+export async function submitHostSurvey(
+  token: string,
+  answers: SurveyAnswers
+): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/host-survey/${token}`, {
+    method: 'POST',
+    body: { answers },
+    requireAuth: false,
+  });
+}
+
+// Underboss — send the host survey to the primary host of each target party.
+export type HostSurveySendScope = 'all' | 'city' | 'status';
+export interface HostSurveySendResult {
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+export async function sendHostSurvey(body: {
+  scope: HostSurveySendScope;
+  cityIds?: string[];
+  statuses?: string[];
+}): Promise<HostSurveySendResult> {
+  return apiRequest<HostSurveySendResult>('/api/underboss/host-survey/send', {
+    method: 'POST',
+    body,
+    requireAuth: true,
+  });
+}
+
+// Underboss — per-respondent host survey responses (city-scoped).
+export interface HostSurveyResponseRow {
+  id: string;
+  submittedAt: string | null;
+  questionSetVersion: number | null;
+  hostName: string;
+  email: string;
+  event: {
+    name: string;
+    slug: string;
+    region: string | null;
+    city: string | null;
+  };
+  answers: SurveyAnswers;
+}
+export interface HostSurveyResponsesResponse {
+  questionSet: SurveyQuestion[];
+  questionSetVersion: number;
+  truncated: boolean;
+  responses: HostSurveyResponseRow[];
+}
+export async function getHostSurveyResponses(): Promise<HostSurveyResponsesResponse> {
+  return apiRequest<HostSurveyResponsesResponse>('/api/underboss/host-survey/responses', {
+    requireAuth: true,
+  });
+}
+
+// Underboss — download the host survey responses CSV (server-rendered via
+// ?format=csv). Fires a browser download via a temporary <a> element.
+export async function exportHostSurveyResponsesCsv(): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(`${API_URL}/api/underboss/host-survey/responses?format=csv`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`CSV export failed: ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = `host-survey-responses-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
+
 // ============================================
 // Tax forms (salame-92110)
 // ============================================

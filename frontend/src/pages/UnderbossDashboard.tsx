@@ -7,7 +7,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, HostSurveyResponsesTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 // montanara-58497: URL <-> EventTable filters + active tab (de)serializer so a
 // refresh / shared link restores the exact filtered view.
@@ -751,6 +751,19 @@ export function UnderbossDashboard() {
               </button>
             )}
             <button
+              onClick={() => setActiveTab('host-survey-responses')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'host-survey-responses'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.hostSurveyResponses', 'Host Survey Responses')}
+              {activeTab === 'host-survey-responses' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('outreach')}
               className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
                 activeTab === 'outreach'
@@ -828,6 +841,10 @@ export function UnderbossDashboard() {
 
           {isAdmin && activeTab === 'survey-responses' && (
             <SurveyResponsesTab />
+          )}
+
+          {activeTab === 'host-survey-responses' && (
+            <HostSurveyResponsesTab />
           )}
 
           {activeTab === 'outreach' && (

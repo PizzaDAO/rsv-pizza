@@ -19,6 +19,7 @@ export type UnderbossTab =
   | 'superlatives'
   | 'survey'
   | 'survey-responses'
+  | 'host-survey-responses'
   | 'outreach'
   | 'telegram-groups';
 
@@ -30,6 +31,7 @@ const UNDERBOSS_TABS: UnderbossTab[] = [
   'superlatives',
   'survey',
   'survey-responses',
+  'host-survey-responses',
   'outreach',
   'telegram-groups',
 ];
