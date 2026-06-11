@@ -687,6 +687,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
     if (ctryInc.length) rows = rows.filter((r) => !!r.party.country && ctryInc.includes(r.party.country));
     if (ctryExc.length) rows = rows.filter((r) => !r.party.country || !ctryExc.includes(r.party.country));
 
+    // farinata-58532: keep only cities with at least one submitted receipt.
+    if (filters.hasReceipts) rows = rows.filter((r) => r.aggregates.totalReceiptCount > 0);
+
     // "Oldest/Newest first" in the by-city view should order cities by their
     // host UPLOAD time, not lastActivityAt. The /by-party endpoint doesn't
     // implement created_asc/created_desc — they fall through to its activity
@@ -758,7 +761,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
       return [...rows].sort((a, b) => (asc ? pick(a) - pick(b) : pick(b) - pick(a)));
     }
     return rows;
-  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal, filters.tagIncludes, filters.tagExcludes, filters.countryIncludes, filters.countryExcludes]);
+  }, [byPartyRows, filters.status, filters.sort, filters.hideUsCities, isRegionalPortal, filters.tagIncludes, filters.tagExcludes, filters.countryIncludes, filters.countryExcludes, filters.hasReceipts]);
 
   // salsiccia-49102: count of selected payouts eligible for bulk USDC send.
   // Mirrors the backend filter (usdc_base + approved/failed + valid 0x
@@ -1266,6 +1269,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           // synthetic rows come from the by-party endpoint, which is the only
           // place a zero-payout party can surface.
           showTbdToggle={viewMode === 'by-city'}
+          // farinata-58532: Has submitted receipts — by-city view only.
+          showReceiptsToggle={viewMode === 'by-city'}
           // provatura-92107: Hide US cities — by-city view + admin dashboard
           // only (regional portals are already region-scoped).
           showHideUsToggle={viewMode === 'by-city' && !isRegionalPortal}

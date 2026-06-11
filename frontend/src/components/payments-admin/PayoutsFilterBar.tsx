@@ -3,7 +3,7 @@ import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-rea
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
-import type { AdminPayoutFilters, PayoutMethod, PayoutPurpose, PayoutStatus } from '../../types';
+import type { AdminPayoutFilters, PayoutMethod, PayoutStatus } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 import {
   PAYMENTS_REGION_DISPLAY_ORDER,
@@ -74,6 +74,13 @@ interface PayoutsFilterBarProps {
    * true (existing behavior).
    */
   showStatusTabs?: boolean;
+  /**
+   * farinata-58532: when true, render the "Has submitted receipts" checkbox.
+   * By-city view only (keys off `aggregates.totalReceiptCount` on by-party
+   * rows). OFF by default — turning it on narrows the list to cities with at
+   * least one submitted receipt. Defaults to false.
+   */
+  showReceiptsToggle?: boolean;
 }
 
 // ciabatta-92110: `'closed'` is a party-level pseudo-status (filters on
@@ -109,13 +116,6 @@ const METHOD_OPTIONS: Array<{ value: PayoutMethod | 'all'; label: string }> = [
   { value: 'usdc_base', label: PAYOUT_METHOD_LABELS.usdc_base },
   { value: 'mercury_card', label: PAYOUT_METHOD_LABELS.mercury_card },
   { value: 'wire', label: PAYOUT_METHOD_LABELS.wire },
-];
-
-// salumi-89172: Purpose filter — event reimbursements vs shipping receipts.
-const PURPOSE_OPTIONS: Array<{ value: PayoutPurpose | 'all'; label: string }> = [
-  { value: 'all', label: 'All purposes' },
-  { value: 'event', label: 'Event' },
-  { value: 'shipping', label: 'Shipping' },
 ];
 
 // arancino-92103: sort order for the payouts list. `created_desc` is the
@@ -170,7 +170,6 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   // active filter when any include/exclude is selected.
   if ((filters.tagIncludes?.length ?? 0) + (filters.tagExcludes?.length ?? 0) > 0) n += 1;
   if ((filters.countryIncludes?.length ?? 0) + (filters.countryExcludes?.length ?? 0) > 0) n += 1;
-  if (filters.purpose && filters.purpose !== 'all') n += 1;
   if (filters.dateFrom) n += 1;
   if (filters.dateTo) n += 1;
   // arancino-92103: count sort as an active filter when it differs from
@@ -184,6 +183,8 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
   if (filters.hideUsCities) n += 1;
   // tigella-58512: count Show TBD (no submission) when the admin turns it on.
   if (filters.showTbdUnsubmitted) n += 1;
+  // farinata-58532: count Has submitted receipts when the admin turns it on.
+  if (filters.hasReceipts) n += 1;
   return n;
 }
 
@@ -210,6 +211,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showHideScamsToggle,
   showHideUsToggle,
   showTbdToggle,
+  showReceiptsToggle,
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
@@ -455,21 +457,6 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
             </div>
           )}
 
-          {/* salumi-89172: Purpose dropdown — Event reimbursements vs
-              Shipping coordinator receipts. Default 'all' shows both. */}
-          <div>
-            <select
-              value={filters.purpose ?? 'all'}
-              onChange={(e) => update({ purpose: e.target.value as PayoutPurpose | 'all' })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by purpose"
-            >
-              {PURPOSE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
           {/* arancino-92103: Sort dropdown — controls the row order of the
               payouts table. Default is `created_desc` (newest submitted
               first), matching the prior implicit backend ordering. */}
@@ -557,6 +544,17 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 checked={!!filters.showTbdUnsubmitted}
                 onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
                 label="Show unsubmitted cities"
+                labelClassName="text-xs text-theme-text-secondary"
+                size={14}
+              />
+            )}
+            {/* farinata-58532: show only cities with ≥1 submitted receipt
+                (aggregates.totalReceiptCount > 0). By-city view only; OFF by default. */}
+            {showReceiptsToggle && (
+              <Checkbox
+                checked={!!filters.hasReceipts}
+                onChange={() => update({ hasReceipts: !filters.hasReceipts })}
+                label="Has submitted receipts"
                 labelClassName="text-xs text-theme-text-secondary"
                 size={14}
               />
