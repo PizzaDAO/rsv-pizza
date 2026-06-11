@@ -2,12 +2,18 @@
  * suppli-58533: host DM submissions to Molto Benny.
  *
  *   POST /api/telegram/host-inbound
- *     Called by moltobene when a host REPLIES to the bot in Telegram (sends a
- *     photo, or types a number). moltobene forwards the inbound DM here; we
- *     resolve which party the chatId belongs to and add the submission to it:
- *       - photo → OCR'd; if it looks like a receipt it's added as a
- *         payout_documents receipt, otherwise as an event photo (gallery).
- *       - text  → a bare positive integer sets the party's estimated attendance.
+ *     Called by moltobene when someone REPLIES to the bot in Telegram (sends a
+ *     photo/PDF, or types a number). moltobene forwards the inbound DM here; we
+ *     resolve the submitter context (host or contributor) for the chatId and
+ *     authorize PER SUBMISSION TYPE (suppli-58533):
+ *       - image photo →
+ *           host        → OCR'd; receipt → payout_documents, else event photo.
+ *           contributor → ALWAYS an event photo (pending review); no OCR.
+ *       - PDF (receipt) → HOST ONLY. Contributors are rejected.
+ *       - text number (attendance) → HOST ONLY. Contributors are rejected.
+ *     Contributors are non-host users who tapped a `submit_<token>` group link
+ *     (party_telegram_contributors). Rejections are non-destructive + reply
+ *     "Only the event host can submit receipts or attendance … Photos welcome".
  *
  *     Auth: header `x-api-key` must equal `TELEGRAM_LINK_CALLBACK_SECRET`
  *       (the exact pattern from telegram-link-callback.routes.ts):
@@ -27,7 +33,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
 import {
-  resolveHostPartyByChatId,
+  resolveSubmitterContext,
   downloadTelegramFile,
   type HostInboundParty,
 } from '../services/hostInboundResolve.js';
@@ -130,32 +136,39 @@ router.post(
         return res.status(400).json({ ok: false, action: 'ignored', reason: "kind must be 'photo' or 'text'" });
       }
 
-      // ---- Resolve the party ----
-      const resolved = await resolveHostPartyByChatId(BigInt(chatIdStr));
+      // ---- Resolve the submitter (host or contributor) ----
+      // suppli-58533: per-type authorization. The chatId may belong to a
+      // VERIFIED host (parties.host_telegram_chat_id) or a photo-only
+      // CONTRIBUTOR (party_telegram_contributors). Most recent action wins.
+      const ctx = await resolveSubmitterContext(BigInt(chatIdStr));
 
-      if (resolved.kind === 'none') {
+      if (!ctx) {
         // chatId not linked to any party → reply nothing.
         return res.status(200).json({ ok: true, action: 'ignored', reason: 'no-party' });
       }
-      if (resolved.kind === 'ambiguous') {
-        // Host runs several events — tell them to use the web link and stop.
-        const slug = resolved.slug;
-        if (slug) {
-          await sendTelegramMessage(
-            chatIdStr,
-            `You host a few events — please add this at rsv.pizza/host/${slug}/payments`,
-          );
-        }
-        return res.status(200).json({ ok: true, action: 'ignored', reason: 'ambiguous' });
-      }
 
-      const party = resolved.party;
+      const party = ctx.party;
+      const isHost = ctx.role === 'host';
       const hostEmail = party.user?.email ?? null;
 
       // =====================================================================
       // TEXT → estimated attendance
       // =====================================================================
       if (kind === 'text') {
+        // suppli-58533: attendance is HOST-ONLY. Contributors are photo-only.
+        if (!isHost) {
+          await sendTelegramMessage(
+            chatIdStr,
+            `Only the event host can submit receipts or attendance for ${party.name}. ` +
+              `Photos are welcome though 📸`,
+          );
+          return res.status(200).json({
+            ok: true,
+            action: 'ignored',
+            partyName: party.name,
+            reason: 'host_only',
+          });
+        }
         const trimmed = typeof text === 'string' ? text.trim() : '';
         // Same validation as party.routes.ts attendance: a bare positive int.
         if (!/^\d+$/.test(trimmed)) {
@@ -231,6 +244,54 @@ router.post(
         downloaded.mimeType.toLowerCase() === 'application/pdf' ||
         /\.pdf$/i.test(downloaded.fileName);
       const isPdf = claimedPdf || looksLikePdf;
+
+      // suppli-58533: PDF = receipt → HOST ONLY. Reject a contributor before any
+      // rasterize/OCR/upload work (non-destructive; photos are still welcome).
+      if (isPdf && !isHost) {
+        await sendTelegramMessage(
+          chatIdStr,
+          `Only the event host can submit receipts or attendance for ${party.name}. ` +
+            `Photos are welcome though 📸`,
+        );
+        return res.status(200).json({
+          ok: true,
+          action: 'ignored',
+          partyName: party.name,
+          reason: 'host_only',
+        });
+      }
+
+      // suppli-58533: CONTRIBUTOR images are ALWAYS event photos — never OCR,
+      // never file a receipt. Upload + create a PENDING photo, attributed to the
+      // contributor's @handle (no host email). Confirm and return.
+      if (!isHost) {
+        const { url: contribUrl } = await uploadPayoutBuffer(
+          downloaded.buffer,
+          party.id,
+          downloaded.mimeType,
+        );
+        await prisma.photo.create({
+          data: {
+            partyId: party.id,
+            url: contribUrl,
+            fileName: sanitizePgString(downloaded.fileName),
+            fileSize: downloaded.buffer.length,
+            mimeType: downloaded.mimeType,
+            uploadedBy: null,
+            uploaderName: ctx.contributorUsername
+              ? sanitizePgString(ctx.contributorUsername)
+              : null,
+            uploaderEmail: null,
+            status: 'pending',
+            photoYear: partyEventYear(party),
+          },
+        });
+        await sendTelegramMessage(
+          chatIdStr,
+          `✅ Thanks! Added your photo to ${party.name}'s gallery (pending review).`,
+        );
+        return res.status(200).json({ ok: true, action: 'photo', partyName: party.name });
+      }
 
       if (isPdf) {
         let raster: Awaited<ReturnType<typeof rasterizePdfFirstPage>>;
