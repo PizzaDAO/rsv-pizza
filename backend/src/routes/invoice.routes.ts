@@ -5,6 +5,46 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
+/**
+ * Compute the calendar year for the given date in the specified timezone.
+ * Falls back to the UTC year if timezone is null/undefined/invalid.
+ */
+function getEventYear(date: Date | null | undefined, timezone: string | null | undefined): number {
+  const now = new Date();
+  const effective = date ?? now;
+  if (timezone) {
+    try {
+      const year = new Intl.DateTimeFormat('en-US', { timeZone: timezone, year: 'numeric' }).format(effective);
+      const parsed = parseInt(year, 10);
+      if (!isNaN(parsed)) return parsed;
+    } catch {
+      // fall through to UTC
+    }
+  }
+  return effective.getUTCFullYear();
+}
+
+/**
+ * Atomically allocate the next invoice number for the given (scope, year).
+ * Returns a formatted invoice number string like "GPP-2026-00001" or "2026-00001".
+ */
+async function allocateInvoiceNumber(
+  isGpp: boolean,
+  year: number,
+): Promise<string> {
+  const scope = isGpp ? 'gpp' : 'nongpp';
+  const rows = await prisma.$queryRaw<Array<{ next_val: number }>>`
+    INSERT INTO invoice_counters (scope, year, next_val)
+    VALUES (${scope}, ${year}, 1)
+    ON CONFLICT (scope, year)
+    DO UPDATE SET next_val = invoice_counters.next_val + 1
+    RETURNING next_val
+  `;
+  const nextVal = rows[0].next_val;
+  const padded = String(nextVal).padStart(5, '0');
+  return isGpp ? `GPP-${year}-${padded}` : `${year}-${padded}`;
+}
+
 // ============================================
 // Host routes (mounted at /api/parties)
 // ============================================
@@ -122,11 +162,18 @@ hostRouter.post('/:partyId/invoices', requireAuth, async (req: AuthRequest, res:
       throw new AppError('Sponsor not found', 404, 'NOT_FOUND');
     }
 
-    // Auto-generate invoice number (count existing + 1, zero-padded to 3 digits)
-    const existingCount = await prisma.invoice.count({
-      where: { partyId },
+    // Load party metadata needed for invoice numbering
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { eventType: true, date: true, timezone: true },
     });
-    const invoiceNumber = String(existingCount + 1).padStart(3, '0');
+
+    // Compute scope (gpp vs nongpp) and calendar year of the event
+    const isGpp = party?.eventType === 'gpp';
+    const eventYear = getEventYear(party?.date, party?.timezone);
+
+    // Atomically allocate a globally-unique, per-year invoice number
+    const invoiceNumber = await allocateInvoiceNumber(isGpp, eventYear);
 
     // Generate view token
     const viewToken = crypto.randomBytes(32).toString('hex');
