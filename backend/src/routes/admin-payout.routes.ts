@@ -6904,12 +6904,18 @@ async function sendCityGroupReminder(
 // suppli-58533: host DM submissions to Molto Benny.
 //
 // A host can now REPLY to the bot (photo or a headcount number) and we add it
-// to their event. Append a no-login CTA to BOTH the host-DM and city-group
-// reminder bodies. For the GROUP message only, also append a deeplink the host
-// can tap to open a DM with the bot (?start=submit_<token>) — moltobene routes
-// that payload back to the host-inbound flow.
-const HOST_INBOUND_CTA =
-  "📸 No need to log in — just reply with your receipt photo, an event photo, or type your headcount and I'll add it for you.";
+// to their event. Append a no-login CTA to both the host-DM and city-group
+// reminder bodies — but with DIFFERENT wording. In the DM, the host can "just
+// reply here" (moltobene processes private-chat replies). In the GROUP, an
+// in-group reply is NOT processed (moltobene only forwards private-chat DMs),
+// so the group copy must point at the tap-to-DM deeplink instead of implying an
+// in-group reply. For the GROUP message we also append a deeplink the host can
+// tap to open a DM with the bot (?start=submit_<token>) — moltobene routes that
+// payload back to the host-inbound flow.
+const HOST_INBOUND_CTA_DM =
+  "📸 No need to log in — just reply here with your receipt photo, an event photo, or type your headcount and I'll add it for you.";
+const HOST_INBOUND_CTA_GROUP =
+  "📸 No login needed — tap below to DM me your receipt photo, an event photo, or your headcount and I'll add it for you:";
 
 // nanoid(10) mint mirrors host-telegram.routes.ts:25-67 (same URL-safe alphabet
 // + length). Used to lazily mint a host_telegram_link_token when one is absent
@@ -6923,7 +6929,7 @@ const generateHostTelegramToken = customAlphabet(
  * suppli-58533: append the no-login CTA to a host-DM reminder body.
  */
 function withHostInboundCta(text: string): string {
-  return `${text}\n\n${HOST_INBOUND_CTA}`;
+  return `${text}\n\n${HOST_INBOUND_CTA_DM}`;
 }
 
 /**
@@ -6936,7 +6942,7 @@ async function buildGroupReminderText(party: {
   id: string;
   hostTelegramLinkToken: string | null;
 }, baseText: string): Promise<string> {
-  let body = withHostInboundCta(baseText);
+  let body = `${baseText}\n\n${HOST_INBOUND_CTA_GROUP}`;
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
   if (!botUsername) return body;
 
@@ -6954,7 +6960,7 @@ async function buildGroupReminderText(party: {
       return body;
     }
   }
-  body += `\n\n👉 Tap to submit by DM: https://t.me/${botUsername}?start=submit_${token}`;
+  body += `\n👉 https://t.me/${botUsername}?start=submit_${token}`;
   return body;
 }
 
