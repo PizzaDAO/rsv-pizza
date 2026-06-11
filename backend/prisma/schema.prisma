@@ -324,6 +324,9 @@ model Party {
   reimbursementCapAudits  ReimbursementCapAudit[]
   surveyResponses         SurveyResponse[]
   hostSurveyResponse      HostSurveyResponse?
+  // suppli-58533: non-host Telegram contributors (photo-only submitters) who
+  // tapped a `submit_<token>` group link. Verified hosts use host_telegram_chat_id.
+  telegramContributors    PartyTelegramContributor[]
 
   @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
   @@map("parties")
@@ -2507,4 +2510,25 @@ model MercuryWireMatch {
   @@index([status])
   @@index([invoiceId])
   @@map("mercury_wire_matches")
+}
+
+// suppli-58533: per-type Telegram authz. A non-host user who taps a publicly
+// broadcast `submit_<token>` group link becomes a photo-only "contributor"
+// (they can add event photos, but NOT receipts/attendance/wallet — those are
+// host-only). Verified hosts continue to use parties.host_telegram_chat_id.
+// One row per (party, chatId); chat_id maps a Telegram DM/group back to a party.
+// Table ALREADY applied to prod separately — do NOT auto-apply a migration.
+model PartyTelegramContributor {
+  id             String   @id @default(uuid()) @db.Uuid
+  partyId        String   @map("party_id") @db.Uuid
+  party          Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  chatId         BigInt   @map("chat_id")
+  telegramUserId BigInt?  @map("telegram_user_id")
+  username       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([partyId, chatId])
+  @@index([chatId])
+  @@map("party_telegram_contributors")
 }

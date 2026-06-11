@@ -39,6 +39,19 @@ export interface HostInboundParty {
   user: { id: string; email: string } | null;
 }
 
+/**
+ * suppli-58533: per-type authorization. A Telegram chatId can be either the
+ * VERIFIED host of a party (parties.host_telegram_chat_id) or a photo-only
+ * CONTRIBUTOR (party_telegram_contributors). resolveSubmitterContext picks the
+ * single most-recently-active candidate across BOTH sets and returns its role.
+ */
+export interface SubmitterContext {
+  role: 'host' | 'contributor';
+  party: HostInboundParty;
+  /** Contributor's @handle (for uploaderName); null when role === 'host'. */
+  contributorUsername: string | null;
+}
+
 const PARTY_SELECT = {
   id: true,
   name: true,
@@ -139,6 +152,91 @@ export async function resolveHostPartyByChatId(
   return { kind: 'party', party: sorted[0] };
 }
 
+/**
+ * suppli-58533: resolve a chatId to a SINGLE submitter context (host OR
+ * contributor), choosing by "most recent action wins":
+ *
+ *  - Host candidates: parties where host_telegram_chat_id = chatId. Recency =
+ *    max(receipts/photo/wallet/attendance reminder timestamps), falling back to
+ *    the event date so a host always has *some* ordering key.
+ *  - Contributor candidates: party_telegram_contributors where chat_id = chatId.
+ *    Recency = the row's updatedAt (set on every (re)tap of the submit link).
+ *
+ * The candidate with the LATEST recency across BOTH sets wins; its role is the
+ * result. This handles a user who hosts one city and contributes photos to
+ * another — the most recent linking action decides where their next DM lands.
+ * Returns null when the chatId matches neither set.
+ */
+export async function resolveSubmitterContext(
+  chatId: number | bigint,
+): Promise<SubmitterContext | null> {
+  let chatIdBig: bigint;
+  try {
+    chatIdBig = BigInt(chatId);
+  } catch {
+    return null;
+  }
+
+  const [hostParties, contributorRows] = await Promise.all([
+    prisma.party.findMany({
+      where: { hostTelegramChatId: chatIdBig },
+      select: PARTY_SELECT,
+      orderBy: { createdAt: 'desc' },
+    }) as unknown as Promise<HostInboundParty[]>,
+    prisma.partyTelegramContributor.findMany({
+      where: { chatId: chatIdBig },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        username: true,
+        updatedAt: true,
+        party: { select: PARTY_SELECT },
+      },
+    }),
+  ]);
+
+  type Candidate = {
+    role: 'host' | 'contributor';
+    party: HostInboundParty;
+    recency: number;
+    contributorUsername: string | null;
+  };
+  const candidates: Candidate[] = [];
+
+  for (const p of hostParties) {
+    // Host recency: most recent reminder, else event date, else 0.
+    const r = maxReminder(p) ?? (p.date ? p.date.getTime() : 0);
+    candidates.push({ role: 'host', party: p, recency: r, contributorUsername: null });
+  }
+
+  for (const row of contributorRows) {
+    const party = row.party as unknown as HostInboundParty | null;
+    if (!party) continue;
+    candidates.push({
+      role: 'contributor',
+      party,
+      recency: row.updatedAt ? row.updatedAt.getTime() : 0,
+      contributorUsername: row.username ?? null,
+    });
+  }
+
+  if (candidates.length === 0) return null;
+
+  // Latest recency wins. On an exact tie, prefer 'host' (more privileged) — a
+  // tie is only plausible when both default to 0 with no activity recorded.
+  candidates.sort((a, b) => {
+    if (b.recency !== a.recency) return b.recency - a.recency;
+    if (a.role === b.role) return 0;
+    return a.role === 'host' ? -1 : 1;
+  });
+
+  const top = candidates[0];
+  return {
+    role: top.role,
+    party: top.party,
+    contributorUsername: top.contributorUsername,
+  };
+}
+
 export interface DownloadedTelegramFile {
   buffer: Buffer;
   mimeType: string;
@@ -221,6 +319,9 @@ export async function downloadTelegramFile(
   else if (lowerPath.endsWith('.heic')) mimeType = 'image/heic';
   else if (lowerPath.endsWith('.heif')) mimeType = 'image/heif';
   else if (lowerPath.endsWith('.gif')) mimeType = 'image/gif';
+  // suppli-58533: PDFs (documents) are receipts; carry the right mime so the
+  // host-inbound handler's `looksLikePdf` check fires on the fileId path too.
+  else if (lowerPath.endsWith('.pdf')) mimeType = 'application/pdf';
   const ext = filePath.split('.').pop() || 'jpg';
   const fileName = `tg-${Date.now()}.${ext}`;
 
