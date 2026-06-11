@@ -47,6 +47,7 @@ model User {
   reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
   reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
   taxForms                         TaxForm[]
+  hostSurveyResponses              HostSurveyResponse[]
 }
 
 model Party {
@@ -235,6 +236,12 @@ model Party {
   surveyEnabled Boolean   @default(true) @map("survey_enabled")
   surveySentAt  DateTime? @map("survey_sent_at") @db.Timestamptz
 
+  // panzerotti-58527: post-event HOST survey. Distinct question set from the
+  // guest survey. host_survey_sent_at is set when the host survey email goes
+  // out (auto morning-after via cron, or manually from /underboss) so the cron
+  // won't double-send a hand-sent event.
+  hostSurveySentAt DateTime? @map("host_survey_sent_at") @db.Timestamptz
+
   // margherita-58471: T-4h reminder email opt-out at the party level.
   // Host toggles in EventDetailsTab; defaults to true for all new + existing
   // events. Cron worker skips parties where this is false.
@@ -316,6 +323,7 @@ model Party {
   reimbursementCapAppeals ReimbursementCapAppeal[]
   reimbursementCapAudits  ReimbursementCapAudit[]
   surveyResponses         SurveyResponse[]
+  hostSurveyResponse      HostSurveyResponse?
 
   @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
   @@map("parties")
@@ -1775,6 +1783,64 @@ model SurveyQuestion {
   @@id([questionSet, id])
   @@unique([questionSet, position])
   @@map("survey_questions")
+}
+
+// ============================================
+// Host survey config + responses (panzerotti-58527)
+// ============================================
+// DB-backed post-event HOST survey. Mirrors the guest survey tables but with a
+// separate question set targeted at hosts. Service-role only for config tables.
+
+model HostSurveyQuestionSet {
+  id        String   @id
+  version   Int      @default(1)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  questions HostSurveyQuestion[]
+
+  @@map("host_survey_question_sets")
+}
+
+model HostSurveyQuestion {
+  id          String
+  questionSet String                @map("question_set")
+  set         HostSurveyQuestionSet @relation(fields: [questionSet], references: [id])
+
+  position    Int
+  type        String
+  text        String
+  scale       Int?
+  multi       Boolean  @default(false)
+  allowOther  Boolean  @default(false) @map("allow_other")
+  options     Json     @default("[]")
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt      @map("updated_at") @db.Timestamptz
+
+  @@id([questionSet, id])
+  @@unique([questionSet, position])
+  @@map("host_survey_questions")
+}
+
+// One post-event host survey response per party (unique party_id). Resubmit =
+// upsert. token is the public tokenized link; host_user_id snapshots the
+// primary host at send time.
+model HostSurveyResponse {
+  id                 String    @id @default(uuid()) @db.Uuid
+  token              String    @unique
+  partyId            String    @unique @map("party_id") @db.Uuid
+  party              Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  hostUserId         String    @map("host_user_id")
+  host               User      @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
+  sentAt             DateTime? @map("sent_at") @db.Timestamptz
+  answers            Json?
+  submittedAt        DateTime? @map("submitted_at") @db.Timestamptz
+  questionSetVersion Int?      @map("question_set_version")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime? @map("updated_at") @db.Timestamptz
+
+  @@map("host_survey_responses")
 }
 
 model SlugAlias {

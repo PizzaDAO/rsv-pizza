@@ -19,6 +19,7 @@ import {
   loadQuestionSet,
   validateSurveyAnswers,
 } from '../lib/surveyQuestions.js';
+import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 
 const SURVEY_TAB = 'survey';
 
@@ -474,6 +475,85 @@ cronRouter.post('/send-surveys', async (req: Request, res: Response, next: NextF
     }
 
     res.json({ processed: results.length, results });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// panzerotti-58527: HOST survey morning-after cron.
+//   POST /api/cron/send-host-surveys — guarded by CRON_SECRET.
+//   Mirrors send-surveys: parties whose endTime is within the last 7 days, a
+//   primary-host email present, host_survey_sent_at IS NULL, and ~09:00 local.
+//   Atomic claim via UPDATE...RETURNING so only one tick sends; rolls the claim
+//   back to NULL on send failure. The actual send/email lives in the shared
+//   sendHostSurveyEmail service.
+// ---------------------------------------------------------------------------
+cronRouter.post('/send-host-surveys', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.authorization || '';
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const candidates = await prisma.party.findMany({
+      where: {
+        hostSurveySentAt: null,
+        endTime: { not: null, gte: sevenDaysAgo, lte: now },
+        // Party must have a linked host (the primary-host email lives on the
+        // User row; email is a required column so presence of the relation is
+        // the gate). sendHostSurveyEmail re-checks the email and no-ops if absent.
+        user: { is: {} },
+      },
+      select: { id: true, endTime: true, timezone: true },
+    });
+
+    let sent = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const party of candidates) {
+      if (!party.endTime) continue;
+      if (!isMorningAfterInTimezone(party.endTime, now, party.timezone)) continue;
+
+      // Atomic claim: only the winning row (host_survey_sent_at flipped NULL ->
+      // NOW) proceeds to send.
+      const claimed = await prisma.$queryRaw<Array<{ id: string }>>`
+        UPDATE "parties"
+        SET host_survey_sent_at = NOW()
+        WHERE id = ${party.id}::uuid AND host_survey_sent_at IS NULL
+        RETURNING id
+      `;
+      if (claimed.length === 0) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const ok = await sendHostSurveyEmail(party.id);
+        if (ok) {
+          sent += 1;
+        } else {
+          // Roll back the claim so a later tick can retry.
+          await prisma.party.update({
+            where: { id: party.id },
+            data: { hostSurveySentAt: null },
+          });
+          failed += 1;
+        }
+      } catch {
+        await prisma.party
+          .update({ where: { id: party.id }, data: { hostSurveySentAt: null } })
+          .catch(() => {});
+        failed += 1;
+      }
+    }
+
+    res.json({ processed: candidates.length, sent, failed, skipped });
   } catch (error) {
     next(error);
   }
