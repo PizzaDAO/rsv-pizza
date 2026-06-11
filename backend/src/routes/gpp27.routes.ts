@@ -89,7 +89,7 @@ router.get('/agreement', requireAuth, async (req: AuthRequest, res: Response, ne
     const clauses = await prisma.gppAgreementClause.findMany({
       where: { active: true },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, version: true, sortOrder: true, body: true, requiresAck: true },
+      select: { id: true, version: true, sortOrder: true, heading: true, body: true, requiresAck: true },
     });
     const version = clauses[0]?.version ?? null;
     res.json({ version, clauses });
