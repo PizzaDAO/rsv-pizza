@@ -15,11 +15,11 @@
  * wires in the actual Mercury / wire / USDC-via-Privy execution paths.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { customAlphabet } from 'nanoid';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
 import { unaccentMatchIds } from '../lib/accentSearch.js';
-import { withBennySignature } from '../lib/bennySignature.js';
 import {
   requireAuth,
   AuthRequest,
@@ -52,6 +52,9 @@ import {
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
+// suppli-58533: sendTelegramMessage moved to a shared service so the host-inbound
+// handler can reuse the exact same send path (withBennySignature + preview off).
+import { sendTelegramMessage } from '../services/telegramSend.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 
@@ -6844,45 +6847,9 @@ router.post(
 // the menu item.
 // ============================================
 
-async function sendTelegramMessage(
-  chatId: string,
-  text: string,
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) {
-    return { ok: false, reason: 'TELEGRAM_BOT_TOKEN not configured' };
-  }
-  try {
-    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: withBennySignature(text),
-        disable_web_page_preview: true,
-      }),
-    });
-    if (!resp.ok) {
-      let detail = '';
-      try {
-        const body = await resp.text();
-        detail = body.slice(0, 200);
-      } catch {
-        // ignore — surface just the status
-      }
-      return {
-        ok: false,
-        reason: `Telegram API returned ${resp.status}${detail ? `: ${detail}` : ''}`,
-      };
-    }
-    return { ok: true };
-  } catch (err: any) {
-    return {
-      ok: false,
-      reason: `Telegram fetch failed: ${err?.message || String(err)}`,
-    };
-  }
-}
+// suppli-58533: sendTelegramMessage was moved to ../services/telegramSend.ts
+// (imported above) so the host-inbound endpoint can reuse the identical send
+// path. The implementation is unchanged.
 
 /**
  * tonda-58293 FIX #4: send a reminder to a party's city Telegram GROUP.
@@ -6909,6 +6876,63 @@ async function sendCityGroupReminder(
     : { groupSent: false, groupReason: result.reason };
 }
 
+// suppli-58533: host DM submissions to Molto Benny.
+//
+// A host can now REPLY to the bot (photo or a headcount number) and we add it
+// to their event. Append a no-login CTA to BOTH the host-DM and city-group
+// reminder bodies. For the GROUP message only, also append a deeplink the host
+// can tap to open a DM with the bot (?start=submit_<token>) — moltobene routes
+// that payload back to the host-inbound flow.
+const HOST_INBOUND_CTA =
+  "📸 No need to log in — just reply with your receipt photo, an event photo, or type your headcount and I'll add it for you.";
+
+// nanoid(10) mint mirrors host-telegram.routes.ts:25-67 (same URL-safe alphabet
+// + length). Used to lazily mint a host_telegram_link_token when one is absent
+// so the group deeplink always resolves.
+const generateHostTelegramToken = customAlphabet(
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+  10,
+);
+
+/**
+ * suppli-58533: append the no-login CTA to a host-DM reminder body.
+ */
+function withHostInboundCta(text: string): string {
+  return `${text}\n\n${HOST_INBOUND_CTA}`;
+}
+
+/**
+ * suppli-58533: build the GROUP reminder body: base text + CTA + a tap-to-DM
+ * deeplink. Mints the party's host_telegram_link_token if it's missing (mirrors
+ * the host-telegram.routes.ts mint). Returns the group text; the deeplink is
+ * omitted when TELEGRAM_BOT_USERNAME is unset (no usable link to offer).
+ */
+async function buildGroupReminderText(party: {
+  id: string;
+  hostTelegramLinkToken: string | null;
+}, baseText: string): Promise<string> {
+  let body = withHostInboundCta(baseText);
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
+  if (!botUsername) return body;
+
+  let token = party.hostTelegramLinkToken;
+  if (!token) {
+    token = generateHostTelegramToken();
+    try {
+      await prisma.party.update({
+        where: { id: party.id },
+        data: { hostTelegramLinkToken: token },
+      });
+    } catch (err) {
+      // Non-fatal — if the mint write fails we just skip the deeplink.
+      console.warn('[suppli-58533] failed to mint host_telegram_link_token:', err);
+      return body;
+    }
+  }
+  body += `\n\n👉 Tap to submit by DM: https://t.me/${botUsername}?start=submit_${token}`;
+  return body;
+}
+
 router.post(
   '/:partyId/tg-receipts-reminder',
   requireAuth,
@@ -6925,6 +6949,8 @@ router.post(
           inviteCode: true,
           name: true,
           hostTelegramChatId: true,
+          // suppli-58533: needed to build the group-only tap-to-DM deeplink.
+          hostTelegramLinkToken: true,
         },
       });
       if (!party) {
@@ -6942,7 +6968,8 @@ router.post(
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          text,
+          // suppli-58533: append the no-login reply CTA to the host DM.
+          withHostInboundCta(text),
         );
         if (result.ok) {
           hostDmSent = true;
@@ -6957,7 +6984,9 @@ router.post(
       // chat_id from `city_telegram_groups` via `sendToCityGroup` (which also
       // persists supergroup migrations). FIX #4: falls back to the raw party
       // name as cityKey so non-GPP-named parties aren't silently skipped.
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
+      const groupText = await buildGroupReminderText(party, text);
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7012,6 +7041,8 @@ router.post(
           inviteCode: true,
           name: true,
           hostTelegramChatId: true,
+          // suppli-58533: needed to build the group-only tap-to-DM deeplink.
+          hostTelegramLinkToken: true,
         },
       });
       if (!party) {
@@ -7026,7 +7057,8 @@ router.post(
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          text,
+          // suppli-58533: append the no-login reply CTA to the host DM.
+          withHostInboundCta(text),
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7041,7 +7073,9 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
+      const groupText = await buildGroupReminderText(party, text);
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7093,6 +7127,8 @@ router.post(
           inviteCode: true,
           name: true,
           hostTelegramChatId: true,
+          // suppli-58533: needed to build the group-only tap-to-DM deeplink.
+          hostTelegramLinkToken: true,
         },
       });
       if (!party) {
@@ -7107,7 +7143,8 @@ router.post(
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          text,
+          // suppli-58533: append the no-login reply CTA to the host DM.
+          withHostInboundCta(text),
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7122,7 +7159,9 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
+      const groupText = await buildGroupReminderText(party, text);
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7174,6 +7213,8 @@ router.post(
           inviteCode: true,
           name: true,
           hostTelegramChatId: true,
+          // suppli-58533: needed to build the group-only tap-to-DM deeplink.
+          hostTelegramLinkToken: true,
         },
       });
       if (!party) {
@@ -7188,7 +7229,8 @@ router.post(
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          text,
+          // suppli-58533: append the no-login reply CTA to the host DM.
+          withHostInboundCta(text),
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7203,7 +7245,9 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, text);
+      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
+      const groupText = await buildGroupReminderText(party, text);
+      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
