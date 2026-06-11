@@ -2179,6 +2179,8 @@ export interface AdminPayout extends Payout, FlaggedReadyFields {
     name: string;
     inviteCode: string;
     customUrl: string | null;
+    /** malfatti-58532: event start ISO; drives the admin Add-photo modal cutoff. */
+    date: string | null;
     /**
      * bruschetta-58291: surface country on the /payments admin queue.
      * Free-form string from `parties.country` (e.g. 'USA', 'Spain').
@@ -2619,6 +2621,8 @@ export interface PartyPayoutsRow {
     customUrl: string | null;
     /** Mirrors `party.inviteCode` so the frontend can build `/host/:slug` links. */
     inviteCode: string | null;
+    /** malfatti-58532: event start ISO; drives the admin Add-photo modal cutoff. */
+    date: string | null;
     country: string | null;
     /** Optional — backend currently surfaces null since the value isn't on PAYOUT_PARTY_SELECT. */
     region: string | null;
