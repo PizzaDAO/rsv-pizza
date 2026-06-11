@@ -16,6 +16,8 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { customAlphabet } from 'nanoid';
+import sharp from 'sharp';
+import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
@@ -6449,6 +6451,121 @@ router.post(
         ranInline,
         inlineError,
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ============================================
+// farinata-58536: POST /api/admin/payouts/documents/:docId/rotate
+//
+// Admin-only: rotate a sideways receipt image so it's readable AND so the next
+// "Re-run OCR" reads the corrected orientation. The rotation is PERSISTED to
+// storage (not CSS-only), because OCR re-reads `payout_documents.url` from
+// storage. We write a NEW rotated object to a fresh path (cache-safe) and
+// repoint `doc.url`. Only changes `url` — never amount/currency/USD/line items.
+//
+// Body: { degrees: 90 | -90 | 180 }
+// Returns: { document: { id, url } }
+// ============================================
+router.post(
+  '/documents/:docId/rotate',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { docId } = req.params;
+      const body = (req.body || {}) as { degrees?: unknown };
+      const degrees = Number(body.degrees);
+      if (degrees !== 90 && degrees !== -90 && degrees !== 180) {
+        throw new AppError('degrees must be 90, -90, or 180', 400, 'INVALID_ROTATION');
+      }
+
+      const existing = await prisma.payoutDocument.findUnique({
+        where: { id: docId },
+        select: { id: true, url: true, kind: true, fileName: true, partyId: true },
+      });
+      if (!existing) {
+        throw new AppError('Document not found', 404, 'NOT_FOUND');
+      }
+
+      // Fetch the bytes (Node 18+ global fetch).
+      const resp = await fetch(existing.url);
+      if (!resp.ok) {
+        throw new AppError('Could not fetch the receipt image', 502, 'ROTATE_FETCH_FAILED');
+      }
+      const contentType = resp.headers.get('content-type') || '';
+
+      // Reject non-raster formats — sharp cannot decode HEIC on Vercel and PDFs
+      // aren't raster. Check both the content-type and the url/fileName extension.
+      const lowerUrl = (existing.url || '').toLowerCase();
+      const lowerName = (existing.fileName || '').toLowerCase();
+      const isUnsupported =
+        contentType.includes('pdf') ||
+        contentType.includes('heic') ||
+        contentType.includes('heif') ||
+        /\.(pdf|heic|heif)$/.test(lowerUrl.split('?')[0]) ||
+        /\.(pdf|heic|heif)$/.test(lowerName);
+      if (isUnsupported) {
+        throw new AppError(
+          'Rotation is only supported for JPG/PNG images',
+          400,
+          'ROTATE_UNSUPPORTED_FORMAT',
+        );
+      }
+
+      // Rotate clockwise by `degrees` and bake it into the pixels. No format
+      // method preserves the input format.
+      const inputBuf = Buffer.from(await resp.arrayBuffer());
+      const rotated = await sharp(inputBuf).rotate(degrees).toBuffer();
+
+      // Upload a NEW object (do NOT overwrite — a fresh path avoids CDN/browser
+      // cache staleness). Mirror logoAudit.routes.ts's admin client pattern.
+      const supabaseAdmin = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      );
+      const ROTATE_BUCKET = 'event-images';
+
+      // Derive the storage path from the public URL. Fall back to a synthesized
+      // path under payouts/{partyId}/ so it still passes the OCR url guard.
+      let newPath: string;
+      const marker = '/object/public/event-images/';
+      const markerIdx = existing.url.indexOf(marker);
+      if (markerIdx !== -1) {
+        let rawPath = existing.url.slice(markerIdx + marker.length);
+        // Strip any query string off the object path.
+        rawPath = rawPath.split('?')[0];
+        const dotIdx = rawPath.lastIndexOf('.');
+        const pathWithoutExt = dotIdx === -1 ? rawPath : rawPath.slice(0, dotIdx);
+        const ext = dotIdx === -1 ? '.jpg' : rawPath.slice(dotIdx);
+        newPath = `${pathWithoutExt}-r${Date.now()}${ext}`;
+      } else {
+        newPath = `payouts/${existing.partyId}/${existing.id}-r${Date.now()}.jpg`;
+      }
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(ROTATE_BUCKET)
+        .upload(newPath, rotated, {
+          contentType: contentType || 'image/jpeg',
+          upsert: false,
+        });
+      if (uploadError) {
+        throw new AppError('Failed to upload rotated image', 502, 'ROTATE_UPLOAD_FAILED');
+      }
+
+      const { data: urlData } = supabaseAdmin.storage
+        .from(ROTATE_BUCKET)
+        .getPublicUrl(newPath);
+      const newUrl = urlData.publicUrl;
+
+      await prisma.payoutDocument.update({
+        where: { id: docId },
+        data: { url: newUrl },
+      });
+
+      res.json({ document: { id: existing.id, url: newUrl } });
     } catch (err) {
       next(err);
     }

@@ -498,8 +498,8 @@ export interface LlmModels {
  * per-use-case tier distinction is intentional: the assistant deliberately runs
  * on the cheaper `gpt-4o-mini` and must NOT be collapsed into one global model.
  */
-export function getLlmModels(): Promise<LlmModels> {
-  return getConfig<LlmModels>(KEYS.llmModels, {
+export async function getLlmModels(): Promise<LlmModels> {
+  const defaults: LlmModels = {
     ocr: 'gpt-4o',
     // bruschetta-58519: cheap first-pass OCR (cost routing). Set equal to `ocr`
     // in app_config to disable routing (no escalation) without a deploy.
@@ -507,7 +507,21 @@ export function getLlmModels(): Promise<LlmModels> {
     visionPrimary: 'gpt-4o',
     assistant: 'gpt-4o-mini',
     visionSecondOpinion: 'claude-3-5-sonnet-latest',
-  });
+  };
+  const cfg = await getConfig<Partial<LlmModels>>(KEYS.llmModels, defaults);
+  // farinata-58536: getConfig returns the stored blob VERBATIM (no deep-merge),
+  // so a prod blob seeded before a field was added (e.g. `ocrCheap`, shipped by
+  // bruschetta-58519) leaves that key undefined → it reaches OpenAI as
+  // `model: undefined` → 400 "you must provide a model parameter", which broke
+  // ALL receipt OCR until the blob was re-seeded. Coalesce every field against
+  // the code default so a missing OR blank key can never reach the model param.
+  return {
+    ocr: cfg.ocr || defaults.ocr,
+    ocrCheap: cfg.ocrCheap || defaults.ocrCheap,
+    visionPrimary: cfg.visionPrimary || defaults.visionPrimary,
+    assistant: cfg.assistant || defaults.assistant,
+    visionSecondOpinion: cfg.visionSecondOpinion || defaults.visionSecondOpinion,
+  };
 }
 
 export { KEYS as PRIVATE_CONFIG_KEYS };

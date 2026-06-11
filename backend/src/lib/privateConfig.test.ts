@@ -274,10 +274,46 @@ describe('getLlmModels', () => {
 
     const models = await getLlmModels();
 
-    expect(models).toEqual(seeded);
+    // farinata-58536: the seeded blob omits `ocrCheap` (a field added after the
+    // prod blob was last written). getConfig returns the blob verbatim, so
+    // getLlmModels coalesces each field against the code default — the seeded
+    // values pass through and the missing `ocrCheap` is backfilled.
+    expect(models).toEqual({ ...seeded, ocrCheap: 'gpt-4o-mini' });
     expect(mockPrisma.appConfig.findUnique).toHaveBeenCalledWith({
       where: { key: PRIVATE_CONFIG_KEYS.llmModels },
     });
+  });
+
+  it('backfills a field missing from the stored blob (e.g. ocrCheap) from the default', async () => {
+    // farinata-58536 regression: the OCR "400 you must provide a model
+    // parameter" outage — a prod blob seeded before `ocrCheap` existed left it
+    // undefined, which reached OpenAI as `model: undefined`. getLlmModels must
+    // never let a missing OR blank key through.
+    mockPrisma.appConfig.findUnique.mockResolvedValue({
+      value: JSON.stringify({
+        ocr: 'gpt-4o',
+        visionPrimary: 'gpt-4o',
+        assistant: 'gpt-4o-mini',
+        visionSecondOpinion: 'claude-3-5-sonnet-latest',
+        // ocrCheap intentionally absent
+      }),
+    });
+    expect((await getLlmModels()).ocrCheap).toBe('gpt-4o-mini');
+  });
+
+  it('backfills a BLANK field from the default (empty string must not reach the model param)', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({
+      value: JSON.stringify({
+        ocr: '',
+        ocrCheap: '',
+        visionPrimary: 'gpt-4o',
+        assistant: 'gpt-4o-mini',
+        visionSecondOpinion: 'claude-3-5-sonnet-latest',
+      }),
+    });
+    const models = await getLlmModels();
+    expect(models.ocr).toBe('gpt-4o');
+    expect(models.ocrCheap).toBe('gpt-4o-mini');
   });
 
   it('falls back to the CURRENT production models when the row is absent', async () => {
