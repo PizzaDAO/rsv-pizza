@@ -1654,6 +1654,7 @@ model GppAgreementClause {
   id          String   @id @default(uuid()) @db.Uuid
   version     String
   sortOrder   Int      @map("sort_order")
+  heading     String?
   body        String
   requiresAck Boolean  @default(true) @map("requires_ack")
   active      Boolean  @default(true)

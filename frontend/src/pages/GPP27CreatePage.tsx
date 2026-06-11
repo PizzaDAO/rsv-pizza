@@ -31,6 +31,52 @@ const TIMELINE_COPY =
 // override (index.css) — use the arbitrary-value class text-[#ffffff].
 const WHITE = 'text-[#ffffff]';
 
+// --- Agreement clause body rendering (polenta-58540) -----------------------
+// Parse inline `**bold**` markers: split on `**` and wrap odd-index segments
+// in <strong>. Returns React nodes with stable index keys.
+function renderInline(text: string): React.ReactNode[] {
+  return text.split('**').map((seg, i) =>
+    i % 2 === 1 ? <strong key={i}>{seg}</strong> : <React.Fragment key={i}>{seg}</React.Fragment>
+  );
+}
+
+// Render a clause body: lines starting with `- ` become bullets grouped into a
+// single <ul>; other lines render as <p>. Inline **bold** is parsed per line.
+function renderClauseBody(body: string): React.ReactNode {
+  const lines = body.split('\n');
+  const out: React.ReactNode[] = [];
+  let bullets: string[] = [];
+
+  const flushBullets = () => {
+    if (bullets.length === 0) return;
+    out.push(
+      <ul key={`ul-${out.length}`} className="list-disc ml-5 space-y-1">
+        {bullets.map((b, i) => (
+          <li key={i}>{renderInline(b)}</li>
+        ))}
+      </ul>
+    );
+    bullets = [];
+  };
+
+  for (const line of lines) {
+    if (line.startsWith('- ')) {
+      bullets.push(line.slice(2));
+    } else {
+      flushBullets();
+      if (line.trim().length > 0) {
+        out.push(
+          <p key={`p-${out.length}`} className="mb-1">
+            {renderInline(line)}
+          </p>
+        );
+      }
+    }
+  }
+  flushBullets();
+  return out;
+}
+
 export function GPP27CreatePage() {
   // --- All hooks declared ABOVE any conditional return (rules-of-hooks). ---
   const [loading, setLoading] = useState(true);
@@ -377,15 +423,17 @@ export function GPP27CreatePage() {
                   Confirm every condition below before creating this event
                   {agreementVersion ? ` (${agreementVersion})` : ''}:
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {renderedClauses.map((c) => (
-                    <Checkbox
-                      key={c.id}
-                      checked={!!acked[c.id]}
-                      onChange={() => setAcked((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}
-                      label={c.text}
-                      labelClassName="text-sm text-gray-800"
-                    />
+                    <div key={c.id} className="space-y-1">
+                      <Checkbox
+                        checked={!!acked[c.id]}
+                        onChange={() => setAcked((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}
+                        label={c.heading ?? ''}
+                        labelClassName="text-base font-semibold text-gray-900"
+                      />
+                      <div className="ml-7 text-sm text-gray-800">{renderClauseBody(c.text)}</div>
+                    </div>
                   ))}
                   {renderedClauses.length === 0 && (
                     <p className="text-sm text-gray-500">No active agreement configured.</p>

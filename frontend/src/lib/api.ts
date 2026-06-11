@@ -7616,6 +7616,7 @@ export interface Gpp27AgreementClause {
   id: string;
   version: string;
   sortOrder: number;
+  heading?: string | null;
   body: string;
   requiresAck: boolean;
 }
