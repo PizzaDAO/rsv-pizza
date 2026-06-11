@@ -3356,6 +3356,13 @@ router.patch(
         payoutBankDetails,
       } = req.body || {};
 
+      const anyFieldSupplied =
+        finalAmountUsd !== undefined ||
+        adminNotes !== undefined ||
+        payoutMethod !== undefined ||
+        payoutWalletAddress !== undefined ||
+        payoutBankDetails !== undefined;
+
       let amountChanged = false;
       let oldAmount: number | null = null;
       let newAmount: number | null = null;
@@ -3452,6 +3459,24 @@ router.patch(
       }
 
       if (Object.keys(data).length === 0) {
+        if (anyFieldSupplied) {
+          // No-op edit (e.g. re-saved the same amount). Nothing to persist; return
+          // the current payout unchanged rather than 400ing the caller.
+          const current = await prisma.payout.findUnique({
+            where: { id: existing.id },
+            include: {
+              party: { select: PAYOUT_PARTY_SELECT },
+              host: { select: { id: true, name: true, email: true } },
+              documents: {
+                orderBy: { sortOrder: 'asc' },
+                include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+              },
+              audits: { orderBy: { createdAt: 'desc' } },
+            },
+          });
+          res.json({ payout: serializePayout(current) });
+          return;
+        }
         throw new AppError('No editable fields supplied', 400, 'VALIDATION_ERROR');
       }
 

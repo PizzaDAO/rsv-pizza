@@ -2358,6 +2358,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                           type="button"
                           onClick={async () => {
                             if (!draftIsValid) return;
+                            // No-op: re-saving the unchanged amount would 400 "No editable fields supplied".
+                            if (draftNum === Number(payout.finalAmountUsd)) {
+                              setEditingAmount(false);
+                              setSaveAmountError(null);
+                              return;
+                            }
                             setSaveAmountError(null);
                             try {
                               // lasagna-92103: no longer forward
