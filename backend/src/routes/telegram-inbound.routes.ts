@@ -160,7 +160,12 @@ router.post(
       const ctx = await resolveSubmitterContext(BigInt(chatIdStr));
 
       if (!ctx) {
-        // chatId not linked to any party → reply nothing.
+        // chatId not linked to any party → tell the user how to connect so
+        // they aren't left on moltobene's "📥 processing…" ack forever.
+        await sendTelegramMessage(
+          chatIdStr,
+          `I'm not sure which event this is for yet! 🍕 Tap the "DM them to me" link in your event's reminder (in your city's Telegram group) to connect, then send it again and I'll add it.`,
+        );
         return res.status(200).json({ ok: true, action: 'ignored', reason: 'no-party' });
       }
 
