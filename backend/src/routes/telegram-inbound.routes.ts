@@ -35,6 +35,7 @@ import { sendTelegramMessage } from '../services/telegramSend.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
+import { rasterizePdfFirstPage } from '../services/pdfRasterize.js';
 
 const router = Router();
 
@@ -104,13 +105,17 @@ router.post(
         return res.status(401).json({ ok: false, action: 'ignored', reason: 'unauthorized' });
       }
 
-      const { chatId, kind, fileId, imageBase64, text } = (req.body || {}) as {
+      const { chatId, kind, fileId, imageBase64, text, mimeType } = (req.body || {}) as {
         chatId?: number | string;
         kind?: string;
         fileId?: string;
         fileUniqueId?: string;
         imageBase64?: string;
         text?: string;
+        // suppli-58533: the bot now forwards PDF receipts with kind:'photo' and
+        // a mimeType of 'application/pdf'. Optional; we also sniff the downloaded
+        // file extension as a belt-and-suspenders PDF check below.
+        mimeType?: string;
       };
 
       // Validate chatId is integer-like before BigInt() (which throws).
@@ -214,6 +219,47 @@ router.post(
         return res.status(200).json({ ok: false, action: 'ignored', reason: 'download-failed' });
       }
 
+      // suppli-58533: PDF receipts. The bot forwards PDFs with kind:'photo' +
+      // mimeType 'application/pdf'; also sniff the downloaded extension as a
+      // belt-and-suspenders check when mimeType is absent. gpt-4o vision can't
+      // read a PDF via image_url, so rasterize page 1 to a PNG and feed THAT
+      // into the same receipt path (so it OCRs and renders in the /payments
+      // <img> grids). PDFs are ALWAYS filed as receipts, never event photos.
+      const claimedPdf =
+        typeof mimeType === 'string' && mimeType.trim().toLowerCase() === 'application/pdf';
+      const looksLikePdf =
+        downloaded.mimeType.toLowerCase() === 'application/pdf' ||
+        /\.pdf$/i.test(downloaded.fileName);
+      const isPdf = claimedPdf || looksLikePdf;
+
+      if (isPdf) {
+        let raster: Awaited<ReturnType<typeof rasterizePdfFirstPage>>;
+        try {
+          raster = await rasterizePdfFirstPage(downloaded.buffer);
+        } catch (err: any) {
+          console.error('[suppli-58533][host-inbound] PDF rasterize failed:', err?.message || err);
+          await sendTelegramMessage(
+            chatIdStr,
+            "I couldn't read that PDF — try sending a photo of the receipt instead.",
+          );
+          return res.status(200).json({ ok: false, action: 'ignored', reason: 'pdf_rasterize_failed' });
+        }
+        if (raster.pageCount > 1) {
+          console.warn(
+            `[suppli-58533] PDF has ${raster.pageCount} pages; only page 1 rasterized`,
+          );
+        }
+        // Swap the image bytes/metadata to the rasterized PNG. Keep the original
+        // .pdf base filename for traceability but as a .png so the upload + the
+        // /payments <img> grid treat it as an image.
+        const pngFileName = downloaded.fileName.replace(/\.pdf$/i, '') + '.png';
+        downloaded = {
+          buffer: raster.pngBuffer,
+          mimeType: 'image/png',
+          fileName: pngFileName,
+        };
+      }
+
       const { url } = await uploadPayoutBuffer(downloaded.buffer, party.id, downloaded.mimeType);
 
       // ---- OCR the image to decide receipt vs. event photo ----
@@ -233,7 +279,31 @@ router.post(
         ocr.confidence >= RECEIPT_OCR_CONFIDENCE_MIN &&
         (!!ocr.merchant || (Array.isArray(ocr.lineItems) && ocr.lineItems.length > 0));
 
-      if (looksLikeReceipt && ocr) {
+      // suppli-58533: a PDF is ALWAYS filed as a receipt even when OCR threw or
+      // read nothing. Synthesize an empty OCR result so the receipt-persist block
+      // below (which dereferences ocr.*) is null-safe; the row stores with no
+      // amount/currency (host can fix it on /payments) but the PDF is preserved.
+      if (isPdf && ocr == null) {
+        ocr = {
+          amount: 0,
+          currency: null,
+          confidence: 0,
+          items: undefined,
+          lineItems: [],
+          merchant: null,
+          receiptDate: null,
+          boundingHint: null,
+          language: null,
+          summary: null,
+          raw: { receipts: [], note: 'pdf_ocr_failed' },
+        };
+      }
+
+      // suppli-58533: a PDF is ALWAYS a receipt — file it as one even if OCR
+      // confidence is low / no amount was read (store with whatever OCR fields
+      // it got). Never route a PDF to the event-photo branch below. For PDFs
+      // `ocr` is guaranteed non-null by the synthesize-empty guard above.
+      if ((isPdf || looksLikeReceipt) && ocr) {
         // ---- RECEIPT path: mirror payout.routes.ts:731-796 column mapping ----
         const fx = await convertToUSD(ocr.amount, ocr.currency);
         const unresolved = fx.source === 'unresolved' || fx.usdAmount == null;
@@ -296,12 +366,16 @@ router.post(
           where: { partyId: party.id, kind: 'receipt' },
         });
 
+        // suppli-58533: when no amount was read (e.g. a PDF whose OCR found no
+        // total), omit the amount fragment so the confirmation still reads
+        // cleanly ("Got your receipt for {party} — that's N receipts on file.").
         const amountLabel = unresolved
-          ? `${ocr.amount.toLocaleString()} ${ocr.currency ?? ''}`.trim()
+          ? (ocr.amount > 0 ? `${ocr.amount.toLocaleString()} ${ocr.currency ?? ''}`.trim() : '')
           : `$${fx.usdAmount!.toFixed(2)}`;
+        const amountFragment = amountLabel ? ` — ${amountLabel}` : '';
         await sendTelegramMessage(
           chatIdStr,
-          `✅ Got your receipt for ${party.name} — ${amountLabel}. ` +
+          `✅ Got your receipt for ${party.name}${amountFragment}. ` +
             `That's ${receiptCount} receipt${receiptCount === 1 ? '' : 's'} on file.`,
         );
         return res.status(200).json({ ok: true, action: 'receipt', partyName: party.name });
