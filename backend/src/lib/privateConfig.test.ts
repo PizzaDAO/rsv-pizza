@@ -53,12 +53,21 @@ describe('getPayoutCaps', () => {
 
     const caps = await getPayoutCaps();
 
-    // Fallback must be present, non-zero, and LOW — every value well under the
-    // real production caps so a missing row caps payouts low (safe), never high.
-    for (const v of Object.values(caps)) {
+    // Fallback must be present, non-zero, and LOW — every DISBURSEMENT cap well
+    // under the real production caps so a missing row caps payouts low (safe),
+    // never high.
+    //
+    // gnocco-58537: `underbossOverPartyCapMaxUsd` (margherita-58526) is a policy
+    // CEILING — the max an underboss may override a per-party cap to ($675), not
+    // a per-payout disbursement amount — so it legitimately exceeds the $200
+    // low-fallback bound and must be excluded from this loop. It's asserted
+    // separately below.
+    const { underbossOverPartyCapMaxUsd, ...disbursementCaps } = caps;
+    for (const v of Object.values(disbursementCaps)) {
       expect(v).toBeGreaterThan(0);
       expect(v).toBeLessThanOrEqual(200);
     }
+    expect(underbossOverPartyCapMaxUsd).toBeGreaterThan(0);
     // Ordering invariant the consumers rely on: per-address / hard ceiling are
     // not below the per-tx / per-submission caps.
     expect(caps.perAddressHardCapUsd).toBeGreaterThanOrEqual(caps.hardPerTxCeilingUsd);
