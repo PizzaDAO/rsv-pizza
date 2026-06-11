@@ -90,6 +90,18 @@ interface SendPaymentModalProps {
    */
   hostWalletByUserId?: Record<string, string>;
   /**
+   * casarecce-58534: the set of User ids that uploaded a receipt doc on this
+   * party (any payout). The backend receipt gate (payoutHasReceipt) credits a
+   * receipt to a payout when a receipt doc on the same party was uploaded by
+   * THAT host. The by-city Send flow creates a FRESH payout for the selected
+   * recipient with `receiptPhotos: []`, so the only thing that can satisfy the
+   * gate is the party+host branch — which passes ONLY if the selected recipient
+   * is one of these uploaders. We therefore key the no-receipt ack on the
+   * recipient (not the city): if the recipient isn't in this set, the new payout
+   * is undocumented and the ack is required.
+   */
+  receiptUploaderUserIds?: string[];
+  /**
    * bufalina-60733: fake-detection risk for this party (looked up by the
    * parent from the by-city score map at open time). When `fakeTier` is
    * `medium`/`high`, the modal shows a caution card and gates "Send" behind
@@ -123,6 +135,7 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   paidTotalUsd,
   primaryHostUserId,
   hostWalletByUserId,
+  receiptUploaderUserIds = [],
   fakeScore,
   fakeTier,
   fakeTopFlags,
@@ -265,16 +278,29 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   const [fakeAck, setFakeAck] = useState(false);
   const isFlagged = fakeTier === 'medium' || fakeTier === 'high';
 
-  // bottarga-58513: no-receipt ack. This by-city Send flow creates a fresh
-  // payout with `receiptPhotos: []`, so when the city has no receipts on file
-  // (receiptsTotalUsd <= 0) the new payout is undocumented and the backend's
-  // receipt gate (at approve + execute) would block it. Surface an amber
-  // warning + ack so the admin explicitly takes responsibility; forward
-  // `allowMissingReceipts` when ticked. When the city already has receipts
-  // (receiptsTotalUsd > 0) the gate keys on party+host and passes, so no ack
-  // is needed.
+  // bottarga-58513 / casarecce-58534: no-receipt ack. This by-city Send flow
+  // creates a FRESH payout for the selected recipient with `receiptPhotos: []`,
+  // so the only thing that can satisfy the backend receipt gate
+  // (`payoutHasReceipt`) is its party+host branch — which credits a receipt only
+  // if a receipt doc on this party was uploaded by THE SELECTED RECIPIENT.
+  //
+  // The original bottarga gate keyed on `receiptsTotalUsd > 0` (city-level),
+  // which deadlocked when a city HAD receipts but they were uploaded by a COHOST
+  // while the payment is sent to a DIFFERENT recipient (e.g. the primary host):
+  // the gate passes city-level so the ack card was hidden, yet the backend
+  // rejects with 400 MISSING_RECEIPT and there was no way to acknowledge.
+  //
+  // casarecce-58534 keys the ack on the SELECTED RECIPIENT instead, matching the
+  // backend gate: if the recipient is not among the party's receipt uploaders,
+  // the new payout is undocumented → show the amber warning + ack and forward
+  // `allowMissingReceipts` when ticked.
   const [noReceiptAck, setNoReceiptAck] = useState(false);
-  const cityHasReceipts = receiptsTotalUsd > 0;
+  // casarecce-58534 safety net: if a Send still returns 400 MISSING_RECEIPT
+  // despite `recipientHasReceipt` looking true (e.g. stale doc data), reveal the
+  // ack card so the admin can tick + resend. Reveal-only — never auto-ticks.
+  const [forceNoReceiptAck, setForceNoReceiptAck] = useState(false);
+  const recipientHasReceipt =
+    !!recipientUserId && (receiptUploaderUserIds ?? []).includes(recipientUserId);
 
   // Close on Escape.
   useEffect(() => {
@@ -309,6 +335,15 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   useEffect(() => {
     setOverridePerAddressCap(false);
   }, [amountNum, recipientUserId, walletAddress, method]);
+
+  // casarecce-58534: reset the no-receipt ack (and the MISSING_RECEIPT safety-
+  // net reveal) whenever the recipient changes, so an ack made for one recipient
+  // can't carry over to another (mirrors the fake/cap ack-reset effects). The
+  // recipient is what the no-receipt gate keys on.
+  useEffect(() => {
+    setNoReceiptAck(false);
+    setForceNoReceiptAck(false);
+  }, [recipientUserId]);
 
   // guanciale-49340: debounced per-address paid-total fetch (bianco-89172
   // pattern). When sending USDC to a syntactically-valid 0x wallet with a
@@ -404,9 +439,10 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
     (!swcHub || swcAck) &&
     // bufalina-60733: flagged (medium/high fake-detection) requires explicit ack.
     (!isFlagged || fakeAck) &&
-    // bottarga-58513: when the city has no receipts on file, the no-receipt
-    // ack is required (the created payout would be undocumented).
-    (cityHasReceipts || noReceiptAck) &&
+    // casarecce-58534: when the SELECTED RECIPIENT has no credited receipt on
+    // this party (or the backend just rejected with MISSING_RECEIPT), the
+    // no-receipt ack is required — the created payout would be undocumented.
+    (recipientHasReceipt && !forceNoReceiptAck ? true : noReceiptAck) &&
     !submitting &&
     !candidatesLoading;
 
@@ -468,11 +504,14 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       const allowOverPerAddressCap = walletPaidTotal?.wouldExceed
         ? overridePerAddressCap
         : undefined;
-      // bottarga-58513: forward the no-receipt ack to BOTH approve and execute
-      // so the new (undocumented) payout passes the receipt gate. Only sent
-      // when the city has no receipts on file AND the admin acked.
+      // casarecce-58534: forward the no-receipt ack to BOTH approve and execute
+      // so the new (undocumented) payout passes the receipt gate. Sent when the
+      // SELECTED RECIPIENT has no credited receipt (or the backend just rejected
+      // with MISSING_RECEIPT via the safety net) AND the admin acked.
       const allowMissingReceipts =
-        !cityHasReceipts && noReceiptAck ? true : undefined;
+        (!recipientHasReceipt || forceNoReceiptAck) && noReceiptAck
+          ? true
+          : undefined;
       if (method === 'usdc_base') {
         // guanciale-49340: the approve handler runs executePayout server-side
         // for USDC and keeps the HTTP 200 contract even when the on-chain send
@@ -530,6 +569,17 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       onSent({ partyName: cleanName, method, amountUsd: amountNum });
       onClose();
     } catch (err: any) {
+      // casarecce-58534 safety net: if the backend still rejected with
+      // MISSING_RECEIPT (e.g. our recipient->uploader mapping was stale or the
+      // backend gate disagreed), reveal the no-receipt ack card so the admin can
+      // tick it and resend. Reveal-only — never auto-ticks the checkbox.
+      const msg = String(err?.message || '');
+      if (
+        err?.code === 'MISSING_RECEIPT' ||
+        /no receipt uploaded/i.test(msg)
+      ) {
+        setForceNoReceiptAck(true);
+      }
       setSubmitError(err?.message || 'Failed to send payment');
     } finally {
       setSubmitting(false);
@@ -885,11 +935,14 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
             </div>
           )}
 
-          {/* bottarga-58513: no-receipt warning + ack. This by-city Send
-              creates a fresh payout with no receipt; when the city has no
-              receipts on file the row is undocumented and the backend gate
-              would block it. Mirrors the fake-detection ack card above. */}
-          {!cityHasReceipts && (
+          {/* casarecce-58534: no-receipt warning + ack. This by-city Send
+              creates a fresh payout for the selected recipient with no receipt.
+              The backend receipt gate credits a receipt only when a receipt doc
+              on this party was uploaded by THAT recipient — so we show the ack
+              whenever the SELECTED recipient has no credited receipt (even if a
+              cohost uploaded one), or when the backend just rejected with
+              MISSING_RECEIPT. Mirrors the fake-detection ack card above. */}
+          {(!recipientHasReceipt || forceNoReceiptAck) && (
             <div className="card p-3 border-l-4 border-l-amber-500 bg-amber-500/10">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle
@@ -898,12 +951,14 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
                 />
                 <div className="flex-1 text-sm">
                   <div className="font-medium text-amber-200 [.gpp-theme_&]:text-amber-900 mb-1">
-                    No receipt uploaded for {cleanName}
+                    No receipt from this recipient for {cleanName}
                   </div>
                   <div className="text-theme-text-secondary [.gpp-theme_&]:text-amber-900 text-xs">
-                    This city has no receipts on file. Paying without
-                    documentation should be rare — prefer asking the host to
-                    upload one first.
+                    The selected recipient hasn&apos;t uploaded a receipt for this
+                    city (a cohost may have — but the payout is credited to the
+                    recipient). Paying without documentation from them should be
+                    rare — prefer asking them to upload one, or send to the host
+                    who did. Proceed only if you take responsibility.
                   </div>
                   <div className="mt-3">
                     <Checkbox

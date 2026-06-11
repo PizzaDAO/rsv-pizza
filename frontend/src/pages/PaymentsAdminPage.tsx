@@ -342,6 +342,13 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         // over the resolved 0x). Lets SendPaymentModal pre-fill the wallet
         // field per selected recipient instead of making the admin re-type it.
         hostWalletByUserId: Record<string, string>;
+        // casarecce-58534: the set of User ids that uploaded a receipt doc on
+        // this party (any payout, regardless of duplicate/ineligible — the
+        // backend receipt gate counts any receipt doc). Lets SendPaymentModal
+        // key the no-receipt ack on whether the SELECTED recipient has a
+        // credited receipt (matching the backend's party+host gate) rather than
+        // on whether the city has any receipts at all.
+        receiptUploaderUserIds: string[];
         // bufalina-60733: fake-detection risk for this party, looked up from
         // `fakeScores` at open time so the modal can gate "Send" behind an ack
         // when the event is flagged (medium/high). Undefined = no flag.
@@ -1501,6 +1508,25 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 const wallet = (p.payoutWalletInput || p.payoutWalletAddress || '').trim();
                 if (wallet) hostWalletByUserId[p.hostUserId] = wallet;
               }
+              // casarecce-58534: collect every User id that uploaded a receipt
+              // doc on this party (any payout). The backend receipt gate credits
+              // a receipt to a payout when a receipt doc on the same party was
+              // uploaded by the SELECTED recipient — so the no-receipt ack must
+              // key on the recipient, not the city. Count ALL receipt docs
+              // (including duplicate/ineligible) since the backend gate does.
+              const receiptUploaderUserIds: string[] = [];
+              {
+                const seen = new Set<string>();
+                for (const p of row.payouts) {
+                  for (const d of p.documents || []) {
+                    if (d.kind !== 'receipt') continue;
+                    const uid = d.uploadedByUserId;
+                    if (!uid || seen.has(uid)) continue;
+                    seen.add(uid);
+                    receiptUploaderUserIds.push(uid);
+                  }
+                }
+              }
               // bufalina-60733: attach the looked-up fake-detection risk for
               // this party so the modal can gate the send behind an ack.
               const fake = fakeScores[row.party.id];
@@ -1515,6 +1541,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
                 paidTotalUsd: paidSumUsd,
                 primaryHostUserId: row.party.userId ?? null,
                 hostWalletByUserId,
+                receiptUploaderUserIds,
                 fakeScore: fake?.score,
                 fakeTier: fake?.tier,
                 fakeTopFlags: fake?.topFlags,
@@ -2101,6 +2128,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             paidTotalUsd={sendPaymentTarget.paidTotalUsd}
             primaryHostUserId={sendPaymentTarget.primaryHostUserId}
             hostWalletByUserId={sendPaymentTarget.hostWalletByUserId}
+            receiptUploaderUserIds={sendPaymentTarget.receiptUploaderUserIds}
             fakeScore={sendPaymentTarget.fakeScore}
             fakeTier={sendPaymentTarget.fakeTier}
             fakeTopFlags={sendPaymentTarget.fakeTopFlags}
