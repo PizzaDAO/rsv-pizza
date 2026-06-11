@@ -51,6 +51,7 @@ import {
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 import { AdminAddAttachment } from './AdminAddAttachment';
+import { AdminAddPhotosModal } from './AdminAddPhotosModal';
 import { isSwcHubParty } from '../../utils/swcHub';
 import { isVideoFile } from '../../lib/mediaUtils';
 import {
@@ -1182,6 +1183,7 @@ function CityExpansion({
   onRowClick,
   busyRowId,
   canEditReceipts,
+  canManagePhotos,
   canEditAdminNotes,
   onApprove,
   onExecute,
@@ -1200,6 +1202,11 @@ function CityExpansion({
    * the plain photo-only lightbox.
    */
   canEditReceipts: boolean;
+  /**
+   * provolone-58531: gates the "+ Add photo" button (admin OR underboss).
+   * Unlike `canEditReceipts` (admin-only), underbosses can add event photos.
+   */
+  canManagePhotos: boolean;
   /**
    * mortadella-92106: gates the city-level admin notes textarea (read AND
    * write). True for admin / super_admin / payment_admin. Underbosses don't
@@ -1237,6 +1244,13 @@ function CityExpansion({
     index: number;
   } | null>(null);
   const [showPendingClaims, setShowPendingClaims] = useState(false);
+  // provolone-58531: admin/underboss "Add photo" modal (host-style role slots).
+  const [showAddPhotos, setShowAddPhotos] = useState(false);
+  // provolone-58531: stable refetch callback for the photos modal so passing it
+  // into EventPhotosCard's onPhotosChange doesn't churn its load effect.
+  const handlePhotosAdded = useCallback(() => {
+    onDocumentsChanged?.(row.party.id);
+  }, [onDocumentsChanged, row.party.id]);
 
   // pesto-92105: per-receipt edit state. Mirrors the agnolotti-58291 /
   // taralli-92104 / culatello-92104 state on PayoutReviewModal but local to
@@ -2461,20 +2475,34 @@ function CityExpansion({
           "Add receipt" control) renders whenever the viewer can edit receipts
           and there's a target payout — even on an empty city, so the FIRST
           receipt can be added. Only the thumbnail grid stays gated on count. */}
-      {(receiptEntries.length > 0 || (canEditReceipts && primaryPayout)) && (
+      {(receiptEntries.length > 0 || (canEditReceipts && primaryPayout) || canManagePhotos) && (
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="text-xs uppercase tracking-wide text-theme-text-muted">
               Receipts ({receiptEntries.length})
             </div>
-            {canEditReceipts && primaryPayout && (
-              <AdminAddAttachment
-                payoutId={primaryPayout.id}
-                partyId={row.party.id}
-                mode="receipt"
-                onAdded={() => onDocumentsChanged?.(row.party.id)}
-              />
-            )}
+            <div className="flex items-center gap-2">
+              {/* provolone-58531: admin/underboss "Add photo" → host-style modal
+                  (3 role slots + additional photos). Available even with no
+                  payout, since it operates on the party gallery. */}
+              {canManagePhotos && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddPhotos(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-surface border border-theme-stroke text-theme-text hover:border-[#ff393a]/40 transition-colors"
+                >
+                  <Plus size={13} /> Add photo
+                </button>
+              )}
+              {canEditReceipts && primaryPayout && (
+                <AdminAddAttachment
+                  payoutId={primaryPayout.id}
+                  partyId={row.party.id}
+                  mode="receipt"
+                  onAdded={() => onDocumentsChanged?.(row.party.id)}
+                />
+              )}
+            </div>
           </div>
           {receiptEntries.length === 0 ? (
             <div className="text-sm text-theme-text-faint">
@@ -2693,31 +2721,19 @@ function CityExpansion({
           read; photos give visual context when drilling in. Empty buckets
           hide entirely via PhotoPreviewSection. Mirrors the focaccia-92104
           split in PayoutReviewModal. */}
+      {/* provolone-58531: the old per-section "+ Add photo" (pizza/event kind)
+          controls were removed. Admins/underbosses now add photos via the
+          single "+ Add photo" button next to Add receipt, which opens the
+          host-style role modal (AdminAddPhotosModal). */}
       <PhotoPreviewSection
         label="Event photos"
         photos={eventPhotos}
         onThumbClick={(idx) => setLightbox({ bucket: 'event', index: idx })}
-        headerAction={canEditReceipts && primaryPayout ? (
-          <AdminAddAttachment
-            payoutId={primaryPayout.id}
-            partyId={row.party.id}
-            mode="photo"
-            onAdded={() => onDocumentsChanged?.(row.party.id)}
-          />
-        ) : undefined}
       />
       <PhotoPreviewSection
         label="Pizza photos"
         photos={pizzaPhotos}
         onThumbClick={(idx) => setLightbox({ bucket: 'pizza', index: idx })}
-        headerAction={canEditReceipts && primaryPayout ? (
-          <AdminAddAttachment
-            payoutId={primaryPayout.id}
-            partyId={row.party.id}
-            mode="photo"
-            onAdded={() => onDocumentsChanged?.(row.party.id)}
-          />
-        ) : undefined}
       />
 
       {receiptEntries.length === 0
@@ -2769,6 +2785,19 @@ function CityExpansion({
           && lightboxReceipt?.isDuplicate !== true
         }
       />
+
+      {/* provolone-58531: admin/underboss "Add photo" modal (host-style role
+          slots + additional photos). row.party has no date field, so the
+          event-start cutoff is disabled (eventStart={null}). */}
+      {showAddPhotos && (
+        <AdminAddPhotosModal
+          partyId={row.party.id}
+          eventStart={null}
+          partyName={row.party.name}
+          onClose={() => setShowAddPhotos(false)}
+          onAdded={handlePhotosAdded}
+        />
+      )}
     </div>
   );
 }
@@ -3921,6 +3950,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                             onRowClick={onRowClick}
                             busyRowId={busyRowId}
                             canEditReceipts={canEditReceipts}
+                            canManagePhotos={viewerRole === 'admin' || viewerRole === 'underboss'}
                             canEditAdminNotes={canEditAdminNotes}
                             onDocumentsChanged={onDocumentsChanged}
                             onApprove={viewerRole === 'admin' ? onApprove : undefined}

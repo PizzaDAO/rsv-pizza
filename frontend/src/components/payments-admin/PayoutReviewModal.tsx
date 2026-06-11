@@ -24,6 +24,7 @@ import {
 import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
 import { AdminAddAttachment } from './AdminAddAttachment';
+import { AdminAddPhotosModal } from './AdminAddPhotosModal';
 
 /**
  * parmigiana-58291: strip the "Global Pizza Party " prefix from event names so
@@ -307,6 +308,16 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
   // argentina-92103: underbosses lose Execute/Mark-paid affordances. The
   // green Flag-ready button replaces them in the footer slot.
   const isAdminViewer = viewerRole === 'admin';
+  // provolone-58531: the "+ Add photo" button (host-style role modal) is open to
+  // admins AND underbosses — unlike receipt attachment, which stays admin-only.
+  const canManagePhotos = viewerRole === 'admin' || viewerRole === 'underboss';
+  // provolone-58531: open/close state for the admin/underboss Add-photos modal.
+  const [showAddPhotos, setShowAddPhotos] = useState(false);
+  // provolone-58531: stable refetch callback (same one the old photo control
+  // used) so EventPhotosCard's onPhotosChange doesn't churn its load effect.
+  const handlePhotosAdded = useCallback(() => {
+    onDocumentsChanged?.();
+  }, [onDocumentsChanged]);
   // marinara-71630 P6: per-submission soft cap fetched from app_config (not
   // hardcoded). High neutral sentinel while unknown → the amber warning below
   // is inert until the real cap loads.
@@ -2033,17 +2044,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <h3 className="text-sm font-semibold text-theme-text">
                   Pizza photos ({pizzaPhotos.length})
                 </h3>
-                {/* sfincione-58500: full payment admins can attach a pizza- or
-                    event-proof photo (kind picker on the control). The backend
-                    mirrors it into the gallery. Hidden for underbosses. */}
-                {isAdminViewer && (
-                  <AdminAddAttachment
-                    payoutId={payout.id}
-                    partyId={payout.partyId}
-                    mode="photo"
-                    onAdded={() => onDocumentsChanged?.()}
-                  />
-                )}
+                {/* provolone-58531: the old pizza/event-kind "+ Add photo"
+                    control was removed. Admins/underbosses now add photos via
+                    the single "+ Add photo" button next to Add receipt below
+                    (opens the host-style role modal). */}
               </div>
               {pizzaPhotos.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No pizza photos yet.</p>
@@ -2114,16 +2118,29 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <h3 className="text-sm font-semibold text-theme-text">
                   Receipts ({receipts.length})
                 </h3>
-                {/* sfincione-58500: full payment admins can attach a receipt
-                    here — OCR'd inline server-side. Hidden for underbosses. */}
-                {isAdminViewer && (
-                  <AdminAddAttachment
-                    payoutId={payout.id}
-                    partyId={payout.partyId}
-                    mode="receipt"
-                    onAdded={() => onDocumentsChanged?.()}
-                  />
-                )}
+                <div className="flex items-center gap-2">
+                  {/* provolone-58531: admin/underboss "+ Add photo" → host-style
+                      role modal (3 role slots + additional photos). */}
+                  {canManagePhotos && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPhotos(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-surface border border-theme-stroke text-theme-text hover:border-[#ff393a]/40 transition-colors"
+                    >
+                      <Plus size={13} /> Add photo
+                    </button>
+                  )}
+                  {/* sfincione-58500: full payment admins can attach a receipt
+                      here — OCR'd inline server-side. Hidden for underbosses. */}
+                  {isAdminViewer && (
+                    <AdminAddAttachment
+                      payoutId={payout.id}
+                      partyId={payout.partyId}
+                      mode="receipt"
+                      onAdded={() => onDocumentsChanged?.()}
+                    />
+                  )}
+                </div>
               </div>
               {receipts.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No receipts attached.</p>
@@ -4301,6 +4318,19 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
           lightboxReceipt ? (authChecks[lightboxReceipt.url]?.verdict ?? null) : null
         }
       />
+
+      {/* provolone-58531: admin/underboss Add-photos modal (host-style role
+          slots + additional photos). AdminPayout.party carries no date field,
+          so the event-start cutoff is disabled (eventStart={null}). */}
+      {showAddPhotos && (
+        <AdminAddPhotosModal
+          partyId={payout.partyId}
+          eventStart={null}
+          partyName={payout.party.name}
+          onClose={() => setShowAddPhotos(false)}
+          onAdded={handlePhotosAdded}
+        />
+      )}
     </div>,
     document.body,
   );

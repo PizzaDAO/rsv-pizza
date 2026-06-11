@@ -1,13 +1,25 @@
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
-import { requireAuth, optionalAuth, isSuperAdmin, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, isSuperAdmin, isPaymentAdmin, isUnderboss, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { getUnderbossScope, partyMatchesScope } from '../helpers/underbossScope.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
 import { getOperationalLimits } from '../lib/privateConfig.js';
 
 const router = Router();
+
+// provolone-58531: payment admins + region/city-scoped underbosses may manage a
+// party's payout photos (designate roles + auto-approved uploads) even though
+// they aren't hosts/cohosts. Mirrors the /payments edit scope.
+async function canAdminManagePartyPhotos(partyId: string, email?: string): Promise<boolean> {
+  if (await isPaymentAdmin(email)) return true;
+  if (!(await isUnderboss(email))) return false;
+  const party = await prisma.party.findUnique({ where: { id: partyId }, select: { region: true, city: true } });
+  if (!party) return false;
+  return partyMatchesScope(party, await getUnderbossScope(email));
+}
 
 // GET /api/parties/:partyId/photos - List all photos for a party (public if photosPublic is true)
 //
@@ -613,7 +625,11 @@ router.post('/:partyId/photos', optionalAuth, async (req: AuthRequest, res: Resp
     // margherita-43821: host uploads (owner / co-host w/ canEdit / super-admin /
     // GPP editor) are auto-approved + auto-starred so they appear in /photos
     // immediately. Guest uploads still go through pending moderation.
-    const isHostUpload = await canUserEditParty(partyId, req.userId, req.userEmail);
+    // provolone-58531: payment admins + scoped underbosses managing payout
+    // photos are treated as host uploads too (auto-approve + auto-star).
+    const isHostUpload =
+      (await canUserEditParty(partyId, req.userId, req.userEmail)) ||
+      (await canAdminManagePartyPhotos(partyId, req.userEmail));
     const initialStatus = isHostUpload ? 'approved' : 'pending';
     const initialStarred = isHostUpload ? true : false;
     const now = new Date();
@@ -726,16 +742,23 @@ router.patch('/:partyId/photos/:photoId', requireAuth, async (req: AuthRequest, 
     const { partyId, photoId } = req.params;
     const { caption, tags, starred, status, photoYear, payoutRole } = req.body;
 
-    // Verify ownership or super admin
+    // Verify ownership or super admin.
+    // provolone-58531: payment admins + region/city-scoped underbosses can also
+    // manage a party's payout photos (designate roles) even though they aren't
+    // hosts/cohosts. When they qualify this way, skip the host-tab gate.
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
-    if (!canEdit) {
+    const isAdminManager = canEdit ? false : await canAdminManagePartyPhotos(partyId, req.userEmail);
+    if (!canEdit && !isAdminManager) {
       throw new AppError('Unauthorized', 403, 'UNAUTHORIZED');
     }
 
-    // Verify co-host has access to photos tab
-    const canAccessPhotosTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'photos');
-    if (!canAccessPhotosTab) {
-      throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
+    // Verify co-host has access to photos tab (host/cohost path only — admins/
+    // underbosses managing payout photos bypass the tab-access requirement).
+    if (canEdit) {
+      const canAccessPhotosTab = await canUserAccessTab(partyId, req.userEmail, req.userId, 'photos');
+      if (!canAccessPhotosTab) {
+        throw new AppError('You do not have access to the photos tab', 403, 'TAB_ACCESS_DENIED');
+      }
     }
 
     // Check if photo exists. provolone-58931: soft-deleted photos can't be
