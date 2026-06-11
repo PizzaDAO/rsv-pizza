@@ -16,6 +16,8 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   purpose: 'all',
   hideClosed: true,
   hideScams: true,
+  // crostata-58532: default-TRUE — mirrors PaymentsAdminPage DEFAULT_FILTERS.
+  hasReceipts: true,
   sort: 'created_desc',
 };
 
@@ -85,6 +87,14 @@ describe('filtersToSearchParams', () => {
       filtersToSearchParams({ ...DEFAULT_FILTERS, showTbdUnsubmitted: true }, 'by-city').get('tbd'),
     ).toBe('1');
   });
+
+  // crostata-58532: default-TRUE toggle — emit `receipts=0` only when OFF.
+  it('hasReceipts: emits receipts=0 only when OFF, nothing by default', () => {
+    expect(filtersToSearchParams(DEFAULT_FILTERS, 'by-city').get('receipts')).toBeNull();
+    expect(
+      filtersToSearchParams({ ...DEFAULT_FILTERS, hasReceipts: false }, 'by-city').get('receipts'),
+    ).toBe('0');
+  });
 });
 
 describe('searchParamsToFilters', () => {
@@ -128,9 +138,18 @@ describe('searchParamsToFilters', () => {
     expect(filters.status).toBe('all');
     expect(filters.payoutMethod).toBe('all');
     expect(filters.hideClosed).toBe(true);
+    expect(filters.hasReceipts).toBe(true);
     expect(filters.hideScams).toBe(true);
     expect(filters.sort).toBe('created_desc');
     expect(viewMode).toBeNull();
+  });
+
+  // crostata-58532: default-TRUE toggle — receipts=0 parses to false.
+  it('hasReceipts: receipts=0 parses to false; absent stays true', () => {
+    const { filters } = searchParamsToFilters(new URLSearchParams('receipts=0'), undefined);
+    expect(filters.hasReceipts).toBe(false);
+    const { filters: f2 } = searchParamsToFilters(new URLSearchParams(''), undefined);
+    expect(f2.hasReceipts).toBe(true);
   });
 
   it('default-TRUE boolean: =0 parses to false', () => {

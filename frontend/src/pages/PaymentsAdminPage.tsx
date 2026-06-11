@@ -124,6 +124,9 @@ const DEFAULT_FILTERS: AdminPayoutFilters = {
   // tigella-58512: surface approved `tbd` events with zero submissions —
   // OFF by default so the default request is byte-identical to before.
   showTbdUnsubmitted: false,
+  // crostata-58532: only show cities that have submitted receipts by default.
+  // Admin un-ticks "Has submitted receipts" to also see not-yet-submitted ones.
+  hasReceipts: true,
   // arancino-92103: sort order default — newest submitted first. Matches the
   // prior implicit backend ordering, so non-sorting callers see no change.
   sort: 'created_desc',
