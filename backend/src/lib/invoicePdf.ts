@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, rgb, PageSizes } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PageSizes, PDFString, PDFName } from 'pdf-lib';
+import { PIZZADAO_LOGO_JPG_BASE64 } from '../assets/pizzadaoLogo.js';
 
 /**
  * Format cents as a currency string (e.g. 150000 → "$1,500.00").
@@ -122,9 +123,20 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const headerH = 70;
   drawRect(0, 0, pageW, headerH, navy);
 
-  // "INVOICE" title
+  // Logo (try/catch — skip on failure, still produce the PDF)
+  try {
+    const logoImg = await doc.embedJpg(Buffer.from(PIZZADAO_LOGO_JPG_BASE64, 'base64'));
+    // Center vertically in the 70pt band: band top=0, band bottom=70 (from top)
+    // Logo is 36×36, so top of logo = (70-36)/2 = 17 from top of band = yFromTop=17
+    page.drawImage(logoImg, { x: margin, y: pageH - 53, width: 36, height: 36 });
+  } catch (_) {
+    // Logo embed failed — continue without it
+  }
+
+  // "INVOICE" title — shifted right of the logo (x ≈ margin + 48)
+  const titleX = margin + 48;
   page.drawText('INVOICE', {
-    x: margin,
+    x: titleX,
     y: pageH - margin - 14,
     font: fontBold,
     size: 22,
@@ -134,7 +146,7 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   // Invoice number below title
   const invoiceNumLabel = `#${invoice.invoiceNumber ?? ''}`;
   page.drawText(invoiceNumLabel, {
-    x: margin,
+    x: titleX,
     y: pageH - margin - 32,
     font: fontRegular,
     size: 11,
@@ -304,37 +316,48 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   }
 
   // ── FOOTER ────────────────────────────────────────────────────────────────
-  // Pin footer 48pt from bottom of page
-  const footerY = pageH - margin - 10; // from bottom → yFromTop = pageH - footerY
+  // All footer coordinates are yFromTop = distance from TOP of page.
+  // The footer sits near the BOTTOM: pageH - 66 from top = 66pt from top = 726pt from bottom.
+  // Separator line just above the footer text
+  drawLine(margin, pageH - 66, margin + contentW, pageH - 66, lightGrey, 0.5);
 
-  // "Pay online" link in red
-  const payLabel = `Pay online: ${payUrl}`;
-  page.drawText(payLabel, {
-    x: margin,
-    y: footerY - (pageH - margin - 10 - (pageH - 48 - margin)),
-    font: fontRegular,
-    size: 8,
-    color: red,
-  });
+  // "Pay this invoice online →" in red at bottom-left (yFromTop = pageH - 50 = near bottom)
+  const linkText = 'Pay this invoice online >';
+  const linkTextSize = 9;
+  drawText(linkText, margin, pageH - 50, { font: fontRegular, size: linkTextSize, color: red });
 
-  // "Sent via RSV.Pizza"
+  // Attempt to add a clickable hyperlink annotation for the pay URL
+  try {
+    const linkW = fontRegular.widthOfTextAtSize(linkText, linkTextSize);
+    // PDF coord from bottom: baseline at y=50, so rect spans y=48 to y=60
+    const yBottom = 48;
+    const yTop = 60;
+    const annotDict = doc.context.obj({
+      Type: PDFName.of('Annot'),
+      Subtype: PDFName.of('Link'),
+      Rect: doc.context.obj([margin, yBottom, margin + linkW, yTop]),
+      Border: doc.context.obj([0, 0, 0]),
+      A: doc.context.obj({
+        Type: PDFName.of('Action'),
+        S: PDFName.of('URI'),
+        URI: PDFString.of(payUrl),
+      }),
+    });
+    const annotRef = doc.context.register(annotDict);
+    const existing = page.node.Annots();
+    if (existing) {
+      existing.push(annotRef);
+    } else {
+      page.node.set(PDFName.of('Annots'), doc.context.obj([annotRef]));
+    }
+  } catch (_) {
+    // Annotation failed — the red text link is still visible in the PDF
+  }
+
+  // "Sent via RSV.Pizza" right-aligned
   const sentLabel = 'Sent via RSV.Pizza';
   const sentW = fontRegular.widthOfTextAtSize(sentLabel, 8);
-  page.drawText(sentLabel, {
-    x: pageW - margin - sentW,
-    y: footerY - (pageH - margin - 10 - (pageH - 48 - margin)),
-    font: fontRegular,
-    size: 8,
-    color: grey,
-  });
-
-  // Bottom separator line
-  page.drawLine({
-    start: { x: margin, y: pageH - (pageH - 60 - margin) },
-    end:   { x: pageW - margin, y: pageH - (pageH - 60 - margin) },
-    thickness: 0.5,
-    color: lightGrey,
-  });
+  drawText(sentLabel, pageW - margin - sentW, pageH - 50, { font: fontRegular, size: 8, color: grey });
 
   // ── Serialize ─────────────────────────────────────────────────────────────
   const pdfBytes = await doc.save();
