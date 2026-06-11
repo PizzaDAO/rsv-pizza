@@ -77,6 +77,12 @@ type PayoutMethod = (typeof PAYOUT_METHODS)[number];
 // `paid`, `rejected`, and `failed` remain terminal from the host side.
 const WITHDRAWABLE_STATUSES = ['pending', 'approved'] as const;
 
+// tiramisu-58530: in addition to the 3 designated role photos (group/box_stack/
+// pizza), hosts must upload at least this many ADDITIONAL event photos (gallery
+// photos not carrying one of those 3 payout roles, dated after the event start)
+// before they can submit a reimbursement.
+const REQUIRED_ADDITIONAL_PHOTOS = 5;
+
 // ---------- helpers ----------
 
 /**
@@ -92,6 +98,7 @@ export async function getPayoutSubmissionReadiness(partyId: string) {
     has_box: boolean;
     has_pizza: boolean;
     has_receipt: boolean;
+    additional_count: number;
   }[]>(Prisma.sql`
     WITH pa AS (SELECT date FROM parties WHERE id = ${partyId}::uuid)
     SELECT
@@ -101,7 +108,11 @@ export async function getPayoutSubmissionReadiness(partyId: string) {
                 AND p.payout_role = 'box_stack' AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_box,
       EXISTS (SELECT 1 FROM photos p, pa WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
                 AND p.payout_role = 'pizza'     AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_pizza,
-      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = ${partyId}::uuid AND pd.kind = 'receipt') AS has_receipt
+      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = ${partyId}::uuid AND pd.kind = 'receipt') AS has_receipt,
+      (SELECT COUNT(*)::int FROM photos p, pa
+         WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
+           AND (p.payout_role IS NULL OR p.payout_role NOT IN ('group','box_stack','pizza'))
+           AND (pa.date IS NULL OR p.created_at >= pa.date)) AS additional_count
   `);
   const row = rows[0];
   return {
@@ -109,6 +120,8 @@ export async function getPayoutSubmissionReadiness(partyId: string) {
     hasBoxStackPhoto: !!row?.has_box,
     hasPizzaPhoto: !!row?.has_pizza,
     hasReceipt: !!row?.has_receipt,
+    // tiramisu-58530: count of non-role gallery photos dated after event start.
+    additionalPhotoCount: Number(row?.additional_count ?? 0),
   };
 }
 
@@ -1031,6 +1044,14 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           'Designate a pizza photo before submitting.',
           400,
           'PIZZA_PHOTO_REQUIRED',
+        );
+      }
+      // tiramisu-58530: beyond the 3 role photos, require >=5 additional event photos.
+      if (submissionReadiness.additionalPhotoCount < REQUIRED_ADDITIONAL_PHOTOS) {
+        throw new AppError(
+          `Upload at least ${REQUIRED_ADDITIONAL_PHOTOS} additional event photos before submitting.`,
+          400,
+          'ADDITIONAL_PHOTOS_REQUIRED',
         );
       }
     }
@@ -2772,6 +2793,7 @@ async function getReimbursementReadiness(partyId: string, userId: string) {
     photoReadiness.hasBoxStackPhoto &&
     photoReadiness.hasPizzaPhoto &&
     photoReadiness.hasReceipt &&
+    photoReadiness.additionalPhotoCount >= REQUIRED_ADDITIONAL_PHOTOS &&
     paymentMethodValid;
 
   return {
@@ -2780,6 +2802,8 @@ async function getReimbursementReadiness(partyId: string, userId: string) {
     hasBoxStackPhoto: photoReadiness.hasBoxStackPhoto,
     hasPizzaPhoto: photoReadiness.hasPizzaPhoto,
     hasReceipt: photoReadiness.hasReceipt,
+    // tiramisu-58530: count of non-role gallery photos dated after event start.
+    additionalPhotoCount: photoReadiness.additionalPhotoCount,
     paymentMethodValid,
     readyToSubmit,
   };

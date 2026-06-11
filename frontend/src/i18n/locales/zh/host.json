@@ -885,6 +885,8 @@
     "missingGroupPhoto": "合影",
     "missingBoxStackPhoto": "披萨盒堆叠照片",
     "missingPizzaPhoto": "披萨照片",
+    "missingAdditionalPhotos": "{{count}}/{{required}} 张额外照片",
+    "additionalPhotosProgress": "额外照片：{{count}}/{{required}} 张",
     "missingReceipt": "至少一张收据",
     "missingPaymentMethod": "付款方式",
     "submitForReview": "提交审核",

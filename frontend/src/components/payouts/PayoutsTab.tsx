@@ -56,6 +56,10 @@ interface PayoutsTabProps {
   expectedGuests?: number | null;
 }
 
+// tiramisu-58530: hosts must upload at least this many ADDITIONAL event photos
+// (gallery photos beyond the 3 designated role photos) before submitting.
+const REQUIRED_ADDITIONAL_PHOTOS = 5;
+
 /**
  * ziti-58300 Phase 3: the host Payments tab is now ONE rolling
  * "Your reimbursement" page for the signed-in co-host. There is no list / new
@@ -407,6 +411,10 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     if (!readiness.hasGroupPhoto) list.push(t('payouts.missingGroupPhoto'));
     if (!readiness.hasBoxStackPhoto) list.push(t('payouts.missingBoxStackPhoto'));
     if (!readiness.hasPizzaPhoto) list.push(t('payouts.missingPizzaPhoto'));
+    // tiramisu-58530: require >=5 additional event photos beyond the 3 roles.
+    const addl = readiness.additionalPhotoCount ?? 0;
+    if (addl < REQUIRED_ADDITIONAL_PHOTOS)
+      list.push(t('payouts.missingAdditionalPhotos', { count: addl, required: REQUIRED_ADDITIONAL_PHOTOS }));
     if (!readiness.hasReceipt) list.push(t('payouts.missingReceipt'));
     if (!readiness.paymentMethodValid) list.push(t('payouts.missingPaymentMethod'));
     return list;
@@ -437,7 +445,9 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   }
 
   const photosAllDesignated =
-    !!readiness?.hasGroupPhoto && !!readiness?.hasBoxStackPhoto && !!readiness?.hasPizzaPhoto;
+    !!readiness?.hasGroupPhoto && !!readiness?.hasBoxStackPhoto &&
+    !!readiness?.hasPizzaPhoto &&
+    (readiness?.additionalPhotoCount ?? 0) >= REQUIRED_ADDITIONAL_PHOTOS;
 
   return (
     <div className="space-y-4">
@@ -579,7 +589,11 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
             {t('payouts.eventPhotosDone')}
           </div>
         )}
-        <EventPhotosCard partyId={partyId} onRolesChange={handleRolesChange} />
+        <EventPhotosCard
+          partyId={partyId}
+          onRolesChange={handleRolesChange}
+          onPhotosChange={handleRolesChange}
+        />
       </div>
 
       {/* ===== 4. Receipts (rolling, auto-saved) ===== */}

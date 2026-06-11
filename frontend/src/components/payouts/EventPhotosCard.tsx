@@ -19,6 +19,12 @@ interface EventPhotosCardProps {
    * unlock the PaymentDetailsCard.
    */
   onRolesChange?: (allDesignated: boolean) => void;
+  /**
+   * tiramisu-58530: fires whenever the gallery reloads (e.g. an additional
+   * photo was uploaded) so the parent can refresh server readiness — which
+   * now requires >=5 additional event photos beyond the 3 role photos.
+   */
+  onPhotosChange?: () => void;
 }
 
 /**
@@ -35,6 +41,7 @@ interface EventPhotosCardProps {
 export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
   partyId,
   onRolesChange,
+  onPhotosChange,
 }) => {
   const { t } = useTranslation('host');
   const { user } = useAuth();
@@ -76,7 +83,10 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
     }
     setRoles(next);
     setGalleryPhotos(photos);
-  }, [partyId]);
+    // tiramisu-58530: tell the parent to refresh readiness whenever the gallery
+    // reloads (covers additional-photo uploads, not just role designations).
+    onPhotosChange?.();
+  }, [partyId, onPhotosChange]);
 
   useEffect(() => {
     loadPhotos();
@@ -87,6 +97,16 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
   const additionalPhotos = galleryPhotos.filter(
     p => !p.payoutRole || !PAYOUT_ROLES.includes(p.payoutRole as PayoutPhotoRole)
   );
+
+  // tiramisu-58530: the 5-additional-photo requirement only counts photos dated
+  // after the event start (party.date NULL ⇒ no cutoff), mirroring the backend
+  // gate (getPayoutSubmissionReadiness) and the RolePhotoPicker cutoff. The
+  // preview grid above still shows ALL additional photos; only this count drives
+  // the progress line so it never reads "5 of 5" while the server still blocks.
+  const cutoff = party?.date ? new Date(party.date).getTime() : null;
+  const eligibleAdditionalCount = additionalPhotos.filter(
+    p => cutoff == null || new Date(p.createdAt).getTime() >= cutoff
+  ).length;
 
   // calzone-58297: report all-designated state to the parent whenever roles
   // change so PaymentDetailsCard can unlock.
@@ -160,6 +180,14 @@ export const EventPhotosCard: React.FC<EventPhotosCardProps> = ({
 
       {/* Optional additional photos — gallery upload, no role. */}
       <div className="mt-4">
+        {/* tiramisu-58530: progress toward the 5 required additional photos. */}
+        <div
+          className={`text-xs mb-2 ${
+            eligibleAdditionalCount >= 5 ? 'text-emerald-500' : 'text-theme-text-muted'
+          }`}
+        >
+          {t('payouts.additionalPhotosProgress', { count: eligibleAdditionalCount, required: 5 })}
+        </div>
         {/* stracciatella-58504: preview of already-uploaded additional photos. */}
         {additionalPhotos.length > 0 && (
           <div className="mb-3">

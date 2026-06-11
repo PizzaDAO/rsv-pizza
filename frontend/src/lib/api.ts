@@ -6524,6 +6524,8 @@ export interface ReimbursementReadiness {
   hasPizzaPhoto: boolean;
   /** This co-host has at least one receipt on the event. */
   hasReceipt: boolean;
+  /** Count of non-role gallery photos dated after event start (tiramisu-58530). */
+  additionalPhotoCount: number;
   /** The caller's saved payment method is valid (mirrors PaymentDetailsCard). */
   paymentMethodValid: boolean;
   /** All of the above — the "Submit for review" toggle is enabled when true. */
