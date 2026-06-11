@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap, MessageSquare } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';

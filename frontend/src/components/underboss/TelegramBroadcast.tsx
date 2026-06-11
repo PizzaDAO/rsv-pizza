@@ -545,7 +545,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
           allResults.push(...r.results.map(res => ({ ...res, kind: 'group' as const })));
           totalSent += r.sent;
           totalFailed += r.failed;
-        } catch (err: any) {
+        } catch {
           totalFailed += selectedGroups.length;
         }
       }
@@ -562,7 +562,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
           blockedHostCount = r.results.filter(
             x => x.error === 'Host blocked the bot — disconnected'
           ).length;
-        } catch (err: any) {
+        } catch {
           totalFailed += selectedHostsPayload.length;
         }
       }

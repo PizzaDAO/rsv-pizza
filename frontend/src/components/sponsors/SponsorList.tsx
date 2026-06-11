@@ -52,7 +52,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, onMouUpdate, onMouDelete, onStatusChange, isLoading, avatarUrls, isPrivileged = false }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, onMouUpdate, onMouDelete, onStatusChange, avatarUrls, isPrivileged = false }: SponsorListProps) {
   const { t } = useTranslation('host');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');

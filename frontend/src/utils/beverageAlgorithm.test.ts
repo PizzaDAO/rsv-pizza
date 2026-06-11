@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateBeverageRecommendations } from './beverageAlgorithm';
-import { Guest, Beverage } from '../types';
+import { Guest } from '../types';
 import { DRINK_CATEGORIES } from '../constants/options';
 
 function makeGuest(overrides: Partial<Guest> = {}): Guest {
@@ -17,9 +17,6 @@ function makeGuest(overrides: Partial<Guest> = {}): Guest {
 }
 
 const ALL_BEVERAGE_IDS = DRINK_CATEGORIES.map(b => b.id);
-const WATER_BEVERAGE = DRINK_CATEGORIES.find(b => b.id === 'water')!;
-const SODA_BEVERAGE = DRINK_CATEGORIES.find(b => b.id === 'soda')!;
-const BEER_BEVERAGE = DRINK_CATEGORIES.find(b => b.id === 'beer')!;
 
 describe('generateBeverageRecommendations', () => {
   it('returns empty array when no beverages are selected by host', () => {

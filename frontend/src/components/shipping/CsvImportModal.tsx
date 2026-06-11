@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { splitCsvLine } from '../../lib/csvParser';
 import { detectCarrier, detectTrackingUrl } from '../../lib/trackingUtils';
 import { importShippingTracking } from '../../lib/api';

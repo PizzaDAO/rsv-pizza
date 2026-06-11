@@ -63,7 +63,7 @@ export function SuperlativesTab() {
       setStatusOverride((s) => ({ ...s, [id]: status }));
       try {
         await markSuperlative(id, status);
-      } catch (err) {
+      } catch {
         // Roll back the optimistic override on failure.
         setStatusOverride((s) => {
           const n = { ...s };

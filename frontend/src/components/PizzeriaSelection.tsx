@@ -52,7 +52,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [showAddPizzeriaModal, setShowAddPizzeriaModal] = useState(false);
-  const [savingField, setSavingField] = useState<string | null>(null);
+  const [, setSavingField] = useState<string | null>(null);
   const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // Discount info modal

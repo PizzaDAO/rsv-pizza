@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FileText, Check, Clock, ExternalLink, Copy, Send, DollarSign,
-  Loader2, X, MoreHorizontal
+  Loader2, X
 } from 'lucide-react';
 import { Sponsor, Invoice } from '../../types';
 import { markInvoicePaid, sendInvoice } from '../../lib/api';

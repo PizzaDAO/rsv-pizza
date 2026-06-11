@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { setupCommonMocks, mockPartyAPI, blockExternalScripts } from '../mocks/api-handlers';
-import { injectAuth, TEST_USER } from '../fixtures/auth.fixture';
+import { setupCommonMocks, blockExternalScripts } from '../mocks/api-handlers';
+import { injectAuth } from '../fixtures/auth.fixture';
 
 test.describe('Create Event', () => {
   test('authenticated user fills event form and submits', async ({ page }) => {

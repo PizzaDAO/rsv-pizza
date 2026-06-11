@@ -863,7 +863,7 @@ export async function getLeaderboardRank(
       `/api/parties/${partyId}/leaderboard-rank?metric=${encodeURIComponent(metric)}`,
       { method: 'GET', requireAuth: true },
     );
-  } catch (error) {
+  } catch {
     // Graceful hide — leaderboard is decorative, not load-bearing.
     return null;
   }

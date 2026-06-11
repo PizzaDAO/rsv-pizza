@@ -420,19 +420,6 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   const scale = containerWidth / config.canvasWidth;
   const aspectRatio = config.canvasHeight / config.canvasWidth;
 
-  // Render to canvas (editor resolution)
-  const renderToCanvas = async (): Promise<HTMLCanvasElement> => {
-    return renderCanvas({
-      config,
-      positions,
-      textValues: { city, dateDisplay, timeDisplay: effectiveTimeDisplay, venueName, streetAddress },
-      sponsors: sponsors.map(s => ({ id: s.id, logoUrl: s.logoUrl! })),
-      sponsorBoxSize,
-      logoSizes,
-      poppedLogos,
-    });
-  };
-
   // Render to canvas at full resolution
   const renderFullRes = async (): Promise<HTMLCanvasElement> => {
     const scaleFactor = config.fullResWidth / config.canvasWidth;

@@ -62,7 +62,7 @@ export function PhotosFeedPage() {
 
   // Feed
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -335,7 +335,7 @@ export function PhotosFeedPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
       setDownloadError('Download failed. Please try again.');
     } finally {
       setDownloading(false);

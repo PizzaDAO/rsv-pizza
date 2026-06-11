@@ -51,7 +51,6 @@ const DonationFormInner: React.FC<DonationFormInnerProps> = ({
   onSuccess,
   onBack,
   guestId,
-  clientSecret,
 }) => {
   const stripe = useStripe();
   const elements = useElements();

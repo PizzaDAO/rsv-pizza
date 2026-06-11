@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Ban, RefreshCcw, Calendar, Play, DollarSign, Wand2, MessageCircle, Send, Check } from 'lucide-react';
+import { User, Lock, Image as ImageIcon, FileText, Loader2, X, Square as SquareIcon, Ban, RefreshCcw, Calendar, Play, Wand2, MessageCircle, Send, Check } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, cancelParty, reinstateParty } from '../lib/supabase';
@@ -42,7 +42,7 @@ export const EventDetailsTab: React.FC = () => {
   const [password, setPassword] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [customUrlValid, setCustomUrlValid] = useState(true);
-  const [customUrlError, setCustomUrlError] = useState<string | undefined>();
+  const [, setCustomUrlError] = useState<string | undefined>();
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -96,9 +96,7 @@ export const EventDetailsTab: React.FC = () => {
 
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
-  const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   // porchetta-81402: cancel state (was `deleting` / `showDeleteConfirm` before
   // the destructive delete was converted to a non-destructive soft-cancel).
   const [cancelling, setCancelling] = useState(false);
@@ -135,7 +133,7 @@ export const EventDetailsTab: React.FC = () => {
       const partyTimezone = party.timezone || (() => {
         try {
           return Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch (error) {
+        } catch {
           return 'UTC';
         }
       })();
@@ -301,167 +299,6 @@ export const EventDetailsTab: React.FC = () => {
     setImagePreview(null);
     setImageError(null);
     setEventImageUrl('');
-  };
-
-  // Check if any values have changed
-  const hasChanges = () => {
-    if (!originalValues) return false;
-
-    return (
-      name !== originalValues.name ||
-      // hostName is no longer editable - it comes from the user account
-      startDate !== originalValues.startDate ||
-      startTime !== originalValues.startTime ||
-      endDate !== originalValues.endDate ||
-      endTime !== originalValues.endTime ||
-      timezone !== originalValues.timezone ||
-      address !== originalValues.address ||
-      description !== originalValues.description ||
-      password !== originalValues.password ||
-      customUrl !== originalValues.customUrl ||
-      eventImageUrl !== originalValues.eventImageUrl ||
-      maxGuests !== originalValues.maxGuests ||
-      limitGuests !== originalValues.limitGuests ||
-      hideGuests !== originalValues.hideGuests ||
-      eventImageFile !== null
-    );
-  };
-
-  // Cancel changes and revert to original values
-  const handleCancelChanges = () => {
-    if (!originalValues) return;
-
-    setName(originalValues.name);
-    // hostName is not reset - it's display-only from user account
-    setStartDate(originalValues.startDate);
-    setStartTime(originalValues.startTime);
-    setEndDate(originalValues.endDate);
-    setEndTime(originalValues.endTime);
-    setTimezone(originalValues.timezone);
-    setAddress(originalValues.address);
-    setDescription(originalValues.description);
-    setPassword(originalValues.password);
-    setCustomUrl(originalValues.customUrl);
-    setEventImageUrl(originalValues.eventImageUrl);
-    setImagePreview(originalValues.eventImageUrl || null);
-    setMaxGuests(originalValues.maxGuests);
-    setLimitGuests(originalValues.limitGuests);
-    setHideGuests(originalValues.hideGuests);
-    setEventImageFile(null);
-    setImageError(null);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!party) return;
-
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      // Upload image if file is selected
-      let imageUrl = eventImageUrl.trim() || undefined;
-      if (eventImageFile) {
-        try {
-          imageUrl = await uploadEventImage(eventImageFile);
-        } catch (err) {
-          throw new Error(err instanceof Error ? err.message : 'Failed to upload image. Please ensure the storage bucket is configured or use an image URL instead.');
-        }
-      }
-
-      // Calculate duration from start/end times
-      // Use the event's timezone when parsing the entered date/time
-      const tz = timezone || 'UTC';
-      let calculatedDuration: number | null = null;
-      let startDateTime: string | null = null;
-      if (startDate && startTime && endDate && endTime) {
-        const start = parseDateTimeInTimezone(startDate, startTime, tz);
-        const end = parseDateTimeInTimezone(endDate, endTime, tz);
-        const durationMs = end.getTime() - start.getTime();
-        calculatedDuration = durationMs / (1000 * 60 * 60); // Convert to hours
-        startDateTime = start.toISOString();
-      } else if (startDate && startTime) {
-        startDateTime = parseDateTimeInTimezone(startDate, startTime, tz).toISOString();
-      }
-
-      // Check if custom URL is valid (already validated by CustomUrlInput)
-      if (customUrl.trim() && !customUrlValid) {
-        throw new Error(customUrlError || 'Invalid custom URL');
-      }
-
-      // Update party in database
-      // Note: host_name is now derived from User.name via user_id relationship
-      const success = await updateParty(party.id, {
-        name: name.trim(),
-        date: startDateTime,
-        duration: calculatedDuration,
-        timezone: timezone || null,
-        address: address.trim() || null,
-        venue_name: venueName || null,
-        description: description.trim() || null,
-        password: password.trim() || null,
-        custom_url: customUrl.trim() || null,
-        event_image_url: imageUrl || null,
-        max_guests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
-        hide_guests: hideGuests,
-        require_approval: requireApproval,
-      });
-
-      if (success) {
-        setSaved(true);
-        setToast(true);
-        setTimeout(() => setToast(false), 2000);
-        // Update original values to match current form state
-        setOriginalValues({
-          name: name.trim(),
-          hostName: hostName.trim(),
-          startDate,
-          startTime,
-          endDate,
-          endTime,
-          timezone,
-          address: address.trim(),
-          venueName: venueName,
-          description: description.trim(),
-          password: password.trim(),
-          customUrl: customUrl.trim(),
-          eventImageUrl: imageUrl || '',
-          maxGuests,
-          limitGuests,
-          hideGuests,
-          requireApproval,
-        });
-        // burrata-72104 v2: merge the bulk-saved fields into context so
-        // sibling components see them without a refetch.
-        const bulkPatch: Partial<Party> = {
-          name: name.trim(),
-          date: startDateTime,
-          duration: calculatedDuration,
-          timezone: timezone || null,
-          address: address.trim() || null,
-          venueName: venueName || null,
-          description: description.trim() || null,
-          password: password.trim() || null,
-          customUrl: customUrl.trim() || null,
-          eventImageUrl: imageUrl || null,
-          maxGuests: limitGuests && maxGuests ? parseInt(maxGuests, 10) : null,
-          hideGuests,
-          requireApproval,
-        };
-        setParty(prev => prev ? { ...prev, ...bulkPatch } : prev);
-        // Clear the image file since it's been uploaded
-        setEventImageFile(null);
-        // Reset saved state after a moment
-        setTimeout(() => setSaved(false), 2000);
-      } else {
-        throw new Error('Failed to update party');
-      }
-    } catch (error) {
-      console.error('Error updating party:', error);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to update event details' });
-    } finally {
-      setSaving(false);
-    }
   };
 
   // porchetta-81402: soft-cancel the event. The host stays on this page (no

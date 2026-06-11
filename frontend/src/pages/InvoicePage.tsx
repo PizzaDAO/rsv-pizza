@@ -27,7 +27,7 @@ export function InvoicePage() {
         } else {
           setError('Invoice not found');
         }
-      } catch (err) {
+      } catch {
         setError('Failed to load invoice');
       } finally {
         setLoading(false);

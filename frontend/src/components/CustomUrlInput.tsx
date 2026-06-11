@@ -36,7 +36,7 @@ export function CustomUrlInput({
       setValidationError(result.valid ? null : result.error || 'Invalid URL');
       setIsValid(result.valid);
       onValidationChange?.(result.valid, result.error);
-    } catch (err) {
+    } catch {
       setValidationError('Failed to validate URL');
       setIsValid(false);
       onValidationChange?.(false, 'Failed to validate URL');

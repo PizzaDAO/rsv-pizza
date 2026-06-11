@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData, getExperimentFlag } from '../lib/supabase';
+import { addGuestToParty, getUserPreferences, saveUserPreferences, ExistingGuestData } from '../lib/supabase';
 import { getExcludedToppingIds } from '../constants/options';
 import { searchPizzerias, geocodeAddress } from '../lib/ordering';
 import { Pizzeria } from '../types';

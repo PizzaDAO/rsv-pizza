@@ -1,7 +1,6 @@
 import { Page } from '@playwright/test';
 import { TestPublicEvent, TestRSVPResponse, TestGuest } from '../fixtures/test-data';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:3006';
 
 /**
  * Mock the GET /api/events/:slug endpoint to return a specific event.

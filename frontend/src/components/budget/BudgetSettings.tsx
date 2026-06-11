@@ -10,7 +10,6 @@ interface BudgetSettingsProps {
 }
 
 export const BudgetSettings: React.FC<BudgetSettingsProps> = ({
-  budgetEnabled,
   budgetTotal,
   onUpdate,
 }) => {

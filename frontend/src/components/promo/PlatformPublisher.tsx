@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, ExternalLink, Check, MessageSquare, Link, Tag, X, Plus, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
-import { Party } from '../../types';
 import { usePizza } from '../../contexts/PizzaContext';
 import { updateParty } from '../../lib/supabase';
 import {

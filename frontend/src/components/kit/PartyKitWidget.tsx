@@ -65,7 +65,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
       if (success) {
         setKit(null);
       }
-    } catch (err) {
+    } catch {
       setError(t('kit.failedToCancel'));
     } finally {
       setCanceling(false);

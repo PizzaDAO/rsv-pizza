@@ -14,26 +14,6 @@ const mockPlaceDetails = {
   place_id: 'ChIJmwpQ1HBZwokR9w',
 };
 
-// Mock predictions from autocomplete
-const mockPredictions = [
-  {
-    description: "Joe's Pizza, Carmine St, New York, NY, USA",
-    place_id: 'ChIJmwpQ1HBZwokR9w',
-    structured_formatting: {
-      main_text: "Joe's Pizza",
-      secondary_text: 'Carmine St, New York, NY, USA',
-    },
-  },
-  {
-    description: "Joe's Pizza, Broadway, New York, NY, USA",
-    place_id: 'ChIJd8BlQ2BZwokRjM',
-    structured_formatting: {
-      main_text: "Joe's Pizza",
-      secondary_text: 'Broadway, New York, NY, USA',
-    },
-  },
-];
-
 // Will be assigned by our mock Autocomplete constructor
 let placesChangedCallback: (() => void) | null = null;
 let mockGetPlace: ReturnType<typeof vi.fn>;

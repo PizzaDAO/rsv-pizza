@@ -20,7 +20,6 @@ import { PlatformIcon, detectPlatform } from '../components/report/platformIcon'
 import { cdnUrl } from '../lib/supabase';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../lib/gppPhotos';
 import { fetchSheetCities } from '../lib/cities';
-import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 import { PartnerTimeSeriesChart } from '../components/partner/PartnerTimeSeriesChart';
@@ -264,7 +263,7 @@ export function PartnerDashboardPage() {
         // For admins, extract unique tags from events to build a tag picker
         if (me.isAdmin && !selectedTag) {
           const tags = new Set<string>();
-          data.events.forEach(e => {
+          data.events.forEach(() => {
             // eventTags are on the event but not in the response — use the dashboard tag
             if (data.tag) tags.add(data.tag);
           });
@@ -989,7 +988,7 @@ interface EventCardProps {
   isAdmin?: boolean;
 }
 
-function EventCard({ event, onToggleChecklist, cityChats, isAdmin = false }: EventCardProps) {
+function EventCard({ event, cityChats, isAdmin = false }: EventCardProps) {
   const { t } = useTranslation('partner');
   // Filter co-hosts to show only visible ones
   const visibleCoHosts = event.coHosts.filter((h: CoHost) => h.showOnEvent !== false);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
@@ -6,8 +6,6 @@ import { Layout } from '../components/Layout';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, type Attestation } from '../lib/api';
-import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
-import { GPPClouds } from '../components/GPPClouds';
 
 // provolone-39042: friendly display name for an attestation row.
 const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
@@ -214,7 +212,7 @@ export function CheckInPage() {
       const result = await claimDiscount(inviteCode!, guestId!);
       setDiscountData(result);
       setState('discount-claimed');
-    } catch (err) {
+    } catch {
       setState('error');
       setErrorMessage(t('postCheckIn.failedToClaim'));
     }

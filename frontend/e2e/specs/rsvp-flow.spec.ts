@@ -3,7 +3,6 @@ import {
   mockEventAPI,
   mockRSVPSubmission,
   setupCommonMocks,
-  mockUserPreferences,
 } from '../mocks/api-handlers';
 import {
   makePublicEvent,

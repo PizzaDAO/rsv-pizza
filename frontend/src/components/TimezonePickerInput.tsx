@@ -34,7 +34,7 @@ const ALL_TIMEZONES = (() => {
       'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
       'Asia/Tokyo', 'Australia/Sydney'
     ];
-  } catch (e) {
+  } catch {
     // Fallback list if supportedValuesOf throws an error
     return [
       'America/Anchorage', 'America/Los_Angeles', 'America/Phoenix', 'America/Denver',
