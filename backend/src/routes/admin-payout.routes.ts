@@ -7015,61 +7015,59 @@ router.post(
 async function sendCityGroupReminder(
   partyName: string,
   text: string,
+  // suppli-58533: optional parse_mode so the per-type reminder copy can embed an
+  // inline <a> "DM them to me" link in the GROUP message. Default plain.
+  parseMode?: string,
 ): Promise<{ groupSent: boolean; groupReason?: string }> {
   const cityKey = cityKeyFromPartyName(partyName) ?? partyName.toLowerCase().trim();
   if (!cityKey) {
     return { groupSent: false, groupReason: 'no city TG group set' };
   }
-  const result = await sendToCityGroup(cityKey, text);
+  const result = await sendToCityGroup(cityKey, text, parseMode);
   return result.ok
     ? { groupSent: true }
     : { groupSent: false, groupReason: result.reason };
 }
 
-// suppli-58533: host DM submissions to Molto Benny.
+// suppli-58533: per-type reminder copy with an inline "DM them to me" link.
 //
-// A host can now REPLY to the bot (photo or a headcount number) and we add it
-// to their event. Append a no-login CTA to both the host-DM and city-group
-// reminder bodies — but with DIFFERENT wording. In the DM, the host can "just
-// reply here" (moltobene processes private-chat replies). In the GROUP, an
-// in-group reply is NOT processed (moltobene only forwards private-chat DMs),
-// so the group copy must point at the tap-to-DM deeplink instead of implying an
-// in-group reply. For the GROUP message we also append a deeplink the host can
-// tap to open a DM with the bot (?start=submit_<token>) — moltobene routes that
-// payload back to the host-inbound flow.
-const HOST_INBOUND_CTA_DM =
-  "📸 No need to log in — just reply here with your receipt photo, an event photo, or type your headcount and I'll add it for you.";
-const HOST_INBOUND_CTA_GROUP =
-  "📸 No login needed — tap below to DM me your receipt photo, an event photo, or your headcount and I'll add it for you:";
-
+// A host can REPLY to the bot (photo / headcount / wallet) and we add it to
+// their event. Each reminder type now has CUSTOM copy. The GROUP variant turns
+// the action words ("DM them to me" / "DM me the number" / "DM it to me") into
+// an inline HTML hyperlink to the tap-to-DM deeplink
+// (https://t.me/<bot>?start=submit_<token>) — moltobene routes that payload back
+// to the host-inbound flow. The DM variant says "just reply here" instead (an
+// in-group reply is NOT processed by moltobene, but a private-chat reply is).
+//
 // nanoid(10) mint mirrors host-telegram.routes.ts:25-67 (same URL-safe alphabet
-// + length). Used to lazily mint a host_telegram_link_token when one is absent
-// so the group deeplink always resolves.
+// + length): lazily mints a host_telegram_link_token when one is absent so the
+// group deeplink always resolves.
 const generateHostTelegramToken = customAlphabet(
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
   10,
 );
 
-/**
- * suppli-58533: append the no-login CTA to a host-DM reminder body.
- */
-function withHostInboundCta(text: string): string {
-  return `${text}\n\n${HOST_INBOUND_CTA_DM}`;
+type ReminderType = 'photos' | 'receipts' | 'attendance' | 'wallet';
+
+/** Minimal HTML escaper for interpolated values in parse_mode:'HTML' bodies. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /**
- * suppli-58533: build the GROUP reminder body: base text + CTA + a tap-to-DM
- * deeplink. Mints the party's host_telegram_link_token if it's missing (mirrors
- * the host-telegram.routes.ts mint). Returns the group text; the deeplink is
- * omitted when TELEGRAM_BOT_USERNAME is unset (no usable link to offer).
+ * suppli-58533: mint (if absent) + return the tap-to-DM deeplink for a party.
+ * Returns null when TELEGRAM_BOT_USERNAME is unset OR the mint write fails — the
+ * caller then falls back to the DM (no-link) copy for the group too.
  */
-async function buildGroupReminderText(party: {
+async function resolveSubmitDeeplink(party: {
   id: string;
   hostTelegramLinkToken: string | null;
-}, baseText: string): Promise<string> {
-  let body = `${baseText}\n\n${HOST_INBOUND_CTA_GROUP}`;
+}): Promise<string | null> {
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
-  if (!botUsername) return body;
+  if (!botUsername) return null;
 
   let token = party.hostTelegramLinkToken;
   if (!token) {
@@ -7082,11 +7080,55 @@ async function buildGroupReminderText(party: {
     } catch (err) {
       // Non-fatal — if the mint write fails we just skip the deeplink.
       console.warn('[suppli-58533] failed to mint host_telegram_link_token:', err);
-      return body;
+      return null;
     }
   }
-  body += `\n👉 https://t.me/${botUsername}?start=submit_${token}`;
-  return body;
+  return `https://t.me/${botUsername}?start=submit_${token}`;
+}
+
+/**
+ * suppli-58533: build the per-type GROUP (HTML, inline link) and DM (plain,
+ * "just reply here") reminder bodies. `slug` is HTML-escaped for the group copy.
+ * When no deeplink is available the group body falls back to the DM (plain)
+ * copy; in that case the caller should send it WITHOUT parse_mode:'HTML'.
+ */
+function buildReminderCopy(
+  type: ReminderType,
+  slug: string,
+  deeplink: string | null,
+): { groupText: string; groupHtml: boolean; dmText: string } {
+  const s = escapeHtml(slug);
+  const link = (label: string) =>
+    deeplink ? `<a href="${escapeHtml(deeplink)}">${label}</a>` : label;
+
+  let groupText: string;
+  let dmText: string;
+  switch (type) {
+    case 'photos':
+      groupText = `Make sure you've uploaded your event photos! ${link('DM them to me')} or upload them to rsv.pizza/${s}`;
+      dmText = `Make sure you've uploaded your event photos! Just reply here with them or upload them to rsv.pizza/${slug}`;
+      break;
+    case 'receipts':
+      groupText = `Make sure you've uploaded your receipts! ${link('DM them to me')} or upload them to rsv.pizza/${s}`;
+      dmText = `Make sure you've uploaded your receipts! Just reply here with them or upload them to rsv.pizza/${slug}`;
+      break;
+    case 'attendance':
+      groupText = `How many people came to your event? ${link('DM me the number')} or enter it at rsv.pizza/${s}`;
+      dmText = `How many people came to your event? Just reply here with the number or enter it at rsv.pizza/${slug}`;
+      break;
+    case 'wallet':
+      groupText = `We need your payout wallet to reimburse you! ${link('DM it to me')} or add it at rsv.pizza/host/${s}/payments`;
+      dmText = `We need your payout wallet to reimburse you! Just reply here with it or add it at rsv.pizza/host/${slug}/payments`;
+      break;
+  }
+
+  // When there's no deeplink the group copy has no <a> tag, so send it plain.
+  const groupHtml = deeplink != null;
+  return {
+    groupText: deeplink ? groupText : dmText,
+    groupHtml,
+    dmText,
+  };
 }
 
 router.post(
@@ -7116,7 +7158,10 @@ router.post(
       // Prefer custom_url for the public link; fall back to invite_code so
       // the URL always resolves even on parties without a custom slug.
       const slug = party.customUrl || party.inviteCode;
-      const text = `Make sure you've uploaded your receipts to rsv.pizza/${slug}`;
+      // suppli-58533: per-type copy. GROUP gets an inline HTML "DM them to me"
+      // link; DM says "just reply here".
+      const deeplink = await resolveSubmitDeeplink(party);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('receipts', slug, deeplink);
 
       // Host DM — only when the party has a linked Telegram chat id.
       let hostDmSent = false;
@@ -7124,8 +7169,7 @@ router.post(
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          // suppli-58533: append the no-login reply CTA to the host DM.
-          withHostInboundCta(text),
+          dmText,
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7140,9 +7184,12 @@ router.post(
       // chat_id from `city_telegram_groups` via `sendToCityGroup` (which also
       // persists supergroup migrations). FIX #4: falls back to the raw party
       // name as cityKey so non-GPP-named parties aren't silently skipped.
-      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
-      const groupText = await buildGroupReminderText(party, text);
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
+      // suppli-58533: HTML group body when a deeplink is available.
+      const { groupSent, groupReason } = await sendCityGroupReminder(
+        party.name,
+        groupText,
+        groupHtml ? 'HTML' : undefined,
+      );
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7206,15 +7253,16 @@ router.post(
       }
 
       const slug = party.customUrl || party.inviteCode;
-      const text = `Please submit your payout wallet address so we can reimburse you: rsv.pizza/host/${slug}/payments`;
+      // suppli-58533: per-type copy (wallet).
+      const deeplink = await resolveSubmitDeeplink(party);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('wallet', slug, deeplink);
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          // suppli-58533: append the no-login reply CTA to the host DM.
-          withHostInboundCta(text),
+          dmText,
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7229,9 +7277,12 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
-      const groupText = await buildGroupReminderText(party, text);
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
+      // suppli-58533: HTML group body when a deeplink is available.
+      const { groupSent, groupReason } = await sendCityGroupReminder(
+        party.name,
+        groupText,
+        groupHtml ? 'HTML' : undefined,
+      );
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7292,15 +7343,16 @@ router.post(
       }
 
       const slug = party.customUrl || party.inviteCode;
-      const text = `Make sure you've uploaded your event photos to rsv.pizza/${slug}`;
+      // suppli-58533: per-type copy (photos).
+      const deeplink = await resolveSubmitDeeplink(party);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('photos', slug, deeplink);
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          // suppli-58533: append the no-login reply CTA to the host DM.
-          withHostInboundCta(text),
+          dmText,
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7315,9 +7367,12 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
-      const groupText = await buildGroupReminderText(party, text);
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
+      // suppli-58533: HTML group body when a deeplink is available.
+      const { groupSent, groupReason } = await sendCityGroupReminder(
+        party.name,
+        groupText,
+        groupHtml ? 'HTML' : undefined,
+      );
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
@@ -7378,15 +7433,16 @@ router.post(
       }
 
       const slug = party.customUrl || party.inviteCode;
-      const text = `Please submit your event's estimated attendance at rsv.pizza/${slug}`;
+      // suppli-58533: per-type copy (attendance).
+      const deeplink = await resolveSubmitDeeplink(party);
+      const { groupText, groupHtml, dmText } = buildReminderCopy('attendance', slug, deeplink);
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
       if (party.hostTelegramChatId) {
         const result = await sendTelegramMessage(
           party.hostTelegramChatId.toString(),
-          // suppli-58533: append the no-login reply CTA to the host DM.
-          withHostInboundCta(text),
+          dmText,
         );
         if (result.ok) {
           hostDmSent = true;
@@ -7401,9 +7457,12 @@ router.post(
       // `city_telegram_groups` via `sendToCityGroup` (adds the migration
       // retry+persist this endpoint previously lacked). FIX #4: shared helper
       // with the raw-party-name cityKey fallback so non-GPP names aren't skipped.
-      // suppli-58533: group body = base text + no-login CTA + tap-to-DM deeplink.
-      const groupText = await buildGroupReminderText(party, text);
-      const { groupSent, groupReason } = await sendCityGroupReminder(party.name, groupText);
+      // suppli-58533: HTML group body when a deeplink is available.
+      const { groupSent, groupReason } = await sendCityGroupReminder(
+        party.name,
+        groupText,
+        groupHtml ? 'HTML' : undefined,
+      );
 
       // Record when the reminder was sent (if at least one message succeeded).
       if (hostDmSent || groupSent) {
