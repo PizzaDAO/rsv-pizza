@@ -210,7 +210,7 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
     // Annotation unavailable — button is still visible
   }
 
-  y += Math.max(logoH, btnH) + 18;
+  y += Math.max(logoH, btnH) + 30;
 
   // ── 3. TWO-COLUMN INFO ROW ───────────────────────────────────────────────────
   // LEFT col: issuer address + crypto
@@ -388,7 +388,7 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const thanksText = 'Thanks for helping us pizza the planet!';
   const thanksSz   = 9;
   const thanksW    = fontBold.widthOfTextAtSize(thanksText, thanksSz);
-  const footerTextY = pageH - 55; // 55pt from bottom
+  const footerTextY = 52; // 52pt from bottom (native pdf-lib y is from bottom)
   page.drawText(thanksText, {
     x: (pageW - thanksW) / 2,
     y: footerTextY,
