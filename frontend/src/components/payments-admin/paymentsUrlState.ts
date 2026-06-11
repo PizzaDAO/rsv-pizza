@@ -36,8 +36,9 @@ const DEFAULTS = {
   hideUsCities: true,
   // tigella-58512: default-FALSE — only emitted (as `tbd=1`) when turned ON.
   showTbdUnsubmitted: false,
-  // farinata-58532: default-FALSE — only emitted (as `receipts=1`) when turned ON.
-  hasReceipts: false,
+  // farinata-58532 + crostata-58532: default-TRUE — only emitted (as
+  // `receipts=0`) when the admin turns the filter OFF.
+  hasReceipts: true,
 };
 const DEFAULT_VIEW: ViewMode = 'by-city';
 
@@ -101,8 +102,8 @@ export function filtersToSearchParams(
   // tigella-58512: default-FALSE toggle — only emit when turned ON.
   if (filters.showTbdUnsubmitted === true) params.set('tbd', '1');
 
-  // farinata-58532: default-FALSE toggle — only emit when turned ON.
-  if (filters.hasReceipts === true) params.set('receipts', '1');
+  // farinata-58532 + crostata-58532: default-TRUE toggle — only emit when OFF.
+  if (filters.hasReceipts === false) params.set('receipts', '0');
 
   if (viewMode !== DEFAULT_VIEW) params.set('view', viewMode);
 
@@ -216,9 +217,9 @@ export function searchParamsToFilters(
   // leave the default (false). Any non-`1` value is treated as false.
   if (params.has('tbd')) filters.showTbdUnsubmitted = params.get('tbd') === '1';
 
-  // farinata-58532: default-FALSE toggle — present `receipts=1` => true; absent
-  // => leave the default (false). Any non-`1` value is treated as false.
-  if (params.has('receipts')) filters.hasReceipts = params.get('receipts') === '1';
+  // farinata-58532 + crostata-58532: default-TRUE toggle — present `receipts=0`
+  // => false; absent => leave the default (true). Any non-`0` value => true.
+  if (params.has('receipts')) filters.hasReceipts = params.get('receipts') !== '0';
 
   const viewRaw = params.get('view');
   const viewMode: ViewMode | null =
