@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { generateInvoicePdf } from '../lib/invoicePdf.js';
 
 /**
  * Compute the calendar year for the given date in the specified timezone.
@@ -493,6 +494,17 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
       // Add CC recipients
       if (invoice.ccEmails && invoice.ccEmails.length > 0) {
         emailPayload.cc = invoice.ccEmails;
+      }
+
+      // Attach generated PDF — never let a PDF error block the email send
+      try {
+        const pdfBuffer = await generateInvoicePdf(invoice);
+        emailPayload.attachments = [{
+          filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+          content: pdfBuffer.toString('base64'),
+        }];
+      } catch (err) {
+        console.error('[invoice] PDF generation failed, sending without attachment:', err);
       }
 
       const response = await fetch('https://api.resend.com/emails', {
