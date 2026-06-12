@@ -4,7 +4,11 @@ export class AppError extends Error {
   constructor(
     public message: string,
     public statusCode: number = 500,
-    public code?: string
+    public code?: string,
+    // caciocavallo-58535: optional structured payload merged into the error
+    // body (e.g. RECIPIENT_REQUIRED ships the candidate host list so the
+    // frontend can render the recipient picker without a second round-trip).
+    public data?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';
@@ -28,6 +32,9 @@ export const errorHandler = (
       error: {
         message: err.message,
         code: err.code,
+        // caciocavallo-58535: surface any structured payload (e.g. candidate
+        // host list for RECIPIENT_REQUIRED) alongside the message/code.
+        ...(err.data ?? {}),
       },
     });
   }
