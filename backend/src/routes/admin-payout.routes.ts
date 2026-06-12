@@ -53,6 +53,11 @@ import {
 } from '../middleware/regionalUnderboss.js';
 import { scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 import { withPaidTag, withoutPaidTag } from '../lib/eventTags.js';
+// paccheri-58541: refund-tag recompute (wired into every payment-record +
+// receipt-change path). Note the intentional runtime-only circular import:
+// refundTag.ts imports `fetchPaidTotalsByParty` from THIS module; both are
+// referenced only at call time so the ESM cycle resolves cleanly.
+import { recomputeRefundTags, REFUND_CAP_USD } from '../services/refundTag.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 // suppli-58533: sendTelegramMessage moved to a shared service so the host-inbound
 // handler can reuse the exact same send path (withBennySignature + preview off).
@@ -157,6 +162,22 @@ const PAID_HAS_PROOF_WHERE: Prisma.PayoutWhereInput = {
     { externalProofUrl: { not: null, notIn: [''] } },
   ],
 };
+
+/**
+ * paccheri-58541: fire-and-forget refund-tag recompute after a mutation that
+ * changes a party's paid total or receipt total. ALWAYS awaited AFTER the
+ * surrounding $transaction commits, and wrapped so a tag-recompute failure can
+ * never 500 the underlying action. Pass the affected partyId(s).
+ */
+async function safeRecomputeRefundTags(partyIds: Array<string | null | undefined>): Promise<void> {
+  try {
+    const ids = partyIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (ids.length === 0) return;
+    await recomputeRefundTags(prisma, ids);
+  } catch (err) {
+    console.error('[paccheri-58541] recomputeRefundTags failed', err);
+  }
+}
 
 /**
  * JS-side proof check (mirror of PAID_HAS_PROOF_WHERE) for use after rows are
@@ -454,7 +475,7 @@ function escapeCSV(value: string): string {
  * no paid payouts are simply absent from the map — callers should default to
  * `{ paidUsd: 0, paidCount: 0 }` for those.
  */
-async function fetchPaidTotalsByParty(
+export async function fetchPaidTotalsByParty(
   partyIds: string[],
 ): Promise<Map<string, { paidUsd: number; paidCount: number }>> {
   if (partyIds.length === 0) return new Map();
@@ -1667,6 +1688,73 @@ router.get(
 //     Mirrors the bismarck-92103 prepay admin override. When override is used,
 //     the audit row's `note` records "Recipient overridden to {email}".
 // ============================================
+// paccheri-58541: one-time backfill — recompute the 'refund' event_tag across
+// ALL open cities that have ≥1 non-excluded receipt. Run ONCE after the backend
+// deploys this code. Admin-guarded (same guard as the other mutation POSTs) and
+// declared among the literal POST routes (NOT after GET /:id) so the path isn't
+// shadowed. Pages in batches; returns { scanned, tagged, untagged }.
+router.post(
+  '/recompute-refund-tags',
+  requireAuth,
+  requireAnyAdminOrPaymentAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const BATCH = 200;
+      let scanned = 0;
+      let tagged = 0;
+      let untagged = 0;
+      let cursor: string | undefined;
+      // Iterate over all OPEN cities with ≥1 non-excluded receipt. Cursor by id.
+      for (;;) {
+        const parties = await prisma.party.findMany({
+          where: {
+            paymentsClosedAt: null,
+            payoutDocuments: {
+              some: { kind: 'receipt', isDuplicate: false, ineligible: false },
+            },
+          },
+          select: { id: true, eventTags: true },
+          orderBy: { id: 'asc' },
+          take: BATCH,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
+        if (parties.length === 0) break;
+
+        const ids = parties.map((p) => p.id);
+        // Snapshot tag membership BEFORE the recompute to report tagged/untagged.
+        const hadTagById = new Map<string, boolean>();
+        for (const p of parties) {
+          hadTagById.set(
+            p.id,
+            Array.isArray(p.eventTags) && p.eventTags.includes('refund'),
+          );
+        }
+
+        await recomputeRefundTags(prisma, ids);
+
+        const after = await prisma.party.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, eventTags: true },
+        });
+        for (const p of after) {
+          const has = Array.isArray(p.eventTags) && p.eventTags.includes('refund');
+          const had = hadTagById.get(p.id) === true;
+          scanned += 1;
+          if (has && !had) tagged += 1;
+          else if (!has && had) untagged += 1;
+        }
+
+        cursor = parties[parties.length - 1].id;
+        if (parties.length < BATCH) break;
+      }
+
+      res.json({ scanned, tagged, untagged });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 router.post(
   '/external',
   requireAuth,
@@ -1915,6 +2003,9 @@ router.post(
           audits: { orderBy: { createdAt: 'desc' } },
         },
       });
+
+      // paccheri-58541: external payment changed this party's paid total.
+      await safeRecomputeRefundTags([partyId]);
 
       res.status(201).json({ payout: serializePayout(full || created) });
     } catch (error) {
@@ -2819,7 +2910,10 @@ router.get(
         byMethod[methodKey] = (byMethod[methodKey] || 0) + 1;
         const usd = Number(r.finalAmountUsd);
         if (r.status === 'pending') {
-          totalUsdPending += usd;
+          // paccheri-58541: totalUsdPending NO LONGER sums pending payout-row
+          // amounts. It is recomputed below as Σ max(0, min(625, receiptTotal)
+          // − paid) over OPEN cities with receipts (see below). awaitingReview
+          // (the count of pending rows) is UNCHANGED and still tallied here.
           awaitingReview += 1;
         } else if (r.status === 'paid') {
           // prosciutto-92106: only proven-paid rows (have transaction_hash /
@@ -2902,6 +2996,97 @@ router.get(
           closedPaidSum += partyTotals.get(pid)?.totalPaidUsd ?? 0;
         }
         avgUsd = closedPaidSum / closedPartyIds.size;
+      }
+
+      // paccheri-58541: REDEFINED "Pending" tile. It NO LONGER sums
+      // status='pending' payout-row amounts. New meaning = total reimbursement
+      // money STILL OWED to hosts, across OPEN cities that have submitted at
+      // least one receipt:
+      //
+      //   totalUsdPending = Σ over qualifying events E of
+      //                       max(0, min(625, receiptTotal(E)) − paid(E))
+      //
+      // - qualifying E = Party with paymentsClosedAt IS NULL AND ≥1 submitted
+      //   receipt (payout_documents kind='receipt', NOT is_duplicate, NOT
+      //   ineligible).
+      // - receiptTotal(E) = Σ ocr_amount over those receipt docs (NULL → 0).
+      // - cap = literal 625 (NOT computeEffectiveCapUsd).
+      // - paid(E) = proof-backed status='paid' only (fetchPaidTotalsByParty;
+      //   'completed' rows are intentionally excluded so mark_pending_complete
+      //   close-outs don't double-count).
+      // - per-event floor at $0 (an event never contributes negative).
+      //
+      // SCOPE: "all open cities with receipts" includes events with ZERO payout
+      // rows, so this CANNOT be derived from `allFiltered`. We run a party-level
+      // query scoped ONLY by the party-level portion of the active filter
+      // (where.party + the search partyId set) — payout-level filters
+      // (status/method/currency/date) are intentionally excluded. Extraction
+      // mirrors the showTbdUnsubmitted block above field-for-field.
+      // (`totalUsdPending` is declared with the other totals above and was left
+      // at 0 by the loop — the pending branch no longer adds to it.)
+      {
+        const pendingPartyScope: any = { ...(where.party ?? {}) };
+        const pendingAndParts: any[] = [
+          { paymentsClosedAt: null },
+          // ≥1 non-excluded receipt doc.
+          {
+            payoutDocuments: {
+              some: { kind: 'receipt', isDuplicate: false, ineligible: false },
+            },
+          },
+        ];
+        if (Array.isArray(where.OR)) {
+          const searchPartyIds = where.OR
+            .map((o: any) => o?.partyId?.in)
+            .find((v: any) => Array.isArray(v));
+          if (Array.isArray(searchPartyIds)) {
+            pendingAndParts.push({ id: { in: searchPartyIds } });
+          }
+        }
+        if (typeof where.partyId === 'string' && where.partyId.length > 0) {
+          pendingAndParts.push({ id: where.partyId });
+        }
+        pendingPartyScope.AND = [
+          ...(Array.isArray(pendingPartyScope.AND) ? pendingPartyScope.AND : []),
+          ...pendingAndParts,
+        ];
+
+        const pendingParties = await prisma.party.findMany({
+          where: pendingPartyScope,
+          select: { id: true },
+        });
+        const pendingPartyIds = pendingParties.map((p) => p.id);
+
+        if (pendingPartyIds.length > 0) {
+          // receiptTotal per party (non-excluded receipt docs; NULL ocr → 0).
+          const receiptAgg = await prisma.payoutDocument.groupBy({
+            by: ['partyId'],
+            where: {
+              partyId: { in: pendingPartyIds },
+              kind: 'receipt',
+              isDuplicate: false,
+              ineligible: false,
+            },
+            _sum: { ocrAmount: true },
+          });
+          const receiptByParty = new Map<string, number>();
+          for (const r of receiptAgg) {
+            receiptByParty.set(
+              r.partyId,
+              r._sum.ocrAmount ? Number(r._sum.ocrAmount.toString()) : 0,
+            );
+          }
+          // proof-backed paid per party (shared helper).
+          const pendingPaidTotals = await fetchPaidTotalsByParty(pendingPartyIds);
+          for (const pid of pendingPartyIds) {
+            const receiptTotal = receiptByParty.get(pid) ?? 0;
+            const paid = pendingPaidTotals.get(pid)?.paidUsd ?? 0;
+            totalUsdPending += Math.max(
+              0,
+              Math.min(REFUND_CAP_USD, receiptTotal) - paid,
+            );
+          }
+        }
       }
 
       // taleggio-49183: the parmigiana-58291 top-level `byParty` aggregate
@@ -4362,6 +4547,9 @@ router.post(
         return row;
       });
 
+      // paccheri-58541: mark-paid changed this party's paid total.
+      await safeRecomputeRefundTags([existing.partyId]);
+
       res.json({ payout: serializePayout(updated) });
     } catch (error) {
       next(error);
@@ -4402,7 +4590,8 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        // paccheri-58541: include partyId so we can recompute the refund tag.
+        select: { id: true, status: true, hostUserId: true, partyId: true },
       });
 
       if (!existing) {
@@ -4457,6 +4646,9 @@ router.post(
 
         return row;
       });
+
+      // paccheri-58541: revert-paid changed this party's paid total.
+      await safeRecomputeRefundTags([existing.partyId]);
 
       res.json({ payout: serializePayout(updated) });
     } catch (error) {
@@ -5125,7 +5317,8 @@ router.post(
       const actor = await loadActor(req);
       const existing = await prisma.payout.findUnique({
         where: { id: req.params.id },
-        select: { id: true, status: true, hostUserId: true },
+        // paccheri-58541: include partyId so we can recompute the refund tag.
+        select: { id: true, status: true, hostUserId: true, partyId: true },
       });
       if (!existing) {
         throw new AppError('Payout not found', 404, 'NOT_FOUND');
@@ -5151,6 +5344,10 @@ router.post(
         // itself (requireAnyAdminOrPaymentAdmin above).
         allowOverPartyCap: !!(req.body && req.body.allowOverPartyCap),
       });
+
+      // paccheri-58541: execution (success → paid) changed this party's paid
+      // total. Safe even on a failed send — recompute is idempotent.
+      await safeRecomputeRefundTags([existing.partyId]);
 
       res.json({ payout: serializePayout(updated) });
     } catch (error) {
@@ -5383,6 +5580,9 @@ router.post(
         }
       }
 
+      // paccheri-58541: the batch changed paid totals for every touched party.
+      await safeRecomputeRefundTags(eligible.map((r) => r.partyId));
+
       // bottarga-58513: include the skipped (no-receipt) ids so the UI can tell
       // the admin which rows were not sent and need a receipt / individual send.
       res.json({ results, skippedNoReceipt });
@@ -5460,6 +5660,9 @@ router.patch(
           id: true,
           kind: true,
           payoutId: true,
+          // paccheri-58541: partyId so we can recompute the refund tag after a
+          // receipt ocr-amount edit or duplicate/ineligible toggle.
+          partyId: true,
           ocrAmount: true,
           ocrCurrency: true,
           // mortadella-92103: pull the existing original-amount + raw OCR
@@ -6053,6 +6256,10 @@ router.patch(
 
         return row;
       });
+
+      // paccheri-58541: an ocr-amount edit or duplicate/ineligible toggle on a
+      // receipt changes the party's receipt total → recompute the refund tag.
+      await safeRecomputeRefundTags([doc.partyId]);
 
       res.json({
         document: {
@@ -6925,6 +7132,10 @@ router.post(
 
         return row;
       });
+
+      // paccheri-58541: admin added a document — if it's a receipt the party's
+      // receipt total changed → recompute the refund tag (no-op for photos).
+      await safeRecomputeRefundTags([partyId]);
 
       res.json({
         document: {
@@ -8017,6 +8228,8 @@ partyMarkPaidRouter.post(
             },
             select: { id: true, name: true, paymentsClosedAt: true },
           });
+          // paccheri-58541: city just closed → drop the refund tag.
+          await safeRecomputeRefundTags([partyId]);
           res.json({
             count: 0,
             party: {
@@ -8256,6 +8469,11 @@ partyMarkPaidRouter.post(
         select: { id: true, name: true, paymentsClosedAt: true },
       });
 
+      // paccheri-58541: paid totals changed (and the city may have just
+      // closed) → recompute the refund tag. If the city closed, the tag is
+      // dropped; otherwise it reflects the new paid-vs-receipts math.
+      await safeRecomputeRefundTags([partyId]);
+
       res.json({
         count: updatedIds.length,
         mode: resolvedMode,
@@ -8368,6 +8586,10 @@ partyMarkPaidRouter.post(
           },
         });
       });
+
+      // paccheri-58541: city reopened → re-add the refund tag if it's still
+      // overpaid (recomputeRefundTags keys on the now-null paymentsClosedAt).
+      await safeRecomputeRefundTags([partyId]);
 
       res.json({
         party: { id: party.id, name: party.name, paymentsClosedAt: null },

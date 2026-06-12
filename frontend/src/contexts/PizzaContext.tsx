@@ -6,6 +6,7 @@ import { generateWaveRecommendations } from '../utils/waveAlgorithm';
 import { TOPPINGS, DRINK_CATEGORIES, DIETARY_OPTIONS, PIZZA_STYLES, PIZZA_SIZES } from '../constants/options';
 import * as db from '../lib/supabase';
 import { computeEffectiveCapUsd } from '../lib/reimbursementCap';
+import { REFUND_TAG } from '../lib/eventTags';
 
 interface PizzaContextType {
   // Party management
@@ -159,7 +160,11 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     rollupImageUrl: dbParty.rollup_image_url || null,
     rollupGeneratedAt: dbParty.rollup_generated_at || null,
     eventType: dbParty.event_type || null,
-    eventTags: dbParty.event_tags || [],
+    // paccheri-58541: strip the internal 'refund' tag from the host-facing
+    // party. Other internal tags ('go', numeric caps) are deliberately KEPT —
+    // HostPage's cap-gating + reimbursementCap math rely on them. The raw
+    // dbParty.event_tags is still used directly for the cap computation below.
+    eventTags: (dbParty.event_tags || []).filter((t) => t !== REFUND_TAG),
     canEdit: dbParty.can_edit || false,
     allowedTabs: dbParty.allowed_tabs,
     hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],
