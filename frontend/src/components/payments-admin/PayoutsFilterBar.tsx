@@ -371,7 +371,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               {regionsOpen && (
                 <div
                   role="listbox"
-                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-2 min-w-[200px]"
+                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-header shadow-lg py-2 min-w-[200px]"
                 >
                   {PAYMENTS_REGION_DISPLAY_ORDER.map((slug) => {
                     const checked = selectedRegionPortals.includes(slug);

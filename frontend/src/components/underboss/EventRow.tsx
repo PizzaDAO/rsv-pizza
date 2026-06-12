@@ -113,7 +113,7 @@ function HostStatusBadge({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[80px]">
+          <div className="absolute top-full left-0 mt-1 z-50 bg-theme-header border border-theme-stroke rounded-lg shadow-xl py-1 min-w-[80px]">
             {HOST_STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}

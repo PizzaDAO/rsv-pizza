@@ -128,7 +128,7 @@ export const CurrencyPicker: React.FC<CurrencyPickerProps> = ({
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-theme-stroke bg-theme-surface shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-theme-stroke bg-theme-header shadow-xl">
           {filtered.length === 0 && (
             <div className="px-3 py-2 text-xs text-theme-text-muted">
               No currencies match "{query}".

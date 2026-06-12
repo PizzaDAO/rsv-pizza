@@ -121,7 +121,7 @@ export function TimezonePickerInput({ value, onChange }: TimezonePickerInputProp
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-1 w-80 bg-theme-card border border-theme-stroke-hover rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full right-0 mt-1 w-80 bg-theme-header border border-theme-stroke-hover rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Search Input */}
           <div className="p-3 border-b border-theme-stroke">
             <input
