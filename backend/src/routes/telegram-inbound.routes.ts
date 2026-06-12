@@ -164,7 +164,7 @@ router.post(
         // they aren't left on moltobene's "📥 processing…" ack forever.
         await sendTelegramMessage(
           chatIdStr,
-          `I'm not sure which event this is for yet! 🍕 Tap the "DM them to me" link in your event's reminder (in your city's Telegram group) to connect, then send it again and I'll add it.`,
+          `I'm not sure which event this is for yet! 🍕 Open your city's Telegram group, tap "📋 Copy connect code" on the reminder and paste it here (or tap the "DM them to me" link), then send your photo/number again and I'll add it.`,
         );
         return res.status(200).json({ ok: true, action: 'ignored', reason: 'no-party' });
       }
@@ -182,7 +182,7 @@ router.post(
           await sendTelegramMessage(
             chatIdStr,
             `Only the event host can submit receipts or attendance for ${party.name}. ` +
-              `Photos are welcome though 📸`,
+              `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
           );
           return res.status(200).json({
             ok: true,
@@ -332,7 +332,7 @@ router.post(
         await sendTelegramMessage(
           chatIdStr,
           `Only the event host can submit receipts or attendance for ${party.name}. ` +
-            `Photos are welcome though 📸`,
+            `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
         );
         return res.status(200).json({
           ok: true,
