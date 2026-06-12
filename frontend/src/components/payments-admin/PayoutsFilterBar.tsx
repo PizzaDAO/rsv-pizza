@@ -418,6 +418,8 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                   includes={filters.tagIncludes ?? []}
                   excludes={filters.tagExcludes ?? []}
                   onChange={({ includes, excludes }) => update({ tagIncludes: includes, tagExcludes: excludes })}
+                  // paccheri-58541: friendly label for the refund-due tag.
+                  labelFor={(t) => (t === 'refund' ? 'Refund due' : t)}
                   searchPlaceholder="Search tags…"
                   noMatchesLabel="No tags"
                   clearLabel="Clear"
@@ -451,7 +453,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               >
                 <option value="all">All tags</option>
                 {availableTags.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>{t === 'refund' ? 'Refund due' : t}</option>
                 ))}
               </select>
             </div>

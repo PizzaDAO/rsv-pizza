@@ -32,6 +32,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/database.js';
+import { recomputeRefundTags } from '../services/refundTag.js';
 import {
   resolveSubmitterContext,
   downloadTelegramFile,
@@ -520,6 +521,14 @@ router.post(
           `✅ Got your receipt for ${party.name}${amountFragment}. ` +
             `That's ${receiptCount} receipt${receiptCount === 1 ? '' : 's'} on file.`,
         );
+        // paccheri-58541: host DM'd a receipt to Molto Benny → receipt total
+        // changed → recompute the refund tag (non-fatal).
+        try {
+          await recomputeRefundTags(prisma, [party.id]);
+        } catch (err) {
+          console.error('[paccheri-58541][host-inbound] recomputeRefundTags failed', err);
+        }
+
         return res.status(200).json({ ok: true, action: 'receipt', partyName: party.name });
       }
 

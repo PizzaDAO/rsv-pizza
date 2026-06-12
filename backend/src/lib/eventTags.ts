@@ -23,6 +23,10 @@ export const INTERNAL_EVENT_TAGS = new Set<string>([
   // 'nonpres' — used only in the payments-admin UI + swcHub helper, never
   // surfaced publicly.
   'nonhub',
+  // paccheri-58541: 'refund' marks an open city that has been OVERPAID (paid
+  // exceeds capped receipt total) so admins can chase a refund. Admin-only —
+  // must never surface on a public PublicEvent / GPP payload.
+  'refund',
 ]);
 
 const INTERNAL_TAG_PATTERNS: RegExp[] = [

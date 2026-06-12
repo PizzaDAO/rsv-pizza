@@ -611,6 +611,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         }
       }
     }
+    // paccheri-58541: always offer the 'refund' (refund-due) tag as a filter
+    // option even when no loaded row carries it yet, so admins can discover it.
+    set.add('refund');
     return Array.from(set).sort();
   }, [payouts]);
 
@@ -639,6 +642,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         }
       }
     }
+    // paccheri-58541: always offer the 'refund' (refund-due) tag (see above).
+    set.add('refund');
     return Array.from(set).sort();
   }, [byPartyRows]);
 
