@@ -826,7 +826,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                     {regionDropdownOpen && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setRegionDropdownOpen(false)} />
-                        <div className="absolute top-full right-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[160px]">
+                        <div className="absolute top-full right-0 mt-1 z-50 bg-theme-header border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[160px]">
                           <button
                             onClick={() => { setRegionFilter('all'); setRegionDropdownOpen(false); }}
                             className={`w-full text-left px-3 py-2 text-sm transition-colors ${

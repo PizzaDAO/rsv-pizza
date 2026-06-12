@@ -566,7 +566,7 @@ export function CitiesTable({ events, selectedRegions, meData, onTelegramBroadca
               {showActionDropdown && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowActionDropdown(false)} />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-theme-card border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-theme-header border border-theme-stroke rounded-xl shadow-2xl py-1 min-w-[180px]">
                     <button onClick={() => handleBulkStatus('created')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-theme-surface transition-colors">
                       {t('cities.setCreated')}
                     </button>

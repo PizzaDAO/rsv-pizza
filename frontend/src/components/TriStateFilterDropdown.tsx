@@ -116,7 +116,7 @@ export function TriStateFilterDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={closePanel} />
-          <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1">
+          <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-header border border-theme-stroke rounded-lg shadow-xl py-1">
             {(includes.length > 0 || excludes.length > 0) && (
               <div className="flex items-center justify-end px-3 py-1.5 border-b border-theme-stroke">
                 <button onClick={clear} className="text-xs text-red-500/70 hover:text-red-500 transition-colors">{clearLabel}</button>
