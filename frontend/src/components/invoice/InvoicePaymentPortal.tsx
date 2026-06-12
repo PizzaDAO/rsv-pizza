@@ -19,14 +19,11 @@ export const InvoicePaymentPortal: React.FC<InvoicePaymentPortalProps> = ({
   invoice,
   onPaymentSuccess,
 }) => {
-  // Determine which tabs are available
-  const hasWire = !!invoice.paymentInstructions;
-  const availableTabs: PaymentTab[] = [];
+  // Determine which tabs are available: crypto first (default), wire always, card only if Stripe configured
+  const availableTabs: PaymentTab[] = ['crypto', 'wire'];
   if (hasStripe) availableTabs.push('card');
-  availableTabs.push('crypto');
-  if (hasWire) availableTabs.push('wire');
 
-  const [activeTab, setActiveTab] = useState<PaymentTab>(availableTabs[0] || 'crypto');
+  const [activeTab, setActiveTab] = useState<PaymentTab>('crypto');
 
   const formatAmount = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -104,7 +101,9 @@ export const InvoicePaymentPortal: React.FC<InvoicePaymentPortalProps> = ({
         )}
         {activeTab === 'wire' && (
           <InvoiceWireDetails
-            paymentInstructions={invoice.paymentInstructions}
+            invoiceNumber={invoice.invoiceNumber}
+            amount={invoice.total}
+            currency={invoice.currency}
           />
         )}
       </div>

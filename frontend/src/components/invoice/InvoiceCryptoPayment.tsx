@@ -244,6 +244,9 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
                 )}
               </button>
             </div>
+            <p className="text-yellow-500/70 text-xs mt-3 leading-relaxed">
+              ⚠️ A manual send to this address isn't detected automatically and won't mark this invoice paid. After sending, send your transaction hash to the host (reference invoice {invoice.invoiceNumber}) so we can confirm it.
+            </p>
           </div>
         </div>
       ) : (
