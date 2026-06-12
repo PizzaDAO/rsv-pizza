@@ -87,7 +87,7 @@ router.post('/link-host', async (req: Request, res: Response, _next: NextFunctio
 
     const party = await prisma.party.findUnique({
       where: { hostTelegramLinkToken: token },
-      select: { id: true, name: true, user: { select: { telegram: true } } },
+      select: { id: true, name: true, coHosts: true, user: { select: { telegram: true } } },
     });
 
     if (!party) {
@@ -95,19 +95,40 @@ router.post('/link-host', async (req: Request, res: Response, _next: NextFunctio
       return res.status(200).json({ ok: false, reason: 'invalid token' });
     }
 
-    // suppli-58533: verify the tapper IS the party host before linking.
-    const hostHandle = party.user?.telegram ?? null;
+    // suppli-58533 (crostata-58533): verify the tapper is the party host OR an
+    // editor co-host before linking. Co-hosts live in parties.co_hosts (JSON);
+    // only entries with canEdit===true count, and only their `telegram` field is
+    // matched (never twitter/instagram — display-only partners have canEdit:false
+    // and no telegram, so they're excluded).
     const tapperHandle = typeof username === 'string' ? username : null;
+    const authorizedHandles: string[] = [];
+    if (party.user?.telegram) authorizedHandles.push(party.user.telegram);
+    const coHosts = Array.isArray(party.coHosts) ? (party.coHosts as unknown[]) : [];
+    for (const ch of coHosts) {
+      if (
+        ch &&
+        typeof ch === 'object' &&
+        (ch as Record<string, unknown>).canEdit === true &&
+        typeof (ch as Record<string, unknown>).telegram === 'string'
+      ) {
+        authorizedHandles.push((ch as Record<string, unknown>).telegram as string);
+      }
+    }
+    const normalizedTapper = normalizeTgHandle(tapperHandle);
     const isHost =
-      !!hostHandle &&
-      !!tapperHandle &&
-      normalizeTgHandle(hostHandle) === normalizeTgHandle(tapperHandle);
+      normalizedTapper !== '' &&
+      authorizedHandles.some((h) => normalizeTgHandle(h) === normalizedTapper);
 
     if (isHost) {
-      // Verified host — set/refresh the host link (the legacy behavior).
+      // Verified host (primary or editor co-host) — set/refresh the host link.
       await prisma.party.update({
         where: { id: party.id },
         data: { hostTelegramChatId: BigInt(chatIdStr) },
+      });
+      // Clear any stale photo-only contributor row for this chat so it doesn't
+      // shadow the host binding in resolveSubmitterContext ("most recent wins").
+      await prisma.partyTelegramContributor.deleteMany({
+        where: { partyId: party.id, chatId: BigInt(chatIdStr) },
       });
       return res.status(200).json({ ok: true, role: 'host', partyName: party.name });
     }
