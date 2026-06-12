@@ -51,6 +51,11 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
 
+  // Direct-send manual hash submission
+  const [directHash, setDirectHash] = useState('');
+  const [directSubmitting, setDirectSubmitting] = useState(false);
+  const [directError, setDirectError] = useState<string | null>(null);
+
   const recipientAddress = extractCryptoAddress(invoice.paymentInstructions);
 
   // Resolve whether the recipient is a valid ETH address or ENS name
@@ -150,6 +155,26 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
     setRecordError(null);
   }, [resetTx]);
 
+  const handleDirectSubmit = useCallback(async () => {
+    const hash = directHash.trim();
+    if (!hash) return;
+    setDirectSubmitting(true);
+    setDirectError(null);
+    try {
+      const result = await payInvoice(invoice.viewToken, {
+        paymentMethod: 'crypto',
+        paymentRef: hash,
+      });
+      if (result?.invoice) {
+        onSuccess(result.invoice);
+      }
+    } catch (err) {
+      console.error('Failed to record direct payment:', err);
+      setDirectError('Could not confirm payment. Please double-check the transaction hash and try again.');
+    }
+    setDirectSubmitting(false);
+  }, [directHash, invoice.viewToken, onSuccess]);
+
   const handleCopyAddress = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(recipientAddress);
@@ -244,6 +269,40 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
                 )}
               </button>
             </div>
+            <p className="text-yellow-500/70 text-xs mt-3 leading-relaxed">
+              ⚠️ A manual send to this address isn't detected automatically. After sending, paste your transaction hash below to confirm your payment for invoice {invoice.invoiceNumber}.
+            </p>
+          </div>
+
+          {/* Direct-send hash submission */}
+          <div className="bg-[#0f0f23] rounded-xl p-4 border border-white/10 space-y-3">
+            <p className="text-white/50 text-xs">Already sent? Confirm your payment:</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={directHash}
+                onChange={(e) => setDirectHash(e.target.value)}
+                placeholder="Paste transaction hash (0x…)"
+                className="flex-1 bg-[#1a1a2e] border border-white/10 rounded-xl px-3 py-2 text-white text-sm font-mono placeholder:text-white/30 focus:outline-none focus:border-white/30 transition-colors"
+                disabled={directSubmitting}
+              />
+              <button
+                type="button"
+                onClick={handleDirectSubmit}
+                disabled={!directHash.trim() || directSubmitting}
+                className="flex-shrink-0 bg-[#627eea] hover:bg-[#627eea]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+              >
+                {directSubmitting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Check size={14} />
+                )}
+                {directSubmitting ? 'Submitting…' : 'Confirm payment'}
+              </button>
+            </div>
+            {directError && (
+              <p className="text-red-400 text-xs">{directError}</p>
+            )}
           </div>
         </div>
       ) : (
