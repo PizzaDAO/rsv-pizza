@@ -80,7 +80,7 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const fontFallback = await doc.embedFont(StandardFonts.HelveticaBold);
 
   // ── Colours ──────────────────────────────────────────────────────────────────
-  const orange     = rgb(0.93, 0.415, 0.10);   // #ED6A1A
+  const orange     = rgb(0.9098, 0.3647, 0.3647); // #E85D5D
   const greyColor  = rgb(0.53, 0.53,  0.53);
   const lightGrey  = rgb(0.82, 0.82,  0.82);
   const black      = rgb(0,    0,     0);
@@ -171,6 +171,13 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   const btnX = pageW - margin - btnW;
   const btnY = y - 2; // align top with header row
 
+  // Drop shadow (offset +2 right, +2 down in PDF coords = -2 in top-down)
+  page.drawRectangle({
+    x: btnX + 2, y: pageH - btnY - btnH - 2,
+    width: btnW, height: btnH,
+    color: rgb(0.75, 0.75, 0.75),
+  });
+
   // Orange filled rectangle for the button
   page.drawRectangle({
     x: btnX, y: pageH - btnY - btnH,
@@ -178,14 +185,24 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
     color: orange,
   });
 
-  const btnLabel = 'Pay Invoice Online';
+  const btnLabel = 'Pay Invoice Online >';
   const btnLabelSz = 10;
   const btnLabelW = fontBold.widthOfTextAtSize(btnLabel, btnLabelSz);
+  const btnTextX = btnX + (btnW - btnLabelW) / 2;
+  const btnTextY = pageH - btnY - btnH / 2 - btnLabelSz * 0.38;
   page.drawText(btnLabel, {
-    x: btnX + (btnW - btnLabelW) / 2,
-    y: pageH - btnY - btnH / 2 - btnLabelSz * 0.38,
+    x: btnTextX,
+    y: btnTextY,
     font: fontBold,
     size: btnLabelSz,
+    color: white,
+  });
+
+  // White underline beneath the button label
+  page.drawLine({
+    start: { x: btnTextX, y: btnTextY - 2 },
+    end:   { x: btnTextX + btnLabelW, y: btnTextY - 2 },
+    thickness: 0.8,
     color: white,
   });
 
@@ -270,8 +287,6 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
   for (const row of billToRows) {
     dt(row, rightColX, ry, { size: valSz, color: black });
     ry += 14;
-    // thin grey underline beneath each bill-to line (form style)
-    line(rightColX, ry - 2, pageW - margin, ry - 2, greyColor, 0.4);
   }
 
   // Advance y past the two-column block
@@ -287,8 +302,6 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
 
   // Grey header row
   rect(tableLeft, y, contentW, tableHeaderH, rgb(0.85, 0.85, 0.85));
-  // Vertical divider between desc and amount in header
-  line(amtColX, y, amtColX, y + tableHeaderH, greyColor, 0.5);
 
   dt('Details', descColX, y + 13, { font: fontBold, size: 9, color: black });
   const amtHdr = 'Amount';
@@ -297,21 +310,24 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
 
   y += tableHeaderH;
 
-  // Table border (will be drawn as lines after rows)
+  // Record the top of the table (top of header row)
   const tableTopY = y - tableHeaderH;
+
+  // Horizontal rule under header row
+  line(tableLeft, y, tableRight, y, greyColor, 0.5);
 
   // Row height
   const rowH = 20;
 
-  for (const item of lineItems) {
+  for (let ii = 0; ii < lineItems.length; ii++) {
+    const item = lineItems[ii];
     const descLines = wrapText(item.description, amtColX - descColX - 8, fontRegular, 9);
     const thisRowH  = Math.max(rowH, descLines.length * 12 + 8);
 
-    // Outer border lines
-    line(tableLeft, y, tableRight, y, greyColor, 0.4);
-
-    // Vertical divider in row
-    line(amtColX, y, amtColX, y + thisRowH, greyColor, 0.5);
+    // Thin separator between line items (not before the first, which already has the header rule)
+    if (ii > 0) {
+      line(tableLeft, y, tableRight, y, greyColor, 0.3);
+    }
 
     // Description (wrapped)
     for (let li = 0; li < descLines.length; li++) {
@@ -326,21 +342,24 @@ export async function generateInvoicePdf(invoice: any): Promise<Buffer> {
     y += thisRowH;
   }
 
-  // Bottom border of last data row
-  line(tableLeft, y, tableRight, y, greyColor, 0.4);
+  // Horizontal rule ABOVE the Subtotal row (separating items from subtotal)
+  line(tableLeft, y, tableRight, y, greyColor, 0.5);
 
   // Subtotal row
   const subtotalH = 20;
-  line(amtColX, y, amtColX, y + subtotalH, greyColor, 0.5);
   const subtotalStr = fmt(invoice.total ?? 0);
   const subtotalW   = fontBold.widthOfTextAtSize(subtotalStr, 10);
   dt('Subtotal', descColX, y + 13, { font: fontBold, size: 9, color: black });
   dt(subtotalStr, tableRight - subtotalW - 8, y + 13, { font: fontBold, size: 10, color: black });
   y += subtotalH;
 
-  // Right border + left border of table
-  line(tableLeft,  tableTopY, tableLeft,  y, greyColor, 0.4);
-  line(tableRight, tableTopY, tableRight, y, greyColor, 0.4);
+  // Full outer border as four lines (top, bottom, left, right)
+  line(tableLeft,  tableTopY, tableRight, tableTopY, greyColor, 0.6); // TOP
+  line(tableLeft,  y,         tableRight, y,         greyColor, 0.6); // BOTTOM
+  line(tableLeft,  tableTopY, tableLeft,  y,         greyColor, 0.5); // LEFT
+  line(tableRight, tableTopY, tableRight, y,         greyColor, 0.5); // RIGHT
+  // Single continuous vertical divider at amtColX spanning full table height
+  line(amtColX, tableTopY, amtColX, y, greyColor, 0.5);
 
   y += 18;
 
