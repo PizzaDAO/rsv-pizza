@@ -1519,7 +1519,7 @@ export interface CreateSponsorData {
   category?: string;
 }
 
-export interface UpdateSponsorData extends Partial<CreateSponsorData> {}
+export type UpdateSponsorData = Partial<CreateSponsorData>;
 
 export interface SponsorFilters {
   status?: SponsorStatus;
@@ -2287,7 +2287,7 @@ export interface VenueCreateData {
   longitude?: number;
 }
 
-export interface VenueUpdateData extends Partial<VenueCreateData> {}
+export type VenueUpdateData = Partial<VenueCreateData>;
 
 // Get all venues for a party
 export async function getVenues(partyId: string): Promise<Venue[]> {

@@ -39,7 +39,7 @@ export function CheckInScanner({ currentGuestId, onVouchSuccess, onClose }: Chec
       if (segments.length === 3 && segments[0] === 'checkin') {
         return { inviteCode: segments[1], guestId: segments[2] };
       }
-    } catch {}
+    } catch { /* not a URL — fall through */ }
     return null;
   }, []);
 

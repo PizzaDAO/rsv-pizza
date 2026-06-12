@@ -117,7 +117,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     setEditCity(null);
     setEditTime(null);
     if (storageKey) {
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
     }
     // Also clear DB config
     if (party?.id) {
@@ -422,7 +422,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
   useEffect(() => {
     if (!storageKey) return;
     const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime };
-    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* ignore: storage unavailable */ }
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
   // One-time migration: legacy hosts customized their flyer in localStorage BEFORE
@@ -458,13 +458,13 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
     } catch (err) {
       // Corrupt JSON — clear the key so the regen gate stops blocking this party.
       console.warn('[jalapeno-32738] corrupt flyer localStorage, clearing:', err);
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
       return;
     }
 
     if (!parsed || typeof parsed !== 'object') {
       // Defensive: parsed null or a primitive — treat as corrupt.
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
       return;
     }
 
@@ -475,7 +475,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       parsed.editStreetAddress || parsed.editTime != null;
     if (!hasContent) {
       // Empty state — clear the stale key but don't waste a DB write.
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
       return;
     }
 
@@ -483,7 +483,7 @@ export function FlyerGenerator({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean 
       .then((ok) => {
         if (ok) {
           // DB write succeeded — clear localStorage so we don't drift.
-          try { localStorage.removeItem(storageKey); } catch {}
+          try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
           // Refresh party state so the regen gate now sees the DB config.
           if (party.inviteCode) {
             loadParty(party.inviteCode).catch(() => {});

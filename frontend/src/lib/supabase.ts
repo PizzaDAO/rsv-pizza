@@ -1680,7 +1680,7 @@ export async function addGuestToParty(
       let errorData: any = null;
       try {
         errorData = await response.json();
-      } catch {}
+      } catch { /* ignore: non-JSON error body */ }
       console.error('Error adding guest:', errorData);
       const message = errorData?.error?.message || errorData?.message || `HTTP ${response.status}`;
       throw new Error(message);

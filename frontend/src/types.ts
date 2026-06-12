@@ -671,7 +671,7 @@ export interface CreateInvoiceData {
   attachments?: Array<{ name: string; url: string }>;
 }
 
-export interface UpdateInvoiceData extends Partial<Omit<CreateInvoiceData, 'sponsorId'>> {}
+export type UpdateInvoiceData = Partial<Omit<CreateInvoiceData, 'sponsorId'>>;
 
 // Mercury wire-reconciliation types (stromboli-58524)
 export type MercuryWireMatchStatus = 'auto_paid' | 'needs_review' | 'unmatched';
@@ -759,7 +759,7 @@ export interface CreateMouData {
   attachments?: Array<{ name: string; url: string }>;
 }
 
-export interface UpdateMouData extends Partial<Omit<CreateMouData, 'sponsorId'>> {}
+export type UpdateMouData = Partial<Omit<CreateMouData, 'sponsorId'>>;
 
 export interface SignMouData {
   signerName: string;

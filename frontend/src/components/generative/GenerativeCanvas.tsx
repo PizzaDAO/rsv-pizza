@@ -119,7 +119,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
     setEditCity(null);
     setEditTime(null);
     if (storageKey) {
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
     }
   }, [storageKey, defaultPositions, defaultSponsorBox]);
 
@@ -357,7 +357,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   useEffect(() => {
     if (!storageKey) return;
     const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime };
-    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* ignore: storage unavailable */ }
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
   if (!party) return null;

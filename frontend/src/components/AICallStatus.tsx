@@ -39,8 +39,7 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
   // Poll for status updates
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    let timeIntervalId: NodeJS.Timeout;
+    const intervals: { poll?: NodeJS.Timeout; time?: NodeJS.Timeout } = {};
 
     const fetchStatus = async () => {
       try {
@@ -66,8 +65,8 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
         // If call is complete, stop polling
         if (['completed', 'failed', 'no_answer'].includes(data.status)) {
-          clearInterval(intervalId);
-          clearInterval(timeIntervalId);
+          clearInterval(intervals.poll);
+          clearInterval(intervals.time);
           onComplete(data);
         }
       } catch (err) {
@@ -78,16 +77,16 @@ export const AICallStatus: React.FC<AICallStatusProps> = ({
 
     // Start polling
     fetchStatus();
-    intervalId = setInterval(fetchStatus, 3000);
+    intervals.poll = setInterval(fetchStatus, 3000);
 
     // Update elapsed time
-    timeIntervalId = setInterval(() => {
+    intervals.time = setInterval(() => {
       setElapsedTime((prev) => prev + 1);
     }, 1000);
 
     return () => {
-      clearInterval(intervalId);
-      clearInterval(timeIntervalId);
+      clearInterval(intervals.poll);
+      clearInterval(intervals.time);
     };
   }, [aiPhoneCallId, onComplete]);
 

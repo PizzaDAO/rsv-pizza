@@ -64,13 +64,11 @@ export function PartnerIntakePage() {
   const handleSubmit = async (data: PartnerFormData) => {
     if (!token) return;
     setSubmitting(true);
+    // PartnerForm catches thrown errors and surfaces them via its error banner
     try {
       const payload = partnerFormDataToIntakeData(data);
       await submitPartnerIntake(token, payload);
       setSubmitted(true);
-    } catch (err) {
-      // PartnerForm catches thrown errors and surfaces them via its error banner
-      throw err;
     } finally {
       setSubmitting(false);
     }

@@ -81,11 +81,12 @@ export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdi
         case 'amount':
           comparison = (a.amount || 0) - (b.amount || 0);
           break;
-        case 'lastContactedAt':
+        case 'lastContactedAt': {
           const dateA = a.lastContactedAt ? new Date(a.lastContactedAt).getTime() : 0;
           const dateB = b.lastContactedAt ? new Date(b.lastContactedAt).getTime() : 0;
           comparison = dateA - dateB;
           break;
+        }
         case 'createdAt':
           comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           break;

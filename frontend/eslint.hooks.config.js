@@ -33,5 +33,18 @@ export default tseslint.config({
         ignoreRestSiblings: true,
       },
     ],
+    // cavatelli P2: long-tail lint errors paid down to 0; these gates keep them there.
+    // Core ESLint rules (no plugin needed):
+    'no-empty': 'error',
+    'no-case-declarations': 'error',
+    'no-useless-catch': 'error',
+    'no-constant-binary-expression': 'error',
+    'no-irregular-whitespace': 'error',
+    'no-useless-escape': 'error',
+    'prefer-const': 'error',
+    // typescript-eslint rules:
+    '@typescript-eslint/no-empty-object-type': 'error',
+    '@typescript-eslint/prefer-as-const': 'error',
+    '@typescript-eslint/ban-ts-comment': 'error',
   },
 });

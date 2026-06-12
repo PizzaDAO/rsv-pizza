@@ -19,6 +19,10 @@ import {
   supportsDirectOrdering,
 } from '../lib/ordering';
 
+// Legacy pizzeria selection UI is hidden while AI ordering is "Coming Soon".
+// Flip to true to restore the manual search/select flow below.
+const SHOW_LEGACY_PIZZERIA_SELECTION = false;
+
 export const PizzaOrderSummary: React.FC = () => {
   const { t } = useTranslation('host');
   const { recommendations, beverageRecommendations, waveRecommendations, party, guests, updatePizzaQuantity, removePizza } = usePizza();
@@ -408,7 +412,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             </div>
 
             {/* Original pizzeria selection - hidden while coming soon */}
-            {false && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
+            {SHOW_LEGACY_PIZZERIA_SELECTION && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
               {!hasSearched || pizzerias.length === 0 ? (
                 // Show search form if no results yet
                 <div className="space-y-3">

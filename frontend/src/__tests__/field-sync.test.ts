@@ -49,7 +49,7 @@ function extractInterfaceFields(source: string, interfaceName: string): string[]
   if (!match) return [];
 
   const body = match[1];
-  const fieldRegex = /^\s*(\w+)[\?:]?\s*:/gm;
+  const fieldRegex = /^\s*(\w+)[?:]?\s*:/gm;
   const fields: string[] = [];
   let fieldMatch;
   while ((fieldMatch = fieldRegex.exec(body)) !== null) {
