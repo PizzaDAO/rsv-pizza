@@ -182,7 +182,7 @@ router.post(
           await sendTelegramMessage(
             chatIdStr,
             `Only the event host can submit receipts or attendance for ${party.name}. ` +
-              `Photos are welcome though 📸`,
+              `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
           );
           return res.status(200).json({
             ok: true,
@@ -332,7 +332,7 @@ router.post(
         await sendTelegramMessage(
           chatIdStr,
           `Only the event host can submit receipts or attendance for ${party.name}. ` +
-            `Photos are welcome though 📸`,
+            `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
         );
         return res.status(200).json({
           ok: true,
