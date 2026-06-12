@@ -3581,6 +3581,20 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                 outstandingUsd,
               } = computePartyTotals(row);
 
+              // tortellini-58542: most recent Molto Benny (Telegram) reminder
+              // sent for this city = max of the four reminder timestamps.
+              const reminders = [
+                { label: 'Receipts', at: row.party.receiptsReminderSentAt },
+                { label: 'Wallet', at: row.party.walletReminderSentAt },
+                { label: 'Photo', at: row.party.photoReminderSentAt },
+                { label: 'Attendance', at: row.party.attendanceReminderSentAt },
+              ].filter((r) => r.at);
+              const lastReminder = reminders.reduce(
+                (best, r) =>
+                  !best || new Date(r.at!) > new Date(best.at!) ? r : best,
+                null as null | { label: string; at: string },
+              );
+
               return (
                 <React.Fragment key={row.party.id}>
                   {/* Outer city summary row */}
@@ -3825,13 +3839,25 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                         {/* tigella-58512: synthetic TBD rows have no payout
                             activity (lastActivityAt=null) → show an em dash
                             instead of a 1969 epoch date. */}
-                        {row.aggregates.lastActivityAt ? (
-                          <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
-                            {relativeTime(new Date(row.aggregates.lastActivityAt))}
-                          </div>
-                        ) : (
-                          <div className="text-theme-text-faint">—</div>
-                        )}
+                        <div className="flex flex-col min-w-0">
+                          {row.aggregates.lastActivityAt ? (
+                            <div title={new Date(row.aggregates.lastActivityAt).toLocaleString()}>
+                              {relativeTime(new Date(row.aggregates.lastActivityAt))}
+                            </div>
+                          ) : (
+                            <div className="text-theme-text-faint">—</div>
+                          )}
+                          {/* tortellini-58542: last Molto Benny reminder sent */}
+                          {lastReminder && (
+                            <div
+                              className="text-xs text-theme-text-faint truncate"
+                              title={new Date(lastReminder.at!).toLocaleString()}
+                            >
+                              🔔 {lastReminder.label} reminder ·{' '}
+                              {relativeTime(new Date(lastReminder.at!))}
+                            </div>
+                          )}
+                        </div>
                         <CityActionsMenu
                           canMarkPaid={showMarkPartyPaid}
                           canAddExternal={canAddExternal}
