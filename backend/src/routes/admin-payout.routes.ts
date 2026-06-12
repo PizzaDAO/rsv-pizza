@@ -7018,12 +7018,14 @@ async function sendCityGroupReminder(
   // suppli-58533: optional parse_mode so the per-type reminder copy can embed an
   // inline <a> "DM them to me" link in the GROUP message. Default plain.
   parseMode?: string,
+  // bocconcini-58533: optional inline keyboard (URL + copy_text connect buttons).
+  replyMarkup?: Record<string, unknown>,
 ): Promise<{ groupSent: boolean; groupReason?: string }> {
   const cityKey = cityKeyFromPartyName(partyName) ?? partyName.toLowerCase().trim();
   if (!cityKey) {
     return { groupSent: false, groupReason: 'no city TG group set' };
   }
-  const result = await sendToCityGroup(cityKey, text, parseMode);
+  const result = await sendToCityGroup(cityKey, text, parseMode, replyMarkup);
   return result.ok
     ? { groupSent: true }
     : { groupSent: false, groupReason: result.reason };
@@ -7065,7 +7067,7 @@ function escapeHtml(s: string): string {
 async function resolveSubmitDeeplink(party: {
   id: string;
   hostTelegramLinkToken: string | null;
-}): Promise<string | null> {
+}): Promise<{ deeplink: string; token: string } | null> {
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || '';
   if (!botUsername) return null;
 
@@ -7083,7 +7085,22 @@ async function resolveSubmitDeeplink(party: {
       return null;
     }
   }
-  return `https://t.me/${botUsername}?start=submit_${token}`;
+  return { deeplink: `https://t.me/${botUsername}?start=submit_${token}`, token };
+}
+
+/**
+ * suppli-58533 FU5: inline keyboard for the GROUP reminder. A URL button opens
+ * the connect deeplink; a copy_text button (Bot API 7.11+) copies the literal
+ * `/start submit_<token>` so a host whose tap didn't fire the payload can paste
+ * it into the DM and still bind. `verb` matches the per-type inline-link label.
+ */
+function buildSubmitKeyboard(deeplink: string, token: string, verb: string) {
+  return {
+    inline_keyboard: [
+      [{ text: verb, url: deeplink }],
+      [{ text: '📋 Copy connect code', copy_text: { text: `/start submit_${token}` } }],
+    ],
+  };
 }
 
 /**
@@ -7160,8 +7177,10 @@ router.post(
       const slug = party.customUrl || party.inviteCode;
       // suppli-58533: per-type copy. GROUP gets an inline HTML "DM them to me"
       // link; DM says "just reply here".
-      const deeplink = await resolveSubmitDeeplink(party);
+      const submit = await resolveSubmitDeeplink(party);
+      const deeplink = submit?.deeplink ?? null;
       const { groupText, groupHtml, dmText } = buildReminderCopy('receipts', slug, deeplink);
+      const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM them to me') : undefined;
 
       // Host DM — only when the party has a linked Telegram chat id.
       let hostDmSent = false;
@@ -7189,6 +7208,7 @@ router.post(
         party.name,
         groupText,
         groupHtml ? 'HTML' : undefined,
+        groupKeyboard,
       );
 
       // Record when the reminder was sent (if at least one message succeeded).
@@ -7254,8 +7274,10 @@ router.post(
 
       const slug = party.customUrl || party.inviteCode;
       // suppli-58533: per-type copy (wallet).
-      const deeplink = await resolveSubmitDeeplink(party);
+      const submit = await resolveSubmitDeeplink(party);
+      const deeplink = submit?.deeplink ?? null;
       const { groupText, groupHtml, dmText } = buildReminderCopy('wallet', slug, deeplink);
+      const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM it to me') : undefined;
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
@@ -7282,6 +7304,7 @@ router.post(
         party.name,
         groupText,
         groupHtml ? 'HTML' : undefined,
+        groupKeyboard,
       );
 
       // Record when the reminder was sent (if at least one message succeeded).
@@ -7344,8 +7367,10 @@ router.post(
 
       const slug = party.customUrl || party.inviteCode;
       // suppli-58533: per-type copy (photos).
-      const deeplink = await resolveSubmitDeeplink(party);
+      const submit = await resolveSubmitDeeplink(party);
+      const deeplink = submit?.deeplink ?? null;
       const { groupText, groupHtml, dmText } = buildReminderCopy('photos', slug, deeplink);
+      const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM them to me') : undefined;
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
@@ -7372,6 +7397,7 @@ router.post(
         party.name,
         groupText,
         groupHtml ? 'HTML' : undefined,
+        groupKeyboard,
       );
 
       // Record when the reminder was sent (if at least one message succeeded).
@@ -7434,8 +7460,10 @@ router.post(
 
       const slug = party.customUrl || party.inviteCode;
       // suppli-58533: per-type copy (attendance).
-      const deeplink = await resolveSubmitDeeplink(party);
+      const submit = await resolveSubmitDeeplink(party);
+      const deeplink = submit?.deeplink ?? null;
       const { groupText, groupHtml, dmText } = buildReminderCopy('attendance', slug, deeplink);
+      const groupKeyboard = submit ? buildSubmitKeyboard(submit.deeplink, submit.token, 'DM me the number') : undefined;
 
       let hostDmSent = false;
       let hostDmReason: string | undefined;
@@ -7462,6 +7490,7 @@ router.post(
         party.name,
         groupText,
         groupHtml ? 'HTML' : undefined,
+        groupKeyboard,
       );
 
       // Record when the reminder was sent (if at least one message succeeded).

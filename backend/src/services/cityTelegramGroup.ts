@@ -87,11 +87,14 @@ export interface SendToCityGroupResult {
  * @param cityKey  Already-normalized city key (caller should pass `lower(trim(city))`).
  * @param text     Message body.
  * @param parseMode Optional Telegram parse_mode ('HTML' | 'Markdown'); omit/None for plain.
+ * @param replyMarkup Optional Telegram reply_markup (e.g. an inline_keyboard);
+ *   bocconcini-58533 uses this to attach URL + copy_text connect buttons.
  */
 export async function sendToCityGroup(
   cityKey: string,
   text: string,
   parseMode?: string,
+  replyMarkup?: Record<string, unknown>,
 ): Promise<SendToCityGroupResult> {
   const key = (cityKey || '').toLowerCase().trim();
   if (!key) {
@@ -135,6 +138,7 @@ export async function sendToCityGroup(
         text: withBennySignature(text),
         disable_web_page_preview: true,
         ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
+        ...(replyMarkup && { reply_markup: replyMarkup }),
       }),
     });
     return resp.json() as Promise<any>;
