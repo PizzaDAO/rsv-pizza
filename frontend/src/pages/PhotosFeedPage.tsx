@@ -423,6 +423,17 @@ export function PhotosFeedPage() {
               </span>
             )}
           </button>
+          {/* crespelle-58543: launch the fullscreen slideshow, carrying the
+              current filters (countries / regions / partnerTag / year / seed). */}
+          <Link
+            to={`/photos/play${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+            title="Play slideshow"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors border-black/10 text-gray-900 hover:bg-white"
+            style={{ background: 'rgba(255,255,255,0.85)' }}
+          >
+            <Play size={14} className="fill-current" />
+            <span>Play</span>
+          </Link>
           {/* salame-58291: download all matching photos as a ZIP. Only visible
               when a partnerTag is active. Auth header is required, so we use
               fetch+blob instead of a plain <a download>. */}
