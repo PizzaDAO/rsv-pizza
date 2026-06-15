@@ -41,8 +41,24 @@ import {
   buildPartyRecipientCandidates,
   assertRecipientIsPartyHost,
 } from '../services/payout-recipients.js';
+import { recomputeRefundTags } from '../services/refundTag.js';
 
 const router = Router();
+
+/**
+ * paccheri-58541: fire-and-forget refund-tag recompute after a host-side
+ * receipt change (create / edit / delete). Always runs AFTER the mutation
+ * commits and never throws — a tag-recompute failure must not 500 the host's
+ * receipt submission.
+ */
+async function safeRecomputeRefundTags(partyId: string | null | undefined): Promise<void> {
+  try {
+    if (typeof partyId !== 'string' || partyId.length === 0) return;
+    await recomputeRefundTags(prisma, [partyId]);
+  } catch (err) {
+    console.error('[paccheri-58541] recomputeRefundTags failed', err);
+  }
+}
 
 // Path-scope auth on /:partyId/payouts ONLY. The router is mounted at
 // /api/parties (alongside many sibling routers including partyRoutes after
@@ -1833,6 +1849,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       }
     }
 
+    // paccheri-58541: a new host receipt changes the party's receipt total.
+    await safeRecomputeRefundTags(req.params.partyId);
+
     res.status(201).json({ payout: serializePayout(payout) });
   } catch (error) {
     // tortellini-58520: structured capture so the next prod 500 on payout
@@ -2680,6 +2699,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       return row;
     });
 
+    // paccheri-58541: PATCH deletes + recreates receipt docs, changing the
+    // party's receipt total → recompute the refund tag.
+    await safeRecomputeRefundTags(req.params.partyId);
+
     res.json({ payout: serializePayout(updated) });
   } catch (error) {
     next(error);
@@ -2754,6 +2777,10 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
         },
       });
     });
+
+    // paccheri-58541: host withdrew the payout request — recompute the refund
+    // tag (paid/committed totals may have shifted).
+    await safeRecomputeRefundTags(req.params.partyId);
 
     res.json({ success: true });
   } catch (error) {
@@ -3335,6 +3362,10 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
       // Non-fatal — the upload succeeded.
     }
 
+    // paccheri-58541: forwarded-payload receipt create changes the party's
+    // receipt total → recompute the refund tag.
+    await safeRecomputeRefundTags(req.params.partyId);
+
     res.status(201).json({
       reimbursement: serializePayout(updated),
       receipts: updated.documents.filter((d) => d.kind === 'receipt').map(serializeDocument),
@@ -3403,6 +3434,10 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
         },
       });
     });
+
+    // paccheri-58541: host deleted a receipt → receipt total changed →
+    // recompute the refund tag.
+    await safeRecomputeRefundTags(req.params.partyId);
 
     res.json({
       reimbursement: serializePayout(updated),

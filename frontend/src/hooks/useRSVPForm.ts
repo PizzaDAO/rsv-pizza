@@ -9,6 +9,7 @@ import { uuid } from '../lib/utils';
 import { findActiveRegion } from '../lib/optinAbRegions';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
 import { rankPizzerias } from '../lib/pizzeriaRank';
+import { publicEventTags } from '../lib/eventTags';
 
 // ---- Types ----
 
@@ -66,7 +67,9 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     customUrl: event.customUrl,
     address: event.address,
     eventType: event.eventType,
-    eventTags: event.eventTags,
+    // paccheri-58541: belt-and-suspenders — the API already strips internal
+    // tags, but re-filter so 'refund'/'paid' never reach the public RSVP form.
+    eventTags: publicEventTags(event.eventTags),
     nftEnabled: event.nftEnabled,
     nftChain: event.nftChain,
     eventImageUrl: event.eventImageUrl,
@@ -91,7 +94,10 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     customUrl: party.custom_url,
     address: party.address,
     eventType: party.event_type,
-    eventTags: party.event_tags,
+    // paccheri-58541: Supabase-direct boundary — strip internal/control tags
+    // ('refund', 'paid', etc.) so they never reach the public RSVP form /
+    // checkbox list. Tag-based row filtering only uses public taxonomy tags.
+    eventTags: publicEventTags(party.event_tags),
     nftEnabled: party.nft_enabled,
     nftChain: party.nft_chain,
     eventImageUrl: party.event_image_url,

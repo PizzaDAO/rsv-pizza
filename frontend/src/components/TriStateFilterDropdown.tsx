@@ -22,6 +22,13 @@ interface TriStateFilterDropdownProps {
   excludeLabel: string;
   /** applied to the outer `relative` wrapper */
   className?: string;
+  /**
+   * paccheri-58541: optional friendly display label for a raw item value (e.g.
+   * map 'refund' → 'Refund due'). The underlying filter value is unchanged; the
+   * label is used for rendering AND type-ahead matching. Items without a mapping
+   * render as-is.
+   */
+  labelFor?: (item: string) => string;
 }
 
 export function TriStateFilterDropdown({
@@ -36,7 +43,9 @@ export function TriStateFilterDropdown({
   includeLabel,
   excludeLabel,
   className,
+  labelFor,
 }: TriStateFilterDropdownProps) {
+  const displayLabel = (item: string) => (labelFor ? labelFor(item) : item);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   // touchOrder floats recently-interacted items to the top of the dropdown.
@@ -57,7 +66,11 @@ export function TriStateFilterDropdown({
   }, [availableSorted, touchOrder, includes, excludes]);
 
   const visibleItems = search.trim()
-    ? orderedItems.filter((x) => x.toLowerCase().includes(search.trim().toLowerCase()))
+    ? orderedItems.filter((x) => {
+        const q = search.trim().toLowerCase();
+        // paccheri-58541: match the raw value OR the friendly display label.
+        return x.toLowerCase().includes(q) || displayLabel(x).toLowerCase().includes(q);
+      })
     : orderedItems;
 
   function getState(item: string): 'neutral' | 'include' | 'exclude' {
@@ -103,7 +116,7 @@ export function TriStateFilterDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={closePanel} />
-          <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-card border border-theme-stroke rounded-lg shadow-xl py-1">
+          <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-header border border-theme-stroke rounded-lg shadow-xl py-1">
             {(includes.length > 0 || excludes.length > 0) && (
               <div className="flex items-center justify-end px-3 py-1.5 border-b border-theme-stroke">
                 <button onClick={clear} className="text-xs text-red-500/70 hover:text-red-500 transition-colors">{clearLabel}</button>
@@ -131,7 +144,7 @@ export function TriStateFilterDropdown({
                   <React.Fragment key={item}>
                     {showDivider && <div className="border-t border-theme-stroke my-1" />}
                     <div className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-surface transition-colors">
-                      <span className="text-sm text-theme-text truncate">{item}</span>
+                      <span className="text-sm text-theme-text truncate">{displayLabel(item)}</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => setState(item, state === 'include' ? 'neutral' : 'include')}

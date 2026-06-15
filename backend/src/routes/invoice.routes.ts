@@ -5,6 +5,8 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { generateInvoicePdf } from '../lib/invoicePdf.js';
+import { WIRE_DETAILS_PDF_B64 } from '../assets/wireDetailsPdf.js';
+import { W9_PDF_B64 } from '../assets/w9Pdf.js';
 
 /**
  * Compute the calendar year for the given date in the specified timezone.
@@ -405,7 +407,10 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
       ? new Date(invoice.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       : null;
 
-    // Build email HTML
+    // Format invoice total for the short note
+    const totalDisplay = (invoice.total / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+    // Build email HTML — short personal note; full invoice is the PDF attachment
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -415,67 +420,15 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
           <title>Invoice #${invoice.invoiceNumber}</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #ffffff; font-size: 28px; margin: 0 0 10px 0;">Invoice #${invoice.invoiceNumber}</h1>
-            <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">${invoice.party.name}</p>
-          </div>
-
           <div style="background: #f9f9f9; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
-            <p style="margin: 0 0 16px 0; font-size: 16px;">
-              Thanks for helping us pizza the planet!
-            </p>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
-              <thead>
-                <tr style="background: #1a1a2e;">
-                  <th style="padding: 12px 16px; text-align: left; color: #ffffff; font-size: 14px; border-radius: 6px 0 0 0;">Description</th>
-                  <th style="padding: 12px 16px; text-align: right; color: #ffffff; font-size: 14px; border-radius: 0 6px 0 0;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lineItemsHtml}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td style="padding: 12px 16px; font-weight: bold; font-size: 16px; color: #1a1a2e;">Total</td>
-                  <td style="padding: 12px 16px; text-align: right; font-weight: bold; font-size: 16px; color: #1a1a2e;">${formatAmount(invoice.total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            ${invoice.paymentInstructions ? `
-              <div style="background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 12px;">
-                <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px;">Payment Instructions</p>
-                <p style="margin: 0; font-size: 14px; color: #333; white-space: pre-wrap;">${invoice.paymentInstructions}</p>
-              </div>
-            ` : ''}
-
-            ${invoice.paymentTerms ? `
-              <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">
-                <strong>Terms:</strong> ${invoice.paymentTerms}
-              </p>
-            ` : ''}
-
-            ${dueDateText ? `
-              <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">
-                <strong>Due:</strong> ${dueDateText}
-              </p>
-            ` : ''}
-
-            ${invoice.memo ? `
-              <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">
-                <strong>Note:</strong> ${invoice.memo}
-              </p>
-            ` : ''}
+            <p style="margin: 0 0 16px 0; font-size: 16px;">Thanks for helping us pizza the planet! See invoice attached.</p>
+            <p style="margin: 0 0 16px 0; font-size: 16px;"><strong>TL;DR ${totalDisplay} USDC to dreadpizzaroberts.eth</strong></p>
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${invoiceViewUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Pay this invoice online</a>
+            </div>
+            <p style="margin: 0; font-size: 15px;">See our Wire Details (if preferred) + our W9 attached.</p>
           </div>
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${invoiceViewUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Invoice Online</a>
-          </div>
-
-          <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
-            <p>Sent via <a href="https://rsv.pizza" style="color: #ff393a; text-decoration: none;">RSV.Pizza</a></p>
-          </div>
+          <p style="font-size: 15px; color: #333;">Best,<br>Dread Pizza Roberts</p>
         </body>
       </html>
     `;
@@ -496,15 +449,19 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
         emailPayload.cc = invoice.ccEmails;
       }
 
-      // Attach generated PDF — never let a PDF error block the email send
+      // Always attach Wire Details + W9; prepend invoice PDF if generation succeeds
+      emailPayload.attachments = [
+        { filename: 'Rare Pizzas LLC - Wire Details.pdf', content: WIRE_DETAILS_PDF_B64 },
+        { filename: 'Rare Pizzas LLC - W9.pdf', content: W9_PDF_B64 },
+      ];
       try {
         const pdfBuffer = await generateInvoicePdf(invoice);
-        emailPayload.attachments = [{
+        emailPayload.attachments.unshift({
           filename: `Invoice-${invoice.invoiceNumber}.pdf`,
           content: pdfBuffer.toString('base64'),
-        }];
+        });
       } catch (err) {
-        console.error('[invoice] PDF generation failed, sending without attachment:', err);
+        console.error('[invoice] PDF generation failed, sending without invoice attachment:', err);
       }
 
       const response = await fetch('https://api.resend.com/emails', {

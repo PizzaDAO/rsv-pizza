@@ -48,6 +48,7 @@ import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
 import { PartnersPage } from './pages/PartnersPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { PhotosFeedPage } from './pages/PhotosFeedPage';
+import { PhotosSlideshowPage } from './pages/PhotosSlideshowPage';
 import { SurveyPage } from './pages/SurveyPage';
 import { HostSurveyPage } from './pages/HostSurveyPage';
 
@@ -109,6 +110,8 @@ function App() {
             <Route path="/payments/india" element={<IndiaPaymentsPage />} />
             <Route path="/payments/asia" element={<AsiaPaymentsPage />} />
             {/* margherita-43821: /photos public global feed; must come before /:slug */}
+            {/* crespelle-58543: /photos/play fullscreen slideshow — before /:slug */}
+            <Route path="/photos/play" element={<PhotosSlideshowPage />} />
             <Route path="/photos" element={<PhotosFeedPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />

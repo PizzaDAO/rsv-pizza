@@ -7,6 +7,7 @@ import { DonationForm } from '../components/DonationForm';
 import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
+import { publicEventTags } from '../lib/eventTags';
 // GPP theme applied conditionally
 import { GPPClouds } from '../components/GPPClouds';
 import { useConfetti } from '../hooks/useConfetti';
@@ -45,7 +46,9 @@ function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
     userId: party.user_id,
     selectedPizzerias: party.selected_pizzerias as any,
     eventType: party.event_type,
-    eventTags: party.event_tags,
+    // paccheri-58541: strip internal/control tags (e.g. 'refund', 'paid') at
+    // this Supabase-direct public boundary so they never leak to RSVPers.
+    eventTags: publicEventTags(party.event_tags),
     donationEnabled: party.donation_enabled,
     donationRecipient: party.donation_recipient,
     donationRecipientUrl: party.donation_recipient_url,

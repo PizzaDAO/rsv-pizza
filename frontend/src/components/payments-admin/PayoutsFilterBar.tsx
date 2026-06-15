@@ -371,7 +371,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               {regionsOpen && (
                 <div
                   role="listbox"
-                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-surface shadow-lg py-2 min-w-[200px]"
+                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-header shadow-lg py-2 min-w-[200px]"
                 >
                   {PAYMENTS_REGION_DISPLAY_ORDER.map((slug) => {
                     const checked = selectedRegionPortals.includes(slug);
@@ -418,6 +418,8 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                   includes={filters.tagIncludes ?? []}
                   excludes={filters.tagExcludes ?? []}
                   onChange={({ includes, excludes }) => update({ tagIncludes: includes, tagExcludes: excludes })}
+                  // paccheri-58541: friendly label for the refund-due tag.
+                  labelFor={(t) => (t === 'refund' ? 'Refund due' : t)}
                   searchPlaceholder="Search tags…"
                   noMatchesLabel="No tags"
                   clearLabel="Clear"
@@ -451,7 +453,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
               >
                 <option value="all">All tags</option>
                 {availableTags.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>{t === 'refund' ? 'Refund due' : t}</option>
                 ))}
               </select>
             </div>
