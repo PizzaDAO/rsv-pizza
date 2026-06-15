@@ -19,9 +19,11 @@ import {
   submitReimbursement,
   unsubmitReimbursement,
   fetchEventReimbursements,
+  fetchPayoutRecipients,
   CreatePayoutPhotoInput,
   MyReimbursementResponse,
   EventReimbursementCohost,
+  PayoutRecipientCandidate,
 } from '../../lib/api';
 import { usePizza } from '../../contexts/PizzaContext';
 import { parsePartyKitCapFromTags } from '../../lib/reimbursementCap';
@@ -36,6 +38,7 @@ import { ReceiptsLibrary } from './ReceiptsLibrary';
 import { TaxFormSection } from './TaxFormSection';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
+import { RecipientPickerModal } from './RecipientPickerModal';
 
 interface PayoutsTabProps {
   partyId: string;
@@ -121,6 +124,25 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   const [failedSaveIds, setFailedSaveIds] = useState<Set<string>>(new Set());
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // caciocavallo-58535: when an aggregator (admin / scoped underboss) uploads on
+  // behalf of a local host, the backend rejects the upload with RECIPIENT_REQUIRED
+  // until a recipient is explicitly chosen. We capture the candidate list + the
+  // docs that need re-sending, then resubmit with `recipientHostUserId` once the
+  // host picks. Ordinary hosts never trigger this path (they're reimbursed as
+  // themselves) so they see no picker.
+  const [recipientPicker, setRecipientPicker] = useState<{
+    candidates: PayoutRecipientCandidate[];
+    docs: CreatePayoutPhotoInput[];
+    attemptedIds: string[];
+  } | null>(null);
+  const [recipientSubmitting, setRecipientSubmitting] = useState(false);
+  // caciocavallo-58535: prefetched candidate hosts. Non-null ⇒ the current user
+  // is an aggregator (admin / scoped underboss) for this party — the endpoint
+  // 403s for ordinary hosts, so we leave this null for them and they never see
+  // the picker. We use it to proactively open the picker before the upload POST
+  // (rather than waiting for the RECIPIENT_REQUIRED round-trip).
+  const aggregatorCandidatesRef = useRef<PayoutRecipientCandidate[] | null>(null);
+
   // sfogliatella-58523: ref-based in-flight guard for the auto-save effect. The
   // previous `addingReceipts`-state + `cancelled`-cleanup guard leaked: during a
   // multi-file upload every finished file mutated `uploadItems`, the effect
@@ -188,6 +210,29 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     loadEvent();
   }, [loadMine, loadEvent]);
 
+  // caciocavallo-58535: detect aggregator status once. The endpoint 403s for
+  // ordinary hosts (ref stays null → no picker), and returns the candidate hosts
+  // for admins / scoped underbosses. The primary host (even if they happen to be
+  // a scoped underboss for their own city) is excluded by the backend's
+  // `party.userId !== req.userId` rule, so an aggregator who IS the primary host
+  // is never asked to pick — handled server-side; here we only need the list.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const candidates = await fetchPayoutRecipients(partyId);
+        if (!cancelled) aggregatorCandidatesRef.current = candidates;
+      } catch {
+        // 403 (ordinary host) or any error → no proactive picker; the
+        // RECIPIENT_REQUIRED fallback still covers the aggregator case.
+        if (!cancelled) aggregatorCandidatesRef.current = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId]);
+
   const readiness = data; // MyReimbursementResponse extends ReimbursementReadiness
   const submittedAt = data?.submittedForReviewAt ?? null;
   const receipts = data?.receipts ?? [];
@@ -242,20 +287,42 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     // previous save attempt failed (so we don't loop — Retry bumps `retryNonce`
     // to bypass the flag) and items already mid-POST (`inFlightIdsRef`).
     if (savingRef.current) return;
+    // caciocavallo-58535: don't auto-fire a new POST while the recipient picker
+    // is open — wait for the host to choose (confirmRecipient does the save).
+    if (recipientPicker) return;
     const ready = uploadItems.filter(
       (r) => isReadyItem(r) && !failedSaveIds.has(r.id) && !inFlightIdsRef.current.has(r.id)
     );
     if (ready.length === 0) return;
 
-    savingRef.current = true;
     const attemptedIds = ready.map((r) => r.id);
+    const docs = ready.flatMap(buildDocsFromItem);
+
+    // caciocavallo-58535: if we already know the user is an aggregator (the
+    // payout-recipients prefetch resolved), open the picker BEFORE the upload
+    // instead of taking the RECIPIENT_REQUIRED round-trip. Flag the items so the
+    // auto-save loop pauses on them until the host picks a recipient.
+    if (aggregatorCandidatesRef.current) {
+      setFailedSaveIds((prev) => {
+        const next = new Set(prev);
+        attemptedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setRecipientPicker({
+        candidates: aggregatorCandidatesRef.current,
+        docs,
+        attemptedIds,
+      });
+      return;
+    }
+
+    savingRef.current = true;
     attemptedIds.forEach((id) => inFlightIdsRef.current.add(id));
     setAddingReceipts(true);
     setReceiptError(null);
 
     (async () => {
       try {
-        const docs = ready.flatMap(buildDocsFromItem);
         const res = await addReimbursementReceipts(partyId, docs);
         // The POST persisted server-side, so ALWAYS reconcile (no cancellation
         // bail-out) — that bail-out is what lost the UI before.
@@ -280,15 +347,31 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
         loadMine(true);
         loadEvent();
       } catch (err: any) {
-        // grissini-58511: keep the failed items in the buffer (don't drop them)
-        // and flag them so the automatic pass stops retrying. The Retry button
-        // clears these flags for one pass.
-        setReceiptError(err?.message || 'Failed to add receipt');
-        setFailedSaveIds((prev) => {
-          const next = new Set(prev);
-          attemptedIds.forEach((id) => next.add(id));
-          return next;
-        });
+        // caciocavallo-58535: an aggregator (admin / scoped underboss) must pick
+        // which host the reimbursement is for. The backend returns a candidate
+        // list in `err.data.candidates`; open the picker (don't surface a raw
+        // error) and stash the docs so we can resubmit with the chosen recipient.
+        if (err?.code === 'RECIPIENT_REQUIRED') {
+          const candidates = (err?.data?.candidates as PayoutRecipientCandidate[]) ?? [];
+          // Flag the attempted items so the automatic pass stops retrying them
+          // while the picker is open; the resubmit clears them on success.
+          setFailedSaveIds((prev) => {
+            const next = new Set(prev);
+            attemptedIds.forEach((id) => next.add(id));
+            return next;
+          });
+          setRecipientPicker({ candidates, docs, attemptedIds });
+        } else {
+          // grissini-58511: keep the failed items in the buffer (don't drop them)
+          // and flag them so the automatic pass stops retrying. The Retry button
+          // clears these flags for one pass.
+          setReceiptError(err?.message || 'Failed to add receipt');
+          setFailedSaveIds((prev) => {
+            const next = new Set(prev);
+            attemptedIds.forEach((id) => next.add(id));
+            return next;
+          });
+        }
       } finally {
         attemptedIds.forEach((id) => inFlightIdsRef.current.delete(id));
         savingRef.current = false;
@@ -296,7 +379,7 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadItems, partyId, buildDocsFromItem, isReadyItem, failedSaveIds, retryNonce, loadMine, loadEvent]);
+  }, [uploadItems, partyId, buildDocsFromItem, isReadyItem, failedSaveIds, retryNonce, loadMine, loadEvent, recipientPicker]);
 
   // grissini-58511: explicit Retry — clear the failed flags so the auto-save
   // effect re-attempts the now-unblocked items on its next run, and bump the
@@ -306,6 +389,56 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     setReceiptError(null);
     setFailedSaveIds(new Set());
     setRetryNonce((n) => n + 1);
+  }, []);
+
+  // caciocavallo-58535: resubmit the stashed receipt docs with the host the
+  // aggregator picked. On success, reconcile exactly like the happy-path
+  // auto-save (clear the buffer rows, refresh the rolling record + roll-up).
+  const confirmRecipient = useCallback(
+    async (recipientUserId: string) => {
+      if (!recipientPicker) return;
+      const { docs, attemptedIds } = recipientPicker;
+      setRecipientSubmitting(true);
+      setReceiptError(null);
+      try {
+        const res = await addReimbursementReceipts(partyId, docs, recipientUserId);
+        setCapWarning(res.capWarning ?? null);
+        const appended = new Set(attemptedIds);
+        setUploadItems((prev) => prev.filter((r) => !appended.has(r.id)));
+        // Clear the failed flags for these items now that they've been saved.
+        setFailedSaveIds((prev) => {
+          const next = new Set(prev);
+          attemptedIds.forEach((id) => next.delete(id));
+          return next;
+        });
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                reimbursement: res.reimbursement,
+                receipts: res.receipts,
+                eligibleTotalUsd: res.eligibleTotalUsd,
+                hasReceipt: res.receipts.length > 0,
+              }
+            : prev
+        );
+        loadMine(true);
+        loadEvent();
+        setRecipientPicker(null);
+      } catch (err: any) {
+        setReceiptError(err?.message || 'Failed to add receipt');
+      } finally {
+        setRecipientSubmitting(false);
+      }
+    },
+    [recipientPicker, partyId, loadMine, loadEvent]
+  );
+
+  // Closing the picker without choosing: clear the stash. The attempted items
+  // stay flagged (failedSaveIds) so the auto-save loop won't immediately re-fire
+  // the same RECIPIENT_REQUIRED rejection; the host can Retry to reopen it.
+  const closeRecipientPicker = useCallback(() => {
+    setRecipientPicker(null);
   }, []);
 
   // grissini-58511: are there local uploads that haven't been persisted yet?
@@ -846,6 +979,16 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           onSubmitted={() => {
             setShowAppealModal(false);
           }}
+        />
+      )}
+
+      {/* ===== caciocavallo-58535: aggregator recipient picker ===== */}
+      {recipientPicker && (
+        <RecipientPickerModal
+          candidates={recipientPicker.candidates}
+          submitting={recipientSubmitting}
+          onConfirm={confirmRecipient}
+          onClose={closeRecipientPicker}
         />
       )}
     </div>

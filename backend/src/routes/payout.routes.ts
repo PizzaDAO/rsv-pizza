@@ -36,6 +36,11 @@ import {
   NON_TERMINAL_PAYOUT_STATUSES,
   payoutRowSnapshotFromUser,
 } from '../services/payout-snapshot.js';
+import {
+  isAggregatorForParty,
+  buildPartyRecipientCandidates,
+  assertRecipientIsPartyHost,
+} from '../services/payout-recipients.js';
 import { recomputeRefundTags } from '../services/refundTag.js';
 
 const router = Router();
@@ -64,6 +69,8 @@ router.use('/:partyId/payouts', requireAuth);
 // Same caveat as above — the router is mounted at /api/parties, so this must be
 // path-scoped to /:partyId/reimbursement and never an unconditioned router.use.
 router.use('/:partyId/reimbursement', requireAuth);
+// caciocavallo-58535: path-scope auth on the payout-recipients picker endpoint.
+router.use('/:partyId/payout-recipients', requireAuth);
 
 // Aggressive rate limit on the OCR-preview endpoint to prevent OpenAI quota abuse.
 // 20 calls/hour/user, keyed by userId (falls back to IP).
@@ -933,15 +940,38 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // enforced for all other callers via the existing check.)
     const recipientOverrideRequested =
       typeof recipientHostUserId === 'string' && recipientHostUserId.trim().length > 0;
+
+    // caciocavallo-58535: load the party once (scope fields + primary host) and
+    // compute whether the caller is acting as an AGGREGATOR on behalf of a local
+    // host — i.e. an admin OR an underboss scoped to this party who is NOT the
+    // event's primary host. Aggregators may set `recipientHostUserId` (widened
+    // from the old admin-only override) and are REQUIRED to pick a recipient
+    // rather than silently default to themselves. Ordinary hosts/co-hosts are
+    // unaffected.
+    const partyForAggregator = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: {
+        userId: true,
+        region: true,
+        name: true,
+        city: true,
+        eventType: true,
+      },
+    });
+    const actingAsAggregator =
+      !!partyForAggregator &&
+      partyForAggregator.userId !== req.userId &&
+      (await isAggregatorForParty(req.userEmail, partyForAggregator));
+
     const skipPartyEditCheck =
-      (recipientOverrideRequested && (await isAnyAdmin(req.userEmail))) ||
+      (recipientOverrideRequested && actingAsAggregator) ||
       isShippingPurpose;
     if (!skipPartyEditCheck) {
       const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
       if (!canEdit) {
         if (recipientOverrideRequested) {
           throw new AppError(
-            'Only payment admins, admins, or super admins can create prepayments on behalf of other hosts.',
+            'Only payment admins, admins, super admins, or scoped underbosses can create prepayments on behalf of other hosts.',
             403,
             'FORBIDDEN_PREPAY',
           );
@@ -1007,9 +1037,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     if (!req.userId) {
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
-    const adminPrepayingForCohost =
-      recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
-    if (!adminPrepayingForCohost) {
+    // caciocavallo-58535: widened from admin-only to "aggregator acting on
+    // behalf" (admin OR underboss scoped to this party, and not the primary
+    // host). When an aggregator prepays for a local host, the aggregator's own
+    // payment method / attestation / tax form aren't the relevant signals.
+    const aggregatorPrepayingForCohost = recipientOverrideRequested && actingAsAggregator;
+    if (!aggregatorPrepayingForCohost) {
       await assertUserHasValidPayoutMethod(req.userId);
     }
 
@@ -1024,7 +1057,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // after their own review (caps + fake-detection + SWC-hub acks) and is not
     // the host attesting receipts — consistent with the payout-method and
     // tax-form gates.
-    if (!isShippingPurpose && !adminPrepayingForCohost) {
+    if (!isShippingPurpose && !aggregatorPrepayingForCohost) {
       if (receiptAttested !== true) {
         throw new AppError(
           'Confirm your receipts are submitted and itemized before submitting.',
@@ -1096,7 +1129,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // admin-override resolution here (a couple of lines below the same logic
     // runs for `effectiveHostUserId`).
     let taxFormSnapshotId: string | null = null;
-    const skipTaxFormGate = isShippingPurpose || adminPrepayingForCohost;
+    const skipTaxFormGate = isShippingPurpose || aggregatorPrepayingForCohost;
     if (!skipTaxFormGate) {
       // culatello-92106: read the per-event flag before doing anything else.
       // We always still snapshot the latest form onto the payout when one
@@ -1524,9 +1557,7 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // `skipPartyEditCheck` admin path (shipping) is also exempt — shipping
     // receipts are handled by their own flow.
     if (noReceiptsFallback) {
-      const adminOnBehalf =
-        recipientOverrideRequested && (await isAnyAdmin(req.userEmail));
-      if (!adminOnBehalf && !isShippingPurpose) {
+      if (!aggregatorPrepayingForCohost && !isShippingPurpose) {
         throw new AppError(
           'Upload at least one receipt before submitting a payout.',
           400,
@@ -1546,27 +1577,51 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
 
-    // bismarck-92103: admin-only override — if `recipientHostUserId` is set
-    // AND the caller is an admin (or super_admin), the payout is created
-    // ON BEHALF OF that user (`hostUserId` = the recipient, not the admin).
-    // Non-admin callers passing the field are silently ignored — falling
-    // through to `req.userId` keeps the existing behavior intact.
+    // bismarck-92103 + caciocavallo-58535: recipient override. If
+    // `recipientHostUserId` is set AND the caller is acting as an aggregator
+    // (admin OR underboss scoped to this party, and not the primary host), the
+    // payout is created ON BEHALF OF that user (`hostUserId` = the recipient,
+    // not the uploader). Non-aggregator callers passing the field are silently
+    // ignored — falling through to `req.userId` keeps existing behavior intact.
+    //
+    // Additionally (caciocavallo-58535): an aggregator must EXPLICITLY pick a
+    // recipient — we no longer silently default the payout to the aggregator.
     let effectiveHostUserId: string = req.userId;
     const callerIsAdmin = await isAnyAdmin(req.userEmail);
-    if (typeof recipientHostUserId === 'string' && recipientHostUserId.trim()) {
-      if (callerIsAdmin) {
-        const targetUser = await prisma.user.findUnique({
-          where: { id: recipientHostUserId.trim() },
-          select: { id: true },
-        });
-        if (!targetUser) {
-          throw new AppError(
-            'recipientHostUserId does not match any User',
-            400,
-            'INVALID_RECIPIENT_HOST_USER_ID',
-          );
-        }
-        effectiveHostUserId = targetUser.id;
+    // When an override is honored we derive wallet/method from the RECIPIENT'S
+    // profile and ignore any body-supplied wallet, so an aggregator can't stamp
+    // their own typed wallet onto a local host's payout.
+    let recipientSnapshot: ReturnType<typeof payoutRowSnapshotFromUser> | null = null;
+    let recipientOverrideNote: string | null = null;
+    if (actingAsAggregator && !recipientOverrideRequested) {
+      // No silent default — require an explicit pick, returning the candidates
+      // so the frontend can render the picker without a second round-trip.
+      const candidates = await buildPartyRecipientCandidates(partyId);
+      throw new AppError(
+        'Select which host this reimbursement is for',
+        400,
+        'RECIPIENT_REQUIRED',
+        { candidates },
+      );
+    }
+    if (recipientOverrideRequested && actingAsAggregator) {
+      const trimmed = (recipientHostUserId as string).trim();
+      const recipient = await assertRecipientIsPartyHost(trimmed, partyId);
+      effectiveHostUserId = trimmed;
+      // Snapshot wallet/method from the recipient's profile (NOT the uploader's,
+      // NOT the body). Empty profile → null snapshot → row un-payable until the
+      // recipient sets their wallet.
+      const recipientUser = await prisma.user.findUnique({
+        where: { id: trimmed },
+        select: {
+          preferredPayoutMethod: true,
+          payoutWalletAddress: true,
+          payoutBankDetails: true,
+        },
+      });
+      recipientSnapshot = recipientUser ? payoutRowSnapshotFromUser(recipientUser) : null;
+      if (effectiveHostUserId !== req.userId) {
+        recipientOverrideNote = `Recipient set to ${recipient.email ?? trimmed} by ${req.userEmail ?? 'an aggregator'}`;
       }
     }
 
@@ -1600,6 +1655,43 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
     // explicitly since it's a sibling FK, not a back-relation.
     const uploaderUserId = req.userId ?? null;
     const uploaderEmail = req.userEmail ?? null;
+
+    // caciocavallo-58535: when a recipient override is in effect, the row's
+    // wallet/method come from the RECIPIENT'S profile snapshot (never the
+    // uploader's typed/body values). Otherwise use the body-derived fields as
+    // before. payoutWalletInput + mercuryCardLast4 are display-only on the
+    // body path; they don't apply to a profile-derived snapshot.
+    const payoutDestinationFields: Record<string, unknown> = recipientSnapshot
+      ? {
+          payoutMethod: recipientSnapshot.payoutMethod,
+          payoutWalletAddress: recipientSnapshot.payoutWalletAddress,
+          payoutWalletInput: null,
+          payoutBankDetails: recipientSnapshot.payoutBankDetails,
+          mercuryCardLast4: null,
+        }
+      : {
+          payoutMethod: hasMethod ? payoutMethod : null,
+          payoutWalletAddress: resolvedWallet,
+          payoutWalletInput: resolvedWalletInput,
+          ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
+            ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
+            : {}),
+          mercuryCardLast4:
+            hasMethod && payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
+              ? mercuryCardLast4.slice(-4)
+              : null,
+        };
+
+    // caciocavallo-58535: when an aggregator sets the recipient, append an audit
+    // line to hostNotes (mirrors the admin external-payment recipientOverrideNote).
+    const hostNotesValue = (() => {
+      const base =
+        typeof hostNotes === 'string' && hostNotes.trim().length > 0
+          ? sanitizePgString(hostNotes.trim())
+          : null;
+      if (!recipientOverrideNote) return base;
+      return base ? `${base}\n${recipientOverrideNote}` : recipientOverrideNote;
+    })();
 
     // napoletana-58211: the `photos` table is the canonical store for ALL
     // party photos. For each kind='pizza' payout doc, insert the photos row
@@ -1689,22 +1781,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           extractedAmountUsd: new Decimal(effectiveExtractedUsd),
           finalAmountUsd: new Decimal(finalUsd),
           status: 'pending',
-          // arugula-38633 v3 follow-up: payoutMethod is optional. Persist null
-          // when the host hasn't set their payment details yet.
-          payoutMethod: hasMethod ? payoutMethod : null,
-          payoutWalletAddress: resolvedWallet,
-          // caciotta-92104: preserve original ENS input alongside 0x. Null
-          // when the host typed a 0x directly (no display difference to show).
-          payoutWalletInput: resolvedWalletInput,
-          ...(hasMethod && payoutMethod === 'wire' && payoutBankDetails && typeof payoutBankDetails === 'object'
-            ? { payoutBankDetails: payoutBankDetails as Prisma.InputJsonValue }
-            : {}),
-          mercuryCardLast4: hasMethod && payoutMethod === 'mercury_card' && typeof mercuryCardLast4 === 'string'
-            ? mercuryCardLast4.slice(-4)
-            : null,
-          hostNotes: typeof hostNotes === 'string' && hostNotes.trim().length > 0
-            ? sanitizePgString(hostNotes.trim())
-            : null,
+          // arugula-38633 v3 follow-up: payoutMethod is optional (null when the
+          // host hasn't set details). caciocavallo-58535: when a recipient
+          // override is in effect these come from the recipient's profile
+          // snapshot, never the uploader's body values (see payoutDestinationFields).
+          ...payoutDestinationFields,
+          hostNotes: hostNotesValue,
           // bismarck-92103: admin-supplied adminNotes (e.g. "Prepayment for X")
           // when an admin creates a prepayment on behalf of a cohost.
           adminNotes: initialAdminNotes,
@@ -1741,7 +1823,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
 
     // Optional: save host defaults. Only meaningful when a method is set —
     // skip entirely on zero-method submissions (arugula-38633 v3 follow-up).
-    if (saveAsDefault === true && hasMethod) {
+    // caciocavallo-58535: never persist body-supplied wallet/method to the
+    // uploader's profile when they're an aggregator prepaying for a local host
+    // (the body values aren't the uploader's own defaults).
+    if (saveAsDefault === true && hasMethod && !recipientSnapshot) {
       try {
         await prisma.user.update({
           where: { id: req.userId },
@@ -2704,6 +2789,39 @@ router.delete('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respo
 });
 
 // =============================================================================
+// caciocavallo-58535: GET /:partyId/payout-recipients
+// =============================================================================
+//
+// Returns the candidate hosts a payout for this party may be attributed to
+// (primary host + co-hosts that resolve to real Users). Used by the /payments
+// receipt-upload picker so an aggregator (admin / scoped underboss) can pick
+// which host a reimbursement is for BEFORE attempting an upload.
+//
+// Gated to aggregators: admins + underbosses scoped to this party. Ordinary
+// hosts don't need it (they're always reimbursed as themselves) and shouldn't
+// see the other hosts' candidate emails.
+router.get('/:partyId/payout-recipients', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId } = req.params;
+    const party = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { userId: true, region: true, name: true, city: true, eventType: true },
+    });
+    if (!party) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const isAggregator = await isAggregatorForParty(req.userEmail, party);
+    if (!isAggregator) {
+      throw new AppError('Forbidden', 403, 'FORBIDDEN');
+    }
+    const candidates = await buildPartyRecipientCandidates(partyId);
+    res.json({ candidates });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =============================================================================
 // ziti-58300: event-level rolling reimbursements
 // =============================================================================
 //
@@ -3062,13 +3180,69 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
     const uploaderUserId = req.userId;
     const uploaderEmail = req.userEmail ?? null;
 
-    // Find-or-create the caller's active rolling record, append the docs, then
-    // recompute finalAmountUsd from ALL eligible receipts on the record.
+    // caciocavallo-58535: resolve who this rolling reimbursement is FOR.
+    //
+    // Historically the rolling record was keyed on `hostUserId = uploaderUserId`
+    // and the uploader's wallet was snapshotted onto it — fine when a host
+    // uploads their own receipts, but silently WRONG when an underboss/admin
+    // does data-entry for a local host (the payout would pay the aggregator).
+    //
+    // Rule: if the uploader is an aggregator (admin OR underboss scoped to this
+    // party) AND is NOT the event's primary host, REQUIRE an explicit recipient
+    // pick (no silent default). An ordinary host/co-host uploading their own
+    // receipts is unaffected (falls through to `req.userId`).
+    const partyForRecipient = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: {
+        userId: true,
+        region: true,
+        name: true,
+        city: true,
+        eventType: true,
+      },
+    });
+    if (!partyForRecipient) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const actingAsAggregator =
+      partyForRecipient.userId !== uploaderUserId &&
+      (await isAggregatorForParty(req.userEmail, partyForRecipient));
+
+    const recipientHostUserIdRaw =
+      typeof (req.body || {}).recipientHostUserId === 'string'
+        ? (req.body as any).recipientHostUserId.trim()
+        : '';
+
+    let effectiveRecipientId = uploaderUserId;
+    let recipientOverrideNote: string | null = null;
+    if (actingAsAggregator) {
+      if (!recipientHostUserIdRaw) {
+        // No silent default — reject with the candidate list so the frontend
+        // can render the picker without a second round-trip.
+        const candidates = await buildPartyRecipientCandidates(partyId);
+        throw new AppError(
+          'Select which host this reimbursement is for',
+          400,
+          'RECIPIENT_REQUIRED',
+          { candidates },
+        );
+      }
+      const recipient = await assertRecipientIsPartyHost(recipientHostUserIdRaw, partyId);
+      effectiveRecipientId = recipientHostUserIdRaw;
+      if (effectiveRecipientId !== uploaderUserId) {
+        recipientOverrideNote = `Recipient set to ${recipient.email ?? recipientHostUserIdRaw} by ${uploaderEmail ?? 'an aggregator'}`;
+      }
+    }
+    // Non-aggregators passing recipientHostUserId are ignored (falls through to
+    // self) — same posture as the manual POST /payouts path.
+
+    // Find-or-create the recipient's active rolling record, append the docs,
+    // then recompute finalAmountUsd from ALL eligible receipts on the record.
     const updated = await prisma.$transaction(async (tx) => {
       let record = await tx.payout.findFirst({
         where: {
           partyId,
-          hostUserId: uploaderUserId,
+          hostUserId: effectiveRecipientId,
           purpose: 'event',
           status: { in: [...NON_TERMINAL_PAYOUT_STATUSES] },
         },
@@ -3076,7 +3250,9 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
         include: { documents: true },
       });
 
-      // Stamp partyId + uploader on every new doc (agnolotti-58291 + pancetta-37195).
+      // Stamp partyId + uploader on every new doc (agnolotti-58291 +
+      // pancetta-37195). Document attribution stays with the UPLOADER even when
+      // the payout is credited to a different recipient host (no data loss).
       const stampedDocs = docsToCreate.map((d) => ({
         ...d,
         partyId,
@@ -3089,12 +3265,14 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
         // Create a fresh rolling record. finalAmountUsd is set after we know
         // the eligible sum; seed FX headline from the first resolved receipt.
         const firstResolved = docsToCreate.find((d) => d.ocrAmount != null);
-        // ricotta-58512: snapshot the uploader's payout method/wallet onto the
-        // new rolling row so the execute/send path (which reads the row, not the
-        // host profile) can pay it. Covers "host set payment details first, then
-        // uploaded receipts, admin approved the rolling row without a submit."
-        const uploader = await tx.user.findUnique({
-          where: { id: uploaderUserId },
+        // ricotta-58512 + caciocavallo-58535: snapshot the RECIPIENT'S payout
+        // method/wallet onto the new rolling row so the execute/send path (which
+        // reads the row, not the host profile) can pay it. When an aggregator
+        // uploads for a local host, this is the LOCAL HOST'S profile — never the
+        // uploader's. An empty recipient profile yields a null/empty snapshot, so
+        // the row is correctly un-payable until the recipient sets their wallet.
+        const recipientUser = await tx.user.findUnique({
+          where: { id: effectiveRecipientId },
           select: {
             preferredPayoutMethod: true,
             payoutWalletAddress: true,
@@ -3104,7 +3282,7 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
         const created = await tx.payout.create({
           data: {
             partyId,
-            hostUserId: uploaderUserId,
+            hostUserId: effectiveRecipientId,
             purpose: 'event',
             originalAmount: firstResolved?.originalAmount ?? new Decimal(0),
             originalCurrency: firstResolved?.originalCurrency ?? 'USD',
@@ -3112,7 +3290,9 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
             extractedAmountUsd: new Decimal(0),
             finalAmountUsd: new Decimal(0),
             status: 'pending',
-            ...(uploader ? payoutRowSnapshotFromUser(uploader) : {}),
+            // caciocavallo-58535: audit who set the recipient (only on override).
+            hostNotes: recipientOverrideNote,
+            ...(recipientUser ? payoutRowSnapshotFromUser(recipientUser) : {}),
             documents: { create: stampedDocs },
           },
           include: { documents: true },

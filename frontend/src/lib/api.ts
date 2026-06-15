@@ -90,9 +90,17 @@ export async function apiRequest<T>(
     // the extra property.
     const err = new Error(
       error.message || error.error?.message || `API error: ${response.status}`,
-    ) as Error & { code?: string };
+    ) as Error & { code?: string; data?: Record<string, unknown> };
     if (typeof error.error?.code === 'string') err.code = error.error.code;
     else if (typeof error.code === 'string') err.code = error.code;
+    // caciocavallo-58535: preserve any structured payload the backend attaches
+    // alongside the error (e.g. RECIPIENT_REQUIRED ships a `candidates` list so
+    // the recipient picker can render without a second round-trip). We expose
+    // the whole `error.error` object (minus message/code) on `err.data`.
+    if (error.error && typeof error.error === 'object') {
+      const { message: _m, code: _c, ...rest } = error.error as Record<string, unknown>;
+      if (Object.keys(rest).length > 0) err.data = rest;
+    }
     throw err;
   }
 
@@ -6637,12 +6645,47 @@ export async function fetchMyReimbursement(partyId: string): Promise<MyReimburse
  */
 export async function addReimbursementReceipts(
   partyId: string,
-  docs: CreatePayoutPhotoInput[]
+  docs: CreatePayoutPhotoInput[],
+  // caciocavallo-58535: when an aggregator (admin / scoped underboss) uploads on
+  // behalf of a local host, the recipient must be picked explicitly. The backend
+  // rejects with RECIPIENT_REQUIRED + a candidate list until this is supplied.
+  recipientHostUserId?: string,
 ): Promise<ReimbursementMutationResponse> {
   return apiRequest<ReimbursementMutationResponse>(
     `/api/parties/${partyId}/reimbursement/receipts`,
-    { method: 'POST', body: { receiptPhotos: docs }, requireAuth: true, timeoutMs: null } // backend OCRs appended receipts inline — never abort client-side
+    {
+      method: 'POST',
+      body: {
+        receiptPhotos: docs,
+        ...(recipientHostUserId ? { recipientHostUserId } : {}),
+      },
+      requireAuth: true,
+      timeoutMs: null, // backend OCRs appended receipts inline — never abort client-side
+    },
   );
+}
+
+// caciocavallo-58535: a host a reimbursement can be attributed to (picker entry).
+export interface PayoutRecipientCandidate {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  isPrimaryHost: boolean;
+}
+
+/**
+ * Fetch the candidate recipient hosts for a party's reimbursement. Gated to
+ * admins + underbosses scoped to that party — ordinary hosts get 403. Used to
+ * proactively render the recipient picker on /payments.
+ */
+export async function fetchPayoutRecipients(
+  partyId: string,
+): Promise<PayoutRecipientCandidate[]> {
+  const res = await apiRequest<{ candidates: PayoutRecipientCandidate[] }>(
+    `/api/parties/${partyId}/payout-recipients`,
+    { requireAuth: true },
+  );
+  return res.candidates;
 }
 
 /** Remove a receipt from the caller's active rolling record + recompute. */
