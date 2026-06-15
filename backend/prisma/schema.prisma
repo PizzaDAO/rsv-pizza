@@ -327,6 +327,7 @@ model Party {
   // suppli-58533: non-host Telegram contributors (photo-only submitters) who
   // tapped a `submit_<token>` group link. Verified hosts use host_telegram_chat_id.
   telegramContributors    PartyTelegramContributor[]
+  telegramHosts           PartyTelegramHost[]
 
   @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
   @@map("parties")
@@ -2532,4 +2533,24 @@ model PartyTelegramContributor {
   @@unique([partyId, chatId])
   @@index([chatId])
   @@map("party_telegram_contributors")
+}
+
+// panettone-58533: VERIFIED host Telegram chats (multi-host). Replaces the
+// single parties.host_telegram_chat_id as the auth source for inbound host
+// submissions, so multiple co-hosts can each submit. host_telegram_chat_id is
+// retained as the single primary OUTBOUND DM target. Table ALREADY applied to
+// prod separately — do NOT auto-apply a migration.
+model PartyTelegramHost {
+  id             String   @id @default(uuid()) @db.Uuid
+  partyId        String   @map("party_id") @db.Uuid
+  party          Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  chatId         BigInt   @map("chat_id")
+  telegramUserId BigInt?  @map("telegram_user_id")
+  username       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([partyId, chatId])
+  @@index([chatId])
+  @@map("party_telegram_hosts")
 }
