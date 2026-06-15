@@ -1261,6 +1261,22 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
         <PayoutsFilterBar
           filters={filters}
           onChange={setFilters}
+          // tortellini: the view-mode segmented control + row count + Saved
+          // Views now live INSIDE the filter bar's header row.
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          rowLabel={loading ? '…' : visibleRowLabel}
+          savedViewsSlot={
+            <SavedViewsMenu
+              scope="payments"
+              currentParams={filtersToSearchParams(filters, viewMode).toString()}
+              onApply={(p) => {
+                const { filters: f, viewMode: vm } = searchParamsToFilters(new URLSearchParams(p), regions);
+                setFilters((prev) => ({ ...prev, ...f }));
+                if (vm) setViewMode(vm);
+              }}
+            />
+          }
           // panuozzo-92114: re-inject the hard `regions` scope on regional
           // portals so Reset can't silently widen a regional underboss's view.
           // The URL sync effect then clears the query string automatically.
@@ -1299,75 +1315,8 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
           showStatusTabs={viewMode !== 'payments'}
         />
 
-        {/* etruria-92103: by-city / by-payment view toggle. by-city is the
-            default; the choice persists in localStorage. Lives on its own
-            row above the bulk-actions bar so it doesn't fight the filter
-            bar's sticky position.
-            coppa-92106: third "Payments" tab shows the actual payments ledger
-            (status=paid|completed, proven-only, sorted by paid_at DESC). */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-sm font-medium text-theme-text-muted">
-            {loading ? '…' : visibleRowLabel}
-          </span>
-          <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wide text-theme-text-muted">View:</span>
-          <div
-            role="tablist"
-            aria-label="Payments view mode"
-            className="inline-flex rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'by-city'}
-              onClick={() => setViewMode('by-city')}
-              className={`px-3 py-1.5 text-sm font-medium ${
-                viewMode === 'by-city'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
-              }`}
-            >
-              By city
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'by-payment'}
-              onClick={() => setViewMode('by-payment')}
-              className={`px-3 py-1.5 text-sm font-medium ${
-                viewMode === 'by-payment'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
-              }`}
-            >
-              By payment
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'payments'}
-              onClick={() => setViewMode('payments')}
-              className={`px-3 py-1.5 text-sm font-medium ${
-                viewMode === 'payments'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-theme-text-muted hover:bg-theme-surface-hover'
-              }`}
-            >
-              Payments
-            </button>
-          </div>
-          {/* montanara-58497: per-account saved filter views */}
-          <SavedViewsMenu
-            scope="payments"
-            currentParams={filtersToSearchParams(filters, viewMode).toString()}
-            onApply={(p) => {
-              const { filters: f, viewMode: vm } = searchParamsToFilters(new URLSearchParams(p), regions);
-              setFilters((prev) => ({ ...prev, ...f }));
-              if (vm) setViewMode(vm);
-            }}
-          />
-          </div>
-        </div>
+        {/* tortellini: the view-mode toggle + row count + Saved Views row that
+            used to live here has moved into PayoutsFilterBar's header row. */}
 
         {/* coppa-92106: breadcrumb under the toggle when the Payments-ledger
             view is active. Surfaces the forced status + sort so the admin
