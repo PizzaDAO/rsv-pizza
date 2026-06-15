@@ -90,6 +90,9 @@ router.delete(
           hostTelegramLinkToken: null,
         },
       });
+      // panettone-58533: disconnect must also revoke inbound submission auth by
+      // removing all verified host chat rows for this party.
+      await prisma.partyTelegramHost.deleteMany({ where: { partyId } });
 
       res.json({ success: true });
     } catch (error) {

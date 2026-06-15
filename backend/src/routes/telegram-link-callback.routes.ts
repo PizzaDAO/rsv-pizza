@@ -119,14 +119,35 @@ router.post('/link-host', async (req: Request, res: Response, _next: NextFunctio
       normalizedTapper !== '' &&
       authorizedHandles.some((h) => normalizeTgHandle(h) === normalizedTapper);
 
+    // panettone-58533: parse telegramUserId once so BOTH the host and
+    // contributor branches can persist it.
+    const tgUserId =
+      telegramUserId !== undefined &&
+      telegramUserId !== null &&
+      /^-?\d+$/.test(`${telegramUserId}`.trim())
+        ? BigInt(`${telegramUserId}`.trim())
+        : null;
+
     if (isHost) {
-      // Verified host (primary or editor co-host) — set/refresh the host link.
+      // panettone-58533: multi-host. Record this chat in party_telegram_hosts
+      // (the auth source for inbound submissions) so multiple co-hosts can each
+      // submit. Keep host_telegram_chat_id as the single primary OUTBOUND DM
+      // target (last verified host wins that slot).
+      await prisma.partyTelegramHost.upsert({
+        where: { partyId_chatId: { partyId: party.id, chatId: BigInt(chatIdStr) } },
+        create: {
+          partyId: party.id,
+          chatId: BigInt(chatIdStr),
+          telegramUserId: tgUserId,
+          username: tapperHandle,
+        },
+        update: { username: tapperHandle, telegramUserId: tgUserId, updatedAt: new Date() },
+      });
       await prisma.party.update({
         where: { id: party.id },
         data: { hostTelegramChatId: BigInt(chatIdStr) },
       });
-      // Clear any stale photo-only contributor row for this chat so it doesn't
-      // shadow the host binding in resolveSubmitterContext ("most recent wins").
+      // Clear any stale photo-only contributor row so it can't shadow this host.
       await prisma.partyTelegramContributor.deleteMany({
         where: { partyId: party.id, chatId: BigInt(chatIdStr) },
       });
@@ -137,13 +158,8 @@ router.post('/link-host', async (req: Request, res: Response, _next: NextFunctio
     // CRITICAL: never set host_telegram_chat_id here — that was the hijack.
     if (linkPurpose === 'submit') {
       // Photo-only contributor: register them so host-inbound can route their
-      // photos to this party's gallery (pending review).
-      const tgUserId =
-        telegramUserId !== undefined &&
-        telegramUserId !== null &&
-        /^-?\d+$/.test(`${telegramUserId}`.trim())
-          ? BigInt(`${telegramUserId}`.trim())
-          : null;
+      // photos to this party's gallery (pending review). Reuses the hoisted
+      // `tgUserId` parsed above (panettone-58533).
       await prisma.partyTelegramContributor.upsert({
         where: { partyId_chatId: { partyId: party.id, chatId: BigInt(chatIdStr) } },
         create: {

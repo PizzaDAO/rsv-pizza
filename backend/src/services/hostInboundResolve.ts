@@ -40,9 +40,9 @@ export interface HostInboundParty {
 }
 
 /**
- * suppli-58533: per-type authorization. A Telegram chatId can be either the
- * VERIFIED host of a party (parties.host_telegram_chat_id) or a photo-only
- * CONTRIBUTOR (party_telegram_contributors). resolveSubmitterContext picks the
+ * suppli-58533: per-type authorization. A Telegram chatId can be either a
+ * VERIFIED host of a party (party_telegram_hosts rows where chat_id = chatId) or
+ * a photo-only CONTRIBUTOR (party_telegram_contributors). resolveSubmitterContext picks the
  * single most-recently-active candidate across BOTH sets and returns its role.
  */
 export interface SubmitterContext {
@@ -88,8 +88,9 @@ function slugOf(p: HostInboundParty): string | null {
 /**
  * Resolve the party a host's Telegram chatId belongs to.
  *
- * `parties.host_telegram_chat_id` is NOT unique — one chatId can map to many
- * parties (a host running multiple cities/years). Selection order:
+ * party_telegram_hosts rows where chat_id = chatId are NOT unique per chatId —
+ * one chatId can map to many parties (a host running multiple cities/years).
+ * Selection order:
  *   1. If exactly one party matches → that party.
  *   2. Pick the party with the MOST RECENT reminder
  *      (max of receipts/photo/wallet/attendance reminder timestamps).
@@ -108,11 +109,14 @@ export async function resolveHostPartyByChatId(
     return { kind: 'none' };
   }
 
-  const parties = (await prisma.party.findMany({
-    where: { hostTelegramChatId: chatIdBig },
-    select: PARTY_SELECT,
+  const hostRows = await prisma.partyTelegramHost.findMany({
+    where: { chatId: chatIdBig },
+    select: { party: { select: PARTY_SELECT } },
     orderBy: { createdAt: 'desc' },
-  })) as unknown as HostInboundParty[];
+  });
+  const parties = hostRows
+    .map((r) => r.party as unknown as HostInboundParty | null)
+    .filter((p): p is HostInboundParty => p != null);
 
   if (parties.length === 0) return { kind: 'none' };
   if (parties.length === 1) return { kind: 'party', party: parties[0] };
@@ -156,7 +160,7 @@ export async function resolveHostPartyByChatId(
  * suppli-58533: resolve a chatId to a SINGLE submitter context (host OR
  * contributor), choosing by "most recent action wins":
  *
- *  - Host candidates: parties where host_telegram_chat_id = chatId. Recency =
+ *  - Host candidates: party_telegram_hosts rows where chat_id = chatId. Recency =
  *    max(receipts/photo/wallet/attendance reminder timestamps), falling back to
  *    the event date so a host always has *some* ordering key.
  *  - Contributor candidates: party_telegram_contributors where chat_id = chatId.
@@ -177,12 +181,12 @@ export async function resolveSubmitterContext(
     return null;
   }
 
-  const [hostParties, contributorRows] = await Promise.all([
-    prisma.party.findMany({
-      where: { hostTelegramChatId: chatIdBig },
-      select: PARTY_SELECT,
-      orderBy: { createdAt: 'desc' },
-    }) as unknown as Promise<HostInboundParty[]>,
+  const [hostRows, contributorRows] = await Promise.all([
+    prisma.partyTelegramHost.findMany({
+      where: { chatId: chatIdBig },
+      orderBy: { updatedAt: 'desc' },
+      select: { party: { select: PARTY_SELECT } },
+    }),
     prisma.partyTelegramContributor.findMany({
       where: { chatId: chatIdBig },
       orderBy: { updatedAt: 'desc' },
@@ -202,7 +206,9 @@ export async function resolveSubmitterContext(
   };
   const candidates: Candidate[] = [];
 
-  for (const p of hostParties) {
+  for (const row of hostRows) {
+    const p = row.party as unknown as HostInboundParty | null;
+    if (!p) continue;
     // Host recency: most recent reminder, else event date, else 0.
     const r = maxReminder(p) ?? (p.date ? p.date.getTime() : 0);
     candidates.push({ role: 'host', party: p, recency: r, contributorUsername: null });
