@@ -185,7 +185,7 @@ export async function resolveSubmitterContext(
     prisma.partyTelegramHost.findMany({
       where: { chatId: chatIdBig },
       orderBy: { updatedAt: 'desc' },
-      select: { party: { select: PARTY_SELECT } },
+      select: { updatedAt: true, party: { select: PARTY_SELECT } },
     }),
     prisma.partyTelegramContributor.findMany({
       where: { chatId: chatIdBig },
@@ -209,8 +209,14 @@ export async function resolveSubmitterContext(
   for (const row of hostRows) {
     const p = row.party as unknown as HostInboundParty | null;
     if (!p) continue;
-    // Host recency: most recent reminder, else event date, else 0.
-    const r = maxReminder(p) ?? (p.date ? p.date.getTime() : 0);
+    // Host recency = the most recent of the host-link connect (row.updatedAt),
+    // any reminder, or the event date. Using the connect time makes a freshly
+    // linked host outrank a stale contributor row for a different event —
+    // symmetric with how contributor recency uses its own row.updatedAt.
+    const r = Math.max(
+      row.updatedAt ? row.updatedAt.getTime() : 0,
+      maxReminder(p) ?? (p.date ? p.date.getTime() : 0),
+    );
     candidates.push({ role: 'host', party: p, recency: r, contributorUsername: null });
   }
 
