@@ -25,13 +25,18 @@ export const NON_TERMINAL_PAYOUT_STATUSES = ['pending', 'approved', 'queued'] as
  * only for wire. The non-matching method field is nulled so switching method
  * leaves no stale field behind. Wallet is copied verbatim (it is already
  * ENS-resolved to 0x at the User PATCH boundary — do NOT re-resolve here).
+ *
+ * When the host has no explicit method but DOES have a wallet, the method
+ * defaults to 'usdc_base' (a bare 0x wallet only supports on-chain USDC) so the
+ * wallet is kept and the row stays payable instead of snapshotting method=null
+ * AND wallet=null (pecorino-58545).
  */
 export function payoutRowSnapshotFromUser(u: {
   preferredPayoutMethod: string | null;
   payoutWalletAddress: string | null;
   payoutBankDetails: Prisma.JsonValue | null;
 }) {
-  const method = u.preferredPayoutMethod ?? null;
+  const method = u.preferredPayoutMethod ?? (u.payoutWalletAddress ? 'usdc_base' : null);
   return {
     payoutMethod: method,
     payoutWalletAddress: method === 'usdc_base' ? (u.payoutWalletAddress ?? null) : null,
