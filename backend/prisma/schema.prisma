@@ -1981,6 +1981,10 @@ model Payout {
   // receipts until an admin acts).
   submittedForReviewAt DateTime? @map("submitted_for_review_at") @db.Timestamptz
 
+  // cannelloni-58543: set when the host submits for review without the required
+  // event photos via the acknowledgment checkbox. Null on photo-complete submits.
+  photosWaivedAt DateTime? @map("photos_waived_at") @db.Timestamptz
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

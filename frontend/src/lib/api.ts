@@ -6592,6 +6592,11 @@ export interface ReimbursementReadiness {
   paymentMethodValid: boolean;
   /** All of the above — the "Submit for review" toggle is enabled when true. */
   readyToSubmit: boolean;
+  /**
+   * cannelloni-58543: everything required EXCEPT the photo gates. Enables the
+   * "submit anyway" path once the host ticks the photo-waiver acknowledgment.
+   */
+  readyToSubmitWithoutPhotos: boolean;
 }
 
 export interface MyReimbursementResponse extends ReimbursementReadiness {
@@ -6702,14 +6707,17 @@ export async function removeReimbursementReceipt(
 /**
  * Flip the host "Submit for review" toggle. Backend enforces `readyToSubmit`
  * AND `attested === true` (NOT_READY / ATTESTATION_REQUIRED otherwise).
+ * cannelloni-58543: pass `photosWaived` to submit without the required event
+ * photos (gated on `readyToSubmitWithoutPhotos` server-side).
  */
 export async function submitReimbursement(
   partyId: string,
-  attested: boolean
+  attested: boolean,
+  photosWaived?: boolean
 ): Promise<{ reimbursement: Payout }> {
   return apiRequest<{ reimbursement: Payout }>(
     `/api/parties/${partyId}/reimbursement/submit`,
-    { method: 'POST', body: { attested }, requireAuth: true }
+    { method: 'POST', body: { attested, photosWaived }, requireAuth: true }
   );
 }
 

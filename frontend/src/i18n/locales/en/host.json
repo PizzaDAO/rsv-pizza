@@ -1015,6 +1015,8 @@
     "submitForReview": "Submit for review",
     "submitDisabledHelp": "Complete the steps above to enable submitting for review.",
     "submitNeedsAttestation": "Tick the attestation above to submit.",
+    "photoWaiverAck": "I'm submitting without the required event photos and understand my reimbursement may be delayed or returned for the missing photos.",
+    "submitNeedsPhotoWaiver": "Tick the box above to submit without the required photos.",
     "eventRollupTitle": "All event receipts",
     "eventRollupSubtitle": "Every co-host's receipts for this event, grouped by who submitted them.",
     "unknownCohost": "Unknown co-host",

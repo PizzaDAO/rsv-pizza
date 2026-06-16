@@ -1485,7 +1485,14 @@ function CityExpansion({
   const hosts = useMemo(() => {
     const seen = new Map<
       string,
-      { id: string; name: string | null; email: string | null; submittedForReviewAt: string | null }
+      {
+        id: string;
+        name: string | null;
+        email: string | null;
+        submittedForReviewAt: string | null;
+        // cannelloni-58543: most-recent photo waiver across active records.
+        photosWaivedAt: string | null;
+      }
     >();
     for (const p of row.payouts) {
       const h = p.host;
@@ -1495,11 +1502,17 @@ function CityExpansion({
         !TERMINAL_STATUSES.includes(p.status) && p.submittedForReviewAt
           ? p.submittedForReviewAt
           : null;
+      // cannelloni-58543: track the waiver on the same active-record basis.
+      const waived =
+        !TERMINAL_STATUSES.includes(p.status) && p.photosWaivedAt
+          ? p.photosWaivedAt
+          : null;
       const existing = seen.get(h.id);
       if (existing) {
         // Keep the latest submitted timestamp if more than one active record.
         if (submitted && (!existing.submittedForReviewAt || submitted > existing.submittedForReviewAt)) {
           existing.submittedForReviewAt = submitted;
+          existing.photosWaivedAt = waived;
         }
         continue;
       }
@@ -1508,6 +1521,7 @@ function CityExpansion({
         name: h.name,
         email: h.email,
         submittedForReviewAt: submitted,
+        photosWaivedAt: waived,
       });
     }
     return Array.from(seen.values());
@@ -2193,7 +2207,11 @@ function CityExpansion({
                       flipped their rolling reimbursement's "Submit for review"
                       toggle — distinguishes host-ready co-hosts from those
                       still rolling. */}
-                  <SubmittedForReviewBadge submittedForReviewAt={h.submittedForReviewAt} compact />
+                  <SubmittedForReviewBadge
+                    submittedForReviewAt={h.submittedForReviewAt}
+                    photosWaivedAt={h.photosWaivedAt}
+                    compact
+                  />
                 </span>
               ))}
             </div>
@@ -2390,6 +2408,7 @@ function CityExpansion({
                           the per-payout ledger row inside the expansion. */}
                       <SubmittedForReviewBadge
                         submittedForReviewAt={p.submittedForReviewAt}
+                        photosWaivedAt={p.photosWaivedAt}
                         compact
                       />
                       <span className="text-theme-text-secondary text-xs min-w-[5.5rem] shrink-0">

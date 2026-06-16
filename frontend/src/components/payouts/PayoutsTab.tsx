@@ -159,6 +159,10 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   // porchetta-58296: receipts-itemized attestation (re-used key).
   const [attested, setAttested] = useState(false);
 
+  // cannelloni-58543: host acknowledges submitting without the required event
+  // photos. Only sent when photos are actually missing.
+  const [photosWaived, setPhotosWaived] = useState(false);
+
   // Submit / reopen action state.
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -474,14 +478,23 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
   // --- Submit / reopen -------------------------------------------------------
 
   const readyToSubmit = readiness?.readyToSubmit === true;
-  const canSubmit = readyToSubmit && attested && !submitting;
+  // cannelloni-58543: everything required except photos. With the waiver ticked,
+  // a host missing photos can still submit.
+  const readyWithWaiver = readiness?.readyToSubmitWithoutPhotos === true;
+  const allPhotosDesignated =
+    !!readiness?.hasGroupPhoto && !!readiness?.hasBoxStackPhoto &&
+    !!readiness?.hasPizzaPhoto &&
+    (readiness?.additionalPhotoCount ?? 0) >= REQUIRED_ADDITIONAL_PHOTOS;
+  const canSubmit =
+    (readyToSubmit || (photosWaived && readyWithWaiver)) && attested && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await submitReimbursement(partyId, true);
+      // Only stamp a waiver when photos are actually missing.
+      const res = await submitReimbursement(partyId, true, photosWaived && !allPhotosDesignated);
       setData((prev) =>
         prev
           ? {
@@ -906,6 +919,17 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
           </div>
         ) : (
           <div className="flex flex-col gap-2">
+            {/* cannelloni-58543: when the required event photos are missing, the
+                host can acknowledge and submit without them. */}
+            {!photosAllDesignated && (
+              <div className="mb-1">
+                <Checkbox
+                  checked={photosWaived}
+                  onChange={() => setPhotosWaived((v) => !v)}
+                  label={t('payouts.photoWaiverAck')}
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={handleSubmit}
@@ -915,10 +939,15 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
               {submitting && <Loader2 size={16} className="animate-spin" />}
               {t('payouts.submitForReview')}
             </button>
-            {!readyToSubmit && (
+            {/* When only photos are missing, point the host at the waiver box
+                instead of the generic "not ready" message. */}
+            {!readyToSubmit && readyWithWaiver && !photosWaived && (
+              <p className="text-xs text-theme-text-muted">{t('payouts.submitNeedsPhotoWaiver')}</p>
+            )}
+            {!readyToSubmit && !readyWithWaiver && (
               <p className="text-xs text-theme-text-muted">{t('payouts.submitDisabledHelp')}</p>
             )}
-            {readyToSubmit && !attested && (
+            {(readyToSubmit || (photosWaived && readyWithWaiver)) && !attested && (
               <p className="text-xs text-theme-text-muted">{t('payouts.submitNeedsAttestation')}</p>
             )}
           </div>
