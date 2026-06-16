@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
@@ -14,11 +14,28 @@ import {
 // panuozzo-92114: canonical filter VALUE lists live in the React-free options
 // module so PayoutsFilterBar and the URL (de)serializer can't drift.
 import type { SortValue, StatusTabValue } from './paymentsFilterOptions';
+import type { ViewMode } from './paymentsUrlState';
+import { getActiveFilterChips } from './activeFilterChips';
 
 interface PayoutsFilterBarProps {
   filters: AdminPayoutFilters;
   onChange: (next: AdminPayoutFilters) => void;
   onReset: () => void;
+  /**
+   * tortellini: the By city / By payment / Payments segmented control is now
+   * the primary control at the TOP of the filter section (moved up from a
+   * standalone row below the bar). The parent stays the state owner.
+   */
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  /** tortellini: row-count label ("52 cities" / "…") shown in the header row. */
+  rowLabel?: string;
+  /**
+   * tortellini: the parent's configured `<SavedViewsMenu>` element, rendered
+   * in the header row. Passed as a slot so the bar doesn't have to re-thread
+   * `scope`/`currentParams`/`onApply` or re-derive URL params.
+   */
+  savedViewsSlot?: React.ReactNode;
   /**
    * mascarpone-49102: distinct event-tag values across the currently-loaded
    * payouts (flattened from each `party.eventTags` array). Derived in
@@ -145,48 +162,18 @@ const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: 'outstanding_desc', label: 'Most outstanding' },
   { value: 'outstanding_asc', label: 'Least outstanding' },
 ];
-const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
+// tortellini: exported so activeFilterChips.ts can label the non-default sort
+// chip from the same source (chip list + count can't drift).
+export const SORT_LABEL: Record<SortValue, string> = SORT_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
   {} as Record<SortValue, string>,
 );
 
-/**
- * regina-89172: count active (non-default) filter fields. Status tab strip is
- * NOT counted here — it's always visible above the collapsible section, so
- * counting it would double-render the signal. Cursor/limit are pagination
- * plumbing, not user-facing filters.
- */
-function countActiveFilters(filters: AdminPayoutFilters): number {
-  let n = 0;
-  if (filters.search && filters.search.trim()) n += 1;
-  if (filters.partyId && filters.partyId.trim()) n += 1;
-  if (filters.payoutMethod && filters.payoutMethod !== 'all') n += 1;
-  if (filters.country && filters.country !== 'all') n += 1;
-  // pancetta-92103: regions multi-select counts as a single active filter
-  // when at least one portal is selected (regardless of how many).
-  if (Array.isArray(filters.regionPortals) && filters.regionPortals.length > 0) n += 1;
-  if (filters.tag && filters.tag !== 'all') n += 1;
-  // cornetto-58510: tri-state tag/country (by-city view) each count as one
-  // active filter when any include/exclude is selected.
-  if ((filters.tagIncludes?.length ?? 0) + (filters.tagExcludes?.length ?? 0) > 0) n += 1;
-  if ((filters.countryIncludes?.length ?? 0) + (filters.countryExcludes?.length ?? 0) > 0) n += 1;
-  if (filters.dateFrom) n += 1;
-  if (filters.dateTo) n += 1;
-  // arancino-92103: count sort as an active filter when it differs from
-  // the default `created_desc` (newest first).
-  if (filters.sort && filters.sort !== 'created_desc') n += 1;
-  // pinsa-92103: count Hide closed cities so admins see they've hidden rows.
-  if (filters.hideClosed) n += 1;
-  // stracchino-92108: count Hide possible scams alongside Hide closed cities.
-  if (filters.hideScams) n += 1;
-  // provatura-92107: count Hide US cities alongside the other hide toggles.
-  if (filters.hideUsCities) n += 1;
-  // tigella-58512: count Show TBD (no submission) when the admin turns it on.
-  if (filters.showTbdUnsubmitted) n += 1;
-  // farinata-58532: count Has submitted receipts when the admin turns it on.
-  if (filters.hasReceipts) n += 1;
-  return n;
-}
+const VIEW_MODE_TABS: Array<{ value: ViewMode; label: string }> = [
+  { value: 'by-city', label: 'By city' },
+  { value: 'by-payment', label: 'By payment' },
+  { value: 'payments', label: 'Payments' },
+];
 
 /**
  * Sticky filter bar at the top of the admin payouts dashboard. All updates are
@@ -195,15 +182,24 @@ function countActiveFilters(filters: AdminPayoutFilters): number {
  * Cursor is intentionally NOT a prop here — when filters change the parent
  * should reset cursor to undefined.
  *
- * regina-89172: on mobile (<640px) the filter controls collapse behind a
- * "Filters (N)" toggle button so the payouts table stays above the fold.
- * The status tab strip stays visible at all times. On `sm:` and up the
- * controls are always expanded (existing desktop behavior).
+ * tortellini: restructured into a single cohesive card —
+ *   1. View-mode segmented control + row count + Saved Views (header row),
+ *   2. Search + ⚙ Filters (N) popover + Sort,
+ *   3. Status pills (hidden when showStatusTabs === false),
+ *   4. Active-filter chips (one removable chip per non-default filter).
+ * Advanced controls (Method, Regions, Tags, Country, Party ID, dates, the five
+ * visibility toggles) live behind the ⚙ Filters popover. The old mobile-only
+ * `expanded` collapse (regina-89172) is superseded by this panel on all
+ * viewports.
  */
 export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   filters,
   onChange,
   onReset,
+  viewMode,
+  onViewModeChange,
+  rowLabel,
+  savedViewsSlot,
   availableTags,
   availableCountries,
   showTriStateFilters,
@@ -215,8 +211,21 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
   showRegionsFilter,
   showStatusTabs = true,
 }) => {
-  const [expanded, setExpanded] = useState(false);
-  const activeCount = countActiveFilters(filters);
+  // tortellini: chips are the single source of truth for "what's active" — the
+  // (N) badge is just their count. View-specific chips are gated by the same
+  // `show*` flags that gate their controls, so By-payment / Payments views
+  // don't surface non-actionable By-city-only chips.
+  const chips = getActiveFilterChips(filters, {
+    showTriStateFilters,
+    showRegionsFilter,
+    showStatusTabs,
+    showHideClosedToggle,
+    showHideScamsToggle,
+    showHideUsToggle,
+    showTbdToggle,
+    showReceiptsToggle,
+  });
+  const activeCount = chips.length;
 
   const update = (patch: Partial<AdminPayoutFilters>) => {
     onChange({ ...filters, ...patch, cursor: undefined });
@@ -240,6 +249,22 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [regionsOpen]);
 
+  // tortellini: Filters popover open/close — modeled on the regionsOpen
+  // click-outside pattern above.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (!filtersRef.current) return;
+      if (!filtersRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [filtersOpen]);
+
   const selectedRegionPortals = useMemo<string[]>(
     () => (Array.isArray(filters.regionPortals) ? filters.regionPortals : []),
     [filters.regionPortals],
@@ -259,14 +284,352 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
       ? current.filter((s) => s !== slug)
       : [...current, slug];
     // Empty array = no filter (treat same as undefined so the URL/query stays
-    // clean and `countActiveFilters` doesn't count an empty selection).
+    // clean and no empty-selection chip is emitted).
     update({ regionPortals: next.length > 0 ? next : undefined });
   }
 
+  // tortellini: render the Visibility group only when at least one of its
+  // toggles is enabled (i.e. by-city view).
+  const showVisibilityGroup =
+    !!showHideClosedToggle ||
+    !!showHideScamsToggle ||
+    !!showHideUsToggle ||
+    !!showTbdToggle ||
+    !!showReceiptsToggle;
+
   return (
     <div className="sticky top-0 z-20 bg-theme-surface/95 backdrop-blur-sm border border-theme-stroke rounded-xl p-4 mb-4 shadow-sm">
-      {/* Status tab strip — always visible (mobile + desktop). Hidden in the
-          coppa-92106 Payments-ledger view, which forces status server-side. */}
+      {/* Row 1 — view-mode segmented control + row count + Saved Views.
+          etruria-92103 / coppa-92106: by-city default; the third "Payments"
+          tab shows the actual payments ledger. tortellini moved this UP from a
+          standalone row below the bar (it governs which filters appear). */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div
+          role="tablist"
+          aria-label="Payments view mode"
+          className="inline-flex rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface"
+        >
+          {VIEW_MODE_TABS.map((tab) => {
+            const active = viewMode === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => onViewModeChange(tab.value)}
+                className={`px-3 py-1.5 text-sm font-medium ${
+                  active
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-theme-text-muted hover:bg-theme-surface-hover'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2">
+          {rowLabel && (
+            <span className="text-sm font-medium text-theme-text-muted">{rowLabel}</span>
+          )}
+          {/* montanara-58497: per-account saved filter views (passed via slot). */}
+          {savedViewsSlot}
+        </div>
+      </div>
+
+      {/* Row 2 — unified search (grows) + ⚙ Filters (N) popover + Sort. */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* salame-83472: unified search — host email|name OR party name. */}
+        <div className="flex-1 min-w-[200px]">
+          <IconInput
+            icon={Search}
+            type="search"
+            placeholder="Search hosts and parties"
+            value={filters.search || ''}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ search: e.target.value })}
+          />
+        </div>
+
+        {/* tortellini: ⚙ Filters (N) popover trigger + opaque panel. */}
+        <div className="relative" ref={filtersRef}>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="h-11 inline-flex items-center gap-2 px-3 rounded-lg border border-theme-stroke bg-theme-surface-hover text-sm font-medium text-theme-text hover:bg-theme-stroke"
+            aria-haspopup="dialog"
+            aria-expanded={filtersOpen}
+          >
+            <SlidersHorizontal size={14} />
+            Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+            <ChevronDown size={14} className="text-theme-text-muted" />
+          </button>
+
+          {filtersOpen && (
+            <div
+              role="dialog"
+              aria-label="Filters"
+              className="
+                bg-theme-header border border-theme-stroke rounded-lg shadow-xl z-50
+                max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto
+                sm:absolute sm:right-0 sm:mt-1 sm:w-[360px] sm:max-w-[90vw]
+                p-4 max-h-[80vh] overflow-y-auto
+              "
+            >
+              {/* — Attributes — */}
+              <div className="mb-4">
+                <h4 className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">Attributes</h4>
+                <div className="flex flex-col gap-2">
+                  {/* Method dropdown */}
+                  <select
+                    value={filters.payoutMethod ?? 'all'}
+                    onChange={(e) => update({ payoutMethod: e.target.value as PayoutMethod | 'all' })}
+                    className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                    aria-label="Filter by payment method"
+                  >
+                    {METHOD_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+
+                  {/* pancetta-92103: Regions multi-select — each region maps to
+                      a fixed list of `parties.region` slugs (PAYMENTS_REGION_SCOPES);
+                      the backend `?regions=` query filters `parties.region IN (...)`.
+                      Hidden on regional sub-portals (hard-scoped by their
+                      parent's `regionFilter` prop). */}
+                  {showRegionsFilter && (
+                    <div className="relative" ref={regionsRef}>
+                      <button
+                        type="button"
+                        onClick={() => setRegionsOpen((v) => !v)}
+                        className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text inline-flex items-center justify-between gap-2"
+                        aria-haspopup="listbox"
+                        aria-expanded={regionsOpen}
+                        aria-label="Filter by region"
+                      >
+                        <span className="truncate">{regionsButtonLabel}</span>
+                        <ChevronDown size={14} className="flex-shrink-0 text-theme-text-muted" />
+                      </button>
+                      {regionsOpen && (
+                        <div
+                          role="listbox"
+                          className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-header shadow-lg py-2 min-w-[200px]"
+                        >
+                          {PAYMENTS_REGION_DISPLAY_ORDER.map((slug) => {
+                            const checked = selectedRegionPortals.includes(slug);
+                            const scopeCount = PAYMENTS_REGION_SCOPES[slug].length;
+                            return (
+                              <div key={slug} className="px-3 py-1.5 hover:bg-theme-surface-hover">
+                                <Checkbox
+                                  checked={checked}
+                                  onChange={() => toggleRegionPortal(slug)}
+                                  label={`${PAYMENTS_REGION_LABELS[slug]} (${scopeCount})`}
+                                  labelClassName="text-sm text-theme-text"
+                                  size={16}
+                                />
+                              </div>
+                            );
+                          })}
+                          {selectedRegionPortals.length > 0 && (
+                            <div className="border-t border-theme-stroke mt-1 pt-1 px-3">
+                              <button
+                                type="button"
+                                onClick={() => update({ regionPortals: undefined })}
+                                className="text-xs text-theme-text-muted hover:text-theme-text py-1"
+                              >
+                                Clear regions
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* cornetto-58510: by-city view uses tri-state Tag + Country
+                      dropdowns (client-side filtering). Other views keep the
+                      legacy single-select Tag dropdown (mascarpone-49102),
+                      filtered server-side via Prisma `{ has: tag }`. */}
+                  {showTriStateFilters ? (
+                    <>
+                      <TriStateFilterDropdown
+                        label="Tags"
+                        className="w-full"
+                        items={availableTags}
+                        includes={filters.tagIncludes ?? []}
+                        excludes={filters.tagExcludes ?? []}
+                        onChange={({ includes, excludes }) => update({ tagIncludes: includes, tagExcludes: excludes })}
+                        // paccheri-58541: friendly label for the refund-due tag.
+                        labelFor={(t) => (t === 'refund' ? 'Refund due' : t)}
+                        searchPlaceholder="Search tags…"
+                        noMatchesLabel="No tags"
+                        clearLabel="Clear"
+                        includeLabel="Include (must have)"
+                        excludeLabel="Exclude (must not have)"
+                      />
+                      <TriStateFilterDropdown
+                        label="Country"
+                        className="w-full"
+                        items={availableCountries}
+                        includes={filters.countryIncludes ?? []}
+                        excludes={filters.countryExcludes ?? []}
+                        onChange={({ includes, excludes }) => update({ countryIncludes: includes, countryExcludes: excludes })}
+                        searchPlaceholder="Search countries…"
+                        noMatchesLabel="No countries"
+                        clearLabel="Clear"
+                        includeLabel="Include (must have)"
+                        excludeLabel="Exclude (must not have)"
+                      />
+                    </>
+                  ) : (
+                    <select
+                      value={filters.tag ?? 'all'}
+                      onChange={(e) => update({ tag: e.target.value })}
+                      className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                      aria-label="Filter by tag"
+                    >
+                      <option value="all">All tags</option>
+                      {availableTags.map((t) => (
+                        <option key={t} value={t}>{t === 'refund' ? 'Refund due' : t}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Party ID search — moved here from the top row (power field). */}
+                  <IconInput
+                    icon={Search}
+                    type="search"
+                    placeholder="Party ID"
+                    value={filters.partyId || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ partyId: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* — Date range — */}
+              <div className="mb-4">
+                <h4 className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">Date range</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-theme-text-muted">From</label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom || ''}
+                    onChange={(e) => update({ dateFrom: e.target.value })}
+                    className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                    aria-label="Date from"
+                  />
+                  <label className="text-xs text-theme-text-muted">To</label>
+                  <input
+                    type="date"
+                    value={filters.dateTo || ''}
+                    onChange={(e) => update({ dateTo: e.target.value })}
+                    className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+                    aria-label="Date to"
+                  />
+                </div>
+              </div>
+
+              {/* — Visibility (by-city only) — */}
+              {showVisibilityGroup && (
+                <div className="mb-4">
+                  <h4 className="text-xs uppercase tracking-wide text-theme-text-muted mb-2">Visibility</h4>
+                  <div className="flex flex-col gap-2">
+                    {/* pinsa-92103: Hide closed cities (`paymentsClosedAt`). */}
+                    {showHideClosedToggle && (
+                      <Checkbox
+                        checked={!!filters.hideClosed}
+                        onChange={() => update({ hideClosed: !filters.hideClosed })}
+                        label="Hide closed cities"
+                        labelClassName="text-sm text-theme-text-secondary"
+                        size={16}
+                      />
+                    )}
+                    {/* stracchino-92108: Hide possible-scam-flagged cities. */}
+                    {showHideScamsToggle && (
+                      <Checkbox
+                        checked={!!filters.hideScams}
+                        onChange={() => update({ hideScams: !filters.hideScams })}
+                        label="Hide possible scams"
+                        labelClassName="text-sm text-theme-text-secondary"
+                        size={16}
+                      />
+                    )}
+                    {/* provatura-92107: Hide US cities (party.region === 'usa'). */}
+                    {showHideUsToggle && (
+                      <Checkbox
+                        checked={!!filters.hideUsCities}
+                        onChange={() => update({ hideUsCities: !filters.hideUsCities })}
+                        label="Hide US cities"
+                        labelClassName="text-sm text-theme-text-secondary"
+                        size={16}
+                      />
+                    )}
+                    {/* tigella-58512: Show approved `tbd` events that submitted
+                        nothing yet (zero payouts + zero documents). */}
+                    {showTbdToggle && (
+                      <Checkbox
+                        checked={!!filters.showTbdUnsubmitted}
+                        onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
+                        label="Show unsubmitted cities"
+                        labelClassName="text-sm text-theme-text-secondary"
+                        size={16}
+                      />
+                    )}
+                    {/* farinata-58532: show only cities with ≥1 submitted receipt. */}
+                    {showReceiptsToggle && (
+                      <Checkbox
+                        checked={!!filters.hasReceipts}
+                        onChange={() => update({ hasReceipts: !filters.hasReceipts })}
+                        label="Has submitted receipts"
+                        labelClassName="text-sm text-theme-text-secondary"
+                        size={16}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* — Footer — */}
+              <div className="flex items-center justify-between gap-2 border-t border-theme-stroke pt-3">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="inline-flex items-center gap-1 text-sm text-theme-text-muted hover:text-theme-text px-3 py-2 rounded-lg hover:bg-theme-surface-hover"
+                >
+                  <X size={14} />
+                  Reset filters
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex items-center text-sm font-medium text-theme-text px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* arancino-92103: Sort dropdown — controls the row order of the
+            payouts table. Default `created_desc` (newest submitted first).
+            Hidden in the Payments-ledger view (sort forced server-side). */}
+        {showStatusTabs && (
+          <select
+            value={filters.sort ?? 'created_desc'}
+            onChange={(e) => update({ sort: e.target.value as SortValue })}
+            className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
+            aria-label="Sort payouts"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Row 3 — status tab strip. Hidden in the coppa-92106 Payments-ledger
+          view, which forces status server-side. */}
       {showStatusTabs && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {STATUS_TABS.map((tab) => {
@@ -289,289 +652,37 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         </div>
       )}
 
-      {/* regina-89172: mobile-only collapse toggle. Hidden on sm:+ via `sm:hidden`. */}
-      <div className="sm:hidden mb-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-theme-stroke bg-theme-surface-hover text-sm font-medium text-theme-text"
-          aria-expanded={expanded}
-          aria-controls="payouts-filter-controls"
-        >
-          <span className="inline-flex items-center gap-2">
-            <SlidersHorizontal size={14} />
-            Filters{activeCount > 0 ? ` (${activeCount})` : ''}
-          </span>
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-      </div>
-
-      {/* Controls. Hidden on mobile when collapsed; force-visible on sm:+. */}
-      <div
-        id="payouts-filter-controls"
-        className={`${expanded ? 'block' : 'hidden'} sm:block`}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-9 gap-2 items-start">
-          {/* salame-83472: unified search — host email|name OR party name. */}
-          <div className="md:col-span-2">
-            <IconInput
-              icon={Search}
-              type="search"
-              placeholder="Search hosts and parties"
-              value={filters.search || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ search: e.target.value })}
-            />
-          </div>
-
-          {/* Party ID search */}
-          <div>
-            <IconInput
-              icon={Search}
-              type="search"
-              placeholder="Party ID"
-              value={filters.partyId || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update({ partyId: e.target.value })}
-            />
-          </div>
-
-          {/* Method dropdown */}
-          <div>
-            <select
-              value={filters.payoutMethod ?? 'all'}
-              onChange={(e) => update({ payoutMethod: e.target.value as PayoutMethod | 'all' })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Filter by payment method"
+      {/* Row 4 — active-filter chips. One removable chip per non-default
+          filter (including the default-on visibility hides, for transparency).
+          Clicking ✕ resets just that field; "Reset all" clears everything. */}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {chips.map((chip) => (
+            <span
+              key={chip.key}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-theme-surface-hover text-xs text-theme-text"
             >
-              {METHOD_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* pancetta-92103: Regions multi-select — replaces the prior
-              bruschetta-58291 single-country dropdown. Each region maps to a
-              fixed list of `parties.region` slugs (PAYMENTS_REGION_SCOPES);
-              the backend `?regions=` query filters `parties.region IN (...)`.
-              Selecting zero regions = no filter (same as the old "All
-              countries"). Hidden on regional sub-portals which are already
-              hard-scoped by their parent's `regionFilter` prop. */}
-          {showRegionsFilter && (
-            <div className="relative" ref={regionsRef}>
+              {chip.label}
               <button
                 type="button"
-                onClick={() => setRegionsOpen((v) => !v)}
-                className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text inline-flex items-center justify-between gap-2"
-                aria-haspopup="listbox"
-                aria-expanded={regionsOpen}
-                aria-label="Filter by region"
+                onClick={() => update(chip.patch)}
+                className="text-theme-text-muted hover:text-theme-text"
+                aria-label={`Remove filter ${chip.label}`}
               >
-                <span className="truncate">{regionsButtonLabel}</span>
-                <ChevronDown size={14} className="flex-shrink-0 text-theme-text-muted" />
+                <X size={12} />
               </button>
-              {regionsOpen && (
-                <div
-                  role="listbox"
-                  className="absolute left-0 right-0 mt-1 z-50 rounded-lg border border-theme-stroke bg-theme-header shadow-lg py-2 min-w-[200px]"
-                >
-                  {PAYMENTS_REGION_DISPLAY_ORDER.map((slug) => {
-                    const checked = selectedRegionPortals.includes(slug);
-                    const scopeCount = PAYMENTS_REGION_SCOPES[slug].length;
-                    return (
-                      <div key={slug} className="px-3 py-1.5 hover:bg-theme-surface-hover">
-                        <Checkbox
-                          checked={checked}
-                          onChange={() => toggleRegionPortal(slug)}
-                          label={`${PAYMENTS_REGION_LABELS[slug]} (${scopeCount})`}
-                          labelClassName="text-sm text-theme-text"
-                          size={16}
-                        />
-                      </div>
-                    );
-                  })}
-                  {selectedRegionPortals.length > 0 && (
-                    <div className="border-t border-theme-stroke mt-1 pt-1 px-3">
-                      <button
-                        type="button"
-                        onClick={() => update({ regionPortals: undefined })}
-                        className="text-xs text-theme-text-muted hover:text-theme-text py-1"
-                      >
-                        Clear regions
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* cornetto-58510: by-city view uses tri-state Tag + Country dropdowns
-              (client-side filtering). Other views keep the legacy single-select
-              Tag dropdown (mascarpone-49102), which is filtered server-side via
-              Prisma `{ has: tag }`. */}
-          {showTriStateFilters ? (
-            <>
-              <div>
-                <TriStateFilterDropdown
-                  label="Tags"
-                  className="w-full"
-                  items={availableTags}
-                  includes={filters.tagIncludes ?? []}
-                  excludes={filters.tagExcludes ?? []}
-                  onChange={({ includes, excludes }) => update({ tagIncludes: includes, tagExcludes: excludes })}
-                  // paccheri-58541: friendly label for the refund-due tag.
-                  labelFor={(t) => (t === 'refund' ? 'Refund due' : t)}
-                  searchPlaceholder="Search tags…"
-                  noMatchesLabel="No tags"
-                  clearLabel="Clear"
-                  includeLabel="Include (must have)"
-                  excludeLabel="Exclude (must not have)"
-                />
-              </div>
-              <div>
-                <TriStateFilterDropdown
-                  label="Country"
-                  className="w-full"
-                  items={availableCountries}
-                  includes={filters.countryIncludes ?? []}
-                  excludes={filters.countryExcludes ?? []}
-                  onChange={({ includes, excludes }) => update({ countryIncludes: includes, countryExcludes: excludes })}
-                  searchPlaceholder="Search countries…"
-                  noMatchesLabel="No countries"
-                  clearLabel="Clear"
-                  includeLabel="Include (must have)"
-                  excludeLabel="Exclude (must not have)"
-                />
-              </div>
-            </>
-          ) : (
-            <div>
-              <select
-                value={filters.tag ?? 'all'}
-                onChange={(e) => update({ tag: e.target.value })}
-                className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-                aria-label="Filter by tag"
-              >
-                <option value="all">All tags</option>
-                {availableTags.map((t) => (
-                  <option key={t} value={t}>{t === 'refund' ? 'Refund due' : t}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* arancino-92103: Sort dropdown — controls the row order of the
-              payouts table. Default is `created_desc` (newest submitted
-              first), matching the prior implicit backend ordering. */}
-          <div>
-            <select
-              value={filters.sort ?? 'created_desc'}
-              onChange={(e) => update({ sort: e.target.value as SortValue })}
-              className="w-full h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Sort payouts"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-end gap-2 mt-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs text-theme-text-muted">From</label>
-            <input
-              type="date"
-              value={filters.dateFrom || ''}
-              onChange={(e) => update({ dateFrom: e.target.value })}
-              className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Date from"
-            />
-            <label className="text-xs text-theme-text-muted">To</label>
-            <input
-              type="date"
-              value={filters.dateTo || ''}
-              onChange={(e) => update({ dateTo: e.target.value })}
-              className="h-11 rounded-lg border border-theme-stroke bg-theme-surface px-3 text-sm text-theme-text"
-              aria-label="Date to"
-            />
-            {/* arancino-92103: surface non-default sort as a small chip so
-                admins notice the list is reordered. The dropdown above is
-                the canonical control; this chip is a read-only summary. */}
-            {filters.sort && filters.sort !== 'created_desc' && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#E52828]/10 text-[#E52828] text-xs font-medium">
-                Sort: {SORT_LABEL[filters.sort]}
-              </span>
-            )}
-            {/* pinsa-92103: Hide closed cities toggle. Only rendered on the
-                by-city view (`paymentsClosedAt` is a party-level signal so
-                the by-payment view has nothing to hide). Backend honors
-                `hideClosed=true` on the /by-party endpoint. */}
-            {showHideClosedToggle && (
-              <Checkbox
-                checked={!!filters.hideClosed}
-                onChange={() => update({ hideClosed: !filters.hideClosed })}
-                label="Hide closed cities"
-                labelClassName="text-xs text-theme-text-secondary"
-                size={14}
-              />
-            )}
-            {/* stracchino-92108: Hide possible-scam-flagged cities. By-city view only,
-                same as Hide closed cities. */}
-            {showHideScamsToggle && (
-              <Checkbox
-                checked={!!filters.hideScams}
-                onChange={() => update({ hideScams: !filters.hideScams })}
-                label="Hide possible scams"
-                labelClassName="text-xs text-theme-text-secondary"
-                size={14}
-              />
-            )}
-            {/* provatura-92107: Hide US cities (party.region === 'usa'). By-city
-                + admin dashboard only, same gating as the other hide toggles. */}
-            {showHideUsToggle && (
-              <Checkbox
-                checked={!!filters.hideUsCities}
-                onChange={() => update({ hideUsCities: !filters.hideUsCities })}
-                label="Hide US cities"
-                labelClassName="text-xs text-theme-text-secondary"
-                size={14}
-              />
-            )}
-            {/* tigella-58512: Show approved `tbd` events that have submitted
-                nothing yet (zero payouts + zero documents). By-city view only;
-                OFF by default. The backend injects synthetic rows on /by-party
-                when `showTbdUnsubmitted` is set. */}
-            {showTbdToggle && (
-              <Checkbox
-                checked={!!filters.showTbdUnsubmitted}
-                onChange={() => update({ showTbdUnsubmitted: !filters.showTbdUnsubmitted })}
-                label="Show unsubmitted cities"
-                labelClassName="text-xs text-theme-text-secondary"
-                size={14}
-              />
-            )}
-            {/* farinata-58532: show only cities with ≥1 submitted receipt
-                (aggregates.totalReceiptCount > 0). By-city view only; OFF by default. */}
-            {showReceiptsToggle && (
-              <Checkbox
-                checked={!!filters.hasReceipts}
-                onChange={() => update({ hasReceipts: !filters.hasReceipts })}
-                label="Has submitted receipts"
-                labelClassName="text-xs text-theme-text-secondary"
-                size={14}
-              />
-            )}
-          </div>
+            </span>
+          ))}
           <button
             type="button"
             onClick={onReset}
-            className="md:ml-auto inline-flex items-center gap-1 text-sm text-theme-text-muted hover:text-theme-text px-3 py-2 rounded-lg hover:bg-theme-surface-hover"
+            className="inline-flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text px-2 py-1"
           >
-            <X size={14} />
-            Reset filters
+            <X size={12} />
+            Reset all
           </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };
