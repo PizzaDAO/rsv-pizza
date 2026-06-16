@@ -6187,6 +6187,14 @@ export interface ApprovedPartySearchResult {
     name: string | null;
     email: string | null;
     role: 'host' | 'cohost';
+    /**
+     * gorgonzola-58544: the candidate's profile-level payout wallet/method
+     * (User.payout_wallet_address / preferred_payout_method). Used by the Send
+     * payment modal as a fallback wallet when a city has no payout rows yet.
+     * Optional for rolling-deploy backward-compat (like country/eventTags).
+     */
+    profileWalletAddress?: string | null;
+    profilePayoutMethod?: string | null;
   }>;
   /**
    * parmigiana-92104: surfaced so the ExternalPaymentModal can render the
