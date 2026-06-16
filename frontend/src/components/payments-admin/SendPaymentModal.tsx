@@ -233,16 +233,23 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
   const [mercuryCardId, setMercuryCardId] = useState('');
   const [wireReference, setWireReference] = useState('');
 
-  // Pre-fill the USDC wallet with the address the selected host submitted on
-  // their receipt payouts for this city (passed down per-recipient by the
-  // parent). Re-runs whenever the recipient changes so switching hosts pulls
-  // in that host's wallet; an empty mapping clears the field. `hostWalletByUserId`
-  // is a stable snapshot for the modal's lifetime, so this only fires on an
+  // Pre-fill the USDC wallet for the selected recipient. The city-submitted
+  // wallet (the address the host put on a receipt payout for THIS city, passed
+  // down per-recipient by the parent) is preferred. gorgonzola-58544: when the
+  // city has no payout rows yet (e.g. Surat/Split), fall back to the host's
+  // profile wallet (User.payout_wallet_address) returned per-candidate by
+  // /parties/search. Re-runs whenever the recipient changes so switching hosts
+  // pulls in that host's wallet; an empty result clears the field. The sources
+  // are stable snapshots for the modal's lifetime, so this only fires on an
   // actual recipient change — a manual edit for the same recipient is kept.
   useEffect(() => {
     if (!recipientUserId) return;
-    setWalletAddress(hostWalletByUserId?.[recipientUserId] ?? '');
-  }, [recipientUserId, hostWalletByUserId]);
+    const cityWallet = hostWalletByUserId?.[recipientUserId];
+    const profileWallet = partyMeta?.hostCandidates.find(
+      (c) => c.userId === recipientUserId,
+    )?.profileWalletAddress;
+    setWalletAddress((cityWallet || profileWallet || '').trim());
+  }, [recipientUserId, hostWalletByUserId, partyMeta]);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

@@ -1095,7 +1095,15 @@ router.get(
           // party is picked. Frontend-only guardrail — no backend gating.
           country: true,
           eventTags: true,
-          user: { select: { id: true, name: true, email: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              payoutWalletAddress: true,
+              preferredPayoutMethod: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 20,
@@ -1116,10 +1124,25 @@ router.get(
       const cohostUsers = allCohostEmails.size
         ? await prisma.user.findMany({
             where: { email: { in: Array.from(allCohostEmails) } },
-            select: { id: true, name: true, email: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              payoutWalletAddress: true,
+              preferredPayoutMethod: true,
+            },
           })
         : [];
-      const cohostUserByEmail = new Map<string, { id: string; name: string | null; email: string }>();
+      const cohostUserByEmail = new Map<
+        string,
+        {
+          id: string;
+          name: string | null;
+          email: string;
+          payoutWalletAddress: string | null;
+          preferredPayoutMethod: string | null;
+        }
+      >();
       for (const u of cohostUsers) {
         cohostUserByEmail.set(u.email.toLowerCase(), u);
       }
@@ -1161,6 +1184,8 @@ router.get(
             name: string | null;
             email: string | null;
             role: 'host' | 'cohost';
+            profileWalletAddress: string | null;
+            profilePayoutMethod: string | null;
           }> = [];
 
           // Main host always first — unless they're an org insider (admin /
@@ -1171,6 +1196,8 @@ router.get(
               name: p.user!.name,
               email: p.user!.email,
               role: 'host',
+              profileWalletAddress: p.user!.payoutWalletAddress ?? null,
+              profilePayoutMethod: p.user!.preferredPayoutMethod ?? null,
             });
           }
 
@@ -1196,6 +1223,8 @@ router.get(
               name: u.name,
               email: u.email,
               role: 'cohost',
+              profileWalletAddress: u.payoutWalletAddress ?? null,
+              profilePayoutMethod: u.preferredPayoutMethod ?? null,
             });
           }
 
