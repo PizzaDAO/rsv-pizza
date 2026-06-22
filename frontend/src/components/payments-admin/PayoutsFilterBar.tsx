@@ -307,7 +307,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
         <div
           role="tablist"
           aria-label="Payments view mode"
-          className="inline-flex rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface"
+          className="flex flex-nowrap whitespace-nowrap overflow-x-auto max-w-full rounded-lg border border-theme-stroke bg-theme-surface md:inline-flex md:overflow-hidden"
         >
           {VIEW_MODE_TABS.map((tab) => {
             const active = viewMode === tab.value;
@@ -318,7 +318,7 @@ export const PayoutsFilterBar: React.FC<PayoutsFilterBarProps> = ({
                 role="tab"
                 aria-selected={active}
                 onClick={() => onViewModeChange(tab.value)}
-                className={`px-3 py-1.5 text-sm font-medium ${
+                className={`shrink-0 px-3 py-1.5 text-sm font-medium ${
                   active
                     ? 'bg-emerald-600 text-white'
                     : 'text-theme-text-muted hover:bg-theme-surface-hover'

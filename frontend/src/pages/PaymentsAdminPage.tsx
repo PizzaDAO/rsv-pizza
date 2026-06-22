@@ -1158,7 +1158,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             <button
               type="button"
               onClick={() => setExternalModalState({ open: true })}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
             >
               <Plus size={14} />
               Record External Payment
@@ -1168,7 +1168,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             type="button"
             onClick={handleExportCsv}
             disabled={exporting}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-sm text-theme-text disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-sm text-theme-text disabled:opacity-50"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
             Export CSV
@@ -2230,7 +2230,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
 
         {/* siciliana-69183: toast stack (bottom-right, 3s auto-dismiss). */}
         {toasts.length > 0 && (
-          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+          <div className="fixed z-50 flex flex-col gap-2 pointer-events-none max-sm:left-2 max-sm:right-2 max-sm:bottom-2 max-sm:max-w-[calc(100vw-1rem)] sm:right-6 sm:bottom-6 sm:max-w-sm">
             {toasts.map((t) => (
               <div
                 key={t.id}
