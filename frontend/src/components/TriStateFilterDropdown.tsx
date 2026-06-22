@@ -29,7 +29,46 @@ interface TriStateFilterDropdownProps {
    * render as-is.
    */
   labelFor?: (item: string) => string;
+  /**
+   * ciabatta-58921: which edge the popover anchors to. 'right' opens leftward so
+   * a trigger near the right viewport edge (e.g. the last filter) doesn't clip.
+   * Default 'left' preserves existing /payments behaviour.
+   */
+  align?: 'left' | 'right';
+  /**
+   * ciabatta-58921: colour scheme. 'dark' (default) = the theme-token popover
+   * used on /payments + /underboss. 'light' = GPP white popover for the light
+   * sky-blue /partners page.
+   */
+  tone?: 'dark' | 'light';
 }
+
+// Tone class maps. 'dark' reproduces the original theme-token styling exactly;
+// 'light' is the GPP white variant for light-background pages.
+const TONES = {
+  dark: {
+    triggerActive: 'bg-theme-surface border-theme-stroke-hover text-theme-text',
+    triggerIdle: 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover',
+    panel: 'bg-theme-header border-theme-stroke',
+    border: 'border-theme-stroke',
+    input: 'bg-theme-surface border-theme-stroke text-theme-text placeholder:text-theme-text-faint focus:border-theme-stroke-hover',
+    itemText: 'text-theme-text',
+    itemHover: 'hover:bg-theme-surface',
+    faint: 'text-theme-text-faint',
+    neutralThumb: 'text-theme-text-faint',
+  },
+  light: {
+    triggerActive: 'bg-white border-black/25 text-[#1a1a1a]',
+    triggerIdle: 'bg-white/90 border-black/10 text-[#1a1a1a] hover:border-black/30',
+    panel: 'bg-white border-black/10',
+    border: 'border-black/10',
+    input: 'bg-white border-black/15 text-[#1a1a1a] placeholder:text-[#555]/50 focus:border-black/30',
+    itemText: 'text-[#1a1a1a]',
+    itemHover: 'hover:bg-black/5',
+    faint: 'text-[#555]/70',
+    neutralThumb: 'text-[#999]',
+  },
+} as const;
 
 export function TriStateFilterDropdown({
   label,
@@ -44,7 +83,10 @@ export function TriStateFilterDropdown({
   excludeLabel,
   className,
   labelFor,
+  align = 'left',
+  tone = 'dark',
 }: TriStateFilterDropdownProps) {
+  const t = TONES[tone];
   const displayLabel = (item: string) => (labelFor ? labelFor(item) : item);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -105,9 +147,7 @@ export function TriStateFilterDropdown({
       <button
         onClick={() => setOpen((v) => { if (v) setSearch(''); return !v; })}
         className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-          activeTotal > 0
-            ? 'bg-theme-surface border-theme-stroke-hover text-theme-text'
-            : 'bg-theme-surface border-theme-stroke text-theme-text-secondary hover:border-theme-stroke-hover'
+          activeTotal > 0 ? t.triggerActive : t.triggerIdle
         }`}
       >
         {activeTotal > 0 ? `${label} (${activeTotal})` : label}
@@ -116,25 +156,25 @@ export function TriStateFilterDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={closePanel} />
-          <div className="absolute top-full left-0 mt-1 z-50 w-64 bg-theme-header border border-theme-stroke rounded-lg shadow-xl py-1">
+          <div className={`absolute top-full ${align === 'right' ? 'right-0' : 'left-0'} mt-1 z-50 w-64 border rounded-lg shadow-xl py-1 ${t.panel}`}>
             {(includes.length > 0 || excludes.length > 0) && (
-              <div className="flex items-center justify-end px-3 py-1.5 border-b border-theme-stroke">
+              <div className={`flex items-center justify-end px-3 py-1.5 border-b ${t.border}`}>
                 <button onClick={clear} className="text-xs text-red-500/70 hover:text-red-500 transition-colors">{clearLabel}</button>
               </div>
             )}
-            <div className="px-2 py-1.5 border-b border-theme-stroke">
+            <div className={`px-2 py-1.5 border-b ${t.border}`}>
               <input
                 type="text"
                 autoFocus
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full bg-theme-surface border border-theme-stroke rounded-md px-2 py-1 text-sm text-theme-text placeholder:text-theme-text-faint focus:outline-none focus:border-theme-stroke-hover"
+                className={`w-full border rounded-md px-2 py-1 text-sm focus:outline-none ${t.input}`}
               />
             </div>
             <div className="max-h-80 overflow-y-auto py-1">
               {visibleItems.length === 0 && (
-                <div className="px-3 py-2 text-sm text-theme-text-faint">{noMatchesLabel}</div>
+                <div className={`px-3 py-2 text-sm ${t.faint}`}>{noMatchesLabel}</div>
               )}
               {visibleItems.map((item, i) => {
                 const state = getState(item);
@@ -142,9 +182,9 @@ export function TriStateFilterDropdown({
                 const showDivider = !search.trim() && activeCount > 0 && i === activeCount && activeCount < orderedItems.length;
                 return (
                   <React.Fragment key={item}>
-                    {showDivider && <div className="border-t border-theme-stroke my-1" />}
-                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-surface transition-colors">
-                      <span className="text-sm text-theme-text truncate">{displayLabel(item)}</span>
+                    {showDivider && <div className={`border-t my-1 ${t.border}`} />}
+                    <div className={`flex items-center justify-between gap-2 px-3 py-1.5 transition-colors ${t.itemHover}`}>
+                      <span className={`text-sm truncate ${t.itemText}`}>{displayLabel(item)}</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => setState(item, state === 'include' ? 'neutral' : 'include')}
@@ -152,7 +192,7 @@ export function TriStateFilterDropdown({
                           aria-label={includeLabel}
                           title={includeLabel}
                         >
-                          <ThumbsUp size={13} className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : 'text-theme-text-faint'}`} />
+                          <ThumbsUp size={13} className={`transition-all ${state === 'include' ? 'text-[#39d98a]' : t.neutralThumb}`} />
                         </button>
                         <button
                           onClick={() => setState(item, state === 'exclude' ? 'neutral' : 'exclude')}
@@ -160,7 +200,7 @@ export function TriStateFilterDropdown({
                           aria-label={excludeLabel}
                           title={excludeLabel}
                         >
-                          <ThumbsDown size={13} className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : 'text-theme-text-faint'}`} />
+                          <ThumbsDown size={13} className={`transition-all ${state === 'exclude' ? 'text-[#ff393a]' : t.neutralThumb}`} />
                         </button>
                       </div>
                     </div>
