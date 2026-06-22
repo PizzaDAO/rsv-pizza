@@ -1097,6 +1097,8 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
             customUrl: true,
             inviteCode: true,
             name: true,
+            country: true,
+            region: true,
           },
         },
       },
@@ -1129,7 +1131,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
       brandInstagram: string | null;
       category: string | null;
       eventCount: number;
-      events: { slug: string; city: string; sponsorId: string }[];
+      events: { slug: string; city: string; sponsorId: string; country: string | null; region: string | null }[];
       // tie-break tracking
       bestSortOrder: number;
       bestCreatedAt: Date;
@@ -1149,6 +1151,8 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
       const city =
         partyName.replace(/^Global Pizza Party\s*/i, '').trim() || partyName || 'Unknown';
       const slug = s.party?.customUrl || s.party?.inviteCode || '';
+      const country = s.party?.country ?? null;
+      const region = s.party?.region ?? null;
 
       // Find existing aggregate via logoKey first, then nameKey fallback.
       let agg = byLogoKey.get(logoKey);
@@ -1168,7 +1172,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
           agg.eventCount += 1;
           // Cap events array at 500 to defend against pathological payload size.
           if (agg.events.length < 500 && slug) {
-            agg.events.push({ slug, city, sponsorId: s.id });
+            agg.events.push({ slug, city, sponsorId: s.id, country, region });
           }
         }
         // Tie-break: prefer the representative row with lowest sortOrder; if tied,
@@ -1200,7 +1204,7 @@ router.get('/partners', async (_req: Request, res: Response, next: NextFunction)
           brandInstagram: s.brandInstagram,
           category: s.category,
           eventCount: 1,
-          events: slug ? [{ slug, city, sponsorId: s.id }] : [],
+          events: slug ? [{ slug, city, sponsorId: s.id, country, region }] : [],
           bestSortOrder: s.sortOrder,
           bestCreatedAt: s.createdAt,
         };

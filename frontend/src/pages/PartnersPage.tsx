@@ -1,9 +1,42 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, X } from 'lucide-react';
 import { GPPClouds } from '../components/GPPClouds';
 import { fetchGppPartners, fetchUnderbossMe, GPPPartner } from '../lib/api';
+import { PartnersFilterBar } from '../components/PartnersFilterBar';
+import {
+  PartnersFilters,
+  filtersToSearchParams,
+  searchParamsToFilters,
+} from './partnersUrlState';
+import {
+  PAYMENTS_REGION_SCOPES,
+  PAYMENTS_REGION_DISPLAY_ORDER,
+  PaymentsRegionPortal,
+} from '../utils/regions';
+
+// Reverse map: a party.region slug (e.g. 'west-africa') → its portal key
+// (e.g. 'westafrica'). Built once from PAYMENTS_REGION_SCOPES so the Region
+// filter operates on the PAYMENTS_REGION_LABELS buckets.
+const REGION_SLUG_TO_PORTAL: Record<string, PaymentsRegionPortal> = (() => {
+  const map: Record<string, PaymentsRegionPortal> = {};
+  // Iterate in display order; the Africa overlap (south-africa appears in both
+  // 'africa' and 'southafrica') resolves to the most specific single-country
+  // portal because the specific ones come later in PAYMENTS_REGION_DISPLAY_ORDER.
+  for (const portal of PAYMENTS_REGION_DISPLAY_ORDER) {
+    for (const slug of PAYMENTS_REGION_SCOPES[portal]) {
+      map[slug] = portal;
+    }
+  }
+  return map;
+})();
+
+/** Map a party.region slug to its portal key (or null if unknown/empty). */
+function regionPortalFor(region: string | null | undefined): PaymentsRegionPortal | null {
+  if (!region) return null;
+  return REGION_SLUG_TO_PORTAL[region] ?? null;
+}
 
 /* ── colour tokens (from the 2026 flyer) ────────────────── */
 const C = {
@@ -26,9 +59,24 @@ const C = {
 
 export function PartnersPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [partners, setPartners] = useState<GPPPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Lazy-init filters from the URL once on mount (mirrors PaymentsAdminPage).
+  // The ref captures the initial searchParams so a later setSearchParams (from
+  // the serialize effect) doesn't re-seed state.
+  const initialSearchParamsRef = useRef(searchParams);
+  const [filters, setFilters] = useState<PartnersFilters>(() =>
+    searchParamsToFilters(initialSearchParamsRef.current)
+  );
+
+  // Serialize filters → URL (diff-against-defaults keeps URLs short).
+  useEffect(() => {
+    setSearchParams(filtersToSearchParams(filters), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   // Role detection (default to all-false — 401 / network errors are silent)
   const [roles, setRoles] = useState<{ isAdmin: boolean; isUnderboss: boolean; isGraphicsAdmin: boolean }>({
@@ -103,6 +151,139 @@ export function PartnersPage() {
     () => new Set(partners.flatMap((p) => p.events.map((e) => e.slug))).size,
     [partners]
   );
+
+  // ── Filter option lists (derived from the loaded partners) ──────────────
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          partners
+            .map((p) => p.category)
+            .filter((c): c is string => !!c && c.trim().length > 0)
+        )
+      ).sort(),
+    [partners]
+  );
+
+  const cityOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          partners.flatMap((p) =>
+            p.events.map((e) => e.city).filter((c): c is string => !!c && c.trim().length > 0)
+          )
+        )
+      ).sort(),
+    [partners]
+  );
+
+  const countryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          partners.flatMap((p) =>
+            p.events
+              .map((e) => e.country)
+              .filter((c): c is string => !!c && c.trim().length > 0)
+          )
+        )
+      ).sort(),
+    [partners]
+  );
+
+  // Region options = the PAYMENTS_REGION_LABELS portal keys actually present in
+  // the data (derived from each event's region slug). Ordered by the canonical
+  // display order.
+  const regionOptions = useMemo(() => {
+    const present = new Set<string>();
+    for (const p of partners) {
+      for (const e of p.events) {
+        const portal = regionPortalFor(e.region);
+        if (portal) present.add(portal);
+      }
+    }
+    return PAYMENTS_REGION_DISPLAY_ORDER.filter((portal) => present.has(portal));
+  }, [partners]);
+
+  // ── Visible (filtered + sorted) partners ────────────────────────────────
+  const visiblePartners = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+
+    const matches = partners.filter((p) => {
+      // Search: name + description + twitter + instagram (case-insensitive).
+      if (q) {
+        const hay = [p.name, p.brandDescription, p.brandTwitter, p.brandInstagram]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      // Category equality.
+      if (filters.category !== 'all' && p.category !== filters.category) return false;
+
+      // any-event include / none-exclude semantics for city.
+      if (filters.cityIncludes.length || filters.cityExcludes.length) {
+        const cities = p.events.map((e) => e.city).filter(Boolean) as string[];
+        if (filters.cityExcludes.length && cities.some((c) => filters.cityExcludes.includes(c))) {
+          return false;
+        }
+        if (filters.cityIncludes.length && !cities.some((c) => filters.cityIncludes.includes(c))) {
+          return false;
+        }
+      }
+
+      // Region (portal-key buckets).
+      if (filters.regionIncludes.length || filters.regionExcludes.length) {
+        const portals = p.events
+          .map((e) => regionPortalFor(e.region))
+          .filter((r): r is PaymentsRegionPortal => !!r);
+        if (filters.regionExcludes.length && portals.some((r) => filters.regionExcludes.includes(r))) {
+          return false;
+        }
+        if (filters.regionIncludes.length && !portals.some((r) => filters.regionIncludes.includes(r))) {
+          return false;
+        }
+      }
+
+      // Country.
+      if (filters.countryIncludes.length || filters.countryExcludes.length) {
+        const countries = p.events.map((e) => e.country).filter(Boolean) as string[];
+        if (filters.countryExcludes.length && countries.some((c) => filters.countryExcludes.includes(c))) {
+          return false;
+        }
+        if (filters.countryIncludes.length && !countries.some((c) => filters.countryIncludes.includes(c))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Sort. Default 'events_desc' reproduces the backend order (eventCount
+    // DESC, then name ASC).
+    const sorted = [...matches];
+    switch (filters.sort) {
+      case 'name_asc':
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name_desc':
+        sorted.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'eventcount_asc':
+        sorted.sort((a, b) =>
+          a.eventCount !== b.eventCount ? a.eventCount - b.eventCount : a.name.localeCompare(b.name)
+        );
+        break;
+      case 'events_desc':
+      default:
+        sorted.sort((a, b) =>
+          b.eventCount !== a.eventCount ? b.eventCount - a.eventCount : a.name.localeCompare(b.name)
+        );
+        break;
+    }
+    return sorted;
+  }, [partners, filters]);
 
   return (
     <div
@@ -218,9 +399,40 @@ export function PartnersPage() {
           </div>
         )}
 
-        {!loading && !error && partners.length > 0 && (
+        {/* Filter bar — admin / underboss / graphics-admin only. Public and
+            logged-out viewers never see it. */}
+        {!loading && !error && partners.length > 0 && canClick && (
+          <>
+            <PartnersFilterBar
+              filters={filters}
+              onChange={setFilters}
+              categories={categoryOptions}
+              cities={cityOptions}
+              regions={regionOptions}
+              countries={countryOptions}
+            />
+            <div className="mb-4 text-sm font-medium" style={{ color: C.mutedText }}>
+              {visiblePartners.length.toLocaleString()} of {partners.length.toLocaleString()} partners
+            </div>
+          </>
+        )}
+
+        {!loading && !error && partners.length > 0 && canClick && visiblePartners.length === 0 && (
+          <div className="flex items-center justify-center py-16 px-6">
+            <div
+              className="rounded-2xl px-6 py-5 border shadow-sm text-center"
+              style={{ background: C.cardBg, borderColor: C.cardBorder }}
+            >
+              <p className="text-sm" style={{ color: C.mutedText }}>
+                No partners match your filters — try clearing some.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && partners.length > 0 && !(canClick && visiblePartners.length === 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {partners.map((partner) => {
+            {(canClick ? visiblePartners : partners).map((partner) => {
               const tile = (
                 <div
                   className="aspect-square flex items-center justify-center p-4 rounded-2xl border shadow-lg transition-transform duration-200 hover:scale-105"

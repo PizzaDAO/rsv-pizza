@@ -4790,7 +4790,7 @@ export interface GPPPartner {
   brandInstagram: string | null;
   category: string | null;
   eventCount: number;
-  events: { slug: string; city: string; sponsorId: string }[];
+  events: { slug: string; city: string; sponsorId: string; country: string | null; region: string | null }[];
 }
 
 export interface GPPPartnersResponse {
