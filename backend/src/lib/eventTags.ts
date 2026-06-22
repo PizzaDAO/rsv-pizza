@@ -27,6 +27,9 @@ export const INTERNAL_EVENT_TAGS = new Set<string>([
   // exceeds capped receipt total) so admins can chase a refund. Admin-only —
   // must never surface on a public PublicEvent / GPP payload.
   'refund',
+  // rigatoni-58919: pre-launch control tag for "side" (conference side) events.
+  // The public 'side' taxonomy tag stays public; this gate marker must not leak.
+  'side-prelaunch',
 ]);
 
 const INTERNAL_TAG_PATTERNS: RegExp[] = [

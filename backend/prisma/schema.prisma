@@ -1666,6 +1666,23 @@ model GppAgreementClause {
   @@map("gpp_agreement_clauses")
 }
 
+// rigatoni-58919: side-event (conference side-event) agreement clauses. Exact
+// field-for-field mirror of GppAgreementClause; its own table + clause copy.
+model SideAgreementClause {
+  id          String   @id @default(uuid()) @db.Uuid
+  version     String
+  sortOrder   Int      @map("sort_order")
+  heading     String?
+  body        String
+  requiresAck Boolean  @default(true) @map("requires_ack")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([active, version, sortOrder])
+  @@map("side_agreement_clauses")
+}
+
 // ============================================
 // Experiment Flags (kill switches)
 // ============================================

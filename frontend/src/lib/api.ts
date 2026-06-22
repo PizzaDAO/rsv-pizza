@@ -7770,6 +7770,104 @@ export async function publishGpp27Event(partyId: string): Promise<{ success: boo
   return apiRequest(`/api/gpp27/parties/${partyId}/publish`, { method: 'POST' });
 }
 
+// ---------------------------------------------------------------------------
+// rigatoni-58919: "side" (PizzaDAO conference side-event) admin/UB create flow.
+// Clones of the gpp27 functions pointed at /api/side/*. NOT city-based: the host
+// enters the event name + date/time + venue; the cap is admin/UB-set (no tiers).
+// ---------------------------------------------------------------------------
+export interface SideAgreementClause {
+  id: string;
+  version: string;
+  sortOrder: number;
+  heading?: string | null;
+  body: string;
+  requiresAck: boolean;
+}
+
+export interface SideAgreementResponse {
+  version: string | null;
+  clauses: SideAgreementClause[];
+}
+
+export async function fetchSideAgreement(): Promise<SideAgreementResponse> {
+  return apiRequest<SideAgreementResponse>('/api/side/agreement');
+}
+
+export interface SideCreateEventInput {
+  name: string;
+  hostName: string;
+  email: string;
+  telegram: string;
+  timezone?: string;
+  date?: string;       // YYYY-MM-DD (event-local)
+  startTime?: string;  // HH:MM 24h
+  endTime?: string;    // HH:MM 24h
+  // Venue (from LocationAutocomplete).
+  formattedName?: string;
+  lat?: number;
+  lng?: number;
+  country?: string;
+  countryCode?: string;
+  reimbursementCapUsd?: number;
+  agreementVersion: string;
+  acceptedClauseIds: string[];
+}
+
+export interface SideCreateEventResponse {
+  success: boolean;
+  event: {
+    id: string;
+    name: string;
+    inviteCode: string;
+    customUrl: string | null;
+    city: string | null;
+    region: string | null;
+  };
+  eventPageUrl: string;
+  hostPageUrl: string;
+}
+
+export async function createSideEvent(input: SideCreateEventInput): Promise<SideCreateEventResponse> {
+  return apiRequest<SideCreateEventResponse>('/api/side/events', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export async function patchSideBudget(
+  partyId: string,
+  reimbursementCapUsd: number,
+): Promise<{ success: boolean; reimbursementCapUsd: number; ceilingUsd: number }> {
+  return apiRequest(`/api/side/parties/${partyId}/budget`, {
+    method: 'PATCH',
+    body: { reimbursementCapUsd },
+  });
+}
+
+export async function acceptSideAgreement(
+  partyId: string,
+): Promise<{ success: boolean; agreementVersion: string; agreementAcceptedAt: string }> {
+  return apiRequest(`/api/side/parties/${partyId}/agreement/accept`, { method: 'POST' });
+}
+
+export interface SidePublishStatus {
+  partyId: string;
+  agreementSigned: boolean;
+  agreementVersionMatches: boolean;
+  hasMerchAddress: boolean;
+  currentAgreementVersion: string | null;
+  signedAgreementVersion: string | null;
+  canPublish: boolean;
+}
+
+export async function fetchSidePublishStatus(partyId: string): Promise<SidePublishStatus> {
+  return apiRequest<SidePublishStatus>(`/api/side/parties/${partyId}/publish-status`);
+}
+
+export async function publishSideEvent(partyId: string): Promise<{ success: boolean; published: boolean }> {
+  return apiRequest(`/api/side/parties/${partyId}/publish`, { method: 'POST' });
+}
+
 // scarpetta-58472: site-wide suggestions list (admin / underboss view-only).
 export interface Suggestion {
   id: string; createdAt: string; body: string;
