@@ -547,7 +547,15 @@ function CityActionsMenu({
   attendanceReminderSentAt,
   paymentsApprovedUsd,
   receiptsTotalUsd,
+  variant = 'menu',
 }: {
+  /**
+   * stracciatella-58546: 'menu' (default) renders the desktop icon-button row +
+   * portaled kebab dropdown. 'card' renders every available action as a
+   * full-width, labeled button (>=44px touch target) for the mobile card view.
+   * Both variants reuse the exact same onClick handlers + confirm state.
+   */
+  variant?: 'menu' | 'card';
   onMarkPartyPaid?: () => void;
   onAddExternalPayment?: () => void;
   onSendPayment?: () => void;
@@ -695,6 +703,276 @@ function CityActionsMenu({
   };
 
   const isApproved = paymentsApprovedUsd != null;
+
+  // stracciatella-58546: mobile card variant — every available action as a
+  // full-width labeled button (>=44px touch target). Reuses the same onClick
+  // handlers + two-click confirm state as the desktop kebab menu; no portal.
+  if (variant === 'card') {
+    const cardBtn =
+      'w-full min-h-11 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50';
+    return (
+      <div
+        className="flex flex-col gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {canApproveCity && (
+          <button
+            type="button"
+            disabled={approveBusy}
+            onClick={() => {
+              if (isApproved) {
+                onApproveCity?.(null);
+              } else {
+                onApproveCity?.(receiptsTotalUsd ?? 0);
+              }
+            }}
+            className={`${cardBtn} ${
+              isApproved
+                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                : 'bg-theme-surface-hover hover:bg-theme-surface text-theme-text-secondary border border-theme-stroke'
+            }`}
+          >
+            {approveBusy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ThumbsUp size={16} className={isApproved ? 'fill-current' : ''} />
+            )}
+            {isApproved
+              ? `Approved: ${formatUsd(paymentsApprovedUsd)} (clear)`
+              : 'Approve payment'}
+          </button>
+        )}
+        {canSendPayment && (
+          <button
+            type="button"
+            onClick={onSendPayment}
+            className={`${cardBtn} bg-emerald-600 hover:bg-emerald-700 text-white`}
+          >
+            <Send size={16} />
+            Send payment
+          </button>
+        )}
+        {canMarkPaid && (
+          <button
+            type="button"
+            onClick={onMarkPartyPaid}
+            className={`${cardBtn} bg-blue-600 hover:bg-blue-700 text-white`}
+          >
+            <Check size={16} />
+            {markPaidLabel}
+          </button>
+        )}
+        {canReopen && (
+          <button
+            type="button"
+            disabled={reopenBusy}
+            onClick={onReopen}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {reopenBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : (
+              <RotateCcw size={16} className="text-amber-400" />
+            )}
+            Reopen city
+          </button>
+        )}
+        {canAddExternal && (
+          <button
+            type="button"
+            onClick={onAddExternalPayment}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            <Plus size={16} className="text-sky-500" />
+            Add external payment
+          </button>
+        )}
+        {canToggleScamFlag && (
+          <button
+            type="button"
+            disabled={scamFlagBusy}
+            onClick={onToggleScamFlag}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {scamFlagBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : isFlaggedScam ? (
+              <CheckCircle2 size={16} className="text-emerald-500" />
+            ) : (
+              <AlertTriangle size={16} className="text-red-500" />
+            )}
+            {isFlaggedScam ? 'Unflag possible scam' : 'Flag as possible scam'}
+          </button>
+        )}
+        {canSendTgReminder && (
+          <button
+            type="button"
+            disabled={tgReminderBusy}
+            onClick={() => {
+              if (!confirmTgReminder) {
+                setConfirmTgReminder(true);
+                return;
+              }
+              setConfirmTgReminder(false);
+              onSendTgReminder?.();
+            }}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {tgReminderBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : (
+              <MessageCircle
+                size={16}
+                className={confirmTgReminder ? 'text-amber-400' : 'text-sky-400'}
+              />
+            )}
+            {confirmTgReminder
+              ? 'Click again to confirm'
+              : 'Send receipts reminder'}
+          </button>
+        )}
+        {canSendWalletReminder && (
+          <button
+            type="button"
+            disabled={walletReminderBusy}
+            onClick={() => {
+              if (!confirmWalletReminder) {
+                setConfirmWalletReminder(true);
+                return;
+              }
+              setConfirmWalletReminder(false);
+              onSendWalletReminder?.();
+            }}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {walletReminderBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : (
+              <Wallet
+                size={16}
+                className={confirmWalletReminder ? 'text-amber-400' : 'text-sky-400'}
+              />
+            )}
+            {confirmWalletReminder
+              ? 'Click again to confirm'
+              : 'Send wallet reminder'}
+          </button>
+        )}
+        {canSendPhotoReminder && (
+          <button
+            type="button"
+            disabled={photoReminderBusy}
+            onClick={() => {
+              if (!confirmPhotoReminder) {
+                setConfirmPhotoReminder(true);
+                return;
+              }
+              setConfirmPhotoReminder(false);
+              onSendPhotoReminder?.();
+            }}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {photoReminderBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : (
+              <Camera
+                size={16}
+                className={confirmPhotoReminder ? 'text-amber-400' : 'text-sky-400'}
+              />
+            )}
+            {confirmPhotoReminder
+              ? 'Click again to confirm'
+              : 'Send photo reminder'}
+          </button>
+        )}
+        {canSendAttendanceReminder && (
+          <button
+            type="button"
+            disabled={attendanceReminderBusy}
+            onClick={() => {
+              if (!confirmAttendanceReminder) {
+                setConfirmAttendanceReminder(true);
+                return;
+              }
+              setConfirmAttendanceReminder(false);
+              onSendAttendanceReminder?.();
+            }}
+            className={`${cardBtn} border border-theme-stroke text-theme-text hover:bg-theme-surface-hover`}
+          >
+            {attendanceReminderBusy ? (
+              <Loader2 size={16} className="animate-spin text-theme-text-muted" />
+            ) : (
+              <Users
+                size={16}
+                className={
+                  confirmAttendanceReminder ? 'text-amber-400' : 'text-sky-400'
+                }
+              />
+            )}
+            {confirmAttendanceReminder
+              ? 'Click again to confirm'
+              : 'Send attendance reminder'}
+          </button>
+        )}
+        {canManageTags && (
+          <div className="border-t border-theme-stroke pt-2">
+            <div className="flex items-center gap-1 text-xs text-theme-text-muted pb-1.5">
+              <Tag size={12} />
+              <span>Custom tags</span>
+              {tagBusy && <Loader2 size={12} className="animate-spin ml-1" />}
+            </div>
+            {customTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 pb-2">
+                {customTags.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      aria-label={`Remove tag ${label}`}
+                      disabled={tagBusy}
+                      onClick={() => onRemoveCustomTag?.(label)}
+                      className="text-indigo-300/70 hover:text-indigo-200 disabled:opacity-50"
+                    >
+                      <XCircle size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <div className="flex-1">
+                <IconInput
+                  icon={Plus}
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  placeholder="Add a tag"
+                  maxLength={40}
+                  disabled={tagBusy}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={tagBusy || !tagDraft.trim()}
+                onClick={handleAddTag}
+                className="px-3 min-h-11 text-sm rounded-md border border-theme-stroke text-theme-text hover:bg-theme-surface-hover disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -3404,7 +3682,10 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
 
   return (
     <div className="bg-theme-surface border border-theme-stroke rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* stracciatella-58546: desktop table view. Hidden below md: where the
+          card list (further down) takes over so the 7-col table doesn't force
+          horizontal scrolling on phones. */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-theme-stroke text-theme-text-muted text-left">
@@ -4001,6 +4282,313 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* stracciatella-58546: mobile card list (md:hidden). Maps over the SAME
+          `rows` + reuses the SAME handlers/state (toggleExpanded, CityExpansion,
+          CityActionsMenu variant="card"). No new data fetching — the per-card
+          money math mirrors the desktop row's receipt loop + computePartyTotals. */}
+      <div className="md:hidden p-3 space-y-3">
+        {loading && rows.length === 0 && (
+          <div className="px-3 py-12 text-center text-theme-text-muted">
+            <Loader2 size={20} className="inline-block animate-spin mr-2" />
+            Loading payments…
+          </div>
+        )}
+        {!loading && rows.length === 0 && (
+          <div className="px-3 py-12 text-center text-theme-text-faint">
+            No events match these filters.
+          </div>
+        )}
+        {rows.map((row) => {
+          const isOpen = expanded.has(row.party.id);
+          const partySlug = row.party.customUrl ?? row.party.inviteCode ?? '';
+          const closedAt = row.party.paymentsClosedAt ?? null;
+          const isClosed = !!closedAt;
+          const effectiveTags =
+            tagOverrides[row.party.id] ?? row.party.eventTags ?? [];
+          const isFlaggedScam = effectiveTags.includes(POSSIBLE_SCAM_TAG);
+          const scamFlagBusy = scamBusyPartyId === row.party.id;
+          const customTags = getCustomTagLabels(effectiveTags);
+          const tagBusy = tagBusyPartyId === row.party.id;
+          const tgReminderBusy = tgReminderBusyPartyId === row.party.id;
+          const walletReminderBusy = walletReminderBusyPartyId === row.party.id;
+          const photoReminderBusy = photoReminderBusyPartyId === row.party.id;
+          const attendanceReminderBusy =
+            attendanceReminderBusyPartyId === row.party.id;
+          const hasInFlight =
+            row.aggregates.pendingCount + row.aggregates.approvedCount > 0;
+          const canCloseOut =
+            !hasInFlight && !isClosed && row.aggregates.paidCount > 0;
+          const showMarkPartyPaid =
+            canMarkPartyPaid && !isClosed && (hasInFlight || canCloseOut);
+          const markPaidLabel = hasInFlight ? 'Mark city paid' : 'Close city';
+
+          const payouts = row.payouts;
+          const partyOverrides = receiptOverridesByParty[row.party.id] ?? {};
+          let receiptUsdTotal = 0;
+          let receiptCount = 0;
+          for (const p of payouts) {
+            for (const d of p.documents || []) {
+              if (d.kind !== 'receipt') continue;
+              receiptCount += 1;
+              const ov = partyOverrides[d.id];
+              const isDup = ov?.isDuplicate ?? d.isDuplicate;
+              const isIne = ov?.ineligible ?? d.ineligible;
+              const amt = ov?.ocrAmount ?? d.ocrAmount;
+              if (isDup === true) continue;
+              if (isIne === true) continue;
+              receiptUsdTotal += Number(amt) || 0;
+            }
+          }
+          const {
+            approvedUsd: approvedSumUsd,
+            paidUsd: paidSumUsd,
+            outstandingUsd,
+          } = computePartyTotals(row);
+
+          return (
+            <div
+              key={row.party.id}
+              className="rounded-xl border border-theme-stroke bg-theme-surface p-3"
+            >
+              {/* Header: chevron + name/country + status pills */}
+              <button
+                type="button"
+                onClick={() => toggleExpanded(row.party.id)}
+                className="w-full flex items-start gap-2 text-left"
+              >
+                <span className="mt-0.5 text-theme-text-muted shrink-0">
+                  {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-theme-text">
+                    {stripGppPrefix(row.party.name)}
+                  </span>
+                  {row.party.country && (
+                    <span className="block text-xs text-theme-text-muted">
+                      {row.party.country}
+                    </span>
+                  )}
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {isClosed && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                        <CheckCircle2 size={11} />
+                        Closed
+                      </span>
+                    )}
+                    {isFlaggedScam && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-red-500 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/40">
+                        <AlertTriangle size={11} />
+                        Possible scam
+                      </span>
+                    )}
+                    {customTags.map((label) => (
+                      <span
+                        key={`m-custom-${label}`}
+                        className="inline-flex items-center gap-1 text-[11px] text-indigo-300 px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30"
+                      >
+                        <Tag size={11} />
+                        {label}
+                      </span>
+                    ))}
+                    {row.aggregates.pendingCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-400">
+                        <XCircle size={11} />
+                        {row.aggregates.pendingCount} pending
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+
+              {/* Money mini-grid */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover/40 px-2.5 py-2">
+                  <div className="text-[11px] text-theme-text-muted">Receipt total</div>
+                  <div className="text-sm font-medium text-theme-text">
+                    {formatUsd(receiptUsdTotal)}
+                  </div>
+                  <div className="text-[11px] text-theme-text-muted inline-flex items-center gap-1">
+                    <Paperclip size={10} />
+                    {receiptCount} receipt{receiptCount === 1 ? '' : 's'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover/40 px-2.5 py-2">
+                  <div className="text-[11px] text-theme-text-muted">Approved</div>
+                  <div
+                    className={`text-sm ${
+                      approvedSumUsd > 0
+                        ? 'text-sky-500 font-medium'
+                        : 'text-theme-text-faint'
+                    }`}
+                  >
+                    {approvedSumUsd > 0 ? formatUsd(approvedSumUsd) : '—'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover/40 px-2.5 py-2">
+                  <div className="text-[11px] text-theme-text-muted">Paid</div>
+                  <div
+                    className={`text-sm ${
+                      paidSumUsd > 0
+                        ? 'text-emerald-500 font-medium'
+                        : 'text-theme-text-faint'
+                    }`}
+                  >
+                    {paidSumUsd > 0 ? formatUsd(paidSumUsd) : '—'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-theme-stroke bg-theme-surface-hover/40 px-2.5 py-2">
+                  <div className="text-[11px] text-theme-text-muted">Outstanding</div>
+                  <div
+                    className={`text-sm ${
+                      outstandingUsd > 0
+                        ? 'text-amber-500 font-medium'
+                        : 'text-theme-text-faint'
+                    }`}
+                  >
+                    {outstandingUsd > 0 ? formatUsd(outstandingUsd) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {partySlug && (
+                <Link
+                  to={`/host/${partySlug}/details`}
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-theme-text-secondary hover:text-[#E52828] hover:underline"
+                >
+                  <ExternalLink size={12} />
+                  View host page
+                </Link>
+              )}
+
+              {/* Actions — full-width labeled buttons */}
+              <div className="mt-3">
+                <CityActionsMenu
+                  variant="card"
+                  canMarkPaid={showMarkPartyPaid}
+                  canAddExternal={canAddExternal}
+                  canSendPayment={canSendPayment}
+                  canToggleScamFlag={canToggleScamFlag}
+                  canSendTgReminder={canSendTgReminder}
+                  canSendWalletReminder={canSendWalletReminder}
+                  canSendPhotoReminder={canSendPhotoReminder}
+                  canSendAttendanceReminder={canSendAttendanceReminder}
+                  canApproveCity={canApproveCity}
+                  canReopen={isClosed && canReopenCap}
+                  canManageTags={canManageTags}
+                  customTags={customTags}
+                  tagBusy={tagBusy}
+                  markPaidLabel={markPaidLabel}
+                  isFlaggedScam={isFlaggedScam}
+                  scamFlagBusy={scamFlagBusy}
+                  tgReminderBusy={tgReminderBusy}
+                  walletReminderBusy={walletReminderBusy}
+                  photoReminderBusy={photoReminderBusy}
+                  attendanceReminderBusy={attendanceReminderBusy}
+                  reopenBusy={reopenBusyPartyId === row.party.id}
+                  approveBusy={approveBusyPartyId === row.party.id}
+                  receiptsReminderSentAt={row.party.receiptsReminderSentAt}
+                  walletReminderSentAt={row.party.walletReminderSentAt}
+                  photoReminderSentAt={row.party.photoReminderSentAt}
+                  attendanceReminderSentAt={row.party.attendanceReminderSentAt}
+                  paymentsApprovedUsd={row.party.paymentsApprovedUsd}
+                  paymentsApprovedAt={row.party.paymentsApprovedAt}
+                  receiptsTotalUsd={receiptUsdTotal}
+                  onMarkPartyPaid={
+                    showMarkPartyPaid && onMarkPartyPaid
+                      ? () => onMarkPartyPaid(row.party.id)
+                      : undefined
+                  }
+                  onAddExternalPayment={
+                    canAddExternal && onAddExternalPayment
+                      ? () => onAddExternalPayment(row.party.id, row.party.name)
+                      : undefined
+                  }
+                  onSendPayment={
+                    canSendPayment && onSendPayment
+                      ? () =>
+                          onSendPayment(
+                            applyReceiptOverridesToRow(row, partyOverrides),
+                          )
+                      : undefined
+                  }
+                  onToggleScamFlag={
+                    canToggleScamFlag ? () => handleToggleScamFlag(row) : undefined
+                  }
+                  onApproveCity={
+                    canApproveCity
+                      ? (amountUsd) => handleApproveCity(row, amountUsd)
+                      : undefined
+                  }
+                  onSendTgReminder={
+                    canSendTgReminder ? () => handleSendTgReminder(row) : undefined
+                  }
+                  onSendWalletReminder={
+                    canSendWalletReminder
+                      ? () => handleSendWalletReminder(row)
+                      : undefined
+                  }
+                  onSendPhotoReminder={
+                    canSendPhotoReminder
+                      ? () => handleSendPhotoReminder(row)
+                      : undefined
+                  }
+                  onSendAttendanceReminder={
+                    canSendAttendanceReminder
+                      ? () => handleSendAttendanceReminder(row)
+                      : undefined
+                  }
+                  onReopen={
+                    isClosed && canReopenCap ? () => handleReopen(row) : undefined
+                  }
+                  onAddCustomTag={
+                    canManageTags
+                      ? (label) => handleAddCustomTag(row, label)
+                      : undefined
+                  }
+                  onRemoveCustomTag={
+                    canManageTags
+                      ? (label) => handleRemoveCustomTag(row, label)
+                      : undefined
+                  }
+                />
+              </div>
+
+              {/* Expanded detail — reuse the SAME CityExpansion component,
+                  stacked vertically inside the card. */}
+              {isOpen && (
+                <div className="mt-3 border-t border-theme-stroke pt-3">
+                  <CityExpansion
+                    row={row}
+                    selectedIds={selectedIds}
+                    onToggleSelect={onToggleSelect}
+                    onRowClick={onRowClick}
+                    busyRowId={busyRowId}
+                    canEditReceipts={canEditReceipts}
+                    canManagePhotos={
+                      viewerRole === 'admin' || viewerRole === 'underboss'
+                    }
+                    canEditAdminNotes={canEditAdminNotes}
+                    onDocumentsChanged={onDocumentsChanged}
+                    onApprove={viewerRole === 'admin' ? onApprove : undefined}
+                    onExecute={viewerRole === 'admin' ? onExecute : undefined}
+                    onMarkPaid={viewerRole === 'admin' ? onMarkPaid : undefined}
+                    onReceiptOverride={(docId, override) => {
+                      setReceiptOverridesByParty((prev) => ({
+                        ...prev,
+                        [row.party.id]: {
+                          ...(prev[row.party.id] ?? {}),
+                          [docId]: override,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
