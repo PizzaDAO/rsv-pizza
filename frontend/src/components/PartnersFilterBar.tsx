@@ -28,13 +28,6 @@ const SORT_OPTIONS: { value: PartnersSortValue; label: string }[] = [
 const FIELD_CLASS =
   'rounded-lg border bg-white/90 px-3 py-2 text-sm text-[#1a1a1a] placeholder:text-[#555]/60 focus:outline-none focus:border-black/30';
 
-// TriStateFilterDropdown ships with dark-theme trigger tokens
-// (text-theme-text-secondary etc.) which render near-white and vanish on this
-// light sky-blue page. Override the trigger button to match the white pills
-// above via arbitrary `[&>button]:` variants (panel stays the shared dark popover).
-const TRISTATE_LIGHT =
-  '[&>button]:!bg-white/90 [&>button]:!text-[#1a1a1a] [&>button]:!border-black/10 [&>button:hover]:!border-black/30';
-
 interface PartnersFilterBarProps {
   filters: PartnersFilters;
   onChange: (next: PartnersFilters) => void;
@@ -111,7 +104,8 @@ export function PartnersFilterBar({
 
         {/* City */}
         <TriStateFilterDropdown
-          className={TRISTATE_LIGHT}
+          tone="light"
+          align="right"
           label="City"
           items={cities}
           includes={filters.cityIncludes}
@@ -128,7 +122,8 @@ export function PartnersFilterBar({
 
         {/* Region */}
         <TriStateFilterDropdown
-          className={TRISTATE_LIGHT}
+          tone="light"
+          align="right"
           label="Region"
           items={regions}
           includes={filters.regionIncludes}
@@ -147,7 +142,8 @@ export function PartnersFilterBar({
 
         {/* Country */}
         <TriStateFilterDropdown
-          className={TRISTATE_LIGHT}
+          tone="light"
+          align="right"
           label="Country"
           items={countries}
           includes={filters.countryIncludes}
