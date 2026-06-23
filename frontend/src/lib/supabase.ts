@@ -369,10 +369,15 @@ export async function uploadPayoutPhoto(
 }> {
   // bocconcino-92104: receipts accept PDF in addition to image MIMEs. Pizza
   // photos remain image-only (PDFs make no sense as a pizza shot).
+  // mortadella-58546: non-receipt photo kinds (pizza/event/role) also accept
+  // video (.mov/.mp4/.webm) — routed to the event-videos bucket. Receipts stay
+  // image + PDF only (they're OCR'd; video can't be read).
   const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+  const isVideo = kind !== 'receipt' && allowedVideoTypes.includes(file.type);
   const allowedTypes = kind === 'receipt'
     ? [...allowedImageTypes, 'application/pdf']
-    : allowedImageTypes;
+    : [...allowedImageTypes, ...allowedVideoTypes];
   // schiacciata-71042: some browsers report an empty file.type for HEIC, so the
   // MIME allowlist would reject a valid .heic/.heif upload. Detect HEIC by mime
   // OR filename extension and let an empty-type HEIC file through validation.
@@ -384,12 +389,16 @@ export async function uploadPayoutPhoto(
     lowerName.endsWith('.heif');
   if (!allowedTypes.includes(file.type) && !(isHeic && !file.type)) {
     console.error('Invalid file type for payout photo:', file.type);
-    throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: JPEG, PNG, WebP, HEIC, PDF.`);
+    const accepted = kind === 'receipt'
+      ? 'JPEG, PNG, WebP, HEIC, PDF'
+      : 'JPEG, PNG, WebP, HEIC, MP4, WebM, MOV';
+    throw new Error(`Unsupported file type: ${file.type || 'unknown'}. Accepted: ${accepted}.`);
   }
-  const maxSize = 25 * 1024 * 1024; // 25MB
+  const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024; // 100MB video / 25MB image
   if (file.size > maxSize) {
     console.error('Payout photo too large:', file.size);
-    throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max 25MB.`);
+    const maxLabel = isVideo ? '100MB' : '25MB';
+    throw new Error(`File is too large (${(file.size / 1048576).toFixed(1)}MB). Max ${maxLabel}.`);
   }
 
   // schiacciata-71042: convert HEIC->JPEG client-side before upload. iPhone
@@ -400,7 +409,8 @@ export async function uploadPayoutPhoto(
   let uploadName = file.name;
   let uploadMime = file.type || 'application/octet-stream';
   let uploadExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  if (isHeic) {
+  // mortadella-58546: video uploads never enter the HEIC conversion branch.
+  if (isHeic && !isVideo) {
     try {
       const heic2any = (await import('heic2any')).default;
       const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
@@ -420,6 +430,9 @@ export async function uploadPayoutPhoto(
     const timestamp = Date.now();
     const rand = Math.random().toString(36).substring(7);
     const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
+    // mortadella-58546: video routes to the event-videos bucket (event-images
+    // allowed_mime_types has no video). Same payout path scheme in either bucket.
+    const bucket = isVideo ? 'event-videos' : 'event-images';
 
     // focaccia-58519: transient Supabase Storage blips (HTTP 520, network
     // hiccups) were surfacing to the host as a bare red error icon with no
@@ -433,7 +446,7 @@ export async function uploadPayoutPhoto(
         let uploadError: any = null;
         try {
           const { error } = await supabase.storage
-            .from('event-images')
+            .from(bucket)
             .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
           uploadError = error;
         } catch (netErr) {
@@ -481,7 +494,7 @@ export async function uploadPayoutPhoto(
     await uploadWithRetry();
 
     const { data: urlData } = supabase.storage
-      .from('event-images')
+      .from(bucket)
       .getPublicUrl(path);
 
     // bocconcino-92104: for PDF receipts, also render page 1 to a PNG and

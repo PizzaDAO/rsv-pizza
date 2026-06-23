@@ -165,7 +165,7 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime"
           multiple
           className="hidden"
           onChange={e => {
@@ -192,7 +192,18 @@ export const PizzaPhotoUpload: React.FC<PizzaPhotoUploadProps> = ({
               className="relative aspect-square rounded-lg overflow-hidden bg-theme-surface group"
             >
               {item.url ? (
-                <img src={item.url} alt="" className="w-full h-full object-cover" />
+                item.mimeType?.startsWith('video/') ? (
+                  <video
+                    src={item.url}
+                    className="w-full h-full object-cover"
+                    controls
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <img src={item.url} alt="" className="w-full h-full object-cover" />
+                )
               ) : item.status === 'error' ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1 text-red-400 text-center">
                   <AlertCircle size={18} className="flex-shrink-0" />

@@ -147,7 +147,7 @@ export const RolePhotoPicker: React.FC<RolePhotoPickerProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,video/mp4,video/webm,video/quicktime"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
