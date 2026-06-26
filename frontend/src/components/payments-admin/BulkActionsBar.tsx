@@ -71,7 +71,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
           type="button"
           onClick={onApprove}
           disabled={busy}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1 px-4 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
         >
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           Approve
@@ -80,7 +80,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
           type="button"
           onClick={onReject}
           disabled={busy}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1 px-4 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
         >
           <X size={14} />
           Reject
@@ -90,7 +90,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             type="button"
             onClick={onMarkPaid}
             disabled={busy}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1 px-4 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
           >
             <DollarSign size={14} />
             Mark paid
@@ -101,7 +101,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             type="button"
             onClick={onBulkSend}
             disabled={busy || eligibleBulkSendCount === 0}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-1 px-4 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             title={
               eligibleBulkSendCount === 0
                 ? 'No eligible USDC payouts selected (need approved or failed + valid 0x wallet)'
@@ -117,7 +117,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             type="button"
             onClick={onExportSafeJson}
             disabled={busy}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1 px-4 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
             title="Bundle selected USDC payouts as a Gnosis Safe Transaction Builder batch"
           >
             <FileJson size={14} />
