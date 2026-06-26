@@ -2017,7 +2017,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               {eventPhotos.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No event photos yet.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {eventPhotos.map((p, idx) => {
                     // focaccia-92104: event photos sit at the END of the
                     // merged carousel. pomodoro-92110: + eventDocs.length for
@@ -2095,7 +2095,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               {pizzaPhotos.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No pizza photos yet.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {pizzaPhotos.map((p, idx) => {
                     // focaccia-92104: pizza photos sit between receipts and
                     // event photos in the merged carousel. pomodoro-92110:
@@ -2188,7 +2188,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               {receipts.length === 0 ? (
                 <p className="text-sm text-theme-text-faint">No receipts attached.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {receipts.map((doc, idx) => {
                     // focaccia-92104: receipt thumbnails sit after the
                     // payment-app pizzas in the merged carousel. pomodoro-92110:
@@ -2744,7 +2744,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                               : ''
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span
                             className={`w-2 h-2 rounded-full flex-shrink-0 ${
                               localOcrError ? (isQuotaErr ? 'bg-amber-500' : 'bg-red-500') :
@@ -3014,7 +3014,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                                   {(drafts ?? []).map((d, idx) => (
                                     <div
                                       key={idx}
-                                      className="flex items-center gap-1.5"
+                                      className="flex flex-wrap items-center gap-1.5"
                                     >
                                       <input
                                         type="text"
@@ -3226,7 +3226,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <h3 className="text-sm font-semibold text-theme-text mb-2">
                   Payment proof ({pizzas.length})
                 </h3>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {pizzas.map((doc, idx) => (
                     <button
                       key={doc.id}
@@ -3271,7 +3271,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 <h3 className="text-sm font-semibold text-theme-text mb-2">
                   Event proof ({eventDocs.length})
                 </h3>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {eventDocs.map((doc, idx) => (
                     <button
                       key={doc.id}
