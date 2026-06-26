@@ -24,6 +24,7 @@ import heicRoutes from './routes/heic.routes.js'; // taleggio-71042: server-side
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
 import gpp27Routes from './routes/gpp27.routes.js'; // soppressata-50927: admin-gated GPP27 (2027) create flow
+import sideRoutes from './routes/side.routes.js'; // rigatoni-58919: admin-gated "side" (conference side-event) create flow
 import donationRoutes from './routes/donation.routes.js';
 import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
@@ -227,6 +228,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/gpp', gppRoutes);
 app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-gated create flow, budget, agreement, publish gates
+app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated create flow, cap, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
