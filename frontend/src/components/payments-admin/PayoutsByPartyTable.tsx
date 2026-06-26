@@ -4347,6 +4347,21 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
             outstandingUsd,
           } = computePartyTotals(row);
 
+          // stracciatella-58546: replicate the desktop "last Molto Benny
+          // reminder" computation (tortellini-58542) so the card can surface
+          // the same line that's hover-only / absent on mobile.
+          const reminders = [
+            { label: 'Receipts', at: row.party.receiptsReminderSentAt },
+            { label: 'Wallet', at: row.party.walletReminderSentAt },
+            { label: 'Photo', at: row.party.photoReminderSentAt },
+            { label: 'Attendance', at: row.party.attendanceReminderSentAt },
+          ].filter((r) => r.at);
+          const lastReminder = reminders.reduce(
+            (best, r) =>
+              !best || new Date(r.at!) > new Date(best.at!) ? r : best,
+            null as null | { label: string; at: string },
+          );
+
           return (
             <div
               key={row.party.id}
@@ -4399,6 +4414,14 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                       </span>
                     )}
                   </span>
+                  {/* stracciatella-58546: surface the Closed pill's hover-only
+                      reason (desktop `title="Closed out …"`) inline on the card.
+                      Same toLocaleString() value as the desktop title=. */}
+                  {isClosed && (
+                    <span className="block mt-1 text-xs text-theme-text-secondary break-words">
+                      Closed out {new Date(closedAt!).toLocaleString()}
+                    </span>
+                  )}
                 </span>
               </button>
 
@@ -4450,6 +4473,31 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                     {outstandingUsd > 0 ? formatUsd(outstandingUsd) : '—'}
                   </div>
                 </div>
+              </div>
+
+              {/* stracciatella-58546: Last activity — absent from the card in
+                  Phase 1. Desktop shows relativeTime() with the precise
+                  localized timestamp in title= (hover-only). Surface BOTH the
+                  relative time and the precise timestamp inline, plus the last
+                  Molto Benny reminder line. Reuses the exact same expressions
+                  as the desktop cell (relativeTime + toLocaleString). */}
+              <div className="mt-3 text-xs text-theme-text-secondary break-words">
+                {row.aggregates.lastActivityAt ? (
+                  <span>
+                    Last activity{' '}
+                    {relativeTime(new Date(row.aggregates.lastActivityAt))} ·{' '}
+                    {new Date(row.aggregates.lastActivityAt).toLocaleString()}
+                  </span>
+                ) : (
+                  <span className="text-theme-text-faint">No activity yet</span>
+                )}
+                {lastReminder && (
+                  <div className="mt-0.5 text-theme-text-faint break-words">
+                    🔔 {lastReminder.label} reminder ·{' '}
+                    {relativeTime(new Date(lastReminder.at!))} ·{' '}
+                    {new Date(lastReminder.at!).toLocaleString()}
+                  </div>
+                )}
               </div>
 
               {partySlug && (
