@@ -7229,6 +7229,8 @@ export interface PhotosFeedFilters {
   // cannoli-58292: event-year filter. Backend defaults to the current calendar
   // year when omitted; only photos uploaded after their event's start show.
   year?: number;
+  // sfoglia-58543: filter by designated photo role (group / box_stack / pizza).
+  type?: string[];
 }
 
 export async function getPhotosFeed(
@@ -7256,6 +7258,10 @@ export async function getPhotosFeed(
     // cannoli-58292: event-year filter.
     if (typeof filters?.year === 'number') {
       params.append('year', String(filters.year));
+    }
+    // sfoglia-58543: photo-role type filter (CSV).
+    if (filters?.type && filters.type.length > 0) {
+      params.append('type', filters.type.join(','));
     }
     return await apiRequest<PhotosFeedResponse>(
       `/api/photos/feed?${params.toString()}`,

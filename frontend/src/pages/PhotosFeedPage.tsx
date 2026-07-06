@@ -55,6 +55,9 @@ export function PhotosFeedPage() {
     return Number.isFinite(n) ? n : CURRENT_YEAR;
   });
 
+  // sfoglia-58543: photo-role type filter (multi-select). Initialized from URL.
+  const [activeType, setActiveType] = useState<string[]>(() => parseCsvParam(searchParams.get('type')));
+
   // Facets + partner tags
   const [facetCountries, setFacetCountries] = useState<Array<{ name: string; count: number }>>([]);
   const [facetYears, setFacetYears] = useState<number[]>([]);
@@ -82,12 +85,14 @@ export function PhotosFeedPage() {
   const sortModeRef = useRef(sortMode);
   const seedRef = useRef(seed);
   const yearRef = useRef(activeYear); // cannoli-58292
+  const typeRef = useRef(activeType); // sfoglia-58543
   countriesRef.current = activeCountries;
   regionsRef.current = activeRegions;
   partnerTagRef.current = activePartnerTag;
   sortModeRef.current = sortMode;
   seedRef.current = seed;
   yearRef.current = activeYear;
+  typeRef.current = activeType;
 
   // Sync filter state -> URL so refresh / sharing work.
   useEffect(() => {
@@ -102,10 +107,12 @@ export function PhotosFeedPage() {
     // cannoli-58292: only put year in the URL when it differs from the current
     // calendar default, so a fresh /photos link stays clean.
     if (activeYear !== CURRENT_YEAR) next.set('year', String(activeYear));
+    // sfoglia-58543: persist the type filter in the URL when active.
+    if (activeType.length > 0) next.set('type', activeType.join(','));
     // Replace (don't push) to keep history clean.
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear]);
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear, activeType]);
 
   // Build the raw-country list to send to the backend by expanding each
   // selected alpha-2 to all known locale variants intersected with what
@@ -141,6 +148,7 @@ export function PhotosFeedPage() {
         sort: sortModeRef.current,
         seed: seedRef.current,
         year: yearRef.current, // cannoli-58292
+        type: typeRef.current, // sfoglia-58543
       };
       const res = await getPhotosFeed(cursorRef.current, 24, filters);
       if (!res) {
@@ -165,8 +173,8 @@ export function PhotosFeedPage() {
   // + seed so picking Shuffle (or reshuffling with a new seed) re-pages.
   // cannoli-58292: include year so changing it resets the cursor + re-pages.
   const filterKey = useMemo(
-    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}|${sortMode}|${seed || ''}|${activeYear}`,
-    [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear]
+    () => `${activeCountries.slice().sort().join(',')}|${activeRegions.slice().sort().join(',')}|${activePartnerTag || ''}|${sortMode}|${seed || ''}|${activeYear}|${activeType.slice().sort().join(',')}`,
+    [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear, activeType]
   );
 
   useEffect(() => {
@@ -266,6 +274,8 @@ export function PhotosFeedPage() {
     setSeed(null);
     // cannoli-58292: reset to the default (current calendar) year.
     setActiveYear(CURRENT_YEAR);
+    // sfoglia-58543: clear the type filter.
+    setActiveType([]);
   };
 
   // sicilian-58195: shuffle handler. Generates a new seed and switches to
@@ -302,8 +312,10 @@ export function PhotosFeedPage() {
     }
     // cannoli-58292: ZIP download honors the selected event year.
     params.append('year', String(activeYear));
+    // sfoglia-58543: ZIP download honors the type filter.
+    if (activeType.length > 0) params.append('type', activeType.join(','));
     return params.toString();
-  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear, buildCountriesForBackend]);
+  }, [activeCountries, activeRegions, activePartnerTag, sortMode, seed, activeYear, activeType, buildCountriesForBackend]);
 
   const handleDownloadZip = async () => {
     if (downloading || !activePartnerTag) return;
@@ -352,7 +364,7 @@ export function PhotosFeedPage() {
     []
   );
 
-  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag || sortMode === 'random' || activeYear !== CURRENT_YEAR;
+  const anyFiltersActive = activeCountries.length > 0 || activeRegions.length > 0 || !!activePartnerTag || sortMode === 'random' || activeYear !== CURRENT_YEAR || activeType.length > 0;
 
   return (
     <ThemeProvider theme="gpp">
@@ -380,6 +392,11 @@ export function PhotosFeedPage() {
             options={yearOptions}
             selected={activeYear}
             onChange={setActiveYear}
+          />
+          {/* sfoglia-58543: photo-role type selector (group / box_stack / pizza). */}
+          <TypeFilterButton
+            selected={activeType}
+            onChange={setActiveType}
           />
           <CountryFilterButton
             options={countryOptions}
@@ -682,6 +699,68 @@ function YearFilterButton({
               {isSel && <Check size={12} className="text-white" />}
             </div>
             <span className="flex-1">{y}</span>
+          </button>
+        );
+      })}
+    </FilterDropdownShell>
+  );
+}
+
+// sfoglia-58543: multi-select photo-role type dropdown. Built on
+// FilterDropdownShell like RegionFilterButton — a user may want Group OR Pizza.
+// Options map to the payout_role values gated on the backend.
+const TYPE_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: 'group', label: 'Group' },
+  { id: 'box_stack', label: 'Box stack' },
+  { id: 'pizza', label: 'Pizza' },
+];
+
+function TypeFilterButton({
+  selected, onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const toggle = (id: string) => {
+    if (selected.includes(id)) onChange(selected.filter((t) => t !== id));
+    else onChange([...selected, id]);
+  };
+
+  return (
+    <FilterDropdownShell
+      label="Type"
+      count={selected.length}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      {selected.length > 0 && (
+        <button
+          onClick={() => onChange([])}
+          className="w-full text-left px-4 py-2 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          Clear ({selected.length})
+        </button>
+      )}
+      {TYPE_OPTIONS.map((opt) => {
+        const isSel = selected.includes(opt.id);
+        return (
+          <button
+            key={opt.id}
+            onClick={() => toggle(opt.id)}
+            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+              isSel
+                ? 'text-red-600 font-medium'
+                : 'text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+              isSel ? 'bg-red-500 border-red-500' : 'border-black/20'
+            }`}>
+              {isSel && <Check size={12} className="text-white" />}
+            </div>
+            {opt.label}
           </button>
         );
       })}

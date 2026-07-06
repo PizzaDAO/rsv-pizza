@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, X, Pause, Play, MapPin } from 'lucide-react';
+import { Loader2, X, Pause, Play, MapPin, ThumbsUp } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
-import { getPhotosFeed, FeedPhoto } from '../lib/api';
+import { getPhotosFeed, togglePhotoVote, togglePayoutPhotoVote, FeedPhoto } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { countryNameToAlpha2, alpha2ToCountryNames } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
 import { CircleFlag } from '../components/CircleFlag';
@@ -40,6 +41,8 @@ export function PhotosSlideshowPage() {
   const countryCodes = parseCsvParam(searchParams.get('countries'));
   const regions = parseCsvParam(searchParams.get('regions'));
   const partnerTag = searchParams.get('partnerTag') || null;
+  // sfoglia-58543: honor the /photos type (payout_role) filter in the slideshow.
+  const types = parseCsvParam(searchParams.get('type'));
   const yearParam = searchParams.get('year');
   const year = yearParam && Number.isFinite(parseInt(yearParam, 10)) ? parseInt(yearParam, 10) : undefined;
   const backendCountries = Array.from(
@@ -51,6 +54,12 @@ export function PhotosSlideshowPage() {
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // sfoglia-58543: thumbs-up (vote) support, mirroring the /photos feed
+  // lightbox. Anon users can't vote (button disabled); logged-in users toggle
+  // via the source-appropriate endpoint.
+  const { user } = useAuth();
+  const [voting, setVoting] = useState(false);
 
   // Refs mirror the state that the interval / prefetch logic reads, so the
   // timer callback never goes stale.
@@ -65,8 +74,8 @@ export function PhotosSlideshowPage() {
 
   // Filters are stable for the life of the page; capture them in a ref so
   // loadPage stays a stable callback.
-  const filtersRef = useRef({ countries: backendCountries, regions, partnerTag, year });
-  filtersRef.current = { countries: backendCountries, regions, partnerTag, year };
+  const filtersRef = useRef({ countries: backendCountries, regions, partnerTag, year, type: types });
+  filtersRef.current = { countries: backendCountries, regions, partnerTag, year, type: types };
 
   const loadPage = useCallback(async (isInitial: boolean) => {
     if (loadingRef.current) return;
@@ -81,6 +90,7 @@ export function PhotosSlideshowPage() {
         regions: filtersRef.current.regions,
         partnerTag: filtersRef.current.partnerTag,
         year: filtersRef.current.year,
+        type: filtersRef.current.type, // sfoglia-58543
       });
       if (!res) {
         if (isInitial) setError('Could not load photos right now.');
@@ -167,6 +177,23 @@ export function PhotosSlideshowPage() {
   const current = photos[idx];
   const isVideo = current?.mimeType?.startsWith('video/');
 
+  // sfoglia-58543: toggle a vote on the current photo. Source-aware dispatch
+  // (same as the /photos FeedLightbox). On success, patch the loaded deck so
+  // the count/fill persist as the slideshow advances or loops.
+  const handleVote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!current || voting || !user) return;
+    setVoting(true);
+    const res = current.source === 'payout' && current.payoutId
+      ? await togglePayoutPhotoVote(current.payoutId, current.id)
+      : await togglePhotoVote(current.party.id, current.id);
+    setVoting(false);
+    if (res) {
+      setPhotos((prev) => prev.map((p) =>
+        p.id === current.id ? { ...p, voteCount: res.voteCount, votedByMe: res.voted } : p));
+    }
+  };
+
   const gpp = current ? gppCityBySlug(current.party.slug) : undefined;
   const displayCity = gpp?.name ?? current?.party.city;
   const displayCountry = gpp?.country ?? current?.party.country;
@@ -186,6 +213,24 @@ export function PhotosSlideshowPage() {
       >
         <X size={24} />
       </Link>
+
+      {/* sfoglia-58543: thumbs-up (vote) — bottom-right, left of Pause/Play.
+          Styled like the other overlay controls. Anon users see the count but
+          can't vote (disabled). */}
+      {photos.length > 0 && current && (
+        <button
+          onClick={handleVote}
+          disabled={!user || voting}
+          aria-label={current.votedByMe ? 'Remove vote' : 'Thumbs up'}
+          title={user ? (current.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
+          className={`absolute bottom-4 right-16 z-20 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors ${
+            !user || voting ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
+        >
+          <ThumbsUp size={20} fill={current.votedByMe ? 'white' : 'none'} />
+          <span className="text-sm font-medium">{current.voteCount}</span>
+        </button>
+      )}
 
       {/* Pause / play */}
       {photos.length > 0 && (
