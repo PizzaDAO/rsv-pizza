@@ -514,6 +514,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       taxFormRequired,
       // quattro-71244: gamified dashboard goals (JSONB) — per-KPI host targets.
       hostGoals,
+      // focaccina-58550: host-customizable one-sheet config (JSONB).
+      oneSheetConfig,
       // porchetta-81402: host can edit the free-text cancellation reason
       // without re-cancelling. Cancel/reinstate themselves go through their
       // dedicated POST endpoints — NOT through this PATCH whitelist.
@@ -716,6 +718,71 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // focaccina-58550: sanitize the host-customizable one-sheet config. Never
+    // store the raw body — build a clean object with capped strings + arrays,
+    // dropping unknown keys. `null` clears the config. Mirrors the externalLinks
+    // validation pattern above.
+    let oneSheetConfigToWrite: any | undefined = undefined;
+    if (oneSheetConfig !== undefined) {
+      if (oneSheetConfig === null) {
+        oneSheetConfigToWrite = null;
+      } else if (typeof oneSheetConfig !== 'object' || Array.isArray(oneSheetConfig)) {
+        throw new AppError('Invalid one sheet config', 400, 'VALIDATION_ERROR');
+      } else {
+        const capStr = (v: any, max: number): string | undefined => {
+          if (typeof v !== 'string') return undefined;
+          const trimmed = v.trim();
+          return trimmed ? trimmed.slice(0, max) : undefined;
+        };
+        const clean: {
+          headline?: string;
+          blurb?: string;
+          tiers?: Array<{ id: string; name: string; price?: string; benefits: string[] }>;
+          sections?: Array<{ id: string; heading: string; body: string }>;
+        } = {};
+
+        const headline = capStr(oneSheetConfig.headline, 120);
+        if (headline !== undefined) clean.headline = headline;
+        const blurb = capStr(oneSheetConfig.blurb, 2000);
+        if (blurb !== undefined) clean.blurb = blurb;
+
+        if (Array.isArray(oneSheetConfig.tiers)) {
+          clean.tiers = oneSheetConfig.tiers
+            .filter((t: any) => t && typeof t === 'object' && !Array.isArray(t))
+            .slice(0, 12)
+            .map((t: any) => {
+              const benefits = Array.isArray(t.benefits)
+                ? t.benefits
+                    .filter((b: any) => typeof b === 'string')
+                    .slice(0, 20)
+                    .map((b: string) => b.slice(0, 200))
+                : [];
+              const tier: { id: string; name: string; price?: string; benefits: string[] } = {
+                id: typeof t.id === 'string' && t.id ? t.id.slice(0, 64) : crypto.randomUUID(),
+                name: capStr(t.name, 120) ?? '',
+                benefits,
+              };
+              const price = capStr(t.price, 60);
+              if (price !== undefined) tier.price = price;
+              return tier;
+            });
+        }
+
+        if (Array.isArray(oneSheetConfig.sections)) {
+          clean.sections = oneSheetConfig.sections
+            .filter((s: any) => s && typeof s === 'object' && !Array.isArray(s))
+            .slice(0, 12)
+            .map((s: any) => ({
+              id: typeof s.id === 'string' && s.id ? s.id.slice(0, 64) : crypto.randomUUID(),
+              heading: capStr(s.heading, 120) ?? '',
+              body: capStr(s.body, 4000) ?? '',
+            }));
+        }
+
+        oneSheetConfigToWrite = clean;
+      }
+    }
+
     // tigella-58513: authoritative guard — GPP events are capped at 3 hours.
     // The frontend block is UX only; this also covers the NL Event Assistant
     // path (arancini-58492), which writes through this same PATCH endpoint.
@@ -834,6 +901,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(reimbursementCapUsdToWrite !== undefined && { reimbursementCapUsd: reimbursementCapUsdToWrite }),
         ...(taxFormRequiredToWrite !== undefined && { taxFormRequired: taxFormRequiredToWrite }),
         ...(hostGoalsToWrite !== undefined && { hostGoals: hostGoalsToWrite }),
+        ...(oneSheetConfigToWrite !== undefined && { oneSheetConfig: oneSheetConfigToWrite }),
         // porchetta-81402: allow editing the cancellation reason (truncated to
         // 500 chars to match the cancel-handler limit). Empty string clears it.
         ...(cancellationReason !== undefined && {

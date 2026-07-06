@@ -226,6 +226,29 @@ export type HostGoals = Partial<{
   pageViews: number;
 }>;
 
+// focaccina-58550: host-customizable one-sheet content. Rendered read-only on
+// the public /onesheet/:slug page; edited from the host dashboard Partners tab.
+// `id` is a client-generated uuid used only for React keys. All fields optional.
+export interface OneSheetTier {
+  id: string;
+  name: string;
+  price?: string;
+  benefits: string[];
+}
+
+export interface OneSheetSection {
+  id: string;
+  heading: string;
+  body: string;
+}
+
+export interface OneSheetConfig {
+  headline?: string;
+  blurb?: string;
+  tiers?: OneSheetTier[];
+  sections?: OneSheetSection[];
+}
+
 export interface MomentumDelta {
   lastHour?: number;
   today?: number;
@@ -366,6 +389,9 @@ export interface Party {
   // quattro-71244: Gamified host dashboard KPIs — host-private goal targets
   // keyed by ReportKPIs stat key. Lives in the `host_goals` JSONB column.
   hostGoals?: HostGoals | null;
+  // focaccina-58550: host-customizable one-sheet config. Lives in the
+  // `one_sheet_config` JSONB column. Rendered read-only on /onesheet/:slug.
+  oneSheetConfig?: OneSheetConfig | null;
   // porchetta-81402: soft-cancel state. cancelledAt non-null = host has
   // cancelled the event. EventPage renders a cancelled banner + replaces
   // the RSVP form with a cancellation notice. Hosts can reinstate.

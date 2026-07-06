@@ -124,6 +124,10 @@ export function OneSheetPage() {
   const partnerCount = event.sponsors?.length ?? 0;
   const sponsorsWithLogos = (event.sponsors || []).filter(s => s.logoUrl);
 
+  // focaccina-58550: host-customizable one-sheet content. Every block below is
+  // conditional so an unconfigured event renders exactly as the fixed default.
+  const cfg = event.oneSheetConfig;
+
   const ogDescription = [
     event.venueName,
     event.address,
@@ -177,6 +181,14 @@ export function OneSheetPage() {
               <Calendar size={18} className="flex-shrink-0 text-white/40" />
               <span>{formatEventDateTime()}</span>
             </div>
+          )}
+
+          {/* focaccina-58550: host-customizable intro headline + blurb */}
+          {cfg?.headline && (
+            <h2 className="text-2xl font-bold text-white pt-2">{cfg.headline}</h2>
+          )}
+          {cfg?.blurb && (
+            <p className="whitespace-pre-line text-white/70">{cfg.blurb}</p>
           )}
         </div>
 
@@ -240,6 +252,54 @@ export function OneSheetPage() {
             extraGppPhotos={event.extraGppPhotos}
           />
         )}
+
+        {/* focaccina-58550: host-customizable detail sections */}
+        {cfg?.sections?.length ? (
+          <div className="space-y-6">
+            {cfg.sections.map((section) => (
+              <div key={section.id} className="space-y-2">
+                {section.heading && (
+                  <h2 className="text-lg font-semibold text-white/80">{section.heading}</h2>
+                )}
+                {section.body && (
+                  <p className="whitespace-pre-line text-white/70">{section.body}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* focaccina-58550: host-customizable sponsorship pricing tiers */}
+        {cfg?.tiers?.length ? (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-white/80">{t('oneSheet.pricingHeader')}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cfg.tiers.map((tier) => (
+                <div
+                  key={tier.id}
+                  className="bg-white/80 border border-black/10 rounded-xl p-4 flex flex-col"
+                >
+                  {tier.name && (
+                    <div className="text-lg font-bold text-white">{tier.name}</div>
+                  )}
+                  {tier.price && (
+                    <div className="text-2xl font-bold text-white mt-1">{tier.price}</div>
+                  )}
+                  {tier.benefits?.length ? (
+                    <ul className="mt-3 space-y-1.5">
+                      {tier.benefits.map((benefit, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                          <CheckCircle size={16} className="mt-0.5 flex-shrink-0 text-green-400" />
+                          <span>{benefit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Interest Form */}
         <div className="bg-white/80 border border-black/10 rounded-xl p-6 space-y-5">
