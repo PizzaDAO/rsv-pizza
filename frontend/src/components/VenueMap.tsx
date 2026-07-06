@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import { geocodeAddress } from '../lib/ordering';
+import { isGoogleMaps } from '../lib/maps/provider';
+import MapLibreMap, { MapLibreMarker } from '../lib/maps/MapLibreMap';
 
 interface VenueMapProps {
   address: string;
@@ -93,8 +95,9 @@ export default function VenueMap({
   }
 
   // Missing API key or geocoding failure → fallback placeholder that matches
-  // the visual language of the old static-map "no key" state.
-  if (error || !apiKey) {
+  // the visual language of the old static-map "no key" state. Under the keyless
+  // `osm` provider we don't need an API key, so only gate on the key for Google.
+  if (error || (isGoogleMaps() && !apiKey)) {
     return (
       <div
         className={`${className ?? ''} venue-map-thumbnail rounded-[inherit] bg-gradient-to-br from-[#ff393a]/20 to-[#ff6b35]/20 flex items-center justify-center`}
@@ -132,6 +135,55 @@ export default function VenueMap({
   const iconOrigin =
     typeof window !== 'undefined' ? window.location.origin : 'https://rsv.pizza';
   const iconUrl = `${iconOrigin}/molto-benny-pin.png`;
+
+  // Canonical Google Maps place card. We don't have a `ChIJ…` placeId in
+  // this component's prop surface, so use `query` alone (address preferred,
+  // fall back to lat/lng). A Google Maps deep link is fine even when the tiles
+  // themselves are OSM.
+  const googleMapsLink = address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : `https://www.google.com/maps/search/?api=1&query=${center}`;
+
+  // ── osm branch: keyless non-interactive MapLibre thumbnail ──────────────────
+  // Keeps the same container className so layout is unchanged. A single Molto
+  // Benny pin sits on the venue coords.
+  if (!isGoogleMaps()) {
+    const buildBennyPin = (): HTMLElement => {
+      const img = document.createElement('img');
+      img.src = iconUrl;
+      img.width = 36;
+      img.height = 36;
+      img.style.width = '36px';
+      img.style.height = '36px';
+      img.style.display = 'block';
+      img.alt = venueName || 'Venue';
+      return img;
+    };
+    const osmMarkers: MapLibreMarker[] = [
+      { lat: location.lat, lng: location.lng, element: buildBennyPin() },
+    ];
+    return (
+      <a
+        href={googleMapsLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="venue-map"
+        className={`${className ?? ''} venue-map-thumbnail block rounded-[inherit] overflow-hidden bg-theme-surface`}
+        aria-label={`Open ${venueName || address} in Google Maps`}
+      >
+        <MapLibreMap
+          center={{ lat: location.lat, lng: location.lng }}
+          zoom={zoom}
+          interactive={false}
+          markers={osmMarkers}
+          className="w-full h-full"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </a>
+    );
+  }
+
+  // ── google branch: cacheable Static Maps <img> (kept verbatim) ──────────────
   const staticMapUrl =
     `https://maps.googleapis.com/maps/api/staticmap` +
     `?center=${center}` +
@@ -141,13 +193,6 @@ export default function VenueMap({
     `&maptype=roadmap` +
     `&markers=anchor:bottom%7Cicon:${encodeURIComponent(iconUrl)}%7C${center}` +
     `&key=${apiKey}`;
-
-  // Canonical Google Maps place card. We don't have a `ChIJ…` placeId in
-  // this component's prop surface, so use `query` alone (address preferred,
-  // fall back to lat/lng).
-  const googleMapsLink = address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-    : `https://www.google.com/maps/search/?api=1&query=${center}`;
 
   return (
     <a

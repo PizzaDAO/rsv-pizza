@@ -1,4 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { kml } from '@tmcw/togeojson';
+import { isGoogleMaps } from '../lib/maps/provider';
+import MapLibreMap from '../lib/maps/MapLibreMap';
 
 const KML_URL = 'https://www.google.com/maps/d/kml?mid=1ixyD2QbCZcz9IdK2gFKCNCz92hDDzEA';
 
@@ -18,8 +21,16 @@ function GPPMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const [error, setError] = useState(false);
+  // napoletana-58547: MapLibre has no KmlLayer. Under `osm` we fetch the same
+  // KML, convert it to GeoJSON with @tmcw/togeojson, and hand it to MapLibreMap
+  // as an overlay. NOTE: Google My Maps' `kml?mid=` endpoint does not send CORS
+  // headers, so a browser fetch may be blocked — in that case we degrade to the
+  // "View map on Google Maps" link fallback (setError).
+  const [kmlGeojson, setKmlGeojson] = useState<unknown | null>(null);
 
   useEffect(() => {
+    if (!isGoogleMaps()) return; // osm path handled by the effect below
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError(true);
@@ -94,6 +105,28 @@ function GPPMap({
     document.head.appendChild(script);
   }, [initialZoom, minZoom, maxZoom]);
 
+  // osm: fetch + convert the KML to GeoJSON for the MapLibre overlay.
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(KML_URL);
+        if (!res.ok) throw new Error(`KML ${res.status}`);
+        const text = await res.text();
+        const dom = new DOMParser().parseFromString(text, 'text/xml');
+        const geojson = kml(dom);
+        if (!cancelled) setKmlGeojson(geojson);
+      } catch (err) {
+        console.error('Failed to load GPP KML overlay:', err);
+        if (!cancelled) setError(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (error) {
     return (
       <div style={{ height }} className="flex items-center justify-center bg-gray-100 rounded-2xl">
@@ -106,6 +139,21 @@ function GPPMap({
           View map on Google Maps
         </a>
       </div>
+    );
+  }
+
+  if (!isGoogleMaps()) {
+    return (
+      <MapLibreMap
+        center={{ lat: 20, lng: 0 }}
+        zoom={initialZoom}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        geojson={kmlGeojson ?? undefined}
+        className="rounded-2xl"
+        style={{ height, width: '100%' }}
+        dataTestId="gpp-map"
+      />
     );
   }
 

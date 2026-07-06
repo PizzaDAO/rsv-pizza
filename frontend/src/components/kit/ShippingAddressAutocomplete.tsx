@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapPin } from 'lucide-react';
+import { isGoogleMaps } from '../../lib/maps/provider';
+import { IconInput } from '../IconInput';
+import {
+  searchAddresses,
+  AddressResult,
+  AUTOCOMPLETE_DEBOUNCE_MS,
+  AUTOCOMPLETE_MIN_CHARS,
+} from '../../lib/maps/photonAutocomplete';
 
 export interface AddressComponents {
   addressLine1: string;
@@ -41,6 +49,10 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  // napoletana-58547: keyless (`osm`) autocomplete state.
+  const [suggestions, setSuggestions] = useState<AddressResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const justSelectedRef = useRef(false);
 
   // Use refs to avoid stale closures in the event listener
   const onChangeRef = useRef(onChange);
@@ -52,6 +64,11 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
   }, [onChange, onAddressSelected]);
 
   useEffect(() => {
+    if (!isGoogleMaps()) {
+      setIsLoaded(true);
+      return;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     // If no API key, fall back to regular text input
@@ -206,6 +223,96 @@ export const ShippingAddressAutocomplete: React.FC<ShippingAddressAutocompletePr
       }
     };
   }, []);
+
+  // ── osm: debounced keyless address search ───────────────────────────────────
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+    const q = value.trim();
+    if (q.length < AUTOCOMPLETE_MIN_CHARS) {
+      setSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchAddresses(q, controller.signal);
+        setSuggestions(results);
+        setShowDropdown(true);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') setSuggestions([]);
+      }
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [value]);
+
+  const handleOsmSelect = (r: AddressResult) => {
+    justSelectedRef.current = true;
+    setShowDropdown(false);
+    setSuggestions([]);
+
+    const addressLine1 = r.street || r.name || '';
+    const components: AddressComponents = {
+      addressLine1,
+      city: r.cityName || '',
+      state: r.state || '',
+      postalCode: r.postalCode || '',
+      country: r.countryCode
+        ? COUNTRY_MAP[r.countryCode] || r.country || ''
+        : r.country || '',
+    };
+    if (addressLine1) onChangeRef.current(addressLine1);
+    onAddressSelectedRef.current?.(components);
+  };
+
+  if (!isGoogleMaps()) {
+    return (
+      <div className="relative">
+        <IconInput
+          icon={MapPin}
+          iconSize={16}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => {
+            if (suggestions.length > 0) setShowDropdown(true);
+          }}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          placeholder={placeholder || t('kit.searchForAddress')}
+          disabled={disabled}
+          className={`text-sm ${className}`}
+        />
+        {showDropdown && suggestions.length > 0 && (
+          <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-theme-stroke bg-theme-header shadow-xl py-1">
+            {suggestions.map((s, i) => (
+              <li key={`${s.lat},${s.lng},${i}`}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleOsmSelect(s);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-start gap-2"
+                >
+                  <MapPin size={13} className="text-theme-text-muted mt-0.5 flex-shrink-0" />
+                  <span className="truncate">{s.formattedName}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

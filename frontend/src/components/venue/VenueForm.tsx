@@ -6,6 +6,7 @@ import { Venue, VenueStatus } from '../../types';
 import { VenueCreateData } from '../../lib/api';
 import { IconInput } from '../IconInput';
 import { LocationAutocomplete } from '../LocationAutocomplete';
+import { isGoogleMaps } from '../../lib/maps/provider';
 
 interface VenueFormProps {
   venue?: Venue;
@@ -71,12 +72,15 @@ const AddVenueModal: React.FC<{ onSave: VenueFormProps['onSave']; onClose: Venue
     setSaving(true);
     setError(null);
 
-    // Try to fetch additional details (website, phone) via Places text search
+    // Try to fetch additional details (website, phone) via Places text search.
+    // napoletana-58547: Google-only — Photon/Nominatim don't expose website or
+    // phone, so under the keyless `osm` provider we skip enrichment and create
+    // the venue from the name/address/coords the autocomplete already provided.
     let website: string | undefined;
     let contactPhone: string | undefined;
 
     try {
-      if (window.google?.maps?.places && venueName) {
+      if (isGoogleMaps() && window.google?.maps?.places && venueName) {
         const searchQuery = venueName + (address ? ' ' + address : '');
         const details = await new Promise<google.maps.places.PlaceResult | null>((resolve) => {
           const div = document.createElement('div');
