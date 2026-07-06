@@ -174,6 +174,11 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       ? partnerTagRaw.trim()
       : null;
 
+    // sfoglia-58543: `type` filters the feed by the photo's designated
+    // payout_role (group / box_stack / pizza). Whitelist to the three known
+    // roles so a bad value can't reach the ANY() bind.
+    const roles = parseCsv(req.query.type).filter((r) => ['group', 'box_stack', 'pizza'].includes(r));
+
     // sicilian-58195: random shuffle sort. When sort=random, the seed deter-
     // mines the order so cursor pagination + filters stay consistent across
     // requests. Order is MD5(id::text || seed::text) ASC (tiebreak: id ASC).
@@ -189,7 +194,7 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
     const year = parseYear(req.query.year);
 
     if (sort === 'random' && seed !== null) {
-      return await handleRandomFeed(req, res, { limit, regions, countries, partnerTag, seed, year });
+      return await handleRandomFeed(req, res, { limit, regions, countries, partnerTag, seed, year, roles });
     }
 
     const cursor = parseCursor(req.query.cursor);
@@ -218,6 +223,18 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
       : Prisma.empty;
     const partnerTagFilter = partnerTag
       ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+      : Prisma.empty;
+    // sfoglia-58543: photos-side role filter (parameter-bound).
+    const roleFilter = roles.length > 0
+      ? Prisma.sql`AND p.payout_role = ANY(${roles}::text[])`
+      : Prisma.empty;
+    // sfoglia-58543: payout_documents have no payout_role column. The only role
+    // a payout pizza doc could represent is 'pizza', so when a role filter is
+    // active include the payout side only if 'pizza' is among the roles; else
+    // exclude it entirely (mostly defensive — this UNION side is effectively
+    // empty in practice per napoletana-58211).
+    const payoutRoleFilter = roles.length > 0
+      ? (roles.includes('pizza') ? Prisma.empty : Prisma.sql`AND FALSE`)
       : Prisma.empty;
 
     // cannoli-58292: keyset predicate. The boundary row's id orders within the
@@ -305,6 +322,7 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
           ${regionFilter}
           ${countryFilter}
           ${partnerTagFilter}
+          ${roleFilter}
 
         UNION ALL
 
@@ -350,6 +368,7 @@ router.get('/feed', optionalAuth, async (req: AuthRequest, res: Response, next: 
           ${regionFilter}
           ${countryFilter}
           ${partnerTagFilter}
+          ${payoutRoleFilter}
       ) u
       ${cursorPredicate}
       ORDER BY u.created_at DESC, u.id DESC
@@ -426,9 +445,10 @@ async function handleRandomFeed(
     partnerTag: string | null;
     seed: string;
     year: number; // cannoli-58292
+    roles: string[]; // sfoglia-58543
   },
 ): Promise<void> {
-  const { limit, regions, countries, partnerTag, seed, year } = opts;
+  const { limit, regions, countries, partnerTag, seed, year, roles } = opts;
   const cursor = parseRandomCursor(req.query.cursor);
   const fetchSize = limit + 1;
 
@@ -442,6 +462,10 @@ async function handleRandomFeed(
     : Prisma.empty;
   const partnerTagFilter = partnerTag
     ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+    : Prisma.empty;
+  // sfoglia-58543: role filter (random mode already skips the payout union).
+  const roleFilter = roles.length > 0
+    ? Prisma.sql`AND p.payout_role = ANY(${roles}::text[])`
     : Prisma.empty;
   const cursorFilter = cursor
     ? Prisma.sql`AND (
@@ -468,6 +492,7 @@ async function handleRandomFeed(
       ${regionFilter}
       ${countryFilter}
       ${partnerTagFilter}
+      ${roleFilter}
       ${cursorFilter}
     ORDER BY MD5(p.id::text || ${seed}::text) ASC, p.id::text ASC
     LIMIT ${fetchSize}
@@ -677,6 +702,8 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
       : null;
     // cannoli-58292: ZIP honors the same year + cutoff as the feed.
     const year = parseYear(req.query.year);
+    // sfoglia-58543: ZIP honors the same role filter as the on-screen feed.
+    const roles = parseCsv(req.query.type).filter((r) => ['group', 'box_stack', 'pizza'].includes(r));
 
     const regionFilter = regions.length > 0
       ? Prisma.sql`AND pa.region = ANY(${regions}::text[])`
@@ -686,6 +713,10 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
       : Prisma.empty;
     const partnerTagFilter = partnerTag
       ? Prisma.sql`AND ${partnerTag} = ANY(pa.event_tags)`
+      : Prisma.empty;
+    // sfoglia-58543: photos-side role filter (ZIP is photos-table only).
+    const roleFilter = roles.length > 0
+      ? Prisma.sql`AND p.payout_role = ANY(${roles}::text[])`
       : Prisma.empty;
 
     // cannoli-58292: raw SQL so the ZIP mirrors /feed exactly — effective_year
@@ -727,6 +758,7 @@ router.get('/feed/download', requireAuth, async (req: AuthRequest, res: Response
         ${regionFilter}
         ${countryFilter}
         ${partnerTagFilter}
+        ${roleFilter}
       ORDER BY p.created_at DESC, p.id DESC
       LIMIT ${DOWNLOAD_MAX_PHOTOS}
     `);
