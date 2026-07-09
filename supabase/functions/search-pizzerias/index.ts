@@ -1,6 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { Pizzeria, OrderingOption } from '../_shared/types.ts';
 
+// napoletana-58547: pluggable map provider. 'osm' = keyless Overpass (default while
+// the Google key is down), 'google' = existing Google Places path. Flip via the
+// MAP_PROVIDER Supabase secret with zero code change.
+const MAP_PROVIDER = (Deno.env.get('MAP_PROVIDER') || 'osm').toLowerCase(); // 'google' | 'osm'
+
 const GOOGLE_PLACES_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY') || '';
 const SQUARE_ACCESS_TOKEN = Deno.env.get('SQUARE_ACCESS_TOKEN') || '';
 const BLAND_API_KEY = Deno.env.get('BLAND_API_KEY') || '';
@@ -120,6 +125,70 @@ async function searchGooglePlaces(lat: number, lng: number, radius: number): Pro
   return pizzerias;
 }
 
+// napoletana-58547: keyless OpenStreetMap pizzeria search via the Overpass API.
+// Maps each OSM element to the same Pizzeria shape searchGooglePlaces returns.
+async function searchOverpassPizzerias(lat: number, lng: number, radius: number): Promise<Pizzeria[]> {
+  const query = `[out:json][timeout:15];
+( node["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng});
+  way ["amenity"~"restaurant|fast_food"]["cuisine"~"pizza",i](around:${radius},${lat},${lng}); );
+out center 20;`;
+
+  const response = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `data=${encodeURIComponent(query)}`,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    console.error('Overpass API error:', response.status, text);
+    throw new Error(`Overpass API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  const pizzerias: Pizzeria[] = (data.elements || [])
+    .filter((el: any) => {
+      const elLat = el.lat ?? el.center?.lat;
+      const elLng = el.lon ?? el.center?.lon;
+      // Require a name (unnamed POIs aren't useful) and resolvable coords
+      // (ways carry coords under `center`).
+      return el.tags?.name && typeof elLat === 'number' && typeof elLng === 'number';
+    })
+    .map((el: any) => {
+      const tags = el.tags || {};
+      const elLat = el.lat ?? el.center?.lat;
+      const elLng = el.lon ?? el.center?.lon;
+
+      // Assemble a street address from OSM addr:* tags when present.
+      const address = [
+        [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' '),
+        tags['addr:city'],
+      ].filter(Boolean).join(', ');
+
+      return {
+        id: `osm/${el.type}/${el.id}`,
+        placeId: `osm/${el.type}/${el.id}`,
+        name: tags.name,
+        address,
+        phone: tags.phone || tags['contact:phone'],
+        url: tags.website || tags['contact:website'],
+        rating: undefined,
+        reviewCount: undefined,
+        priceLevel: undefined,
+        isOpen: undefined,
+        distance: Math.round(calculateDistance(lat, lng, elLat, elLng)),
+        location: {
+          lat: elLat,
+          lng: elLng,
+        },
+        orderingOptions: [], // populated by the main handler (Square/phone/AI)
+      };
+    });
+
+  return pizzerias;
+}
+
 // Calculate distance between two coordinates in meters (Haversine formula)
 function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000; // Earth's radius in meters
@@ -193,7 +262,9 @@ serve(async (req) => {
       );
     }
 
-    if (!GOOGLE_PLACES_API_KEY) {
+    // Only the Google provider requires the Places key. The Overpass (osm)
+    // path is keyless, so don't gate it on GOOGLE_PLACES_API_KEY.
+    if (MAP_PROVIDER === 'google' && !GOOGLE_PLACES_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'Google Places API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -211,8 +282,10 @@ serve(async (req) => {
       return new Response(JSON.stringify(cached), { headers: successHeaders });
     }
 
-    // Search for pizzerias
-    const pizzerias = await searchGooglePlaces(lat, lng, radius);
+    // Search for pizzerias via the active provider.
+    const pizzerias = MAP_PROVIDER === 'google'
+      ? await searchGooglePlaces(lat, lng, radius)
+      : await searchOverpassPizzerias(lat, lng, radius);
 
     // Add ordering options to each pizzeria
     for (const pizzeria of pizzerias) {
