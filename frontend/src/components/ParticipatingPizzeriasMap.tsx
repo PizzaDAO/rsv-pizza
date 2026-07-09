@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pizzeria } from '../types';
+import { isGoogleMaps } from '../lib/maps/provider';
+import MapLibreMap, { MapLibreMarker } from '../lib/maps/MapLibreMap';
 
 interface ParticipatingPizzeriasMapProps {
   pizzerias: Pizzeria[];
@@ -34,7 +36,67 @@ export default function ParticipatingPizzeriasMap({
     [pizzerias]
   );
 
+  // napoletana-58547: markers for the keyless MapLibre (`osm`) render path.
+  // Pizzeria pins are the 🍕 emoji with the name label below; the venue is the
+  // Molto Benny mascot — mirroring the Google markers.
+  const osmMarkers = useMemo<MapLibreMarker[]>(() => {
+    if (isGoogleMaps()) return [];
+
+    const buildPizzeriaPin = (name: string): HTMLElement => {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.alignItems = 'center';
+      wrap.style.transform = 'translateY(-50%)';
+      const emoji = document.createElement('div');
+      emoji.textContent = '\u{1F355}';
+      emoji.style.fontSize = '24px';
+      emoji.style.lineHeight = '1';
+      const label = document.createElement('div');
+      label.textContent = name;
+      label.style.color = '#ffffff';
+      label.style.fontSize = '11px';
+      label.style.fontWeight = '600';
+      label.style.textShadow = '0 1px 2px rgba(0,0,0,0.85)';
+      label.style.whiteSpace = 'nowrap';
+      wrap.appendChild(emoji);
+      wrap.appendChild(label);
+      return wrap;
+    };
+
+    const buildVenuePin = (title: string): HTMLElement => {
+      const img = document.createElement('img');
+      img.src = '/molto-benny.png';
+      img.width = 45;
+      img.height = 45;
+      img.style.width = '45px';
+      img.style.height = '45px';
+      img.alt = title;
+      return img;
+    };
+
+    const list: MapLibreMarker[] = validPizzerias.map((p) => ({
+      lat: p.location.lat,
+      lng: p.location.lng,
+      element: buildPizzeriaPin(p.name),
+      title: p.name,
+    }));
+
+    if (venueLocation) {
+      list.push({
+        lat: venueLocation.lat,
+        lng: venueLocation.lng,
+        element: buildVenuePin(venueName || 'Venue'),
+        title: venueName || 'Venue',
+      });
+    }
+    return list;
+  }, [validPizzerias, venueLocation, venueName]);
+
   useEffect(() => {
+    // osm renders declaratively via <MapLibreMap> below — skip Google loading.
+    if (!isGoogleMaps()) return;
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError(true);
@@ -172,6 +234,23 @@ export default function ParticipatingPizzeriasMap({
   // collapse the grid.
   if (validPizzerias.length === 0) {
     return null;
+  }
+
+  // ── osm branch: keyless MapLibre map ────────────────────────────────────────
+  if (!isGoogleMaps()) {
+    return (
+      <MapLibreMap
+        center={validPizzerias[0]?.location || { lat: 40, lng: -100 }}
+        zoom={14}
+        markers={osmMarkers}
+        fitToMarkers
+        fitPadding={48}
+        fitMaxZoom={16}
+        className="rounded-2xl overflow-hidden border border-theme-stroke"
+        style={{ height, width: '100%' }}
+        dataTestId="participating-pizzerias-map"
+      />
+    );
   }
 
   if (error) {

@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
+import { isGoogleMaps } from '../lib/maps/provider';
+import { IconInput } from './IconInput';
+import {
+  searchAddresses,
+  AddressResult,
+  AUTOCOMPLETE_DEBOUNCE_MS,
+  AUTOCOMPLETE_MIN_CHARS,
+} from '../lib/maps/photonAutocomplete';
 
 export interface CityData {
   cityName: string;      // "New York"
@@ -49,6 +57,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  // napoletana-58547: keyless (`osm`) autocomplete state.
+  const [suggestions, setSuggestions] = useState<AddressResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const justSelectedRef = useRef(false);
 
   // Use refs to avoid stale closures in the event listener
   const onChangeRef = useRef(onChange);
@@ -68,6 +80,12 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   }, [onChange, onVenueNameChange, onTimezoneChange, onPlaceSelected, onLocationSelected, onCitySelected]);
 
   useEffect(() => {
+    // osm provider: skip Google entirely (handled by the search effect below).
+    if (!isGoogleMaps()) {
+      setIsLoaded(true);
+      return;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     // If no API key, fall back to regular text input
@@ -256,6 +274,110 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       }
     };
   }, []);
+
+  // ── osm: debounced, abortable keyless search on the controlled `value` ───────
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    // Suppress the search that would otherwise fire right after a selection
+    // (selecting sets `value` to the formatted address).
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+    const q = value.trim();
+    if (q.length < AUTOCOMPLETE_MIN_CHARS) {
+      setSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchAddresses(q, controller.signal);
+        setSuggestions(results);
+        setShowDropdown(true);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') setSuggestions([]);
+      }
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [value]);
+
+  const handleOsmSelect = (r: AddressResult) => {
+    justSelectedRef.current = true;
+    setShowDropdown(false);
+    setSuggestions([]);
+
+    const selectedAddress = r.formattedName;
+    onChangeRef.current(selectedAddress);
+    // osm has no reliable distinct "venue name" — leave it to the address.
+    onVenueNameChangeRef.current?.(null);
+    // Set coords + timezone BEFORE onPlaceSelected (callers may read them).
+    if (r.timezone) onTimezoneChangeRef.current?.(r.timezone);
+    onLocationSelectedRef.current?.({ lat: r.lat, lng: r.lng });
+    onCitySelectedRef.current?.({
+      cityName: r.cityName,
+      country: r.country,
+      countryCode: r.countryCode,
+      state: r.state,
+      street: r.street,
+      postalCode: r.postalCode,
+      lat: r.lat,
+      lng: r.lng,
+      formattedName: selectedAddress,
+    });
+    // placeId is null under osm (callers already accept null).
+    onPlaceSelectedRef.current?.(selectedAddress, null, null);
+  };
+
+  if (!isGoogleMaps()) {
+    return (
+      <div className="relative">
+        <IconInput
+          icon={MapPin}
+          iconSize={18}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => {
+            if (suggestions.length > 0) setShowDropdown(true);
+          }}
+          onBlur={() => {
+            // Delay so a click on a suggestion registers first.
+            setTimeout(() => setShowDropdown(false), 150);
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`text-left ${className}`}
+        />
+        {showDropdown && suggestions.length > 0 && (
+          <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-theme-stroke bg-theme-header shadow-xl py-1">
+            {suggestions.map((s, i) => (
+              <li key={`${s.lat},${s.lng},${i}`}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    // onMouseDown (not onClick) so it fires before input blur.
+                    e.preventDefault();
+                    handleOsmSelect(s);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-start gap-2"
+                >
+                  <MapPin size={14} className="text-theme-text-muted mt-0.5 flex-shrink-0" />
+                  <span className="truncate">{s.formattedName}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

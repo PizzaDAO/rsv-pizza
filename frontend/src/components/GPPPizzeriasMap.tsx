@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { GPPPizzeriaMapItem, saveGppPizzeriaPhoto } from '../lib/api';
+import { isGoogleMaps } from '../lib/maps/provider';
+import { loadMapLibre, DEFAULT_MAP_STYLE } from '../lib/maps/loadMapLibre';
+import type { Map as MlMap, Marker as MlMarker, Popup as MlPopup } from 'maplibre-gl';
 
 interface GPPPizzeriasMapProps {
   pizzerias: GPPPizzeriaMapItem[];
@@ -16,6 +19,10 @@ export default function GPPPizzeriasMap({
   const markersRef = useRef<google.maps.Marker[]>([]);
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  // napoletana-58547: keyless MapLibre (`osm`) refs.
+  const osmMapRef = useRef<MlMap | null>(null);
+  const osmMarkersRef = useRef<MlMarker[]>([]);
+  const osmPopupRef = useRef<MlPopup | null>(null);
   const [error, setError] = useState(false);
 
   // Filter out pizzerias with no valid coordinates
@@ -30,6 +37,8 @@ export default function GPPPizzeriasMap({
   );
 
   useEffect(() => {
+    if (!isGoogleMaps()) return; // osm handled by the effect below
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError(true);
@@ -250,6 +259,133 @@ export default function GPPPizzeriasMap({
     script.onload = () => initMap();
     script.onerror = () => setError(true);
     document.head.appendChild(script);
+  }, [validPizzerias]);
+
+  // ── osm: keyless MapLibre implementation ────────────────────────────────────
+  // No native clustering and no on-demand Google Places photo fetch (Overpass
+  // ids are not Google place ids). We still show a persisted `photoUrl` when the
+  // backend has one cached.
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    if (validPizzerias.length === 0) return;
+
+    let cancelled = false;
+
+    function buildInfoContent(pizzeria: GPPPizzeriaMapItem, photoUrl?: string) {
+      let photoHtml = '';
+      if (photoUrl) {
+        photoHtml = `<img src="${photoUrl}" alt="${pizzeria.name}" referrerpolicy="no-referrer" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px" />`;
+      }
+
+      let ratingHtml = '';
+      if (pizzeria.rating) {
+        const fullStars = Math.floor(pizzeria.rating);
+        const halfStar = pizzeria.rating - fullStars >= 0.5;
+        let stars = '';
+        for (let i = 0; i < fullStars; i++) stars += '★';
+        if (halfStar) stars += '½';
+        const reviewText = pizzeria.reviewCount ? ` (${pizzeria.reviewCount})` : '';
+        ratingHtml = `<div style="color:#f59e0b;font-size:14px;margin:2px 0">${stars} <span style="color:#666;font-size:12px">${pizzeria.rating}${reviewText}</span></div>`;
+      }
+
+      let descHtml = '';
+      if (pizzeria.description) {
+        const truncated =
+          pizzeria.description.length > 120
+            ? pizzeria.description.slice(0, 120) + '...'
+            : pizzeria.description;
+        descHtml = `<p style="color:#555;font-size:12px;margin:4px 0;line-height:1.4">${truncated}</p>`;
+      }
+
+      let linkHtml = '';
+      if (pizzeria.url) {
+        linkHtml = `<a href="${pizzeria.url}" target="_blank" rel="noopener noreferrer" style="color:#E52828;font-size:12px;text-decoration:none;font-weight:500">Visit Website &rarr;</a>`;
+      }
+
+      return `
+        <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
+          ${photoHtml}
+          <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a">${pizzeria.name}</h3>
+          ${ratingHtml}
+          <p style="color:#888;font-size:12px;margin:2px 0">${pizzeria.address || ''}</p>
+          ${descHtml}
+          <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+            ${linkHtml}
+            <span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${pizzeria.eventCity}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    loadMapLibre()
+      .then((maplibregl) => {
+        if (cancelled || !containerRef.current) return;
+
+        osmMarkersRef.current.forEach((m) => m.remove());
+        osmMarkersRef.current = [];
+
+        if (!osmMapRef.current) {
+          osmMapRef.current = new maplibregl.Map({
+            container: containerRef.current,
+            style: DEFAULT_MAP_STYLE,
+            center: [0, 20],
+            zoom: 3,
+            minZoom: 2,
+            maxZoom: 18,
+            attributionControl: { compact: true },
+          });
+          osmMapRef.current.addControl(
+            new maplibregl.NavigationControl({ showCompass: false }),
+            'top-right'
+          );
+        }
+        const map = osmMapRef.current;
+
+        if (!osmPopupRef.current) {
+          osmPopupRef.current = new maplibregl.Popup({ maxWidth: '280px', closeButton: true });
+        }
+        const popup = osmPopupRef.current;
+
+        for (const pizzeria of validPizzerias) {
+          const el = document.createElement('div');
+          el.textContent = '\u{1F355}';
+          el.style.fontSize = '22px';
+          el.style.lineHeight = '1';
+          el.style.cursor = 'pointer';
+
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([pizzeria.location.lng, pizzeria.location.lat])
+            .addTo(map);
+
+          el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const cachedUrl = pizzeria.photoUrl || undefined;
+            popup
+              .setLngLat([pizzeria.location.lng, pizzeria.location.lat])
+              .setHTML(buildInfoContent(pizzeria, cachedUrl))
+              .addTo(map);
+          });
+
+          osmMarkersRef.current.push(marker);
+        }
+
+        map.on('click', () => popup.remove());
+      })
+      .catch((err) => {
+        console.error('Failed to load MapLibre pizzerias map:', err);
+        if (!cancelled) setError(true);
+      });
+
+    return () => {
+      cancelled = true;
+      osmMarkersRef.current.forEach((m) => m.remove());
+      osmMarkersRef.current = [];
+      if (osmPopupRef.current) osmPopupRef.current.remove();
+      if (osmMapRef.current) {
+        osmMapRef.current.remove();
+        osmMapRef.current = null;
+      }
+    };
   }, [validPizzerias]);
 
   if (error) {

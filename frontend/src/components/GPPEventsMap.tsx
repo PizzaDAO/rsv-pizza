@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { GPPEventMapItem, updateUnderbossStatus } from '../lib/api';
+import { isGoogleMaps } from '../lib/maps/provider';
+import { loadMapLibre, DEFAULT_MAP_STYLE } from '../lib/maps/loadMapLibre';
+import type { Map as MlMap, Marker as MlMarker, Popup as MlPopup } from 'maplibre-gl';
+
+// Inner SVG for a status-colored circle pin (shared by the osm marker path).
+function statusCircleSvg(status?: string | null): string {
+  const color = statusColor(status);
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">` +
+    `<circle cx="16" cy="16" r="11" fill="${color}" stroke="white" stroke-width="3"/>` +
+    `</svg>`
+  );
+}
 
 // Lucide "send" icon SVG, inlined for use inside the InfoWindow HTML string.
 const SEND_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`;
@@ -87,6 +100,11 @@ export default function GPPEventsMap({
     null
   );
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  // napoletana-58547: keyless MapLibre (`osm`) refs.
+  const osmMapRef = useRef<MlMap | null>(null);
+  const osmMarkersRef = useRef<MlMarker[]>([]);
+  const osmMarkerElByIdRef = useRef<Map<string, HTMLElement>>(new Map());
+  const osmPopupRef = useRef<MlPopup | null>(null);
   const [error, setError] = useState(false);
 
   // Filter out events with no valid coordinates
@@ -102,6 +120,8 @@ export default function GPPEventsMap({
   );
 
   useEffect(() => {
+    if (!isGoogleMaps()) return; // osm handled by the effect below
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError(true);
@@ -503,6 +523,299 @@ export default function GPPEventsMap({
     script.onerror = () => setError(true);
     document.head.appendChild(script);
   }, [validEvents, cityChats, canModerate, isModerator, iconUrl, iconWidth, iconHeight, iconAnchorX, iconAnchorY, cluster]);
+
+  // ── osm: keyless MapLibre implementation ────────────────────────────────────
+  // A parallel port of the Google map above. No native clustering — markers are
+  // rendered individually (acceptable for the temporary keyless bridge).
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    if (validEvents.length === 0) return;
+
+    let cancelled = false;
+
+    // Popup HTML is identical to the Google InfoWindow content.
+    function buildInfoContent(event: GPPEventMapItem) {
+      const dateHtml = event.date
+        ? `<p style="color:#555;font-size:12px;margin:2px 0;font-weight:500">${new Date(
+            event.date
+          ).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}</p>`
+        : '';
+
+      const venueHtml = event.venueName
+        ? `<p style="color:#555;font-size:12px;margin:2px 0">${event.venueName}</p>`
+        : '';
+
+      const addressHtml = event.address
+        ? `<p style="color:#888;font-size:11px;margin:2px 0">${event.address}</p>`
+        : '';
+
+      const safeName = event.name
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const nameLinkHtml = `<a href="/${event.slug}" target="_blank" rel="noopener noreferrer" style="display:block;margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a1a;text-decoration:none;line-height:1.25">${safeName}</a>`;
+
+      const flyerHtml = event.eventImageUrl
+        ? `<img src="${event.eventImageUrl}" alt="" loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block;margin:0 0 8px;background:#f3f4f6" onerror="this.style.display='none'" />`
+        : '';
+
+      const cityKey = event.name.replace(/^Global Pizza Party\s*/i, '').trim().toLowerCase();
+      const telegramUrlRaw = event.telegramGroup || cityChats.get(cityKey) || null;
+      const telegramUrl = telegramUrlRaw ? telegramUrlRaw.replace(/"/g, '&quot;') : null;
+      const telegramHtml = telegramUrl
+        ? `<a href="${telegramUrl}" target="_blank" rel="noopener noreferrer" title="Join the Telegram chat" style="display:inline-flex;align-items:center;text-decoration:none;line-height:0">${TELEGRAM_LOGO_SVG}</a>`
+        : '';
+
+      const sanitizeHandle = (raw: string | null | undefined): string | null => {
+        if (!raw) return null;
+        const stripped = raw.trim().replace(/^@/, '');
+        if (!/^[A-Za-z0-9_]{3,40}$/.test(stripped)) return null;
+        return stripped;
+      };
+
+      const hostTgHandles: string[] = [];
+      if (canModerate) {
+        const primary = sanitizeHandle(event.hostTelegram);
+        if (primary) hostTgHandles.push(primary);
+        for (const raw of event.coHostTelegrams || []) {
+          if (hostTgHandles.length >= 2) break;
+          const h = sanitizeHandle(raw);
+          if (h && !hostTgHandles.includes(h)) hostTgHandles.push(h);
+        }
+      }
+
+      const hostTgIconsHtml = hostTgHandles
+        .map(
+          (h) =>
+            `<a href="https://t.me/${h}" target="_blank" rel="noopener noreferrer" title="DM @${h} on Telegram" style="color:#29B6F6;display:inline-flex;align-items:center;text-decoration:none">${SEND_ICON_SVG}</a>`
+        )
+        .join('');
+
+      let actionsHtml = '';
+      if (canModerate) {
+        const statusKey = event.underbossStatus || 'pending';
+        const statusColorHex = statusColor(statusKey);
+        const statusPillHtml = `<span style="background:${statusColorHex}1a;color:${statusColorHex};font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:600;text-transform:capitalize">${statusKey}</span>`;
+        const rsvpPillHtml = `<span style="background:#fef2f2;color:#E52828;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:500">${event.rsvpCount.toLocaleString()} RSVPs</span>`;
+        if (statusKey === 'approved') {
+          actionsHtml = `
+            ${statusPillHtml}
+            ${hostTgIconsHtml}
+            ${rsvpPillHtml}
+            <button data-action="reject" data-event-id="${event.id}" style="background:none;border:none;color:#dc2626;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark rejected</button>
+          `;
+        } else if (statusKey === 'rejected') {
+          actionsHtml = `
+            ${statusPillHtml}
+            ${hostTgIconsHtml}
+            ${rsvpPillHtml}
+            <button data-action="approve" data-event-id="${event.id}" style="background:none;border:none;color:#16a34a;font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Mark approved</button>
+          `;
+        } else {
+          actionsHtml = `
+            ${statusPillHtml}
+            ${hostTgIconsHtml}
+            ${rsvpPillHtml}
+            <button data-action="approve" data-event-id="${event.id}" style="background:#16a34a;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Approve</button>
+            <button data-action="reject" data-event-id="${event.id}" style="background:#dc2626;color:white;border:none;font-size:12px;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer">Reject</button>
+          `;
+        }
+      }
+
+      const actionsRowHtml = canModerate
+        ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${actionsHtml}</div>`
+        : '';
+
+      const telegramRowHtml = telegramHtml
+        ? `<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${telegramHtml}</div>`
+        : '';
+
+      return `
+        <div style="max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:4px">
+          ${flyerHtml}
+          ${nameLinkHtml}
+          ${dateHtml}
+          ${venueHtml}
+          ${addressHtml}
+          ${telegramRowHtml}
+          ${actionsRowHtml}
+        </div>
+      `;
+    }
+
+    loadMapLibre()
+      .then((maplibregl) => {
+        if (cancelled || !containerRef.current) return;
+
+        // Populate event lookup ref
+        const eventIndex = new Map<string, GPPEventMapItem>();
+        for (const ev of validEvents) eventIndex.set(ev.id, ev);
+        eventByIdRef.current = eventIndex;
+
+        // Tear down any previous markers
+        osmMarkersRef.current.forEach((m) => m.remove());
+        osmMarkersRef.current = [];
+        osmMarkerElByIdRef.current.clear();
+
+        if (!osmMapRef.current) {
+          osmMapRef.current = new maplibregl.Map({
+            container: containerRef.current,
+            style: DEFAULT_MAP_STYLE,
+            center: [0, 20],
+            zoom: 3,
+            minZoom: 2,
+            maxZoom: 18,
+            attributionControl: { compact: true },
+          });
+          osmMapRef.current.addControl(
+            new maplibregl.NavigationControl({ showCompass: false }),
+            'top-right'
+          );
+        }
+        const map = osmMapRef.current;
+
+        if (!osmPopupRef.current) {
+          osmPopupRef.current = new maplibregl.Popup({
+            maxWidth: '280px',
+            closeButton: true,
+          });
+        }
+        const popup = osmPopupRef.current;
+
+        async function onOsmActionClick(e: Event) {
+          const button = e.currentTarget as HTMLButtonElement;
+          const action = button.dataset.action as 'approve' | 'reject';
+          const eventId = button.dataset.eventId;
+          if (!action || !eventId) return;
+
+          const popupEl = popup.getElement();
+          const actionButtons = popupEl
+            ? popupEl.querySelectorAll<HTMLButtonElement>('[data-action][data-event-id]')
+            : ([] as unknown as NodeListOf<HTMLButtonElement>);
+          const originalText = button.textContent;
+          actionButtons.forEach((b) => {
+            b.disabled = true;
+          });
+          button.textContent = 'Saving…';
+
+          try {
+            await updateUnderbossStatus(
+              eventId,
+              action === 'approve' ? 'approved' : 'rejected'
+            );
+          } catch (err) {
+            alert((err as Error).message || 'Failed to update');
+            actionButtons.forEach((b) => {
+              b.disabled = false;
+            });
+            button.textContent = originalText;
+            return;
+          }
+
+          const current = eventByIdRef.current.get(eventId);
+          if (!current) return;
+          const updated: GPPEventMapItem = {
+            ...current,
+            underbossStatus: action === 'approve' ? 'approved' : 'rejected',
+          };
+          eventByIdRef.current.set(eventId, updated);
+
+          renderPopupContent(updated);
+
+          if (isModerator) {
+            const elm = osmMarkerElByIdRef.current.get(eventId);
+            if (elm) elm.innerHTML = statusCircleSvg(updated.underbossStatus);
+          }
+        }
+
+        function attachActionHandlers() {
+          if (!canModerate) return;
+          const popupEl = popup.getElement();
+          if (!popupEl) return;
+          popupEl
+            .querySelectorAll<HTMLButtonElement>('[data-action][data-event-id]')
+            .forEach((b) => b.addEventListener('click', onOsmActionClick));
+        }
+
+        function renderPopupContent(event: GPPEventMapItem) {
+          popup.setHTML(buildInfoContent(event));
+          attachActionHandlers();
+        }
+
+        const bounds = new maplibregl.LngLatBounds();
+
+        for (const event of validEvents) {
+          const lng = event.longitude as number;
+          const lat = event.latitude as number;
+          bounds.extend([lng, lat]);
+
+          let el: HTMLElement;
+          let anchor: 'bottom' | 'center';
+          if (isModerator) {
+            el = document.createElement('div');
+            el.style.width = '32px';
+            el.style.height = '32px';
+            el.innerHTML = statusCircleSvg(event.underbossStatus);
+            anchor = 'center';
+          } else {
+            const img = document.createElement('img');
+            img.src = iconUrl;
+            img.width = iconWidth;
+            img.height = iconHeight;
+            img.style.width = `${iconWidth}px`;
+            img.style.height = `${iconHeight}px`;
+            img.alt = event.name;
+            el = img;
+            anchor = 'bottom';
+          }
+          el.style.cursor = 'pointer';
+
+          const marker = new maplibregl.Marker({ element: el, anchor })
+            .setLngLat([lng, lat])
+            .addTo(map);
+
+          const eventId = event.id;
+          el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const latest = eventByIdRef.current.get(eventId) ?? event;
+            popup.setLngLat([lng, lat]).addTo(map);
+            renderPopupContent(latest);
+          });
+
+          osmMarkersRef.current.push(marker);
+          osmMarkerElByIdRef.current.set(event.id, el);
+        }
+
+        map.on('click', () => popup.remove());
+
+        if (osmMarkersRef.current.length > 0) {
+          map.fitBounds(bounds, { padding: 48, maxZoom: 15, animate: false });
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load MapLibre events map:', err);
+        if (!cancelled) setError(true);
+      });
+
+    return () => {
+      cancelled = true;
+      osmMarkersRef.current.forEach((m) => m.remove());
+      osmMarkersRef.current = [];
+      osmMarkerElByIdRef.current.clear();
+      if (osmPopupRef.current) {
+        osmPopupRef.current.remove();
+      }
+      if (osmMapRef.current) {
+        osmMapRef.current.remove();
+        osmMapRef.current = null;
+      }
+    };
+  }, [validEvents, cityChats, canModerate, isModerator, iconUrl, iconWidth, iconHeight, cluster]);
 
   if (error) {
     return (

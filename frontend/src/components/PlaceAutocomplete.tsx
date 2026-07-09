@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { Pizzeria } from '../types';
 import { uuid } from '../lib/utils';
+import { isGoogleMaps } from '../lib/maps/provider';
+import { IconInput } from './IconInput';
+import {
+  searchAddresses,
+  AddressResult,
+  AUTOCOMPLETE_DEBOUNCE_MS,
+  AUTOCOMPLETE_MIN_CHARS,
+} from '../lib/maps/photonAutocomplete';
 
 interface PlaceAutocompleteProps {
   onPlaceSelected: (pizzeria: Partial<Pizzeria>) => void;
@@ -21,12 +29,21 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const [loading, setLoading] = useState(false);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+  // napoletana-58547: keyless (`osm`) autocomplete state.
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<AddressResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     onPlaceSelectedRef.current = onPlaceSelected;
   }, [onPlaceSelected]);
 
   useEffect(() => {
+    if (!isGoogleMaps()) {
+      setIsLoaded(true);
+      return;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
@@ -154,6 +171,88 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       }
     };
   }, []);
+
+  // ── osm: debounced keyless establishment search ─────────────────────────────
+  useEffect(() => {
+    if (isGoogleMaps()) return;
+    const q = query.trim();
+    if (q.length < AUTOCOMPLETE_MIN_CHARS) {
+      setSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchAddresses(q, controller.signal);
+        setSuggestions(results);
+        setShowDropdown(true);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') setSuggestions([]);
+      }
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const handleOsmSelect = (r: AddressResult) => {
+    const pizzeria: Partial<Pizzeria> = {
+      id: `custom-${uuid()}`,
+      placeId: '', // no Google place id under osm
+      name: r.name || r.formattedName,
+      address: r.formattedName,
+      location: { lat: r.lat, lng: r.lng },
+      orderingOptions: [],
+    };
+    onPlaceSelectedRef.current(pizzeria);
+    setQuery('');
+    setSuggestions([]);
+    setShowDropdown(false);
+  };
+
+  if (!isGoogleMaps()) {
+    return (
+      <div className="relative">
+        <IconInput
+          icon={MapPin}
+          iconSize={18}
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => {
+            if (suggestions.length > 0) setShowDropdown(true);
+          }}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className={`text-left ${className}`}
+        />
+        {showDropdown && suggestions.length > 0 && (
+          <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-theme-stroke bg-theme-header shadow-xl py-1">
+            {suggestions.map((s, i) => (
+              <li key={`${s.lat},${s.lng},${i}`}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleOsmSelect(s);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-theme-text hover:bg-theme-surface-hover flex items-start gap-2"
+                >
+                  <MapPin size={14} className="text-theme-text-muted mt-0.5 flex-shrink-0" />
+                  <span className="truncate">{s.formattedName}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

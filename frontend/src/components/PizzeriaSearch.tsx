@@ -24,6 +24,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { isGoogleMaps } from '../lib/maps/provider';
+import MapLibreMap, { MapLibreMarker } from '../lib/maps/MapLibreMap';
 
 interface PizzeriaRanking {
   id: string;
@@ -319,10 +321,15 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${pizzeria.name} ${pizzeria.address}`)}${pizzeria.placeId?.startsWith('ChIJ') ? `&query_place_id=${pizzeria.placeId}` : ''}`
       : null;
 
-    // Construct static map URL (only for valid coords)
-    const staticMapUrl = apiKey && hasValidCoords
+    // Construct static map URL (Google only; osm renders a MapLibre thumbnail).
+    const staticMapUrl = isGoogleMaps() && apiKey && hasValidCoords
       ? `https://maps.googleapis.com/maps/api/staticmap?center=${pizzeria.location.lat},${pizzeria.location.lng}&zoom=15&size=200x200&scale=2&markers=color:red%7C${pizzeria.location.lat},${pizzeria.location.lng}&key=${apiKey}`
       : null;
+
+    const osmThumbMarkers: MapLibreMarker[] | null =
+      !isGoogleMaps() && hasValidCoords
+        ? [{ lat: pizzeria.location.lat, lng: pizzeria.location.lng, color: '#ff393a' }]
+        : null;
 
     return (
       <div
@@ -407,6 +414,15 @@ export const PizzeriaSearch: React.FC<PizzeriaSearchProps> = ({
                   src={staticMapUrl}
                   alt="Map"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                />
+              ) : osmThumbMarkers ? (
+                <MapLibreMap
+                  center={pizzeria.location}
+                  zoom={15}
+                  interactive={false}
+                  markers={osmThumbMarkers}
+                  className="w-full h-full"
+                  style={{ width: '100%', height: '100%' }}
                 />
               ) : (
                 <>
