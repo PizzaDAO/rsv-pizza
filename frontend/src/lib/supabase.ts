@@ -11,6 +11,7 @@ import {
   uncheckInGuestApi,
   promoteGuestApi,
 } from './api';
+import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
 import { sanitizeCoHosts } from './sanitizeCoHosts';
 import type { HostGoals } from '../types';
@@ -957,6 +958,8 @@ export interface DbParty {
   tax_form_required?: boolean;
   // quattro-71244: gamified-dashboard goal targets (JSONB on parties).
   host_goals?: HostGoals | null;
+  // focaccina-58550: host-customizable one-sheet config (JSONB on parties).
+  one_sheet_config?: OneSheetConfig | null;
   // porchetta-81402: soft-cancel columns. cancelledAt null = active event.
   cancelled_at?: string | null;
   cancelled_by?: string | null;
@@ -1034,6 +1037,7 @@ export const SAFE_PARTY_COLUMNS = `
   rollup_image_url, rollup_generated_at,
   reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at,
   tax_form_required,
+  one_sheet_config,
   cancelled_at, cancelled_by, cancellation_reason
 `;
 
@@ -2125,6 +2129,8 @@ export async function updateParty(
     tax_form_required?: boolean;
     // quattro-71244: gamified-dashboard goal targets.
     host_goals?: HostGoals | null;
+    // focaccina-58550: host-customizable one-sheet config.
+    one_sheet_config?: OneSheetConfig | null;
     // porchetta-81402: edit cancellation reason via PATCH. Cancel/reinstate
     // themselves go through `cancelParty()` / `reinstateParty()`.
     cancellation_reason?: string | null;
@@ -2217,6 +2223,8 @@ export async function updateParty(
         parkingNotes: updates.parking_notes,
         // quattro-71244: gamified-dashboard goal targets.
         hostGoals: updates.host_goals,
+        // focaccina-58550: host-customizable one-sheet config.
+        oneSheetConfig: updates.one_sheet_config,
         // porchetta-81402: edit cancellation reason via PATCH.
         cancellationReason: updates.cancellation_reason,
       });

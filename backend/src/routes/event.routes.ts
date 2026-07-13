@@ -112,6 +112,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         turtleRolesEnabled: true,
         underbossStatus: true,
         reimbursementCapUsd: true,
+        oneSheetConfig: true, // focaccina-58550
         password: true, // Just to check if it exists
         userId: true,
         user: {
@@ -194,6 +195,7 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
           turtleRolesEnabled: true,
           underbossStatus: true,
           reimbursementCapUsd: true,
+          oneSheetConfig: true, // focaccina-58550
           password: true,
           userId: true,
           user: {
@@ -422,6 +424,8 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
         sponsors,
         pageViewStats,
         reimbursementCapUsd: party.reimbursementCapUsd != null ? Number(party.reimbursementCapUsd) : null,
+        // focaccina-58550: host-customizable one-sheet config (read-only on public page).
+        oneSheetConfig: party.oneSheetConfig ?? null,
         // arugula-38633 v2 follow-up: numeric-tag fallback when no
         // underboss-validated cap exists. See helpers/reimbursementCap.ts.
         effectiveReimbursementCapUsd: computeEffectiveCapUsd({

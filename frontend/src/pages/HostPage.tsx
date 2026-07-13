@@ -24,7 +24,7 @@ import { uuid } from '../lib/utils';
 import { fetchXAvatarToSupabase } from '../utils/avatarUtils';
 import { CoHost } from '../types';
 import { AppsHub } from '../components/AppsHub';
-import { SponsorCRM } from '../components/sponsors';
+import { SponsorCRM, OneSheetEditor } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
 import { VenueReportWidget } from '../components/venue-report';
 import { MusicWidget } from '../components/music';
@@ -355,7 +355,13 @@ function HostPageContent() {
         ) : activeTab === 'apps' && party ? (
           <AppsHub inviteCode={party.inviteCode} pinnedApps={party.pinnedApps ?? []} partyId={party.id} />
         ) : activeTab === 'partners' && party ? (
-          <SponsorCRM
+          <div className="space-y-4">
+            {/* focaccina-58550: host editor for the customizable public one sheet */}
+            <OneSheetEditor
+              party={party}
+              onSaved={(config) => mergeParty({ oneSheetConfig: config })}
+            />
+            <SponsorCRM
             partyId={party.id}
             onAddAsCoHost={async (data) => {
               // Use manually-provided avatar if available, otherwise auto-fetch from socials
@@ -392,6 +398,7 @@ function HostPageContent() {
               mergeParty({ coHosts: updated });
             }}
           />
+          </div>
         ) : activeTab !== 'apps' && activeTab !== 'dashboard' && activeTab !== 'party-guide' && activeTab !== 'partners' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 space-y-3">

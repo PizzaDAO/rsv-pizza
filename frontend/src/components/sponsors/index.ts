@@ -6,3 +6,4 @@ export type { PartnerFormData } from './PartnerForm';
 export { PartnerIntakeButton } from './PartnerIntakeButton';
 export { PartnerFlyerGenerator } from './PartnerFlyerGenerator';
 export { MercuryReconcilePanel } from './MercuryReconcilePanel';
+export { OneSheetEditor } from './OneSheetEditor';

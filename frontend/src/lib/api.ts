@@ -1,4 +1,4 @@
-import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData, MercuryWireMatch, MercuryReconcileResult } from '../types';
+import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, OneSheetTier, OneSheetSection, OneSheetConfig, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData, MercuryWireMatch, MercuryReconcileResult } from '../types';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -279,10 +279,17 @@ export interface UpdatePartyData {
   parkingNotes?: string | null;
   // quattro-71244: Gamified dashboard host-set goals (JSONB).
   hostGoals?: HostGoals | null;
+  // focaccina-58550: host-customizable one-sheet config (JSONB).
+  oneSheetConfig?: OneSheetConfig | null;
   // porchetta-81402: edit cancellation reason via PATCH (cancel/reinstate go
   // through dedicated POST endpoints).
   cancellationReason?: string | null;
 }
+
+// focaccina-58550: host-customizable one-sheet content. Defined in ../types to
+// avoid a circular import (api.ts already imports from ../types); re-exported
+// here so existing callers can keep importing from lib/api.
+export type { OneSheetTier, OneSheetSection, OneSheetConfig } from '../types';
 
 export async function createPartyApi(data: CreatePartyData) {
   return apiRequest<{ party: any }>('/api/parties', {
@@ -408,6 +415,8 @@ export async function updatePartyApi(partyId: string, data: UpdatePartyData) {
       parkingNotes: data.parkingNotes,
       // quattro-71244: gamified-dashboard goal targets.
       hostGoals: data.hostGoals,
+      // focaccina-58550: host-customizable one-sheet config.
+      oneSheetConfig: data.oneSheetConfig,
       // porchetta-81402: edit cancellation reason via PATCH.
       cancellationReason: data.cancellationReason,
     },
@@ -1110,6 +1119,9 @@ export interface PublicEvent {
   // shows a cancelled banner + replaces the RSVP button with a notice card.
   cancelledAt?: string | null;
   cancellationReason?: string | null;
+  // focaccina-58550: host-customizable one-sheet config, rendered read-only on
+  // the public /onesheet/:slug page. Null/absent = the fixed default one-sheet.
+  oneSheetConfig?: OneSheetConfig | null;
 }
 
 // Public Event API (no auth required)

@@ -224,6 +224,12 @@ model Party {
   // empty goal bar + "Set goal" affordance when null.
   hostGoals Json? @map("host_goals")
 
+  // focaccina-58550: host-customizable one-sheet config (headline/blurb,
+  // sponsorship pricing tiers, custom detail sections). Rendered read-only on
+  // the public /onesheet/:slug page. Nullable; unconfigured events render the
+  // fixed default one-sheet.
+  oneSheetConfig Json? @map("one_sheet_config")
+
   // Quiz settings
   quizEnabled Boolean @default(false) @map("quiz_enabled")
 
