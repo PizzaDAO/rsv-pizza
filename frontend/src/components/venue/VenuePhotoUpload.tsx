@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
+import { Loader2, ImagePlus } from 'lucide-react';
 import { VenuePhotoCategory } from '../../types';
 import { uploadVenuePhoto } from '../../lib/supabase';
 import { createVenuePhoto } from '../../lib/api';

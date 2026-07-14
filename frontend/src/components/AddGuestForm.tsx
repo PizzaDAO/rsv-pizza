@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { usePizza } from '../contexts/PizzaContext';
-import { Guest } from '../types';
 import { UserPlus, Loader2, ThumbsUp, ThumbsDown, User, X } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { getExcludedToppingIds, DIETARY_OPTIONS } from '../constants/options';

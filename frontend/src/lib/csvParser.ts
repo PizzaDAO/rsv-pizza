@@ -72,7 +72,7 @@ function isEmailHeader(cell: string): boolean {
  * (below) is kept as-is for the bulk-invite Promo widget.
  */
 export function parseCsvWithHeaders(text: string): { headers: string[]; rows: string[][] } {
-  const cleaned = text.replace(/^﻿/, '');
+  const cleaned = text.replace(/^\uFEFF/, '');
   const lines = cleaned
     .split(/\r\n|\n|\r/)
     .filter((l) => l.length > 0);
@@ -91,7 +91,7 @@ export function parseCsvWithHeaders(text: string): { headers: string[]; rows: st
 
 export function parseCsv(text: string): ParsedCsvRow[] {
   // Strip a BOM if present
-  const cleaned = text.replace(/^﻿/, '');
+  const cleaned = text.replace(/^\uFEFF/, '');
 
   // Normalize line endings and split
   const lines = cleaned

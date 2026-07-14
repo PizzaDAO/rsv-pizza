@@ -28,7 +28,7 @@ export function DisplayPage() {
       } else {
         setError(t('display.notFound'));
       }
-    } catch (err) {
+    } catch {
       setError(t('display.failedToLoad'));
     } finally {
       setLoading(false);

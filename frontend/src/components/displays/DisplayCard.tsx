@@ -61,9 +61,10 @@ export function DisplayCard({ display, partyId, onEdit, onDelete, onToggleActive
     switch (display.contentType) {
       case 'slideshow':
         return config?.googleSlidesUrl ? 'Google Slides' : 'No slides configured';
-      case 'photos':
+      case 'photos': {
         const filter = config?.filter === 'starred' ? 'Starred only' : 'All photos';
         return filter;
+      }
       case 'qr_code':
         return config?.message || 'RSVP QR';
       case 'event_info':

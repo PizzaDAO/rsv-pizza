@@ -11,7 +11,7 @@ interface CheckInScannerProps {
   onClose: () => void;
 }
 
-export function CheckInScanner({ inviteCode, currentGuestId, onVouchSuccess, onClose }: CheckInScannerProps) {
+export function CheckInScanner({ currentGuestId, onVouchSuccess, onClose }: CheckInScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<string>('Starting camera...');
@@ -39,7 +39,7 @@ export function CheckInScanner({ inviteCode, currentGuestId, onVouchSuccess, onC
       if (segments.length === 3 && segments[0] === 'checkin') {
         return { inviteCode: segments[1], guestId: segments[2] };
       }
-    } catch {}
+    } catch { /* not a URL — fall through */ }
     return null;
   }, []);
 

@@ -197,7 +197,7 @@ export function ShippingDashboard() {
       // Refresh stats
       const statsResult = await fetchShippingStats();
       setStats(statsResult.stats);
-    } catch (err) {
+    } catch {
       // Revert on failure
       loadData();
     }
@@ -210,7 +210,7 @@ export function ShippingDashboard() {
     );
     try {
       await updateShippingKit(kitId, { allocatedTier: tier });
-    } catch (err) {
+    } catch {
       loadData();
     }
   };
@@ -236,7 +236,7 @@ export function ShippingDashboard() {
       );
       const statsResult = await fetchShippingStats();
       setStats(statsResult.stats);
-    } catch (err) {
+    } catch {
       loadData();
     }
   };

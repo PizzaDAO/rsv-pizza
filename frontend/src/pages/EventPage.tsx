@@ -62,7 +62,7 @@ function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   }
 
   const bare = trimmed.replace(/^@/, '');
-  if (/^[A-Za-z0-9_+\-]{3,}$/.test(bare)) {
+  if (/^[A-Za-z0-9_+-]{3,}$/.test(bare)) {
     return `https://t.me/${bare}`;
   }
 

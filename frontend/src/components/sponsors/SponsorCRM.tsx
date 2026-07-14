@@ -331,7 +331,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
         p => p.source === 'underboss' && !p.sponsorId && p.sponsorUserId
       );
 
-      let sponsorIdMap: Record<string, string> = {};
+      const sponsorIdMap: Record<string, string> = {};
 
       if (underbossOnly.length > 0) {
         const result = await ensureUnderbossSponsors(
@@ -451,7 +451,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       {isPrivileged && (
         <MercuryReconcilePanel
           invoices={invoices}
-          onInvoiceUpdate={(updatedId) => {
+          onInvoiceUpdate={() => {
             // Reload invoices to get fresh paid status
             getInvoices(partyId).then((result) => {
               if (result) setInvoices(result.invoices);

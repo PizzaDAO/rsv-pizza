@@ -49,7 +49,7 @@ function extractInterfaceFields(source: string, interfaceName: string): string[]
   if (!match) return [];
 
   const body = match[1];
-  const fieldRegex = /^\s*(\w+)[\?:]?\s*:/gm;
+  const fieldRegex = /^\s*(\w+)[?:]?\s*:/gm;
   const fields: string[] = [];
   let fieldMatch;
   while ((fieldMatch = fieldRegex.exec(body)) !== null) {
@@ -92,19 +92,6 @@ function extractDbPartyToPartyFields(source: string): string[] {
     fields.add(match[1]);
   }
   return Array.from(fields);
-}
-
-// Extract fields destructured in the backend PATCH handler
-function extractPatchHandlerFields(source: string): string[] {
-  // Find the PATCH handler destructuring
-  const patchRegex = /router\.patch\s*\(\s*'\/:id'[\s\S]*?const\s*\{([^}]+)\}\s*=\s*req\.body/;
-  const match = source.match(patchRegex);
-  if (!match) return [];
-
-  return match[1]
-    .split(',')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('//'));
 }
 
 describe('Field Mapping Consistency', () => {

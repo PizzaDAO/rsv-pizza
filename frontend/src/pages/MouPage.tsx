@@ -32,7 +32,7 @@ export function MouPage() {
         } else {
           setError('MOU not found');
         }
-      } catch (err) {
+      } catch {
         setError('Failed to load MOU');
       } finally {
         setLoading(false);

@@ -63,34 +63,26 @@ export const VenueWidget: React.FC<VenueWidgetProps> = ({ partyId, onVenueSelect
 
   // Handle create venue
   const handleCreate = async (data: VenueCreateData) => {
-    try {
-      const venue = await createVenue(partyId, data);
-      if (venue) {
-        setVenues(prev => [venue, ...prev]);
-        setShowForm(false);
+    const venue = await createVenue(partyId, data);
+    if (venue) {
+      setVenues(prev => [venue, ...prev]);
+      setShowForm(false);
 
-        // In confirmed mode, auto-select the venue
-        if (confirmedMode) {
-          setConfirmedMode(false);
-          await handleSelect(venue.id);
-        }
+      // In confirmed mode, auto-select the venue
+      if (confirmedMode) {
+        setConfirmedMode(false);
+        await handleSelect(venue.id);
       }
-    } catch (error) {
-      throw error;
     }
   };
 
   // Handle update venue
   const handleUpdate = async (data: VenueCreateData) => {
     if (!editingVenue) return;
-    try {
-      const venue = await updateVenue(partyId, editingVenue.id, data);
-      if (venue) {
-        setVenues(prev => prev.map(v => v.id === venue.id ? venue : v));
-        setEditingVenue(null);
-      }
-    } catch (error) {
-      throw error;
+    const venue = await updateVenue(partyId, editingVenue.id, data);
+    if (venue) {
+      setVenues(prev => prev.map(v => v.id === venue.id ? venue : v));
+      setEditingVenue(null);
     }
   };
 

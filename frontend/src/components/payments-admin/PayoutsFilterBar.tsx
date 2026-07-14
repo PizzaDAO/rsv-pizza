@@ -3,7 +3,7 @@ import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
-import type { AdminPayoutFilters, PayoutMethod, PayoutStatus } from '../../types';
+import type { AdminPayoutFilters, PayoutMethod } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 import {
   PAYMENTS_REGION_DISPLAY_ORDER,

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
-import { PartyPopper, Link2, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
+import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
 import { uploadEventImage, cdnUrl } from '../lib/supabase';
 import { IconInput } from './IconInput';
 
 export const PartyHeader: React.FC = () => {
-  const { party, createParty, clearParty, getInviteLink, getHostLink } = usePizza();
+  const { party, createParty, getInviteLink, getHostLink } = usePizza();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);

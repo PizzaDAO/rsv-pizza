@@ -209,7 +209,7 @@ export const ImportGuestsModal: React.FC<Props> = ({ isOpen, onClose, existingEm
     // Build the API payload. Apply the host's landing-status override.
     const approved =
       landStatus === 'pending' ? null : true;
-    const baseStatus: 'CONFIRMED' = 'CONFIRMED';
+    const baseStatus = 'CONFIRMED' as const;
     const guests = Array.from(selected)
       .sort((a, b) => a - b)
       .map((idx) => {

@@ -55,7 +55,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   className = ''
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [, setIsLoaded] = useState(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   // napoletana-58547: keyless (`osm`) autocomplete state.
   const [suggestions, setSuggestions] = useState<AddressResult[]>([]);

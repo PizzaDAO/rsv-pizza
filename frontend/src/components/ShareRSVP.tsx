@@ -30,7 +30,7 @@ export function normalizeHandle(raw: string): string {
 
 /** Build share text that fits within maxLen chars */
 function buildShareText(base: string, handles: string[], maxLen: number): string {
-  let mentions = handles.map(h => `@${h}`);
+  const mentions = handles.map(h => `@${h}`);
   let text = `${base}\n\n${mentions.join(' ')}`;
   if (text.length <= maxLen) return text;
   // Drop handles from end but always keep @Pizza_DAO (first)

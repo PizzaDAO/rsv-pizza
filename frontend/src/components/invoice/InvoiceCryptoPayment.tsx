@@ -39,7 +39,7 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
   invoice,
   onSuccess,
 }) => {
-  const { address, chainId, isConnected } = useAccount();
+  const { chainId, isConnected } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balances, isLoading: balancesLoading } = useTokenBalances();
   const { status: txStatus, txHash, error: txError, sendDonation, reset: resetTx } = useCryptoDonation();

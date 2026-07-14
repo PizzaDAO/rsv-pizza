@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { UserPlus, Shield, Trash2, Pencil, ToggleLeft, ToggleRight } from 'lucide-react';
+import { UserPlus, Shield, Pencil, ToggleLeft, ToggleRight } from 'lucide-react';
 import { CoordinatorModal } from './CoordinatorModal';
 import { GPP_REGIONS } from '../../types';
 import type { ShippingCoordinator } from '../../types';
@@ -52,10 +52,6 @@ export function CoordinatorManager() {
     loadCoordinators();
   };
 
-  const regionLabels = (regions: string[]) =>
-    regions
-      .map((r) => GPP_REGIONS.find((g) => g.id === r)?.label || r)
-      .join(', ');
 
   return (
     <div className="mt-8">

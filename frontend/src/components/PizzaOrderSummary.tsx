@@ -15,14 +15,17 @@ import {
   getCurrentLocation,
   geocodeAddress,
   formatDistance,
-  getProviderName,
   getProviderColor,
   supportsDirectOrdering,
 } from '../lib/ordering';
 
+// Legacy pizzeria selection UI is hidden while AI ordering is "Coming Soon".
+// Flip to true to restore the manual search/select flow below.
+const SHOW_LEGACY_PIZZERIA_SELECTION = false;
+
 export const PizzaOrderSummary: React.FC = () => {
   const { t } = useTranslation('host');
-  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations, updatePizzaQuantity, removePizza } = usePizza();
+  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, updatePizzaQuantity, removePizza } = usePizza();
   const isGppEvent = party?.eventType === 'gpp';
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
@@ -290,7 +293,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
   };
 
   const handleCopyAllWaves = () => {
-    const allWavesText = waveRecommendations.map((waveRec, index) => {
+    const allWavesText = waveRecommendations.map((waveRec) => {
       const pizzaText = waveRec.pizzas
         .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
         .map(pizza => {
@@ -409,7 +412,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
             </div>
 
             {/* Original pizzeria selection - hidden while coming soon */}
-            {false && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
+            {SHOW_LEGACY_PIZZERIA_SELECTION && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
               {!hasSearched || pizzerias.length === 0 ? (
                 // Show search form if no results yet
                 <div className="space-y-3">

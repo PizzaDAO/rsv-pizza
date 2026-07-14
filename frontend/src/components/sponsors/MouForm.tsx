@@ -31,7 +31,7 @@ const DEFAULT_MOU_BODY = `This Memorandum of Understanding ("MOU") outlines the 
 
 This MOU is a statement of intent and good-faith collaboration between the parties.`;
 
-export function MouForm({ sponsor, partyId, existingMou, onClose, onSave, onSponsorUpdate }: MouFormProps) {
+export function MouForm({ sponsor, partyId, existingMou, onClose, onSave }: MouFormProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);

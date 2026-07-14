@@ -95,7 +95,7 @@ export const SongForm: React.FC<SongFormProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^\.]+$/, '') }));
+      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^.]+$/, '') }));
     }
   };
 
@@ -104,7 +104,7 @@ export const SongForm: React.FC<SongFormProps> = ({
     setIsDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('audio/')) {
-      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^\.]+$/, '') }));
+      setFormData((prev) => ({ ...prev, file, title: prev.title || file.name.replace(/\.[^.]+$/, '') }));
     }
   };
 

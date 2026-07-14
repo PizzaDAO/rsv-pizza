@@ -28,7 +28,6 @@ export function RSVPFlowContent({
   event,
   form,
   eventName,
-  closeButtonLabel,
   onClose,
   isEditing,
   walletFieldSlot,

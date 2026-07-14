@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import { Pizzeria, OrderItem, OrderingProvider } from '../types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;

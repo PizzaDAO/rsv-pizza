@@ -60,7 +60,6 @@ function setupHostPageMocks(page: import('@playwright/test').Page, partyOverride
 
     // Mock Supabase parties query (both custom_url and invite_code lookups)
     page.route('**/*.supabase.co/rest/v1/parties*', (route, request) => {
-      const url = request.url();
       if (request.method() === 'GET') {
         return route.fulfill({
           status: 200,

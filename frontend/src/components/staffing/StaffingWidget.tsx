@@ -46,7 +46,7 @@ export const StaffingWidget: React.FC<StaffingWidgetProps> = ({ partyId }) => {
       } else {
         setError('Failed to load staff');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load staff');
     } finally {
       setLoading(false);

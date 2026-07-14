@@ -101,12 +101,12 @@ export function DJPage() {
         try {
           const storedSongs = localStorage.getItem(`music_songs_${foundEvent.id}`);
           if (storedSongs) setSongs(JSON.parse(storedSongs));
-        } catch (e) { /* ignore parse errors */ }
+        } catch { /* ignore parse errors */ }
 
         try {
           const storedPlaylists = localStorage.getItem(`music_playlists_${foundEvent.id}`);
           if (storedPlaylists) setPlaylists(JSON.parse(storedPlaylists));
-        } catch (e) { /* ignore parse errors */ }
+        } catch { /* ignore parse errors */ }
 
       } catch (err) {
         console.error('Error loading DJ page data:', err);

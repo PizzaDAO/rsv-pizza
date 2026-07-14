@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Package, MapPin, Truck, User, Calendar, FileText, ExternalLink, Gift, Star, Check } from 'lucide-react';
+import { X, Package, MapPin, Truck, FileText, ExternalLink, Gift, Star, Check } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { ShippingKit, KitStatus, KitTier } from '../../types';
 import { GPP_REGIONS, KIT_TIERS } from '../../types';

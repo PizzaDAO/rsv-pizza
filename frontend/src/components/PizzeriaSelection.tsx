@@ -17,6 +17,10 @@ interface PizzeriaSelectionProps {
   embedded?: boolean;
 }
 
+// AI "Order" button is hidden while AI ordering is "Coming Soon".
+// Flip to true to restore the per-pizzeria Order button below.
+const SHOW_AI_ORDER_BUTTON = false;
+
 export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
   const { party, guests, recommendations } = usePizza();
 
@@ -52,7 +56,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
   const [loadingPizzerias, setLoadingPizzerias] = useState(false);
   const [showAddPizzeriaModal, setShowAddPizzeriaModal] = useState(false);
-  const [savingField, setSavingField] = useState<string | null>(null);
+  const [, setSavingField] = useState<string | null>(null);
   const [venueLocation, setVenueLocation] = useState<{lat:number;lng:number}|null>(null);
 
   // Discount info modal
@@ -456,7 +460,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* AI Order button - disabled while AI ordering is Coming Soon */}
-                  {false && pizzeria.phone && recommendations.length > 0 && (
+                  {SHOW_AI_ORDER_BUTTON && pizzeria.phone && recommendations.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setOrderPizzeria(pizzeria)}

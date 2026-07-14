@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockAuthFlow, setupCommonMocks } from '../mocks/api-handlers';
 import { LoginPage, VerifyPage } from '../pages/login.page';
-import { injectAuth, clearAuth, TEST_USER, TEST_TOKEN } from '../fixtures/auth.fixture';
+import { injectAuth, clearAuth, TEST_TOKEN } from '../fixtures/auth.fixture';
 
 test.describe('Authentication Flow', () => {
   test('visit /login and see email input', async ({ page }) => {

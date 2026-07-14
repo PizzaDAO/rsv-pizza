@@ -204,7 +204,7 @@ export function OutreachTab(_props: OutreachTabProps) {
     );
     try {
       await updateOutreachAttempt(attemptId, { status });
-    } catch (e) {
+    } catch {
       // Reload on failure to revert
       loadCommunities();
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Gift, Trophy, Loader2, CheckCircle, Users } from 'lucide-react';
-import { Raffle, RaffleStatus } from '../../types';
+import { Raffle } from '../../types';
 import { getRaffles, enterRaffle } from '../../lib/api';
 
 interface RaffleEntryProps {
@@ -10,7 +10,7 @@ interface RaffleEntryProps {
   guestName?: string;
 }
 
-export function RaffleEntry({ partyId, guestId, guestName }: RaffleEntryProps) {
+export function RaffleEntry({ partyId, guestId }: RaffleEntryProps) {
   const { t } = useTranslation('host');
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [loading, setLoading] = useState(true);

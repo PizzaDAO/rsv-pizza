@@ -8,7 +8,6 @@ import { AnnouncePanel } from './AnnouncePanel';
 import { AnnouncementHistory } from './AnnouncementHistory';
 import { PizzaStatusCard } from './PizzaStatusCard';
 import { MusicNowPlayingCard } from './MusicNowPlayingCard';
-import { ChecklistTodayCard } from './ChecklistTodayCard';
 import { PhotoQuickCaptureCard } from './PhotoQuickCaptureCard';
 import { BriefingCard } from './BriefingCard';
 import { SignedPizzaBoxCard } from './SignedPizzaBoxCard';

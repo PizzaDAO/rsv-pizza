@@ -36,7 +36,6 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif
  */
 export const RolePhotoPicker: React.FC<RolePhotoPickerProps> = ({
   partyId,
-  role,
   roleLabel,
   eventStart,
   selectedPhotoId,

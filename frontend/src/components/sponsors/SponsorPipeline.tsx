@@ -25,7 +25,7 @@ const PIPELINE_STATUSES: SponsorStatus[] = ['todo', 'asked', 'yes', 'billed', 'p
 // Secondary statuses
 const SECONDARY_STATUSES: SponsorStatus[] = ['stuck', 'skip', 'alum'];
 
-export function SponsorPipeline({ stats, onUpdateGoal, isLoading }: SponsorPipelineProps) {
+export function SponsorPipeline({ stats, onUpdateGoal }: SponsorPipelineProps) {
   const { t } = useTranslation('host');
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState<string>('');

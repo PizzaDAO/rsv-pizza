@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Users, DollarSign, Globe, ThumbsUp, ThumbsDown, Check, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
+import { MapPin, Users, DollarSign, Globe, ThumbsUp, ThumbsDown, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { VenueReport, Venue, VenuePhoto } from '../../types';
 
 interface VenueReportPreviewProps {

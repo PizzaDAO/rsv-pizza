@@ -52,7 +52,7 @@ const STATUS_ORDER: Record<SponsorStatus, number> = {
   skip: 7,
 };
 
-export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, onMouUpdate, onMouDelete, onStatusChange, isLoading, avatarUrls, isPrivileged = false }: SponsorListProps) {
+export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdit, onDelete, onSponsorUpdate, onInvoiceUpdate, onMouUpdate, onMouDelete, onStatusChange, avatarUrls, isPrivileged = false }: SponsorListProps) {
   const { t } = useTranslation('host');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -81,11 +81,12 @@ export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdi
         case 'amount':
           comparison = (a.amount || 0) - (b.amount || 0);
           break;
-        case 'lastContactedAt':
+        case 'lastContactedAt': {
           const dateA = a.lastContactedAt ? new Date(a.lastContactedAt).getTime() : 0;
           const dateB = b.lastContactedAt ? new Date(b.lastContactedAt).getTime() : 0;
           comparison = dateA - dateB;
           break;
+        }
         case 'createdAt':
           comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           break;

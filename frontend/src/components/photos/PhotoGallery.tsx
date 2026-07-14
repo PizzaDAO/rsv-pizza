@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Star, Loader2, Upload, Filter, Clock, CheckCircle2, XCircle, CheckCheck, Tag, Video } from 'lucide-react';
+import { Camera, Star, Loader2, Upload, Clock, CheckCheck, Tag, Video } from 'lucide-react';
 import { Photo, PhotoStats } from '../../types';
 import { getPartyPhotos, getPhotoStats, updatePhoto, deletePhoto, restorePhoto, batchReviewPhotos, getPhotoTags } from '../../lib/api';
 import { PhotoCard } from './PhotoCard';
@@ -108,7 +108,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       } else {
         setError('Failed to load photos');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load photos');
     } finally {
       setLoading(false);

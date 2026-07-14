@@ -23,7 +23,7 @@ function DayOfRunPageContent() {
 
   useEffect(() => {
     if (!inviteCode || loaded) return;
-    loadParty(inviteCode).then((ok) => setLoaded(true));
+    loadParty(inviteCode).then(() => setLoaded(true));
   }, [inviteCode, loadParty, loaded]);
 
   // salami-39204: gate Day-Of on party approval status instead of the prior

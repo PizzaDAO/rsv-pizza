@@ -25,8 +25,13 @@ const POPULAR_TIMEZONES = [
 // Get all IANA timezones with fallback for older browsers
 const ALL_TIMEZONES = (() => {
   try {
-    // @ts-ignore - supportedValuesOf may not be in older TypeScript definitions
-    return Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [
+    // supportedValuesOf may not be in older TypeScript lib definitions
+    const intlWithSupportedValues = Intl as typeof Intl & {
+      supportedValuesOf?: (key: string) => string[];
+    };
+    return intlWithSupportedValues.supportedValuesOf
+      ? intlWithSupportedValues.supportedValuesOf('timeZone')
+      : [
       'America/Anchorage', 'America/Los_Angeles', 'America/Phoenix', 'America/Denver',
       'America/Chicago', 'America/New_York', 'America/Toronto', 'America/Mexico_City',
       'America/Sao_Paulo', 'Europe/London', 'Europe/Madrid', 'Europe/Paris',
@@ -34,7 +39,7 @@ const ALL_TIMEZONES = (() => {
       'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
       'Asia/Tokyo', 'Australia/Sydney'
     ];
-  } catch (e) {
+  } catch {
     // Fallback list if supportedValuesOf throws an error
     return [
       'America/Anchorage', 'America/Los_Angeles', 'America/Phoenix', 'America/Denver',

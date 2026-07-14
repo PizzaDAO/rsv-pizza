@@ -7,15 +7,6 @@ import { DIETARY_TOPPING_EXCLUSIONS } from '../constants/options';
 // - Detroit: 2 slices per person (similar to NY-style serving)
 // - NY/default: based on surface area (18" feeds 4)
 
-function getServingsForStyle(size: PizzaSize, style: PizzaStyle): number {
-  if (style.id === 'neapolitan') {
-    // Neapolitan pizzas are personal-sized, 1 pizza per 1.5 people regardless of size
-    return 1.5;
-  }
-  // Detroit and NY use surface-area based servings
-  return size.servings;
-}
-
 function getMaxGuestsPerPizza(style: PizzaStyle): number {
   if (style.id === 'neapolitan') {
     // Neapolitan is personal-sized, max ~2 people sharing one
@@ -323,7 +314,7 @@ function splitIntoTwoGroups(guests: Guest[]): [Guest[], Guest[]] {
 }
 
 // Determine if half-and-half would improve satisfaction for a group
-function shouldUseHalfAndHalf(guests: Guest[], style: PizzaStyle): boolean {
+function shouldUseHalfAndHalf(guests: Guest[], _style: PizzaStyle): boolean {
   // Don't use half-and-half for very small groups or non-respondent pizzas
   if (guests.length < 2) return false;
 

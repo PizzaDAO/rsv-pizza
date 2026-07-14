@@ -15,7 +15,7 @@ export function AuthVerifyPage() {
   const [status, setStatus] = useState<'idle' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
-  const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
+  const [, setLastSubmittedCode] = useState<string | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
   const [name, setName] = useState('');
   const [pendingAuthData, setPendingAuthData] = useState<any>(null);

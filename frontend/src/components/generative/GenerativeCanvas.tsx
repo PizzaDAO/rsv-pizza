@@ -119,7 +119,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
     setEditCity(null);
     setEditTime(null);
     if (storageKey) {
-      try { localStorage.removeItem(storageKey); } catch {}
+      try { localStorage.removeItem(storageKey); } catch { /* ignore: storage unavailable */ }
     }
   }, [storageKey, defaultPositions, defaultSponsorBox]);
 
@@ -357,7 +357,7 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
   useEffect(() => {
     if (!storageKey) return;
     const state = { positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime };
-    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* ignore: storage unavailable */ }
   }, [storageKey, positions, poppedLogos, logoSizes, sponsorBoxSize, editVenueName, editStreetAddress, editCity, editTime]);
 
   if (!party) return null;
@@ -419,19 +419,6 @@ export function GenerativeCanvas({ config }: GenerativeCanvasProps) {
 
   const scale = containerWidth / config.canvasWidth;
   const aspectRatio = config.canvasHeight / config.canvasWidth;
-
-  // Render to canvas (editor resolution)
-  const renderToCanvas = async (): Promise<HTMLCanvasElement> => {
-    return renderCanvas({
-      config,
-      positions,
-      textValues: { city, dateDisplay, timeDisplay: effectiveTimeDisplay, venueName, streetAddress },
-      sponsors: sponsors.map(s => ({ id: s.id, logoUrl: s.logoUrl! })),
-      sponsorBoxSize,
-      logoSizes,
-      poppedLogos,
-    });
-  };
 
   // Render to canvas at full resolution
   const renderFullRes = async (): Promise<HTMLCanvasElement> => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Gift, Loader2, Trash2, Edit2, Play, Trophy, CheckCircle, X } from 'lucide-react';
+import { Plus, Gift, Loader2 } from 'lucide-react';
 import { Raffle, RafflePrize } from '../../types';
 import {
   getRaffles,
