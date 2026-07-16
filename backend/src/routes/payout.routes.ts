@@ -195,6 +195,9 @@ function serializePayout(p: any) {
     // ziti-58300: host "Submit for review" toggle timestamp on the rolling
     // reimbursement record. Null until the host signals ready.
     submittedForReviewAt: p.submittedForReviewAt ? p.submittedForReviewAt.toISOString() : null,
+    // cannelloni-58543: non-null when the host submitted without the required
+    // event photos via the acknowledgment checkbox.
+    photosWaivedAt: p.photosWaivedAt ? p.photosWaivedAt.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     documents: Array.isArray(p.documents) ? p.documents.map(serializeDocument) : undefined,
@@ -885,6 +888,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
       // porchetta-58296: host must affirm "I have submitted all my receipts and
       // they are itemized." before the payout can be created.
       receiptAttested,
+      // cannelloni-58543: host acknowledges submitting without the required event
+      // photos. Waives ONLY the photo gates (receipt + attestation stay required).
+      photosWaived,
       // bismarck-92103: admin-only override so the resulting Payout row is
       // credited to the chosen cohost (not the admin creating it). When set
       // AND the caller is an admin, `recipientHostUserId` replaces the
@@ -1074,34 +1080,39 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           'RECEIPTS_REQUIRED',
         );
       }
-      if (!submissionReadiness.hasGroupPhoto) {
-        throw new AppError(
-          'Designate a group photo before submitting.',
-          400,
-          'GROUP_PHOTO_REQUIRED',
-        );
-      }
-      if (!submissionReadiness.hasBoxStackPhoto) {
-        throw new AppError(
-          'Designate a box stack photo before submitting.',
-          400,
-          'BOX_STACK_PHOTO_REQUIRED',
-        );
-      }
-      if (!submissionReadiness.hasPizzaPhoto) {
-        throw new AppError(
-          'Designate a pizza photo before submitting.',
-          400,
-          'PIZZA_PHOTO_REQUIRED',
-        );
-      }
-      // tiramisu-58530: beyond the 3 role photos, require >=5 additional event photos.
-      if (submissionReadiness.additionalPhotoCount < REQUIRED_ADDITIONAL_PHOTOS) {
-        throw new AppError(
-          `Upload at least ${REQUIRED_ADDITIONAL_PHOTOS} additional event photos before submitting.`,
-          400,
-          'ADDITIONAL_PHOTOS_REQUIRED',
-        );
+      // cannelloni-58543: the host may waive ALL photo gates (3 role photos +
+      // the >=5 additional) via an acknowledgment checkbox. Receipt + attestation
+      // gates above stay unconditional.
+      if (photosWaived !== true) {
+        if (!submissionReadiness.hasGroupPhoto) {
+          throw new AppError(
+            'Designate a group photo before submitting.',
+            400,
+            'GROUP_PHOTO_REQUIRED',
+          );
+        }
+        if (!submissionReadiness.hasBoxStackPhoto) {
+          throw new AppError(
+            'Designate a box stack photo before submitting.',
+            400,
+            'BOX_STACK_PHOTO_REQUIRED',
+          );
+        }
+        if (!submissionReadiness.hasPizzaPhoto) {
+          throw new AppError(
+            'Designate a pizza photo before submitting.',
+            400,
+            'PIZZA_PHOTO_REQUIRED',
+          );
+        }
+        // tiramisu-58530: beyond the 3 role photos, require >=5 additional event photos.
+        if (submissionReadiness.additionalPhotoCount < REQUIRED_ADDITIONAL_PHOTOS) {
+          throw new AppError(
+            `Upload at least ${REQUIRED_ADDITIONAL_PHOTOS} additional event photos before submitting.`,
+            400,
+            'ADDITIONAL_PHOTOS_REQUIRED',
+          );
+        }
       }
     }
 
@@ -1794,6 +1805,9 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
           // time (W-9 / W-8BEN / W-8BEN-E). Null on shipping-purpose receipts
           // and on admin-prepay rows where the gate is skipped.
           taxFormId: taxFormSnapshotId,
+          // cannelloni-58543: stamp the photo waiver when the host explicitly
+          // submitted without the required event photos.
+          photosWaivedAt: photosWaived === true ? new Date() : null,
           documents: { create: docsToCreateStamped },
         },
         include: {
@@ -2941,6 +2955,12 @@ async function getReimbursementReadiness(partyId: string, userId: string) {
     photoReadiness.additionalPhotoCount >= REQUIRED_ADDITIONAL_PHOTOS &&
     paymentMethodValid;
 
+  // cannelloni-58543: everything required EXCEPT the photo gates. Drives the
+  // "submit anyway with a waiver checkbox" path. readyToSubmit keeps its full
+  // meaning (still includes photos) so existing labels/behavior don't shift.
+  const readyToSubmitWithoutPhotos =
+    attendanceSet && photoReadiness.hasReceipt && paymentMethodValid;
+
   return {
     attendanceSet,
     hasGroupPhoto: photoReadiness.hasGroupPhoto,
@@ -2951,6 +2971,7 @@ async function getReimbursementReadiness(partyId: string, userId: string) {
     additionalPhotoCount: photoReadiness.additionalPhotoCount,
     paymentMethodValid,
     readyToSubmit,
+    readyToSubmitWithoutPhotos,
   };
 }
 
@@ -3460,7 +3481,10 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
 router.post('/:partyId/reimbursement/submit', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
-    const { attested } = req.body || {};
+    // cannelloni-58543: `photosWaived` lets the host submit without the required
+    // event photos (acknowledged via a checkbox). Receipt/attestation/method/
+    // attendance gates stay required.
+    const { attested, photosWaived } = req.body || {};
     const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
     if (!canEdit) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
@@ -3484,7 +3508,20 @@ router.post('/:partyId/reimbursement/submit', async (req: AuthRequest, res: Resp
     }
 
     const readiness = await getReimbursementReadiness(partyId, req.userId);
-    if (!readiness.readyToSubmit) {
+    if (photosWaived === true) {
+      // cannelloni-58543: photo gates waived — require only the non-photo gates.
+      if (!readiness.readyToSubmitWithoutPhotos) {
+        let missing = 'unknown';
+        if (!readiness.attendanceSet) missing = 'attendance';
+        else if (!readiness.hasReceipt) missing = 'receipt';
+        else if (!readiness.paymentMethodValid) missing = 'paymentMethod';
+        throw new AppError(
+          `Your reimbursement is not ready to submit (missing: ${missing}).`,
+          400,
+          'NOT_READY',
+        );
+      }
+    } else if (!readiness.readyToSubmit) {
       // Report the first missing requirement so the client can highlight it.
       let missing = 'unknown';
       if (!readiness.attendanceSet) missing = 'attendance';
@@ -3517,6 +3554,9 @@ router.post('/:partyId/reimbursement/submit', async (req: AuthRequest, res: Resp
       where: { id: record.id },
       data: {
         submittedForReviewAt: new Date(),
+        // cannelloni-58543: stamp/clear the photo waiver. A re-submit with photos
+        // (photosWaived !== true) un-waives a previously waived record.
+        photosWaivedAt: photosWaived === true ? new Date() : null,
         ...(submitter ? payoutRowSnapshotFromUser(submitter) : {}),
       },
       include: {
@@ -3560,7 +3600,9 @@ router.post('/:partyId/reimbursement/unsubmit', async (req: AuthRequest, res: Re
 
     const updated = await prisma.payout.update({
       where: { id: record.id },
-      data: { submittedForReviewAt: null },
+      // cannelloni-58543: reopening drops any stale photo waiver alongside the
+      // submitted-for-review flag.
+      data: { submittedForReviewAt: null, photosWaivedAt: null },
       include: {
         host: { select: { id: true, name: true, email: true } },
         documents: {

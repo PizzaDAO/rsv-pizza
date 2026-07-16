@@ -2081,6 +2081,11 @@ export interface Payout {
    * Optional on the wire for backward-compat with cached payloads.
    */
   submittedForReviewAt?: string | null;
+  /**
+   * cannelloni-58543: set when the host submitted without the required event
+   * photos via the acknowledgment checkbox. Null on photo-complete submits.
+   */
+  photosWaivedAt?: string | null;
 }
 
 // ============================================

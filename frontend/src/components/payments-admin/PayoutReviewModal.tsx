@@ -1948,7 +1948,10 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
               {/* ziti-58300: amber "Submitted {date}" pill in the review header
                   so the reviewer sees the co-host explicitly marked their
                   rolling reimbursement ready for review. */}
-              <SubmittedForReviewBadge submittedForReviewAt={payout.submittedForReviewAt} />
+              <SubmittedForReviewBadge
+                submittedForReviewAt={payout.submittedForReviewAt}
+                photosWaivedAt={payout.photosWaivedAt}
+              />
               <PayoutMethodIcon method={payout.payoutMethod} showLabel />
             </div>
             <div className="text-xs text-theme-text-muted mt-0.5">
