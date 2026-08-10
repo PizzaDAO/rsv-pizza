@@ -1,33 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Elements,
-  CardElement,
+  PaymentElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import {
-  getStripe,
-  createStripeCustomer,
-  getSetupIntent,
-  getStoredCustomerId,
-  storeCustomerId,
-  storeCustomerEmail,
-  setHasPaymentMethod,
-} from '../lib/stripe';
-import { Loader2, CreditCard, Check, Lock } from 'lucide-react';
+import type { StripeElementsOptions } from '@stripe/stripe-js';
+import { getStripe, formatCurrency } from '../lib/stripe';
+import { Loader2, CreditCard, Check, Lock, AlertCircle } from 'lucide-react';
 
 interface PaymentFormProps {
-  customerEmail: string;
-  customerName: string;
-  onPaymentMethodSaved: () => void;
+  clientSecret: string;
+  amount: number; // in cents, for display
+  onPaymentSuccess: (paymentIntentId: string) => void;
   onCancel?: () => void;
 }
 
 // Inner form component that uses Stripe hooks
-const PaymentFormInner: React.FC<PaymentFormProps> = ({
-  customerEmail,
-  customerName,
-  onPaymentMethodSaved,
+const PaymentFormInner: React.FC<{
+  amount: number;
+  onPaymentSuccess: (paymentIntentId: string) => void;
+  onCancel?: () => void;
+}> = ({
+  amount,
+  onPaymentSuccess,
   onCancel,
 }) => {
   const stripe = useStripe();
@@ -47,107 +43,66 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
     setError(null);
 
     try {
-      // Get or create customer
-      let customerId = getStoredCustomerId();
+      // Confirm the payment using PaymentElement (supports cards, crypto, etc.)
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
 
-      if (!customerId) {
-        const { customerId: newCustomerId } = await createStripeCustomer(
-          customerEmail,
-          customerName
-        );
-        customerId = newCustomerId;
-        storeCustomerId(customerId);
+      if (confirmError) {
+        setError(confirmError.message || 'Payment failed');
+        setLoading(false);
+        return;
       }
 
-      storeCustomerEmail(customerEmail);
-
-      // Get a SetupIntent
-      const { clientSecret } = await getSetupIntent(customerId);
-
-      // Confirm the SetupIntent with the card
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
-
-      const { error: stripeError, setupIntent } = await stripe.confirmCardSetup(
-        clientSecret,
-        {
-          payment_method: {
-            card: cardElement,
-            billing_details: {
-              name: customerName,
-              email: customerEmail,
-            },
-          },
-        }
-      );
-
-      if (stripeError) {
-        throw new Error(stripeError.message);
-      }
-
-      if (setupIntent?.status === 'succeeded') {
-        setHasPaymentMethod(true);
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
         setSuccess(true);
         setTimeout(() => {
-          onPaymentMethodSaved();
+          onPaymentSuccess(paymentIntent.id);
         }, 1500);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save payment method');
+      setError(err instanceof Error ? err.message : 'Payment failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const cardElementOptions = {
-    style: {
-      base: {
-        fontSize: '16px',
-        color: '#ffffff',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        '::placeholder': {
-          color: 'rgba(255, 255, 255, 0.5)',
-        },
-      },
-      invalid: {
-        color: '#ff393a',
-        iconColor: '#ff393a',
-      },
-    },
-  };
-
   if (success) {
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-[#39d98a]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#39d98a]/30">
           <Check size={32} className="text-[#39d98a]" />
         </div>
-        <h3 className="text-lg font-medium text-theme-text mb-2">Payment Method Saved!</h3>
-        <p className="text-theme-text-secondary text-sm">Your card is securely stored for future orders.</p>
+        <h3 className="text-lg font-medium text-theme-text mb-2">Payment Successful!</h3>
+        <p className="text-theme-text-secondary text-sm">Your payment has been securely processed.</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <label className="block text-sm font-medium text-theme-text mb-2">
-          <CreditCard size={14} className="inline mr-1" />
-          Card Information
-        </label>
-        <div className="p-4 bg-theme-surface rounded-xl border border-theme-stroke-hover focus-within:border-[#ff393a]/50 transition-colors">
-          <CardElement options={cardElementOptions} />
-        </div>
-        <p className="mt-2 text-xs text-theme-text-muted flex items-center gap-1">
-          <Lock size={12} />
-          Your card is securely stored by Stripe. We never see your full card number.
-        </p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement
+        options={{
+          layout: {
+            type: 'accordion',
+            defaultCollapsed: false,
+          },
+          paymentMethodOrder: ['card'],
+        }}
+      />
+
+      <p className="text-xs text-theme-text-muted flex items-center gap-1">
+        <Lock size={12} />
+        Your payment is securely processed by Stripe.
+      </p>
 
       {error && (
-        <div className="p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
+        <div className="flex items-center gap-2 p-3 bg-[#ff393a]/10 border border-[#ff393a]/30 rounded-xl text-[#ff393a] text-sm">
+          <AlertCircle size={16} />
           {error}
         </div>
       )}
@@ -171,12 +126,12 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
           {loading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              Saving...
+              Processing...
             </>
           ) : (
             <>
               <CreditCard size={18} />
-              Save Payment Method
+              Pay {formatCurrency(amount)}
             </>
           )}
         </button>
@@ -185,20 +140,14 @@ const PaymentFormInner: React.FC<PaymentFormProps> = ({
   );
 };
 
-// Wrapper component that provides Stripe context
-export const PaymentForm: React.FC<PaymentFormProps> = (props) => {
-  const [stripeReady, setStripeReady] = useState(false);
+// Wrapper component that provides Stripe context with clientSecret
+export const PaymentForm: React.FC<PaymentFormProps> = ({
+  clientSecret,
+  amount,
+  onPaymentSuccess,
+  onCancel,
+}) => {
   const stripePromise = getStripe();
-
-  useEffect(() => {
-    if (stripePromise) {
-      stripePromise.then((stripe) => {
-        if (stripe) {
-          setStripeReady(true);
-        }
-      });
-    }
-  }, [stripePromise]);
 
   if (!stripePromise) {
     return (
@@ -210,18 +159,28 @@ export const PaymentForm: React.FC<PaymentFormProps> = (props) => {
     );
   }
 
-  if (!stripeReady) {
-    return (
-      <div className="text-center py-8">
-        <Loader2 size={24} className="animate-spin mx-auto text-theme-text-muted" />
-        <p className="text-theme-text-secondary mt-2">Loading payment form...</p>
-      </div>
-    );
-  }
+  const elementsOptions: StripeElementsOptions = {
+    clientSecret,
+    appearance: {
+      theme: 'night',
+      variables: {
+        colorPrimary: '#ff393a',
+        colorBackground: '#1a1a2e',
+        colorText: '#ffffff',
+        colorDanger: '#ff393a',
+        fontFamily: 'system-ui, sans-serif',
+        borderRadius: '12px',
+      },
+    },
+  };
 
   return (
-    <Elements stripe={stripePromise}>
-      <PaymentFormInner {...props} />
+    <Elements stripe={stripePromise} options={elementsOptions}>
+      <PaymentFormInner
+        amount={amount}
+        onPaymentSuccess={onPaymentSuccess}
+        onCancel={onCancel}
+      />
     </Elements>
   );
 };

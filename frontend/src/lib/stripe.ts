@@ -119,6 +119,43 @@ export async function getVirtualCardDetails(cardId: string): Promise<{
   });
 }
 
+// Create an order payment (pay-first flow with 3DS + crypto support)
+export async function createOrderPayment(
+  amount: number, // in cents
+  orderId: string,
+  partyId: string,
+  pizzeriaName: string,
+  customerEmail?: string
+): Promise<{
+  paymentIntentId: string;
+  clientSecret: string;
+  status: string;
+}> {
+  return callStripeFunction({
+    action: 'create_order_payment',
+    amount,
+    orderId,
+    partyId,
+    pizzeriaName,
+    customerEmail,
+  });
+}
+
+// Refund a payment (for failed AI calls)
+export async function refundPayment(
+  paymentIntentId: string,
+  reason?: string
+): Promise<{
+  refundId: string;
+  status: string;
+}> {
+  return callStripeFunction({
+    action: 'refund_payment',
+    paymentIntentId,
+    reason,
+  });
+}
+
 // Estimate order total based on pizzas (rough estimate)
 export function estimateOrderTotal(pizzaCount: number, avgPizzaPrice: number = 18): number {
   // Add 20% buffer for tax, fees, potential upsells
