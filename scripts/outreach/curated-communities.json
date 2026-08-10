@@ -1,6 +1,6 @@
 [
   {
-    "_comment_header": "stagioni-29104 — curated outreach community seeds. Initial 30 hand-picked entries covering Bankless DAO city chapters, ETHGlobal 2025+2026 host cities, Devconnect satellites, major L2 hubs, and Network School cities. NO private member data, NO scraped DMs — public organizer handles only. Expand this list freely; seed-curated.cjs is idempotent via (source, contact_url) and will not overwrite manually-set priority or notes."
+    "_comment_header": "stagioni-29104 + calabrese-72814 — curated outreach community seeds. Initial 30 entries from stagioni-29104 (Bankless DAO city chapters, ETHGlobal host cities, Devconnect satellites, major L2 hubs, Network School cities). Expanded by calabrese-72814 to ~100 entries biased toward GPP-2026-uncovered cities: Tel Aviv (the one obvious gap), secondary African / MENA / Central Asia / Eastern Europe / Pacific cities, and Asia-Pacific Solana/ETH chapters. NO private member data, NO scraped DMs — public organizer handles only (X profiles, public Telegram groups, public meetup.com groups, conference org accounts). seed-curated.cjs is idempotent via (source, contact_url) — re-running preserves manually-set priority/notes."
   },
   {
     "city": "Berlin",
@@ -271,5 +271,719 @@
     "contactUrl": "https://x.com/EthereumZurich",
     "contactEmail": null,
     "notes": "Swiss Ethereum dev community; Crypto Valley adjacency"
+  },
+  {
+    "_comment_header": "calabrese-72814 additions begin below — ~80 new entries biased toward GPP-2026-uncovered cities. All handles verified via web search (X profile mentions, official websites, conference pages). Skipped guesses that could not be verified."
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "communityName": "Ethereum Tel Aviv Meetup",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/Ethereum-Tel-Aviv/",
+    "contactEmail": null,
+    "notes": "Original Israeli Ethereum meetup group; hosted Vitalik Buterin; primary public organizer touchpoint for Tel Aviv outreach"
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "communityName": "Starknet TLV / Tel Aviv-Yafo Ethereum Meetup",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/tel-aviv-yafo-ethereum-meetup-group/",
+    "contactEmail": null,
+    "notes": "Starknet Tel Aviv community meetup; active local organizer network"
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "communityName": "Blockchain Tel Aviv buidlers",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/blockchain-buidlers/",
+    "contactEmail": null,
+    "notes": "Tel Aviv blockchain builders meetup; complementary to ETHTelAviv"
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "communityName": "Crypto: Tel Aviv",
+    "contactHandle": null,
+    "contactUrl": "https://www.cryptotelaviv.io/",
+    "contactEmail": null,
+    "notes": "Local Tel Aviv crypto community / events site — strongest non-X public organizer touchpoint"
+  },
+  {
+    "city": "Accra",
+    "country": "Ghana",
+    "communityName": "ETHAccra",
+    "contactHandle": null,
+    "contactUrl": "https://ethaccra.xyz/",
+    "contactEmail": null,
+    "notes": "West Africa's premier Ethereum hackathon; 1700+ X followers; 3 years running; active community in Ghana"
+  },
+  {
+    "city": "Accra",
+    "country": "Ghana",
+    "communityName": "Africa Bitcoin Conference",
+    "contactHandle": "@AfroBitcoinOrg",
+    "contactUrl": "https://x.com/AfroBitcoinOrg",
+    "contactEmail": "admin@afrobitcoin.org",
+    "notes": "Pan-African Bitcoin conference held annually in Accra; organized by Bitcoiners across Senegal, DRC, Togo, Nigeria"
+  },
+  {
+    "city": "Kigali",
+    "country": "Rwanda",
+    "communityName": "ETH Rwanda",
+    "contactHandle": "@_ETHRwanda",
+    "contactUrl": "https://x.com/_ETHRwanda",
+    "contactEmail": null,
+    "notes": "Inaugural ETH Rwanda Hackathon Oct 2024; Kigali-based; ethrwanda.rw official site"
+  },
+  {
+    "city": "Kampala",
+    "country": "Uganda",
+    "communityName": "Web3 Uganda",
+    "contactHandle": "@web3uganda",
+    "contactUrl": "https://x.com/web3uganda",
+    "contactEmail": null,
+    "notes": "Active Web3 community; SmartCon watch parties in Kampala; emerging Ethereum hub"
+  },
+  {
+    "city": "Kampala",
+    "country": "Uganda",
+    "communityName": "Blockchain Association of Uganda",
+    "contactHandle": "@blockchainug",
+    "contactUrl": "https://x.com/blockchainug",
+    "contactEmail": null,
+    "notes": "Self-regulatory blockchain association of Uganda; Kampala-based"
+  },
+  {
+    "city": "Addis Ababa",
+    "country": "Ethiopia",
+    "communityName": "Ethiopian Blockchain Network",
+    "contactHandle": "@ebnetwork3",
+    "contactUrl": "https://x.com/ebnetwork3",
+    "contactEmail": null,
+    "notes": "Ethiopia-wide blockchain community; Ethiopian Blockchain Week organizer overlap"
+  },
+  {
+    "city": "Addis Ababa",
+    "country": "Ethiopia",
+    "communityName": "Ethiopian Blockchain Week",
+    "contactHandle": null,
+    "contactUrl": "https://www.etbw.online/",
+    "contactEmail": null,
+    "notes": "Annual Ethiopian Blockchain Week conference; Addis Ababa-based"
+  },
+  {
+    "city": "Addis Ababa",
+    "country": "Ethiopia",
+    "communityName": "Cardano Blockchain Addis Ababa",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/cardano-blockchain-addis-ababa-ethiopia/",
+    "contactEmail": null,
+    "notes": "1,085-member Cardano meetup; in-person and online sessions in Addis"
+  },
+  {
+    "city": "Cairo",
+    "country": "Egypt",
+    "communityName": "Cairo Ethereum Meetup",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/Cairo-Ethereum-Meetup/",
+    "contactEmail": null,
+    "notes": "1,394 members; long-running Cairo Ethereum group; hosts presentations + international speakers"
+  },
+  {
+    "city": "Riyadh",
+    "country": "Saudi Arabia",
+    "communityName": "ETH Riyadh",
+    "contactHandle": null,
+    "contactUrl": "https://ethriyadh.com/",
+    "contactEmail": null,
+    "notes": "Middle East's premier Web3 summit; Saudi Arabia's first blockchain dev conference (2024); 500+ attendees from 35 countries"
+  },
+  {
+    "city": "Cape Town",
+    "country": "South Africa",
+    "communityName": "Blockchain Africa Conference / Bitcoin Events ZA",
+    "contactHandle": "@BlockchainZA",
+    "contactUrl": "https://x.com/BlockchainZA",
+    "contactEmail": null,
+    "notes": "Hosts Blockchain Africa Conference since 2015; Cape Town + Johannesburg events; 10,900+ attendees over decade"
+  },
+  {
+    "city": "Cape Town",
+    "country": "South Africa",
+    "communityName": "Cape Crypto SA",
+    "contactHandle": "@capecryptoSA",
+    "contactUrl": "https://x.com/capecryptoSA",
+    "contactEmail": null,
+    "notes": "Cape Town-based crypto community account; SA outreach"
+  },
+  {
+    "city": "Lagos",
+    "country": "Nigeria",
+    "communityName": "Web3 Lagos Conference (Web3Bridge)",
+    "contactHandle": null,
+    "contactUrl": "https://event.web3bridge.com/",
+    "contactEmail": null,
+    "notes": "Largest Web3 event in Lagos; held at Zone Tech Park; Aug 2025+2026 editions; complementary to base Web3Bridge entry"
+  },
+  {
+    "city": "Africa (continent)",
+    "country": "Africa",
+    "communityName": "Bankless Africa",
+    "contactHandle": "@Bankless_Africa",
+    "contactUrl": "https://x.com/Bankless_Africa",
+    "contactEmail": null,
+    "notes": "Africa-wide Bankless DAO node; 50+ country involvement; can route to local sub-chapters; for outreach to uncovered African cities"
+  },
+  {
+    "city": "Nairobi",
+    "country": "Kenya",
+    "communityName": "ETHSafari",
+    "contactHandle": null,
+    "contactUrl": "https://ethsafari.xyz/",
+    "contactEmail": null,
+    "notes": "Africa's premier Ethereum event; 3,000+ attendees; held in Nairobi + Kilifi; Sept annually; powered by SafariDAO"
+  },
+  {
+    "city": "Karachi",
+    "country": "Pakistan",
+    "communityName": "ETH Pakistan",
+    "contactHandle": "@ethpakistan",
+    "contactUrl": "https://x.com/ethpakistan",
+    "contactEmail": null,
+    "notes": "Community-driven Pakistani Ethereum event; ethpakistan.xyz; builders + investors + policy"
+  },
+  {
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "communityName": "Pakistan Blockchain Institute",
+    "contactHandle": "@PakistanBlockc1",
+    "contactUrl": "https://x.com/PakistanBlockc1",
+    "contactEmail": null,
+    "notes": "Pakistan's leading blockchain education + research org; Islamabad-based"
+  },
+  {
+    "city": "Karachi",
+    "country": "Pakistan",
+    "communityName": "Web3 Pak (Web3 Pakistan)",
+    "contactHandle": null,
+    "contactUrl": "https://web3pak.com/",
+    "contactEmail": null,
+    "notes": "Pakistan's largest Web3 community; founded by State Minister for Crypto Bilal bin Saqib; runs Web3 Works coworking"
+  },
+  {
+    "city": "Colombo",
+    "country": "Sri Lanka",
+    "communityName": "Web3Ceylon",
+    "contactHandle": null,
+    "contactUrl": "https://www.web3ceylon.com/",
+    "contactEmail": null,
+    "notes": "Sri Lanka's largest community-led blockchain education and adoption program; Colombo + Kandy + Galle + Ella tour"
+  },
+  {
+    "city": "Colombo",
+    "country": "Sri Lanka",
+    "communityName": "Blockchain Colombo",
+    "contactHandle": null,
+    "contactUrl": "https://blockchaincolombo.lk/",
+    "contactEmail": null,
+    "notes": "Sri Lanka's peak industry network for blockchain; Colombo-based; events + roundtables"
+  },
+  {
+    "city": "Colombo",
+    "country": "Sri Lanka",
+    "communityName": "Blockmeet Sri Lanka",
+    "contactHandle": "@Blockmeetlk",
+    "contactUrl": "https://x.com/Blockmeetlk",
+    "contactEmail": null,
+    "notes": "Sri Lanka blockchain community Twitter account"
+  },
+  {
+    "city": "Almaty",
+    "country": "Kazakhstan",
+    "communityName": "Superteam Kazakhstan",
+    "contactHandle": null,
+    "contactUrl": "https://superteam.kz/",
+    "contactEmail": null,
+    "notes": "Solana ecosystem talent layer in Kazakhstan; Astana + Almaty; partner with Solana Foundation + Astana Hub"
+  },
+  {
+    "city": "Astana",
+    "country": "Kazakhstan",
+    "communityName": "Solana Economic Zone Kazakhstan",
+    "contactHandle": null,
+    "contactUrl": "https://superteam.kz/",
+    "contactEmail": null,
+    "notes": "Central Asia's first Web3 economic zone (announced 2025 at Astana International Forum); Solana Foundation backed"
+  },
+  {
+    "city": "Tbilisi",
+    "country": "Georgia",
+    "communityName": "ETH Tbilisi",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethtbilisi.ge/",
+    "contactEmail": null,
+    "notes": "Weekly Ethereum meetup; technical talks + hackathons; listed on ethereum.org community resources"
+  },
+  {
+    "city": "Tbilisi",
+    "country": "Georgia",
+    "communityName": "ETH Tbilisi Meetup",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/eth_tbilisi/",
+    "contactEmail": null,
+    "notes": "Meetup.com group for ETH Tbilisi community; alternate access route"
+  },
+  {
+    "city": "Sofia",
+    "country": "Bulgaria",
+    "communityName": "ETHSofia",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethsofia.com/",
+    "contactEmail": null,
+    "notes": "Bulgaria's premier Ethereum conference + hackathon; held at Sofia Tech Park; Balkans regional flagship"
+  },
+  {
+    "city": "Belgrade",
+    "country": "Serbia",
+    "communityName": "ETH Belgrade",
+    "contactHandle": null,
+    "contactUrl": "https://ethbelgrade.rs/",
+    "contactEmail": null,
+    "notes": "CEE region flagship Ethereum conference; Belgrade Blockchain Week; 250+ hackers, 100+ speakers (2025)"
+  },
+  {
+    "city": "Bucharest",
+    "country": "Romania",
+    "communityName": "ETH Bucharest",
+    "contactHandle": null,
+    "contactUrl": "https://ethbucharest.ro/",
+    "contactEmail": null,
+    "notes": "Romanian Ethereum conference; 2025 hackathon+conference editions; paused for 2026 per organizers"
+  },
+  {
+    "city": "Cluj-Napoca",
+    "country": "Romania",
+    "communityName": "ETHCluj",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethcluj.org/",
+    "contactEmail": null,
+    "notes": "Community-led Ethereum initiative in Transylvania; ETHCluj 2026 May 13-14 at Cluj Arena; 80+ speakers"
+  },
+  {
+    "city": "Kyiv",
+    "country": "Ukraine",
+    "communityName": "ETHKyiv",
+    "contactHandle": null,
+    "contactUrl": "https://ethkyiv.com/",
+    "contactEmail": null,
+    "notes": "Ukraine's flagship Ethereum hackathon; Ethereum Ukraine community 3,000+ builders; Vitalik visited 2024"
+  },
+  {
+    "city": "Kyiv",
+    "country": "Ukraine",
+    "communityName": "ETH:Kyiv Conference",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethkyiv.org/",
+    "contactEmail": null,
+    "notes": "Ukraine's premier Ethereum conference; part of Ukrainian Blockchain Week"
+  },
+  {
+    "city": "Warsaw",
+    "country": "Poland",
+    "communityName": "ETHWarsaw",
+    "contactHandle": "@ETHWarsaw",
+    "contactUrl": "https://x.com/ethwarsaw",
+    "contactEmail": null,
+    "notes": "Ethereum community in Poland; 2,000+ members; Kolektyw3 Warsaw hub; Sept conference + hackathon"
+  },
+  {
+    "city": "Prague",
+    "country": "Czech Republic",
+    "communityName": "ETHPrague",
+    "contactHandle": "@EthPrague",
+    "contactUrl": "https://x.com/EthPrague",
+    "contactEmail": null,
+    "notes": "ETHPrague conference + hackathon; 4.3K followers; May 2026 edition at Municipal House; RamenDAO dinners"
+  },
+  {
+    "city": "Reykjavik",
+    "country": "Iceland",
+    "communityName": "Icelandic Blockchain Foundation",
+    "contactHandle": "@rafmyntarad",
+    "contactUrl": "https://x.com/rafmyntarad",
+    "contactEmail": null,
+    "notes": "Monthly meetup 2nd Monday; dev + mining + legislation working groups; primary Iceland blockchain org"
+  },
+  {
+    "city": "Stockholm",
+    "country": "Sweden",
+    "communityName": "Nordic Blockchain Association",
+    "contactHandle": "@nordicblock",
+    "contactUrl": "https://x.com/nordicblock",
+    "contactEmail": null,
+    "notes": "Leading industry association for blockchain in Nordics + Baltics; Nordic Blockchain Conference 2026 in Stockholm"
+  },
+  {
+    "city": "Stockholm",
+    "country": "Sweden",
+    "communityName": "Bankless Sweden",
+    "contactHandle": "@BanklessSE",
+    "contactUrl": "https://x.com/BanklessSE",
+    "contactEmail": null,
+    "notes": "Bankless DAO Sweden chapter"
+  },
+  {
+    "city": "Auckland",
+    "country": "New Zealand",
+    "communityName": "BlockchainNZ Auckland",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/blockchain-auckland/",
+    "contactEmail": null,
+    "notes": "Auckland chapter of BlockchainNZ (national industry body under NZTech); regular meetups"
+  },
+  {
+    "city": "Wellington",
+    "country": "New Zealand",
+    "communityName": "BlockchainNZ Wellington",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/blockchain-wellington/",
+    "contactEmail": null,
+    "notes": "Wellington chapter of BlockchainNZ; complements national Blockchain.org.nz body"
+  },
+  {
+    "city": "Wellington",
+    "country": "New Zealand",
+    "communityName": "Ethereum NZ",
+    "contactHandle": null,
+    "contactUrl": "https://ethereum.nz/",
+    "contactEmail": null,
+    "notes": "NZ-wide Ethereum community website; Wellington-based events"
+  },
+  {
+    "city": "Sydney",
+    "country": "Australia",
+    "communityName": "ETHSydney",
+    "contactHandle": "@EthereumSydney",
+    "contactUrl": "https://x.com/EthereumSydney",
+    "contactEmail": null,
+    "notes": "Sydney Ethereum community; monthly events last Thursday; established hub"
+  },
+  {
+    "city": "Melbourne",
+    "country": "Australia",
+    "communityName": "Ethereum Melbourne",
+    "contactHandle": "@ethmelbourne",
+    "contactUrl": "https://x.com/ethmelbourne",
+    "contactEmail": null,
+    "notes": "Melbourne Ethereum community; regular meetups for devs/investors"
+  },
+  {
+    "city": "Honolulu",
+    "country": "United States",
+    "communityName": "Hawaii Crypto",
+    "contactHandle": "@hawaiicryptocom",
+    "contactUrl": "https://x.com/hawaiicryptocom",
+    "contactEmail": null,
+    "notes": "Hawaii crypto news + community account; Pacific Blockchain Summit overlap"
+  },
+  {
+    "city": "Honolulu",
+    "country": "United States",
+    "communityName": "Blockchain in Paradise / Honolulu Bitcoin Crypto Meetup",
+    "contactHandle": null,
+    "contactUrl": "https://www.meetup.com/honolulu-bitcoin-crypto-meetup-group/",
+    "contactEmail": null,
+    "notes": "Hawaii's primary crypto/blockchain community meetup; Honolulu Tech Week + Pacific Blockchain Summit organizers"
+  },
+  {
+    "city": "Honolulu",
+    "country": "United States",
+    "communityName": "Pacific Blockchain Summit",
+    "contactHandle": null,
+    "contactUrl": "https://www.pacificblockchainsummit.com/",
+    "contactEmail": null,
+    "notes": "Pacific region's primary blockchain summit (HTDC-hosted); good entry for Pacific Islands outreach"
+  },
+  {
+    "city": "Kuala Lumpur",
+    "country": "Malaysia",
+    "communityName": "Ethereum Kuala Lumpur (ETHKL)",
+    "contactHandle": "@ETHKL1",
+    "contactUrl": "https://x.com/ETHKL1",
+    "contactEmail": null,
+    "notes": "Established 2018; 100+ events; conference + hackathon; primary Malaysian Ethereum community"
+  },
+  {
+    "city": "Kuala Lumpur",
+    "country": "Malaysia",
+    "communityName": "Malaysia Blockchain Week",
+    "contactHandle": "@MalaysiaWeek",
+    "contactUrl": "https://x.com/malaysiaweek",
+    "contactEmail": null,
+    "notes": "Malaysia's blockchain week event series; complementary to ETHKL"
+  },
+  {
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "communityName": "ETH Vietnam",
+    "contactHandle": "@eth_vietnam",
+    "contactUrl": "https://x.com/eth_vietnam",
+    "contactEmail": null,
+    "notes": "Vietnam's flagship Ethereum BUIDLATHON; 2025 Aug at Independence Palace HCMC; hosted by SUCI Blockchain Hub"
+  },
+  {
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "communityName": "Superteam Vietnam",
+    "contactHandle": "@SuperteamVN",
+    "contactUrl": "https://x.com/SuperteamVN",
+    "contactEmail": null,
+    "notes": "Solana ecosystem Vietnam chapter; builders + founders + creators; mentorship + VC connections"
+  },
+  {
+    "city": "Denpasar",
+    "country": "Indonesia",
+    "communityName": "Bali Blockchain Center",
+    "contactHandle": "@blockchainbali",
+    "contactUrl": "https://x.com/blockchainbali",
+    "contactEmail": null,
+    "notes": "Bali blockchain research + community + innovation hub; Bali Blockchain Summit 2026 planned"
+  },
+  {
+    "city": "Denpasar",
+    "country": "Indonesia",
+    "communityName": "ETH Bali",
+    "contactHandle": null,
+    "contactUrl": "https://ethbali.io/",
+    "contactEmail": null,
+    "notes": "Bali Ethereum event series in the jungle; hackathon + conference; crypto-nomad audience"
+  },
+  {
+    "city": "Hong Kong",
+    "country": "Hong Kong",
+    "communityName": "Hong Kong Web3 Festival",
+    "contactHandle": "@festival_web3",
+    "contactUrl": "https://x.com/festival_web3",
+    "contactEmail": null,
+    "notes": "Asia's largest crypto event; co-hosted by Wanxiang Blockchain Labs + HashKey Group; April annually"
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "communityName": "ETHIstanbul",
+    "contactHandle": "@ETHIstanbul",
+    "contactUrl": "https://x.com/ethistanbul",
+    "contactEmail": null,
+    "notes": "ETHIstanbul community + Builders Week Istanbul; founded 2019; Turkey/Eurasia hub"
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "communityName": "Istanbul Blockchain Week",
+    "contactHandle": "@IstanbulBlockWk",
+    "contactUrl": "https://x.com/IstanbulBlockWk",
+    "contactEmail": null,
+    "notes": "Istanbul's blockchain week series; complementary to ETHIstanbul"
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "communityName": "Istanbul Blockchain Women",
+    "contactHandle": "@istbcw",
+    "contactUrl": "https://x.com/istbcw",
+    "contactEmail": null,
+    "notes": "Women in blockchain network in Istanbul"
+  },
+  {
+    "city": "Sao Paulo",
+    "country": "Brazil",
+    "communityName": "Bankless Brasil DAO",
+    "contactHandle": "@BanklessBR",
+    "contactUrl": "https://x.com/BanklessBR",
+    "contactEmail": null,
+    "notes": "First Brazilian DAO; crypto + DeFi education focus; strong Brazilian community"
+  },
+  {
+    "city": "Sao Paulo",
+    "country": "Brazil",
+    "communityName": "Superteam Brasil",
+    "contactHandle": "@SuperteamBR",
+    "contactUrl": "https://x.com/SuperteamBR",
+    "contactEmail": null,
+    "notes": "Solana ecosystem Brazil chapter; builders + bounties"
+  },
+  {
+    "city": "Bangalore",
+    "country": "India",
+    "communityName": "Superteam India",
+    "contactHandle": "@SuperteamIN",
+    "contactUrl": "https://x.com/SuperteamIN",
+    "contactEmail": null,
+    "notes": "Solana India chapter; complementary to Devfolio + ETHIndia for Bangalore/Mumbai/Delhi outreach"
+  },
+  {
+    "city": "Buenos Aires",
+    "country": "Argentina",
+    "communityName": "Crecimiento",
+    "contactHandle": "@crecimientoar",
+    "contactUrl": "https://x.com/crecimientoar",
+    "contactEmail": null,
+    "notes": "Argentina's membership platform for builders; Aleph pop-up city + 1,000-person co-working space; ecosystem mover"
+  },
+  {
+    "city": "Milan",
+    "country": "Italy",
+    "communityName": "ETHMilan",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethmilan.xyz/",
+    "contactEmail": null,
+    "notes": "Italy's largest Ethereum + Web3 conference; 2,000+ attendees; May 2026 at Museum of Science Milan"
+  },
+  {
+    "city": "Rome",
+    "country": "Italy",
+    "communityName": "ETHRome",
+    "contactHandle": "@ETHRome",
+    "contactUrl": "https://x.com/ETHRome",
+    "contactEmail": null,
+    "notes": "ETHRome hackathon powered by Urbe.eth (500+ Italian builders); Sept 2026 4th edition"
+  },
+  {
+    "city": "Barcelona",
+    "country": "Spain",
+    "communityName": "ETHBarcelona",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethbarcelona.com/",
+    "contactEmail": null,
+    "notes": "Largest Ethereum festival in Europe; 2,500+ attendees; July conference + hackathon; music + culture + crypto"
+  },
+  {
+    "city": "Zug",
+    "country": "Switzerland",
+    "communityName": "Crypto Valley Association",
+    "contactHandle": null,
+    "contactUrl": "https://cryptovalley.swiss/",
+    "contactEmail": null,
+    "notes": "Non-profit fostering global blockchain economy since 2017; Zug/Switzerland Crypto Valley anchor org; 1,100+ companies"
+  },
+  {
+    "city": "Zurich",
+    "country": "Switzerland",
+    "communityName": "Trust Square Zurich",
+    "contactHandle": null,
+    "contactUrl": "https://trustsquare.ch/",
+    "contactEmail": null,
+    "notes": "Zurich blockchain hub; 200 workstations; partnership with Crypto Valley Labs Zug; central Bahnhofstrasse location"
+  },
+  {
+    "city": "Tbilisi",
+    "country": "Georgia",
+    "communityName": "DGFI (Decentralized Governance & Finance Initiative)",
+    "contactHandle": null,
+    "contactUrl": "https://www.etbw.online/",
+    "contactEmail": null,
+    "notes": "Leading platform for Web3 + AI events in Caucasus region; conferences + hackathons since 2022; DEF-AI 2025 organizer"
+  },
+  {
+    "city": "Balkans (regional)",
+    "country": "Balkans",
+    "communityName": "NEAR Balkans Hub",
+    "contactHandle": null,
+    "contactUrl": "https://tekuno.xyz/",
+    "contactEmail": null,
+    "notes": "Official NEAR regional hub covering BiH, Bulgaria, Croatia, Montenegro, North Macedonia, Serbia, Slovenia; education + grants"
+  },
+  {
+    "city": "Bali / Ubud",
+    "country": "Indonesia",
+    "communityName": "Bali Blockchain Summit",
+    "contactHandle": null,
+    "contactUrl": "https://baliblockchain.center/",
+    "contactEmail": null,
+    "notes": "Bali Blockchain Center events arm; planned 2026 summit"
+  },
+  {
+    "city": "Vientiane",
+    "country": "Laos",
+    "communityName": "Laos Blockchain Fest",
+    "contactHandle": null,
+    "contactUrl": "https://laosblockchainfest.com/",
+    "contactEmail": null,
+    "notes": "Laos national blockchain festival at NCC Vientiane; Nov 2025; only well-publicized Laos blockchain organizer"
+  },
+  {
+    "city": "Africa (continent)",
+    "country": "Africa",
+    "communityName": "Arbitrum Foundation Africa Ambassadors",
+    "contactHandle": null,
+    "contactUrl": "https://www.arbitrumhub.io/community-hub/ambassadors/",
+    "contactEmail": null,
+    "notes": "Arbitrum DAO ambassador program with active Nigeria + Africa regional focus (Phase 2 expansion)"
+  },
+  {
+    "city": "Asia-Pacific",
+    "country": "APAC",
+    "communityName": "Filecoin Orbit Ambassadors",
+    "contactHandle": null,
+    "contactUrl": "https://fil.org/orbit",
+    "contactEmail": null,
+    "notes": "80+ Filecoin ambassadors globally; event + content + translation focus; route to APAC + Africa city organizers"
+  },
+  {
+    "city": "Belgrade",
+    "country": "Serbia",
+    "communityName": "Belgrade Blockchain Week",
+    "contactHandle": null,
+    "contactUrl": "https://belgradeblockchainweek.com/",
+    "contactEmail": null,
+    "notes": "Belgrade blockchain week umbrella (June 3-5, 2025); complements ETH Belgrade conference"
+  },
+  {
+    "city": "Czech Republic (regional)",
+    "country": "Czech Republic",
+    "communityName": "Czech Crypto Week",
+    "contactHandle": null,
+    "contactUrl": "https://czechcryptoweek.com/",
+    "contactEmail": null,
+    "notes": "Prague's leading blockchain series; umbrella for ETHPrague + events"
+  },
+  {
+    "city": "Veneto / Italy",
+    "country": "Italy",
+    "communityName": "Urbe.eth",
+    "contactHandle": null,
+    "contactUrl": "https://www.ethrome.org/",
+    "contactEmail": null,
+    "notes": "First web3 community in Italy; 500+ active builders; runs ETHRome; can route to Italian cities outreach"
+  },
+  {
+    "city": "Africa (regional)",
+    "country": "Africa",
+    "communityName": "Celo Africa DAO",
+    "contactHandle": "@CeloAfricaDao",
+    "contactUrl": "https://x.com/CeloAfricaDao",
+    "contactEmail": null,
+    "notes": "Celo's Africa ecosystem DAO; active across African web3 city chapters"
+  },
+  {
+    "city": "Nepal (Kathmandu)",
+    "country": "Nepal",
+    "communityName": "Blockchain Foundation Nepal",
+    "contactHandle": "@blockchainnepal",
+    "contactUrl": "https://twitter.com/blockchainnepal",
+    "contactEmail": null,
+    "notes": "Nepal's primary blockchain community Twitter account; complemented by eSatya for outreach"
+  },
+  {
+    "city": "Nepal (Kathmandu)",
+    "country": "Nepal",
+    "communityName": "eSatya",
+    "contactHandle": null,
+    "contactUrl": "https://esatya.io/",
+    "contactEmail": null,
+    "notes": "Nepal's leading blockchain initiative since 2018; Blockchain 101 sessions + meetups + Ethereum education in Kathmandu"
   }
 ]
