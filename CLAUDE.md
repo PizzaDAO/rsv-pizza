@@ -33,6 +33,20 @@ Use **`mcp__supabase-pizzadao__`** for this project (not `supabase-snax`).
 - Project ID: `znpiwdvvsqaxuskpfleo`
 - Project Name: RSV.Pizza
 
+## Supabase credentials (service_role)
+The prod **`service_role`** key (bypasses RLS — never echo it) lives in the macOS
+**login keychain** as a generic password: **service/label `pizzadaosupabase`**,
+**account `service_role`**. Retrieve it non-interactively (sandbox disabled so the
+keychain is reachable):
+
+```bash
+export SUPABASE_URL="https://znpiwdvvsqaxuskpfleo.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="$(security find-generic-password -l pizzadaosupabase -a service_role -w)"
+```
+
+Prod `DATABASE_URL` (pooler) is in `backend/.env`. The public `anon` key ships in
+the deployed frontend bundle.
+
 ## Branching Convention
 - Use `{task-id}-{short-name}` for branches (no `feature/` prefix)
 - Example: `buffalo-39031-donation` not `feature/buffalo-39031-donation-option`
