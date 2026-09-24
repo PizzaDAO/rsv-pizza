@@ -1,0 +1,39 @@
+name: RLS Check (new tables)
+
+# salame-92110 follow-up. Fails a PR that adds a new public-schema table without
+# either ENABLE ROW LEVEL SECURITY or REVOKE ... FROM anon in the same PR.
+# Supabase auto-exposes public tables to the anon role via PostgREST, so a table
+# shipped without one of those is world-readable — the class of bug that leaked
+# tax_forms (SSN/EIN). See scripts/check-rls-on-new-tables.js.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'backend/prisma/migrations/**'
+      - 'scripts/check-rls-on-new-tables.js'
+      - 'scripts/rls-check-allowlist.json'
+      - '.github/workflows/rls-check.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Read-only: the script only runs `git diff`, no DB access.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so we can diff the PR against its base commit.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run RLS check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-rls-on-new-tables.js

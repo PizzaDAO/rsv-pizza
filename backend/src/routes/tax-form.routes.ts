@@ -29,7 +29,7 @@ import {
   W8BENFormData,
   W8BENEFormData,
 } from '../services/taxFormPdf.service.js';
-import { uploadTaxFormPdf, TaxFormType } from '../services/taxFormStorage.service.js';
+import { uploadTaxFormPdf, getSignedTaxFormUrl, TaxFormType } from '../services/taxFormStorage.service.js';
 
 export const taxFormRouter = Router();
 export const adminTaxFormRouter = Router();
@@ -44,14 +44,22 @@ function isValidFormType(v: unknown): v is TaxFormType {
   return typeof v === 'string' && (FORM_TYPES as ReadonlyArray<string>).includes(v);
 }
 
-function serializeTaxForm(t: any, includeFormData: boolean) {
+// NOTE: `t.pdfUrl` / `t.pdfThumbUrl` in the DB are private-bucket object PATHS
+// (salame-92110 security fix), never public URLs. Callers must resolve them to
+// short-lived signed URLs via `serializeTaxForm` (async), which mints them on
+// each read. The path is never returned to clients.
+async function serializeTaxForm(t: any, includeFormData: boolean) {
+  const [pdfUrl, pdfThumbUrl] = await Promise.all([
+    getSignedTaxFormUrl(t.pdfUrl),
+    getSignedTaxFormUrl(t.pdfThumbUrl),
+  ]);
   return {
     id: t.id,
     userId: t.userId,
     formType: t.formType,
     status: t.status,
-    pdfUrl: t.pdfUrl ?? null,
-    pdfThumbUrl: t.pdfThumbUrl ?? null,
+    pdfUrl,
+    pdfThumbUrl,
     signedAt: t.signedAt ? t.signedAt.toISOString() : null,
     expiresAt: t.expiresAt ? t.expiresAt.toISOString() : null,
     verifiedAt: t.verifiedAt ? t.verifiedAt.toISOString() : null,
@@ -165,7 +173,7 @@ taxFormRouter.get('/me', async (req: AuthRequest, res: Response, next: NextFunct
       where: { userId: req.userId },
       orderBy: [{ updatedAt: 'desc' }],
     });
-    res.json({ taxForms: forms.map((t) => serializeTaxForm(t, /* includeFormData */ true)) });
+    res.json({ taxForms: await Promise.all(forms.map((t) => serializeTaxForm(t, /* includeFormData */ true))) });
   } catch (error) {
     next(error);
   }
@@ -216,7 +224,7 @@ taxFormRouter.post('/draft', async (req: AuthRequest, res: Response, next: NextF
       });
     }
 
-    res.status(existingDraft ? 200 : 201).json({ taxForm: serializeTaxForm(row, true) });
+    res.status(existingDraft ? 200 : 201).json({ taxForm: await serializeTaxForm(row, true) });
   } catch (error) {
     next(error);
   }
@@ -264,8 +272,9 @@ taxFormRouter.post('/submit', async (req: AuthRequest, res: Response, next: Next
       pdf = await generateW8BENEPDF(dataToValidate as W8BENEFormData, refIdForPdf.slice(0, 8));
     }
 
-    // Upload to storage.
-    const { url, thumbUrl } = await uploadTaxFormPdf(pdf, req.userId, formType);
+    // Upload to the PRIVATE tax-forms bucket. We persist the object PATH (not a
+    // URL); signed URLs are minted on read (salame-92110 security fix).
+    const { path, thumbPath } = await uploadTaxFormPdf(pdf, req.userId, formType);
 
     // Persist as submitted.
     const now = new Date();
@@ -277,8 +286,8 @@ taxFormRouter.post('/submit', async (req: AuthRequest, res: Response, next: Next
         data: {
           formData: dataToValidate as Prisma.InputJsonValue,
           status: 'submitted',
-          pdfUrl: url,
-          pdfThumbUrl: thumbUrl,
+          pdfUrl: path,
+          pdfThumbUrl: thumbPath,
           signedAt: now,
           expiresAt,
           // Clear any prior rejection state if the host re-submits.
@@ -292,15 +301,15 @@ taxFormRouter.post('/submit', async (req: AuthRequest, res: Response, next: Next
           formType,
           status: 'submitted',
           formData: dataToValidate as Prisma.InputJsonValue,
-          pdfUrl: url,
-          pdfThumbUrl: thumbUrl,
+          pdfUrl: path,
+          pdfThumbUrl: thumbPath,
           signedAt: now,
           expiresAt,
         },
       });
     }
 
-    res.status(200).json({ taxForm: serializeTaxForm(row, true) });
+    res.status(200).json({ taxForm: await serializeTaxForm(row, true) });
   } catch (error) {
     next(error);
   }
@@ -355,7 +364,7 @@ adminTaxFormRouter.get('/', async (req: AuthRequest, res: Response, next: NextFu
     });
 
     // Tight payload — omit form_data on the list (it's only fetched on detail).
-    res.json({ taxForms: rows.map((t) => serializeTaxForm(t, /* includeFormData */ false)) });
+    res.json({ taxForms: await Promise.all(rows.map((t) => serializeTaxForm(t, /* includeFormData */ false))) });
   } catch (error) {
     next(error);
   }
@@ -369,7 +378,7 @@ adminTaxFormRouter.get('/:id', async (req: AuthRequest, res: Response, next: Nex
       include: { user: { select: { id: true, name: true, email: true } } },
     });
     if (!row) throw new AppError('Tax form not found', 404, 'NOT_FOUND');
-    res.json({ taxForm: serializeTaxForm(row, /* includeFormData */ true) });
+    res.json({ taxForm: await serializeTaxForm(row, /* includeFormData */ true) });
   } catch (error) {
     next(error);
   }
@@ -399,7 +408,7 @@ adminTaxFormRouter.post(
         },
         include: { user: { select: { id: true, name: true, email: true } } },
       });
-      res.json({ taxForm: serializeTaxForm(updated, true) });
+      res.json({ taxForm: await serializeTaxForm(updated, true) });
     } catch (error) {
       next(error);
     }
@@ -427,7 +436,7 @@ adminTaxFormRouter.post(
         },
         include: { user: { select: { id: true, name: true, email: true } } },
       });
-      res.json({ taxForm: serializeTaxForm(updated, true) });
+      res.json({ taxForm: await serializeTaxForm(updated, true) });
     } catch (error) {
       next(error);
     }
