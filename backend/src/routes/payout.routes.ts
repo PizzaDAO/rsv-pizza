@@ -21,7 +21,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
-import { analyzeReceipt, analyzeReceiptMulti } from '../services/ocr.service.js';
+import { analyzeReceipt, analyzeReceiptMulti, OcrResult } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizeForPg, sanitizePgString } from '../lib/sanitizePg.js';
 import { looksLikeEnsName, resolveWalletInput, resolveWalletInputWithMeta } from '../services/ens.service.js';
@@ -1304,7 +1304,12 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
               // come from the server, never from the client. This is always a
               // single unit (multi-receipt split happened at preview time).
               if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
-                const ocr = {
+                // ocrLanguage/ocrSummary are optional on OcrResult; the forwarded
+                // preview payload doesn't carry them, so they default to null via
+                // the ?. accesses downstream. Typing this as OcrResult keeps the
+                // union with analyzeReceipt()'s result homogeneous (fixes the
+                // `.language`/`.summary` access below).
+                const ocr: OcrResult = {
                   amount: r.ocrOriginalAmount as number,
                   currency: (typeof r.ocrOriginalCurrency === 'string' && r.ocrOriginalCurrency.trim()) ? r.ocrOriginalCurrency.trim().slice(0, 8) : null,
                   confidence: Math.min(1, Math.max(0, Number(r.ocrConfidence) || 0)),
@@ -2275,7 +2280,12 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
               // skip a second analyzeReceipt pass when present (parity with
               // POST /payouts). USD + rate still come from convertToUSD.
               if (Number.isFinite(r.ocrOriginalAmount) && (r.ocrOriginalAmount as number) >= 0) {
-                const ocr = {
+                // ocrLanguage/ocrSummary are optional on OcrResult; the forwarded
+                // preview payload doesn't carry them, so they default to null via
+                // the ?. accesses downstream. Typing this as OcrResult keeps the
+                // union with analyzeReceipt()'s result homogeneous (fixes the
+                // `.language`/`.summary` access below).
+                const ocr: OcrResult = {
                   amount: r.ocrOriginalAmount as number,
                   currency: (typeof r.ocrOriginalCurrency === 'string' && r.ocrOriginalCurrency.trim()) ? r.ocrOriginalCurrency.trim().slice(0, 8) : null,
                   confidence: Math.min(1, Math.max(0, Number(r.ocrConfidence) || 0)),
