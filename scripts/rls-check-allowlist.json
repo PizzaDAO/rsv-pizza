@@ -1,0 +1,4 @@
+{
+  "_comment": "Tables that are INTENTIONALLY readable by the anon role and are therefore exempt from the new-table RLS guard (scripts/check-rls-on-new-tables.js). Only add a table here after confirming it holds no sensitive data and is meant to be world-readable via PostgREST. Prefer ENABLE ROW LEVEL SECURITY + a scoped policy over adding an entry here.",
+  "allow": []
+}
