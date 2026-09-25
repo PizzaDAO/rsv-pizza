@@ -2572,7 +2572,11 @@ router.get(
             },
             payouts: [],
             eventPhotos: [],
-          } as (typeof rows)[number]);
+            // Empty arrays infer as never[] and lastActivityAt is null here (vs
+            // `string` on real rows), so the direct assertion is rejected —
+            // route through `unknown` as TS suggests. Shape matches field-for-
+            // field above; this synthetic row is intentionally a 0-aggregate row.
+          } as unknown as (typeof rows)[number]);
         }
       }
 
