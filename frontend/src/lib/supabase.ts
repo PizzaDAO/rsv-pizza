@@ -26,7 +26,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const SUPABASE_STORAGE_PREFIX = 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/';
+// Derive the storage public-URL prefix from the configured Supabase project so
+// the CDN rewrite works for any brand/deploy. In prod `supabaseUrl` is exactly
+// `https://znpiwdvvsqaxuskpfleo.supabase.co`, so this string is byte-identical
+// to the previous literal. The literal is kept as a defensive fallback.
+const SUPABASE_STORAGE_PREFIX = supabaseUrl
+  ? `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/`
+  : 'https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/';
 
 /**
  * Rewrite a Supabase Storage public URL to go through the Vercel edge CDN.
