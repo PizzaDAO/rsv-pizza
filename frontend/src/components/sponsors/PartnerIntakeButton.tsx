@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from 'lucide-react';
 import { Sponsor } from '../../types';
 import { generatePartnerIntakeToken, revokePartnerIntakeToken } from '../../lib/api';
+import { brandUrl } from '../../config/brand';
 
 interface PartnerIntakeButtonProps {
   sponsor: Sponsor;
@@ -17,7 +18,7 @@ export function PartnerIntakeButton({ sponsor, partyId, onUpdate }: PartnerIntak
   const [showMenu, setShowMenu] = useState(false);
 
   const intakeUrl = sponsor.intakeToken
-    ? `https://rsv.pizza/partner-intake/${sponsor.intakeToken}`
+    ? brandUrl(`partner-intake/${sponsor.intakeToken}`)
     : null;
 
   const handleGenerateToken = async () => {

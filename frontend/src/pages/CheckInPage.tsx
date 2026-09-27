@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, type Attestation } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 import { GPPClouds } from '../components/GPPClouds';
+import { brandUrl } from '../config/brand';
 
 // provolone-39042: friendly display name for an attestation row.
 const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
@@ -321,7 +322,7 @@ export function CheckInPage() {
           </p>
           <div className="bg-white rounded-xl p-4 inline-block mb-4">
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`https://rsv.pizza/checkin/${inviteCode}/${guestId}`)}`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(brandUrl(`checkin/${inviteCode}/${guestId}`))}`}
               alt="Check-in QR code"
               width={250}
               height={250}

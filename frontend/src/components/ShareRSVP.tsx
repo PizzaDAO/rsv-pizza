@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { countryNameToFlag } from '../utils/countryFlag';
+import { BRAND } from '../config/brand';
 
 interface ShareRSVPProps {
   eventName: string;
@@ -44,7 +45,7 @@ function buildShareText(base: string, handles: string[], maxLen: number): string
 export function ShareRSVP({ eventName, eventImageUrl, customUrl, inviteCode, twitterHandles = [], country, calendarSlot }: ShareRSVPProps) {
   const { t } = useTranslation('rsvp');
   const city = eventName.replace(/^Global Pizza Party\s*/i, '') || eventName;
-  const baseText = `${countryNameToFlag(country)}\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!\nrsv.pizza/${customUrl || inviteCode}`;
+  const baseText = `${countryNameToFlag(country)}\u{1F355}\u{1F973}\nI'm going to the Global Pizza Party in ${city}!\n${BRAND.domain}/${customUrl || inviteCode}`;
 
   // Build deduplicated handles list, always starting with Pizza_DAO
   const allHandles = ['Pizza_DAO', ...twitterHandles];

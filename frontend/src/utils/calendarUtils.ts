@@ -1,4 +1,5 @@
 import { stripMarkdown } from '../lib/utils';
+import { BRAND, brandUrl } from '../config/brand';
 
 export interface CalendarEvent {
   title: string;
@@ -51,7 +52,7 @@ function foldLine(line: string): string {
  * Generate an ICS file string with two VALARM reminders (1 day and 1 hour before).
  */
 export function generateICSFile(event: CalendarEvent): string {
-  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@rsv.pizza`;
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@${BRAND.domain}`;
   const now = formatICSDate(new Date());
   const start = formatICSDate(event.startDate);
   const end = formatICSDate(event.endDate);
@@ -191,7 +192,7 @@ export function buildCalendarEvent(event: {
 
   // Build event URL
   const slug = event.customUrl || event.inviteCode;
-  const url = `https://rsv.pizza/${slug}`;
+  const url = brandUrl(slug);
 
   return {
     title: event.name,

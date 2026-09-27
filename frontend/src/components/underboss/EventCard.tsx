@@ -8,6 +8,7 @@ import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPh
 import { AuthenticityPanel } from '../payments-shared';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';
+import { brandUrl } from '../../config/brand';
 
 interface DisplayPhoto {
   id: string;
@@ -404,7 +405,7 @@ export function EventCard({ event, showRegion, onEventUpdate, isSelected, onTogg
 
   const hasNotes = !!(event.underbossNotes || notesValue.trim());
 
-  const eventUrl = `https://rsv.pizza/${event.customUrl || event.inviteCode}`;
+  const eventUrl = brandUrl(event.customUrl || event.inviteCode);
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);
 

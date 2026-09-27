@@ -6,6 +6,7 @@ import {
 import { Sponsor, Mou } from '../../types';
 import { sendMou, deleteMou } from '../../lib/api';
 import { MouForm } from './MouForm';
+import { brandUrl } from '../../config/brand';
 
 interface MouButtonProps {
   sponsor: Sponsor;
@@ -23,7 +24,7 @@ export function MouButton({ sponsor, partyId, mou, onMouUpdate, onMouDelete, onS
   const [copied, setCopied] = useState(false);
 
   const mouUrl = mou?.viewToken
-    ? `https://rsv.pizza/mou/${mou.viewToken}`
+    ? brandUrl(`mou/${mou.viewToken}`)
     : null;
 
   const handleCopyUrl = async () => {

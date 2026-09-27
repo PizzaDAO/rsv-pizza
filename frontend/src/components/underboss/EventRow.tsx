@@ -12,6 +12,7 @@ import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import { calculateEventPrice } from '../../utils/sponsorshipPricing';
 import { usePricingConfig } from '../../hooks/usePricingConfig';
 import type { UnderbossEvent, HostStatus } from '../../types';
+import { brandUrl } from '../../config/brand';
 
 interface DisplayPhoto {
   id: string;
@@ -472,7 +473,7 @@ export function EventRow({ event, showRegion, onEventUpdate, isSelected, onToggl
     saveNotes(notesValue);
   }, [notesValue, saveNotes]);
 
-  const eventUrl = `https://rsv.pizza/${event.customUrl || event.inviteCode}`;
+  const eventUrl = brandUrl(event.customUrl || event.inviteCode);
 
   const relTime = formatRelativeTime(event.date);
   const fullDate = formatFullDate(event.date);

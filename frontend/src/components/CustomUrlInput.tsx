@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link as LinkIcon, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { validateCustomSlug } from '../lib/supabase';
+import { BRAND } from '../config/brand';
 
 interface CustomUrlInputProps {
   value: string;
@@ -63,7 +64,7 @@ export function CustomUrlInput({
     <div>
       <div className="relative flex items-center">
         <LinkIcon size={20} className="absolute left-3 text-theme-text-muted pointer-events-none" />
-        <span className="absolute left-12 text-theme-text-secondary pointer-events-none font-mono text-sm">rsv.pizza/</span>
+        <span className="absolute left-12 text-theme-text-secondary pointer-events-none font-mono text-sm">{`${BRAND.domain}/`}</span>
         <input
           type="text"
           value={value}

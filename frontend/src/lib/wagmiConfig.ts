@@ -2,6 +2,7 @@ import { createConfig, http } from 'wagmi';
 import { mainnet, base } from 'wagmi/chains';
 import { defineChain } from 'viem';
 import { getDefaultConfig } from 'connectkit';
+import { BRAND } from '../config/brand';
 
 const monad = defineChain({
   id: 143,
@@ -29,7 +30,7 @@ export const wagmiConfig = createConfig(
     walletConnectProjectId,
     appName: 'RSV.Pizza',
     appDescription: 'Pizza party RSVP and donation platform',
-    appUrl: 'https://rsv.pizza',
+    appUrl: BRAND.url,
     enableAaveAccount: false,
   })
 );

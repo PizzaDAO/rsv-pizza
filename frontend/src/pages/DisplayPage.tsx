@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { getDisplayForViewer, getDisplayPhotos } from '../lib/api';
 import { DisplayViewerData, SlideshowConfig, QRCodeConfig, PhotosConfig, EventInfoConfig, UploadConfig, Photo } from '../types';
+import { brandUrl } from '../config/brand';
 
 export function DisplayPage() {
   const { t } = useTranslation('partner');
@@ -90,8 +91,8 @@ export function DisplayPage() {
 
   const { display, party } = data;
   const rsvpUrl = party.customUrl
-    ? `https://rsv.pizza/${party.customUrl}`
-    : `https://rsv.pizza/rsvp/${party.inviteCode}`;
+    ? brandUrl(party.customUrl)
+    : brandUrl(`rsvp/${party.inviteCode}`);
 
   return (
     <>

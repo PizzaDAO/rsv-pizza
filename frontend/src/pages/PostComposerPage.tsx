@@ -10,6 +10,7 @@ import type { FeedPhoto } from '../lib/api';
 import { getAllParties } from '../lib/supabase';
 import type { DbParty } from '../lib/supabase';
 import { countryNameToFlag } from '../utils/countryFlag';
+import { BRAND } from '../config/brand';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -65,7 +66,7 @@ const POST_TEMPLATES: PostTemplate[] = [
       const partnerTags = getPartnerInstagramTags(event.co_hosts as any[]);
       const lines = [
         `Pizza party in ${city}!`,
-        `RSVP: rsv.pizza/${slug}`,
+        `RSVP: ${BRAND.domain}/${slug}`,
       ];
       if (partnerTags) {
         lines.push('');

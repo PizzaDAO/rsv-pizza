@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { brandUrl } from '../config/brand';
 
 interface CheckInQRDisplayProps {
   inviteCode: string;
@@ -10,7 +11,7 @@ interface CheckInQRDisplayProps {
 }
 
 export function CheckInQRDisplay({ inviteCode, guestId, guestName, onClose }: CheckInQRDisplayProps) {
-  const qrData = `https://rsv.pizza/checkin/${inviteCode}/${guestId}`;
+  const qrData = brandUrl(`checkin/${inviteCode}/${guestId}`);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`;
 
   return createPortal(
