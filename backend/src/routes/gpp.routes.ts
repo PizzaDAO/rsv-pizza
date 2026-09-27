@@ -12,6 +12,7 @@ import { haversineKm } from '../lib/distance.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getScoringWeights } from '../lib/privateConfig.js';
 import { publicTags, isInternalTag } from '../lib/eventTags.js';
+import { brand } from '../config/brand.js';
 
 const router = Router();
 
@@ -236,7 +237,7 @@ async function sendGPPWelcomeEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [email],
       subject: `Your Global Pizza Party is Live! - ${eventName}`,
       html: emailHtml,

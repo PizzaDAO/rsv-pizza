@@ -6,6 +6,7 @@ import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
 import { canUserAccessTab } from '../../helpers/partyAccess.js';
+import { brand } from '../../config/brand.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -607,7 +608,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: [guest.email],
         subject,
         html,
@@ -761,7 +762,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   Authorization: `Bearer ${resendApiKey}`,
                 },
                 body: JSON.stringify({
-                  from: 'RSV.Pizza <noreply@rsv.pizza>',
+                  from: brand.fromEmail,
                   to: [normalizedEmail],
                   subject,
                   html,

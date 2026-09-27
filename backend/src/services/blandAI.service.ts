@@ -1,4 +1,5 @@
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 
 const BLAND_API_URL = 'https://api.bland.ai/v1';
 
@@ -59,7 +60,7 @@ async function sendOrderConfirmedEmail(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: [email],
         subject: `✓ Order Confirmed - ${pizzeriaName}`,
         html: emailHtml,
@@ -142,7 +143,7 @@ async function sendOrderFailedEmail(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: [email],
         subject: `⚠️ Order Update - ${pizzeriaName}`,
         html: emailHtml,

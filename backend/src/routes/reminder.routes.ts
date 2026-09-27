@@ -29,6 +29,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
+import { brand } from '../config/brand.js';
 
 const router = Router();
 
@@ -266,7 +267,7 @@ async function sendReminderEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [guest.email],
       subject: `Tonight at ${timeOnly}: ${ctx.partyName} 🍕`,
       html,

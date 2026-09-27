@@ -7,6 +7,7 @@ import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 import { generateInvoicePdf } from '../lib/invoicePdf.js';
 import { WIRE_DETAILS_PDF_B64 } from '../assets/wireDetailsPdf.js';
 import { W9_PDF_B64 } from '../assets/w9Pdf.js';
+import { brand } from '../config/brand.js';
 
 /**
  * Compute the calendar year for the given date in the specified timezone.
@@ -438,7 +439,7 @@ hostRouter.post('/:partyId/invoices/:invoiceId/send', requireAuth, async (req: A
 
     if (resendApiKey) {
       const emailPayload: any = {
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: [invoice.billToEmail],
         subject: `Invoice #${invoice.invoiceNumber} - ${invoice.billToCompany || invoice.sponsor.name} - ${invoice.party.name}`,
         html: emailHtml,
