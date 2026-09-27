@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { brand } from '../config/brand.js';
 
 // ============================================
 // Host routes (mounted at /api/parties)
@@ -366,7 +367,7 @@ hostRouter.post('/:partyId/mous/:mouId/send', requireAuth, async (req: AuthReque
 
     if (resendApiKey) {
       const emailPayload: any = {
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: [mou.counterpartyEmail],
         subject: `${mou.title} - ${mou.counterpartyCompany || mou.sponsor.name} - ${mou.party.name}`,
         html: emailHtml,

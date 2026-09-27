@@ -20,6 +20,7 @@ import {
   validateSurveyAnswers,
 } from '../lib/surveyQuestions.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
+import { brand } from '../config/brand.js';
 
 const SURVEY_TAB = 'survey';
 
@@ -171,7 +172,7 @@ async function sendSurveyToParty(
               Authorization: `Bearer ${resendApiKey}`,
             },
             body: JSON.stringify({
-              from: 'RSV.Pizza <noreply@rsv.pizza>',
+              from: brand.fromEmail,
               to: [g.email],
               subject,
               html,

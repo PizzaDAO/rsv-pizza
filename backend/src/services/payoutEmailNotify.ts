@@ -15,6 +15,7 @@
  * Hosts without a `User.email` are silently skipped.
  */
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 
 export async function emailHostOfPaymentExecution(
   payoutId: string,
@@ -101,7 +102,7 @@ ${errorLine}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'RSV.Pizza <noreply@rsv.pizza>',
+        from: brand.fromEmail,
         to: toEmail,
         subject,
         html,

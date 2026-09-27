@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
+import { brand } from '../config/brand.js';
 
 const router = Router();
 
@@ -908,7 +909,7 @@ async function sendRSVPConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [params.guestEmail],
       subject: emailSubject,
       html: emailHtml,
@@ -1028,7 +1029,7 @@ export async function sendApprovalEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [params.guestEmail],
       subject: `You're approved for ${params.partyName}! 🍕`,
       html: emailHtml,
@@ -1131,7 +1132,7 @@ async function sendWaitlistConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [params.guestEmail],
       subject: `You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`,
       html: emailHtml,
@@ -1252,7 +1253,7 @@ export async function sendPromotionEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [params.guestEmail],
       subject: `You're in! A spot opened up at ${params.partyName}`,
       html: emailHtml,
