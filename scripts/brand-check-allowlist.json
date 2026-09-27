@@ -1,0 +1,9 @@
+{
+  "_comment": "File path prefixes (relative to repo root) exempt from the new-hardcoded-brand check (scripts/check-no-hardcoded-brand.js). The brand config modules legitimately hold the RSV.Pizza defaults; supabase.ts keeps the project-id fallback; i18n holds source strings. Do NOT add feature files here to silence the check — route brand chrome through config/brand instead.",
+  "allow": [
+    "frontend/src/config/brand.ts",
+    "backend/src/config/brand.ts",
+    "frontend/src/lib/supabase.ts",
+    "frontend/src/i18n/"
+  ]
+}

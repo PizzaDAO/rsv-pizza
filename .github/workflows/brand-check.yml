@@ -1,0 +1,39 @@
+name: Brand Check (no new hardcoding)
+
+# White-label Phase 0. Fails a PR that ADDS new hardcoded brand chrome
+# (rsv.pizza / RSV.Pizza / the Supabase project id) in frontend/src or
+# backend/src, so branding keeps flowing through the config modules
+# (frontend|backend/src/config/brand.ts). Only added lines are scanned; existing
+# literals are untouched until the Phase 2 codemod. See
+# scripts/check-no-hardcoded-brand.js and plans/whitelabel-brand-config.md.
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/**'
+      - 'backend/src/**'
+      - 'scripts/check-no-hardcoded-brand.js'
+      - 'scripts/brand-check-allowlist.json'
+      - '.github/workflows/brand-check.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Read-only: the script only runs `git diff`.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run brand check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-no-hardcoded-brand.js
