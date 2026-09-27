@@ -1,5 +1,6 @@
 import { loadImg } from '../flyer/renderFlyer';
 import type { Party } from '../../types';
+import { BRAND } from '../../config/brand';
 
 /**
  * napoli-93184: Pure render function that draws a 1200x630 host-progress
@@ -121,7 +122,7 @@ export async function drawProgressCard(
   }
 
   const slug = opts.party.customUrl || opts.party.inviteCode || '';
-  const urlText = slug ? `rsv.pizza/${slug}` : 'rsv.pizza';
+  const urlText = slug ? `${BRAND.domain}/${slug}` : BRAND.domain;
   ctx.fillStyle = WHITE_DIM;
   ctx.font = `20px ${TEXT_FONT}`;
   ctx.textAlign = 'right';

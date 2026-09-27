@@ -6,6 +6,7 @@ import {
 import { Sponsor, Invoice } from '../../types';
 import { markInvoicePaid, sendInvoice } from '../../lib/api';
 import { InvoiceForm } from './InvoiceForm';
+import { brandUrl } from '../../config/brand';
 
 interface InvoiceButtonProps {
   sponsor: Sponsor;
@@ -27,7 +28,7 @@ export function InvoiceButton({ sponsor, partyId, invoice, onInvoiceUpdate, onSp
   const [paymentRef, setPaymentRef] = useState('');
 
   const invoiceUrl = invoice?.viewToken
-    ? `https://rsv.pizza/invoice/${invoice.viewToken}`
+    ? brandUrl(`invoice/${invoice.viewToken}`)
     : null;
 
   const handleCopyUrl = async () => {

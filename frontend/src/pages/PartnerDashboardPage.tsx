@@ -24,6 +24,7 @@ import type { SheetCity } from '../lib/cities';
 import type { SponsorDashboardEvent, SponsorMeResponse, SponsorDashboardData, CoHost } from '../types';
 import { GPP_REGIONS } from '../types';
 import { PartnerTimeSeriesChart } from '../components/partner/PartnerTimeSeriesChart';
+import { brandUrl } from '../config/brand';
 
 // Ad-equivalent CPM/CPC/CPL benchmarks for admin-only "Estimated Program Value" card.
 // Mid-range for crypto-niche / Web3-targeted audiences. Tune as needed.
@@ -155,8 +156,8 @@ function buildEventsCsv(events: SponsorDashboardEvent[], chats: Map<string, stri
   const rows = events.map((e) => {
     const city = e.name.replace(/^Global Pizza Party\s*/i, '').trim();
     const telegram = e.telegramGroup || resolveCityChat(e.name, chats) || '';
-    const eventLink = e.slug ? `https://rsv.pizza/${e.slug}` : '';
-    const reportLink = e.reportPublicSlug ? `https://rsv.pizza/report/${e.reportPublicSlug}` : '';
+    const eventLink = e.slug ? brandUrl(e.slug) : '';
+    const reportLink = e.reportPublicSlug ? brandUrl(`report/${e.reportPublicSlug}`) : '';
     const coHosts = (e.coHosts || []).map((c) => c.name).filter(Boolean).join('; ');
     return [
       e.name,
@@ -1179,7 +1180,7 @@ function EventCard({ event, onToggleChecklist, cityChats, isAdmin = false }: Eve
             })()}
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`https://rsv.pizza/onesheet/${event.slug}`);
+                navigator.clipboard.writeText(brandUrl(`onesheet/${event.slug}`));
                 setOneSheetCopied(true);
                 setTimeout(() => setOneSheetCopied(false), 2000);
               }}

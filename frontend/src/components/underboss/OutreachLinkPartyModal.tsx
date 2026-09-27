@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Search, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
+import { BRAND } from '../../config/brand';
 import {
   searchPartiesForOutreach,
   updateOutreachAttempt,
@@ -127,7 +128,7 @@ export function OutreachLinkPartyModal({
                     <div className="text-xs text-theme-text-muted mt-0.5 flex items-center gap-2">
                       {party.city && <span>{party.city}</span>}
                       {party.customUrl && (
-                        <span className="text-theme-text-faint">rsv.pizza/{party.customUrl}</span>
+                        <span className="text-theme-text-faint">{BRAND.domain}/{party.customUrl}</span>
                       )}
                     </div>
                   </button>

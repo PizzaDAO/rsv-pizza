@@ -40,6 +40,7 @@ import { CheckInScanner } from '../components/CheckInScanner';
 import { GuestScorecard } from '../components/scorecard';
 import { uploadPhoto } from '../lib/api';
 import { uploadEventPhoto } from '../lib/supabase';
+import { brandUrl } from '../config/brand';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -402,8 +403,8 @@ export function EventPage() {
     const needsYear = event.eventType === 'gpp' && (eventYear === 2027 || (yearParam != null && `${yearParam}`.length > 0));
     const yearForUrl = yearParam && `${yearParam}`.length > 0 ? yearParam : eventYear;
     return needsYear && yearForUrl
-      ? `https://rsv.pizza/${publicSlug}?year=${yearForUrl}`
-      : `https://rsv.pizza/${publicSlug}`;
+      ? brandUrl(`${publicSlug}?year=${yearForUrl}`)
+      : brandUrl(publicSlug);
   }, [event, eventYear, yearParam]);
 
   if (loading) {
@@ -495,7 +496,7 @@ export function EventPage() {
               {!showTweetInput ? (
                 <button
                   onClick={() => {
-                    const eventUrl = `https://rsv.pizza/${slug}`;
+                    const eventUrl = brandUrl(slug);
                     const tweetText = event.shareTweetText
                       ? event.shareTweetText + '\n\n' + eventUrl
                       : `I'm going to ${event.name}! RSVP at ${eventUrl}`;

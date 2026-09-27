@@ -6,6 +6,7 @@ import { Checkbox } from '../Checkbox';
 import { fetchFakeDetection, updateUnderbossStatus } from '../../lib/api';
 import type { FakeDetectionResponse, FakeDetectionRow, FakeDetectionTier } from '../../types';
 import { normalizeText } from '../../lib/normalizeText';
+import { brandUrl } from '../../config/brand';
 
 type ActionStatus = 'pending' | 'approved' | 'rejected';
 
@@ -422,7 +423,7 @@ export function FakeDetectionTable() {
                 <td className="py-2 px-3 align-top">
                   {row.customUrl ? (
                     <a
-                      href={`https://rsv.pizza/${row.customUrl}`}
+                      href={brandUrl(row.customUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-mono text-xs text-theme-text-muted hover:text-theme-text underline-offset-2 hover:underline"
@@ -458,7 +459,7 @@ export function FakeDetectionTable() {
                 <td className="py-2 px-3 align-top">
                   {row.customUrl ? (
                     <a
-                      href={`https://rsv.pizza/${row.customUrl}`}
+                      href={brandUrl(row.customUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-theme-text-muted hover:text-theme-text"

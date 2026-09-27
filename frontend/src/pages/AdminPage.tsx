@@ -29,6 +29,7 @@ import { GPP_REGIONS } from '../types';
 import type { AdminUser, UnderbossAdmin, SponsorUser, GraphicsAdmin } from '../types';
 import { fetchSheetCities } from '../lib/cities';
 import { CityScopePicker } from '../components/underboss';
+import { brandUrl } from '../config/brand';
 
 const themeClass = 'gpp-theme';
 const backgroundStyle = { background: 'linear-gradient(180deg, #7EC8E3 0%, #B6E4F7 100%)' } as React.CSSProperties;
@@ -271,7 +272,7 @@ export function AdminPage() {
         return [
           e.name,
           e.address || '',
-          e.customUrl ? `https://rsv.pizza/${e.customUrl}` : '',
+          e.customUrl ? brandUrl(e.customUrl) : '',
           telegramLink,
           e.country || '',
         ];
