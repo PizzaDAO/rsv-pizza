@@ -10,6 +10,7 @@
  * Hosts without a `User.email` are silently skipped (also filters seed rows).
  */
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 
 function esc(s: string): string {
   return s.replace(/[<>&]/g, (c) => (c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'));
@@ -51,7 +52,7 @@ async function sendResend(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to,
       subject,
       html,

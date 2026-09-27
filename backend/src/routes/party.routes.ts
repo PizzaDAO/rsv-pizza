@@ -21,6 +21,7 @@ import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
+import { brand } from '../config/brand.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -2288,7 +2289,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                from: 'RSV.Pizza <noreply@rsv.pizza>',
+                from: brand.fromEmail,
                 to: [recipient.email],
                 subject: subject || `Update from ${party.name}`,
                 html,

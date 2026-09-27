@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
+import { brand } from '../config/brand.js';
 
 const router = Router();
 
@@ -45,7 +46,7 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: str
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'RSV.Pizza <noreply@rsv.pizza>',
+      from: brand.fromEmail,
       to: [email],
       subject: `RSV.Pizza Code ${code}`,
       html: emailHtml,

@@ -20,6 +20,7 @@
  */
 import { prisma } from '../config/database.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { brand } from '../config/brand.js';
 
 type NotifyKind = 'approved' | 'flag_ready';
 
@@ -93,7 +94,7 @@ export async function notifyPaymentsTeam(opts: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'RSV.Pizza <noreply@rsv.pizza>',
+          from: brand.fromEmail,
           to: emails,
           subject,
           html,
