@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import BrandHelmet from './components/BrandHelmet';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
@@ -71,6 +72,7 @@ const EventsMapAllPage = React.lazy(() => import('./pages/EventsMapAllPage').the
 function App() {
   return (
     <HelmetProvider>
+      <BrandHelmet />
       <AuthProvider>
         <ThemeProvider theme="dark">
         <BrowserRouter>

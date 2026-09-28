@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { fetchGppEventsForMap, GPPEventMapItem } from '../lib/api';
+import { BRAND, brandUrl } from '../config/brand';
 
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
@@ -50,17 +51,17 @@ export function EventsMapAllPage() {
           name="description"
           content="Every Global Pizza Party 2026 event as an individual pin (no clustering) — see every free pizza event on the world map for May 22, 2026."
         />
-        <link rel="canonical" href="https://rsv.pizza/map/all" />
-        <meta property="og:title" content="Global Pizza Party 2026 Map — All Pins | RSV.Pizza" />
+        <link rel="canonical" href={brandUrl('map/all')} />
+        <meta property="og:title" content={`Global Pizza Party 2026 Map — All Pins | ${BRAND.name}`} />
         <meta
           property="og:description"
           content="Every Global Pizza Party 2026 event as an individual pin (no clustering) — see every free pizza event on the world map for May 22, 2026."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://rsv.pizza/map/all" />
-        <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta property="og:url" content={brandUrl('map/all')} />
+        <meta property="og:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta name="twitter:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
       </Helmet>
 
       <div
