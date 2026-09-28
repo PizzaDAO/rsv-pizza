@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, type Attestation } from '../lib/api';
 import { CheckInQRDisplay } from '../components/CheckInQRDisplay';
 import { GPPClouds } from '../components/GPPClouds';
-import { brandUrl } from '../config/brand';
+import { BRAND, brandUrl } from '../config/brand';
 
 // provolone-39042: friendly display name for an attestation row.
 const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
@@ -505,8 +505,8 @@ export function CheckInPage() {
       </div>
       <Helmet>
         <title>Claim 10% Discount | Global Pizza Party</title>
-        <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
-        <meta name="twitter:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta property="og:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
+        <meta name="twitter:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
 

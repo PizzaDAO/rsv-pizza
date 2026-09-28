@@ -40,7 +40,7 @@ import { CheckInScanner } from '../components/CheckInScanner';
 import { GuestScorecard } from '../components/scorecard';
 import { uploadPhoto } from '../lib/api';
 import { uploadEventPhoto } from '../lib/supabase';
-import { brandUrl } from '../config/brand';
+import { BRAND, brandUrl } from '../config/brand';
 
 function normalizeTelegramUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -560,7 +560,7 @@ export function EventPage() {
   }
 
   // Generate meta tags for social sharing
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rsv.pizza';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : BRAND.url;
   const pageUrl = `${baseUrl}/${slug}`;
   const ogImageUrl = (() => {
     if (!event.eventImageUrl) return `${baseUrl}/logo.png`;

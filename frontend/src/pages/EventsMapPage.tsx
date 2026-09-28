@@ -6,6 +6,7 @@ import { fetchGppEventsForMap, fetchUnderbossMe, GPPEventMapItem } from '../lib/
 import { fetchSheetCities } from '../lib/cities';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal } from '../components/LoginModal';
+import { BRAND, brandUrl } from '../config/brand';
 
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
@@ -258,17 +259,17 @@ export function EventsMapPage() {
           name="description"
           content="See every Global Pizza Party 2026 event on the world map — find a free pizza event near you on May 22, 2026."
         />
-        <link rel="canonical" href="https://rsv.pizza/map" />
-        <meta property="og:title" content="Global Pizza Party 2026 Map | RSV.Pizza" />
+        <link rel="canonical" href={brandUrl('map')} />
+        <meta property="og:title" content={`Global Pizza Party 2026 Map | ${BRAND.name}`} />
         <meta
           property="og:description"
           content="See every Global Pizza Party 2026 event on the world map — find a free pizza event near you on May 22, 2026."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://rsv.pizza/map" />
-        <meta property="og:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta property="og:url" content={brandUrl('map')} />
+        <meta property="og:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="https://rsv.pizza/gpp-flyer-2026-og.jpg" />
+        <meta name="twitter:image" content={`${BRAND.url}/gpp-flyer-2026-og.jpg`} />
       </Helmet>
 
       <div
