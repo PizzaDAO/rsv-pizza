@@ -687,6 +687,15 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
  * 3. For per-event themes from the database, pass the theme name through
  *    ThemeProvider and map it to the CSS class in Layout.tsx.
  *
+ * 3b. WHITE-LABEL (brand-wide theme): define your override class here, e.g.
+ *
+ *       .acme-theme { --bg-main: #0a1020; --accent: #00b3a4; ... }
+ *
+ *     then set VITE_BRAND_THEME_CLASS=acme-theme for that deploy (see
+ *     src/config/brand.ts). App.tsx applies BRAND.themeClass to <html> at the
+ *     root so it themes the whole app; per-page classes above still win within
+ *     their subtree. The default brand leaves it empty => the :root theme.
+ *
  * Available semantic classes:
  *   Text:    text-theme-text, text-theme-text-secondary, text-theme-text-muted, text-theme-text-faint
  *   Bg:      bg-theme-bg, bg-theme-card, bg-theme-surface, bg-theme-surface-hover, bg-theme-input, bg-theme-header

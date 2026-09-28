@@ -1,7 +1,8 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import BrandHelmet from './components/BrandHelmet';
+import { BRAND } from './config/brand';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
@@ -70,6 +71,18 @@ const EventsMapSwcPage = React.lazy(() => import('./pages/EventsMapSwcPage').the
 const EventsMapAllPage = React.lazy(() => import('./pages/EventsMapAllPage').then(m => ({ default: m.EventsMapAllPage })));
 
 function App() {
+  // White-label: apply the brand's theme class at the document root so a
+  // re-branded deploy can override the design tokens (see src/index.css) via
+  // VITE_BRAND_THEME_CLASS. Empty for the default brand => no class added =>
+  // the default :root theme, unchanged. Per-page themes (e.g. .gpp-theme
+  // wrappers) still override within their subtree.
+  useEffect(() => {
+    const cls = BRAND.themeClass;
+    if (!cls) return;
+    document.documentElement.classList.add(cls);
+    return () => document.documentElement.classList.remove(cls);
+  }, []);
+
   return (
     <HelmetProvider>
       <BrandHelmet />
