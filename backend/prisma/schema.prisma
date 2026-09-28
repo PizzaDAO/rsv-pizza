@@ -123,6 +123,11 @@ model Party {
   eventType String?  @map("event_type") // 'standard', 'gpp', 'private', etc.
   eventTags String[] @default([]) @map("event_tags") // Tags for filtering/grouping
 
+  // White-label event series (e.g. GPP). Nullable: standalone parties have none;
+  // GPP parties link to a seeded series. See EventSeries.
+  eventSeriesId String?      @map("event_series_id") @db.Uuid
+  eventSeries   EventSeries? @relation(fields: [eventSeriesId], references: [id], onDelete: SetNull)
+
   // Donation settings
   donationEnabled      Boolean  @default(false) @map("donation_enabled")
   donationGoal         Decimal? @map("donation_goal") @db.Decimal(10, 2)
@@ -336,7 +341,50 @@ model Party {
   telegramHosts           PartyTelegramHost[]
 
   @@index([coHosts(ops: JsonbPathOps)], type: Gin, map: "idx_parties_co_hosts_gin")
+  @@index([eventSeriesId])
   @@map("parties")
+}
+
+/// White-label event series (e.g. PizzaDAO's Global Pizza Party). Makes a
+/// "campaign/series" a first-class, brand-ownable entity instead of hardcoded
+/// GPP logic. A Party may belong to a series (Party.eventSeriesId). Series
+/// carries the defaults + branding + copy that were previously hardcoded in
+/// backend/src/routes/gpp.routes.ts (GPP_DEFAULTS). Later phases add series-scoped
+/// checklists, flyer templates, agreement clauses, and reimbursement funding.
+/// See plans/whitelabel-event-series.md.
+model EventSeries {
+  id          String  @id @default(uuid()) @db.Uuid
+  slug        String  @unique // 'gpp2026', 'gpp2027', 'acme-2026'
+  name        String // 'Global Pizza Party 2026'
+  displayName String  @map("display_name") // 'Global Pizza Party'
+  isActive    Boolean @default(true) @map("is_active")
+
+  // Branding / theming (ties into the cosmetic white-label brand config)
+  themeClass String? @map("theme_class")
+  logoUrl    String? @map("logo_url")
+  ogImageUrl String? @map("og_image_url")
+
+  // Event defaults (mirror of GPP_DEFAULTS in gpp.routes.ts)
+  description     String?
+  eventType       String?  @map("event_type") // 'gpp'
+  publicTags      String[] @default([]) @map("public_tags") // ['Global Pizza Party','wpc','ens']
+  internalTags    String[] @default([]) @map("internal_tags") // ['gpp2027']
+  requireApproval Boolean  @default(true) @map("require_approval")
+  hideGuests      Boolean  @default(false) @map("hide_guests")
+  photosEnabled   Boolean  @default(true) @map("photos_enabled")
+  photosPublic    Boolean  @default(true) @map("photos_public")
+
+  // Canonical date/time for the series (nullable)
+  eventDate      DateTime? @map("event_date") @db.Timestamptz
+  eventStartTime String?   @map("event_start_time") // 'HH:MM' local
+  eventEndTime   String?   @map("event_end_time")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  parties Party[]
+
+  @@map("event_series")
 }
 
 // romana-61204: one post-event survey response per guest. Resubmit = upsert
