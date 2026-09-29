@@ -483,22 +483,38 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
       }));
     }
 
-    // Read DB-stored default description, fall back to hardcoded
-    const configRow = await prisma.appConfig.findUnique({ where: { key: 'gpp_default_description' } });
-    const gppDescription = configRow?.value ?? GPP_DEFAULTS.description;
+    // Resolve series defaults from the EventSeries row (white-label Phase 2),
+    // falling back to GPP_DEFAULTS if the row is missing so behavior is
+    // unchanged. This /gpp create path is the 2026 series.
+    const series = await prisma.eventSeries.findUnique({ where: { slug: 'gpp2026' } });
+    const seriesDefaults = {
+      eventType: series?.eventType ?? GPP_DEFAULTS.eventType,
+      eventTags: series?.publicTags?.length ? series.publicTags : GPP_DEFAULTS.eventTags,
+      requireApproval: series?.requireApproval ?? GPP_DEFAULTS.requireApproval,
+      hideGuests: series?.hideGuests ?? GPP_DEFAULTS.hideGuests,
+      photosEnabled: series?.photosEnabled ?? GPP_DEFAULTS.photosEnabled,
+      photosPublic: series?.photosPublic ?? GPP_DEFAULTS.photosPublic,
+      eventImageUrl: series?.ogImageUrl ?? GPP_DEFAULTS.eventImageUrl,
+      description: series?.description ?? GPP_DEFAULTS.description,
+    };
 
-    // Create the party with GPP defaults
+    // Read DB-stored default description (highest precedence), then series, then hardcoded.
+    const configRow = await prisma.appConfig.findUnique({ where: { key: 'gpp_default_description' } });
+    const gppDescription = configRow?.value ?? seriesDefaults.description;
+
+    // Create the party with GPP/series defaults
     const party = await prisma.party.create({
       data: {
         name: eventName,
         description: gppDescription,
-        eventType: GPP_DEFAULTS.eventType,
-        eventTags: GPP_DEFAULTS.eventTags,
-        requireApproval: GPP_DEFAULTS.requireApproval,
-        hideGuests: GPP_DEFAULTS.hideGuests,
-        photosEnabled: GPP_DEFAULTS.photosEnabled,
-        photosPublic: GPP_DEFAULTS.photosPublic,
-        eventImageUrl: GPP_DEFAULTS.eventImageUrl,
+        eventType: seriesDefaults.eventType,
+        eventTags: seriesDefaults.eventTags,
+        eventSeriesId: series?.id ?? null,
+        requireApproval: seriesDefaults.requireApproval,
+        hideGuests: seriesDefaults.hideGuests,
+        photosEnabled: seriesDefaults.photosEnabled,
+        photosPublic: seriesDefaults.photosPublic,
+        eventImageUrl: seriesDefaults.eventImageUrl,
         customUrl: customUrl,
         date: defaultDate,
         endTime: defaultEndDate,
@@ -539,7 +555,7 @@ router.post('/events', async (req: Request, res: Response, next: NextFunction) =
 
     // Auto-sync partner co-hosts + sponsors for default tags
     try {
-      const partners = await getAutoCoHostPartners(GPP_DEFAULTS.eventTags);
+      const partners = await getAutoCoHostPartners(seriesDefaults.eventTags);
       for (const partner of partners) {
         await addPartnerToParty(party as any, partner);
       }
