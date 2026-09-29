@@ -45,6 +45,7 @@ import reportRoutes from './routes/report.routes.js';
 import leaderboardRoutes from './routes/leaderboard.routes.js';
 import publicLeaderboardRoutes from './routes/publicLeaderboard.routes.js';
 import seriesRoutes from './routes/series.routes.js';
+import adminSeriesRoutes from './routes/admin-series.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import linkclickRoutes from './routes/linkclick.routes.js';
 import funnelRoutes from './routes/funnel.routes.js';
@@ -170,6 +171,7 @@ app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-
 app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
 app.use('/api/admin/survey-responses', surveyResponsesAdminRouter); // gnocchi-58507: admin survey responses feed — before /api/admin catch-all
 app.use('/api/admin/mercury', adminMercuryRoutes); // stromboli-58524: Mercury wire reconciliation — before /api/admin catch-all
+app.use('/api/admin/series', adminSeriesRoutes); // white-label: admin event-series CRUD + per-series checklist — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
 app.use('/api/suggestions', suggestionsRoutes); // scarpetta-58472: admin/underboss-only site-wide suggestions (view-only)
