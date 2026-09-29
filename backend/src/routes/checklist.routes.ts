@@ -42,7 +42,7 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
     // 2. venue_added: party.address is set (picking a venue or filling the location autocomplete both write address)
     const party = await prisma.party.findUnique({
       where: { id: partyId },
-      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, underbossStatus: true, estimatedAttendance: true, user: { select: { email: true, name: true } } },
+      select: { address: true, addressIsCityDefault: true, venueName: true, coHosts: true, userId: true, region: true, selectedPizzerias: true, underbossStatus: true, estimatedAttendance: true, eventSeriesId: true, user: { select: { email: true, name: true } } },
     });
 
     // 3. budget_submitted: budget_items has items for this party
@@ -104,14 +104,19 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
       attendance_estimated: party?.estimatedAttendance != null,
     };
 
-    // Check if defaults have been seeded — compare against checklist_defaults count
+    // Check if defaults have been seeded — compare against the party's effective
+    // template count: series-specific defaults if its series defines any, else the
+    // global template (series_id IS NULL). White-label Phase 2b.
     const defaultCount = await prisma.checklistItem.count({
       where: { partyId, isDefault: true },
     });
-    const templateCount = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*) as count FROM checklist_defaults
-    `;
-    const expectedCount = Number(templateCount[0]?.count ?? 0);
+    const seriesId = party?.eventSeriesId ?? null;
+    let expectedCount = seriesId
+      ? await prisma.checklistDefault.count({ where: { seriesId } })
+      : 0;
+    if (expectedCount === 0) {
+      expectedCount = await prisma.checklistDefault.count({ where: { seriesId: null } });
+    }
 
     res.json({
       items,
@@ -140,19 +145,19 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
       throw new AppError('You do not have access to the checklist tab', 403, 'TAB_ACCESS_DENIED');
     }
 
-    // Read template from checklist_defaults
-    const defaults = await prisma.$queryRaw<Array<{
-      name: string;
-      due_date: Date | null;
-      is_auto: boolean;
-      auto_rule: string | null;
-      link_tab: string | null;
-      sort_order: number;
-    }>>`
-      SELECT name, due_date, is_auto, auto_rule, link_tab, sort_order
-      FROM checklist_defaults
-      ORDER BY sort_order ASC
-    `;
+    // Read the party's effective template: series-specific defaults if its series
+    // defines any, else the global template (series_id IS NULL). White-label Phase 2b.
+    const partyRow = await prisma.party.findUnique({
+      where: { id: partyId },
+      select: { eventSeriesId: true },
+    });
+    const seriesId = partyRow?.eventSeriesId ?? null;
+    let defaults = seriesId
+      ? await prisma.checklistDefault.findMany({ where: { seriesId }, orderBy: { sortOrder: 'asc' } })
+      : [];
+    if (defaults.length === 0) {
+      defaults = await prisma.checklistDefault.findMany({ where: { seriesId: null }, orderBy: { sortOrder: 'asc' } });
+    }
 
     if (defaults.length === 0) {
       const items = await prisma.checklistItem.findMany({
@@ -196,8 +201,8 @@ router.post('/:partyId/checklist/seed', async (req: AuthRequest, res: Response, 
             INSERT INTO checklist_items
               (id, party_id, name, due_date, is_auto, auto_rule, link_tab, sort_order, is_default, created_at, updated_at)
             VALUES
-              (gen_random_uuid(), ${partyId}::uuid, ${d.name}, ${d.due_date}, ${d.is_auto},
-               ${d.auto_rule}, ${d.link_tab}, ${d.sort_order}, true, now(), now())
+              (gen_random_uuid(), ${partyId}::uuid, ${d.name}, ${d.dueDate}, ${d.isAuto},
+               ${d.autoRule}, ${d.linkTab}, ${d.sortOrder}, true, now(), now())
             ON CONFLICT (party_id, name) WHERE is_default = true DO NOTHING
           `;
         }
