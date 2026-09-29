@@ -86,6 +86,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         eventStartTime: str(b.eventStartTime) ?? null,
         eventEndTime: str(b.eventEndTime) ?? null,
         eventDate: b.eventDate ? new Date(b.eventDate as string) : null,
+        fundingWalletAddress: str(b.fundingWalletAddress) ?? null,
       },
     });
     res.status(201).json({ series });
@@ -118,6 +119,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.eventStartTime !== undefined) data.eventStartTime = str(b.eventStartTime) ?? null;
     if (b.eventEndTime !== undefined) data.eventEndTime = str(b.eventEndTime) ?? null;
     if (b.eventDate !== undefined) data.eventDate = b.eventDate ? new Date(b.eventDate as string) : null;
+    if (b.fundingWalletAddress !== undefined) data.fundingWalletAddress = str(b.fundingWalletAddress) ?? null;
 
     const series = await prisma.eventSeries.update({ where: { id: req.params.id }, data });
     res.json({ series });

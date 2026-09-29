@@ -5039,6 +5039,12 @@ async function executePayout(params: {
             status: 'paid',
             paidAt: new Date(),
             transactionHash: result.txHash,
+            // White-label Phase 4: attribute the spend. Today all USDC sends come
+            // from the shared treasury, so record 'global' + the actual sender
+            // address. Phase 5 sets fundingSourceId to a series when routing to a
+            // per-series wallet.
+            fundingSourceId: 'global',
+            fundingWalletAddress: result.fromAddress,
             // caciotta-92104: when ENS was resolved at send time, persist
             // the canonical 0x back to `payoutWalletAddress` and preserve
             // the original ENS string in `payoutWalletInput`. Future retries
