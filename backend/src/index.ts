@@ -44,6 +44,7 @@ import checklistRoutes from './routes/checklist.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import leaderboardRoutes from './routes/leaderboard.routes.js';
 import publicLeaderboardRoutes from './routes/publicLeaderboard.routes.js';
+import seriesRoutes from './routes/series.routes.js';
 import pageviewRoutes from './routes/pageview.routes.js';
 import linkclickRoutes from './routes/linkclick.routes.js';
 import funnelRoutes from './routes/funnel.routes.js';
@@ -232,6 +233,7 @@ app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated c
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
+app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
 app.use('/api/ens', ensRoutes); // taleggio-30219: ENS → 0x resolution utility (auth-optional)
 app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-click unsubscribe
 app.use('/api/checkin', checkinRoutes);
