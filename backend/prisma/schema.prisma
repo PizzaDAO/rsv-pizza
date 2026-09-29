@@ -374,6 +374,11 @@ model EventSeries {
   photosEnabled   Boolean  @default(true) @map("photos_enabled")
   photosPublic    Boolean  @default(true) @map("photos_public")
 
+  // White-label funding (Phase 4): the wallet a series intends to reimburse hosts
+  // from (config/display). Key custody + the actual send routing land in Phase 5;
+  // null = use the shared PizzaDAO treasury (current behavior).
+  fundingWalletAddress String? @map("funding_wallet_address")
+
   // Canonical date/time for the series (nullable)
   eventDate      DateTime? @map("event_date") @db.Timestamptz
   eventStartTime String?   @map("event_start_time") // 'HH:MM' local
@@ -2043,6 +2048,13 @@ model Payout {
   transactionHash  String? @map("transaction_hash")
   wireReference    String? @map("wire_reference")
   externalProofUrl String? @map("external_proof_url")
+  // White-label funding attribution (Phase 4). Which funding source paid this
+  // payout ('global' = the shared PizzaDAO treasury; a series id once per-series
+  // wallets exist) and a snapshot of the actual send-from wallet at execute time
+  // (reconciliation anchor). Nullable/backfilled 'global' — no send behavior
+  // change; Phase 5 sets these when routing to a series wallet.
+  fundingSourceId      String? @map("funding_source_id")
+  fundingWalletAddress String? @map("funding_wallet_address")
 
   // salame-92110: snapshot of the host's tax form at the time this payout was
   // submitted. Set on POST when the host has a `status='submitted'` form on
