@@ -362,6 +362,7 @@ router.get('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Res
     }>>`
       SELECT name, due_date, sort_order, is_auto, auto_rule, link_tab
       FROM checklist_defaults
+      WHERE series_id IS NULL
       ORDER BY sort_order ASC
     `;
 
@@ -426,7 +427,7 @@ router.patch('/checklist-defaults', requireAuth, async (req: AuthRequest, res: R
       if (hasLinkTab) defaultData.linkTab = linkTabValue;
 
       await prisma.checklistDefault.updateMany({
-        where: { name: item.name },
+        where: { name: item.name, seriesId: null },
         data: defaultData,
       });
 
@@ -478,7 +479,7 @@ router.delete('/checklist-defaults/:name', requireAuth, async (req: AuthRequest,
 
     // 1. Delete from checklist_defaults
     const deleted = await prisma.$executeRaw`
-      DELETE FROM checklist_defaults WHERE name = ${itemName}
+      DELETE FROM checklist_defaults WHERE name = ${itemName} AND series_id IS NULL
     `;
 
     if (deleted === 0) {
@@ -522,8 +523,9 @@ router.post('/checklist-defaults', requireAuth, async (req: AuthRequest, res: Re
     const parsedDate = dueDate ? new Date(dueDate + 'T00:00:00.000Z') : null;
     const linkTabValue: string | null = linkTab === '' || linkTab == null ? null : linkTab;
 
-    // Get next sort_order
+    // Get next sort_order (global template only)
     const existing = await prisma.checklistDefault.findMany({
+      where: { seriesId: null },
       orderBy: { sortOrder: 'desc' },
       take: 1,
       select: { sortOrder: true },

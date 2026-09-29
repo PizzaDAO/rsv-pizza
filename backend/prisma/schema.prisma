@@ -382,7 +382,8 @@ model EventSeries {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  parties Party[]
+  parties           Party[]
+  checklistDefaults ChecklistDefault[]
 
   @@map("event_series")
 }
@@ -1356,15 +1357,22 @@ model ChecklistItem {
 
 model ChecklistDefault {
   id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique
+  name      String
   dueDate   DateTime? @map("due_date") @db.Date
   isAuto    Boolean   @default(false) @map("is_auto")
   autoRule  String?   @map("auto_rule")
   linkTab   String?   @map("link_tab")
   sortOrder Int       @default(0) @map("sort_order")
+  // White-label: null = the global template (shared fallback); a series id scopes
+  // this default to one event series so a brand can define its own host checklist.
+  // Uniqueness is per (series_id, name) via a COALESCE unique index in the
+  // 20260929_checklist_series migration (not expressible in Prisma).
+  seriesId  String?      @map("series_id") @db.Uuid
+  series    EventSeries? @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  @@index([seriesId])
   @@map("checklist_defaults")
 }
 
