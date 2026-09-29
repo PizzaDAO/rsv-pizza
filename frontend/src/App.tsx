@@ -26,6 +26,7 @@ import { DisplayPage } from './pages/DisplayPage';
 import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
+import { AdminSeriesPage } from './pages/AdminSeriesPage';
 import { SuggestionsPage } from './pages/SuggestionsPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
@@ -152,6 +153,7 @@ function App() {
             {/* scarpetta-58472: admin/underboss-only suggestions list — before /:slug catch-all */}
             <Route path="/suggestions" element={<SuggestionsPage />} />
             <Route path="/admin/logo-cleanup" element={<AdminLogoCleanup />} />
+            <Route path="/admin/series" element={<AdminSeriesPage />} />
             <Route path="/partner" element={<PartnerDashboardPage />} />
             <Route path="/partner/report" element={<ConsolidatedReportPage />} />
             {/* soppressata-72251: per-partner BizDev industry report — before /:slug catch-all */}
