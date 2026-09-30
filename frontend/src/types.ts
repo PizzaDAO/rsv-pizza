@@ -325,6 +325,7 @@ export interface Party {
   selectedPizzerias?: Pizzeria[];
   eventType?: string | null; // 'standard', 'gpp', 'private', etc.
   eventTags?: string[]; // Tags for filtering/grouping
+  eventSeriesId?: string | null; // white-label: linked EventSeries id (Phase 1)
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
   photoModeration?: boolean;

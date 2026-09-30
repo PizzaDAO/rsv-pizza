@@ -926,6 +926,7 @@ export interface DbParty {
   region?: string | null;
   event_type?: string | null;
   event_tags?: string[];
+  event_series_id?: string | null;
   flyer_generated_at?: string | null;
   flyer_config?: Record<string, any> | null;
   poster_image_url?: string | null;
@@ -1018,7 +1019,7 @@ export const SAFE_PARTY_COLUMNS = `
   donation_recipient_url, donation_eth_address, donation_amounts_public, share_to_unlock, share_tweet_text,
   nft_enabled, nft_chain,
   photos_enabled, photos_public, photo_moderation,
-  event_type, event_tags, budget_total, budget_enabled,
+  event_type, event_tags, event_series_id, budget_total, budget_enabled,
   music_enabled, music_notes,
   kit_enabled, kit_deadline,
   fundraising_goal, report_recap, report_video_url, report_photos_url,
