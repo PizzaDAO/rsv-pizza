@@ -165,6 +165,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     // HostPage's cap-gating + reimbursementCap math rely on them. The raw
     // dbParty.event_tags is still used directly for the cap computation below.
     eventTags: (dbParty.event_tags || []).filter((t) => t !== REFUND_TAG),
+    eventSeriesId: dbParty.event_series_id || null,
     canEdit: dbParty.can_edit || false,
     allowedTabs: dbParty.allowed_tabs,
     hiddenGppPhotos: (dbParty.hidden_gpp_photos as string[]) || [],

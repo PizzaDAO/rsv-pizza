@@ -32,6 +32,7 @@ const BLANK_FORM = {
   themeClass: '',
   logoUrl: '',
   ogImageUrl: '',
+  flyerTemplateKey: '',
   fundingWalletAddress: '',
   publicTags: '',
   eventDate: '',
@@ -54,6 +55,7 @@ function seriesToForm(s: EventSeries): FormState {
     themeClass: s.themeClass ?? '',
     logoUrl: s.logoUrl ?? '',
     ogImageUrl: s.ogImageUrl ?? '',
+    flyerTemplateKey: s.flyerTemplateKey ?? '',
     fundingWalletAddress: s.fundingWalletAddress ?? '',
     publicTags: (s.publicTags ?? []).join(', '),
     eventDate: s.eventDate ? s.eventDate.slice(0, 10) : '',
@@ -76,6 +78,7 @@ function formToInput(f: FormState): SeriesInput {
     themeClass: f.themeClass.trim() || null,
     logoUrl: f.logoUrl.trim() || null,
     ogImageUrl: f.ogImageUrl.trim() || null,
+    flyerTemplateKey: f.flyerTemplateKey.trim() || null,
     fundingWalletAddress: f.fundingWalletAddress.trim() || null,
     publicTags: f.publicTags.split(',').map((t) => t.trim()).filter(Boolean),
     eventDate: f.eventDate || null,
@@ -277,6 +280,8 @@ export function AdminSeriesPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('logoUrl', e.target.value)} />
               <IconInput icon={Image} placeholder="OG / social image URL" value={form.ogImageUrl}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('ogImageUrl', e.target.value)} />
+              <IconInput icon={Image} placeholder="Flyer template key (e.g. gpp, avax)" value={form.flyerTemplateKey}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('flyerTemplateKey', e.target.value)} />
               <IconInput icon={Tag} placeholder="Public tags (comma-separated)" value={form.publicTags}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('publicTags', e.target.value)} />
               <IconInput icon={Wallet} placeholder="Reimbursement wallet (config only — no auto-send yet)" value={form.fundingWalletAddress}

@@ -3641,6 +3641,7 @@ export interface EventSeries {
   themeClass: string | null;
   logoUrl: string | null;
   ogImageUrl: string | null;
+  flyerTemplateKey: string | null;
   description: string | null;
   eventType: string | null;
   publicTags: string[];
@@ -3737,6 +3738,15 @@ export interface PublicSeriesEvent {
   eventImageUrl: string | null;
   slug: string;
   community: boolean;
+}
+
+export interface PublicSeriesWithId extends PublicSeries {
+  id: string;
+  flyerTemplateKey: string | null;
+}
+
+export async function fetchPublicSeriesList(): Promise<{ series: PublicSeriesWithId[] }> {
+  return apiRequest<{ series: PublicSeriesWithId[] }>(`/api/series`, { requireAuth: false });
 }
 
 export async function fetchPublicSeries(slug: string): Promise<{ series: PublicSeries }> {

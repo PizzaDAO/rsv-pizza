@@ -363,6 +363,9 @@ model EventSeries {
   themeClass String? @map("theme_class")
   logoUrl    String? @map("logo_url")
   ogImageUrl String? @map("og_image_url")
+  // Which generative flyer template this series uses (key into the frontend flyer
+  // template registry, e.g. 'gpp' | 'avax'). Null = default behavior.
+  flyerTemplateKey String? @map("flyer_template_key")
 
   // Event defaults (mirror of GPP_DEFAULTS in gpp.routes.ts)
   description     String?

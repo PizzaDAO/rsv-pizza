@@ -75,6 +75,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         themeClass: str(b.themeClass) ?? null,
         logoUrl: str(b.logoUrl) ?? null,
         ogImageUrl: str(b.ogImageUrl) ?? null,
+        flyerTemplateKey: str(b.flyerTemplateKey) ?? null,
         description: str(b.description) ?? null,
         eventType: str(b.eventType) ?? null,
         publicTags: strArr(b.publicTags) ?? [],
@@ -108,6 +109,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.themeClass !== undefined) data.themeClass = str(b.themeClass) ?? null;
     if (b.logoUrl !== undefined) data.logoUrl = str(b.logoUrl) ?? null;
     if (b.ogImageUrl !== undefined) data.ogImageUrl = str(b.ogImageUrl) ?? null;
+    if (b.flyerTemplateKey !== undefined) data.flyerTemplateKey = str(b.flyerTemplateKey) ?? null;
     if (b.description !== undefined) data.description = str(b.description) ?? null;
     if (b.eventType !== undefined) data.eventType = str(b.eventType) ?? null;
     if (b.publicTags !== undefined) data.publicTags = strArr(b.publicTags) ?? [];
