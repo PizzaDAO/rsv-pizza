@@ -3704,6 +3704,49 @@ export async function deleteSeriesChecklistDefault(defaultId: string): Promise<{
   return apiRequest<{ success: boolean }>(`/api/admin/series/checklist/${defaultId}`, { method: 'DELETE' });
 }
 
+// ---- Public series (landing page) ----
+export interface PublicSeries {
+  slug: string;
+  name: string;
+  displayName: string;
+  isActive: boolean;
+  themeClass: string | null;
+  logoUrl: string | null;
+  ogImageUrl: string | null;
+  description: string | null;
+  eventType: string | null;
+  publicTags: string[];
+  requireApproval: boolean;
+  hideGuests: boolean;
+  photosEnabled: boolean;
+  photosPublic: boolean;
+  eventDate: string | null;
+  eventStartTime: string | null;
+  eventEndTime: string | null;
+}
+
+export interface PublicSeriesEvent {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  region: string | null;
+  date: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  eventImageUrl: string | null;
+  slug: string;
+  community: boolean;
+}
+
+export async function fetchPublicSeries(slug: string): Promise<{ series: PublicSeries }> {
+  return apiRequest<{ series: PublicSeries }>(`/api/series/${encodeURIComponent(slug)}`, { requireAuth: false });
+}
+
+export async function fetchPublicSeriesEvents(slug: string): Promise<{ events: PublicSeriesEvent[] }> {
+  return apiRequest<{ events: PublicSeriesEvent[] }>(`/api/series/${encodeURIComponent(slug)}/events`, { requireAuth: false });
+}
+
 // Underboss Dashboard API
 
 // Fetch current user's underboss status

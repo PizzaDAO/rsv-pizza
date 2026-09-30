@@ -82,4 +82,47 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// GET /api/series/:slug/events — public event cards for the series (approved or
+// community-listed, not cancelled). Powers the series landing page + map.
+router.get('/:slug/events', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const slug = req.params.slug?.trim();
+    if (!slug) throw new AppError('slug is required', 400, 'VALIDATION_ERROR');
+    const series = await prisma.eventSeries.findUnique({ where: { slug }, select: { id: true } });
+    if (!series) throw new AppError('Series not found', 404, 'NOT_FOUND');
+
+    const rows = await prisma.party.findMany({
+      where: {
+        eventSeriesId: series.id,
+        underbossStatus: { in: ['approved', 'listed'] },
+        cancelledAt: null,
+      },
+      orderBy: [{ date: 'asc' }],
+      select: {
+        id: true, name: true, customUrl: true, inviteCode: true, city: true,
+        country: true, region: true, date: true, latitude: true, longitude: true,
+        eventImageUrl: true, underbossStatus: true,
+      },
+      take: 2000,
+    });
+
+    const events = rows.map((e) => ({
+      id: e.id,
+      name: e.name,
+      city: e.city,
+      country: e.country,
+      region: e.region,
+      date: e.date ? e.date.toISOString() : null,
+      latitude: e.latitude,
+      longitude: e.longitude,
+      eventImageUrl: e.eventImageUrl,
+      slug: e.customUrl || e.inviteCode,
+      community: e.underbossStatus === 'listed',
+    }));
+    res.json({ events });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

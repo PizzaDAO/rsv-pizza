@@ -27,6 +27,7 @@ import { UnderbossDashboard } from './pages/UnderbossDashboard';
 import { ShippingDashboard } from './pages/ShippingDashboard';
 import { AdminPage } from './pages/AdminPage';
 import { AdminSeriesPage } from './pages/AdminSeriesPage';
+import { SeriesLandingPage } from './pages/SeriesLandingPage';
 import { SuggestionsPage } from './pages/SuggestionsPage';
 import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
 import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
@@ -174,6 +175,8 @@ function App() {
             <Route path="/survey/:token" element={<SurveyPage />} />
             {/* panzerotti-58527: post-event host survey — before /:slug catch-all */}
             <Route path="/host-survey/:token" element={<HostSurveyPage />} />
+            {/* white-label: public series landing — before /:slug catch-all */}
+            <Route path="/series/:slug" element={<SeriesLandingPage />} />
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>
