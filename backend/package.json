@@ -20,11 +20,11 @@
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@napi-rs/canvas": "^0.1.100",
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "^2.117.2",
     "archiver": "^7.0.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -35,11 +35,11 @@
     "openai": "^6.38.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
-    "pg": "^8.21.0",
-    "sharp": "^0.33.5",
+    "pg": "^8.23.0",
+    "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "viem": "^2.44.4"
+    "viem": "^2.57.1"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
@@ -47,13 +47,13 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.11.0",
-    "@types/supertest": "^6.0.3",
+    "@types/supertest": "^7.2.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@vitest/coverage-v8": "^4.0.18",
     "prisma": "^6.8.2",
-    "supertest": "^7.2.2",
-    "tsx": "^4.7.0",
+    "supertest": "^7.3.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.3",
     "vitest": "^4.0.18"
   }
