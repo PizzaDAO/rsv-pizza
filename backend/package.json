@@ -20,7 +20,7 @@
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@napi-rs/canvas": "^0.1.100",
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
@@ -36,7 +36,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.21.0",
-    "sharp": "^0.33.5",
+    "sharp": "^0.35.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "viem": "^2.44.4"
