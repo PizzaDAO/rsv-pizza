@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
-    "@napi-rs/canvas": "^0.1.100",
+    "@napi-rs/canvas": "^1.0.9",
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
     "@supabase/supabase-js": "^2.49.1",
