@@ -31,7 +31,7 @@
     "pdfjs-dist": "^5.7.284",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-helmet-async": "^2.0.5",
+    "react-helmet-async": "^3.0.0",
     "react-i18next": "^17.0.6",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.30.4",
