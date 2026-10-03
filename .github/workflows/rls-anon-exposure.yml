@@ -1,0 +1,34 @@
+name: RLS Anon-Exposure Check
+
+# Live-state guard for the tax_forms / #1061 leak class: fails if any public table
+# is RLS-off AND anon-SELECTable (readable by anyone with the public anon key).
+# Runs weekly (catches drift from manual SQL / dashboard / restores, not just PRs)
+# and on PRs that touch migrations. Read-only. See scripts/check-rls-anon-exposure.js.
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # Mondays 08:00 UTC
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'backend/prisma/migrations/**'
+      - 'scripts/check-rls-anon-exposure.js'
+      - 'scripts/rls-anon-allowlist.json'
+      - '.github/workflows/rls-anon-exposure.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Check RLS anon-exposure
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-rls-anon-exposure.js

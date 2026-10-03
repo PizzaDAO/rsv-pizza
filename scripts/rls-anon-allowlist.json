@@ -1,0 +1,4 @@
+{
+  "_comment": "Public tables that are INTENTIONALLY anon-readable with RLS off. Currently EMPTY — the live DB has zero such tables (the public frontend tables parties/guests/experiment_flags/rsvp_checkboxes/slug_aliases/suggestions are RLS-ON with anon SELECT policies, so they don't count). Only add a table here after confirming it holds no sensitive data and must be world-readable; prefer ENABLE RLS + a scoped policy. See scripts/check-rls-anon-exposure.js + the tax_forms/#1061 incidents.",
+  "allow": []
+}
