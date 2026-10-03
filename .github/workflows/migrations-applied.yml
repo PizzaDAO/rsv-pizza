@@ -1,0 +1,36 @@
+name: Migrations Applied Check
+
+# Enforces "apply migrations to prod BEFORE merging" (CLAUDE.md). For every
+# migration.sql ADDED in the PR, verifies its CREATE TABLE / ADD COLUMN targets
+# already exist in prod (read-only information_schema). Complements schema-drift:
+# schema-drift *simulates* pending migrations (can mask an unapplied one); this
+# checks they're actually applied. See scripts/check-migrations-applied.js.
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'backend/prisma/migrations/**'
+      - 'scripts/check-migrations-applied.js'
+      - '.github/workflows/migrations-applied.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install root deps
+        run: npm ci
+      - name: Check migrations applied
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # READ-ONLY use of prod DATABASE_URL (information_schema SELECTs only).
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-migrations-applied.js

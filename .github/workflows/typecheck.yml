@@ -1,0 +1,61 @@
+name: Typecheck (non-blocking)
+
+# Reports `tsc --noEmit` errors for frontend + backend on PRs. NON-BLOCKING for
+# now (continue-on-error) because the frontend carries a large pre-existing error
+# baseline and `vite build` doesn't type-check — so a type break can currently
+# ship and black-screen at runtime. This surfaces the counts in CI; once the
+# baseline is driven to 0, flip continue-on-error to false to make it a real gate.
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/**'
+      - 'backend/src/**'
+      - 'frontend/tsconfig*.json'
+      - 'backend/tsconfig*.json'
+      - '.github/workflows/typecheck.yml'
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: tsc --noEmit (frontend)
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/fe.txt || true
+          echo "frontend tsc errors: $(grep -c 'error TS' /tmp/fe.txt || echo 0)"
+
+  backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        working-directory: backend
+        run: npm ci
+      - name: Prisma generate
+        working-directory: backend
+        run: npx prisma generate
+      - name: tsc --noEmit (backend)
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          npx tsc --noEmit -p tsconfig.json 2>&1 | tee /tmp/be.txt || true
+          echo "backend tsc errors: $(grep -c 'error TS' /tmp/be.txt || echo 0)"
