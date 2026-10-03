@@ -32,7 +32,7 @@
     "heic-convert": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.0.5",
-    "openai": "^6.38.0",
+    "openai": "^7.25.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.21.0",
