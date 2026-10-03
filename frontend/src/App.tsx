@@ -8,8 +8,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { HomePage } from './pages/HomePage';
 import { RSVPPage } from './pages/RSVPPage';
 import { HostPage } from './pages/HostPage';
-import { DayOfRunPage } from './pages/DayOfRunPage';
-import { ArtDisplayPage } from './pages/ArtDisplayPage';
+const DayOfRunPage = React.lazy(() => import('./pages/DayOfRunPage').then(m => ({ default: m.DayOfRunPage })));
+const ArtDisplayPage = React.lazy(() => import('./pages/ArtDisplayPage').then(m => ({ default: m.ArtDisplayPage })));
 import { EventPage } from './pages/EventPage';
 import { AuthVerifyPage } from './pages/AuthVerifyPage';
 import { LoginPage } from './pages/LoginPage';
@@ -19,43 +19,43 @@ import { GPPLandingPage } from './pages/GPPLandingPage';
 import { GPP27CreatePage } from './pages/GPP27CreatePage';
 import { SideCreatePage } from './pages/SideCreatePage';
 import { CheckInPage } from './pages/CheckInPage';
-import { DJPage } from './pages/DJPage';
-import { PublicReportPage } from './pages/PublicReportPage';
-import { PublicVenueReportPage } from './pages/PublicVenueReportPage';
-import { DisplayPage } from './pages/DisplayPage';
-import { UnderbossDashboard } from './pages/UnderbossDashboard';
-import { ShippingDashboard } from './pages/ShippingDashboard';
-import { AdminPage } from './pages/AdminPage';
-import { AdminSeriesPage } from './pages/AdminSeriesPage';
+const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
+const PublicReportPage = React.lazy(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
+const PublicVenueReportPage = React.lazy(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
+const DisplayPage = React.lazy(() => import('./pages/DisplayPage').then(m => ({ default: m.DisplayPage })));
+const UnderbossDashboard = React.lazy(() => import('./pages/UnderbossDashboard').then(m => ({ default: m.UnderbossDashboard })));
+const ShippingDashboard = React.lazy(() => import('./pages/ShippingDashboard').then(m => ({ default: m.ShippingDashboard })));
+const AdminPage = React.lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
+const AdminSeriesPage = React.lazy(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
 import { SeriesLandingPage } from './pages/SeriesLandingPage';
-import { SuggestionsPage } from './pages/SuggestionsPage';
-import { PaymentsAdminPage } from './pages/PaymentsAdminPage';
-import { LatamPaymentsPage } from './pages/LatamPaymentsPage';
-import { SouthAfricaPaymentsPage } from './pages/SouthAfricaPaymentsPage';
-import { AfricaPaymentsPage } from './pages/AfricaPaymentsPage';
-import { WestAfricaPaymentsPage } from './pages/WestAfricaPaymentsPage';
-import { EastAfricaPaymentsPage } from './pages/EastAfricaPaymentsPage';
-import { NaPaymentsPage } from './pages/NaPaymentsPage';
-import { EuropePaymentsPage } from './pages/EuropePaymentsPage';
-import { IndiaPaymentsPage } from './pages/IndiaPaymentsPage';
-import { AsiaPaymentsPage } from './pages/AsiaPaymentsPage';
-import { PartnerIntakePage } from './pages/PartnerIntakePage';
-import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
-import { InvoicePage } from './pages/InvoicePage';
-import { MouPage } from './pages/MouPage';
-import { ConsolidatedReportPage } from './pages/ConsolidatedReportPage';
-import { PartnerBizdevPage } from './pages/PartnerBizdevPage';
-import { PostComposerPage } from './pages/PostComposerPage';
-import { OneSheetPage } from './pages/OneSheetPage';
+const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
+const PaymentsAdminPage = React.lazy(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
+const LatamPaymentsPage = React.lazy(() => import('./pages/LatamPaymentsPage').then(m => ({ default: m.LatamPaymentsPage })));
+const SouthAfricaPaymentsPage = React.lazy(() => import('./pages/SouthAfricaPaymentsPage').then(m => ({ default: m.SouthAfricaPaymentsPage })));
+const AfricaPaymentsPage = React.lazy(() => import('./pages/AfricaPaymentsPage').then(m => ({ default: m.AfricaPaymentsPage })));
+const WestAfricaPaymentsPage = React.lazy(() => import('./pages/WestAfricaPaymentsPage').then(m => ({ default: m.WestAfricaPaymentsPage })));
+const EastAfricaPaymentsPage = React.lazy(() => import('./pages/EastAfricaPaymentsPage').then(m => ({ default: m.EastAfricaPaymentsPage })));
+const NaPaymentsPage = React.lazy(() => import('./pages/NaPaymentsPage').then(m => ({ default: m.NaPaymentsPage })));
+const EuropePaymentsPage = React.lazy(() => import('./pages/EuropePaymentsPage').then(m => ({ default: m.EuropePaymentsPage })));
+const IndiaPaymentsPage = React.lazy(() => import('./pages/IndiaPaymentsPage').then(m => ({ default: m.IndiaPaymentsPage })));
+const AsiaPaymentsPage = React.lazy(() => import('./pages/AsiaPaymentsPage').then(m => ({ default: m.AsiaPaymentsPage })));
+const PartnerIntakePage = React.lazy(() => import('./pages/PartnerIntakePage').then(m => ({ default: m.PartnerIntakePage })));
+const PartnerDashboardPage = React.lazy(() => import('./pages/PartnerDashboardPage').then(m => ({ default: m.PartnerDashboardPage })));
+const InvoicePage = React.lazy(() => import('./pages/InvoicePage').then(m => ({ default: m.InvoicePage })));
+const MouPage = React.lazy(() => import('./pages/MouPage').then(m => ({ default: m.MouPage })));
+const ConsolidatedReportPage = React.lazy(() => import('./pages/ConsolidatedReportPage').then(m => ({ default: m.ConsolidatedReportPage })));
+const PartnerBizdevPage = React.lazy(() => import('./pages/PartnerBizdevPage').then(m => ({ default: m.PartnerBizdevPage })));
+const PostComposerPage = React.lazy(() => import('./pages/PostComposerPage').then(m => ({ default: m.PostComposerPage })));
+const OneSheetPage = React.lazy(() => import('./pages/OneSheetPage').then(m => ({ default: m.OneSheetPage })));
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 import { EventsMapPage } from './pages/EventsMapPage';
-import { AdminLogoCleanup } from './pages/AdminLogoCleanup';
+const AdminLogoCleanup = React.lazy(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
 import { PartnersPage } from './pages/PartnersPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
-import { PhotosFeedPage } from './pages/PhotosFeedPage';
-import { PhotosSlideshowPage } from './pages/PhotosSlideshowPage';
-import { SurveyPage } from './pages/SurveyPage';
-import { HostSurveyPage } from './pages/HostSurveyPage';
+const PhotosFeedPage = React.lazy(() => import('./pages/PhotosFeedPage').then(m => ({ default: m.PhotosFeedPage })));
+const PhotosSlideshowPage = React.lazy(() => import('./pages/PhotosSlideshowPage').then(m => ({ default: m.PhotosSlideshowPage })));
+const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
+const HostSurveyPage = React.lazy(() => import('./pages/HostSurveyPage').then(m => ({ default: m.HostSurveyPage })));
 
 // Legacy redirect: /sponsor-intake/:token → /partner-intake/:token
 // <Navigate> doesn't forward path params, so we wrap useParams().
@@ -91,6 +91,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider theme="dark">
         <BrowserRouter>
+          <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -180,6 +181,7 @@ function App() {
             {/* Catch-all route for custom URLs - must be last */}
             <Route path="/:slug" element={<EventPage />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
         </ThemeProvider>
       </AuthProvider>
