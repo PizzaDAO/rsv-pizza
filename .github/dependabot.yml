@@ -1,0 +1,40 @@
+version: 2
+# Automated dependency updates. The repo had 62 open alerts (33 high) with no
+# automation; this generates testable, grouped update PRs so bumps go through CI
+# (build + typecheck + schema/rls/migration guards) instead of piling up.
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Group low-risk dev/build-chain bumps into one PR to reduce noise.
+      dev-and-build:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-and-build:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-and-build:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
