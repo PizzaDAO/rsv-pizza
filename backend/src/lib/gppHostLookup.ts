@@ -12,7 +12,7 @@
  *              (the host who filed a reimbursement for that party)
  *   telegrams  User.telegram (owner), co_hosts[].telegram, and
  *              party_telegram_hosts.username (bot-verified host chats)
- * Discord ids are not stored anywhere in rsv.pizza, so they can't be matched.
+ * Discord ids are not stored anywhere in this app, so they can't be matched.
  *
  * An event counts when event_type = 'gpp', underboss_status is 'approved' or
  * 'listed', and it isn't cancelled. The result carries no PII: per event only
@@ -121,7 +121,7 @@ export async function findGppHostEvents(ids: HostIdentifiers, db = prisma): Prom
   const tgVariants = telegramVariants(ids.telegrams);
   const statuses = [...GPP_HOST_STATUSES];
 
-  // 1. rsv.pizza accounts behind the identifiers, and the parties linked
+  // 1. user accounts behind the identifiers, and the parties linked
   //    directly (reimbursement wallet, bot-verified host Telegram chat).
   const [users, payouts, tgHosts] = await Promise.all([
     db.user.findMany({
