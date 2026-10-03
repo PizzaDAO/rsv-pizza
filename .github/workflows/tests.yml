@@ -1,0 +1,58 @@
+name: Tests (non-blocking)
+
+# Runs the existing vitest suites (21 backend + 20 frontend files) on PRs. These
+# previously ran in NO CI workflow at all, so they gated nothing. NON-BLOCKING
+# for now (continue-on-error) to surface status without risking a flake blocking
+# merges; flip to blocking once green and stable. This is the structural fix —
+# adding more tests (RLS/anon-exposure, payout money-path) builds on top of it.
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/**'
+      - 'backend/src/**'
+      - 'frontend/**/*.test.ts'
+      - 'frontend/**/*.test.tsx'
+      - 'backend/**/*.test.ts'
+      - '.github/workflows/tests.yml'
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        working-directory: backend
+        run: npm ci
+      - name: Prisma generate
+        working-directory: backend
+        run: npx prisma generate
+      - name: Test (backend)
+        working-directory: backend
+        continue-on-error: true
+        run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Test (frontend)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm test
