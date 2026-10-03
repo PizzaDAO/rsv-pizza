@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "dotenv": "^17.3.1",
-    "pg": "^8.16.3"
+    "pg": "^8.23.0"
   },
   "overrides": {
     "express": {
