@@ -17,6 +17,7 @@
  *    for log retention.
  */
 import { Router, Response, NextFunction } from 'express';
+import { brand } from '../config/brand.js';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/database.js';
@@ -196,7 +197,7 @@ router.post(
         });
         if (!newOwner) {
           throw new AppError(
-            `User ${rawEmail} doesn't exist on rsv.pizza yet — they need to log in once before they can be made owner.`,
+            `User ${rawEmail} doesn't exist on ${brand.name} yet — they need to log in once before they can be made owner.`,
             400,
             'NEW_OWNER_NOT_FOUND',
           );
