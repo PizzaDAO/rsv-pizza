@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 
 const JWT_SECRET = 'test-jwt-secret';
 
@@ -34,7 +34,7 @@ function createTestApp(middleware: any) {
   return app;
 }
 
-function makeToken(userId: string, email: string, expiresIn: string = '1h') {
+function makeToken(userId: string, email: string, expiresIn: SignOptions['expiresIn'] = '1h') {
   return jwt.sign({ userId, email }, JWT_SECRET, { expiresIn });
 }
 
