@@ -1,4 +1,5 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { Flag, Globe, Building2 } from 'lucide-react';
 import { TaxFormType } from '../../../types';
 
@@ -10,7 +11,7 @@ interface TaxFormPickerProps {
 
 interface CardSpec {
   type: TaxFormType;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   title: string;
   desc: string;
 }

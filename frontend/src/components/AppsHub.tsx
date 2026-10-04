@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Store,
@@ -39,7 +40,7 @@ interface AppItem {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   status: AppStatus;
   category: AppCategory;
   tab?: string;

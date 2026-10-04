@@ -1,4 +1,5 @@
 import {
+  type LucideIcon,
   Handshake,
   MapPin,
   Music,
@@ -25,7 +26,7 @@ export interface PinnableApp {
   id: string;
   name: string;
   tab: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
 }
 
 export const PINNABLE_APPS: PinnableApp[] = [

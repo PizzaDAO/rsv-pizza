@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Pizza, Wine, Home, Package, Music, Heart, MoreHorizontal } from 'lucide-react';
 import { BudgetItem, BudgetCategory, BudgetCategoryTotal, BUDGET_CATEGORIES } from '../../types';
@@ -15,7 +16,7 @@ interface BudgetCategorySectionProps {
   onRestore?: (itemId: string) => void;
 }
 
-const categoryIcons: Record<BudgetCategory, React.ComponentType<{ size?: number; className?: string }>> = {
+const categoryIcons: Record<BudgetCategory, LucideIcon> = {
   pizza: Pizza,
   drinks: Wine,
   venue: Home,
