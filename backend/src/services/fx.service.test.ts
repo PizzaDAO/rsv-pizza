@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { convertToUSD, CURRENCY_MAP, FALLBACK_RATES_TO_USD } from './fx.service';
+import { convertToUSD, CURRENCY_MAP, FALLBACK_RATES_TO_USD } from './fx.service.js';
 
 /**
  * Money-path safety tests for FX conversion. The critical invariant
