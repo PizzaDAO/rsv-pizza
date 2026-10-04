@@ -10,9 +10,10 @@
 
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const FROM = 'RSV.Pizza <noreply@rsv.pizza>';
+const FROM = brand.fromEmail;
 
 function escapeHtml(s: string): string {
   return s

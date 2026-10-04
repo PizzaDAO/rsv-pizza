@@ -18,8 +18,10 @@
  * is a Telegram-only convention (see telegram.routes.ts).
  */
 
+import { brand } from '../config/brand.js';
+
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const FROM = 'RSV.Pizza <noreply@rsv.pizza>';
+const FROM = brand.fromEmail;
 
 /** Minimal HTML escape for user-authored text dropped into an email body. */
 function escapeHtml(s: string): string {

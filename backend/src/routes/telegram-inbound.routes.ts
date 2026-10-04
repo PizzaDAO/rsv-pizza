@@ -28,6 +28,7 @@
  *     Mounted at /api/telegram (same router family as /link-host) in index.ts.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { brand } from '../config/brand.js';
 import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -183,7 +184,7 @@ router.post(
           await sendTelegramMessage(
             chatIdStr,
             `Only the event host can submit receipts or attendance for ${party.name}. ` +
-              `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
+              `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your ${brand.domain} profile so I can verify you.`,
           );
           return res.status(200).json({
             ok: true,
@@ -233,8 +234,8 @@ router.post(
             resolvedWallet = await resolveWalletInput(trimmed);
           } catch (err: any) {
             const hint = looksLikeEnsName(trimmed)
-              ? `I couldn't resolve "${trimmed}" to a wallet address. Double-check the ENS name, or send your 0x… address instead — or add it at rsv.pizza/host/${slug}/payments`
-              : `That doesn't look like a valid wallet address. Send a 0x… address (or an ENS name like alice.eth), or add it at rsv.pizza/host/${slug}/payments`;
+              ? `I couldn't resolve "${trimmed}" to a wallet address. Double-check the ENS name, or send your 0x… address instead — or add it at ${brand.domain}/host/${slug}/payments`
+              : `That doesn't look like a valid wallet address. Send a 0x… address (or an ENS name like alice.eth), or add it at ${brand.domain}/host/${slug}/payments`;
             await sendTelegramMessage(chatIdStr, hint);
             return res.status(200).json({
               ok: true,
@@ -250,7 +251,7 @@ router.post(
             // a role:'host' context, but guard rather than crash.
             await sendTelegramMessage(
               chatIdStr,
-              `I couldn't save that wallet — please add it at rsv.pizza/host/${slug}/payments`,
+              `I couldn't save that wallet — please add it at ${brand.domain}/host/${slug}/payments`,
             );
             return res.status(200).json({
               ok: true,
@@ -274,7 +275,7 @@ router.post(
         await sendTelegramMessage(
           chatIdStr,
           `I can add a receipt photo, an event photo, a headcount number, or your payout wallet for ${party.name}. ` +
-            `For anything else, head to rsv.pizza/host/${slug}/payments`,
+            `For anything else, head to ${brand.domain}/host/${slug}/payments`,
         );
         return res.status(200).json({
           ok: true,
@@ -309,7 +310,7 @@ router.post(
         await sendTelegramMessage(
           chatIdStr,
           `I couldn't download that image — please try again, or add it at ` +
-            `rsv.pizza/host/${party.customUrl || party.inviteCode}/payments`,
+            `${brand.domain}/host/${party.customUrl || party.inviteCode}/payments`,
         );
         return res.status(200).json({ ok: false, action: 'ignored', reason: 'download-failed' });
       }
@@ -333,7 +334,7 @@ router.post(
         await sendTelegramMessage(
           chatIdStr,
           `Only the event host can submit receipts or attendance for ${party.name}. ` +
-            `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your rsv.pizza profile so I can verify you.`,
+            `Photos are welcome though 📸 — if you're the host, add your Telegram @handle on your ${brand.domain} profile so I can verify you.`,
         );
         return res.status(200).json({
           ok: true,

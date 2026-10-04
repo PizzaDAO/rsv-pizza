@@ -85,7 +85,7 @@ export async function notifyPaymentsTeam(opts: {
       const html = `
         <p>${verb}</p>
         <p><b>${escapeHtml(cityName)}</b> — $${amount} USDC to ${escapeHtml(recipient)}</p>
-        <p><a href="${reviewUrl}">Review on rsv.pizza</a></p>
+        <p><a href="${reviewUrl}">Review on ${brand.name}</a></p>
       `.trim();
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
