@@ -80,8 +80,9 @@ export async function canUserEditParty(
     return false;
   }
 
-  // Check if user is the owner
-  if (party.userId === userId) {
+  // Check if user is the owner (guard: an anonymous caller must never match an
+  // ownerless party via undefined === undefined)
+  if (userId && party.userId === userId) {
     return true;
   }
 

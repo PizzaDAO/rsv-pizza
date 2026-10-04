@@ -7,6 +7,10 @@ const mockPrisma = vi.hoisted(() => ({
   party: {
     findUnique: vi.fn(),
   },
+  // Alias fallback for old slugs; default to "no alias".
+  slugAlias: {
+    findUnique: vi.fn(() => Promise.resolve(null)),
+  },
   guest: {
     findFirst: vi.fn(),
     create: vi.fn(),

@@ -25,6 +25,8 @@ const mockPrisma = vi.hoisted(() => ({
   // the loader falls back to the current real value (30) — the behavior the
   // upload tests assume.
   appConfig: { findUnique: vi.fn(() => Promise.resolve(null)) },
+  // PATCH runs its role-clear + update inside an interactive transaction.
+  $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma)),
 }));
 
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
@@ -51,6 +53,9 @@ vi.mock('../middleware/auth.js', () => {
       next();
     },
     isSuperAdmin: (email?: string) => email === 'hello@rarepizzas.com',
+    isAdmin: () => false,
+    isPaymentAdmin: () => false,
+    isUnderboss: () => false,
     AuthRequest: {},
   };
 });
@@ -82,18 +87,21 @@ describe('Photo Routes - Moderation', () => {
   describe('POST /:partyId/photos', () => {
     const pp = { url: 'https://s.com/p.jpg', fileName: 'p.jpg', fileSize: 500000, mimeType: 'image/jpeg' };
 
-    it('sets status=approved when moderation OFF', async () => {
+    // margherita-43821: status is decided by WHO uploads, not party.photoModeration —
+    // host uploads auto-approve, guest uploads always go to pending.
+    it('host upload is auto-approved', async () => {
       const app = createTestApp();
-      mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY_ID, photosEnabled: true, photoModeration: false });
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY_ID, userId: HOST_USER_ID, photosEnabled: true, photoModeration: true, coHosts: [] });
       mockPrisma.photo.create.mockResolvedValue({ id: PHOTO_ID, ...pp, partyId: PARTY_ID, status: 'approved', guest: null });
-      const res = await request(app).post(`/api/parties/${PARTY_ID}/photos`).send(pp);
+      const res = await request(app).post(`/api/parties/${PARTY_ID}/photos`).set('Authorization', `Bearer ${token}`).send(pp);
       expect(res.status).toBe(201);
       expect(mockPrisma.photo.create.mock.calls[0][0].data.status).toBe('approved');
     });
 
-    it('sets status=pending when moderation ON', async () => {
+    it('anonymous guest upload is pending, even when moderation is OFF', async () => {
       const app = createTestApp();
-      mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY_ID, photosEnabled: true, photoModeration: true });
+      mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY_ID, userId: HOST_USER_ID, photosEnabled: true, photoModeration: false, coHosts: [] });
       mockPrisma.photo.create.mockResolvedValue({ id: PHOTO_ID, ...pp, partyId: PARTY_ID, status: 'pending', guest: null });
       const res = await request(app).post(`/api/parties/${PARTY_ID}/photos`).send(pp);
       expect(res.status).toBe(201);
