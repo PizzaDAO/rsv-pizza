@@ -1002,7 +1002,6 @@ export interface DbGuest {
   submitted_via: string;
   checked_in_at?: string | null;
   approved?: boolean | null; // null = pending, true = approved, false = declined
-  checked_in_at?: string | null;
   checked_in_by?: string | null;
   status?: DbGuestStatus;
   waitlist_position?: number | null;
