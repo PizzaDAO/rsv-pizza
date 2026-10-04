@@ -201,7 +201,6 @@ export function parseDateTimeInTimezone(dateStr: string, timeStr: string, timezo
 
   const targetMs = parseFormatted(localInTarget);
   const utcMs = parseFormatted(localInUTC);
-  const localOffset = targetMs - utcMs;
 
   // Now we need to figure out the offset of the target timezone from UTC
   // Create a reference date at the target time

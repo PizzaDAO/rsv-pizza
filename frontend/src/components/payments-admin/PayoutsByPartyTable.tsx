@@ -43,7 +43,7 @@ import {
   PayoutStatusPill,
   PayoutMethodIcon,
   ReceiptLightbox,
-  type ReceiptLightboxImage,
+  ReceiptLightboxImage,
   formatUsd,
   computePartyTotals,
   CapInlineEditor,

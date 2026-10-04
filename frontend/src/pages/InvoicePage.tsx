@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2, FileText, Download, AlertCircle } from 'lucide-react';
 import { Invoice, InvoiceLineItem } from '../types';

@@ -27,7 +27,7 @@
  * Country-tier logic is intentionally out of scope (city tier only).
  */
 
-import { getCityTier, type CityTiers } from './sponsorshipPricing';
+import { getCityTier, CityTiers } from './sponsorshipPricing';
 import type { PricingConfig } from '../lib/api';
 
 export type ReimbursementCapBands = PricingConfig['reimbursementCapBands'];

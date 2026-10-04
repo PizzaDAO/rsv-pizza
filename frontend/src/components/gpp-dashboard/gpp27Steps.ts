@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   Megaphone,
   Rocket,
-  type LucideIcon,
+  LucideIcon,
 } from 'lucide-react';
 import type { Party, Guest } from '../../types';
 

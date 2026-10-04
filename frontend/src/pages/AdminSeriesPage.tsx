@@ -14,7 +14,7 @@ import {
   fetchSeriesChecklist,
   addSeriesChecklistDefault,
   deleteSeriesChecklistDefault,
-  type EventSeries,
+  EventSeries,
   type SeriesChecklistDefault,
   type SeriesInput,
 } from '../lib/api';

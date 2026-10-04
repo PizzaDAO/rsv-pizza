@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Copy, Loader2, X, MessageSquare } from 'lucide-react';
 import { IconInput } from '../IconInput';
@@ -6,7 +6,7 @@ import {
   OUTREACH_CHANNEL_LABELS,
   getTemplate,
   renderTemplate,
-  type OutreachChannel,
+  OutreachChannel,
 } from '../../lib/outreachTemplates';
 import { logOutreachAttempt, type OutreachCommunityRow } from '../../lib/api';
 

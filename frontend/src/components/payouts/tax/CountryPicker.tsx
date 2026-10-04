@@ -4,7 +4,7 @@ import {
   COUNTRY_DATA,
   findCountryByName,
   searchCountries,
-  type Country,
+  Country,
 } from '../../../utils/countries';
 
 /**

@@ -7,7 +7,7 @@ import {
   eventAssistant,
   eventAssistantFeedback,
   updatePartyApi,
-  type AssistantProposedChange,
+  AssistantProposedChange,
   type AssistantHistoryTurn,
 } from '../lib/api';
 import type { Party } from '../types';

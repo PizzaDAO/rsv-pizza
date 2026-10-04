@@ -10,7 +10,7 @@ import {
   applyLogoBgFix,
   applyLogoBgFixUpload,
   fetchLogoBgPreviewBlob,
-  type LogoCleanupItem,
+  LogoCleanupItem,
 } from '../lib/api';
 
 // Inline checkerboard background so transparency is visible against both

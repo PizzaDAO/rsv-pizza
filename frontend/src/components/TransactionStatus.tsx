@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
-import { type DonationStatus } from '../hooks/useCryptoDonation';
+import { DonationStatus } from '../hooks/useCryptoDonation';
 import { getExplorerTxUrl, getChainName } from '../lib/tokens';
 
 interface TransactionStatusProps {

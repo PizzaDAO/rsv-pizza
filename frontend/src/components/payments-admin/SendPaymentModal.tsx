@@ -25,7 +25,7 @@ import {
   executeAdminPayout,
   fetchWalletPaidTotal,
   searchApprovedParties,
-  type ApprovedPartySearchResult,
+  ApprovedPartySearchResult,
 } from '../../lib/api';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import type { PayoutMethod, WalletPaidTotal } from '../../types';

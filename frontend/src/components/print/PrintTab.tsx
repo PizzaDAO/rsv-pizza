@@ -1,4 +1,3 @@
-import React from 'react';
 import { Download, Tag } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { PosterGenerator } from '../generative/PosterGenerator';

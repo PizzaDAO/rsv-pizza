@@ -39,7 +39,7 @@ import type {
   PrepayCandidate,
 } from '../types';
 import { formatUsd, computePartyTotals } from '../components/payments-shared';
-import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../utils/regions';
+import { PAYMENTS_REGION_LABELS, PaymentsRegionPortal } from '../utils/regions';
 import { isSwcHubParty } from '../utils/swcHub';
 import { normalizeText } from '../lib/normalizeText';
 import {

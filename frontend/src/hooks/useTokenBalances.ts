@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAccount, useBalance, useReadContracts } from 'wagmi';
-import { type Address, formatUnits } from 'viem';
+import { Address, formatUnits } from 'viem';
 import { SUPPORTED_TOKENS, ERC20_TRANSFER_ABI, type TokenInfo } from '../lib/tokens';
 
 export interface TokenBalance {

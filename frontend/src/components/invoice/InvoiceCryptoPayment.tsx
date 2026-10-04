@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSwitchChain, useEnsAddress } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
-import { type Address, isAddress } from 'viem';
+import { Address, isAddress } from 'viem';
 import { Copy, Check, ExternalLink, ChevronDown, Loader2 } from 'lucide-react';
 import { useTokenBalances, type TokenBalance } from '../../hooks/useTokenBalances';
 import { useCryptoDonation } from '../../hooks/useCryptoDonation';
@@ -39,7 +39,7 @@ export const InvoiceCryptoPayment: React.FC<InvoiceCryptoPaymentProps> = ({
   invoice,
   onSuccess,
 }) => {
-  const { address, chainId, isConnected } = useAccount();
+  const { chainId, isConnected } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balances, isLoading: balancesLoading } = useTokenBalances();
   const { status: txStatus, txHash, error: txError, sendDonation, reset: resetTx } = useCryptoDonation();

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, Users, ExternalLink } from 'lucide-react';
 import { PageViewStats as PageViewStatsType } from '../../types';

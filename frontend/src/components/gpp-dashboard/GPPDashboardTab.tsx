@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, Lock, ShieldCheck, ExternalLink, type LucideIcon } from 'lucide-react';
+import { PartyPopper, Package, Users, MapPin, DollarSign, Handshake, ClipboardCheck, Megaphone, Rocket, CheckCircle, Circle, Loader2, Eye, EyeOff, Check, Lock, ShieldCheck, ExternalLink, LucideIcon } from 'lucide-react';
 import { usePizza } from '../../contexts/PizzaContext';
 import { getChecklist, seedChecklist, updateUnderbossStatus, toggleChecklistItem, listPayouts } from '../../lib/api';
 import { AutoCompleteStates, ChecklistItem, Payout } from '../../types';

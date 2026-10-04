@@ -1,7 +1,7 @@
 import type { FormatConfig, CanvasPositions } from './types';
 import {
   fitText, loadImg,
-  CITY_COLOR, TIME_COLOR, VENUE_COLOR,
+  CITY_COLOR, TIME_COLOR,
 } from '../flyer/renderFlyer';
 
 export interface RenderCanvasOptions {

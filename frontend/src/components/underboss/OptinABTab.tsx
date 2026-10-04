@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { fetchOptinABResults, fetchExperimentFlags, setExperimentFlag } from '../../lib/api';
 import type { OptinABResults, OptinABRegion, OptinABArm, ExperimentFlag } from '../../lib/api';

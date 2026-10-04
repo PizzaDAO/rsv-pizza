@@ -4,7 +4,7 @@ import { Checkbox } from './Checkbox';
 import {
   sendSurvey,
   getSurveyResults,
-  type SurveyResults,
+  SurveyResults,
 } from '../lib/api';
 import { updateParty } from '../lib/supabase';
 import { usePizza } from '../contexts/PizzaContext';

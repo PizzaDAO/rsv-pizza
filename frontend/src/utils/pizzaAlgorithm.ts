@@ -7,14 +7,6 @@ import { DIETARY_TOPPING_EXCLUSIONS } from '../constants/options';
 // - Detroit: 2 slices per person (similar to NY-style serving)
 // - NY/default: based on surface area (18" feeds 4)
 
-function getServingsForStyle(size: PizzaSize, style: PizzaStyle): number {
-  if (style.id === 'neapolitan') {
-    // Neapolitan pizzas are personal-sized, 1 pizza per 1.5 people regardless of size
-    return 1.5;
-  }
-  // Detroit and NY use surface-area based servings
-  return size.servings;
-}
 
 function getMaxGuestsPerPizza(style: PizzaStyle): number {
   if (style.id === 'neapolitan') {

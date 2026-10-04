@@ -5,7 +5,7 @@ import { Checkbox } from '../Checkbox';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
 import type { AdminPayout, WalletPaidTotal } from '../../types';
-import { bulkExecutePayouts, fetchWalletPaidTotal, type BulkSendResult } from '../../lib/api';
+import { bulkExecutePayouts, fetchWalletPaidTotal, BulkSendResult } from '../../lib/api';
 
 interface BulkSendModalProps {
   isOpen: boolean;

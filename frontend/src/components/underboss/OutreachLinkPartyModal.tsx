@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Search, X } from 'lucide-react';
 import { IconInput } from '../IconInput';
@@ -6,7 +6,7 @@ import { BRAND } from '../../config/brand';
 import {
   searchPartiesForOutreach,
   updateOutreachAttempt,
-  type OutreachPartySearchResult,
+  OutreachPartySearchResult,
 } from '../../lib/api';
 
 interface OutreachLinkPartyModalProps {

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Users, Camera, MapPin, Calendar, ExternalLink, Check, Plus, X, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProgressIndicator } from './ProgressIndicator';
 import { IconInput } from '../IconInput';
-import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
+import { updateHostStatus, bulkUpdateEventTags, updateUnderbossNotes, getPartyPhotos, getImageAuthenticityCheck, ImageAuthenticityCheck } from '../../lib/api';
 import { AuthenticityPanel } from '../payments-shared';
 import { getGppPhotosForCity, getGppPhotoCounts } from '../../lib/gppPhotos';
 import type { UnderbossEvent, HostStatus } from '../../types';

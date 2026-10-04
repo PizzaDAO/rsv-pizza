@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { UnderbossEvent } from '../types';
 import { GPP_REGIONS } from '../types';
-import { renderFlyer, uses12Hour, formatFlyerTime, type FlyerConfig } from '../components/flyer/renderFlyer';
+import { renderFlyer, uses12Hour, formatFlyerTime, FlyerConfig } from '../components/flyer/renderFlyer';
 import { getDateTimeInTimezone } from '../utils/dateUtils';
 import { uploadEventImage, updateParty } from '../lib/supabase';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
-import { Performer, Song, Playlist, MusicPlatform } from '../../types';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { Performer, Song, Playlist } from '../../types';
 import { PizzaContext } from '../../contexts/PizzaContext';
 import {
   getPerformers,
@@ -65,7 +65,6 @@ export const MusicWidget: React.FC<MusicWidgetProps> = ({ isHost = false, partyI
 
   // File upload state for songs
   const [isSongDragOver, setIsSongDragOver] = useState(false);
-  const songFileInputRef = useRef<HTMLInputElement>(null);
 
   // Share button state
   const [copied, setCopied] = useState(false);

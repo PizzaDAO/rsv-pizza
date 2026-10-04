@@ -5,7 +5,7 @@ import {
   listSavedViews,
   saveFilterView,
   deleteSavedView,
-  type SavedView,
+  SavedView,
   type SavedViewScope,
 } from '../lib/api';
 

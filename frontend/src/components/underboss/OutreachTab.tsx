@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpDown, ExternalLink, Loader2, Mail, MapPin, MessageCircle, Search, Send, Twitter, Users } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import {
   fetchOutreachCommunities,
   fetchUnderbossMe,
   updateOutreachAttempt,
-  type OutreachChannel,
+  OutreachChannel,
   type OutreachCommunityRow,
   type OutreachStatus,
 } from '../../lib/api';

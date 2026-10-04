@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   filtersToSearchParams,
   searchParamsToFilters,
-  type ViewMode,
+  ViewMode,
 } from './paymentsUrlState';
 import type { AdminPayoutFilters } from '../../types';
 

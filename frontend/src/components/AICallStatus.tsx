@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, PhoneCall, PhoneOff, CheckCircle, XCircle, Loader2, RotateCcw, Clock } from 'lucide-react';
+import { Phone, PhoneCall, PhoneOff, CheckCircle, Loader2, RotateCcw, Clock } from 'lucide-react';
 
 export interface CallStatusData {
   id: string;

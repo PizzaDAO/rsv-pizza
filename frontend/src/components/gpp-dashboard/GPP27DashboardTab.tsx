@@ -20,7 +20,7 @@ import {
   GPP27_STEPS,
   stepUnlocked,
   manualDoneKey,
-  type Gpp27Step,
+  Gpp27Step,
   type Gpp27StepCtx,
 } from './gpp27Steps';
 

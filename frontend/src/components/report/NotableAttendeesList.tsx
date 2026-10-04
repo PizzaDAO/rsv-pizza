@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Loader2, Users, Building2, User, Link } from 'lucide-react';
 import { IconInput } from '../IconInput';

@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import { Pizzeria, OrderItem, OrderingProvider } from '../types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -172,7 +171,6 @@ export async function createAIPhoneOrder(
 
 // Generate a phone order script
 export function generatePhoneOrderScript(
-  pizzeriaName: string,
   items: OrderItem[],
   customerName: string,
   fulfillmentType: 'pickup' | 'delivery',

@@ -65,7 +65,7 @@ export function AccountPage() {
 
   // Helper to compare arrays
   const arraysEqual = (a: string[], b: string[]) =>
-    a.length === b.length && a.every((v, i) => b.includes(v)) && b.every((v) => a.includes(v));
+    a.length === b.length && a.every((v) => b.includes(v)) && b.every((v) => a.includes(v));
 
   // Check if preferences have changed
   const preferencesChanged = originalPreferences

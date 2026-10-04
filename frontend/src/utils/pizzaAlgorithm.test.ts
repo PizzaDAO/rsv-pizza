@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generatePizzaRecommendations } from './pizzaAlgorithm';
-import { Guest, PizzaStyle, PizzaSize, PizzaRecommendation } from '../types';
-import { PIZZA_STYLES, PIZZA_SIZES } from '../constants/options';
+import { Guest, PizzaRecommendation } from '../types';
+import { PIZZA_STYLES } from '../constants/options';
 
 // Helpers
 const NY_STYLE = PIZZA_STYLES.find(s => s.id === 'new-york')!;
@@ -172,7 +172,6 @@ describe('generatePizzaRecommendations', () => {
 
       // Should have grouped identical pizzas
       const customPizzas = result.filter(p => !p.isForNonRespondents);
-      const hasGrouped = customPizzas.some(p => (p.quantity || 1) > 1);
       // With 10 guests on NY style, they should be split into groups and potentially merged
       expect(customPizzas.length).toBeGreaterThan(0);
     });

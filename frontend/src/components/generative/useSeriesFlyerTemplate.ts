@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchPublicSeriesList } from '../../lib/api';
-import { resolveFlyerTemplate, type FlyerTemplate } from './configs/flyerTemplates';
+import { resolveFlyerTemplate, FlyerTemplate } from './configs/flyerTemplates';
 
 /**
  * Resolve a party's series flyer template (Phase 2c). Given the party's

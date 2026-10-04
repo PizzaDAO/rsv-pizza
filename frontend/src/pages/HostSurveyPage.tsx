@@ -7,7 +7,7 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { fetchHostSurvey, submitHostSurvey, type HostSurveyFetchResponse } from '../lib/api';
+import { fetchHostSurvey, submitHostSurvey, HostSurveyFetchResponse } from '../lib/api';
 import type { SurveyQuestion, SurveyAnswers, SurveyAnswerValue } from '../lib/surveyQuestions';
 
 // panzerotti-58527: host survey-taking page. Clone of SurveyPage, but rendered

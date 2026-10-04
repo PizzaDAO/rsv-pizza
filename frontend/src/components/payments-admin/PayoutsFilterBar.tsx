@@ -3,13 +3,13 @@ import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { TriStateFilterDropdown } from '../TriStateFilterDropdown';
-import type { AdminPayoutFilters, PayoutMethod, PayoutStatus } from '../../types';
+import type { AdminPayoutFilters, PayoutMethod } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
 import {
   PAYMENTS_REGION_DISPLAY_ORDER,
   PAYMENTS_REGION_LABELS,
   PAYMENTS_REGION_SCOPES,
-  type PaymentsRegionPortal,
+  PaymentsRegionPortal,
 } from '../../utils/regions';
 // panuozzo-92114: canonical filter VALUE lists live in the React-free options
 // module so PayoutsFilterBar and the URL (de)serializer can't drift.

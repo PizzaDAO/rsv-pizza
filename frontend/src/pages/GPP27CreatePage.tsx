@@ -16,7 +16,7 @@ import {
   createGpp27Event, fetchGpp27BudgetSuggestion,
   fetchGpp27Agreement,
   fetchGpp27PublishStatus, publishGpp27Event,
-  type Gpp27CreateEventResponse, type Gpp27BudgetSuggestion,
+  Gpp27CreateEventResponse, type Gpp27BudgetSuggestion,
   type Gpp27AgreementClause, type Gpp27PublishStatus,
 } from '../lib/api';
 

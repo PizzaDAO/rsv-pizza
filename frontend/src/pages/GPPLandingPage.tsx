@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle, Loader2, ArrowRight, MapPin, Globe, ChevronDown } from 'lucide-react';

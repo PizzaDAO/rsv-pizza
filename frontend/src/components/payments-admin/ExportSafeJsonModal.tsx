@@ -5,7 +5,7 @@ import type { AdminPayout } from '../../types';
 import {
   buildSafeBatch,
   downloadSafeBatch,
-  type SafeBatchLabel,
+  SafeBatchLabel,
 } from '../../lib/safeTransactionBuilder';
 
 interface ExportSafeJsonModalProps {

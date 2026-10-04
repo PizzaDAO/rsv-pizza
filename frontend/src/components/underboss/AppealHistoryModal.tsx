@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { fetchReimbursementCapAppeals } from '../../lib/api';

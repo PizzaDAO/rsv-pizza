@@ -6,7 +6,7 @@ import { Layout } from '../components/Layout';
 import { IconInput } from '../components/IconInput';
 import { Checkbox } from '../components/Checkbox';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { fetchSurvey, submitSurvey, type SurveyFetchResponse } from '../lib/api';
+import { fetchSurvey, submitSurvey, SurveyFetchResponse } from '../lib/api';
 import type { SurveyQuestion, SurveyAnswers, SurveyAnswerValue } from '../lib/surveyQuestions';
 
 export function SurveyPage() {

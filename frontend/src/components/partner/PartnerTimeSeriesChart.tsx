@@ -14,7 +14,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import {
   fetchSponsorEventsTimeSeries,
-  type PartnerTimeSeriesRange,
+  PartnerTimeSeriesRange,
   type PartnerTimeSeriesPoint,
 } from '../../lib/api';
 

@@ -6,7 +6,7 @@ import { Checkbox } from '../Checkbox';
 import { ClickableEmail } from '../ClickableEmail';
 import { SwcHubWarning } from './SwcHubWarning';
 import { isSwcHubParty } from '../../utils/swcHub';
-import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, rotatePayoutDocument, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, type ImageAuthenticityCheck } from '../../lib/api';
+import { updatePartyApi, updatePayoutDocument, retryPayoutDocumentOcr, rotatePayoutDocument, summarizePayoutDocument, markReceiptDuplicate, markReceiptIneligible, getImageAuthenticityCheck, ImageAuthenticityCheck } from '../../lib/api';
 import { isVideoFile } from '../../lib/mediaUtils';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';
 import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';

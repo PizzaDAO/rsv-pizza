@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wallet, RefreshCcw, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
-import { fetchPayoutWalletInfo, type PayoutWalletInfo } from '../../lib/api';
+import { fetchPayoutWalletInfo, PayoutWalletInfo } from '../../lib/api';
 
 /**
  * coppa-91827: payout hot wallet info card.

@@ -15,7 +15,7 @@ import {
   fetchAdminMe, fetchUnderbossMe,
   createSideEvent, fetchSideAgreement,
   fetchSidePublishStatus, publishSideEvent,
-  type SideCreateEventResponse,
+  SideCreateEventResponse,
   type SideAgreementClause, type SidePublishStatus,
 } from '../lib/api';
 

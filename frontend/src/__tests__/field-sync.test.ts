@@ -95,17 +95,6 @@ function extractDbPartyToPartyFields(source: string): string[] {
 }
 
 // Extract fields destructured in the backend PATCH handler
-function extractPatchHandlerFields(source: string): string[] {
-  // Find the PATCH handler destructuring
-  const patchRegex = /router\.patch\s*\(\s*'\/:id'[\s\S]*?const\s*\{([^}]+)\}\s*=\s*req\.body/;
-  const match = source.match(patchRegex);
-  if (!match) return [];
-
-  return match[1]
-    .split(',')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('//'));
-}
 
 describe('Field Mapping Consistency', () => {
   const safeColumns = parseSafeColumns(SAFE_PARTY_COLUMNS);

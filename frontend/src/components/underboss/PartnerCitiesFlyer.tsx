@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Download, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import type { SponsorUser, UnderbossEvent } from '../../types';
 import { loadImg, CITY_COLOR, CITY_FONT, TEXT_FONT, VENUE_COLOR } from '../flyer/renderFlyer';
-import { getCityTier, type CityTiers } from '../../utils/sponsorshipPricing';
+import { getCityTier, CityTiers } from '../../utils/sponsorshipPricing';
 import { usePricingConfig } from '../../hooks/usePricingConfig';
 
 interface PartnerCitiesFlyerProps {
@@ -132,7 +132,6 @@ function flagForCountry(country: string | null | undefined): string {
 const DEFAULT_LOGO_POS = { x: 340, y: 36 };
 const DEFAULT_LOGO_SIZE = 50;
 const CITY_BOX = { x: 55, y: 597, width: 500, height: 490 };
-const MAX_VISIBLE = 10;
 const CITY_FONT_SIZE = 42;
 const CITY_LINE_SPACING = 1.25;
 const SUBHEAD_TEXT = 'SUPPORTING EVENTS IN';

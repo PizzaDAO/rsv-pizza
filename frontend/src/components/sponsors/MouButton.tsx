@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   FileSignature, Check, Clock, ExternalLink, Copy, Send, Trash2,
   Loader2,

@@ -6,7 +6,7 @@ import {
   getPartnerAiShareToken,
   createPartnerAiShareToken,
   revokePartnerAiShareToken,
-  type PartnerAiShareTokenResponse,
+  PartnerAiShareTokenResponse,
 } from '../../lib/api';
 
 interface ShareWithAiButtonProps {

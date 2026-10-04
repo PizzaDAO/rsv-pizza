@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { X, Search, Check, AlertCircle, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';

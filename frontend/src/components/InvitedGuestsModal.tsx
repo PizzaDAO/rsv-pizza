@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, MailQuestion } from 'lucide-react';
 import { Guest } from '../types';
 import { ClickableEmail } from './ClickableEmail';

@@ -14,7 +14,7 @@ import {
   METHOD_VALUES as METHOD_OPTION_VALUES,
   PURPOSE_VALUES as PURPOSE_OPTION_VALUES,
   SORT_VALUES as SORT_OPTION_VALUES,
-  type SortValue,
+  SortValue,
 } from './paymentsFilterOptions';
 
 export type ViewMode = 'by-city' | 'by-payment' | 'payments';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Guest, BeverageRecommendation, PizzaRecommendation } from '../types';
-import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Pencil, Star, UserRoundX } from 'lucide-react';
+import { Trash2, Check, X, CheckCircle2, Loader2, ArrowUpCircle, Plus, Minus, Star, UserRoundX } from 'lucide-react';
 import { format } from 'date-fns';
 import { getToppingEmoji } from '../utils/toppingEmojis';
 import { ClickableEmail } from './ClickableEmail';
@@ -58,7 +58,6 @@ export const TableRow: React.FC<TableRowProps> = ({
   guest,
   beverageRec,
   pizzaRec,
-  pizzaIndex = 0,
   variant = 'basic',
   requireApproval = false,
   onApprove,

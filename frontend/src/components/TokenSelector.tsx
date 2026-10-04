@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { type TokenBalance } from '../hooks/useTokenBalances';
+import { TokenBalance } from '../hooks/useTokenBalances';
 
 interface TokenSelectorProps {
   balances: TokenBalance[];

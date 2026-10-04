@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Check, Edit2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { computeSuggestedReimbursementCap } from '../../utils/reimbursementCap';
-import { updatePartyApi, reviewReimbursementCapAppeal, type PricingConfig } from '../../lib/api';
+import { updatePartyApi, reviewReimbursementCapAppeal, PricingConfig } from '../../lib/api';
 import type { UnderbossEvent } from '../../types';
 import { AppealHistoryModal } from './AppealHistoryModal';
 
