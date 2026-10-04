@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Settings, Pizza, Users, Camera, LayoutGrid, Home, Zap, MessageSquare } from 'lucide-react';
@@ -244,7 +245,7 @@ function HostPageContent() {
         const appDef = PINNABLE_APPS.find(a => a.id === appId);
         if (!appDef) return null;
         return { id: appDef.tab as TabType, label: appDef.name, icon: appDef.icon };
-      }).filter((t): t is { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> } => t !== null);
+      }).filter((t): t is { id: TabType; label: string; icon: LucideIcon } => t !== null);
 
     const allTabs = [...coreTabs, ...pinnedTabs, { id: 'apps' as TabType, label: t('tabs.apps'), icon: LayoutGrid }];
 

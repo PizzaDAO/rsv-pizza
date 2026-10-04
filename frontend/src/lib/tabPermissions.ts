@@ -1,4 +1,5 @@
 import {
+  type LucideIcon,
   Home,
   Zap,
   Settings,
@@ -51,7 +52,7 @@ export type TabId =
 export interface HostTab {
   id: TabId;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
 }
 
 /**
