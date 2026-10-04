@@ -1052,11 +1052,15 @@ export const SAFE_PARTY_COLUMNS = `
  * of the codebase can continue reading party.co_hosts.  The raw co_hosts column
  * is now hidden from anon/authenticated; only co_hosts_public is returned.
  */
-function normalizePartyCoHosts<T extends Record<string, any>>(party: T): T {
-  if (party && party.co_hosts_public !== undefined && party.co_hosts === undefined) {
-    party.co_hosts = party.co_hosts_public;
+function normalizePartyCoHosts<T extends { co_hosts_public?: any[] | null }>(
+  party: T,
+): T & { co_hosts: any[] } {
+  const p = party as T & { co_hosts?: any[] };
+  if (p && p.co_hosts_public !== undefined && p.co_hosts === undefined) {
+    p.co_hosts = p.co_hosts_public as any[];
   }
-  return party;
+  // Every SAFE_PARTY_COLUMNS row carries co_hosts_public, so co_hosts is now set.
+  return p as T & { co_hosts: any[] };
 }
 
 // Party operations
@@ -1161,6 +1165,9 @@ export async function createParty(opts: CreatePartyOptions = {}): Promise<DbPart
         description: party.description,
         address: party.address,
         place_id: party.placeId,
+        venue_name: party.venueName ?? null,
+        require_approval: party.requireApproval ?? false,
+        selected_pizzerias: party.selectedPizzerias ?? null,
         rsvp_closed_at: party.rsvpClosedAt,
         co_hosts: party.coHosts || [],
         created_at: party.createdAt,
@@ -1248,11 +1255,10 @@ export async function getPartyByInviteCode(inviteCode: string): Promise<DbParty 
     console.error('Error fetching party:', error);
     return null;
   }
-  if (data) {
-    normalizePartyCoHosts(data);
-    data.co_hosts = sanitizeCoHosts(data.co_hosts);
-  }
-  return data;
+  if (!data) return null;
+  const party = normalizePartyCoHosts(data);
+  party.co_hosts = sanitizeCoHosts(party.co_hosts);
+  return party;
 }
 
 /**
@@ -1313,11 +1319,10 @@ export async function getPartyByCustomUrl(customUrl: string): Promise<DbParty | 
     }
   }
 
-  if (party) {
-    normalizePartyCoHosts(party);
-    party.co_hosts = sanitizeCoHosts(party.co_hosts);
-  }
-  return party;
+  if (!party) return null;
+  const normalized = normalizePartyCoHosts(party);
+  normalized.co_hosts = sanitizeCoHosts(normalized.co_hosts);
+  return normalized;
 }
 
 // Reserved slugs that can't be used as custom party URLs
@@ -1416,7 +1421,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
     .maybeSingle();
 
   if (customUrlData) {
-    party = customUrlData as DbParty;
+    party = normalizePartyCoHosts(customUrlData);
   } else {
     // If not found by custom URL, try invite code
     const { data: inviteCodeData, error: inviteCodeError } = await supabase
@@ -1426,7 +1431,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
       .maybeSingle();
 
     if (inviteCodeData) {
-      party = inviteCodeData as DbParty;
+      party = normalizePartyCoHosts(inviteCodeData);
     } else {
       // Alias fallback: check slug_aliases
       const { data: aliasData } = await supabase
@@ -1443,7 +1448,7 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
           .maybeSingle();
 
         if (aliasPartyData) {
-          party = aliasPartyData as DbParty;
+          party = normalizePartyCoHosts(aliasPartyData);
         }
       }
 
@@ -1508,7 +1513,7 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     console.error('Error fetching party:', partyError);
   }
 
-  let party: DbParty | null = partyData;
+  let party: DbParty | null = partyData ? normalizePartyCoHosts(partyData) : null;
 
   // Alias fallback: check slug_aliases if not found
   if (!party) {
@@ -1524,16 +1529,13 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
         .select(SAFE_PARTY_COLUMNS)
         .eq('id', aliasData.party_id)
         .maybeSingle();
-      party = aliasPartyData;
+      party = aliasPartyData ? normalizePartyCoHosts(aliasPartyData) : null;
     }
   }
 
   if (!party) {
     return null;
   }
-
-  // Normalize: Supabase returns co_hosts_public (sanitized), copy to co_hosts
-  normalizePartyCoHosts(party);
 
   // Run co-host enrichment and guest fetch in parallel
   const enrichPromise = (async () => {
@@ -1583,8 +1585,7 @@ export async function updatePartyBeverages(partyId: string, availableBeverages: 
     .eq('id', partyId)
     .single();
 
-  if (data) normalizePartyCoHosts(data);
-  return data;
+  return data ? normalizePartyCoHosts(data) : null;
 }
 
 export async function updatePartyToppings(partyId: string, availableToppings: string[]): Promise<DbParty | null> {
@@ -1599,8 +1600,7 @@ export async function updatePartyToppings(partyId: string, availableToppings: st
     .eq('id', partyId)
     .single();
 
-  if (data) normalizePartyCoHosts(data);
-  return data;
+  return data ? normalizePartyCoHosts(data) : null;
 }
 
 export async function updatePartyDietaryOptions(partyId: string, availableDietaryOptions: string[]): Promise<DbParty | null> {
@@ -1615,8 +1615,7 @@ export async function updatePartyDietaryOptions(partyId: string, availableDietar
     .eq('id', partyId)
     .single();
 
-  if (data) normalizePartyCoHosts(data);
-  return data;
+  return data ? normalizePartyCoHosts(data) : null;
 }
 
 export async function updatePartyShowToppingsOnRsvp(partyId: string, value: boolean): Promise<DbParty | null> {
@@ -1629,8 +1628,7 @@ export async function updatePartyShowToppingsOnRsvp(partyId: string, value: bool
     .eq('id', partyId)
     .single();
 
-  if (data) normalizePartyCoHosts(data);
-  return data;
+  return data ? normalizePartyCoHosts(data) : null;
 }
 
 // Guest operations
@@ -2015,8 +2013,8 @@ export async function getAllParties(): Promise<DbParty[]> {
     return [];
   }
   return (data || []).map(p => {
-    normalizePartyCoHosts(p);
-    return { ...p, co_hosts: sanitizeCoHosts(p.co_hosts) };
+    const party = normalizePartyCoHosts(p);
+    return { ...party, co_hosts: sanitizeCoHosts(party.co_hosts) };
   });
 }
 
@@ -2340,8 +2338,8 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
       console.error('Error fetching guest parties:', error);
     } else {
       guestParties = (data || []).map(p => {
-        normalizePartyCoHosts(p);
-        return { ...p, co_hosts: sanitizeCoHosts(p.co_hosts) };
+        const party = normalizePartyCoHosts(p);
+        return { ...party, co_hosts: sanitizeCoHosts(party.co_hosts) };
       });
     }
   }
@@ -2377,8 +2375,8 @@ export async function getUserParties(userEmail: string): Promise<UserParty[]> {
       console.error('Error fetching host parties:', hostError);
     } else {
       hostParties = (data || []).map(p => {
-        normalizePartyCoHosts(p);
-        return { ...p, co_hosts: sanitizeCoHosts(p.co_hosts) };
+        const party = normalizePartyCoHosts(p);
+        return { ...party, co_hosts: sanitizeCoHosts(party.co_hosts) };
       });
     }
   }
