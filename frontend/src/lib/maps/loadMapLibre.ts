@@ -17,21 +17,24 @@ export const DEFAULT_MAP_STYLE = OPENFREEMAP_STYLE;
 
 type MapLibreModule = typeof import('maplibre-gl');
 
-let modPromise: Promise<MapLibreModule['default']> | null = null;
+let modPromise: Promise<MapLibreModule> | null = null;
 
 /**
  * Resolve the maplibre-gl default export, loading the library + its stylesheet
  * on first use. Safe to call from multiple components — the underlying import
  * is memoized so the library is only fetched once.
  */
-export async function loadMapLibre(): Promise<MapLibreModule['default']> {
+export async function loadMapLibre(): Promise<MapLibreModule> {
   if (!modPromise) {
     modPromise = (async () => {
       // Side-effect CSS import (static literal so Vite can bundle it). Loaded
       // alongside the JS the first time any MapLibre map mounts.
       await import('maplibre-gl/dist/maplibre-gl.css');
       const mod = await import('maplibre-gl');
-      return mod.default;
+      // maplibre-gl ships a UMD bundle: the bundler's CJS interop hands back the
+      // API on `.default`, while its .d.ts only declares named exports. Prefer
+      // `.default` when present, else the namespace itself.
+      return (mod as MapLibreModule & { default?: MapLibreModule }).default ?? mod;
     })();
   }
   return modPromise;

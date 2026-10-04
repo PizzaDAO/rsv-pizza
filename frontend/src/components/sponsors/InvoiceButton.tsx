@@ -6,6 +6,7 @@ import { Sponsor, Invoice } from '../../types';
 import { markInvoicePaid, sendInvoice } from '../../lib/api';
 import { InvoiceForm } from './InvoiceForm';
 import { brandUrl } from '../../config/brand';
+import { IconInput } from '../IconInput';
 
 interface InvoiceButtonProps {
   sponsor: Sponsor;

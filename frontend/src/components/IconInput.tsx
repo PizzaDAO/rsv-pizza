@@ -1,16 +1,25 @@
 import React, { forwardRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 
-interface IconInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface IconInputBaseProps {
   icon?: LucideIcon;
   customIcon?: React.ReactNode;
   iconSize?: number;
-  multiline?: boolean;
-  rows?: number;
 }
 
+/** Single-line mode: renders an `<input>`, handlers receive HTMLInputElement events. */
+type SingleLineProps = IconInputBaseProps &
+  React.InputHTMLAttributes<HTMLInputElement> & { multiline?: false };
+
+/** `multiline` mode: renders a `<textarea>`, handlers receive HTMLTextAreaElement events. */
+type MultilineProps = IconInputBaseProps &
+  React.TextareaHTMLAttributes<HTMLTextAreaElement> & { multiline: true; rows?: number };
+
+export type IconInputProps = SingleLineProps | MultilineProps;
+
 export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, IconInputProps>(
-  ({ icon: Icon, customIcon, iconSize = 20, className = '', placeholder, required, multiline, rows = 3, ...props }, ref) => {
+  (allProps, ref) => {
+    const { icon: Icon, customIcon, iconSize = 20, className = '', placeholder, required, multiline, ...props } = allProps;
     const displayPlaceholder = placeholder && required && !placeholder.endsWith('*')
       ? `${placeholder} *`
       : placeholder;
@@ -23,7 +32,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
     ) : null);
 
     if (multiline) {
-      const { type, ...textareaProps } = props as any;
+      const { rows = 3, ...textareaProps } = props as Omit<MultilineProps, keyof IconInputBaseProps | 'className' | 'placeholder' | 'required' | 'multiline'>;
       return (
         <div className="relative">
           {iconElement}
@@ -47,7 +56,7 @@ export const IconInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Icon
           className={`w-full !pl-14 ${className}`}
           placeholder={displayPlaceholder}
           required={required}
-          {...props}
+          {...(props as React.InputHTMLAttributes<HTMLInputElement>)}
         />
       </div>
     );

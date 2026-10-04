@@ -296,7 +296,7 @@ export function AdminSeriesPage() {
 
             <IconInput icon={FileText} multiline rows={5} placeholder="Description (shown on the series landing / event pages)"
               value={form.description}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('description', e.target.value)} />
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => set('description', e.target.value)} />
 
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <Checkbox checked={form.isActive} onChange={() => set('isActive', !form.isActive)} label="Active" size={16} labelClassName="text-sm text-theme-text-secondary" />

@@ -101,7 +101,7 @@ export function CoordinatorModal({ coordinator, onClose, onSave }: CoordinatorMo
             icon={X}
             placeholder="Notes (optional)"
             value={notes}
-            onChange={(e) => setNotes((e.target as HTMLInputElement).value)}
+            onChange={(e) => setNotes(e.target.value)}
             multiline
             rows={2}
           />

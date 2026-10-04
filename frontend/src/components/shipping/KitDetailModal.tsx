@@ -238,7 +238,7 @@ export function KitDetailModal({ kit, onClose, onUpdate }: KitDetailModalProps) 
                 icon={FileText}
                 placeholder="Admin notes (internal only)"
                 value={adminNotes}
-                onChange={(e) => setAdminNotes((e.target as HTMLInputElement).value)}
+                onChange={(e) => setAdminNotes(e.target.value)}
                 multiline
                 rows={3}
               />
