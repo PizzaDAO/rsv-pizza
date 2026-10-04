@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -11,7 +11,7 @@ interface CheckInScannerProps {
   onClose: () => void;
 }
 
-export function CheckInScanner({ inviteCode, currentGuestId, onVouchSuccess, onClose }: CheckInScannerProps) {
+export function CheckInScanner({ currentGuestId, onVouchSuccess, onClose }: CheckInScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<string>('Starting camera...');

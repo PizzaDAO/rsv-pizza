@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSwitchChain, useEnsAddress } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
-import { type Address, isAddress } from 'viem';
+import { Address, isAddress } from 'viem';
 import { Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
 import { useTokenBalances, type TokenBalance } from '../hooks/useTokenBalances';
 import { useCryptoDonation } from '../hooks/useCryptoDonation';

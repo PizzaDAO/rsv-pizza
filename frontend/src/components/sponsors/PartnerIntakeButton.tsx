@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link2, Copy, Check, X, Clock, CheckCircle, Loader2, ExternalLink } from 'lucide-react';
 import { Sponsor } from '../../types';

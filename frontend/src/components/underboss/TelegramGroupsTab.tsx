@@ -4,7 +4,7 @@ import {
   fetchTelegramGroupsStatus,
   testCityTelegramGroup,
   refreshCityTelegramGroup,
-  type TelegramGroupCityStatus,
+  TelegramGroupCityStatus,
   type TelegramGroupTestResult,
   type TelegramGroupRefreshResult,
 } from '../../lib/api';

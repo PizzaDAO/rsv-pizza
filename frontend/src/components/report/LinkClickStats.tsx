@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { MousePointerClick, Users, ExternalLink } from 'lucide-react';
 import { LinkClickStats as LinkClickStatsType } from '../../types';

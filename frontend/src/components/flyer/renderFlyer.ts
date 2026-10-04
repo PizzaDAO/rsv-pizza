@@ -1,4 +1,4 @@
-import { DEFAULT_POSITIONS, type FlyerPositions } from './useFlyerDrag';
+import { DEFAULT_POSITIONS, FlyerPositions } from './useFlyerDrag';
 
 // ---- Shared constants ----
 export const CITY_FONT = '"Hub 191 Display", "Hub 191", "Comic Sans MS", cursive';

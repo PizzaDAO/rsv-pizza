@@ -11,7 +11,6 @@
  * Send, Export Safe JSON, Record External Payment, Hot Wallet refresh)
  * stay admin-only — the underboss sees the Hot Wallet card in read-only mode.
  */
-import React from 'react';
 import { LATAM_REGIONS } from '../utils/regions';
 import { PaymentsAdminPage } from './PaymentsAdminPage';
 

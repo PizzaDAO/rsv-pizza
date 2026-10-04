@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchPayoutCaps, type PayoutCapsConfig } from '../lib/api';
+import { fetchPayoutCaps, PayoutCapsConfig } from '../lib/api';
 
 /**
  * marinara-71630 P6 — shared loader for the payments-admin payout caps that

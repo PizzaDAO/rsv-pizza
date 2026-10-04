@@ -11,7 +11,6 @@ import { BRAND, brandUrl } from '../config/brand';
 const GPPEventsMap = lazy(() => import('../components/GPPEventsMap'));
 
 const STATUS_FILTER_KEYS = ['approved', 'pending', 'listed', 'rejected'] as const;
-type StatusFilterKey = (typeof STATUS_FILTER_KEYS)[number];
 
 // Semantic colors used by the marker icons + legend, keyed on underbossStatus.
 // Keep in sync with STATUS_COLORS in GPPEventsMap.tsx.

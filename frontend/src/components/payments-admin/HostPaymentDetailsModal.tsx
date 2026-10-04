@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
-import { fetchUserPaymentDetails, type UserPaymentDetails } from '../../lib/api';
+import { fetchUserPaymentDetails, UserPaymentDetails } from '../../lib/api';
 import { PayoutMethodIcon, PAYOUT_METHOD_LABELS } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
 

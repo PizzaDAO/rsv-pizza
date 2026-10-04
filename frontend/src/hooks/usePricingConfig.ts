@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchPricingConfig, type PricingConfig } from '../lib/api';
+import { fetchPricingConfig, PricingConfig } from '../lib/api';
 
 /**
  * marinara-71630 P5 — shared loader for the private pricing config

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAccount, useSendTransaction, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { type Address, parseUnits } from 'viem';
+import { Address, parseUnits } from 'viem';
 import { type TokenInfo, ERC20_TRANSFER_ABI } from '../lib/tokens';
 
 export type DonationStatus = 'idle' | 'sending' | 'confirming' | 'success' | 'error';

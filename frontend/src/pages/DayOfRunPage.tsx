@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { PizzaProvider, usePizza } from '../contexts/PizzaContext';
@@ -23,7 +23,7 @@ function DayOfRunPageContent() {
 
   useEffect(() => {
     if (!inviteCode || loaded) return;
-    loadParty(inviteCode).then((ok) => setLoaded(true));
+    loadParty(inviteCode).then(() => setLoaded(true));
   }, [inviteCode, loadParty, loaded]);
 
   // salami-39204: gate Day-Of on party approval status instead of the prior

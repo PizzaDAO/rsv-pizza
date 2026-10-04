@@ -15,7 +15,7 @@ import {
   createRsvpCheckbox,
   updateRsvpCheckbox,
   deleteRsvpCheckbox,
-  type RsvpCheckboxAdminRow,
+  RsvpCheckboxAdminRow,
   type RsvpCheckboxAdminInput,
 } from '../../lib/api';
 import { Checkbox } from '../Checkbox';

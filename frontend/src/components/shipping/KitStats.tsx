@@ -1,4 +1,3 @@
-import React from 'react';
 import { Package, CheckCircle, Truck, MapPin, XCircle, AlertCircle, BarChart3 } from 'lucide-react';
 import type { ShippingKitStats } from '../../types';
 

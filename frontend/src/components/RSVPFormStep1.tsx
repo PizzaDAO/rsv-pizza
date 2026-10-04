@@ -20,8 +20,6 @@ interface RSVPFormStep1Props {
 
 export function RSVPFormStep1({
   form,
-  eventName,
-  isEditing,
   walletFieldSlot,
   showWallet,
   showTurtleRoles,

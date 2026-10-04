@@ -1,4 +1,4 @@
-import { type Address } from 'viem';
+import { Address } from 'viem';
 
 export interface TokenInfo {
   symbol: string;

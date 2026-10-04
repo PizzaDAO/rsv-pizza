@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, Download, Upload, Package } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type { KitStatus } from '../../types';

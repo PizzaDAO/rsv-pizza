@@ -19,7 +19,7 @@ import {
   flagEmoji,
   findCurrency as findIso4217,
   searchCurrencies as searchIso4217,
-  type Iso4217Entry,
+  Iso4217Entry,
 } from '../lib/iso4217';
 
 export interface CurrencyOption {

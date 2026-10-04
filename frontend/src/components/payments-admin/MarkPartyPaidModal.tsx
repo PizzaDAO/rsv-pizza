@@ -5,7 +5,7 @@ import { SwcHubWarning } from './SwcHubWarning';
 import {
   fetchMarkPartyPaidPreview,
   markPartyPaid,
-  type MarkPartyPaidPreviewResponse,
+  MarkPartyPaidPreviewResponse,
 } from '../../lib/api';
 
 // provolone-92103: 'mark_pending_complete' replaces caciotta's

@@ -15,14 +15,13 @@ import {
   getCurrentLocation,
   geocodeAddress,
   formatDistance,
-  getProviderName,
   getProviderColor,
   supportsDirectOrdering,
 } from '../lib/ordering';
 
 export const PizzaOrderSummary: React.FC = () => {
   const { t } = useTranslation('host');
-  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, orderExpectedGuests, setOrderExpectedGuests, generateRecommendations, updatePizzaQuantity, removePizza } = usePizza();
+  const { recommendations, beverageRecommendations, waveRecommendations, party, guests, updatePizzaQuantity, removePizza } = usePizza();
   const isGppEvent = party?.eventType === 'gpp';
   const [isCopied, setIsCopied] = useState(false);
   const [showCallScript, setShowCallScript] = useState(false);
@@ -290,7 +289,7 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
   };
 
   const handleCopyAllWaves = () => {
-    const allWavesText = waveRecommendations.map((waveRec, index) => {
+    const allWavesText = waveRecommendations.map((waveRec) => {
       const pizzaText = waveRec.pizzas
         .sort((a, b) => (b.quantity || 1) - (a.quantity || 1))
         .map(pizza => {

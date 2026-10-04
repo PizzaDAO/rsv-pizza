@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown } from 'lucide-react';
 import { KitRow } from './KitRow';
-import type { ShippingKit, KitStatus, KitTier } from '../../types';
+import type { ShippingKit } from '../../types';
 
 interface KitTableProps {
   kits: ShippingKit[];

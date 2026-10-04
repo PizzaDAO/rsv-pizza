@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, Loader2, Image as ImageIcon, Check, Tag, Play } from 'lucide-react';
+import { Upload, X, Loader2, Check, Tag, Play } from 'lucide-react';
 import { uploadEventPhoto, uploadEventVideo } from '../../lib/supabase';
 import { uploadPhoto as uploadPhotoApi, PhotoUploadData } from '../../lib/api';
 import { Photo } from '../../types';

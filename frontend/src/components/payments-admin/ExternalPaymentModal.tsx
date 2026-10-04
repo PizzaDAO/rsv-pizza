@@ -26,7 +26,7 @@ import { isSwcHubParty } from '../../utils/swcHub';
 import {
   recordExternalPayment,
   searchApprovedParties,
-  type ApprovedPartySearchResult,
+  ApprovedPartySearchResult,
 } from '../../lib/api';
 import { uploadPayoutPhoto } from '../../lib/supabase';
 import { usePayoutCaps } from '../../hooks/usePayoutCaps';

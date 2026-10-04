@@ -7,7 +7,7 @@
  * - Needs-review queue: list unmatched/needs-review wires with invoice picker to resolve
  */
 
-import React, { useState, useEffect, createPortal } from 'react';
+import { useState, useEffect, createPortal } from 'react';
 import { Zap, AlertTriangle, RefreshCw, X, Check, ChevronDown } from 'lucide-react';
 import { MercuryWireMatch, MercuryReconcileResult, Invoice } from '../../types';
 import { reconcileMercuryWires, getMercuryMatches, resolveMercuryMatch } from '../../lib/api';

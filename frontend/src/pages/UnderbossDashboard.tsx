@@ -14,7 +14,7 @@ import { SavedViewsMenu } from '../components/SavedViewsMenu';
 import {
   eventTableFiltersToSearchParams,
   searchParamsToEventTableFilters,
-  type EventTableFilters,
+  EventTableFilters,
   type UnderbossTab,
 } from '../components/underboss/underbossTableUrlState';
 import { triggerFlyerRegenForEvents } from '../components/flyer/autoRegenFlyer';

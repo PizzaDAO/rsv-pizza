@@ -451,7 +451,7 @@ export function SponsorCRM({ partyId, onAddAsCoHost }: SponsorCRMProps) {
       {isPrivileged && (
         <MercuryReconcilePanel
           invoices={invoices}
-          onInvoiceUpdate={(updatedId) => {
+          onInvoiceUpdate={() => {
             // Reload invoices to get fresh paid status
             getInvoices(partyId).then((result) => {
               if (result) setInvoices(result.invoices);

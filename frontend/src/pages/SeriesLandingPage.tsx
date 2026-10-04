@@ -6,7 +6,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { useTheme } from '../contexts/ThemeContext';
 import { brandUrl } from '../config/brand';
-import { fetchPublicSeries, fetchPublicSeriesEvents, type PublicSeries, type PublicSeriesEvent } from '../lib/api';
+import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
 
 /**
  * Public landing page for a white-label event series: /series/:slug.

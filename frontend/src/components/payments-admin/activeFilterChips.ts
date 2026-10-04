@@ -5,7 +5,7 @@
 // row and the badge can never drift.
 import type { AdminPayoutFilters, PayoutMethod } from '../../types';
 import { PAYOUT_METHOD_LABELS } from '../payments-shared';
-import { PAYMENTS_REGION_LABELS, type PaymentsRegionPortal } from '../../utils/regions';
+import { PAYMENTS_REGION_LABELS, PaymentsRegionPortal } from '../../utils/regions';
 import { SORT_LABEL } from './PayoutsFilterBar';
 import type { SortValue } from './paymentsFilterOptions';
 

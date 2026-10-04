@@ -9,7 +9,6 @@
  * Funds-sending operations stay admin-only — the underboss sees the Hot
  * Wallet card in read-only mode.
  */
-import React from 'react';
 import { PAYMENTS_REGION_SCOPES } from '../utils/regions';
 import { PaymentsAdminPage } from './PaymentsAdminPage';
 

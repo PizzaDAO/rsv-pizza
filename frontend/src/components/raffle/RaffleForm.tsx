@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, Type, AlignLeft, Users } from 'lucide-react';
+import { X, Loader2, Type, AlignLeft } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Raffle } from '../../types';
 

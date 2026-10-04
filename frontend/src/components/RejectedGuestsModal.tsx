@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, RotateCcw, Loader2, Ban } from 'lucide-react';
 import { Guest, Party } from '../types';
 import { ClickableEmail } from './ClickableEmail';

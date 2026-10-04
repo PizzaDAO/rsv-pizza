@@ -197,7 +197,7 @@ export function RSVPPage() {
     },
     user,
     isOpen: !!party, // Only active when party is loaded
-    onSuccess: (result) => {
+    onSuccess: () => {
       if (isGPP) fireFromCenter();
     },
   });

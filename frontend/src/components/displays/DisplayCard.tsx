@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Monitor, Eye, Clock, ExternalLink, Copy, Edit2, Trash2, Power, PowerOff } from 'lucide-react';
 import { Display, DisplayContentType } from '../../types';

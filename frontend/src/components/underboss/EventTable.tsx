@@ -14,7 +14,7 @@ import { calculateTagSponsorshipTotal } from '../../utils/sponsorshipPricing';
 import { usePricingConfig } from '../../hooks/usePricingConfig';
 import { normalizeText } from '../../lib/normalizeText';
 import {
-  type EventTableFilters,
+  EventTableFilters,
   DEFAULT_EVENT_TABLE_FILTERS,
 } from './underbossTableUrlState';
 

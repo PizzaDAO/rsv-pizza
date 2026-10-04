@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { hostSelfCheckIn } from '../lib/api';
 import { CheckInQRDisplay } from './CheckInQRDisplay';

@@ -4,7 +4,7 @@ import {
   SUPPORTED_CURRENCIES,
   findCurrencyByCode,
   searchCurrencies,
-  type CurrencyOption,
+  CurrencyOption,
 } from '../../utils/currencies';
 
 /**

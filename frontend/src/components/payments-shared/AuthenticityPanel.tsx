@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2, ShieldCheck, ShieldAlert, ShieldX, RefreshCw, Sparkles, Download, AlertTriangle } from 'lucide-react';
 import {
   verifyImageAuthenticity,
-  type ImageAuthenticityCheck,
+  ImageAuthenticityCheck,
   type ImageAuthenticityVerdict,
 } from '../../lib/api';
 

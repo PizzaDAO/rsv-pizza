@@ -14,7 +14,6 @@
  * `south-africa` slug, so SA events surface in both portals. v1 ships this
  * overlap intentionally.
  */
-import React from 'react';
 import { PAYMENTS_REGION_SCOPES } from '../utils/regions';
 import { PaymentsAdminPage } from './PaymentsAdminPage';
 
