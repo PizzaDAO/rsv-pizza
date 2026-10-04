@@ -123,7 +123,7 @@ export const PartyKitWidget: React.FC<PartyKitWidgetProps> = ({ partyId }) => {
   }
 
   // No kit request - show request button
-  const isDeadlinePassed = kitDeadline && new Date(kitDeadline) < new Date();
+  const isDeadlinePassed = !!kitDeadline && new Date(kitDeadline) < new Date();
 
   return (
     <>

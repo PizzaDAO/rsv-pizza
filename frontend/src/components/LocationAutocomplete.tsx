@@ -195,7 +195,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
             place.formatted_address &&
             !place.formatted_address.startsWith(place.name);
 
-          const selectedVenueName = hasDistinctName ? place.name : null;
+          const selectedVenueName = hasDistinctName ? (place.name ?? null) : null;
 
           if (onVenueNameChangeRef.current) {
             onVenueNameChangeRef.current(selectedVenueName);

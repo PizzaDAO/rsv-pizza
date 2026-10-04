@@ -296,9 +296,6 @@ export function SponsorList({ sponsors, partyId, invoices = [], mous = [], onEdi
                             ) : null;
                           })()}
                         </div>
-                        {sponsor.organization && (
-                          <div className="text-xs text-theme-text-muted truncate">{sponsor.organization}</div>
-                        )}
                         {sponsor.pointPerson && (
                           <div className="flex items-center gap-1 text-xs text-theme-text-muted mt-0.5">
                             <User size={10} />
