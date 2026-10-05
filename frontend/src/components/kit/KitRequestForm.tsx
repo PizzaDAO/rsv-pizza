@@ -94,7 +94,7 @@ export const KitRequestForm: React.FC<KitRequestFormProps> = ({
     if (components.country) setCountry(components.country);
   };
 
-  const isDeadlinePassed = kitDeadline && new Date(kitDeadline) < new Date();
+  const isDeadlinePassed = !!kitDeadline && new Date(kitDeadline) < new Date();
   const isEditing = !!existingKit;
 
   const handleSubmit = async (e: React.FormEvent) => {

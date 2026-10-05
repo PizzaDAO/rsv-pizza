@@ -7,11 +7,12 @@ import { Loader2, CheckCircle2, XCircle, AlertCircle, QrCode } from 'lucide-reac
 import { useAuth } from '../contexts/AuthContext';
 import { vouchForGuest, checkInGuest, getDiscountStatus, claimDiscount, Attestation } from '../lib/api';
 import { BRAND, brandUrl } from '../config/brand';
+import type { CloudSpec } from '../components/GPPClouds';
 
 // provolone-39042: friendly display name for an attestation row.
 const attestationDisplay = (a: Attestation): string => a.name || a.email || 'someone';
 
-const DISCOUNT_CLOUDS = [
+const DISCOUNT_CLOUDS: readonly CloudSpec[] = [
   // Mobile clouds — above and below content
   { src: '/gpp-cloud-2.png', top: '4%', left: '-8%', width: 140, anim: 'cloud-drift-left 40s ease-in-out infinite' },
   { src: '/gpp-cloud-3.png', top: '10%', right: '-5%', width: 110, anim: 'cloud-drift-right 48s ease-in-out infinite' },
@@ -20,7 +21,7 @@ const DISCOUNT_CLOUDS = [
   // Desktop extras — sides
   { src: '/gpp-cloud-1.png', top: '20%', left: '-4%', width: 260, anim: 'cloud-drift-left 50s ease-in-out infinite', mdOnly: true },
   { src: '/gpp-cloud-1.png', top: '55%', right: '-3%', width: 240, anim: 'cloud-drift-right 46s ease-in-out infinite', flip: true, mdOnly: true },
-] as const;
+];
 
 const C = {
   skyTop: '#7EC8E3',

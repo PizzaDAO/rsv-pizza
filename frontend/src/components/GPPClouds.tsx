@@ -1,6 +1,19 @@
 import React, { useMemo } from 'react';
 
-const CLOUDS = [
+/** One decorative cloud: exactly one vertical (top/bottom) and one horizontal (left/right) anchor. */
+export interface CloudSpec {
+  src: string;
+  width: number;
+  anim: string;
+  top?: string;
+  bottom?: string;
+  left?: string;
+  right?: string;
+  flip?: boolean;
+  mdOnly?: boolean;
+}
+
+const CLOUDS: readonly CloudSpec[] = [
   // Layer 1 — large slow clouds
   { src: '/gpp-cloud-1.png', top: '5%', right: '-5%', width: 320, anim: 'cloud-drift-right 50s ease-in-out infinite', mdOnly: true },
   { src: '/gpp-cloud-2.png', top: '18%', left: '-3%', width: 200, anim: 'cloud-drift-left 40s ease-in-out infinite', mdOnly: true },
@@ -9,7 +22,7 @@ const CLOUDS = [
   { src: '/gpp-cloud-1.png', top: '50%', left: '-6%', width: 280, anim: 'cloud-drift-left 45s ease-in-out infinite', flip: true, mdOnly: true },
   { src: '/gpp-cloud-2.png', top: '65%', right: '5%', width: 160, anim: 'cloud-drift-right 38s ease-in-out infinite' },
   { src: '/gpp-cloud-3.png', top: '80%', left: '5%', width: 120, anim: 'cloud-drift-left 52s ease-in-out infinite' },
-] as const;
+];
 
 /** Random opacity between 50-95%, stable for the component's lifetime. */
 const randomOpacity = () => 0.5 + Math.random() * 0.45;
