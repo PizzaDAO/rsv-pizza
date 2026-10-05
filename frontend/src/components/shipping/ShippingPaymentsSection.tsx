@@ -26,6 +26,10 @@ const STATUS_STYLES: Record<PayoutStatus, string> = {
   failed: 'bg-red-600/30 text-red-900',
   // ravioli-82931: muted neutral for soft-withdrawn rows.
   withdrawn: 'bg-gray-500/20 text-gray-700',
+  // Mirrors PayoutStatusPill: queued = wire sent, awaiting settlement;
+  // completed = terminal close-out from Mark-Party-Paid.
+  queued: 'bg-amber-500/30 text-amber-900',
+  completed: 'bg-teal-500/20 text-teal-800',
 };
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -35,6 +39,8 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   paid: 'Paid',
   failed: 'Failed',
   withdrawn: 'Withdrawn',
+  queued: 'Queued',
+  completed: 'Completed',
 };
 
 /**

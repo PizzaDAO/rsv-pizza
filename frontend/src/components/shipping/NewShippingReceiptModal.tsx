@@ -66,10 +66,14 @@ export const NewShippingReceiptModal: React.FC<NewShippingReceiptModalProps> = (
     [kits],
   );
 
+  // Same rule as PayoutAmountSummary: flatten every detected receipt per photo
+  // (stracciatella-92114) and skip unresolved-currency ones (amount is 0 there).
   const ocrSum = useMemo(
     () => receipts
-      .filter(r => r.status === 'done' && r.ocr)
-      .reduce((sum, r) => sum + (r.ocr?.amount ?? 0), 0),
+      .filter(r => r.status === 'done')
+      .flatMap(r => r.receipts ?? [])
+      .filter(rc => rc.ocrError !== 'CURRENCY_UNRESOLVED')
+      .reduce((sum, rc) => sum + (rc.amount ?? 0), 0),
     [receipts],
   );
   const finalAmount = overrideAmount != null ? overrideAmount : ocrSum;
@@ -120,9 +124,6 @@ export const NewShippingReceiptModal: React.FC<NewShippingReceiptModalProps> = (
             fileSize: r.fileSize,
             mimeType: r.mimeType,
           })),
-        // Shipping receipts don't carry pizza/event proof photos.
-        pizzaPhotos: [],
-        eventPhotos: [],
         hostNotes: notes.trim() || undefined,
         purpose: 'shipping',
         partyKitId: selectedKit.id,

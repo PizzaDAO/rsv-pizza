@@ -40,6 +40,7 @@ export const CheckInPanel: React.FC<CheckInPanelProps> = ({ party, guests, onGue
   }, [guests, query]);
 
   const toggleCheckIn = async (guest: Guest) => {
+    if (!guest.id) return;
     setBusyId(guest.id);
     try {
       if (guest.checkedInAt) {

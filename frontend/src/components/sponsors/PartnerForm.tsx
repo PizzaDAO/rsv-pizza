@@ -59,6 +59,11 @@ export interface PartnerFormData {
   coHostAvatarUrl: string;
   autoCoHost: boolean;
   autoSponsor: boolean;
+  // Granular auto-co-host permissions (87704c1f). Plumbed through PartnerManager →
+  // API, but this form has no inputs for them yet, so they're optional/unset.
+  coHostShowOnEvent?: boolean;
+  coHostCanEdit?: boolean;
+  coHostAllowedTabs?: string[] | null;
 }
 
 /** Extract CRM sponsor data from the unified form */

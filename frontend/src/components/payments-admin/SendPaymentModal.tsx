@@ -472,8 +472,6 @@ export const SendPaymentModal: React.FC<SendPaymentModalProps> = ({
       // the defining inputs change, so a reused id always matches the form.
       if (!createdPayoutIdRef.current) {
         const created = await createPayout(partyId, {
-          pizzaPhotos: [],
-          eventPhotos: [],
           receiptPhotos: [],
           payoutMethod: method,
           payoutWalletAddress:

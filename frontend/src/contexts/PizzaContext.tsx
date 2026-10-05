@@ -46,6 +46,8 @@ interface PizzaContextType {
   // Recommendations
   recommendations: PizzaRecommendation[];
   generateRecommendations: () => void;
+  updatePizzaQuantity: (pizzaId: string, newQuantity: number) => void;
+  removePizza: (pizzaId: string) => void;
   beverageRecommendations: BeverageRecommendation[];
   waveRecommendations: WaveRecommendation[];
   orderExpectedGuests: number | null;
@@ -109,7 +111,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     date: dbParty.date,
     duration: dbParty.duration,
     timezone: dbParty.timezone,
-    hostName: dbParty.host_name,
+    hostName: dbParty.host_name ?? null,
     userId: dbParty.user_id,
     pizzaStyle: dbParty.pizza_style,
     availableBeverages: dbParty.available_beverages || [],
@@ -146,7 +148,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     donationEnabled: dbParty.donation_enabled || false,
     donationGoal: dbParty.donation_goal || null,
     donationMessage: dbParty.donation_message || null,
-    suggestedAmounts: dbParty.suggested_amounts || null,
+    suggestedAmounts: dbParty.suggested_amounts || undefined,
     donationRecipient: dbParty.donation_recipient || null,
     donationRecipientUrl: dbParty.donation_recipient_url || null,
     donationEthAddress: dbParty.donation_eth_address || null,

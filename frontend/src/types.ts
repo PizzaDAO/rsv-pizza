@@ -306,17 +306,18 @@ export interface Party {
   city?: string | null;
   placeId?: string | null;
   venueName: string | null;
-  // Venue tracking fields
-  venueStatus: VenueStatus | null;
-  venueCapacity: number | null;
-  venueCost: number | null;
-  venuePointPerson: string | null;
-  venueContactName: string | null;
-  venueContactEmail: string | null;
-  venueContactPhone: string | null;
-  venueOrganization: string | null;
-  venueWebsite: string | null;
-  venueNotes: string | null;
+  // Legacy venue tracking fields — not selected by SAFE_PARTY_COLUMNS, so a
+  // Party built from the DB never has them. Venue data lives on `Venue`.
+  venueStatus?: VenueStatus | null;
+  venueCapacity?: number | null;
+  venueCost?: number | null;
+  venuePointPerson?: string | null;
+  venueContactName?: string | null;
+  venueContactEmail?: string | null;
+  venueContactPhone?: string | null;
+  venueOrganization?: string | null;
+  venueWebsite?: string | null;
+  venueNotes?: string | null;
   // Day-of logistics (pepperoni-58341)
   wifiInfo?: string | null;
   parkingNotes?: string | null;

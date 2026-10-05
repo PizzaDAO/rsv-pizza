@@ -147,8 +147,6 @@ export const CreatePrepaymentModal: React.FC<CreatePrepaymentModalProps> = ({
     setError(null);
     try {
       await createPayout(party.id, {
-        pizzaPhotos: [],
-        eventPhotos: [],
         receiptPhotos: [],
         payoutMethod: selectedCandidate.method,
         payoutWalletAddress:

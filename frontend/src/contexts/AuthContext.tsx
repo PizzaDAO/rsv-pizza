@@ -32,7 +32,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string) => Promise<void>;
+  /** Sends a magic link. `isNewUser` = no account or no name yet (drives onboarding). */
+  signIn: (email: string) => Promise<{ success: boolean; isNewUser: boolean }>;
   signOut: () => void;
   setUser: (user: User | null) => void;
   updateProfile: (data: Partial<Omit<User, 'id' | 'email'>>) => Promise<User>;
