@@ -8,6 +8,12 @@ interface SubmittedForReviewBadgeProps {
    * hasn't signalled their reimbursement is ready for review yet.
    */
   submittedForReviewAt?: string | null;
+  /**
+   * cannelloni-58543: when set, the host submitted for review WITHOUT the
+   * required event photos via the acknowledgment checkbox. The pill switches
+   * to "Submitted without photos" so reviewers know photos are missing.
+   */
+  photosWaivedAt?: string | null;
   /** Compact variant drops the date text and shows just the check + label. */
   compact?: boolean;
   className?: string;
@@ -25,18 +31,29 @@ interface SubmittedForReviewBadgeProps {
  */
 export const SubmittedForReviewBadge: React.FC<SubmittedForReviewBadgeProps> = ({
   submittedForReviewAt,
+  photosWaivedAt,
   compact = false,
   className = '',
 }) => {
   if (!submittedForReviewAt) return null;
   const abs = new Date(submittedForReviewAt).toLocaleString();
-  const label = compact
-    ? 'Submitted'
-    : `Submitted ${new Date(submittedForReviewAt).toLocaleDateString()}`;
+  // cannelloni-58543: photo-waived submissions read differently so reviewers
+  // can spot photo-less submissions at a glance.
+  const waived = !!photosWaivedAt;
+  const label = waived
+    ? compact
+      ? 'Submitted without photos'
+      : `Submitted without photos ${new Date(submittedForReviewAt).toLocaleDateString()}`
+    : compact
+      ? 'Submitted'
+      : `Submitted ${new Date(submittedForReviewAt).toLocaleDateString()}`;
+  const title = waived
+    ? `Host submitted this reimbursement WITHOUT the required event photos on ${abs}`
+    : `Host marked this reimbursement ready for review on ${abs}`;
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full font-medium border px-2 py-0.5 text-xs bg-amber-100 text-amber-800 border-amber-300 ${className}`}
-      title={`Host marked this reimbursement ready for review on ${abs}`}
+      title={title}
     >
       <CheckCircle2 size={12} className="shrink-0" />
       {label}

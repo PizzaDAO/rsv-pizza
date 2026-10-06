@@ -848,6 +848,8 @@
     "submitForReview": "검토를 위해 제출",
     "submitDisabledHelp": "위 단계를 완료하면 검토 제출이 활성화됩니다.",
     "submitNeedsAttestation": "제출하려면 위의 확인란에 체크하세요.",
+    "photoWaiverAck": "필수 행사 사진 없이 제출하며, 누락된 사진으로 인해 환급이 지연되거나 반려될 수 있음을 이해합니다.",
+    "submitNeedsPhotoWaiver": "필수 사진 없이 제출하려면 위의 체크박스를 선택하세요.",
     "eventRollupTitle": "이벤트의 모든 영수증",
     "eventRollupSubtitle": "이 이벤트의 모든 공동 호스트 영수증을 제출자별로 그룹화했습니다.",
     "unknownCohost": "알 수 없는 공동 호스트",
