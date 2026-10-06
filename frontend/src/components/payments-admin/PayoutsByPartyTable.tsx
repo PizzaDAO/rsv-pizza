@@ -47,6 +47,7 @@ import {
   formatUsd,
   computePartyTotals,
   CapInlineEditor,
+  EstimatedAttendanceInlineEditor,
   SubmittedForReviewBadge,
 } from '../payments-shared';
 import { ClickableEmail } from '../ClickableEmail';
@@ -213,6 +214,8 @@ interface PayoutsByPartyTableProps {
   onUnapprove?: (id: string) => void;
   onHostClick?: (userId: string) => void;
   onCapUpdated?: (partyId: string) => void;
+  /** bucatini-58546: refresh hook called after editing estimated attendance. */
+  onEstimatedAttendanceUpdated?: (partyId: string) => void;
   /**
    * schiacciata-58503: refresh hook called after an admin adds a receipt or
    * photo to the city's primary payout via the in-panel AdminAddAttachment
@@ -3289,6 +3292,7 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
   onSendPayment,
   onScamFlagChanged,
   onCapUpdated,
+  onEstimatedAttendanceUpdated,
   onDocumentsChanged,
   onTagsChanged,
   onTgReminderResult,
@@ -3908,7 +3912,18 @@ export const PayoutsByPartyTable: React.FC<PayoutsByPartyTableProps> = ({
                       {/* cappelletti-58525: est. attendance + RSVP + check-in
                           counts as a compact sub-line on each city row. */}
                       <div className="text-xs text-theme-text-muted mt-0.5 flex flex-wrap items-center gap-x-2">
-                        <span title="Host-estimated attendance">Est. {row.party.estimatedAttendance ?? '—'}</span>
+                        <span
+                          title="Host-estimated attendance"
+                          className="inline-flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Est.{' '}
+                          <EstimatedAttendanceInlineEditor
+                            partyId={row.party.id}
+                            currentAttendance={row.party.estimatedAttendance ?? null}
+                            onUpdated={() => onEstimatedAttendanceUpdated?.(row.party.id)}
+                          />
+                        </span>
                         <span aria-hidden>·</span>
                         <span title="RSVPs (non-invited guests)">{row.party.rsvpCount ?? 0} RSVP{(row.party.rsvpCount ?? 0) === 1 ? '' : 's'}</span>
                         <span aria-hidden>·</span>
