@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { Sharp, Metadata, OutputInfo } from 'sharp';
 
 /**
  * Classifies and strips white backgrounds from logo images.
@@ -73,9 +73,9 @@ export async function classifyLogo(buffer: Buffer, contentType: string): Promise
 
   if (ct.includes('svg')) return 'svg';
 
-  let image: sharp.Sharp;
-  let metadata: sharp.Metadata;
-  let raw: { data: Buffer; info: sharp.OutputInfo };
+  let image: Sharp;
+  let metadata: Metadata;
+  let raw: { data: Buffer; info: OutputInfo };
 
   try {
     image = sharp(buffer);

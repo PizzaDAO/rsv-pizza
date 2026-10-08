@@ -1,6 +1,10 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import { Prisma } from '@prisma/client';
-import archiver from 'archiver';
+// @types/archiver@8 dropped the factory-function declaration that the
+// archiver@7 runtime still exports (archiver(format, options)); import as a
+// namespace and call it, same runtime behavior as before.
+import * as archiverNS from 'archiver';
+const archiver = archiverNS as unknown as (format: string, options?: archiverNS.ArchiverOptions) => archiverNS.Archiver;
 import { prisma } from '../config/database.js';
 import { optionalAuth, requireAuth, AuthRequest } from '../middleware/auth.js';
 
