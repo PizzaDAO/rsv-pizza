@@ -54,7 +54,7 @@
     "prisma": "^6.8.2",
     "supertest": "^7.2.2",
     "tsx": "^4.7.0",
-    "typescript": "^5.5.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.0.18"
   }
 }
