@@ -31,7 +31,7 @@
     "express-rate-limit": "^8.7.0",
     "heic-convert": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
-    "nanoid": "^5.0.5",
+    "nanoid": "^6.0.1",
     "openai": "^7.28.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
