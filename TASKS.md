@@ -7,14 +7,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| mushroom-96149 | Capture reCAPTCHA v3 score per RSVP submission + add fake-detection heuristic (#24): frontend integration, backend siteverify call, new guests.recaptcha_score column, median-score signal | doing | P1 |  |  |  |  |  | dssd <br>2026-05-17: Merged PR #362 — modal replaces venue tab routing on both checklist renderers<br>2026-05-17: Merged PR #367. apply-upload endpoint live, accepts PNG/JPEG up to 5MB via base64 JSON. Same sync behavior as auto-apply.<br>2026-05-18: Deferred: avoiding Google API dependency for now. Revisit if other heuristics insufficient. |
-| pepperoni-94639 | Add Prisma to DB schema-drift CI check to prevent migration mismatches | doing | P1 |  |  |  |  |  |  |
-| olive-79044 | Guest scorecard after check-in: gamified engagement tasks (post about party, upload photo, check in others, pizza selfie, molto benny sticker) | doing | P1 |  |  |  |  |  |  |
-| anchovy-48037 | Tag-based invoicing: select tag, set per-city pricing, generate invoice with line items per city, Google Sheet sync, admin /invoices page | doing | P1 |  |  |  |  |  |  |
-| zucchini-70040 | Post composer: Instagram template with partner IG tags | doing | P1 |  |  |  |  |  |  |
-| mushroom-48841 | Composable post templates at rsv.pizza/post (admin-gated) | doing | P1 |  |  |  |  |  |  |
-| mushroom-35437 | Mandatory wallet address on RSVP with MetaMask setup modal | doing | P1 |  |  |  |  |  |  |
-| funghi-72623 | Geolocation check-in button on event page | doing | P1 |  |  |  |  |  | On event day, RSVP button splits: half Edit RSVP \| half Check In. Server-side Haversine distance check (500m radius). No DB changes needed. |
 | diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | doing | P2 |  |  |  |  |  |  |
 | napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | doing | P2 |  |  |  |  |  |  |
 | sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | doing | P2 |  |  |  |  |  |  |
@@ -98,6 +90,14 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| mushroom-96149 | Capture reCAPTCHA v3 score per RSVP submission + add fake-detection heuristic (#24): frontend integration, backend siteverify call, new guests.recaptcha_score column, median-score signal | P1 | 2026-10-07 |  | Archived: deferred, avoiding Google API dependency |
+| pepperoni-94639 | Add Prisma to DB schema-drift CI check to prevent migration mismatches | P1 | 2026-10-07 | #371 | Shipped |
+| olive-79044 | Guest scorecard after check-in: gamified engagement tasks (post about party, upload photo, check in others, pizza selfie, molto benny sticker) | P1 | 2026-10-07 | #245 | Base scorecard shipped (#245-#262); later hub rewrite superseded draft #270 |
+| anchovy-48037 | Tag-based invoicing: select tag, set per-city pricing, generate invoice with line items per city, Google Sheet sync, admin /invoices page | P1 | 2026-10-07 |  | Archived: draft #225 conflicts with existing Invoice model |
+| zucchini-70040 | Post composer: Instagram template with partner IG tags | P1 | 2026-10-07 | #180 | Shipped |
+| mushroom-48841 | Composable post templates at rsv.pizza/post (admin-gated) | P1 | 2026-10-07 | #180 | Shipped as part of #180 |
+| mushroom-35437 | Mandatory wallet address on RSVP with MetaMask setup modal | P1 | 2026-10-07 |  | Archived: draft #187 stale vs current RSVPModal flow |
+| funghi-72623 | Geolocation check-in button on event page | P1 | 2026-10-07 | #175 | Shipped as QR peer-attestation check-in instead of GPS |
 | stuffed-crust-61855 | Best Version, Best Version Code | P1 |  |  |  |
 | 1710 | First Bolt Version | P2 |  |  |  |
 | truffle-90229 | Rejected-event dashboard button: rename 'List My Event' to 'List My Event Without Funding' | P3 |  |  | skipped. asdasd |
