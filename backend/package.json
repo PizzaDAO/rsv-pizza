@@ -51,7 +51,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@vitest/coverage-v8": "^4.0.18",
-    "prisma": "^6.8.2",
+    "prisma": "^7.10.0",
     "supertest": "^7.2.2",
     "tsx": "^4.7.0",
     "typescript": "^5.5.3",
