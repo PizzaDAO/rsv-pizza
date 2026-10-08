@@ -15,7 +15,7 @@
     "@googlemaps/markerclusterer": "^2.6.2",
     "@napi-rs/canvas": "^0.1.88",
     "@stripe/react-stripe-js": "^5.4.1",
-    "@stripe/stripe-js": "^8.6.1",
+    "@stripe/stripe-js": "^10.0.0",
     "@supabase/supabase-js": "^2.90.1",
     "@tanstack/react-query": "^5.90.20",
     "@tmcw/togeojson": "^7.1.2",
