@@ -20,7 +20,7 @@
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.129.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@napi-rs/canvas": "^0.1.100",
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
