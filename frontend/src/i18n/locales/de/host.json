@@ -893,6 +893,8 @@
     "submitForReview": "Zur Prüfung einreichen",
     "submitDisabledHelp": "Schließe die obigen Schritte ab, um das Einreichen zur Prüfung zu aktivieren.",
     "submitNeedsAttestation": "Bestätige die obige Erklärung, um einzureichen.",
+    "photoWaiverAck": "Ich reiche ohne die erforderlichen Event-Fotos ein und verstehe, dass meine Erstattung wegen der fehlenden Fotos verzögert oder zurückgewiesen werden kann.",
+    "submitNeedsPhotoWaiver": "Aktiviere das Kästchen oben, um ohne die erforderlichen Fotos einzureichen.",
     "eventRollupTitle": "Alle Belege der Veranstaltung",
     "eventRollupSubtitle": "Alle Belege jedes Co-Gastgebers für diese Veranstaltung, gruppiert nach Einreichendem.",
     "unknownCohost": "Unbekannter Co-Gastgeber",

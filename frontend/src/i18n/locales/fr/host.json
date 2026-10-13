@@ -892,6 +892,8 @@
     "submitForReview": "Soumettre pour examen",
     "submitDisabledHelp": "Terminez les étapes ci-dessus pour activer la soumission pour examen.",
     "submitNeedsAttestation": "Cochez l'attestation ci-dessus pour soumettre.",
+    "photoWaiverAck": "Je soumets sans les photos d'événement requises et je comprends que mon remboursement peut être retardé ou retourné en raison des photos manquantes.",
+    "submitNeedsPhotoWaiver": "Cochez la case ci-dessus pour soumettre sans les photos requises.",
     "eventRollupTitle": "Tous les reçus de l'événement",
     "eventRollupSubtitle": "Tous les reçus de chaque co-hôte pour cet événement, regroupés selon qui les a soumis.",
     "unknownCohost": "Co-hôte inconnu",

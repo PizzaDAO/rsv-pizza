@@ -843,6 +843,9 @@ function serializePayout(row: any): any {
     submittedForReviewAt: row.submittedForReviewAt
       ? row.submittedForReviewAt.toISOString()
       : null,
+    // cannelloni-58543: non-null when the host submitted without the required
+    // event photos; /payments surfaces a "Submitted without photos" pill.
+    photosWaivedAt: row.photosWaivedAt ? row.photosWaivedAt.toISOString() : null,
     payoutMethod: row.payoutMethod,
     payoutWalletAddress: row.payoutWalletAddress,
     // caciotta-92104: original ENS input (e.g. `puebla.eth`) when the

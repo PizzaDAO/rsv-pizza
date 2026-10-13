@@ -892,6 +892,8 @@
     "submitForReview": "Enviar para revisión",
     "submitDisabledHelp": "Completa los pasos anteriores para habilitar el envío para revisión.",
     "submitNeedsAttestation": "Marca la declaración de arriba para enviar.",
+    "photoWaiverAck": "Estoy enviando sin las fotos del evento requeridas y entiendo que mi reembolso puede retrasarse o devolverse por las fotos faltantes.",
+    "submitNeedsPhotoWaiver": "Marca la casilla de arriba para enviar sin las fotos requeridas.",
     "eventRollupTitle": "Todos los recibos del evento",
     "eventRollupSubtitle": "Todos los recibos de cada coanfitrión de este evento, agrupados por quién los envió.",
     "unknownCohost": "Coanfitrión desconocido",

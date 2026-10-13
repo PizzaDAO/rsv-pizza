@@ -290,7 +290,11 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
           {/* ziti-58300: amber "Submitted" pill when the co-host has flipped
               their rolling reimbursement's "Submit for review" toggle. Helps
               admins prioritise host-ready records over still-rolling ones. */}
-          <SubmittedForReviewBadge submittedForReviewAt={payout.submittedForReviewAt} compact />
+          <SubmittedForReviewBadge
+            submittedForReviewAt={payout.submittedForReviewAt}
+            photosWaivedAt={payout.photosWaivedAt}
+            compact
+          />
           {/* argentina-92103: green Flag icon when a regional underboss (or
               admin) has marked the row "ready for payment". Tooltip carries
               the actor email + timestamp. Sticky until the row is paid /

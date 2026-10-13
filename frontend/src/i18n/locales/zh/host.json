@@ -892,6 +892,8 @@
     "submitForReview": "提交审核",
     "submitDisabledHelp": "完成上述步骤即可提交审核。",
     "submitNeedsAttestation": "请勾选上方的声明以提交。",
+    "photoWaiverAck": "我在没有所需活动照片的情况下提交，并理解由于照片缺失，我的报销可能会被延迟或退回。",
+    "submitNeedsPhotoWaiver": "勾选上方复选框即可在没有所需照片的情况下提交。",
     "eventRollupTitle": "活动的所有收据",
     "eventRollupSubtitle": "本活动每位联合主办人的收据，按提交人分组。",
     "unknownCohost": "未知联合主办人",

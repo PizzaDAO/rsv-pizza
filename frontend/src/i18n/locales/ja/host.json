@@ -892,6 +892,8 @@
     "submitForReview": "審査のため提出",
     "submitDisabledHelp": "上記の手順を完了すると、審査への提出が有効になります。",
     "submitNeedsAttestation": "提出するには上記の確認にチェックを入れてください。",
+    "photoWaiverAck": "必要なイベント写真なしで提出します。写真が不足しているため、払い戻しが遅れたり差し戻されたりする可能性があることを理解しています。",
+    "submitNeedsPhotoWaiver": "必要な写真なしで提出するには、上のチェックボックスをオンにしてください。",
     "eventRollupTitle": "イベントのすべての領収書",
     "eventRollupSubtitle": "このイベントの各共同ホストの領収書を、提出者ごとにまとめたものです。",
     "unknownCohost": "不明な共同ホスト",
