@@ -28,6 +28,7 @@ import {
   Wallet,
   Camera,
   Users,
+  FileText,
 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import type {
@@ -54,6 +55,7 @@ import { AdminAddAttachment } from './AdminAddAttachment';
 import { AdminAddPhotosModal } from './AdminAddPhotosModal';
 import { isSwcHubParty } from '../../utils/swcHub';
 import { isVideoFile } from '../../lib/mediaUtils';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 import {
   updatePayoutDocument,
   markReceiptDuplicate,
@@ -2819,11 +2821,28 @@ function CityExpansion({
                       : ''
                   }`}
                 >
+                  {/* pangrattato-58543: PDF receipts thumbnail off their
+                      sibling `.thumb.png` (same derivation as
+                      PayoutReviewModal). Legacy PDFs uploaded before the
+                      thumbnail feature have no sibling → the derived URL
+                      404s; the onError below hides the broken <img> and
+                      reveals the FileText placeholder layered beneath. */}
+                  {isPdfFile(e.doc) && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-theme-text-muted pointer-events-none">
+                      <FileText size={20} />
+                      <span className="text-[8px] uppercase font-bold tracking-wide">
+                        PDF
+                      </span>
+                    </div>
+                  )}
                   <img
-                    src={e.doc.url}
+                    src={isPdfFile(e.doc) ? derivePdfThumbnailUrl(e.doc.url) : e.doc.url}
                     alt={e.doc.fileName}
-                    className="w-full h-full object-cover"
+                    className="relative w-full h-full object-cover bg-theme-surface"
                     loading="lazy"
+                    onError={(ev) => {
+                      ev.currentTarget.style.display = 'none';
+                    }}
                   />
                   {/* coppa-92105: 8px alternating dark/transparent diagonal
                       stripes laid over the thumbnail. Reinforces "do not
