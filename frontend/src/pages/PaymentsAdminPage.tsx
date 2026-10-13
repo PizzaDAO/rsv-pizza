@@ -1377,6 +1377,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             onUnapprove={handleRowUnapprove}
             onHostClick={(userId) => setHostDetailUserId(userId)}
             onCapUpdated={() => refresh()}
+            onEstimatedAttendanceUpdated={() => refresh()}
             // schiacciata-58503: refetch after an admin adds a receipt/photo
             // in the by-party panel. New docs aren't on `row.payouts` yet, so
             // the local receiptOverrides merge can't surface them.
