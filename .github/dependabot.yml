@@ -2,6 +2,8 @@ version: 2
 # Automated dependency updates. The repo had 62 open alerts (33 high) with no
 # automation; this generates testable, grouped update PRs so bumps go through CI
 # (build + typecheck + schema/rls/migration guards) instead of piling up.
+# Majors with no advisory/EOL are ignored to cut noise (2026-10-15). wagmi and prisma
+# majors are deliberately NOT ignored: they carry real advisories and should keep resurfacing.
 updates:
   - package-ecosystem: npm
     directory: /frontend
@@ -13,6 +15,21 @@ updates:
       dev-and-build:
         patterns: ['*']
         update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@stripe/stripe-js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@stripe/react-stripe-js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vercel/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-helmet-async"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /backend
@@ -23,6 +40,23 @@ updates:
       dev-and-build:
         patterns: ['*']
         update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/supertest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@napi-rs/canvas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pdfjs-dist"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /
@@ -33,6 +67,9 @@ updates:
       dev-and-build:
         patterns: ['*']
         update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
