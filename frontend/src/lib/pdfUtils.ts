@@ -66,7 +66,7 @@ export async function renderPdfPageOneToPng(
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const pdf = await loadingTask.promise;
     if (pdf.numPages < 1) {
-      await pdf.destroy();
+      await loadingTask.destroy();
       return null;
     }
     const page = await pdf.getPage(1);
@@ -85,7 +85,7 @@ export async function renderPdfPageOneToPng(
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      await pdf.destroy();
+      await loadingTask.destroy();
       return null;
     }
 
@@ -101,7 +101,7 @@ export async function renderPdfPageOneToPng(
       canvas.toBlob((b) => resolve(b), 'image/png');
     });
 
-    await pdf.destroy();
+    await loadingTask.destroy();
     return blob;
   } catch (err) {
     // Encrypted PDFs, malformed files, etc. Log but don't throw — the caller
