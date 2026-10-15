@@ -35,7 +35,7 @@
     "react-i18next": "^17.0.6",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.30.4",
-    "recharts": "^2.13.0",
+    "recharts": "^3.10.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "tz-lookup": "^6.1.25",

@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  TooltipProps,
+  TooltipContentProps,
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
 import {
@@ -50,7 +50,7 @@ function formatFullTimestamp(iso: string): string {
   });
 }
 
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function CustomTooltip({ active, payload, label }: TooltipContentProps) {
   if (!active || !payload || !payload.length || !label) return null;
   return (
     <div className="bg-theme-card border border-theme-stroke rounded-lg px-3 py-2 shadow-lg text-xs">
@@ -187,7 +187,7 @@ export function PartnerTimeSeriesChart({ tag }: PartnerTimeSeriesChartProps) {
                 width={36}
                 domain={[0, yMax]}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
               <Legend
                 wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
                 iconType="circle"
