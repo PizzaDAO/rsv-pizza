@@ -7942,7 +7942,7 @@ export async function deleteSavedView(id: string): Promise<void> {
 // Tax-form requests (calzone-70821)
 // ============================================
 
-export type TaxFormRequestStatus = 'sent' | 'opened' | 'draft' | 'submitted' | 'verified' | 'rejected';
+export type TaxFormRequestStatus = 'sent' | 'opened' | 'draft' | 'submitting' | 'submitted' | 'verified' | 'rejected';
 
 export interface PublicTaxFormRequest {
   payeeLabel: string;
@@ -7953,7 +7953,10 @@ export interface PublicTaxFormRequest {
   locked: boolean;
   submittedFormType: TaxFormType | null;
   rejectedReason: string | null;
+  /** Draft with every TIN / sensitive key (and the signature) removed server-side. */
   currentDraft: { formType: TaxFormType; formData: Record<string, any> } | null;
+  /** Names (not values) of sensitive fields already stored on the draft. */
+  storedSecretFields: string[];
 }
 
 export async function getPublicTaxFormRequest(token: string): Promise<PublicTaxFormRequest> {
@@ -8030,16 +8033,25 @@ export async function listAdminTaxFormRequests(
   return res.requests;
 }
 
+export interface SkippedTaxFormRequest {
+  label: string;
+  email: string | null;
+  reason: 'exists' | 'duplicate_in_batch';
+}
+
 export async function createAdminTaxFormRequests(
   requests: TaxFormRequestInput[],
   requester = 'rare_pizzas',
-): Promise<AdminTaxFormRequest[]> {
-  const res = await apiRequest<{ requests: AdminTaxFormRequest[] }>(`/api/admin/tax-form-requests`, {
-    method: 'POST',
-    body: { requester, requests },
-    requireAuth: true,
-  });
-  return res.requests;
+): Promise<{ requests: AdminTaxFormRequest[]; skipped: SkippedTaxFormRequest[] }> {
+  const res = await apiRequest<{ requests: AdminTaxFormRequest[]; skipped?: SkippedTaxFormRequest[] }>(
+    `/api/admin/tax-form-requests`,
+    {
+      method: 'POST',
+      body: { requester, requests },
+      requireAuth: true,
+    },
+  );
+  return { requests: res.requests, skipped: res.skipped ?? [] };
 }
 
 export async function revokeAdminTaxFormRequest(id: string): Promise<AdminTaxFormRequest> {

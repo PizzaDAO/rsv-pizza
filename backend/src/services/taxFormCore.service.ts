@@ -27,16 +27,46 @@ export function isValidFormType(v: unknown): v is TaxFormType {
 export const SECRET_KEYS = ['ssn', 'ein', 'tin', 'itin', 'usTin', 'foreignTin', 'giin', 'dateOfBirth', 'accountNumbers'];
 
 /**
+ * Keys the public token API never returns: every SECRET_KEY plus the typed
+ * signature (the payee re-signs on each submit, see submitTaxFormCore).
+ */
+export const PUBLIC_REDACTED_KEYS: ReadonlyArray<string> = [...SECRET_KEYS, 'signature'];
+
+function isBlank(v: unknown): boolean {
+  return v === undefined || v === null || (typeof v === 'string' && !v.trim());
+}
+
+/** Names (never values) of SECRET_KEYS that hold a non-blank value in `data`. */
+export function storedSecretFieldNames(data: unknown): string[] {
+  if (!data || typeof data !== 'object') return [];
+  const d = data as Record<string, unknown>;
+  return SECRET_KEYS.filter((k) => !isBlank(d[k]));
+}
+
+/** Copy of `data` with every PUBLIC_REDACTED_KEYS entry removed. */
+export function redactForPublic(data: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (data && typeof data === 'object') {
+    for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+      if (!PUBLIC_REDACTED_KEYS.includes(k)) out[k] = v;
+    }
+  }
+  return out;
+}
+
+/**
  * Merge incoming over existing, but keep stored values for secret keys the
  * payload omits or leaves blank (public draft GET never returns them).
  */
 export function mergePreservingSecrets(existing: any, incoming: any): Record<string, any> {
   const out: Record<string, any> = { ...(existing || {}), ...(incoming || {}) };
   for (const k of SECRET_KEYS) {
-    const v = incoming?.[k];
-    const blank = v === undefined || v === null || (typeof v === 'string' && !v.trim());
-    if (blank && existing && existing[k] !== undefined) out[k] = existing[k];
+    if (isBlank(incoming?.[k]) && existing && existing[k] !== undefined) out[k] = existing[k];
   }
+  // W-9 SSN and EIN are mutually exclusive: a newly entered one replaces the
+  // stored other instead of both ending up on the PDF.
+  if (!isBlank(incoming?.ssn) && isBlank(incoming?.ein)) delete out.ein;
+  if (!isBlank(incoming?.ein) && isBlank(incoming?.ssn)) delete out.ssn;
   return out;
 }
 
@@ -47,6 +77,23 @@ export interface TaxFormOwner {
   /** Audit trail, recorded with signed_at on submit (request flow). */
   signerIp?: string | null;
   signerUserAgent?: string | null;
+}
+
+/**
+ * Request-owned (token) forms must NEVER carry a user_id: the token proves
+ * possession of a link, not identity, and linking would surface the form in
+ * that user's /api/tax-forms/me and payout gate. Refuse rather than silently
+ * drop so a caller bug is loud.
+ */
+function assertOwner(owner: TaxFormOwner): void {
+  if (owner.requestId && owner.userId) {
+    throw new AppError('Tax form owner conflict', 500, 'OWNER_CONFLICT');
+  }
+}
+
+/** user_id to write on CREATE. Always null for request-owned forms. */
+function ownerUserId(owner: TaxFormOwner): string | null {
+  return owner.requestId ? null : owner.userId ?? null;
 }
 
 function ownerWhere(owner: TaxFormOwner): Prisma.TaxFormWhereInput {
@@ -152,6 +199,7 @@ export async function saveTaxFormDraftCore(
   formType: TaxFormType,
   formData: unknown,
 ) {
+  assertOwner(owner);
   if (formData == null || typeof formData !== 'object') {
     throw new AppError('formData must be an object', 400, 'INVALID_FORM_DATA');
   }
@@ -165,15 +213,26 @@ export async function saveTaxFormDraftCore(
     const merged = (owner.requestId
       ? mergePreservingSecrets(existingDraft.formData, formData)
       : formData) as Prisma.InputJsonValue;
-    const row = await prisma.taxForm.update({
-      where: { id: existingDraft.id },
-      data: { formData: merged, ...(owner.userId ? { userId: owner.userId } : {}) },
+    // Conditional on still being a draft, so a concurrent submit that already
+    // finalised this row is never overwritten. Owner columns are never touched.
+    const upd = await prisma.taxForm.updateMany({
+      where: { id: existingDraft.id, status: 'draft' },
+      data: { formData: merged },
     });
+    if (upd.count === 0) {
+      throw new AppError(
+        'This form has already been submitted.',
+        409,
+        owner.requestId ? 'TOKEN_LOCKED' : 'ALREADY_SUBMITTED',
+      );
+    }
+    const row = await prisma.taxForm.findUnique({ where: { id: existingDraft.id } });
+    if (!row) throw new AppError('Tax form not found', 404, 'NOT_FOUND');
     return { row, created: false };
   }
   const row = await prisma.taxForm.create({
     data: {
-      userId: owner.userId ?? null,
+      userId: ownerUserId(owner),
       requestId: owner.requestId ?? null,
       formType,
       status: 'draft',
@@ -188,6 +247,12 @@ export async function submitTaxFormCore(
   formType: TaxFormType,
   formData: unknown,
 ) {
+  assertOwner(owner);
+  // Token flow: the payee must type the signature on every submit (the public
+  // GET never returns it), so a stored draft signature never counts as signing.
+  if (owner.requestId && isBlank((formData as any)?.signature)) {
+    throw new AppError('Missing required field: signature', 400, 'INVALID_FORM_DATA');
+  }
   const draft = await prisma.taxForm.findFirst({
     where: { ...ownerWhere(owner), formType, status: 'draft' },
     orderBy: { updatedAt: 'desc' },
@@ -233,14 +298,13 @@ export async function submitTaxFormCore(
         signedAt: now,
         expiresAt,
         rejectedReason: null,
-        ...(owner.userId ? { userId: owner.userId } : {}),
         ...audit,
       },
     });
   }
   return prisma.taxForm.create({
     data: {
-      userId: owner.userId ?? null,
+      userId: ownerUserId(owner),
       requestId: owner.requestId ?? null,
       formType,
       status: 'submitted',

@@ -64,7 +64,12 @@ const STATUS_STYLE: Record<string, string> = {
   submitted: 'bg-emerald-500/15 text-emerald-300',
   verified: 'bg-emerald-600/25 text-emerald-200',
   rejected: 'bg-red-500/15 text-red-300',
+  submitting: 'bg-amber-500/15 text-amber-300',
 };
+
+/** Only rows with a finished form are reviewable (never drafts / in-flight submits). */
+const REVIEWABLE = new Set(['submitted', 'verified', 'rejected']);
+const isReviewable = (r: AdminTaxFormRequest) => Boolean(r.taxFormId) && REVIEWABLE.has(r.status);
 
 /**
  * calzone-70821: admin "Tax form requests" section (collapsed by default).
@@ -113,9 +118,20 @@ export const TaxFormRequestsSection: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      const created = await createAdminTaxFormRequests(items);
-      setMessage(`Created ${created.length} request${created.length === 1 ? '' : 's'}. Downloaded a links CSV.`);
-      download('tax-form-links.csv', [['label', 'link'], ...created.map((r) => [r.payeeLabel, linkFor(r.token)])]);
+      const { requests: created, skipped } = await createAdminTaxFormRequests(items);
+      const parts = [`Created ${created.length} request${created.length === 1 ? '' : 's'}.`];
+      if (created.length > 0) {
+        download('tax-form-links.csv', [['label', 'link'], ...created.map((r) => [r.payeeLabel, linkFor(r.token)])]);
+        parts.push('Downloaded a links CSV.');
+      }
+      if (skipped.length > 0) {
+        parts.push(
+          `Skipped ${skipped.length} duplicate${skipped.length === 1 ? '' : 's'}: ${skipped
+            .map((s) => `${s.label}${s.reason === 'duplicate_in_batch' ? ' (repeated in file)' : ' (already has a link)'}`)
+            .join(', ')}.`,
+        );
+      }
+      setMessage(parts.join(' '));
       await refresh();
     } catch (e: any) {
       setError(e?.message || 'Failed to create requests');
@@ -195,7 +211,7 @@ export const TaxFormRequestsSection: React.FC = () => {
     ]);
 
   const counts = rows.reduce<Record<string, number>>((m, r) => ((m[r.status] = (m[r.status] || 0) + 1), m), {});
-  const reviewing = rows.find((r) => r.id === reviewId) || null;
+  const reviewing = rows.find((r) => r.id === reviewId && isReviewable(r)) || null;
 
   return (
     <div className="card mb-6">
@@ -275,8 +291,8 @@ export const TaxFormRequestsSection: React.FC = () => {
                   {rows.map((r) => (
                     <tr
                       key={r.id}
-                      className={`border-t border-theme-stroke ${r.taxFormId ? 'cursor-pointer hover:bg-theme-surface-hover' : ''}`}
-                      onClick={() => r.taxFormId && setReviewId(r.id === reviewId ? null : r.id)}
+                      className={`border-t border-theme-stroke ${isReviewable(r) ? 'cursor-pointer hover:bg-theme-surface-hover' : ''}`}
+                      onClick={() => isReviewable(r) && setReviewId(r.id === reviewId ? null : r.id)}
                     >
                       <td className="py-2 pr-3 text-theme-text">
                         {r.payeeLabel}

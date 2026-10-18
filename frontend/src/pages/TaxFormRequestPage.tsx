@@ -134,9 +134,17 @@ export const TaxFormRequestPage: React.FC = () => {
     const t = editor.editingType;
     return (
       <div className="space-y-4">
-        {info.status === 'rejected' && (
+        {(info.status === 'rejected' || info.rejectedReason !== null) && (
           <div className="card p-3 border-l-4 border-l-red-500 bg-red-500/10 text-sm text-red-200 [.gpp-theme_&]:text-red-800">
             Your previous form was rejected{info.rejectedReason ? `: ${info.rejectedReason}` : '.'} Please fill it in again.
+          </div>
+        )}
+        {t && info.storedSecretFields?.length > 0 && info.currentDraft?.formType === t && (
+          <div className="card p-3 border-l-4 border-l-emerald-500 bg-emerald-500/10 text-sm text-theme-text flex items-start gap-2">
+            <Lock size={14} className="mt-0.5 flex-shrink-0" />
+            <span>
+              TIN / sensitive details on file — re-enter only to change. Please re-type your signature before submitting.
+            </span>
           </div>
         )}
         {!t ? (

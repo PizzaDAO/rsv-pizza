@@ -78,8 +78,10 @@ taxFormRouter.use(requireAuth);
 taxFormRouter.get('/me', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.userId) throw new AppError('No user id on request', 500, 'NO_USER_ID');
+    // calzone-70821: request-owned (token-link) forms are never listed here,
+    // even if a user_id were somehow set on one.
     const forms = await prisma.taxForm.findMany({
-      where: { userId: req.userId },
+      where: { userId: req.userId, requestId: null },
       orderBy: [{ updatedAt: 'desc' }],
     });
     res.json({ taxForms: await Promise.all(forms.map((t) => serializeTaxForm(t, /* includeFormData */ true))) });
@@ -277,6 +279,7 @@ export async function getLatestSubmittedTaxFormForUser(userId: string) {
   return prisma.taxForm.findFirst({
     where: {
       userId,
+      requestId: null, // calzone-70821: token-link forms never satisfy the payout gate
       status: { in: ['submitted', 'verified'] },
     },
     orderBy: [{ updatedAt: 'desc' }],
