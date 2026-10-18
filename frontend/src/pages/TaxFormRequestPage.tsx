@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { AlertTriangle, CheckCircle2, FileText, Loader2, Lock, XCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { BRAND } from '../config/brand';
 import { TaxFormType } from '../types';
 import {
   getPublicTaxFormRequest,
@@ -225,7 +226,7 @@ export const TaxFormRequestPage: React.FC = () => {
   return (
     <Layout>
       <Helmet>
-        <title>Tax form | RSV.Pizza</title>
+        <title>{`Tax form | ${BRAND.name}`}</title>
         <meta name="robots" content="noindex,nofollow" />
       </Helmet>
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-4">
