@@ -8,6 +8,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | calzone-70821 | Standalone tax-form request page /tax-form?payee=<token> (Rare Pizzas W-9/W-8 collection from past payees; admin bulk links + status) | review | P1 |  | Snax | tax, payouts | plans/calzone-70821.md | #1142 |  |
+| marinara-61842 | Lock down event-images storage listing: anon could list all ~15.4k objects incl. host payout receipts (drop SELECT policy; private bucket for receipts as follow-up) | review | P1 |  |  | security | plans/marinara-61842.md |  | SQL NOT applied yet — owner applies migration, verifies, then merge. |
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P1 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment |
 | diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | doing | P2 |  |  |  |  |  |  |
 | napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | doing | P2 |  |  |  |  |  |  |

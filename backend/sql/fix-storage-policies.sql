@@ -16,26 +16,11 @@ FOR INSERT
 TO public
 WITH CHECK (bucket_id = 'event-images');
 
--- Policy 2: Allow anyone to view event images (public bucket)
-CREATE POLICY "Anyone can view event images"
-ON storage.objects
-FOR SELECT
-TO public
-USING (bucket_id = 'event-images');
-
--- Policy 3: Allow anyone to delete event images
-CREATE POLICY "Anyone can delete event images"
-ON storage.objects
-FOR DELETE
-TO public
-USING (bucket_id = 'event-images');
-
--- Policy 4: Allow anyone to update event images
-CREATE POLICY "Anyone can update event images"
-ON storage.objects
-FOR UPDATE
-TO public
-USING (bucket_id = 'event-images');
+-- marinara-61842: Policies 2-4 (SELECT / DELETE / UPDATE TO public) were removed.
+-- The SELECT policy let anon LIST every object in the bucket (incl. payout
+-- receipts); public image URLs don't need it. DELETE/UPDATE let anyone remove or
+-- overwrite any object. Do not re-add them. See
+-- supabase/migrations/20261018_marinara_61842_lockdown_event_images_listing.sql.
 
 -- Verify policies were created
 SELECT
