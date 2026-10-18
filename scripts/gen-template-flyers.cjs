@@ -42,8 +42,8 @@ const DEFAULT_POSITIONS = {
 // Supabase client (for storage uploads)
 const supabase = createClient(
   'https://znpiwdvvsqaxuskpfleo.supabase.co',
-  // anon key - storage upload needs to be allowed for anon or use service role
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMjA0ODQsImV4cCI6MjA4MzU5NjQ4NH0.yAb2_JOtyYD0uqvqoPufzc5kG2pNjyqd1pC97UViXuw'
+  // Supabase secret key (storage upload); set SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const prisma = new PrismaClient();
