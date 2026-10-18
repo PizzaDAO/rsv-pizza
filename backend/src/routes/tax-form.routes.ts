@@ -21,28 +21,24 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { getSignedTaxFormUrl, TaxFormType } from '../services/taxFormStorage.service.js';
 import {
-  generateW9PDF,
-  generateW8BENPDF,
-  generateW8BENEPDF,
-  W9FormData,
-  W8BENFormData,
-  W8BENEFormData,
-} from '../services/taxFormPdf.service.js';
-import { uploadTaxFormPdf, getSignedTaxFormUrl, TaxFormType } from '../services/taxFormStorage.service.js';
+  isValidFormType,
+  saveTaxFormDraftCore,
+  submitTaxFormCore,
+} from '../services/taxFormCore.service.js';
 
 export const taxFormRouter = Router();
 export const adminTaxFormRouter = Router();
 
-const FORM_TYPES: ReadonlyArray<TaxFormType> = ['w9', 'w8ben', 'w8bene'] as const;
+// Verify/reject mirror onto tax_form_requests (calzone-70821).
+import { mirrorRequestStatus } from '../services/taxFormCore.service.js';
+
 const STATUSES = ['draft', 'submitted', 'verified', 'rejected'] as const;
 type TaxFormStatus = (typeof STATUSES)[number];
 
 // ---------- helpers ----------
 
-function isValidFormType(v: unknown): v is TaxFormType {
-  return typeof v === 'string' && (FORM_TYPES as ReadonlyArray<string>).includes(v);
-}
 
 // NOTE: `t.pdfUrl` / `t.pdfThumbUrl` in the DB are private-bucket object PATHS
 // (salame-92110 security fix), never public URLs. Callers must resolve them to
@@ -70,93 +66,6 @@ async function serializeTaxForm(t: any, includeFormData: boolean) {
     ...(includeFormData ? { formData: t.formData ?? {} } : {}),
     ...(t.user ? { user: { id: t.user.id, name: t.user.name ?? null, email: t.user.email ?? null } } : {}),
   };
-}
-
-/**
- * Validate the minimal required fields per form type before generating a PDF.
- * Throws AppError(400, 'INVALID_FORM_DATA') with a human-readable message
- * naming the missing field.
- */
-function assertSubmitValid(formType: TaxFormType, data: any): void {
-  function requireField(field: string) {
-    if (!data || typeof data[field] !== 'string' || !data[field].trim()) {
-      throw new AppError(
-        `Missing required field: ${field}`,
-        400,
-        'INVALID_FORM_DATA',
-      );
-    }
-  }
-  if (formType === 'w9') {
-    requireField('name');
-    requireField('taxClassification');
-    requireField('address');
-    // prosciutto-92107: accept either the new structured fields (city + state
-    // + zipCode) or the legacy combined cityStateZip field. New form submits
-    // populate the structured fields; older drafts pre-dating this change
-    // still validate via the legacy fallback so the host can submit their
-    // saved draft without re-typing.
-    const hasStructured =
-      typeof data.city === 'string' && data.city.trim()
-      && typeof data.state === 'string' && data.state.trim()
-      && typeof data.zipCode === 'string' && data.zipCode.trim();
-    if (!hasStructured) {
-      requireField('cityStateZip');
-    }
-    requireField('signature');
-    requireField('date');
-    // Exactly one of SSN / EIN must be present.
-    const hasSsn = typeof data.ssn === 'string' && data.ssn.trim();
-    const hasEin = typeof data.ein === 'string' && data.ein.trim();
-    if (!hasSsn && !hasEin) {
-      throw new AppError(
-        'Either SSN or EIN is required on the W-9',
-        400,
-        'INVALID_FORM_DATA',
-      );
-    }
-  } else if (formType === 'w8ben') {
-    requireField('name');
-    requireField('citizenship');
-    requireField('permanentAddress');
-    requireField('permanentCity');
-    requireField('permanentCountry');
-    requireField('dateOfBirth');
-    requireField('signature');
-    requireField('date');
-  } else if (formType === 'w8bene') {
-    requireField('entityName');
-    requireField('countryOfIncorporation');
-    requireField('entityType');
-    requireField('chapter4Status');
-    requireField('permanentAddress');
-    requireField('permanentCity');
-    requireField('permanentCountry');
-    requireField('signature');
-    requireField('date');
-    if (data.chapter4Status === 'ffi') {
-      // FFI requires the long-form FATCA classification we don't render.
-      throw new AppError(
-        'FFI entities require a paper W-8BEN-E — please contact an admin',
-        400,
-        'FFI_PAPER_FORM_REQUIRED',
-      );
-    }
-  }
-}
-
-/**
- * Compute the IRS expiry for a W-8 form: signed_at + 3 years and the rest of
- * the calendar year. Simplified to "signed_at + 3 years 11 months" — phase 2
- * cron refines this if needed.
- *
- * W-9 has no expiry (returns null).
- */
-function computeExpiry(formType: TaxFormType, signedAt: Date): Date | null {
-  if (formType === 'w9') return null;
-  const d = new Date(signedAt);
-  d.setUTCMonth(d.getUTCMonth() + 47); // 3 years 11 months
-  return d;
 }
 
 // ============================================================================
@@ -198,33 +107,9 @@ taxFormRouter.post('/draft', async (req: AuthRequest, res: Response, next: NextF
       throw new AppError('formData must be an object', 400, 'INVALID_FORM_DATA');
     }
 
-    // Look for an existing draft of this type for this user. If found, update
-    // in place (so editing the form before submit doesn't pile up rows).
-    const existingDraft = await prisma.taxForm.findFirst({
-      where: { userId: req.userId, formType, status: 'draft' },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const { row, created } = await saveTaxFormDraftCore({ userId: req.userId }, formType, formData);
 
-    const data = formData as Prisma.InputJsonValue;
-
-    let row;
-    if (existingDraft) {
-      row = await prisma.taxForm.update({
-        where: { id: existingDraft.id },
-        data: { formData: data },
-      });
-    } else {
-      row = await prisma.taxForm.create({
-        data: {
-          userId: req.userId,
-          formType,
-          status: 'draft',
-          formData: data,
-        },
-      });
-    }
-
-    res.status(existingDraft ? 200 : 201).json({ taxForm: await serializeTaxForm(row, true) });
+    res.status(created ? 201 : 200).json({ taxForm: await serializeTaxForm(row, true) });
   } catch (error) {
     next(error);
   }
@@ -246,68 +131,7 @@ taxFormRouter.post('/submit', async (req: AuthRequest, res: Response, next: Next
       throw new AppError('formType must be w9|w8ben|w8bene', 400, 'INVALID_FORM_TYPE');
     }
 
-    // Locate the current draft for this type; either we're submitting one
-    // the host already saved, or we'll create a fresh row.
-    let draft = await prisma.taxForm.findFirst({
-      where: { userId: req.userId, formType, status: 'draft' },
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    // Merge incoming formData over the saved draft (or use it standalone).
-    const dataToValidate = formData && typeof formData === 'object'
-      ? { ...(draft?.formData as any || {}), ...(formData as any) }
-      : (draft?.formData as any || {});
-
-    assertSubmitValid(formType, dataToValidate);
-
-    // Render the PDF — use a stable shortish reference id for the PDF footer.
-    // We use the draft id when available, otherwise a placeholder until insert.
-    const refIdForPdf = draft?.id || `${formType}-${Date.now()}`;
-    let pdf: Buffer;
-    if (formType === 'w9') {
-      pdf = await generateW9PDF(dataToValidate as W9FormData, refIdForPdf.slice(0, 8));
-    } else if (formType === 'w8ben') {
-      pdf = await generateW8BENPDF(dataToValidate as W8BENFormData, refIdForPdf.slice(0, 8));
-    } else {
-      pdf = await generateW8BENEPDF(dataToValidate as W8BENEFormData, refIdForPdf.slice(0, 8));
-    }
-
-    // Upload to the PRIVATE tax-forms bucket. We persist the object PATH (not a
-    // URL); signed URLs are minted on read (salame-92110 security fix).
-    const { path, thumbPath } = await uploadTaxFormPdf(pdf, req.userId, formType);
-
-    // Persist as submitted.
-    const now = new Date();
-    const expiresAt = computeExpiry(formType, now);
-    let row;
-    if (draft) {
-      row = await prisma.taxForm.update({
-        where: { id: draft.id },
-        data: {
-          formData: dataToValidate as Prisma.InputJsonValue,
-          status: 'submitted',
-          pdfUrl: path,
-          pdfThumbUrl: thumbPath,
-          signedAt: now,
-          expiresAt,
-          // Clear any prior rejection state if the host re-submits.
-          rejectedReason: null,
-        },
-      });
-    } else {
-      row = await prisma.taxForm.create({
-        data: {
-          userId: req.userId,
-          formType,
-          status: 'submitted',
-          formData: dataToValidate as Prisma.InputJsonValue,
-          pdfUrl: path,
-          pdfThumbUrl: thumbPath,
-          signedAt: now,
-          expiresAt,
-        },
-      });
-    }
+    const row = await submitTaxFormCore({ userId: req.userId }, formType, formData);
 
     res.status(200).json({ taxForm: await serializeTaxForm(row, true) });
   } catch (error) {
@@ -408,6 +232,7 @@ adminTaxFormRouter.post(
         },
         include: { user: { select: { id: true, name: true, email: true } } },
       });
+      await mirrorRequestStatus(updated.id, 'verified');
       res.json({ taxForm: await serializeTaxForm(updated, true) });
     } catch (error) {
       next(error);
@@ -436,6 +261,7 @@ adminTaxFormRouter.post(
         },
         include: { user: { select: { id: true, name: true, email: true } } },
       });
+      await mirrorRequestStatus(updated.id, 'rejected');
       res.json({ taxForm: await serializeTaxForm(updated, true) });
     } catch (error) {
       next(error);

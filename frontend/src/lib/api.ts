@@ -7937,3 +7937,123 @@ export async function deleteSavedView(id: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+// ============================================
+// Tax-form requests (calzone-70821)
+// ============================================
+
+export type TaxFormRequestStatus = 'sent' | 'opened' | 'draft' | 'submitted' | 'verified' | 'rejected';
+
+export interface PublicTaxFormRequest {
+  payeeLabel: string;
+  requester: string;
+  suggestedFormType: TaxFormType | null;
+  taxYearNote: string | null;
+  status: TaxFormRequestStatus;
+  locked: boolean;
+  submittedFormType: TaxFormType | null;
+  rejectedReason: string | null;
+  currentDraft: { formType: TaxFormType; formData: Record<string, any> } | null;
+}
+
+export async function getPublicTaxFormRequest(token: string): Promise<PublicTaxFormRequest> {
+  return apiRequest<PublicTaxFormRequest>(`/api/tax-form-requests/${encodeURIComponent(token)}`, {
+    requireAuth: false,
+  });
+}
+
+export async function savePublicTaxFormDraft(
+  token: string,
+  formType: TaxFormType,
+  formData: Record<string, any>,
+): Promise<void> {
+  await apiRequest(`/api/tax-form-requests/${encodeURIComponent(token)}/draft`, {
+    method: 'POST',
+    body: { formType, formData },
+    requireAuth: false,
+  });
+}
+
+export async function submitPublicTaxForm(
+  token: string,
+  formType: TaxFormType,
+  formData: Record<string, any>,
+): Promise<void> {
+  await apiRequest(`/api/tax-form-requests/${encodeURIComponent(token)}/submit`, {
+    method: 'POST',
+    body: { formType, formData },
+    requireAuth: false,
+  });
+}
+
+export interface AdminTaxFormRequest {
+  id: string;
+  token: string;
+  requester: string;
+  payeeLabel: string;
+  payeeEmail: string | null;
+  payeeWallet: string | null;
+  payeeHandle: string | null;
+  suggestedFormType: TaxFormType | null;
+  taxYearNote: string | null;
+  userId: string | null;
+  taxFormId: string | null;
+  formType: TaxFormType | null;
+  status: TaxFormRequestStatus;
+  openedAt: string | null;
+  submittedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxFormRequestInput {
+  label: string;
+  email?: string;
+  wallet?: string;
+  handle?: string;
+  suggestedFormType?: string;
+  taxYearNote?: string;
+}
+
+export async function listAdminTaxFormRequests(
+  filters: { requester?: string; status?: TaxFormRequestStatus } = {},
+): Promise<AdminTaxFormRequest[]> {
+  const qs = new URLSearchParams();
+  if (filters.requester) qs.set('requester', filters.requester);
+  if (filters.status) qs.set('status', filters.status);
+  const q = qs.toString();
+  const res = await apiRequest<{ requests: AdminTaxFormRequest[] }>(
+    `/api/admin/tax-form-requests${q ? `?${q}` : ''}`,
+    { requireAuth: true },
+  );
+  return res.requests;
+}
+
+export async function createAdminTaxFormRequests(
+  requests: TaxFormRequestInput[],
+  requester = 'rare_pizzas',
+): Promise<AdminTaxFormRequest[]> {
+  const res = await apiRequest<{ requests: AdminTaxFormRequest[] }>(`/api/admin/tax-form-requests`, {
+    method: 'POST',
+    body: { requester, requests },
+    requireAuth: true,
+  });
+  return res.requests;
+}
+
+export async function revokeAdminTaxFormRequest(id: string): Promise<AdminTaxFormRequest> {
+  const res = await apiRequest<{ request: AdminTaxFormRequest }>(
+    `/api/admin/tax-form-requests/${id}/revoke`,
+    { method: 'POST', requireAuth: true },
+  );
+  return res.request;
+}
+
+export async function regenerateAdminTaxFormRequestToken(id: string): Promise<AdminTaxFormRequest> {
+  const res = await apiRequest<{ request: AdminTaxFormRequest }>(
+    `/api/admin/tax-form-requests/${id}/regenerate-token`,
+    { method: 'POST', requireAuth: true },
+  );
+  return res.request;
+}

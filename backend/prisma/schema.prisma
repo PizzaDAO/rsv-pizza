@@ -47,6 +47,7 @@ model User {
   reimbursementCapAppealsSubmitted ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsByHost")
   reimbursementCapAppealsReviewed  ReimbursementCapAppeal[] @relation("ReimbursementCapAppealsReviewedBy")
   taxForms                         TaxForm[]
+  taxFormRequests                  TaxFormRequest[]         @relation("TaxFormRequestUser")
   hostSurveyResponses              HostSurveyResponse[]
 }
 
@@ -2102,8 +2103,14 @@ model Payout {
 // at payout time is snapshotted onto `payouts.tax_form_id`.
 model TaxForm {
   id             String    @id @default(uuid()) @db.Uuid
-  userId         String    @map("user_id")
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // calzone-70821: nullable — request-owned forms have request_id instead
+  // (DB CHECK: user_id OR request_id must be set).
+  userId         String?   @map("user_id")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId      String?   @map("request_id") @db.Uuid
+  request        TaxFormRequest? @relation("TaxFormRequestForms", fields: [requestId], references: [id], onDelete: SetNull)
+  signerIp       String?   @map("signer_ip")
+  signerUserAgent String?  @map("signer_user_agent")
   // 'w9' | 'w8ben' | 'w8bene' — enforced by DB CHECK constraint.
   formType       String    @map("form_type")
   // 'draft' | 'submitted' | 'verified' | 'rejected' — enforced by DB CHECK.
@@ -2123,11 +2130,44 @@ model TaxForm {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   payouts Payout[]
+  latestForRequests TaxFormRequest[] @relation("TaxFormRequestLatest")
 
   @@index([userId])
+  @@index([requestId])
   @@index([status])
   @@index([expiresAt])
   @@map("tax_forms")
+}
+
+// calzone-70821: one row per payee asked to file a tax form via
+// /tax-form?payee=<token>. `token` is the link secret (256-bit, url-safe).
+model TaxFormRequest {
+  id                String    @id @default(uuid()) @db.Uuid
+  token             String    @unique
+  requester         String    @default("rare_pizzas")
+  payeeLabel        String    @map("payee_label")
+  payeeEmail        String?   @map("payee_email")
+  payeeWallet       String?   @map("payee_wallet")
+  payeeHandle       String?   @map("payee_handle")
+  suggestedFormType String?   @map("suggested_form_type")
+  taxYearNote       String?   @map("tax_year_note")
+  userId            String?   @map("user_id")
+  user              User?     @relation("TaxFormRequestUser", fields: [userId], references: [id], onDelete: SetNull)
+  taxFormId         String?   @map("tax_form_id") @db.Uuid
+  taxForm           TaxForm?  @relation("TaxFormRequestLatest", fields: [taxFormId], references: [id], onDelete: SetNull)
+  // 'sent' | 'opened' | 'draft' | 'submitted' | 'verified' | 'rejected' (DB CHECK)
+  status            String    @default("sent")
+  openedAt          DateTime? @map("opened_at") @db.Timestamptz
+  submittedAt       DateTime? @map("submitted_at") @db.Timestamptz
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  forms TaxForm[] @relation("TaxFormRequestForms")
+
+  @@index([requester, status])
+  @@index([userId])
+  @@map("tax_form_requests")
 }
 
 // ============================================

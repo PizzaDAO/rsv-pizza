@@ -8,7 +8,8 @@
  * object PATH (not a URL); the route layer mints a signed URL from it at read
  * time via `getSignedTaxFormUrl`.
  *
- * Path: `{userId}/{formType}-{timestamp}.pdf` inside the `tax-forms` bucket.
+ * Path: `{ownerKey}/{formType}-{timestamp}.pdf` inside the `tax-forms` bucket,
+ * where ownerKey is the userId (host flow) or `requests/{requestId}` (calzone-70821).
  *
  * Thumbnails: phase 1 skips server-side PDF→PNG rendering. The admin reviewer
  * modal renders the PDF itself via <embed> against a signed URL.
@@ -70,13 +71,13 @@ export interface UploadTaxFormPdfResult {
  */
 export async function uploadTaxFormPdf(
   buffer: Buffer,
-  userId: string,
+  ownerKey: string,
   formType: TaxFormType,
 ): Promise<UploadTaxFormPdfResult> {
   const supabase = getSupabaseAdmin();
   await ensureBucket(supabase);
   const ts = Date.now();
-  const path = `${userId}/${formType}-${ts}.pdf`;
+  const path = `${ownerKey}/${formType}-${ts}.pdf`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
