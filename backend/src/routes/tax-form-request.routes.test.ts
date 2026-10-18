@@ -245,6 +245,7 @@ const SECRET_VALUES = {
   giin: 'GIIN-SECRET',
   dateOfBirth: '1980-01-02',
   accountNumbers: 'ACCT-SECRET',
+  referenceNumbers: 'REF-SECRET',
 };
 
 beforeEach(() => {
