@@ -10,6 +10,11 @@
 -- policies, see 20260924_taxform_rls_lockdown), and (c) the existing FK is
 -- ON DELETE CASCADE which is unchanged for non-null values.
 --
+-- Status 'submitting' is a transient lock held while the PDF is generated.
+-- The tax_forms.user_id FK stays ON DELETE CASCADE on purpose: SET NULL would
+-- violate the owner CHECK for user-owned forms and block user deletion. Token
+-- routes never set user_id, so request-owned rows are unaffected.
+--
 -- NOT applied automatically. Apply to prod BEFORE merging (see CLAUDE.md).
 
 CREATE TABLE IF NOT EXISTS "tax_form_requests" (
@@ -26,7 +31,7 @@ CREATE TABLE IF NOT EXISTS "tax_form_requests" (
   "user_id"             TEXT         REFERENCES "User"("id") ON DELETE SET NULL,
   "tax_form_id"         UUID,
   "status"              TEXT         NOT NULL DEFAULT 'sent'
-                                      CHECK ("status" IN ('sent', 'opened', 'draft', 'submitted', 'verified', 'rejected')),
+                                      CHECK ("status" IN ('sent', 'opened', 'draft', 'submitting', 'submitted', 'verified', 'rejected')),
   "opened_at"           TIMESTAMPTZ,
   "submitted_at"        TIMESTAMPTZ,
   "revoked_at"          TIMESTAMPTZ,

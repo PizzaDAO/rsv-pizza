@@ -23,6 +23,23 @@ export function isValidFormType(v: unknown): v is TaxFormType {
   return typeof v === 'string' && (FORM_TYPES as ReadonlyArray<string>).includes(v);
 }
 
+/** Sensitive keys: preserved server-side when a payload omits/blanks them. */
+export const SECRET_KEYS = ['ssn', 'ein', 'tin', 'itin', 'usTin', 'foreignTin', 'giin', 'dateOfBirth', 'accountNumbers'];
+
+/**
+ * Merge incoming over existing, but keep stored values for secret keys the
+ * payload omits or leaves blank (public draft GET never returns them).
+ */
+export function mergePreservingSecrets(existing: any, incoming: any): Record<string, any> {
+  const out: Record<string, any> = { ...(existing || {}), ...(incoming || {}) };
+  for (const k of SECRET_KEYS) {
+    const v = incoming?.[k];
+    const blank = v === undefined || v === null || (typeof v === 'string' && !v.trim());
+    if (blank && existing && existing[k] !== undefined) out[k] = existing[k];
+  }
+  return out;
+}
+
 /** Who owns the form. At least one of userId / requestId must be set. */
 export interface TaxFormOwner {
   userId?: string | null;
@@ -145,9 +162,12 @@ export async function saveTaxFormDraftCore(
   });
   const data = formData as Prisma.InputJsonValue;
   if (existingDraft) {
+    const merged = (owner.requestId
+      ? mergePreservingSecrets(existingDraft.formData, formData)
+      : formData) as Prisma.InputJsonValue;
     const row = await prisma.taxForm.update({
       where: { id: existingDraft.id },
-      data: { formData: data, ...(owner.userId ? { userId: owner.userId } : {}) },
+      data: { formData: merged, ...(owner.userId ? { userId: owner.userId } : {}) },
     });
     return { row, created: false };
   }
@@ -174,7 +194,9 @@ export async function submitTaxFormCore(
   });
 
   const dataToValidate = formData && typeof formData === 'object'
-    ? { ...((draft?.formData as any) || {}), ...(formData as any) }
+    ? (owner.requestId
+        ? mergePreservingSecrets(draft?.formData, formData)
+        : { ...((draft?.formData as any) || {}), ...(formData as any) })
     : ((draft?.formData as any) || {});
 
   assertSubmitValid(formType, dataToValidate);

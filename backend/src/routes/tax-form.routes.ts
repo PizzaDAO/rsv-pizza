@@ -251,6 +251,9 @@ adminTaxFormRouter.post(
       }
       const row = await prisma.taxForm.findUnique({ where: { id: req.params.id } });
       if (!row) throw new AppError('Tax form not found', 404, 'NOT_FOUND');
+      if (row.status !== 'submitted' && row.status !== 'verified') {
+        throw new AppError('Only submitted or verified forms can be rejected', 400, 'INVALID_STATUS_TRANSITION');
+      }
       const updated = await prisma.taxForm.update({
         where: { id: row.id },
         data: {

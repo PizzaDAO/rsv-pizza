@@ -2155,7 +2155,7 @@ model TaxFormRequest {
   user              User?     @relation("TaxFormRequestUser", fields: [userId], references: [id], onDelete: SetNull)
   taxFormId         String?   @map("tax_form_id") @db.Uuid
   taxForm           TaxForm?  @relation("TaxFormRequestLatest", fields: [taxFormId], references: [id], onDelete: SetNull)
-  // 'sent' | 'opened' | 'draft' | 'submitted' | 'verified' | 'rejected' (DB CHECK)
+  // 'sent' | 'opened' | 'draft' | 'submitting' | 'submitted' | 'verified' | 'rejected' (DB CHECK)
   status            String    @default("sent")
   openedAt          DateTime? @map("opened_at") @db.Timestamptz
   submittedAt       DateTime? @map("submitted_at") @db.Timestamptz
