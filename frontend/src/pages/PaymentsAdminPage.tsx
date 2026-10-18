@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { TaxFormRequestsSection } from '../components/payments-admin/TaxFormRequestsSection';
 import { IconInput } from '../components/IconInput';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 import {
@@ -1174,6 +1175,9 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
             Export CSV
           </button>
         </div>
+
+        {/* calzone-70821: standalone tax-form requests (admin-only). */}
+        {!isUnderboss && <TaxFormRequestsSection />}
 
         {/* coppa-91827: hot wallet address + ETH/USDC balances so admins know
             where to deposit funds and can verify they landed. Self-fetches.

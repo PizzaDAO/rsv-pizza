@@ -29,6 +29,7 @@ const AdminPage = React.lazy(() => import('./pages/AdminPage').then(m => ({ defa
 const AdminSeriesPage = React.lazy(() => import('./pages/AdminSeriesPage').then(m => ({ default: m.AdminSeriesPage })));
 import { SeriesLandingPage } from './pages/SeriesLandingPage';
 const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
+const TaxFormRequestPage = React.lazy(() => import('./pages/TaxFormRequestPage').then(m => ({ default: m.TaxFormRequestPage })));
 const PaymentsAdminPage = React.lazy(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
 const LatamPaymentsPage = React.lazy(() => import('./pages/LatamPaymentsPage').then(m => ({ default: m.LatamPaymentsPage })));
 const SouthAfricaPaymentsPage = React.lazy(() => import('./pages/SouthAfricaPaymentsPage').then(m => ({ default: m.SouthAfricaPaymentsPage })));
@@ -114,6 +115,7 @@ function App() {
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/gpp/leaderboard" element={<LeaderboardPage />} />
             {/* /payments must come before /:slug */}
+            <Route path="/tax-form" element={<Suspense fallback={null}><TaxFormRequestPage /></Suspense>} />
             <Route path="/payments" element={<PaymentsAdminPage />} />
             {/* argentina-92103: regional LATAM portal for the LATAM
                 underboss. Wraps PaymentsAdminPage with regionFilter +

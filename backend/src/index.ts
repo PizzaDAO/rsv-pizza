@@ -86,6 +86,7 @@ import {
 import { surveyResponsesAdminRouter } from './routes/admin/surveyResponses.routes.js'; // gnocchi-58507: admin survey responses feed
 import reminderRoutes from './routes/reminder.routes.js';
 import { taxFormRouter, adminTaxFormRouter } from './routes/tax-form.routes.js';
+import { publicTaxFormRequestRouter, adminTaxFormRequestRouter } from './routes/tax-form-request.routes.js';
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
@@ -162,6 +163,7 @@ app.use('/api/rsvp', rsvpLimiter);
 
 // Routes
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
+app.use('/api/admin/tax-form-requests', adminTaxFormRequestRouter); // calzone-70821: before /api/admin catch-all
 app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
@@ -189,6 +191,7 @@ app.use('/api/sponsor-users', quizTemplateRoutes); // Quiz template CRUD (admin)
 app.use('/api/sponsor/report/ai', partnerAiShareRouter);
 app.use('/api/sponsor', sponsorDashboardRouter); // Sponsor dashboard (login-based auth)
 app.use('/api/shipping', shippingRoutes); // Shipping coordinator dashboard
+app.use('/api/tax-form-requests', publicTaxFormRequestRouter); // calzone-70821: public token-authed tax-form requests
 app.use('/api/tax-forms', taxFormRouter); // salame-92110: host tax-form upload (W-9 / W-8BEN / W-8BEN-E)
 app.use('/api/auth', authRoutes);
 app.use('/api/heic', heicRoutes); // taleggio-71042: public server-side HEIC->JPEG convert (no auth; SSRF-guarded)
