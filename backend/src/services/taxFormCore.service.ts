@@ -24,7 +24,7 @@ export function isValidFormType(v: unknown): v is TaxFormType {
 }
 
 /** Sensitive keys: preserved server-side when a payload omits/blanks them. */
-export const SECRET_KEYS = ['ssn', 'ein', 'tin', 'itin', 'usTin', 'foreignTin', 'giin', 'dateOfBirth', 'accountNumbers'];
+export const SECRET_KEYS = ['ssn', 'ein', 'tin', 'itin', 'usTin', 'foreignTin', 'giin', 'dateOfBirth', 'accountNumbers', 'referenceNumbers'];
 
 /**
  * Keys the public token API never returns: every SECRET_KEY plus the typed
