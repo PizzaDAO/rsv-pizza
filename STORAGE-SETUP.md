@@ -27,33 +27,20 @@ The event image upload feature requires a Supabase Storage bucket. Follow these 
 3. **Set Permissions (RLS Policies)**
    - After creating the bucket, go to **Storage** → **Policies**
    - Click **New Policy** on the `storage.objects` table
-   - Create 3 policies:
+   - Create 1 policy (upload only):
 
-   **Policy 1: Upload**
+   > **Security (marinara-61842):** do NOT add a `FOR SELECT` (view) policy or any
+   > `DELETE`/`UPDATE` policy for `event-images`. The bucket is public, so image URLs
+   > work without one, and a SELECT policy lets anyone LIST every object (incl. payout
+   > receipts) via `POST /storage/v1/object/list/event-images`. Uploads need INSERT only.
+
+   **Policy: Upload**
    ```sql
    CREATE POLICY "Anyone can upload event images"
    ON storage.objects
    FOR INSERT
    TO anon, authenticated
    WITH CHECK (bucket_id = 'event-images');
-   ```
-
-   **Policy 2: View**
-   ```sql
-   CREATE POLICY "Anyone can view event images"
-   ON storage.objects
-   FOR SELECT
-   TO anon, authenticated, public
-   USING (bucket_id = 'event-images');
-   ```
-
-   **Policy 3: Delete**
-   ```sql
-   CREATE POLICY "Anyone can delete event images"
-   ON storage.objects
-   FOR DELETE
-   TO anon, authenticated
-   USING (bucket_id = 'event-images');
    ```
 
 ## Option 2: SQL Script
@@ -80,13 +67,7 @@ CREATE POLICY IF NOT EXISTS "Anyone can upload event images"
 ON storage.objects FOR INSERT TO anon, authenticated
 WITH CHECK (bucket_id = 'event-images');
 
-CREATE POLICY IF NOT EXISTS "Anyone can view event images"
-ON storage.objects FOR SELECT TO anon, authenticated, public
-USING (bucket_id = 'event-images');
-
-CREATE POLICY IF NOT EXISTS "Anyone can delete event images"
-ON storage.objects FOR DELETE TO anon, authenticated
-USING (bucket_id = 'event-images');
+-- No SELECT/DELETE/UPDATE policies: see marinara-61842 note above.
 ```
 
 ## Verify Setup

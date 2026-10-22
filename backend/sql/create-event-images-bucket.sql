@@ -19,16 +19,7 @@ FOR INSERT
 TO anon, authenticated
 WITH CHECK (bucket_id = 'event-images');
 
--- Policy: Anyone can view images in event-images bucket (public bucket)
-CREATE POLICY "Anyone can view event images"
-ON storage.objects
-FOR SELECT
-TO anon, authenticated, public
-USING (bucket_id = 'event-images');
-
--- Policy: Anyone can delete their own uploads (optional, based on file path)
-CREATE POLICY "Anyone can delete event images"
-ON storage.objects
-FOR DELETE
-TO anon, authenticated
-USING (bucket_id = 'event-images');
+-- marinara-61842: NO SELECT / DELETE / UPDATE policies for event-images.
+-- The bucket is public, so /object/public/... URLs work without a SELECT policy;
+-- a SELECT policy lets anon LIST every object (incl. payout receipts).
+-- See supabase/migrations/20261018_marinara_61842_lockdown_event_images_listing.sql.
