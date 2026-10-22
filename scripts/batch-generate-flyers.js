@@ -13,8 +13,11 @@ const { createClient } = require('@supabase/supabase-js');
 
 // ---- Config ----
 const SUPABASE_URL = 'https://znpiwdvvsqaxuskpfleo.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucGl3ZHZ2c3FheHVza3BmbGVvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODAyMDQ4NCwiZXhwIjoyMDgzNTk2NDg0fQ.KkAjyc8k6FbX4YxWPJEhOsInijffOcPtp6roESj4U9s';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('Set SUPABASE_SERVICE_KEY (Supabase secret key) to run this script.');
+  process.exit(1);
+}
 const TEMPLATE_IMG = 'https://www.rsv.pizza/gpp-flyer-2026-og.jpg';
 const DRY_RUN = process.argv.includes('--dry-run');
 const REGENERATE = process.argv.includes('--regenerate');

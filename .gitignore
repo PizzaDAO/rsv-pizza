@@ -44,3 +44,6 @@ nul
 .cache/
 scripts/outreach/output/
 secrets.md
+
+# Per-developer Claude Code settings (may hold secrets)
+.claude/settings.local.json
