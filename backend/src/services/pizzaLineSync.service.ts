@@ -55,6 +55,7 @@ export interface DocContext {
 /** Numeric/plain view of an existing pizza_line_items row. */
 export interface ExistingLine {
   id: string;
+  rawName?: string;
   lineIndex: number;
   lineFingerprint: string;
   sourceCategory: string;
@@ -419,6 +420,7 @@ type DbLine = Awaited<ReturnType<typeof prisma.pizzaLineItem.findMany>>[number];
 export function dbLineToExisting(r: DbLine): ExistingLine {
   return {
     id: r.id,
+    rawName: r.rawName,
     lineIndex: r.lineIndex,
     lineFingerprint: r.lineFingerprint,
     sourceCategory: r.sourceCategory,
