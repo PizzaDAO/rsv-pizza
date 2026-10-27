@@ -3277,6 +3277,7 @@ router.get(
           id: true,
           ocrLineItems: true,
           ocrCurrency: true,
+          exchangeRate: true,
           payout: {
             select: {
               originalCurrency: true,
@@ -3319,7 +3320,9 @@ router.get(
         const payoutCurrency = r.payout.originalCurrency ?? r.ocrCurrency ?? 'USD';
         if (currency && payoutCurrency.toUpperCase() !== currency) continue;
 
-        const fx = Number(r.payout.exchangeRate?.toString() ?? '1');
+        // sfincione-40417: prefer the document's OWN rate (498/628 non-USD
+        // receipts carry one); fall back to the parent payout's rate.
+        const fx = Number((r.exchangeRate ?? r.payout.exchangeRate)?.toString() ?? '1');
         const safeFx = Number.isFinite(fx) && fx > 0 ? fx : 1;
 
         for (const it of items) {
