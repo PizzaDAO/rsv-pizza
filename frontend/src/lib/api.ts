@@ -8069,3 +8069,341 @@ export async function regenerateAdminTaxFormRequestToken(id: string): Promise<Ad
   );
   return res.request;
 }
+
+// ===========================================================================
+// sfincione-40417: Pizza Price Index (admin/underboss review + index + public)
+// Mirrors backend/src/routes/pizza-index.routes.ts + services/pizzaIndex.service.ts
+// ===========================================================================
+
+export type PizzaShape = 'round' | 'rect' | 'slice';
+export type PizzaExcludedReason = 'lump_sum' | 'not_pizza' | 'zero_price' | 'duplicate_line' | 'unreadable' | 'other';
+export type PizzaIndexLevel = 'global' | 'continent' | 'country' | 'city' | 'merchant';
+export type PizzaSizeLadder = Record<'25' | '30' | '35' | '40', number | null>;
+
+export interface PizzaLineDto {
+  id: string;
+  documentId: string;
+  partyId: string;
+  lineIndex: number;
+  rawName: string;
+  merchant: string | null;
+  merchantKey: string | null;
+  qty: number;
+  unitPriceList: number;
+  unitPriceNet: number | null;
+  discountAmount: number | null;
+  discountLabel: string | null;
+  currency: string;
+  fxRate: number;
+  unitPriceUsd: number;
+  sizeLabel: string | null;
+  shape: PizzaShape | 'other' | null;
+  diameterCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  sliceFraction: number | null;
+  areaCm2: number | null;
+  style: string | null;
+  sizeSource: 'parsed' | 'preset' | 'llm' | 'web' | 'manual' | null;
+  sizeConfidence: number | null;
+  presetId: string | null;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  updatedBy: string | null;
+  excluded: boolean;
+  excludedReason: PizzaExcludedReason | null;
+  isBundle: boolean;
+  outlierFlag: boolean;
+  notes: string | null;
+  sourceCategory: string;
+  usdPerCm2: number | null;
+  localPerCm2: number | null;
+  sizeLadderUsd: PizzaSizeLadder | null;
+}
+
+export interface PizzaPresetDto {
+  id: string;
+  scope: 'merchant' | 'chain' | 'country' | 'global';
+  merchantKey: string | null;
+  country: string | null;
+  sizeLabel: string;
+  shape: PizzaShape;
+  diameterCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  sliceFraction: number | null;
+  areaCm2: number | null;
+  source: 'manual' | 'web' | 'llm';
+  sourceUrl: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface PizzaQueueReceipt {
+  document: {
+    id: string; url: string; mimeType: string; fileName: string;
+    sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
+  };
+  party: { id: string; name: string; city: string | null; country: string | null; region: string | null; date: string | null };
+  merchant: string | null;
+  currency: string | null;
+  receiptDiscounts: Array<{ label: string; amount: number }>;
+  lines: PizzaLineDto[];
+  pizzaPhotoUrls: string[];
+}
+
+export interface PizzaQueueProgress {
+  totalLines: number; verifiedLines: number; totalPizzas: number; verifiedPizzas: number;
+  unresolvedLines: number; outlierLines: number; bundleLines: number;
+}
+
+export interface PizzaQueueResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  progress: PizzaQueueProgress;
+  receipts: PizzaQueueReceipt[];
+}
+
+export interface PizzaQueueParams {
+  status?: 'unverified' | 'verified' | 'all';
+  country?: string;
+  merchant?: string;
+  source?: string;
+  outlier?: boolean;
+  excluded?: boolean;
+  bundles?: 'include' | 'exclude' | 'only';
+  partyId?: string;
+  documentId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface PizzaStatusResponse {
+  docsWithItems: number;
+  docsSynced: number;
+  docsPendingSync: number;
+  docsPendingLlm: number;
+  docsPendingVision: number;
+  lines: number;
+  verifiedLines: number;
+  unresolvedLines: number;
+  excludedLines: number;
+  bundleLines: number;
+  outlierLines: number;
+  bySource: Record<string, number>;
+}
+
+export interface PizzaLinePatch {
+  shape?: PizzaShape;
+  diameterCm?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  sliceFraction?: number | null;
+  sizeLabel?: string | null;
+  style?: string | null;
+  excluded?: boolean;
+  excludedReason?: PizzaExcludedReason;
+  isBundle?: boolean;
+  qty?: number;
+  unitPriceList?: number;
+  notes?: string | null;
+  verify?: boolean;
+  unverify?: boolean;
+}
+
+export interface PizzaQuantiles { median: number | null; p25: number | null; p75: number | null }
+
+export interface PizzaGroupSummary {
+  nParties: number;
+  nLines: number;
+  nPizzas: number;
+  nVerifiedLines: number;
+  pctVerified: number;
+  usdPerCm2: PizzaQuantiles;
+  netUsdPerCm2: number | null;
+  localCurrency: string | null;
+  localNParties: number;
+  localPerCm2: number | null;
+  ladderUsd: PizzaSizeLadder;
+  ladderLocal: PizzaSizeLadder;
+  ladderNetUsd: PizzaSizeLadder;
+}
+
+export interface PizzaIndexGroup extends PizzaGroupSummary {
+  level: PizzaIndexLevel;
+  key: string;
+  label: string;
+  country: string | null;
+  continent: string | null;
+  published: boolean;
+  minParties: number;
+  yearly: Record<string, PizzaGroupSummary>;
+}
+
+export interface PizzaBundleRow {
+  lineId: string; documentId: string; partyId: string; partyName: string;
+  country: string | null; city: string | null; merchant: string | null; rawName: string;
+  qty: number; currency: string; unitPriceList: number; unitPriceUsd: number;
+  totalUsd: number; perPizzaUsd: number | null;
+  sizeKnown: boolean; areaCm2: number | null; usdPerCm2: number | null;
+  verified: boolean; eventYear: number | null;
+}
+
+export interface PizzaIndexResponse {
+  level: PizzaIndexLevel;
+  filters: Record<string, unknown>;
+  generatedAt: string;
+  basis: { verifiedOnly: boolean; includeBundles: boolean; minPartiesNote: string };
+  groups: PizzaIndexGroup[];
+  bundles: PizzaBundleRow[];
+  meta: { rowsInView: number; rowsUsed: number; excludedUnverifiedOutliers: number; excludedLowConfidence: number };
+}
+
+export interface PizzaIndexParams {
+  level?: PizzaIndexLevel;
+  verifiedOnly?: boolean;
+  includeBundles?: boolean;
+  country?: string;
+  city?: string;
+  continent?: string;
+  merchantKey?: string;
+  year?: number;
+}
+
+/** Row returned by GET /index/lines (backend IndexRow + verifiedAt ISO + ladder). */
+export interface PizzaIndexLineRow {
+  lineId: string; documentId: string; partyId: string; partyName: string;
+  country: string | null; city: string | null; region: string | null;
+  eventYear: number | null; merchant: string | null; merchantKey: string | null;
+  rawName: string; qty: number; currency: string; unitPriceList: number; unitPriceUsd: number;
+  sizeLabel: string | null; shape: string | null; diameterCm: number | null; areaCm2: number;
+  sizeSource: string | null; sizeConfidence: number | null;
+  verifiedAt: string | null; verifiedBy: string | null; isVerified: boolean;
+  outlierFlag: boolean; isBundle: boolean;
+  usdPerCm2: number; localPerCm2: number;
+  sizeLadderUsd: PizzaSizeLadder | null;
+}
+
+export interface PizzaPassResult {
+  dryRun: boolean;
+  model: string;
+  candidates: number;
+  processed: number;
+  remaining: number;
+  linesInserted: number;
+  linesUpdated: number;
+  errors: Array<{ documentId: string; error: string }>;
+  docIds: string[];
+}
+
+export interface PizzaSyncResult {
+  docsScanned: number;
+  docsSynced: number;
+  docsSkippedNoFx: number;
+  linesWritten: number;
+  linesDeleted: number;
+  remaining: number;
+  duplicatesMarked: number;
+  orphansRemoved: number;
+  outliersFlagged: number;
+  outlierFlagsChanged: number;
+}
+
+export interface PublicPizzaCountry {
+  country: string;
+  countryCode: string | null;
+  continent: string | null;
+  nParties: number;
+  nLines: number;
+  nPizzas: number;
+  usdPerCm2: number;
+  ladderUsd: PizzaSizeLadder;
+  localCurrency: string | null;
+  localPerCm2: number | null;
+  ladderLocal: PizzaSizeLadder;
+}
+
+export interface PublicPizzaIndex {
+  year: number;
+  generatedAt: string;
+  minParties: number;
+  basis: string;
+  global: { nParties: number; nCountries: number; usdPerCm2: number | null; ladderUsd: PizzaSizeLadder };
+  countries: PublicPizzaCountry[];
+}
+
+function pizzaQs(params: object): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '') continue;
+    sp.set(k, String(v));
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : '';
+}
+
+const PIZZA_BASE = '/api/admin/pizza-index';
+
+export function fetchPizzaStatus(): Promise<PizzaStatusResponse> {
+  return apiRequest<PizzaStatusResponse>(`${PIZZA_BASE}/status`);
+}
+export function fetchPizzaQueue(params: PizzaQueueParams = {}): Promise<PizzaQueueResponse> {
+  return apiRequest<PizzaQueueResponse>(`${PIZZA_BASE}/queue${pizzaQs(params)}`);
+}
+export function patchPizzaLine(id: string, patch: PizzaLinePatch): Promise<{ line: PizzaLineDto }> {
+  return apiRequest<{ line: PizzaLineDto }>(`${PIZZA_BASE}/lines/${id}`, { method: 'PATCH', body: patch });
+}
+export function applyPizzaLineToMerchant(id: string, sizeLabel?: string): Promise<{ preset: PizzaPresetDto; updatedLines: number }> {
+  return apiRequest<{ preset: PizzaPresetDto; updatedLines: number }>(`${PIZZA_BASE}/lines/${id}/apply-to-merchant`, {
+    method: 'POST',
+    body: sizeLabel ? { sizeLabel } : {},
+  });
+}
+export function fetchPizzaPresets(params: { scope?: string; country?: string; merchantKey?: string; q?: string } = {}): Promise<{ presets: PizzaPresetDto[] }> {
+  return apiRequest<{ presets: PizzaPresetDto[] }>(`${PIZZA_BASE}/presets${pizzaQs(params)}`);
+}
+export type PizzaPresetInput = {
+  scope: PizzaPresetDto['scope'];
+  merchantKey?: string | null;
+  merchantName?: string;
+  country?: string | null;
+  sizeLabel: string;
+  shape: PizzaShape;
+  diameterCm?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  sliceFraction?: number | null;
+  source?: 'manual' | 'web' | 'llm';
+  sourceUrl?: string | null;
+  notes?: string | null;
+};
+export function createPizzaPreset(body: PizzaPresetInput): Promise<{ preset: PizzaPresetDto; reresolvedLines: number }> {
+  return apiRequest(`${PIZZA_BASE}/presets`, { method: 'POST', body });
+}
+export function updatePizzaPreset(id: string, body: Partial<PizzaPresetInput>): Promise<{ preset: PizzaPresetDto; reresolvedLines: number }> {
+  return apiRequest(`${PIZZA_BASE}/presets/${id}`, { method: 'PATCH', body });
+}
+export function deletePizzaPreset(id: string): Promise<{ ok: boolean; reresolvedLines: number }> {
+  return apiRequest(`${PIZZA_BASE}/presets/${id}`, { method: 'DELETE' });
+}
+export function fetchPizzaIndex(params: PizzaIndexParams = {}): Promise<PizzaIndexResponse> {
+  return apiRequest<PizzaIndexResponse>(`${PIZZA_BASE}/index${pizzaQs(params)}`);
+}
+export function fetchPizzaIndexLines(params: PizzaIndexParams & { limit?: number; applyPolicy?: boolean } = {}): Promise<{ total: number; lines: PizzaIndexLineRow[] }> {
+  return apiRequest(`${PIZZA_BASE}/index/lines${pizzaQs(params)}`);
+}
+export function runPizzaSync(body: { limit?: number; force?: boolean } = {}): Promise<PizzaSyncResult> {
+  return apiRequest(`${PIZZA_BASE}/sync`, { method: 'POST', body, timeoutMs: 120_000 });
+}
+export function runPizzaLlmPass(body: { limit?: number; dryRun?: boolean } = {}): Promise<PizzaPassResult> {
+  return apiRequest(`${PIZZA_BASE}/llm-pass`, { method: 'POST', body, timeoutMs: 180_000 });
+}
+export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; requireLlmPass?: boolean; includeLowConfidence?: boolean } = {}): Promise<PizzaPassResult> {
+  return apiRequest(`${PIZZA_BASE}/vision-pass`, { method: 'POST', body, timeoutMs: 180_000 });
+}
+export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
+  return apiRequest<PublicPizzaIndex>('/api/pizza-index', { requireAuth: false });
+}

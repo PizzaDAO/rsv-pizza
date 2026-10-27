@@ -49,6 +49,7 @@ const PartnerBizdevPage = React.lazy(() => import('./pages/PartnerBizdevPage').t
 const PostComposerPage = React.lazy(() => import('./pages/PostComposerPage').then(m => ({ default: m.PostComposerPage })));
 const OneSheetPage = React.lazy(() => import('./pages/OneSheetPage').then(m => ({ default: m.OneSheetPage })));
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
+const PizzaIndexPage = React.lazy(() => import('./pages/PizzaIndexPage').then(m => ({ default: m.PizzaIndexPage })));
 import { EventsMapPage } from './pages/EventsMapPage';
 const AdminLogoCleanup = React.lazy(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
 import { PartnersPage } from './pages/PartnersPage';
@@ -103,6 +104,8 @@ function App() {
             {/* rigatoni-58919: admin/UB-gated side-event create flow; must come before /:slug */}
             <Route path="/side" element={<SideCreatePage />} />
             <Route path="/gpp/pizzerias" element={<GPPPizzeriasPage />} />
+            {/* sfincione-40417: public Pizza Price Index; must come before /:slug */}
+            <Route path="/pizza-index" element={<Suspense fallback={null}><PizzaIndexPage /></Suspense>} />
             {/* /map must come before /:slug */}
             <Route path="/map" element={<EventsMapPage />} />
             {/* cacciatore-72814: /map/swc super-admin-only variant; must come before /:slug */}
