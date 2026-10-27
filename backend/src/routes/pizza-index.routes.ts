@@ -367,15 +367,20 @@ function scopeKey(actor: PizzaActor): string {
 const router = Router();
 
 // ===========================================================================
-// POST /sync   (full admin)  body: { limit?: 1-300 (default 100), force?: boolean, docIds?: string[] }
+// POST /sync   (full admin)  body: { limit?: 1-300 (default 100), force?: boolean, forceBefore?: ISO string, docIds?: string[] }
+//   force:true loop: first call omits forceBefore; the response returns `forceBefore`; pass it back on every
+//   following call until remaining is 0 (docs synced after that instant are skipped, so it advances).
 // ===========================================================================
 router.post('/sync', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const docIds = Array.isArray(body.docIds) ? body.docIds.filter((x): x is string => typeof x === 'string') : undefined;
+    const fb = str(body.forceBefore);
+    const forceBeforeIn = fb && !Number.isNaN(new Date(fb).getTime()) ? new Date(fb) : undefined;
     const stats = await syncPizzaLineItems({
       limit: intQ(body.limit, 100, 1, 300),
       force: bool(body.force) ?? false,
+      forceBefore: forceBeforeIn,
       docIds,
     });
     const outliers = await flagOutliers();

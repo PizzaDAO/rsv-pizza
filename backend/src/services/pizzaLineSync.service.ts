@@ -564,6 +564,8 @@ export interface SyncStats {
   linesWritten: number;
   linesDeleted: number;
   remaining: number;
+  /** force mode: pass this back as `forceBefore` on follow-up calls. */
+  forceBefore: string | null;
   duplicatesMarked: number;
   orphansRemoved: number;
 }
@@ -576,13 +578,20 @@ export async function syncPizzaLineItems(opts: {
   docIds?: string[];
   limit?: number;
   force?: boolean;
+  /**
+   * force mode only: re-process docs whose sync row is older than this instant.
+   * Each processed doc gets synced_at = now (> forceBefore), so repeated calls
+   * with the SAME forceBefore advance and `remaining` reaches 0.
+   */
+  forceBefore?: Date;
 } = {}): Promise<SyncStats> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 300);
   const docFilter = opts.docIds?.length
     ? Prisma.sql`AND d.id = ANY(${opts.docIds}::uuid[])`
     : Prisma.empty;
+  const forceBefore = opts.forceBefore ?? new Date();
   const changedFilter = opts.force
-    ? Prisma.empty
+    ? Prisma.sql`AND (s.synced_at IS NULL OR s.synced_at < ${forceBefore})`
     : Prisma.sql`AND (s.items_hash IS NULL OR s.items_hash <> ${HASH_SQL})`;
 
   const fromWhere = Prisma.sql`
@@ -615,6 +624,7 @@ export async function syncPizzaLineItems(opts: {
     linesWritten: 0,
     linesDeleted: 0,
     remaining: Math.max(totalChanged - candidates.length, 0),
+    forceBefore: opts.force ? forceBefore.toISOString() : null,
     duplicatesMarked: 0,
     orphansRemoved: 0,
   };
