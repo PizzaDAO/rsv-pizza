@@ -8,6 +8,7 @@ import request from 'supertest';
 
 const m = vi.hoisted(() => ({
   isPaymentAdmin: vi.fn(),
+  isFullAdmin: vi.fn(),
   canUserEditParty: vi.fn(),
   isSelfInterested: vi.fn(),
   loadReviewAssist: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('../middleware/auth.js', () => ({
     next();
   },
   isPaymentAdmin: m.isPaymentAdmin,
+  isFullAdmin: m.isFullAdmin,
 }));
 vi.mock('../helpers/partyAccess.js', () => ({ canUserEditParty: m.canUserEditParty }));
 vi.mock('./budget.routes.js', () => ({
@@ -70,6 +72,7 @@ function assist(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   m.isPaymentAdmin.mockResolvedValue(true);
+  m.isFullAdmin.mockResolvedValue(false);
   m.isSelfInterested.mockResolvedValue(false);
   m.loadReviewAssist.mockResolvedValue(assist());
   m.prisma.party.findUnique.mockResolvedValue({
@@ -114,13 +117,40 @@ describe('admin approve', () => {
     expect(m.prisma.hostFastPassApproval.upsert).not.toHaveBeenCalled();
   });
 
-  it('high risk blocks both fast_pass and manual_review bases', async () => {
-    const high = { flags: [], checklist: [], riskLevel: 'high' };
-    m.loadReviewAssist.mockResolvedValue(assist({ review: high }));
+  it('hard-block flags stop both bases, even for a full admin with a note', async () => {
+    m.isFullAdmin.mockResolvedValue(true);
+    const review = { flags: [{ id: 'reused_receipts', severity: 'high', detail: '' }], checklist: [], riskLevel: 'high' };
+    m.loadReviewAssist.mockResolvedValue(assist({ review }));
     await request(app()).post(P).set(admin).send(body).expect(409);
-    m.loadReviewAssist.mockResolvedValue(assist({ review: high, eligibleForFastPass: false }));
+    m.loadReviewAssist.mockResolvedValue(assist({ review, eligibleForFastPass: false }));
     await request(app()).post(P).set(admin).send({ ...body, note: 'looked fine' }).expect(409);
     expect(m.prisma.hostFastPassApproval.upsert).not.toHaveBeenCalled();
+  });
+
+  it('soft high flags: only a full admin with a note gets through, as manual_review', async () => {
+    const review = { flags: [{ id: 'no_prior_photos', severity: 'high', detail: '' }], checklist: [], riskLevel: 'high' };
+    m.loadReviewAssist.mockResolvedValue(assist({ review }));
+    await request(app()).post(P).set(admin).send({ ...body, note: 'n' }).expect(409);
+    m.isFullAdmin.mockResolvedValue(true);
+    await request(app()).post(P).set(admin).send(body).expect(400);
+    const r = await request(app()).post(P).set(admin).send({ ...body, note: 'returning host' }).expect(200);
+    expect(r.body.approval.basis).toBe('manual_review');
+  });
+
+  it('clamps the receipt deadline to [now, party date + 90d]', async () => {
+    const far = await request(app()).post(P).set(admin).send({ ...body, receiptDeadline: '2099-01-01' }).expect(200);
+    expect(new Date(far.body.approval.receiptDeadline).getTime()).toBeLessThanOrEqual(
+      new Date('2026-12-01T00:00:00Z').getTime() + 90 * 86400000,
+    );
+    const past = await request(app()).post(P).set(admin).send({ ...body, receiptDeadline: '2001-01-01' }).expect(200);
+    expect(new Date(past.body.approval.receiptDeadline).getTime()).toBeGreaterThan(Date.now() - 5000);
+  });
+
+  it('review endpoint explains a block up front', async () => {
+    m.prisma.hostFastPassApproval.findUnique.mockResolvedValue(null);
+    m.loadReviewAssist.mockResolvedValue(assist({ capUsd: null }));
+    const r = await request(app()).get('/api/admin/host-fast-pass/party/p1/review').set(admin).expect(200);
+    expect(r.body.decision).toMatchObject({ allowed: false, code: 'CAP_REQUIRED' });
   });
 
   it('ineligible host needs a note, then is stored as manual_review', async () => {
@@ -155,6 +185,7 @@ describe('host route', () => {
           cancelledAt: null,
           eventTags: ['possible-scam'],
           photoCount: 0,
+          rolePhotoCount: 0,
           rsvpCount: 0,
           receiptCount: 0,
           firstReceiptAt: null,

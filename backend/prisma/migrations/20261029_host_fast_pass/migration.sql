@@ -25,5 +25,12 @@ ALTER TABLE "host_fast_pass_approvals" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "host_fast_pass_approvals" FROM anon;
 REVOKE ALL ON "host_fast_pass_approvals" FROM authenticated;
 
--- Receipt-reuse lookup (host fast pass review assist) matches on url.
+-- Receipt-reuse lookups (host fast pass review assist) match on url and on
+-- (file_name, file_size). Plain CREATE INDEX IF NOT EXISTS per repo convention.
+-- payout_documents is large-ish: if you want zero write blocking, run the two
+-- CREATE INDEX CONCURRENTLY statements below BY HAND first (outside a
+-- transaction, same index names); these then become no-ops.
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_payout_documents_url" ON "payout_documents"("url");
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_payout_documents_file_name_size" ON "payout_documents"("file_name", "file_size");
 CREATE INDEX IF NOT EXISTS "idx_payout_documents_url" ON "payout_documents"("url");
+CREATE INDEX IF NOT EXISTS "idx_payout_documents_file_name_size" ON "payout_documents"("file_name", "file_size");

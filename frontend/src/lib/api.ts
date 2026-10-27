@@ -8440,6 +8440,7 @@ export interface HostTrackView {
   tier: 'fast_pass' | 'building' | 'new';
   eligibleForFastPass: boolean;
   missing: Array<'verifiedParties' | 'accountAge'>;
+  underReview: boolean;
 }
 export interface HostFastPassStatus {
   track: HostTrackView | null;
@@ -8453,6 +8454,9 @@ export function fetchHostFastPass(partyId: string): Promise<HostFastPassStatus> 
 export interface AdminReviewAssist {
   hostEmail: string;
   selfBlocked: boolean;
+  decision:
+    | { allowed: true; basis: 'fast_pass' | 'manual_review'; requiresNote: boolean }
+    | { allowed: false; code: string; message: string; requiresNote: boolean };
   track: {
     partiesHosted: number;
     partiesWithPhotos: number;

@@ -22,6 +22,7 @@ import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { brand } from '../config/brand.js';
+import { changesGuardedTags } from '../lib/eventTags.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -560,6 +561,19 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         if (!canToggleGo) {
           throw new AppError(
             "Only admins and payment admins can add or remove the 'go' tag.",
+            403,
+            'FORBIDDEN_TAG',
+          );
+        }
+      }
+      // Host fast pass: 'possible-scam' feeds the host track record and numeric
+      // ('200', '350.50') / party-kit ('k40') tags set reimbursement caps. A host
+      // must not be able to clear their own scam flag or mint a cap, so any
+      // change to these tags is restricted exactly like 'go'.
+      if (changesGuardedTags(currentTags, eventTags)) {
+        if (!(await isPaymentAdmin(req.userEmail))) {
+          throw new AppError(
+            "Only admins and payment admins can add or remove 'possible-scam' or numeric cap tags.",
             403,
             'FORBIDDEN_TAG',
           );

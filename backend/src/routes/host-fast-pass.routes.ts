@@ -16,15 +16,16 @@
  */
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
-import { requireAuth, isPaymentAdmin, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, isPaymentAdmin, isFullAdmin, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { BUDGET_CATEGORIES } from './budget.routes.js';
-import { FAST_PASS_THRESHOLDS, toHostView } from '../lib/hostTrackRecord.js';
+import { FAST_PASS_THRESHOLDS, decideApproval, toHostView } from '../lib/hostTrackRecord.js';
 import { isSelfInterested, loadHostTrackRecord, loadReviewAssist } from '../services/hostFastPass.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_APPROVED_USD = 5000;
+const MAX_DEADLINE_DAYS = 90;
 
 async function requirePaymentAdmin(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
@@ -65,8 +66,23 @@ adminFastPassRouter.get('/party/:partyId/review', async (req: AuthRequest, res, 
       where: { partyId: req.params.partyId },
     });
     const selfBlocked = await isSelfInterested(req.params.partyId, req.userId, req.userEmail);
+    // Same rules as approve (note assumed present) so the UI can explain a block up front.
+    const decision = decideApproval({
+      track: result.track,
+      review: result.review,
+      eligibleForFastPass: result.eligibleForFastPass,
+      capUsd: result.capUsd,
+      amountUsd: null,
+      selfInterested: selfBlocked,
+      actorEmail: req.userEmail ?? '',
+      actorIsFullAdmin: await isFullAdmin(req.userEmail),
+      note: 'preview',
+    });
     res.json({
       selfBlocked,
+      decision: decision.ok
+        ? { allowed: true, basis: decision.basis, requiresNote: decision.requiresNote }
+        : { allowed: false, code: decision.code, message: decision.message, requiresNote: decision.requiresNote },
       hostEmail: result.hostEmail,
       track: result.track,
       review: result.review,
@@ -106,39 +122,34 @@ adminFastPassRouter.post('/party/:partyId/approve', async (req: AuthRequest, res
     if (!party?.userId) throw new AppError('Party not found', 404, 'NOT_FOUND');
     if (party.cancelledAt) throw new AppError('Party is cancelled', 400, 'PARTY_CANCELLED');
 
-    // Segregation of duties: not the host, a co-host, or a payee on this party.
-    if (await isSelfInterested(partyId, req.userId, req.userEmail)) {
-      throw new AppError('You cannot pre-approve a party you host or are paid on', 403, 'SELF_APPROVAL');
-    }
-
     const result = await loadReviewAssist(partyId);
     if (!result) throw new AppError('Party or host not found', 404, 'NOT_FOUND');
 
-    // High-risk flags block pre-approval on BOTH paths (fast pass and manual).
-    if (result.review.riskLevel === 'high') {
-      throw new AppError('High-risk flags are open on this host; resolve them first', 409, 'HIGH_RISK');
-    }
-    // Not Fast Pass eligible: allowed only as an explicit manual review with a note.
-    let basis: 'fast_pass' | 'manual_review' = 'fast_pass';
-    if (!result.eligibleForFastPass) {
-      if (!note) {
-        throw new AppError('Host is not Fast Pass eligible: a review note is required', 400, 'NOTE_REQUIRED');
-      }
-      basis = 'manual_review';
-    }
-    // A known reimbursement cap is required; the budget can never exceed it.
-    if (result.capUsd == null) {
-      throw new AppError('Set the party reimbursement cap before pre-approving a budget', 400, 'CAP_REQUIRED');
-    }
-    if (amount > result.capUsd) {
-      throw new AppError(`Amount exceeds the party reimbursement cap (US$${result.capUsd})`, 400, 'OVER_CAP');
-    }
+    const decision = decideApproval({
+      track: result.track,
+      review: result.review,
+      eligibleForFastPass: result.eligibleForFastPass,
+      capUsd: result.capUsd,
+      amountUsd: amount,
+      selfInterested: await isSelfInterested(partyId, req.userId, req.userEmail),
+      actorEmail: req.userEmail ?? '',
+      actorIsFullAdmin: await isFullAdmin(req.userEmail),
+      note,
+    });
+    if (!decision.ok) throw new AppError(decision.message, decision.status, decision.code);
+    const basis = decision.basis;
 
+    // Receipt deadline: default party date + 14d; clamp to [now, party date + 90d].
+    const now = new Date();
+    const anchor = party.date ?? now;
+    const maxDeadline = new Date(anchor.getTime() + MAX_DEADLINE_DAYS * DAY_MS);
     const requestedDeadline = req.body?.receiptDeadline ? new Date(req.body.receiptDeadline) : null;
-    const receiptDeadline =
+    let receiptDeadline =
       requestedDeadline && !Number.isNaN(requestedDeadline.getTime())
         ? requestedDeadline
-        : new Date((party.date ?? new Date()).getTime() + FAST_PASS_THRESHOLDS.receiptDeadlineDays * DAY_MS);
+        : new Date(anchor.getTime() + FAST_PASS_THRESHOLDS.receiptDeadlineDays * DAY_MS);
+    if (receiptDeadline < now) receiptDeadline = now;
+    if (receiptDeadline > maxDeadline) receiptDeadline = maxDeadline;
 
     const data = {
       approvedAmountUsd: amount,

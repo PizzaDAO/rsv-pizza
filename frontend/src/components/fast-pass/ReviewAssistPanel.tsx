@@ -30,7 +30,8 @@ interface Props {
 export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
   const { t } = useTranslation('admin');
   const [data, setData] = useState<AdminReviewAssist | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [amount, setAmount] = useState('');
   const [covers, setCovers] = useState<string[]>(['pizza']);
@@ -38,15 +39,22 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
   const [busy, setBusy] = useState(false);
 
   const load = React.useCallback(() => {
-    setError(null);
+    setLoadError(null);
     fetchAdminReviewAssist(partyId)
       .then(setData)
-      .catch((e) => setError(e?.message || t('hostReview.loadFailed')));
+      .catch((e) => setLoadError(e?.message || t('hostReview.loadFailed')));
   }, [partyId, t]);
 
   useEffect(load, [load]);
 
-  if (error) return <div className="text-xs text-red-700">{error}</div>;
+  if (loadError && !data) {
+    return (
+      <div className="text-xs text-red-700">
+        {loadError}{' '}
+        <button onClick={load} className="underline">{t('hostReview.retry')}</button>
+      </div>
+    );
+  }
   if (!data) {
     return (
       <div className="flex items-center gap-2 text-xs text-theme-text-muted">
@@ -59,7 +67,7 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
 
   const submit = async () => {
     setBusy(true);
-    setError(null);
+    setActionError(null);
     try {
       await approveFastPassBudget(partyId, {
         amountUsd: Number(amount),
@@ -70,7 +78,7 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
       setNote('');
       load();
     } catch (e: any) {
-      setError(e?.message || t('hostReview.approveFailed'));
+      setActionError(e?.message || t('hostReview.approveFailed'));
     } finally {
       setBusy(false);
     }
@@ -82,7 +90,7 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
       await revokeFastPassBudget(partyId);
       load();
     } catch (e: any) {
-      setError(e?.message || t('hostReview.approveFailed'));
+      setActionError(e?.message || t('hostReview.approveFailed'));
     } finally {
       setBusy(false);
     }
@@ -154,6 +162,8 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
         </ul>
       </div>
 
+      {loadError && <div className="text-xs text-red-700">{loadError}</div>}
+
       {data.selfBlocked && (
         <p className="text-[11px] text-amber-700">{t('hostReview.selfBlocked')}</p>
       )}
@@ -184,7 +194,6 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={data.capUsd != null ? t('hostReview.amountCap', { cap: data.capUsd }) : t('hostReview.amount')}
-                disabled={data.capUsd == null}
                 className="w-full rounded-md border border-theme-stroke px-2 py-1 text-xs bg-transparent"
               />
               <div className="flex flex-wrap gap-2">
@@ -201,7 +210,7 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
                   />
                 ))}
               </div>
-              {!data.eligibleForFastPass && (
+              {data.decision.requiresNote && (
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
@@ -210,16 +219,17 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
                   rows={2}
                 />
               )}
+              {!data.decision.allowed && (
+                <p className="text-[11px] text-red-700" data-testid="approval-blocked">{data.decision.message}</p>
+              )}
+              {actionError && <p className="text-[11px] text-red-700">{actionError}</p>}
               <button
                 onClick={submit}
-                disabled={busy || !Number(amount) || covers.length === 0}
+                disabled={busy || !data.decision.allowed || !Number(amount) || covers.length === 0 || (data.decision.requiresNote && !note.trim())}
                 className="px-3 py-1.5 rounded-lg bg-[#E52828] text-white text-xs disabled:opacity-50"
               >
                 {busy ? t('hostReview.saving') : t('hostReview.approve')}
               </button>
-              {data.capUsd == null && (
-                <p className="text-[11px] text-amber-700">{t('hostReview.capRequired')}</p>
-              )}
               <p className="text-[11px] text-theme-text-faint">{t('hostReview.noPayoutNote')}</p>
             </>
           )}

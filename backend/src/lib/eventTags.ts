@@ -66,3 +66,25 @@ export function withPaidTag(tags: string[] | null | undefined): string[] {
 export function withoutPaidTag(tags: string[] | null | undefined): string[] {
   return (tags ?? []).filter((t) => t !== 'paid');
 }
+
+/**
+ * Tags a host must never be able to add or remove themselves: the scam flag
+ * (feeds the host track record) and numeric / party-kit cap tags (set
+ * reimbursement caps). Only payment admins may change them.
+ */
+export function isGuardedTag(tag: unknown): boolean {
+  if (typeof tag !== 'string') return false;
+  const t = tag.trim().toLowerCase();
+  return t === 'possible-scam' || /^\d+(\.\d{1,2})?$/.test(t) || /^k\d+(\.\d{1,2})?$/.test(t);
+}
+
+/** True when `next` adds or removes any guarded tag relative to `current`. */
+export function changesGuardedTags(current: string[] | null | undefined, next: unknown[]): boolean {
+  const norm = (arr: unknown[]) =>
+    new Set(arr.filter(isGuardedTag).map((t) => (t as string).trim().toLowerCase()));
+  const a = norm(Array.isArray(current) ? current : []);
+  const b = norm(Array.isArray(next) ? next : []);
+  if (a.size !== b.size) return true;
+  for (const t of a) if (!b.has(t)) return true;
+  return false;
+}

@@ -91,6 +91,9 @@ export const FastPassCard: React.FC<Props> = ({ partyId }) => {
         <div className="rounded-xl border border-theme-stroke bg-theme-surface p-3 text-sm">
           <div className="font-semibold text-theme-text">{t('fastPass.progressTitle')}</div>
           <p className="text-xs text-theme-text-secondary mb-2">{t('fastPass.progressDesc')}</p>
+          {track.underReview && (
+            <p className="text-xs text-theme-text mb-2">{t('fastPass.underReview')}</p>
+          )}
           <ul className="space-y-1 text-xs text-theme-text-secondary">
             <li>
               {t('fastPass.reqVerified', {

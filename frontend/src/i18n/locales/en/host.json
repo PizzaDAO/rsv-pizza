@@ -1043,6 +1043,7 @@
       "other": "Other"
     },
     "reqVerified": "Verified parties (paid by our team, receipts within {{days}} days, event photos, {{rsvps}}+ RSVPs): {{have}} of {{need}}",
-    "amountUsd": "US${{amount}} USD"
+    "amountUsd": "US${{amount}}",
+    "underReview": "Your record is being reviewed."
   }
 }

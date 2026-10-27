@@ -274,11 +274,11 @@
       "entertainment": "Entertainment",
       "other": "Other"
     },
-    "noteRequired": "Not Fast Pass eligible: add a review note (required)",
+    "noteRequired": "Manual review note (required for this host)",
     "approve": "Pre-approve budget",
     "saving": "Saving...",
     "noPayoutNote": "Pre-approval does not pay anything. Payouts are still approved by an admin.",
     "selfBlocked": "You host, co-host or are paid on this party, so you cannot pre-approve it.",
-    "capRequired": "Set the party reimbursement cap before pre-approving a budget."
+    "retry": "Retry"
   }
 }
