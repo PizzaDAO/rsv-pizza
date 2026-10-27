@@ -64,6 +64,7 @@ import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { sendTelegramMessage } from '../services/telegramSend.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
+import { sanitizeLineSize, type OcrLineItemSize } from '../services/ocr.service.js'; // sfincione-40417
 
 const router = Router();
 
@@ -5557,6 +5558,8 @@ router.patch(
         // who never touched the flag don't get a `false` sprinkled into
         // every entry.
         ineligible?: boolean;
+        // sfincione-40417: optional printed size, preserved across admin edits.
+        size?: OcrLineItemSize;
       };
       function sanitizeLineItem(raw: unknown, idx: number): SanitizedLineItem {
         if (!raw || typeof raw !== 'object') {
@@ -5616,6 +5619,8 @@ router.patch(
         // it don't pollute every line with `ineligible:false`.
         const out: SanitizedLineItem = { name, qty, unitPrice, subtotal, category };
         if (e.ineligible === true) out.ineligible = true;
+        const size = sanitizeLineSize(e.size);
+        if (size) out.size = size;
         return out;
       }
 

@@ -20,7 +20,7 @@ function row(p: Partial<IndexRow> & { partyId: string; usdPerCm2: number }): Ind
   const area = p.areaCm2 ?? 706.9;
   return {
     lineId: `l${++seq}`, documentId: `d${seq}`, partyName: `Party ${p.partyId}`, country: 'India', city: 'Delhi',
-    region: 'india', eventYear: 2026, eventSeriesSlug: 'gpp2026', merchant: 'M', merchantKey: 'm', rawName: 'Pizza',
+    region: 'india', eventYear: 2026, eventSeriesSlug: 'gpp2026', documentUrl: 'https://x/r.jpg', documentMimeType: 'image/jpeg', sourceReceiptIndex: null, sourceReceiptCount: null, merchant: 'M', merchantKey: 'm', rawName: 'Pizza',
     qty: 1, currency: 'INR', fxRate: 0.0105, unitPriceList: 100, unitPriceNet: null,
     unitPriceUsd: p.usdPerCm2 * area, unitPriceNetUsd: null, sizeLabel: 'large', shape: 'round', diameterCm: 30,
     areaCm2: area, style: null, sizeSource: 'parsed', sizeConfidence: 0.95, verifiedAt: null, verifiedBy: null,
@@ -165,6 +165,21 @@ describe('aggregate', () => {
     expect(aggregate(rows, { level: 'continent' }).map((g) => g.key).sort()).toEqual(['Asia', 'North America']);
     const india = aggregate(rows, { level: 'country' }).find((g) => g.country === 'India')!;
     expect(Object.keys(india.yearly).sort()).toEqual(['2026', '2027']);
+  });
+});
+
+describe('group keys and sort', () => {
+  it('city groups expose plain city + country; cheapest sort orders by price', () => {
+    const rows = [
+      row({ partyId: 'A', usdPerCm2: 0.05, city: 'Pune' }), row({ partyId: 'B', usdPerCm2: 0.05, city: 'Pune' }),
+      row({ partyId: 'C', usdPerCm2: 0.05, city: 'Pune' }), row({ partyId: 'D', usdPerCm2: 0.01, city: 'Delhi' }),
+      row({ partyId: 'E', usdPerCm2: 0.01, city: 'Delhi' }),
+    ];
+    const g = aggregate(rows, { level: 'city', sort: 'cheapest' });
+    expect(g[0].city).toBe('Delhi');
+    expect(g[0].country).toBe('India');
+    expect(g[0].key).toBe('delhi|India');
+    expect(aggregate(rows, { level: 'city' })[0].city).toBe('Pune');
   });
 });
 

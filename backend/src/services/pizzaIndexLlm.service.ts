@@ -147,7 +147,16 @@ export function sizeFromModel(
   if (dims) return dims;
   if (rep.sizeLabel) {
     const r = resolveSize(parseSize(rep.sizeLabel), presets, ctx);
-    if (r.areaCm2 !== null) return { ...r, style: rep.style ?? r.style };
+    if (r.areaCm2 !== null) {
+      // The LLM supplied the label, so provenance is 'llm' (keeps the preset link);
+      // confidence can't exceed the preset's, the cap, or the model's own.
+      return {
+        ...r,
+        sizeSource: 'llm',
+        sizeConfidence: Math.round(Math.min(r.sizeConfidence ?? conf, conf) * 100) / 100,
+        style: rep.style ?? r.style,
+      };
+    }
   }
   return null;
 }

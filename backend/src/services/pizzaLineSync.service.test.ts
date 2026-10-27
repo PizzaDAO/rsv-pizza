@@ -9,6 +9,8 @@ import {
   extractDiscounts,
   allocateDiscounts,
   resolveDocFx,
+  planSyncRow,
+  labelHint,
   type ExistingLine,
   type DocContext,
   type LineWrite,
@@ -219,5 +221,43 @@ describe('resolveDocFx', () => {
       .toEqual({ currency: 'USD', fxRate: 1 });
     expect(resolveDocFx({ originalCurrency: null, exchangeRate: null, ocrCurrency: null, payoutCurrency: null, payoutRate: null })).toBeNull();
     expect(resolveDocFx({ originalCurrency: 'UNKNOWN', exchangeRate: 1, ocrCurrency: null, payoutCurrency: null, payoutRate: null })).toBeNull();
+  });
+});
+
+describe('planSyncRow (force:true must not wipe passes / discounts)', () => {
+  const raw = [{ label: 'promo', amount: 4 }];
+  const vision = [{ label: 'vision promo', amount: 9 }];
+  it('keeps pass markers when the hash is unchanged (force resync)', () => {
+    const r = planSyncRow({ prevHash: 'h', newHash: 'h', prevDiscounts: vision, rawDiscounts: [] });
+    expect(r.resetMarkers).toBe(false);
+    expect(r.writeDiscounts).toBe(false);
+    expect(r.discounts).toEqual(vision);
+  });
+  it('resets markers only when the hash changed', () => {
+    expect(planSyncRow({ prevHash: 'a', newHash: 'b', prevDiscounts: null, rawDiscounts: [] }).resetMarkers).toBe(true);
+    expect(planSyncRow({ prevHash: null, newHash: 'b', prevDiscounts: null, rawDiscounts: [] }).resetMarkers).toBe(true);
+  });
+  it('raw discounts win when present', () => {
+    const r = planSyncRow({ prevHash: 'a', newHash: 'b', prevDiscounts: vision, rawDiscounts: raw });
+    expect(r.discounts).toEqual(raw);
+    expect(r.writeDiscounts).toBe(true);
+  });
+});
+
+describe('size label hints survive re-resolve', () => {
+  it('labelHint only passes size words', () => {
+    expect(labelHint('Large')).toBe('large');
+    expect(labelHint('33cm')).toBeNull();
+    expect(labelHint('default')).toBeNull();
+  });
+  it('an unverified preset row keeps its OCR/LLM word label when the name has no cue', () => {
+    const items = [item('Margherita', 1, 300, 'pizza', { label: 'Large' })];
+    const first = planDocSync(items, [], doc, presets).writes[0];
+    expect(first.sizeLabel).toBe('large');
+    const prev = existingFrom(first); // sizeSource 'preset'
+    // a later sync where the OCR item no longer carries size, but the stored label does
+    const again = planDocSync([item('Margherita', 1, 300)], [prev], doc, presets).writes[0];
+    expect(again.sizeLabel).toBe('large');
+    expect(again.diameterCm).toBe(35);
   });
 });

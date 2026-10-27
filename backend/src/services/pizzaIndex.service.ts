@@ -33,6 +33,10 @@ export interface IndexRow {
   region: string | null;
   eventYear: number | null;
   eventSeriesSlug: string | null;
+  documentUrl: string | null;
+  documentMimeType: string | null;
+  sourceReceiptIndex: number | null;
+  sourceReceiptCount: number | null;
   merchant: string | null;
   merchantKey: string | null;
   rawName: string;
@@ -94,6 +98,8 @@ export interface IndexGroup extends GroupSummary {
   key: string;
   label: string;
   country: string | null;
+  /** Plain city name (city level only). */
+  city: string | null;
   continent: string | null;
   /** >= minParties distinct parties; unpublished groups are shown greyed ("n<3"). */
   published: boolean;
@@ -109,6 +115,8 @@ export interface IndexOptions {
   includeBundles?: boolean;
   /** Drop groups below the publish threshold from the result. */
   publishedOnly?: boolean;
+  /** 'parties' (default): most parties first. 'cheapest': lowest USD/cm^2 first. */
+  sort?: 'parties' | 'cheapest';
 }
 
 export const HIGH_CONFIDENCE = 0.8;
@@ -244,7 +252,7 @@ export function summarize(rows: IndexRow[]): GroupSummary {
   };
 }
 
-interface GroupKey { key: string; label: string; country: string | null; continent: string | null }
+interface GroupKey { key: string; label: string; country: string | null; continent: string | null; city?: string | null }
 
 function groupKeyFor(level: IndexLevel, r: IndexRow): GroupKey | null {
   const continent = regionToContinent(r.region);
@@ -258,7 +266,7 @@ function groupKeyFor(level: IndexLevel, r: IndexRow): GroupKey | null {
       return { key: r.country, label: r.country, country: r.country, continent };
     case 'city':
       if (!r.city || !r.country) return null;
-      return { key: `${r.city.trim().toLowerCase()}|${r.country}`, label: `${r.city.trim()}, ${r.country}`, country: r.country, continent };
+      return { key: `${r.city.trim().toLowerCase()}|${r.country}`, label: `${r.city.trim()}, ${r.country}`, country: r.country, continent, city: r.city.trim() };
     case 'merchant':
       if (!r.merchantKey) return null;
       return { key: r.merchantKey, label: r.merchant ?? r.merchantKey, country: r.country, continent };
@@ -290,9 +298,13 @@ export function aggregate(allRows: IndexRow[], opts: IndexOptions): IndexGroup[]
       const cs = new Set(grs.map((r) => r.country));
       country = cs.size === 1 ? [...cs][0] : null;
     }
-    out.push({ level: opts.level, ...gk, country, ...summary, published, minParties, yearly });
+    out.push({ level: opts.level, ...gk, city: gk.city ?? null, country, ...summary, published, minParties, yearly });
   }
-  out.sort((a, b) => b.nParties - a.nParties || b.nLines - a.nLines || a.label.localeCompare(b.label));
+  if (opts.sort === 'cheapest') {
+    out.sort((a, b) => (a.usdPerCm2.median ?? Infinity) - (b.usdPerCm2.median ?? Infinity) || a.label.localeCompare(b.label));
+  } else {
+    out.sort((a, b) => b.nParties - a.nParties || b.nLines - a.nLines || a.label.localeCompare(b.label));
+  }
   return out;
 }
 
@@ -361,6 +373,8 @@ interface ViewRow {
   line_id: string; document_id: string; party_id: string; party_name: string;
   country: string | null; city: string | null; region: string | null;
   event_year: number | null; event_series_slug: string | null;
+  document_url: string | null; document_mime_type: string | null;
+  source_receipt_index: number | null; source_receipt_count: number | null;
   merchant: string | null; merchant_key: string | null; raw_name: string;
   qty: number; currency: string; fx_rate: number; unit_price_list: number; unit_price_net: number | null;
   unit_price_usd: number; unit_price_net_usd: number | null;
@@ -375,7 +389,9 @@ function mapViewRow(v: ViewRow): IndexRow {
   return {
     lineId: v.line_id, documentId: v.document_id, partyId: v.party_id, partyName: v.party_name,
     country: v.country, city: v.city, region: v.region, eventYear: v.event_year,
-    eventSeriesSlug: v.event_series_slug, merchant: v.merchant, merchantKey: v.merchant_key,
+    eventSeriesSlug: v.event_series_slug, documentUrl: v.document_url,
+    documentMimeType: v.document_mime_type, sourceReceiptIndex: v.source_receipt_index,
+    sourceReceiptCount: v.source_receipt_count, merchant: v.merchant, merchantKey: v.merchant_key,
     rawName: v.raw_name, qty: v.qty, currency: v.currency, fxRate: v.fx_rate,
     unitPriceList: v.unit_price_list, unitPriceNet: v.unit_price_net, unitPriceUsd: v.unit_price_usd,
     unitPriceNetUsd: v.unit_price_net_usd, sizeLabel: v.size_label, shape: v.shape,
@@ -527,7 +543,6 @@ let publicCache: { at: number; value: PublicPizzaIndex } | null = null;
 
 export async function getPublicPizzaIndex(): Promise<PublicPizzaIndex> {
   if (publicCache && Date.now() - publicCache.at < PUBLIC_TTL_MS) return publicCache.value;
-  await refreshOutliers(5 * 60_000);
   const rows = await fetchIndexRows(undefined, { year: PUBLIC_INDEX_YEAR });
   const value = buildPublicIndexFromRows(rows);
   publicCache = { at: Date.now(), value };
