@@ -8,7 +8,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P1 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment |
-| sfincione-40417 | Pizza Price Index: size-adjusted (per cm²) pizza prices from receipts + diameter review queue + public /pizza-index | review | P2 |  | Snax |  | plans/sfincione-40417-pizza-price-index.md | #1146, #1147 | 2026-10-27: Decisions recorded (§12). Phase 1 = PR A backend+migration, PR B review UI; 2026-10-27: migrations 1–4 applied to prod; PR A backend #1146, PR B UI #1147 (stacked) |
 | diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | doing | P2 |  |  |  |  |  |  |
 | napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | doing | P2 |  |  |  |  |  |  |
 | sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | doing | P2 |  |  |  |  |  |  |
@@ -92,6 +91,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| sfincione-40417 | Pizza Price Index: size-adjusted (per cm²) pizza prices from receipts + diameter review queue + public /pizza-index | P2 | 2026-10-27 | #1146, #1147, #1148, #1149, #1151 | Live at /pizza-index + Underboss → Pizza Index. Backfill/sync/LLM/vision passes run; ~650 lines still need sizes via the review queue |
 | calzone-70821 | Standalone tax-form request page /tax-form?payee=<token> (Rare Pizzas W-9/W-8 collection; admin bulk links + status) | P1 | 2026-10-22 | #1142 | Migration applied to prod 2026-10-18; e2e test passed 2026-10-20 (test data deleted) |
 | marinara-61842 | Lock down event-images storage listing (drop anon SELECT policy) | P1 | 2026-10-22 | #1143 | Applied to prod 2026-10-18; live upload test 2026-10-22 (event image, sponsor logo, payout receipt) OK, listing blocked. Follow-up: private bucket for payout receipts |
 | mushroom-96149 | Capture reCAPTCHA v3 score per RSVP submission + add fake-detection heuristic (#24): frontend integration, backend siteverify call, new guests.recaptcha_score column, median-score signal | P1 | 2026-10-07 |  | Archived: deferred, avoiding Google API dependency |
