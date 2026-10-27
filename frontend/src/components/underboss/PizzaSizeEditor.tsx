@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Ruler, Store, Tag, Ban, Package, AlertTriangle, StickyNote } from 'lucide-react';
+import { Check, Loader2, Ruler, Store, Tag, Ban, Package, AlertTriangle, Hash, DollarSign } from 'lucide-react';
 import {
   applyPizzaLineToMerchant,
   patchPizzaLine,
@@ -31,9 +31,12 @@ import {
  *   (Left/Right arrows are handled by the lightbox itself).
  */
 
-const QUICK_CM = [25, 30, 33, 35, 40, 45];
+const QUICK_CM = [20, 25, 30, 33, 35, 40, 45];
+// hotkeys: 1-6 = 25..45 cm (20 cm is click-only so existing muscle memory holds)
+const CM_HOTKEY: Record<number, string> = { 25: '1', 30: '2', 33: '3', 35: '4', 40: '5', 45: '6' };
 const QUICK_IN = [10, 12, 14, 16, 18];
 const CM_KEYS = ['1', '2', '3', '4', '5', '6'];
+const CM_BY_KEY: Record<string, number> = { '1': 25, '2': 30, '3': 33, '4': 35, '5': 40, '6': 45 };
 const IN_KEYS = ['7', '8', '9', '0'];
 
 const EXCLUDE_REASONS: Array<{ value: PizzaExcludedReason; label: string }> = [
@@ -114,12 +117,15 @@ function SourceBadge({ line }: { line: PizzaLineDto }) {
 interface PizzaSizeEditorProps {
   receipt: PizzaQueueReceipt;
   onLineUpdated: (line: PizzaLineDto) => void;
-  onNextReceipt: () => void;
+  /** `force` skips the unsaved-changes prompt (used right after a successful save). */
+  onNextReceipt: (force?: boolean) => void;
+  /** Reports whether the selected line has unsaved edits. */
+  onDirtyChange?: (dirty: boolean) => void;
   /** Called after apply-to-merchant so the parent can refresh the queue on close. */
   onMerchantApplied?: () => void;
 }
 
-export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerchantApplied }: PizzaSizeEditorProps) {
+export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerchantApplied, onDirtyChange }: PizzaSizeEditorProps) {
   const lines = receipt.lines;
   const firstTodo = Math.max(
     0,
@@ -138,6 +144,15 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line?.id, line?.verifiedAt, line?.updatedBy, line?.areaCm2, line?.excluded, line?.isBundle]);
+
+  const dirty = useMemo(
+    () => !!line && !!draft && JSON.stringify(draft) !== JSON.stringify(draftFromLine(line)),
+    [line, draft],
+  );
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const update = useCallback((patch: Partial<Draft>) => {
     setDraft((d) => (d ? { ...d, ...patch } : d));
@@ -161,6 +176,8 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
 
   const nextTodoIdx = useCallback((from: number): number => {
     for (let i = from + 1; i < lines.length; i++) if (!lines[i].verifiedAt && !lines[i].excluded) return i;
+    // wrap to earlier unverified lines before leaving the receipt
+    for (let i = 0; i < from; i++) if (!lines[i].verifiedAt && !lines[i].excluded) return i;
     return -1;
   }, [lines]);
 
@@ -241,7 +258,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
     if (!saved) return;
     const nxt = nextTodoIdx(selIdx);
     if (nxt >= 0) setSelIdx(nxt);
-    else onNextReceipt();
+    else onNextReceipt(true);
   }, [save, nextTodoIdx, selIdx, onNextReceipt]);
 
   const unverify = useCallback(async () => {
@@ -281,7 +298,9 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
       const tag = t?.tagName?.toLowerCase();
       const editable = tag === 'input' || tag === 'textarea' || tag === 'select' || (t?.isContentEditable ?? false);
       if (e.key === 'Enter') {
-        if (tag === 'button' || tag === 'textarea') return;
+        if (tag === 'textarea') return;
+        // The editor's own verify button handles its click itself.
+        if (t?.closest('[data-pizza-verify]')) return;
         e.preventDefault();
         void verifyAndAdvance();
         return;
@@ -295,10 +314,25 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
         setSelIdx((i) => Math.max(i - 1, 0));
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
-        onNextReceipt();
+        onNextReceipt(false);
       } else if (CM_KEYS.includes(e.key)) {
         e.preventDefault();
-        setCm(QUICK_CM[CM_KEYS.indexOf(e.key)]);
+        setCm(CM_BY_KEY[e.key]);
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        update({ shape: 'round' });
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        update({ shape: 'slice' });
+      } else if (e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        update({ shape: 'rect' });
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        setDraft((d) => (d ? { ...d, excluded: !d.excluded } : d));
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        void applyToMerchant();
       } else if (IN_KEYS.includes(e.key)) {
         e.preventDefault();
         setCm(Math.round(QUICK_IN[IN_KEYS.indexOf(e.key)] * IN_TO_CM * 10) / 10);
@@ -306,7 +340,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [verifyAndAdvance, lines.length, onNextReceipt, setCm]);
+  }, [verifyAndAdvance, lines.length, onNextReceipt, setCm, update, applyToMerchant]);
 
   if (!line || !draft) {
     return <div className="p-4 text-sm text-theme-text-muted">This receipt has no pizza lines.</div>;
@@ -418,7 +452,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
         {/* Quick picks */}
         <div className="space-y-1.5">
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_CM.map((cm, i) => (
+            {QUICK_CM.map((cm) => (
               <button
                 key={cm}
                 type="button"
@@ -429,7 +463,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
                     : 'border-theme-stroke hover:bg-white/10'
                 }`}
               >
-                {cm} cm <span className="text-theme-text-faint">[{CM_KEYS[i]}]</span>
+                {cm} cm {CM_HOTKEY[cm] && <span className="text-theme-text-faint">[{CM_HOTKEY[cm]}]</span>}
               </button>
             ))}
           </div>
@@ -492,8 +526,8 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
             <IconInput icon={Ruler} type="number" inputMode="decimal" step="0.01" placeholder="Slice fraction (e.g. 0.125)" value={draft.fraction} onChange={(e) => update({ fraction: e.target.value })} />
           )}
           <IconInput icon={Tag} placeholder="Size label (e.g. large)" value={draft.sizeLabel} onChange={(e) => update({ sizeLabel: e.target.value })} />
-          <IconInput icon={StickyNote} type="number" inputMode="decimal" placeholder="Qty" value={draft.qty} onChange={(e) => update({ qty: e.target.value })} />
-          <IconInput icon={StickyNote} type="number" inputMode="decimal" placeholder={`Unit price (${priceCur})`} value={draft.price} onChange={(e) => update({ price: e.target.value })} />
+          <IconInput icon={Hash} type="number" inputMode="decimal" placeholder="Qty" value={draft.qty} onChange={(e) => update({ qty: e.target.value })} />
+          <IconInput icon={DollarSign} type="number" inputMode="decimal" placeholder={`Unit price (${priceCur})`} value={draft.price} onChange={(e) => update({ price: e.target.value })} />
         </div>
 
         {/* Live preview */}
@@ -549,6 +583,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            data-pizza-verify
             onClick={verifyAndAdvance}
             disabled={saving}
             className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-50"
@@ -567,7 +602,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
           </button>
         </div>
         <div className="text-[11px] text-theme-text-faint">
-          Up/Down = line · 1-6 = cm sizes · 7-0 = 10/12/14/16″ · N or → = next receipt · ← = previous
+          Up/Down = line · 1-6 = cm sizes · 7-0 = 10/12/14/16″ · r/s/x = round/slice/rect · e = exclude · m = apply to pizzeria · N or → = next receipt
         </div>
       </div>
     </div>

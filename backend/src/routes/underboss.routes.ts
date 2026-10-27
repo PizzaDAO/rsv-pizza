@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { unaccentMatchIds } from '../lib/accentSearch.js';
-import { requireAuth, AuthRequest, isAdmin } from '../middleware/auth.js';
+import { requireAuth, AuthRequest, isAdmin, isPaymentAdmin } from '../middleware/auth.js';
 import { requireUnderbossAuth, UnderbossAuthRequest } from '../middleware/underbossAuth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
@@ -250,6 +250,8 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       where: { email: email.toLowerCase() },
     });
     const isGraphicsAdmin = !!graphicsAdmin;
+    // sfincione-40417: payment admins may use the Pizza Index tab only.
+    const paymentAdmin = await isPaymentAdmin(email);
 
     // Check admin first
     const adminStatus = await isAdmin(email);
@@ -258,6 +260,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
         isAdmin: true,
         isUnderboss: false,
         isGraphicsAdmin,
+        isPaymentAdmin: paymentAdmin,
         region: null,
         regions: ['__admin__'],
         cities: [],
@@ -278,6 +281,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
         isAdmin: false,
         isUnderboss: true,
         isGraphicsAdmin,
+        isPaymentAdmin: paymentAdmin,
         region: underboss.region,
         regions,
         cities: underboss.cities || [],
@@ -291,6 +295,7 @@ router.get('/me', requireAuth, async (req: UnderbossRequest, res: Response, next
       isAdmin: false,
       isUnderboss: false,
       isGraphicsAdmin,
+      isPaymentAdmin: paymentAdmin,
       region: null,
       regions: [],
       cities: [],

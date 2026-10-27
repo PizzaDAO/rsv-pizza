@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Loader2, Package, Search, Store, Globe } from 'lucide-react';
 import {
   fetchPizzaQueue,
@@ -65,6 +65,11 @@ function ReviewView() {
   const [startIndex, setStartIndex] = useState(0);
   const [currentIdx, setCurrentIdx] = useState(0);
 
+  const total = data?.total ?? 0;
+  const dirtyRef = useRef(false);
+  const resetIdxAfterLoad = useRef(false);
+  const onDirtyChange = useCallback((d: boolean) => { dirtyRef.current = d; }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -83,6 +88,12 @@ function ReviewView() {
       const res = await fetchPizzaQueue(params);
       setData(res);
       setReceipts(res.receipts);
+      if (resetIdxAfterLoad.current) {
+        resetIdxAfterLoad.current = false;
+        setStartIndex(0);
+        setCurrentIdx(0);
+        if (res.receipts.length === 0) setLightboxOpen(false);
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load queue');
     } finally {
@@ -110,15 +121,59 @@ function ReviewView() {
       : r)));
   }, []);
 
-  // The lightbox owns the index; synthesize its ArrowRight handler for "next receipt".
-  const nextReceipt = useCallback(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+  const goTo = useCallback((i: number) => {
+    setStartIndex(i);
+    setCurrentIdx(i);
   }, []);
+
+  const confirmDiscard = useCallback((): boolean => {
+    return !dirtyRef.current || window.confirm('Discard unsaved changes to this line?');
+  }, []);
+
+  // The parent owns the receipt index (the lightbox follows `initialIndex`).
+  const nextReceipt = useCallback((force?: boolean) => {
+    if (!force && !confirmDiscard()) return;
+    if (currentIdx + 1 < receipts.length) {
+      goTo(currentIdx + 1);
+      return;
+    }
+    // End of the page: reload the unverified queue, or move to the next page.
+    resetIdxAfterLoad.current = true;
+    if (applied.status === 'unverified') {
+      if (offset !== 0) setOffset(0);
+      else void load();
+    } else if (offset + PAGE_SIZE < total) {
+      setOffset(offset + PAGE_SIZE);
+    } else {
+      resetIdxAfterLoad.current = false;
+      setLightboxOpen(false);
+    }
+  }, [confirmDiscard, currentIdx, receipts.length, goTo, applied.status, offset, total, load]);
+
+  const onBeforeNavigate = useCallback(() => confirmDiscard(), [confirmDiscard]);
 
   const closeLightbox = useCallback(() => {
     setLightboxOpen(false);
-    void load();
-  }, [load]);
+    dirtyRef.current = false;
+    if (offset !== 0) setOffset(0);
+    else void load();
+  }, [load, offset]);
+
+  // Pull sibling lines updated by "apply to this pizzeria" without disturbing the list.
+  const refreshMerchant = useCallback(async () => {
+    const m = receipts[currentIdx]?.merchant;
+    if (!m) return;
+    try {
+      const res = await fetchPizzaQueue({ status: 'all', merchant: m, limit: 100 });
+      const byDoc = new Map(res.receipts.map((r) => [r.document.id, r]));
+      setReceipts((rs) => rs.map((r) => {
+        const f = byDoc.get(r.document.id);
+        return f ? { ...r, lines: f.lines } : r;
+      }));
+    } catch {
+      /* non-fatal: list refreshes on close */
+    }
+  }, [receipts, currentIdx]);
 
   const current = receipts[currentIdx];
   const set = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
@@ -127,7 +182,6 @@ function ReviewView() {
     setApplied(filters);
   };
 
-  const total = data?.total ?? 0;
 
   return (
     <div className="space-y-4">
@@ -192,7 +246,7 @@ function ReviewView() {
               <button
                 key={r.document.id}
                 type="button"
-                onClick={() => { setStartIndex(i); setCurrentIdx(i); setLightboxOpen(true); }}
+                onClick={() => { (document.activeElement as HTMLElement | null)?.blur(); goTo(i); setLightboxOpen(true); }}
                 className="w-full text-left rounded-xl border border-theme-stroke bg-white/5 hover:bg-white/10 p-3 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -235,7 +289,8 @@ function ReviewView() {
         images={images}
         initialIndex={startIndex}
         onClose={closeLightbox}
-        onIndexChange={setCurrentIdx}
+        onIndexChange={goTo}
+        onBeforeNavigate={onBeforeNavigate}
         editorPane={
           lightboxOpen && current ? (
             <PizzaSizeEditor
@@ -243,6 +298,8 @@ function ReviewView() {
               receipt={current}
               onLineUpdated={onLineUpdated}
               onNextReceipt={nextReceipt}
+              onDirtyChange={onDirtyChange}
+              onMerchantApplied={refreshMerchant}
             />
           ) : null
         }

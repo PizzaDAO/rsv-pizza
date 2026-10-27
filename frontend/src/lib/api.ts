@@ -3642,6 +3642,8 @@ export interface UnderbossMeResponse {
   isAdmin: boolean;
   isUnderboss: boolean;
   isGraphicsAdmin?: boolean;
+  /** sfincione-40417: payment_admin/admin/super_admin; payment admins only see the Pizza Index tab. */
+  isPaymentAdmin?: boolean;
   region: string | null;
   regions: string[];
   cities?: string[];
@@ -8238,6 +8240,7 @@ export interface PizzaIndexGroup extends PizzaGroupSummary {
   label: string;
   country: string | null;
   continent: string | null;
+  city: string | null;
   published: boolean;
   minParties: number;
   yearly: Record<string, PizzaGroupSummary>;
@@ -8250,6 +8253,8 @@ export interface PizzaBundleRow {
   totalUsd: number; perPizzaUsd: number | null;
   sizeKnown: boolean; areaCm2: number | null; usdPerCm2: number | null;
   verified: boolean; eventYear: number | null;
+  documentUrl: string | null; documentMimeType: string | null;
+  sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
 }
 
 export interface PizzaIndexResponse {
@@ -8271,6 +8276,7 @@ export interface PizzaIndexParams {
   continent?: string;
   merchantKey?: string;
   year?: number;
+  sort?: 'cheapest' | 'parties';
 }
 
 /** Row returned by GET /index/lines (backend IndexRow + verifiedAt ISO + ladder). */
@@ -8284,6 +8290,8 @@ export interface PizzaIndexLineRow {
   verifiedAt: string | null; verifiedBy: string | null; isVerified: boolean;
   outlierFlag: boolean; isBundle: boolean;
   usdPerCm2: number; localPerCm2: number;
+  documentUrl: string | null; documentMimeType: string | null;
+  sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
   sizeLadderUsd: PizzaSizeLadder | null;
 }
 

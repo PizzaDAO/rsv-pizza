@@ -99,6 +99,9 @@ export function UnderbossDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  // sfincione-40417: payment admins (not admin, not underboss) get the Pizza Index tab only.
+  const [pizzaOnly, setPizzaOnly] = useState(false);
+  const [canRunPizzaOps, setCanRunPizzaOps] = useState(false);
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
@@ -305,6 +308,7 @@ export function UnderbossDashboard() {
       try {
         const me = await fetchUnderbossMe();
         setMeData(me);
+        setCanRunPizzaOps(!!me.isAdmin || !!me.isPaymentAdmin);
 
         if (me.isAdmin) {
           setIsAdmin(true);
@@ -318,6 +322,11 @@ export function UnderbossDashboard() {
           const assignedCities = me.cities || [];
           // mozzarella-25815: allow access if EITHER regions OR cities are assigned.
           if (assignedRegions.length === 0 && assignedCities.length === 0) {
+            if (me.isPaymentAdmin) {
+              setPizzaOnly(true);
+              setLoading(false);
+              return;
+            }
             setLoading(false);
             setError('You are not authorized to access the underboss dashboard.');
             return;
@@ -329,6 +338,9 @@ export function UnderbossDashboard() {
             setSelectedCities(assignedCities);
           }
           loadDashboard();
+        } else if (me.isPaymentAdmin) {
+          setPizzaOnly(true);
+          setLoading(false);
         } else {
           setLoading(false);
           setError('You are not authorized to access the underboss dashboard.');
@@ -427,6 +439,19 @@ export function UnderbossDashboard() {
           <h1 className="text-2xl font-bold text-theme-text mb-2">{t('underbossDashboard.error')}</h1>
           <p className="text-theme-text-muted">{error}</p>
         </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (pizzaOnly) {
+    return (
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-4">
+          <h1 className="text-2xl font-bold text-theme-text">Pizza Index</h1>
+          <PizzaIndexTab isAdmin={canRunPizzaOps} />
+        </main>
         <Footer />
       </div>
     );
@@ -870,7 +895,7 @@ export function UnderbossDashboard() {
 
           {/* sfincione-40417: reviewers = admins + underboss (backend scopes UBs) */}
           {activeTab === 'pizza-index' && (
-            <PizzaIndexTab isAdmin={isAdmin} />
+            <PizzaIndexTab isAdmin={canRunPizzaOps} />
           )}
 
         </section>

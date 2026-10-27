@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Play, RefreshCw, Square } from 'lucide-react';
 import {
   fetchPizzaStatus,
@@ -22,6 +22,9 @@ const OPS: Array<{ key: OpKey; title: string; blurb: string; batch: number; hasD
   { key: 'vision', title: '3. Vision pass', blurb: 'Read sizes from the receipt image for lines still without a size (OpenAI vision, higher cost).', batch: 10, hasDryRun: true },
 ];
 
+// Module-level guard so a remount (tab switch) can never start a second loop.
+const activeLoop: { current: { key: OpKey; stop: boolean } | null } = { current: null };
+
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg border border-theme-stroke bg-white/5 px-3 py-2">
@@ -34,11 +37,20 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 export function PizzaOpsView() {
   const [status, setStatus] = useState<PizzaStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState<OpKey | null>(null);
+  const [running, setRunning] = useState<OpKey | null>(activeLoop.current?.key ?? null);
   const [log, setLog] = useState<string[]>([]);
   const [dryRunDone, setDryRunDone] = useState<Record<OpKey, boolean>>({ sync: true, llm: false, vision: false });
   const [progress, setProgress] = useState<{ done: number; remaining: number | null } | null>(null);
-  const stopRef = useRef(false);
+
+  // Stop the loop when this view unmounts; while an old loop is still winding
+  // down, show it as running and block new starts.
+  useEffect(() => {
+    const poll = setInterval(() => setRunning(activeLoop.current?.key ?? null), 1000);
+    return () => {
+      clearInterval(poll);
+      if (activeLoop.current) activeLoop.current.stop = true;
+    };
+  }, []);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -55,21 +67,24 @@ export function PizzaOpsView() {
 
   const addLog = (line: string) => setLog((l) => [...l.slice(-199), `${new Date().toLocaleTimeString()}  ${line}`]);
 
-  const runOnce = async (key: OpKey, dryRun: boolean, limit: number): Promise<{ remaining: number; processed: number }> => {
+  const runOnce = async (key: OpKey, dryRun: boolean, limit: number): Promise<{ remaining: number; processed: number; errors: number }> => {
     if (key === 'sync') {
       const r = await runPizzaSync({ limit });
       addLog(`sync: ${r.docsSynced} docs synced, ${r.linesWritten} lines written, ${r.linesDeleted} deleted, ${r.remaining} docs remaining, ${r.outliersFlagged} outliers flagged`);
-      return { remaining: r.remaining, processed: r.docsSynced };
+      return { remaining: r.remaining, processed: r.docsSynced, errors: 0 };
     }
     const r = key === 'llm' ? await runPizzaLlmPass({ limit, dryRun }) : await runPizzaVisionPass({ limit, dryRun });
     addLog(
       `${key}${dryRun ? ' (dry run)' : ''}: ${r.candidates} candidates, ${r.processed} processed, ${r.linesInserted} inserted, ${r.linesUpdated} updated, ${r.remaining} remaining${r.errors.length ? `, ${r.errors.length} errors` : ''} [${r.model}]`,
     );
     r.errors.slice(0, 3).forEach((e) => addLog(`  error ${e.documentId}: ${e.error}`));
-    return { remaining: r.remaining, processed: r.processed };
+    return { remaining: r.remaining, processed: r.processed, errors: r.errors.length };
   };
 
   const dryRun = async (key: OpKey) => {
+    if (activeLoop.current) return;
+    const me = { key, stop: false };
+    activeLoop.current = me;
     setRunning(key);
     setError(null);
     try {
@@ -78,6 +93,7 @@ export function PizzaOpsView() {
     } catch (e: any) {
       setError(e?.message || 'Dry run failed');
     } finally {
+      if (activeLoop.current === me) activeLoop.current = null;
       setRunning(null);
     }
   };
@@ -85,17 +101,24 @@ export function PizzaOpsView() {
   const runLoop = async (key: OpKey) => {
     const op = OPS.find((o) => o.key === key)!;
     if (key !== 'sync' && !window.confirm(`Run the ${op.title.slice(3)} for real? This spends OpenAI credits.`)) return;
-    stopRef.current = false;
+    if (activeLoop.current) return;
+    const me = { key, stop: false };
+    activeLoop.current = me;
     setRunning(key);
     setError(null);
     let done = 0;
     try {
-      for (let i = 0; i < 500 && !stopRef.current; i++) {
-        const { remaining, processed } = await runOnce(key, false, op.batch);
+      for (let i = 0; i < 500 && !me.stop; i++) {
+        const { remaining, processed, errors } = await runOnce(key, false, op.batch);
         done += processed;
         setProgress({ done, remaining });
         if (remaining <= 0) {
           addLog(`${key}: finished`);
+          break;
+        }
+        if (errors > 0 && processed === 0) {
+          addLog(`${key}: every doc in this batch failed, stopping (${remaining} remaining)`);
+          setError('Every document in the last batch failed; check the log before retrying.');
           break;
         }
         if (processed === 0) {
@@ -103,11 +126,12 @@ export function PizzaOpsView() {
           break;
         }
       }
-      if (stopRef.current) addLog(`${key}: stopped by user`);
+      if (me.stop) addLog(`${key}: stopped by user`);
     } catch (e: any) {
       setError(e?.message || 'Run failed');
       addLog(`${key}: failed - ${e?.message || 'error'}`);
     } finally {
+      if (activeLoop.current === me) activeLoop.current = null;
       setRunning(null);
       setProgress(null);
       void loadStatus();
@@ -168,7 +192,7 @@ export function PizzaOpsView() {
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run until done
                 </button>
                 {busy && (
-                  <button type="button" onClick={() => { stopRef.current = true; }}
+                  <button type="button" onClick={() => { if (activeLoop.current) activeLoop.current.stop = true; }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-theme-stroke hover:bg-white/10 text-sm">
                     <Square size={14} /> Stop
                   </button>

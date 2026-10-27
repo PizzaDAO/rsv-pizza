@@ -3,7 +3,6 @@ import { Download, Loader2, ChevronLeft, Package } from 'lucide-react';
 import {
   fetchPizzaIndex,
   fetchPizzaIndexLines,
-  fetchPizzaQueue,
   type PizzaIndexGroup,
   type PizzaIndexLevel,
   type PizzaIndexLineRow,
@@ -33,8 +32,8 @@ function drillFilters(g: PizzaIndexGroup): PizzaIndexParams {
   switch (g.level) {
     case 'continent': return { continent: g.label };
     case 'country': return { country: g.label };
-    case 'city': return { city: g.label, ...(g.country ? { country: g.country } : {}) };
-    case 'merchant': return { merchantKey: g.key, ...(g.country ? { country: g.country } : {}) };
+    case 'city': return { city: g.city ?? g.label, ...(g.country ? { country: g.country } : {}) };
+    case 'merchant': return { merchantKey: g.key };
     default: return {};
   }
 }
@@ -43,7 +42,7 @@ export function PizzaIndexView() {
   const [level, setLevel] = useState<PizzaIndexLevel>('country');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [includeBundles, setIncludeBundles] = useState(false);
-  const [sortBy, setSortBy] = useState<'parties' | 'price'>('parties');
+  const [sortBy, setSortBy] = useState<'parties' | 'cheapest'>('parties');
   const [data, setData] = useState<PizzaIndexResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,61 +51,49 @@ export function PizzaIndexView() {
   const [drillLines, setDrillLines] = useState<PizzaIndexLineRow[]>([]);
   const [drillTotal, setDrillTotal] = useState(0);
   const [drillLoading, setDrillLoading] = useState(false);
+  const [drillError, setDrillError] = useState<string | null>(null);
 
   const [lightbox, setLightbox] = useState<{ url: string; fileName: string; mimeType: string } | null>(null);
-  const [lightboxLoading, setLightboxLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchPizzaIndex({ level, verifiedOnly, includeBundles }));
+      setData(await fetchPizzaIndex({ level, verifiedOnly, includeBundles, sort: sortBy }));
     } catch (e: any) {
       setError(e?.message || 'Failed to load index');
     } finally {
       setLoading(false);
     }
-  }, [level, verifiedOnly, includeBundles]);
+  }, [level, verifiedOnly, includeBundles, sortBy]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const groups = useMemo(() => {
-    const g = [...(data?.groups ?? [])];
-    if (sortBy === 'price') g.sort((a, b) => (a.usdPerCm2.median ?? Infinity) - (b.usdPerCm2.median ?? Infinity));
-    return g;
-  }, [data, sortBy]);
+  const groups = useMemo(() => data?.groups ?? [], [data]);
 
   const openDrill = async (g: PizzaIndexGroup) => {
     if (g.level === 'global') return;
     setDrill(g);
+    setDrillLines([]);
+    setDrillTotal(0);
+    setDrillError(null);
     setDrillLoading(true);
     try {
       const res = await fetchPizzaIndexLines({ ...drillFilters(g), verifiedOnly, includeBundles, limit: 300 });
       setDrillLines(res.lines);
       setDrillTotal(res.total);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load lines');
+      setDrillError(e?.message || 'Failed to load lines');
     } finally {
       setDrillLoading(false);
     }
   };
 
-  // Receipt URL for a drill-down line: the index lines only carry documentId, so
-  // resolve it through the queue endpoint (documentId filter, any status).
-  const openReceipt = async (documentId: string) => {
-    setLightboxLoading(true);
-    try {
-      const q = await fetchPizzaQueue({ status: 'all', limit: 1, documentId });
-      const r = q.receipts[0];
-      if (r) setLightbox({ url: r.document.url, fileName: r.document.fileName, mimeType: r.document.mimeType });
-      else setError('Receipt not found in your scope');
-    } catch (e: any) {
-      setError(e?.message || 'Failed to open receipt');
-    } finally {
-      setLightboxLoading(false);
-    }
+  const openReceipt = (url: string | null, mimeType: string | null, label: string) => {
+    if (!url) { setError('This receipt has no image on file.'); return; }
+    setLightbox({ url, fileName: label, mimeType: mimeType ?? 'image/jpeg' });
   };
 
   const exportGroups = () => {
@@ -156,8 +143,8 @@ export function PizzaIndexView() {
           <button type="button" onClick={exportDrill} className="ml-auto flex items-center gap-1 text-sm text-red-500/80 hover:text-red-500">
             <Download size={14} /> CSV
           </button>
-          {lightboxLoading && <Loader2 size={14} className="animate-spin" />}
         </div>
+        {drillError && <div className="text-sm text-red-400">{drillError}</div>}
         {drillLoading ? (
           <div className="py-10 flex justify-center"><Loader2 className="animate-spin" /></div>
         ) : (
@@ -174,7 +161,7 @@ export function PizzaIndexView() {
               </thead>
               <tbody>
                 {drillLines.map((l) => (
-                  <tr key={l.lineId} onClick={() => openReceipt(l.documentId)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
+                  <tr key={l.lineId} onClick={() => openReceipt(l.documentUrl, l.documentMimeType, l.rawName)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
                     <td className={`${td} max-w-[220px] truncate`} title={l.rawName}>{l.rawName}</td>
                     <td className={`${td} max-w-[140px] truncate`}>{l.merchant ?? '-'}</td>
                     <td className={`${td} max-w-[160px] truncate`}>{l.partyName}</td>
@@ -223,9 +210,9 @@ export function PizzaIndexView() {
         </div>
         <Checkbox checked={verifiedOnly} onChange={() => setVerifiedOnly((v) => !v)} label="Verified only" />
         <Checkbox checked={includeBundles} onChange={() => setIncludeBundles((v) => !v)} label="Include bundles" />
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'parties' | 'price')} aria-label="Sort" className="text-sm">
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'parties' | 'cheapest')} aria-label="Sort" className="text-sm">
           <option value="parties">Sort: most parties</option>
-          <option value="price">Sort: cheapest first</option>
+          <option value="cheapest">Sort: cheapest first</option>
         </select>
         <button type="button" onClick={exportGroups} disabled={!groups.length} className="ml-auto flex items-center gap-1 text-sm text-red-500/80 hover:text-red-500 disabled:opacity-40">
           <Download size={14} /> Export CSV
@@ -308,7 +295,7 @@ export function PizzaIndexView() {
               </thead>
               <tbody>
                 {data.bundles.map((b) => (
-                  <tr key={b.lineId} onClick={() => openReceipt(b.documentId)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
+                  <tr key={b.lineId} onClick={() => openReceipt(b.documentUrl, b.documentMimeType, b.rawName)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
                     <td className={`${td} max-w-[240px] truncate`} title={b.rawName}>{b.rawName}</td>
                     <td className={`${td} max-w-[140px] truncate`}>{b.merchant ?? '-'}</td>
                     <td className={`${td} max-w-[160px] truncate`}>{b.partyName}</td>
