@@ -698,7 +698,9 @@ router.patch('/lines/:id', ...reviewerChain, async (req: PizzaRequest, res: Resp
     const sizeTouched = sizeKeys.some((k) => k in body);
     const labelTouched = 'sizeLabel' in body;
     if (sizeTouched) {
-      const shape = (str(body.shape) ?? cur.shape) as PizzaShape | 'other' | null;
+      // A bare diameter on an unsized line means a round pie.
+      const fallbackShape = cur.shape ?? ('diameterCm' in body && !('lengthCm' in body) ? 'round' : null);
+      const shape = (str(body.shape) ?? fallbackShape) as PizzaShape | 'other' | null;
       if (shape === 'other' || shape === null) throw new AppError('shape is required (round, rect or slice)', 400, 'INVALID_SIZE');
       const pick = (k: 'diameterCm' | 'lengthCm' | 'widthCm' | 'sliceFraction') => {
         const v = numField(body, k);
