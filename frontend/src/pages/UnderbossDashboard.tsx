@@ -7,7 +7,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, HostSurveyResponsesTab, OutreachTab, TelegramGroupsTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, HostSurveyResponsesTab, OutreachTab, TelegramGroupsTab, PizzaIndexTab } from '../components/underboss';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 // montanara-58497: URL <-> EventTable filters + active tab (de)serializer so a
 // refresh / shared link restores the exact filtered view.
@@ -99,6 +99,9 @@ export function UnderbossDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  // sfincione-40417: payment admins (not admin, not underboss) get the Pizza Index tab only.
+  const [pizzaOnly, setPizzaOnly] = useState(false);
+  const [canRunPizzaOps, setCanRunPizzaOps] = useState(false);
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [meData, setMeData] = useState<UnderbossMeResponse | null>(null);
@@ -305,6 +308,7 @@ export function UnderbossDashboard() {
       try {
         const me = await fetchUnderbossMe();
         setMeData(me);
+        setCanRunPizzaOps(!!me.isAdmin || !!me.isPaymentAdmin);
 
         if (me.isAdmin) {
           setIsAdmin(true);
@@ -318,6 +322,11 @@ export function UnderbossDashboard() {
           const assignedCities = me.cities || [];
           // mozzarella-25815: allow access if EITHER regions OR cities are assigned.
           if (assignedRegions.length === 0 && assignedCities.length === 0) {
+            if (me.isPaymentAdmin) {
+              setPizzaOnly(true);
+              setLoading(false);
+              return;
+            }
             setLoading(false);
             setError('You are not authorized to access the underboss dashboard.');
             return;
@@ -329,6 +338,9 @@ export function UnderbossDashboard() {
             setSelectedCities(assignedCities);
           }
           loadDashboard();
+        } else if (me.isPaymentAdmin) {
+          setPizzaOnly(true);
+          setLoading(false);
         } else {
           setLoading(false);
           setError('You are not authorized to access the underboss dashboard.');
@@ -427,6 +439,19 @@ export function UnderbossDashboard() {
           <h1 className="text-2xl font-bold text-theme-text mb-2">{t('underbossDashboard.error')}</h1>
           <p className="text-theme-text-muted">{error}</p>
         </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (pizzaOnly) {
+    return (
+      <div className={`min-h-screen ${themeClass}`} style={backgroundStyle}>
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-4">
+          <h1 className="text-2xl font-bold text-theme-text">Pizza Index</h1>
+          <PizzaIndexTab isAdmin={canRunPizzaOps} />
+        </main>
         <Footer />
       </div>
     );
@@ -789,6 +814,19 @@ export function UnderbossDashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('pizza-index')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'pizza-index'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.pizzaIndex', 'Pizza Index')}
+              {activeTab === 'pizza-index' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -853,6 +891,11 @@ export function UnderbossDashboard() {
 
           {activeTab === 'telegram-groups' && (
             <TelegramGroupsTab />
+          )}
+
+          {/* sfincione-40417: reviewers = admins + underboss (backend scopes UBs) */}
+          {activeTab === 'pizza-index' && (
+            <PizzaIndexTab isAdmin={canRunPizzaOps} />
           )}
 
         </section>
