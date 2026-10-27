@@ -131,3 +131,21 @@ describe('INTERNAL_EVENT_TAGS export', () => {
     expect(INTERNAL_EVENT_TAGS.has('possible-scam')).toBe(true);
   });
 });
+
+import { changesGuardedTags } from './eventTags.js';
+
+describe('changesGuardedTags (host cannot clear scam flag or mint a cap)', () => {
+  it('detects removing possible-scam, adding numeric/k caps, case-insensitively', () => {
+    expect(changesGuardedTags(['possible-scam', 'gpp2026'], ['gpp2026'])).toBe(true);
+    expect(changesGuardedTags(['x'], ['x', 'possible-scam'])).toBe(true);
+    expect(changesGuardedTags(['x'], ['x', '500'])).toBe(true);
+    expect(changesGuardedTags(['200'], ['350.50'])).toBe(true);
+    expect(changesGuardedTags(['x'], ['x', 'K40'])).toBe(true);
+    expect(changesGuardedTags(['Possible-Scam'], [])).toBe(true);
+  });
+  it('allows unrelated and unchanged tag edits', () => {
+    expect(changesGuardedTags(['possible-scam', '200'], ['200', 'possible-scam', 'swc'])).toBe(false);
+    expect(changesGuardedTags([], ['swc', 'gpp2026'])).toBe(false);
+    expect(changesGuardedTags(null, [])).toBe(false);
+  });
+});

@@ -8415,3 +8415,76 @@ export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; req
 export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
   return apiRequest<PublicPizzaIndex>('/api/pizza-index', { requireAuth: false });
 }
+
+// ---------------------------------------------------------------------------
+// Host fast pass: track record, review assist, budget pre-approval.
+// None of these move money; payouts still go through the admin payout flow.
+// ---------------------------------------------------------------------------
+export interface FastPassThresholds {
+  minVerifiedParties: number;
+  minRsvps: number;
+  minAccountAgeDays: number;
+  receiptDeadlineDays: number;
+}
+export interface FastPassApproval {
+  approvedAmountUsd: number;
+  covers: string[];
+  receiptDeadline: string;
+  basis: 'fast_pass' | 'manual_review';
+  approvedAt: string;
+}
+export interface HostTrackView {
+  partiesHosted: number;
+  verifiedParties: number;
+  accountAgeDays: number;
+  tier: 'fast_pass' | 'building' | 'new';
+  eligibleForFastPass: boolean;
+  missing: Array<'verifiedParties' | 'accountAge'>;
+  underReview: boolean;
+}
+export interface HostFastPassStatus {
+  track: HostTrackView | null;
+  approval: FastPassApproval | null;
+  thresholds: FastPassThresholds;
+}
+export function fetchHostFastPass(partyId: string): Promise<HostFastPassStatus> {
+  return apiRequest<HostFastPassStatus>(`/api/parties/${partyId}/fast-pass`);
+}
+
+export interface AdminReviewAssist {
+  hostEmail: string;
+  selfBlocked: boolean;
+  decision:
+    | { allowed: true; basis: 'fast_pass' | 'manual_review'; requiresNote: boolean }
+    | { allowed: false; code: string; message: string; requiresNote: boolean };
+  track: {
+    partiesHosted: number;
+    partiesWithPhotos: number;
+    verifiedParties: number;
+    issues: number;
+    partiesWithDuplicateReceipts: number;
+    accountAgeDays: number;
+    issueDetails: string[];
+  };
+  review: {
+    riskLevel: 'high' | 'medium' | 'low';
+    flags: Array<{ id: string; severity: 'high' | 'medium' | 'low'; detail: string }>;
+    checklist: Array<{ id: string; auto: boolean | null }>;
+  };
+  capUsd: number | null;
+  eligibleForFastPass: boolean;
+  approval: FastPassApproval | null;
+  thresholds: FastPassThresholds;
+}
+export function fetchAdminReviewAssist(partyId: string): Promise<AdminReviewAssist> {
+  return apiRequest<AdminReviewAssist>(`/api/admin/host-fast-pass/party/${partyId}/review`);
+}
+export function approveFastPassBudget(
+  partyId: string,
+  body: { amountUsd: number; covers: string[]; receiptDeadline?: string; note?: string },
+): Promise<{ approval: FastPassApproval }> {
+  return apiRequest(`/api/admin/host-fast-pass/party/${partyId}/approve`, { method: 'POST', body });
+}
+export function revokeFastPassBudget(partyId: string): Promise<{ ok: true }> {
+  return apiRequest(`/api/admin/host-fast-pass/party/${partyId}/revoke`, { method: 'POST', body: {} });
+}

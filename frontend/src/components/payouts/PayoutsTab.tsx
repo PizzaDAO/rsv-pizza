@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FastPassCard } from '../fast-pass/FastPassCard';
 import {
   Loader2,
   AlertCircle,
@@ -584,6 +585,9 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* ===== Host fast pass: pre-approved budget + badge progress ===== */}
+      <FastPassCard partyId={partyId} />
+
       {/* ===== Cap / funding banner (unchanged precedence) ===== */}
       {(() => {
         const needsExpectedGuests = !party?.expectedGuests || party.expectedGuests <= 0;

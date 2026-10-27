@@ -23,6 +23,7 @@ import {
 } from '../payments-shared';
 import { ReceiptEditor, computeLineSubtotal } from './ReceiptEditor';
 import { TaxFormReviewPanel } from './TaxFormReviewPanel';
+import { ReviewAssistPanel } from '../fast-pass/ReviewAssistPanel';
 import { AdminAddAttachment } from './AdminAddAttachment';
 import { AdminAddPhotosModal } from './AdminAddPhotosModal';
 
@@ -3360,6 +3361,11 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Host fast pass: track record, red flags, checklist, budget pre-approval */}
+            {adminRole && payout.purpose !== 'shipping' && (
+              <ReviewAssistPanel partyId={payout.partyId} readOnly={selfPayoutBlocked} />
+            )}
 
             {/* Status timeline */}
             <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">

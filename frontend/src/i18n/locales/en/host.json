@@ -1021,5 +1021,29 @@
     "rollupSubmitted": "Submitted {{date}}",
     "rollupReceiptCount_one": "{{count}} receipt",
     "rollupReceiptCount_other": "{{count}} receipts"
+  },
+  "fastPass": {
+    "approvedTitle": "Your budget is pre-approved",
+    "covers": "What it covers",
+    "receiptDeadline": "Receipts due by",
+    "approvedFootnote": "Upload your receipts by the deadline. Reimbursement is still reviewed and paid by the PizzaDAO payments team.",
+    "badge": "Fast Pass host",
+    "badgeDesc": "You have a clean track record. Your budget can be pre-approved well ahead of your party.",
+    "badgeHaveBudget": "Thanks for being a reliable host.",
+    "progressTitle": "Earn a Fast Pass",
+    "progressDesc": "Hosts with a clean track record get their budget pre-approved ahead of the party.",
+    "reqAccountAge": "Account age: {{have}} of {{need}} days",
+    "cat": {
+      "pizza": "Pizza",
+      "drinks": "Drinks",
+      "venue": "Venue",
+      "supplies": "Supplies",
+      "entertainment": "Entertainment",
+      "tips": "Tips",
+      "other": "Other"
+    },
+    "reqVerified": "Verified parties (paid by our team, receipts within {{days}} days, event photos, {{rsvps}}+ RSVPs): {{have}} of {{need}}",
+    "amountUsd": "US${{amount}}",
+    "underReview": "Your record is being reviewed."
   }
 }

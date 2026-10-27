@@ -221,5 +221,64 @@
     "noKitRequest": "No kit request",
     "noRequest": "No request",
     "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "hostReview": {
+    "title": "Host review assist",
+    "loading": "Loading host record...",
+    "loadFailed": "Could not load review assist",
+    "approveFailed": "Could not save",
+    "risk": "{{level}} risk",
+    "level": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "record": "{{hosted}} parties hosted, {{verified}} fully verified, {{photos}} with photos, {{issues}} issues. Account {{age}} days old.",
+    "fastPassEligible": "Fast Pass eligible",
+    "noFlags": "No automated red flags.",
+    "flag": {
+      "new_account": "New account",
+      "first_party": "First party",
+      "no_prior_photos": "No photos from prior events",
+      "prior_issues": "Prior issues",
+      "shared_payee": "Shared payee",
+      "no_rsvps": "No RSVPs",
+      "low_rsvps": "Few RSVPs",
+      "reused_receipts": "Reused receipts",
+      "no_receipts": "No receipts",
+      "over_cap": "Over cap",
+      "duplicate_receipts": "Duplicate receipts (prior)"
+    },
+    "checklist": "Review checklist",
+    "auto": "auto",
+    "check": {
+      "accountEstablished": "Account is established",
+      "priorPhotos": "Prior events have photos",
+      "noPriorIssues": "No prior rejections or scam flags",
+      "uniquePayee": "Payee is not shared with other hosts",
+      "realRsvps": "RSVPs look real for this city",
+      "receiptsOriginal": "Receipts are original (not reused)",
+      "receiptsMatchAmount": "Receipts match the requested amount",
+      "venueExists": "Venue / city checked on a map"
+    },
+    "preapprove": "Pre-approve budget",
+    "currentApproval": "Pre-approved US${{amount}} for {{covers}}, receipts due {{deadline}}.",
+    "revoke": "Revoke",
+    "amount": "Amount (USD)",
+    "amountCap": "Amount in USD (cap US${{cap}})",
+    "cat": {
+      "pizza": "Pizza",
+      "drinks": "Drinks",
+      "venue": "Venue",
+      "supplies": "Supplies",
+      "entertainment": "Entertainment",
+      "other": "Other"
+    },
+    "noteRequired": "Manual review note (required for this host)",
+    "approve": "Pre-approve budget",
+    "saving": "Saving...",
+    "noPayoutNote": "Pre-approval does not pay anything. Payouts are still approved by an admin.",
+    "selfBlocked": "You host, co-host or are paid on this party, so you cannot pre-approve it.",
+    "retry": "Retry"
   }
 }

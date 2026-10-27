@@ -335,6 +335,7 @@ model Party {
   attestations            GuestAttestation[]
   reimbursementCapAppeals ReimbursementCapAppeal[]
   reimbursementCapAudits  ReimbursementCapAudit[]
+  fastPassApproval        HostFastPassApproval?
   surveyResponses         SurveyResponse[]
   hostSurveyResponse      HostSurveyResponse?
   // suppli-58533: non-host Telegram contributors (photo-only submitters) who
@@ -2305,6 +2306,8 @@ model PayoutDocument {
   @@index([payoutId])
   @@index([uploadedByUserId])
   @@index([photoId])
+  @@index([url], map: "idx_payout_documents_url")
+  @@index([fileName, fileSize], map: "idx_payout_documents_file_name_size")
   @@map("payout_documents")
 }
 
@@ -2323,6 +2326,29 @@ model PayoutDocumentVote {
   @@index([payoutDocumentId], map: "payout_document_votes_doc_idx")
   @@index([userId], map: "payout_document_votes_user_idx")
   @@map("payout_document_votes")
+}
+
+// Host fast pass: an admin pre-approves a party's reimbursement budget well
+// ahead of the event. This is a COMMITMENT shown to the host (amount, what it
+// covers, receipt deadline). It never moves money: payouts are still approved
+// and executed by admins through the normal payout flow.
+model HostFastPassApproval {
+  id                String    @id @default(uuid()) @db.Uuid
+  partyId           String    @unique @map("party_id") @db.Uuid
+  party             Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  approvedAmountUsd Decimal   @map("approved_amount_usd") @db.Decimal(12, 2)
+  // Budget categories covered, e.g. ['pizza','drinks','venue'].
+  covers            String[]
+  receiptDeadline   DateTime  @map("receipt_deadline") @db.Timestamptz
+  // 'fast_pass' (host met thresholds) | 'manual_review' (admin override).
+  basis             String    @default("fast_pass")
+  note              String?
+  approvedByEmail   String    @map("approved_by_email")
+  approvedAt        DateTime  @default(now()) @map("approved_at") @db.Timestamptz
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz
+  revokedByEmail    String?   @map("revoked_by_email")
+
+  @@map("host_fast_pass_approvals")
 }
 
 model PayoutAudit {
