@@ -328,6 +328,7 @@ model Party {
   // payout association is optional. Inverse relation lives here so cascading
   // a party delete also removes its receipts.
   payoutDocuments         PayoutDocument[]
+  pizzaLineItems          PizzaLineItem[]
   paymentOptIns           PartyPaymentOptIn[]
   outreachAttempts        OutreachAttempt[]
   announcements           Announcement[]
@@ -2288,6 +2289,10 @@ model PayoutDocument {
   voteCount Int                  @default(0) @map("vote_count")
   votes     PayoutDocumentVote[]
 
+  // sfincione-40417: pizza price index side tables (never written from payout flows)
+  pizzaLineItems PizzaLineItem[]
+  pizzaLineSync  PizzaLineSync?
+
   // napoletana-58211: when kind='pizza', this links to the canonical row in
   // the `photos` table. Receipts (kind='receipt') keep photoId NULL. ON
   // DELETE SET NULL so deleting the photo row doesn't cascade and lose the
@@ -2687,4 +2692,96 @@ model PartyTelegramHost {
   @@unique([partyId, chatId])
   @@index([chatId])
   @@map("party_telegram_hosts")
+}
+
+
+// ============================================
+// Pizza Price Index (sfincione-40417)
+// ============================================
+// Migrations: prisma/migrations/sfincione-40417-1-pizza-price-index.sql (+ -2 view).
+// RLS enabled with no policies; backend-only access.
+
+model PizzaSizePreset {
+  id            String    @id @default(uuid()) @db.Uuid
+  scope         String // 'merchant' | 'chain' | 'country' | 'global'
+  merchantKey   String?   @map("merchant_key")
+  country       String?
+  sizeLabel     String    @map("size_label")
+  shape         String // 'round' | 'rect' | 'slice'
+  diameterCm    Decimal?  @map("diameter_cm") @db.Decimal(5, 1)
+  lengthCm      Decimal?  @map("length_cm") @db.Decimal(5, 1)
+  widthCm       Decimal?  @map("width_cm") @db.Decimal(5, 1)
+  sliceFraction Decimal?  @map("slice_fraction") @db.Decimal(4, 3)
+  source        String // 'manual' | 'web' | 'llm'
+  sourceUrl     String?   @map("source_url")
+  notes         String?
+  createdBy     String?   @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime? @map("updated_at") @db.Timestamptz
+
+  lines PizzaLineItem[]
+
+  @@map("pizza_size_presets")
+}
+
+model PizzaLineItem {
+  id              String         @id @default(uuid()) @db.Uuid
+  documentId      String         @map("document_id") @db.Uuid
+  document        PayoutDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  partyId         String         @map("party_id") @db.Uuid
+  party           Party          @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  lineIndex       Int            @map("line_index")
+  lineFingerprint String         @map("line_fingerprint")
+  sourceCategory  String         @default("pizza") @map("source_category")
+  rawName         String         @map("raw_name")
+  merchant        String?
+  merchantKey     String?        @map("merchant_key")
+  qty             Decimal        @db.Decimal(8, 2)
+  unitPriceList   Decimal        @map("unit_price_list") @db.Decimal(14, 4)
+  unitPriceNet    Decimal?       @map("unit_price_net") @db.Decimal(14, 4)
+  discountAmount  Decimal?       @map("discount_amount") @db.Decimal(14, 4)
+  discountLabel   String?        @map("discount_label")
+  currency        String         @db.Char(3)
+  fxRate          Decimal        @map("fx_rate") @db.Decimal(18, 8)
+  unitPriceUsd    Decimal        @map("unit_price_usd") @db.Decimal(12, 4)
+  sizeLabel       String?        @map("size_label")
+  shape           String? // 'round' | 'rect' | 'slice' | 'other'
+  diameterCm      Decimal?       @map("diameter_cm") @db.Decimal(5, 1)
+  lengthCm        Decimal?       @map("length_cm") @db.Decimal(5, 1)
+  widthCm         Decimal?       @map("width_cm") @db.Decimal(5, 1)
+  sliceFraction   Decimal?       @map("slice_fraction") @db.Decimal(4, 3)
+  areaCm2         Decimal?       @map("area_cm2") @db.Decimal(8, 1)
+  style           String?
+  sizeSource      String?        @map("size_source") // 'parsed' | 'preset' | 'llm' | 'web' | 'manual'
+  sizeConfidence  Decimal?       @map("size_confidence") @db.Decimal(3, 2)
+  presetId        String?        @map("preset_id") @db.Uuid
+  preset          PizzaSizePreset? @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  verifiedBy      String?        @map("verified_by")
+  verifiedAt      DateTime?      @map("verified_at") @db.Timestamptz
+  updatedBy       String?        @map("updated_by")
+  excluded        Boolean        @default(false)
+  excludedReason  String?        @map("excluded_reason")
+  isBundle        Boolean        @default(false) @map("is_bundle")
+  outlierFlag     Boolean        @default(false) @map("outlier_flag")
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime?      @map("updated_at") @db.Timestamptz
+
+  @@unique([documentId, lineIndex])
+  @@index([partyId], map: "pizza_line_items_party")
+  @@index([merchantKey], map: "pizza_line_items_merchant")
+  @@map("pizza_line_items")
+}
+
+model PizzaLineSync {
+  documentId    String         @id @map("document_id") @db.Uuid
+  document      PayoutDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  itemsHash     String         @map("items_hash")
+  syncedAt      DateTime       @default(now()) @map("synced_at") @db.Timestamptz
+  llmPassAt     DateTime?      @map("llm_pass_at") @db.Timestamptz
+  visionPassAt  DateTime?      @map("vision_pass_at") @db.Timestamptz
+  discounts     Json?
+  discountTotal Decimal?       @map("discount_total") @db.Decimal(14, 4)
+
+  @@map("pizza_line_sync")
 }
