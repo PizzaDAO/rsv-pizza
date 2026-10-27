@@ -40,6 +40,16 @@ export interface OcrLineItem {
   unitPrice: number;
   subtotal: number;
   category: OcrLineItemCategory;
+  // sfincione-40417: OPTIONAL printed size info for pizza lines (additive;
+  // older rows simply lack it). Feeds the pizza price index size resolver.
+  size?: OcrLineItemSize;
+}
+
+export interface OcrLineItemSize {
+  label: string | null;
+  diameterCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
 }
 
 export interface OcrResult {
@@ -144,12 +154,13 @@ Return ONLY a JSON object with these fields:
     qty: number,             // quantity (default 1 if not visible)
     unitPrice: number,       // price per unit in the receipt's currency (use amount field's currency)
     subtotal: number,        // total for this line (qty * unitPrice, or what's printed)
-    category: "pizza" | "drink" | "side" | "dessert" | "tax" | "tip" | "fee" | "other"
+    category: "pizza" | "drink" | "side" | "dessert" | "tax" | "tip" | "fee" | "other",
+    size?: { label: string | null, diameterCm: number | null, lengthCm: number | null, widthCm: number | null }  // OPTIONAL, pizza lines only: any size PRINTED on the receipt line (e.g. "Large", "12 inch", "33 cm", "30x40 cm"); null for fields not printed. Omit or set null if no size is printed. Never guess.
   }>
 - items: string[] (legacy fallback — flat list of item names; will be deprecated)
 
 Be exhaustive with lineItems — extract every line on the receipt. If a line is illegible, set name to "[illegible]" and other numeric fields to 0.
-Use your best judgment for category. Default "other".
+Use your best judgment for category. Default "other". Use "drink" for any beverage.
 If the receipt is unreadable, return lineItems: [] and confidence: 0.
 
 Always return valid JSON.`;
@@ -220,7 +231,7 @@ Reminder: wrap the result as { "receipts": [ ... ] }. Always return valid JSON.`
  * Fetch an image from a public URL and convert to a base64 data URL.
  * Suitable for passing as `image_url.url` to OpenAI vision endpoints.
  */
-async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
+export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
   const response = await fetch(imageUrl, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
     throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${imageUrl}`);
@@ -260,6 +271,30 @@ async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
 }
 
 /**
+ * sfincione-40417: sanitize the optional per-line printed size. Returns
+ * undefined when nothing usable is present so the field stays absent.
+ */
+export function sanitizeLineSize(raw: unknown): OcrLineItemSize | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown): number | null => {
+    const n = Number(v);
+    return v !== null && v !== undefined && v !== '' && Number.isFinite(n) && n > 0 && n < 1000 ? n : null;
+  };
+  const label = typeof r.label === 'string' && r.label.trim()
+    ? sanitizePgString(r.label.trim().slice(0, 40))
+    : null;
+  const size: OcrLineItemSize = {
+    label,
+    diameterCm: num(r.diameterCm),
+    lengthCm: num(r.lengthCm),
+    widthCm: num(r.widthCm),
+  };
+  if (!size.label && size.diameterCm === null && size.lengthCm === null && size.widthCm === null) return undefined;
+  return size;
+}
+
+/**
  * formaggi-89172: defensively sanitize the model's `lineItems` array.
  * Drops rows that don't have at least a name; clamps numeric fields to
  * non-negative finite numbers; coerces category into the allowed enum.
@@ -290,14 +325,19 @@ function sanitizeLineItems(raw: unknown): OcrLineItem[] {
       ? subNum
       : qty * unitPrice;
 
-    const rawCategory = typeof e.category === 'string'
+    // sfincione-40417: models occasionally emit "beverage(s)"; normalize to drink.
+    let rawCategory = typeof e.category === 'string'
       ? e.category.toLowerCase().trim()
       : 'other';
+    if (rawCategory === 'beverage' || rawCategory === 'beverages') rawCategory = 'drink';
     const category: OcrLineItemCategory = (ALLOWED_CATEGORIES as readonly string[]).includes(rawCategory)
       ? (rawCategory as OcrLineItemCategory)
       : 'other';
 
-    out.push({ name, qty, unitPrice, subtotal, category });
+    const item: OcrLineItem = { name, qty, unitPrice, subtotal, category };
+    const size = sanitizeLineSize(e.size);
+    if (size) item.size = size;
+    out.push(item);
   }
   return out;
 }
@@ -442,7 +482,7 @@ export function parseSingleReceipt(parsed: any): OcrResult {
  * The model is forced to emit exactly this shape; our bare-object/bare-array
  * fallback in the parser stays as insurance against provider drift.
  */
-const RECEIPTS_JSON_SCHEMA: {
+export const RECEIPTS_JSON_SCHEMA: {
   name: string;
   strict: boolean;
   schema: Record<string, unknown>;
@@ -485,7 +525,7 @@ const RECEIPTS_JSON_SCHEMA: {
               items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['name', 'qty', 'unitPrice', 'subtotal', 'category'],
+                required: ['name', 'qty', 'unitPrice', 'subtotal', 'category', 'size'],
                 properties: {
                   name: { type: 'string' },
                   qty: { type: 'number' },
@@ -494,6 +534,24 @@ const RECEIPTS_JSON_SCHEMA: {
                   category: {
                     type: 'string',
                     enum: [...ALLOWED_CATEGORIES],
+                  },
+                  // sfincione-40417: strict mode needs every key required, so
+                  // size is required-but-nullable (null = nothing printed).
+                  size: {
+                    anyOf: [
+                      {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['label', 'diameterCm', 'lengthCm', 'widthCm'],
+                        properties: {
+                          label: { type: ['string', 'null'] },
+                          diameterCm: { type: ['number', 'null'] },
+                          lengthCm: { type: ['number', 'null'] },
+                          widthCm: { type: ['number', 'null'] },
+                        },
+                      },
+                      { type: 'null' },
+                    ],
                   },
                 },
               },
