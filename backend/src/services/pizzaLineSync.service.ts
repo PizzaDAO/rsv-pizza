@@ -244,6 +244,52 @@ function currentFields(e: ExistingLine) {
   };
 }
 
+/** Build the write for a brand-new (or fingerprint-reset) line. */
+export function buildFreshWrite(
+  item: OcrItemLike,
+  idx: number,
+  existingId: string | null,
+  doc: DocContext,
+  presets: SizePreset[],
+  category: string,
+  merchant: string | null,
+  merchantKey: string | null,
+): LineWrite {
+  const rawName = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '[illegible]';
+  const qtyRaw = num(item.qty, 1);
+  const qty = Math.min(Math.max(qtyRaw, 0), MAX_QTY);
+  const unit = Math.max(num(item.unitPrice, 0), 0);
+  const resolved = resolveForItem(item, rawName, presets, { merchantKey, country: doc.country });
+  const zero = unit <= 0 || qty <= 0;
+  return {
+    existingId,
+    documentId: doc.documentId,
+    partyId: doc.partyId,
+    lineIndex: idx,
+    lineFingerprint: lineFingerprint(rawName, qtyRaw, unit),
+    sourceCategory: category,
+    rawName,
+    merchant,
+    merchantKey,
+    qty,
+    unitPriceList: unit,
+    unitPriceNet: null,
+    discountAmount: null,
+    discountLabel: null,
+    currency: doc.currency,
+    fxRate: doc.fxRate,
+    unitPriceUsd: round4(unit * doc.fxRate),
+    ...resolvedToFields(resolved),
+    verifiedAt: null,
+    verifiedBy: null,
+    excluded: zero,
+    excludedReason: zero ? 'zero_price' : null,
+    isBundle: looksLikeBundle(rawName),
+    outlierFlag: false,
+    notes: null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Pure planner
 // ---------------------------------------------------------------------------
@@ -327,36 +373,7 @@ export function planDocSync(
     }
 
     // New line, or fingerprint changed -> fresh resolve, verification reset.
-    const resolved = resolveForItem(item, rawName, presets, { merchantKey, country: doc.country });
-    const zero = unit <= 0 || qty <= 0;
-    const bundle = looksLikeBundle(rawName);
-    writes.push({
-      existingId: prev?.id ?? null,
-      documentId: doc.documentId,
-      partyId: doc.partyId,
-      lineIndex: idx,
-      lineFingerprint: fp,
-      sourceCategory: category,
-      rawName,
-      merchant,
-      merchantKey,
-      qty,
-      unitPriceList: unit,
-      unitPriceNet: null,
-      discountAmount: null,
-      discountLabel: null,
-      currency: doc.currency,
-      fxRate: doc.fxRate,
-      unitPriceUsd: round4(unit * doc.fxRate),
-      ...resolvedToFields(resolved),
-      verifiedAt: null,
-      verifiedBy: null,
-      excluded: zero,
-      excludedReason: zero ? 'zero_price' : null,
-      isBundle: bundle,
-      outlierFlag: false,
-      notes: null,
-    });
+    writes.push(buildFreshWrite(item, idx, prev?.id ?? null, doc, presets, category, merchant, merchantKey));
   });
 
   allocateDiscounts(writes, doc.discounts);
