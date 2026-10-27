@@ -6,12 +6,13 @@ import { BRAND } from '../config/brand';
 import { fetchPublicPizzaIndex, type PublicPizzaIndex } from '../lib/api';
 import { LADDER_SIZES, fmtLocalPerCm2, fmtPerCm2, fmtUsd } from '../lib/pizzaIndexUtils';
 import { flagEmoji } from '../lib/iso4217';
+import { PizzaIndexMap } from '../components/PizzaIndexMap';
 
 /**
  * sfincione-40417 Phase 3: public Pizza Price Index. Aggregates only
  * (n>=3 parties per country, GPP 2026 receipts, verified or high-confidence
  * sizes, bundles excluded). Handles an empty dataset gracefully.
- * Map: skipped for now (GPPPizzeriasMap takes pizzeria lat/lng markers, not country aggregates).
+ * Map: PizzaIndexMap puts a sized/coloured marker on each published country's centroid.
  */
 
 const LADDER_LABEL: Record<(typeof LADDER_SIZES)[number], string> = {
@@ -88,6 +89,8 @@ export function PizzaIndexPage() {
                 Median across {data.global.nCountries} countries and {data.global.nParties} events. Prices in USD at each event's exchange rate.
               </p>
             </section>
+
+            <PizzaIndexMap countries={countries} />
 
             {/* Leaderboard */}
             <section className="space-y-3">
