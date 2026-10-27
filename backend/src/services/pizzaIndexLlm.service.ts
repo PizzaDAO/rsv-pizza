@@ -18,6 +18,7 @@ import { getLlmModels } from '../lib/privateConfig.js';
 import { imageUrlToBase64DataUrl } from './ocr.service.js';
 import {
   CONFIDENCE,
+  looksLikeBundle,
   normalizeMerchantKey,
   parseSize,
   resolveFromReportedDims,
@@ -67,7 +68,13 @@ Rules:
 - "i" is the input index; return one entry per input line.
 - sizeLabel: one of personal, small, medium, regular, large, xl, family, mega, slice, half, or null. Use a size word only if the line (or its merchant/country context) says so.
 - diameterCm / lengthCm / widthCm: ONLY if the line prints a dimension, or you KNOW the merchant's published size for that exact size name. Otherwise null. NEVER invent a diameter from a generic idea of "large".
-- isBundle: true for all-you-can-eat, party packs, lump sums ("Pizzas varias", "Pizza Party x47", buffet), or a price that covers many unspecified pizzas.
+- isBundle: DEFAULT FALSE. true ONLY when the per-pizza price CANNOT be recovered from the line:
+  (a) a lump sum covering many/unspecified pizzas at qty 1 ("Global pizza party payment", "30 additional pizzas for attendees", "Pizzas varias" qty 1);
+  (b) a package mixing pizza with other items or services ("Fabrication et installation des pizzas", "PIZZA COMBO" with drinks/sides);
+  (c) all-you-can-eat / buffet / per-head pricing ("Rodizio", "Pizza libre x 50").
+  A line with qty > 1 and a unit price is NOT a bundle, however large the qty: the unit price is the per-pizza price. A number in the name ("20 Margherita Pizza", "Margherita x 17") is a quantity, not a bundle.
+  Examples isBundle=false: {"name":"Piggy Pizza","qty":3}, {"name":"Margherita x 17","qty":17}, {"name":"B & S Chicken (L)","qty":10}, {"name":"20 Margherita Pizza","qty":20}, {"name":"Capricciosa x 10","qty":10}, {"name":"Beef Salami x 8","qty":8}.
+  Examples isBundle=true: {"name":"Global pizza party payment","qty":1}, {"name":"30 additional pizzas for attendees","qty":1}, {"name":"Pizzas varias","qty":1}, {"name":"Fabrication et installation des pizzas","qty":1}, {"name":"PIZZA COMBO + drinks","qty":1}, {"name":"All you can eat pizza","qty":1}.
 - shape "slice" is for single slices (sliceFraction e.g. 0.125); "rect" for square/sheet/al taglio/Sicilian/Detroit with known dimensions.
 - confidence: 0..1, your confidence in the size (not in isPizza). reasoning: at most 80 characters.
 The lines may be in any language.`;
@@ -176,6 +183,17 @@ function sizeData(r: ResolvedSize): Prisma.PizzaLineItemUpdateInput {
 }
 
 /**
+ * Deterministic guard on the model's isBundle (plan 12.4): qty > 1 with a unit
+ * price has a recoverable per-pizza price, so it is never a bundle unless the
+ * name itself matches the all-you-can-eat / party-pack heuristic.
+ */
+export function llmBundleAccepted(llm: LlmLine, qty: number | null | undefined, rawName: string | null | undefined): boolean {
+  if (!llm.isBundle) return false;
+  if (Number(qty) > 1 && !looksLikeBundle(rawName)) return false;
+  return true;
+}
+
+/**
  * Merge one LLM line into the existing row (or create a row for a promoted
  * `other`/`beverage` line). Never touches verified rows, never lowers a
  * higher-confidence size (parsed 0.95 / merchant preset 0.85 beat the LLM cap).
@@ -212,14 +230,14 @@ export function applyLlmLine(
         sizeSource: sized.sizeSource, sizeConfidence: sized.sizeConfidence, presetId: sized.presetId,
       });
     }
-    if (llm.isBundle) write.isBundle = true;
+    if (llmBundleAccepted(llm, write.qty, write.rawName)) write.isBundle = true;
     if (!write.style && llm.style) write.style = llm.style;
     return { kind: 'insert', write };
   }
 
   const data: Prisma.PizzaLineItemUpdateInput = {};
   if (sized && (prev.sizeConfidence ?? 0) < (sized.sizeConfidence ?? 0)) Object.assign(data, sizeData(sized));
-  if (llm.isBundle && !prev.isBundle) data.isBundle = true;
+  if (llmBundleAccepted(llm, prev.qty, prev.rawName) && !prev.isBundle) data.isBundle = true;
   if (!prev.style && llm.style) data.style = llm.style;
   if (Object.keys(data).length === 0) return { kind: 'none' };
   data.updatedAt = new Date();

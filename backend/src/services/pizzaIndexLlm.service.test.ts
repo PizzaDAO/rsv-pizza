@@ -8,6 +8,8 @@ vi.mock('./ocr.service.js', () => ({ imageUrlToBase64DataUrl: async () => '' }))
 
 import {
   applyLlmLine,
+  llmBundleAccepted,
+  TEXT_PASS_SYSTEM,
   parseTextPassResponse,
   parseVisionResponse,
   sizeFromModel,
@@ -77,6 +79,33 @@ describe('sizeFromModel', () => {
     expect(r?.presetId).toBe('g-large');
     expect(r?.diameterCm).toBe(35);
     expect(r?.sizeConfidence).toBe(0.5); // min(preset 0.5, cap 0.7, model 0.9)
+  });
+});
+
+describe('bundle definition (plan 12.4)', () => {
+  it('prompt carries the definition and few-shot examples for both cases', () => {
+    expect(TEXT_PASS_SYSTEM).toContain('DEFAULT FALSE');
+    expect(TEXT_PASS_SYSTEM).toContain('qty > 1 and a unit price is NOT a bundle');
+    for (const ex of ['Margherita x 17', 'Piggy Pizza', 'Global pizza party payment', 'Fabrication et installation des pizzas']) {
+      expect(TEXT_PASS_SYSTEM).toContain(ex);
+    }
+  });
+  it.each([
+    ['Piggy Pizza', 3], ['Margherita x 17', 17], ['B & S Chicken (L)', 10], ['20 Margherita Pizza', 20],
+    ['Capricciosa x 10', 10], ['Beef Salami x 8', 8],
+  ])('rejects model bundle flag on multi-quantity line %s (qty %i)', (name, qty) => {
+    expect(llmBundleAccepted(llm({ isBundle: true }), qty, name)).toBe(false);
+    const r = applyLlmLine(llm({ isBundle: true }), undefined, { ...prevLine({ qty }), rawName: name }, doc, presets);
+    expect(r.kind === 'update' && r.data.isBundle).toBeFalsy();
+  });
+  it.each([
+    ['Global pizza party payment', 1], ['30 additional pizzas for attendees', 1], ['Pizzas varias', 1],
+    ['Fabrication et installation des pizzas', 1], ['All you can eat pizza', 20],
+  ])('accepts model bundle flag on %s (qty %i)', (name, qty) => {
+    expect(llmBundleAccepted(llm({ isBundle: true }), qty, name)).toBe(true);
+  });
+  it('never flags when the model says not bundle', () => {
+    expect(llmBundleAccepted(llm({ isBundle: false }), 1, 'Pizzas varias')).toBe(false);
   });
 });
 
