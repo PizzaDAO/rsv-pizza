@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Pizza } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { BRAND } from '../config/brand';
 import { fetchPublicPizzaIndex, type PublicPizzaIndex } from '../lib/api';
 import { LADDER_SIZES, fmtLocalPerCm2, fmtPerCm2, fmtUsd } from '../lib/pizzaIndexUtils';
 import { flagEmoji } from '../lib/iso4217';
@@ -42,7 +43,7 @@ export function PizzaIndexPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Pizza Price Index | RSV.Pizza</title>
+        <title>{`Pizza Price Index | ${BRAND.name}`}</title>
         <meta name="description" content="What does a pizza really cost around the world? Price per cm² and standard-size prices by country, from Global Pizza Party receipts." />
       </Helmet>
 
