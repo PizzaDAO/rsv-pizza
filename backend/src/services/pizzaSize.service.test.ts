@@ -55,7 +55,7 @@ describe('parseSize: real receipt strings (plan section 2)', () => {
     ['MEGA JAMON (E)', { label: 'mega', shape: null }],
     ['P. Muzzarella', { label: null, shape: null }],
     ['P. Fugazzeta', { label: null, shape: null }],
-    ['1/1 Calabresa com Mussarela', { label: null, shape: null }],
+    ['1/1 Calabresa com Mussarela', { label: 'whole', shape: null }],
     ['PIZZA SICILIENNE', { label: null, shape: null }],
     ['6x 7. Cacciatore', { label: null, shape: null }],
     ['Պիցցա', { label: null, shape: null }],
@@ -69,6 +69,43 @@ describe('parseSize: real receipt strings (plan section 2)', () => {
     if ('shape' in exp) expect(p.shape).toBe(exp.shape);
     if ('d' in exp) expect(p.diameterCm).toBe(exp.d);
     if ('explicit' in exp) expect(p.explicit).toBe(exp.explicit);
+  });
+});
+
+describe('parseSize: real-data gaps (prod unresolved lines)', () => {
+  it('bracketed bare numbers are inches next to a size word / Serves N', () => {
+    const a = parseSize('Hello Jalapeno Pizza (Large [12] Serves 3)');
+    expect(a.diameterCm).toBe(30.5);
+    expect(a.label).toBe('large');
+    expect(a.explicit).toBe(true);
+    const b = parseSize('Chicken Supreme Pizza (Monster [22] Serves 5)');
+    expect(b.diameterCm).toBe(55.9);
+    expect(b.label).toBe('monster');
+    expect(parseSize('Farm House [10] Serves 2').diameterCm).toBe(25.4);
+  });
+  it('does not misread brackets without a cue or out of range', () => {
+    expect(parseSize('Pizza [12]').explicit).toBe(false);
+    expect(parseSize('Large [45]').explicit).toBe(false);
+    expect(parseSize('Pizza (8 slices) Large').explicit).toBe(false);
+  });
+  it('CJK inch marks, monster word, diameter prefix, cms', () => {
+    expect(parseSize('32英寸派对怪兽').label).toBe('monster');
+    expect(parseSize('12英寸披萨').diameterCm).toBe(30.5);
+    expect(parseSize('Pizza Ø 32').diameterCm).toBe(32);
+    expect(parseSize('Pizza diam. 30 cm').diameterCm).toBe(30);
+    expect(parseSize('Pizza 30cms').diameterCm).toBe(30);
+  });
+  it('(G)/(P) codes, familiares, 1/1 whole', () => {
+    expect(parseSize('MARGHERITA (G)').label).toBe('large');
+    expect(parseSize('MARGHERITA (P)').label).toBe('small');
+    expect(parseSize('MARGHERITA (E)').label).toBeNull();
+    expect(parseSize('Pizzas Familiares').label).toBe('family');
+    expect(parseSize('1/1 Portuguesa').label).toBe('whole');
+  });
+  it("'whole' falls back to the country default preset", () => {
+    const br = [...GLOBALS, preset({ scope: 'country', country: 'Brazil', sizeLabel: 'default', shape: 'round', diameterCm: 35 })];
+    expect(parseAndResolve('1/1 Portuguesa', br, { country: 'Brazil' }).resolved.diameterCm).toBe(35);
+    expect(parseAndResolve('1/1 Portuguesa', GLOBALS, { country: 'Peru' }).resolved.areaCm2).toBeNull();
   });
 });
 
