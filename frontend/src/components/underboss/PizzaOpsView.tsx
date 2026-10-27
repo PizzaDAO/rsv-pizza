@@ -40,6 +40,8 @@ export function PizzaOpsView() {
   const [running, setRunning] = useState<OpKey | null>(activeLoop.current?.key ?? null);
   const [log, setLog] = useState<string[]>([]);
   const [dryRunDone, setDryRunDone] = useState<Record<OpKey, boolean>>({ sync: true, llm: false, vision: false });
+  // In-page spend confirmation (a native confirm() dialog blocks browser automation).
+  const [armed, setArmed] = useState<OpKey | null>(null);
   const [progress, setProgress] = useState<{ done: number; remaining: number | null } | null>(null);
 
   // Stop the loop when this view unmounts; while an old loop is still winding
@@ -100,7 +102,8 @@ export function PizzaOpsView() {
 
   const runLoop = async (key: OpKey) => {
     const op = OPS.find((o) => o.key === key)!;
-    if (key !== 'sync' && !window.confirm(`Run the ${op.title.slice(3)} for real? This spends OpenAI credits.`)) return;
+    if (key !== 'sync' && armed !== key) { setArmed(key); return; }
+    setArmed(null);
     if (activeLoop.current) return;
     const me = { key, stop: false };
     activeLoop.current = me;
@@ -189,8 +192,15 @@ export function PizzaOpsView() {
                 <button type="button" disabled={!canRun} onClick={() => runLoop(op.key)}
                   title={op.hasDryRun && !dryRunDone[op.key] ? 'Do a dry run first' : undefined}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm disabled:opacity-40">
-                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run until done
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                  {armed === op.key ? 'Confirm: spend OpenAI credits' : 'Run until done'}
                 </button>
+                {armed === op.key && !busy && (
+                  <button type="button" onClick={() => setArmed(null)}
+                    className="px-3 py-1.5 rounded-lg border border-theme-stroke hover:bg-white/10 text-sm">
+                    Cancel
+                  </button>
+                )}
                 {busy && (
                   <button type="button" onClick={() => { if (activeLoop.current) activeLoop.current.stop = true; }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-theme-stroke hover:bg-white/10 text-sm">
