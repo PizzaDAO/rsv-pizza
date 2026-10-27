@@ -144,7 +144,7 @@ const IN_TO_CM = 2.54;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // Quote characters that mean "inches": " ” ″ '' ’’
-const INCH_MARK = `(?:"|”|“|″|''|’’|‘‘)`;
+const INCH_MARK = `(?:"|”|“|″|''|’’|‘‘|英寸|吋)`;
 const NUM = `(\\d{1,3}(?:[.,]\\d{1,2})?)`;
 const toNum = (s: string) => parseFloat(s.replace(',', '.'));
 
@@ -152,12 +152,18 @@ const RECT_RE = new RegExp(
   `${NUM}\\s*(?:x|×|by)\\s*${NUM}\\s*(cm|${INCH_MARK}|in(?:ch(?:es)?)?\\b)`, 'i');
 const INCH_RE = new RegExp(
   `${NUM}\\s*-?\\s*(?:${INCH_MARK}|in\\b|inch(?:es)?\\b|pulgadas?\\b|pol\\b|polegadas?\\b|zoll\\b|pouces?\\b)`, 'i');
-const CM_RE = new RegExp(`${NUM}\\s*cm\\b`, 'i');
+const CM_RE = new RegExp(`${NUM}\\s*(?:cms?|厘米|公分)(?![a-z])`, 'i');
+// Ø / diameter prefix: "Ø 30", "diam. 32 cm" (cm unless an inch mark follows)
+const DIAM_RE = new RegExp(`(?:Ø|⌀|\\bdi[aá]m(?:eter|etro)?\\.?)\\s*:?\\s*${NUM}(?!\\s*${INCH_MARK})`, 'i');
+// India-style menus: "Large [12] Serves 3" / "Monster [22] Serves 5" => bare bracketed inches
+const BRACKET_INCH_RE = /[\[(]\s*(\d{1,2}(?:\.\d)?)\s*[\])]/;
+const SERVES_RE = /\bserves?\s*\d/i;
 
 // Multi-letter size words (case-insensitive). Order matters: xl before large.
 const WORD_RULES: Array<[RegExp, SizeLabel]> = [
+  [/\bmonster\b|怪兽|怪獸/i, 'monster'],
   [/\b(?:x[- ]?large|extra[- ]?large|xlarge|xxl|xl|extra grande)\b/i, 'xl'],
-  [/\b(?:family|familiar|familia|jumbo|gigante|giant)\b/i, 'family'],
+  [/\b(?:family|familiar(?:es)?|familia|jumbo|gigante|giant)\b/i, 'family'],
   [/\bmega\b/i, 'mega'],
   [/\b(?:personal|individual|mini|personnelle?|single)\b/i, 'personal'],
   [/\b(?:small|sm|chica|chico|pequena|pequeno|petite|piccola|kleine?)\b/i, 'small'],
@@ -186,8 +192,17 @@ const SLICE_RE = /\b(?:slice|slices|porci[oó]n|porcion|rebanada|fetta|fette|ped
 const SLICE_COUNT_RE = /\b\d{1,2}\s*-?\s*(?:slices?|pcs?|pieces?|porciones|porcoes|fatias|pedazos|fette)\b/i;
 const HALF_RE = /(?:^|\s)1\/2(?=\s|$)|\b(?:half|mezza|metade)\s+pizza\b/i;
 
+// Parenthesized trailing codes that are unambiguous in LATAM menus: (G)=grande, (P)=pequena.
+const PAREN_CODE_RE = /\(\s*([GP])\s*\)\s*$/;
+const PAREN_CODE_MAP: Record<string, SizeLabel> = { G: 'large', P: 'small' };
+// "1/1" prefix (Brazil): a whole pie, size unspecified.
+const WHOLE_RE = /^\s*1\/1(?=\s|$)/;
+
 function detectWord(name: string): SizeLabel | null {
   for (const [re, label] of WORD_RULES) if (re.test(name)) return label;
+  const pc = PAREN_CODE_RE.exec(name);
+  if (pc) return PAREN_CODE_MAP[pc[1]];
+  if (WHOLE_RE.test(name)) return 'whole';
   const m = SINGLE_LETTER_RE.exec(name);
   if (m) return SINGLE_LETTER_MAP[m[1]];
   return null;
@@ -238,9 +253,19 @@ export function parseSize(name: string | null | undefined): ParsedSize {
   // 2. Explicit round diameter in cm, then inches (cm wins when both appear).
   const cmHit = CM_RE.exec(text);
   const inHit = INCH_RE.exec(text);
+  const diamHit = DIAM_RE.exec(text);
   const candidates: number[] = [];
   if (cmHit) candidates.push(toNum(cmHit[1]));
   if (inHit) candidates.push(round1(toNum(inHit[1]) * IN_TO_CM));
+  if (diamHit && !cmHit) candidates.push(toNum(diamHit[1]));
+  // Bare bracketed number next to a size word / "Serves N" is inches (6-30").
+  if (candidates.length === 0 && (out.word || SERVES_RE.test(text))) {
+    const b = BRACKET_INCH_RE.exec(text);
+    if (b) {
+      const inch = parseFloat(b[1]);
+      if (inch >= 6 && inch <= 30) candidates.push(round1(inch * IN_TO_CM));
+    }
+  }
   for (const d of candidates) {
     if (d >= MIN_ROUND_DIAMETER_CM && d <= MAX_ROUND_DIAMETER_CM) {
       // A slice of an explicitly sized pie is still a slice; handled below.
@@ -474,7 +499,7 @@ export function resolveSize(
 
   // Size word -> preset; no word -> merchant/chain/country 'default'.
   const label = parsed.word ?? 'default';
-  const hit = lookupPreset(presets, label, ctx);
+  const hit = lookupPreset(presets, label, ctx) ?? (label === 'whole' ? lookupPreset(presets, 'default', ctx) : null);
   if (hit) {
     // a bare 'default' only counts from merchant/chain/country scope (lookupPreset enforces).
     return fromPreset(hit.preset, hit.confidence, parsed.word ?? 'default', parsed.style);
