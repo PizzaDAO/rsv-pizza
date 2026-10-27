@@ -37,6 +37,7 @@ import venueReportRoutes from './routes/venue-report.routes.js';
 import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
+import { adminFastPassRouter, hostFastPassRouter } from './routes/host-fast-pass.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
 import eventAssistantRoutes from './routes/eventAssistant.routes.js';
 import payoutDocumentVoteRoutes from './routes/payout-document-vote.routes.js';
@@ -167,6 +168,7 @@ app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cle
 app.use('/api/admin/tax-form-requests', adminTaxFormRequestRouter); // calzone-70821: before /api/admin catch-all
 app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
 app.use('/api/admin/pizza-index', pizzaIndexRoutes); // sfincione-40417: admin/UB-gated, before /api/admin catch-all
+app.use('/api/admin/host-fast-pass', adminFastPassRouter); // host fast pass review assist + budget pre-approval (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
@@ -217,6 +219,7 @@ app.use('/api/mou', mouPublicRoutes); // Public MOU view + sign routes (token-ga
 app.use('/api/parties', mouHostRoutes); // MOU host routes (before sponsorRoutes)
 app.use('/api/parties', sponsorRoutes); // Sponsor CRM routes (host only)
 app.use('/api/parties', budgetRoutes); // Budget routes (host only)
+app.use('/api/parties', hostFastPassRouter); // Host fast pass badge + approved budget (host only)
 app.use('/api/parties', payoutRoutes); // Payout/reimbursement routes (host only, before partyRoutes)
 app.use('/api/parties', eventAssistantRoutes); // arancini-58492: NL event assistant (path-scoped auth, before partyRoutes)
 app.use('/api/parties', checklistRoutes); // Checklist routes (host only)

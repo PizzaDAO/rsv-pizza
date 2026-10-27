@@ -221,5 +221,61 @@
     "noKitRequest": "No kit request",
     "noRequest": "No request",
     "rsvpsTooltip": "Non-declined guests for this event"
+  },
+  "hostReview": {
+    "title": "Host review assist",
+    "loading": "Loading host record...",
+    "loadFailed": "Could not load review assist",
+    "approveFailed": "Could not save",
+    "risk": "{{level}} risk",
+    "level": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "record": "{{hosted}} parties hosted, {{receipts}} with on-time receipts, {{photos}} with photos, {{paid}} paid cleanly, {{issues}} issues. Account {{age}} days old.",
+    "fastPassEligible": "Fast Pass eligible",
+    "noFlags": "No automated red flags.",
+    "flag": {
+      "new_account": "New account",
+      "first_party": "First party",
+      "no_prior_photos": "No photos from prior events",
+      "prior_issues": "Prior issues",
+      "shared_payee": "Shared payee",
+      "no_rsvps": "No RSVPs",
+      "low_rsvps": "Few RSVPs",
+      "reused_receipts": "Reused receipts",
+      "no_receipts": "No receipts",
+      "over_cap": "Over cap"
+    },
+    "checklist": "Review checklist",
+    "auto": "auto",
+    "check": {
+      "accountEstablished": "Account is established",
+      "priorPhotos": "Prior events have photos",
+      "noPriorIssues": "No prior rejections or scam flags",
+      "uniquePayee": "Payee is not shared with other hosts",
+      "realRsvps": "RSVPs look real for this city",
+      "receiptsOriginal": "Receipts are original (not reused)",
+      "receiptsMatchAmount": "Receipts match the requested amount",
+      "venueExists": "Venue / city checked on a map"
+    },
+    "preapprove": "Pre-approve budget",
+    "currentApproval": "Pre-approved ${{amount}} for {{covers}}, receipts due {{deadline}}.",
+    "revoke": "Revoke",
+    "amount": "Amount (USD)",
+    "amountCap": "Amount in USD (cap {{cap}})",
+    "cat": {
+      "pizza": "Pizza",
+      "drinks": "Drinks",
+      "venue": "Venue",
+      "supplies": "Supplies",
+      "entertainment": "Entertainment",
+      "other": "Other"
+    },
+    "noteRequired": "Not Fast Pass eligible: add a review note (required)",
+    "approve": "Pre-approve budget",
+    "saving": "Saving...",
+    "noPayoutNote": "Pre-approval does not pay anything. Payouts are still approved by an admin."
   }
 }
