@@ -54,7 +54,9 @@ export const FastPassCard: React.FC<Props> = ({ partyId }) => {
             {t('fastPass.approvedTitle')}
           </div>
           <div className="mt-2 text-3xl font-bold text-theme-text">
-            ${approval.approvedAmountUsd.toLocaleString(i18n.language, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            {t('fastPass.amountUsd', {
+              amount: approval.approvedAmountUsd.toLocaleString(i18n.language, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+            })}
           </div>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div>
@@ -86,33 +88,26 @@ export const FastPassCard: React.FC<Props> = ({ partyId }) => {
           </div>
         </div>
       ) : (
-        track.tier !== 'flagged' && (
-          <div className="rounded-xl border border-theme-stroke bg-theme-surface p-3 text-sm">
-            <div className="font-semibold text-theme-text">{t('fastPass.progressTitle')}</div>
-            <p className="text-xs text-theme-text-secondary mb-2">{t('fastPass.progressDesc')}</p>
-            <ul className="space-y-1 text-xs text-theme-text-secondary">
-              <li>
-                {t('fastPass.reqReceipts', {
-                  have: track.partiesWithOnTimeReceipts,
-                  need: thresholds.minPartiesWithOnTimeReceipts,
-                  days: thresholds.receiptDeadlineDays,
-                })}
-              </li>
-              <li>
-                {t('fastPass.reqPhotos', {
-                  have: track.partiesWithPhotos,
-                  need: thresholds.minPartiesWithPhotos,
-                })}
-              </li>
-              <li>
-                {t('fastPass.reqAccountAge', {
-                  have: track.accountAgeDays,
-                  need: thresholds.minAccountAgeDays,
-                })}
-              </li>
-            </ul>
-          </div>
-        )
+        <div className="rounded-xl border border-theme-stroke bg-theme-surface p-3 text-sm">
+          <div className="font-semibold text-theme-text">{t('fastPass.progressTitle')}</div>
+          <p className="text-xs text-theme-text-secondary mb-2">{t('fastPass.progressDesc')}</p>
+          <ul className="space-y-1 text-xs text-theme-text-secondary">
+            <li>
+              {t('fastPass.reqVerified', {
+                have: track.verifiedParties,
+                need: thresholds.minVerifiedParties,
+                rsvps: thresholds.minRsvps,
+                days: thresholds.receiptDeadlineDays,
+              })}
+            </li>
+            <li>
+              {t('fastPass.reqAccountAge', {
+                have: track.accountAgeDays,
+                need: thresholds.minAccountAgeDays,
+              })}
+            </li>
+          </ul>
+        </div>
       )}
     </div>
   );

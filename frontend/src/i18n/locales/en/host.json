@@ -1032,8 +1032,6 @@
     "badgeHaveBudget": "Thanks for being a reliable host.",
     "progressTitle": "Earn a Fast Pass",
     "progressDesc": "Hosts with a clean track record get their budget pre-approved ahead of the party.",
-    "reqReceipts": "Parties with receipts within {{days}} days: {{have}} of {{need}}",
-    "reqPhotos": "Parties with event photos submitted: {{have}} of {{need}}",
     "reqAccountAge": "Account age: {{have}} of {{need}} days",
     "cat": {
       "pizza": "Pizza",
@@ -1043,6 +1041,8 @@
       "entertainment": "Entertainment",
       "tips": "Tips",
       "other": "Other"
-    }
+    },
+    "reqVerified": "Verified parties (paid by our team, receipts within {{days}} days, event photos, {{rsvps}}+ RSVPs): {{have}} of {{need}}",
+    "amountUsd": "US${{amount}} USD"
   }
 }

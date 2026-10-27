@@ -22,3 +22,8 @@ CREATE TABLE IF NOT EXISTS "host_fast_pass_approvals" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "host_fast_pass_approvals_party_id_key" ON "host_fast_pass_approvals"("party_id");
 ALTER TABLE "host_fast_pass_approvals" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON "host_fast_pass_approvals" FROM anon;
+REVOKE ALL ON "host_fast_pass_approvals" FROM authenticated;
+
+-- Receipt-reuse lookup (host fast pass review assist) matches on url.
+CREATE INDEX IF NOT EXISTS "idx_payout_documents_url" ON "payout_documents"("url");

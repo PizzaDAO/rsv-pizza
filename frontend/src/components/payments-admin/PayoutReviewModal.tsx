@@ -3363,7 +3363,9 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             </div>
 
             {/* Host fast pass: track record, red flags, checklist, budget pre-approval */}
-            <ReviewAssistPanel partyId={payout.partyId} readOnly={selfPayoutBlocked} />
+            {adminRole && payout.purpose !== 'shipping' && (
+              <ReviewAssistPanel partyId={payout.partyId} readOnly={selfPayoutBlocked} />
+            )}
 
             {/* Status timeline */}
             <div className="rounded-xl border border-theme-stroke p-3 bg-theme-surface">

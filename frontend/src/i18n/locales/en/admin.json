@@ -233,7 +233,7 @@
       "medium": "Medium",
       "low": "Low"
     },
-    "record": "{{hosted}} parties hosted, {{receipts}} with on-time receipts, {{photos}} with photos, {{paid}} paid cleanly, {{issues}} issues. Account {{age}} days old.",
+    "record": "{{hosted}} parties hosted, {{verified}} fully verified, {{photos}} with photos, {{issues}} issues. Account {{age}} days old.",
     "fastPassEligible": "Fast Pass eligible",
     "noFlags": "No automated red flags.",
     "flag": {
@@ -246,7 +246,8 @@
       "low_rsvps": "Few RSVPs",
       "reused_receipts": "Reused receipts",
       "no_receipts": "No receipts",
-      "over_cap": "Over cap"
+      "over_cap": "Over cap",
+      "duplicate_receipts": "Duplicate receipts (prior)"
     },
     "checklist": "Review checklist",
     "auto": "auto",
@@ -261,10 +262,10 @@
       "venueExists": "Venue / city checked on a map"
     },
     "preapprove": "Pre-approve budget",
-    "currentApproval": "Pre-approved ${{amount}} for {{covers}}, receipts due {{deadline}}.",
+    "currentApproval": "Pre-approved US${{amount}} for {{covers}}, receipts due {{deadline}}.",
     "revoke": "Revoke",
     "amount": "Amount (USD)",
-    "amountCap": "Amount in USD (cap {{cap}})",
+    "amountCap": "Amount in USD (cap US${{cap}})",
     "cat": {
       "pizza": "Pizza",
       "drinks": "Drinks",
@@ -276,6 +277,8 @@
     "noteRequired": "Not Fast Pass eligible: add a review note (required)",
     "approve": "Pre-approve budget",
     "saving": "Saving...",
-    "noPayoutNote": "Pre-approval does not pay anything. Payouts are still approved by an admin."
+    "noPayoutNote": "Pre-approval does not pay anything. Payouts are still approved by an admin.",
+    "selfBlocked": "You host, co-host or are paid on this party, so you cannot pre-approve it.",
+    "capRequired": "Set the party reimbursement cap before pre-approving a budget."
   }
 }

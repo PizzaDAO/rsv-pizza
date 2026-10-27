@@ -2306,6 +2306,7 @@ model PayoutDocument {
   @@index([payoutId])
   @@index([uploadedByUserId])
   @@index([photoId])
+  @@index([url], map: "idx_payout_documents_url")
   @@map("payout_documents")
 }
 

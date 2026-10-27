@@ -21,7 +21,7 @@ import { AppError } from '../middleware/error.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { BUDGET_CATEGORIES } from './budget.routes.js';
 import { FAST_PASS_THRESHOLDS, toHostView } from '../lib/hostTrackRecord.js';
-import { loadHostTrackRecord, loadReviewAssist } from '../services/hostFastPass.service.js';
+import { isSelfInterested, loadHostTrackRecord, loadReviewAssist } from '../services/hostFastPass.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_APPROVED_USD = 5000;
@@ -64,7 +64,9 @@ adminFastPassRouter.get('/party/:partyId/review', async (req: AuthRequest, res, 
     const approval = await prisma.hostFastPassApproval.findUnique({
       where: { partyId: req.params.partyId },
     });
+    const selfBlocked = await isSelfInterested(req.params.partyId, req.userId, req.userEmail);
     res.json({
+      selfBlocked,
       hostEmail: result.hostEmail,
       track: result.track,
       review: result.review,
@@ -104,29 +106,32 @@ adminFastPassRouter.post('/party/:partyId/approve', async (req: AuthRequest, res
     if (!party?.userId) throw new AppError('Party not found', 404, 'NOT_FOUND');
     if (party.cancelledAt) throw new AppError('Party is cancelled', 400, 'PARTY_CANCELLED');
 
-    // Segregation of duties: nobody pre-approves their own party's budget.
-    const host = await prisma.user.findUnique({ where: { id: party.userId }, select: { email: true } });
-    if (host && req.userEmail && host.email.toLowerCase() === req.userEmail.toLowerCase()) {
-      throw new AppError('You cannot pre-approve your own party', 403, 'SELF_APPROVAL');
+    // Segregation of duties: not the host, a co-host, or a payee on this party.
+    if (await isSelfInterested(partyId, req.userId, req.userEmail)) {
+      throw new AppError('You cannot pre-approve a party you host or are paid on', 403, 'SELF_APPROVAL');
     }
 
     const result = await loadReviewAssist(partyId);
     if (!result) throw new AppError('Party or host not found', 404, 'NOT_FOUND');
 
-    // Not Fast Pass eligible: allowed only as an explicit manual review with a
-    // written note, and never when a high-severity flag is open.
+    // High-risk flags block pre-approval on BOTH paths (fast pass and manual).
+    if (result.review.riskLevel === 'high') {
+      throw new AppError('High-risk flags are open on this host; resolve them first', 409, 'HIGH_RISK');
+    }
+    // Not Fast Pass eligible: allowed only as an explicit manual review with a note.
     let basis: 'fast_pass' | 'manual_review' = 'fast_pass';
     if (!result.eligibleForFastPass) {
       if (!note) {
         throw new AppError('Host is not Fast Pass eligible: a review note is required', 400, 'NOTE_REQUIRED');
       }
-      if (result.review.riskLevel === 'high') {
-        throw new AppError('High-risk flags are open on this host; resolve them first', 409, 'HIGH_RISK');
-      }
       basis = 'manual_review';
     }
-    if (result.capUsd != null && amount > result.capUsd) {
-      throw new AppError(`Amount exceeds the party reimbursement cap ($${result.capUsd})`, 400, 'OVER_CAP');
+    // A known reimbursement cap is required; the budget can never exceed it.
+    if (result.capUsd == null) {
+      throw new AppError('Set the party reimbursement cap before pre-approving a budget', 400, 'CAP_REQUIRED');
+    }
+    if (amount > result.capUsd) {
+      throw new AppError(`Amount exceeds the party reimbursement cap (US$${result.capUsd})`, 400, 'OVER_CAP');
     }
 
     const requestedDeadline = req.body?.receiptDeadline ? new Date(req.body.receiptDeadline) : null;
@@ -173,7 +178,9 @@ adminFastPassRouter.post('/party/:partyId/revoke', async (req: AuthRequest, res,
 
 // ----------------------------------------------------------------- host
 export const hostFastPassRouter = Router();
-hostFastPassRouter.use(requireAuth);
+// Path-scoped: this router is mounted at /api/parties beside many others, so an
+// unconditioned router.use(requireAuth) would gate every /api/parties/* request.
+hostFastPassRouter.use('/:partyId/fast-pass', requireAuth);
 
 hostFastPassRouter.get('/:partyId/fast-pass', async (req: AuthRequest, res, next) => {
   try {

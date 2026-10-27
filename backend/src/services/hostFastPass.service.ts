@@ -1,8 +1,8 @@
 /**
  * Host fast pass: DB loading for the pure logic in lib/hostTrackRecord.ts.
  *
- * Read-only except for approve/revoke of HostFastPassApproval rows. Nothing
- * here moves money or changes payout status.
+ * Read-only except for approve/revoke of HostFastPassApproval rows (done in the
+ * route). Nothing here moves money or changes payout status.
  */
 import { prisma } from '../config/database.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
@@ -33,29 +33,32 @@ export async function loadHostTrackRecord(
       eventTags: true,
       payouts: {
         where: { purpose: 'event' },
-        select: { status: true, createdAt: true },
+        select: { status: true, reviewedBy: true },
       },
       payoutDocuments: {
         where: { kind: 'receipt' },
-        select: { createdAt: true, payoutId: true, isDuplicate: true },
+        select: { createdAt: true, isDuplicate: true, ineligible: true },
       },
       _count: { select: { guests: true } },
     },
   });
 
+  // Only host-designated payout-role photos count: plain uploads are
+  // approved by default and prove nothing.
   const photoCounts = await prisma.photo.groupBy({
     by: ['partyId'],
-    where: { partyId: { in: parties.map((p) => p.id) }, status: 'approved', deletedAt: null },
+    where: {
+      partyId: { in: parties.map((p) => p.id) },
+      status: 'approved',
+      deletedAt: null,
+      payoutRole: { not: null },
+    },
     _count: { _all: true },
   });
   const photosByParty = new Map(photoCounts.map((r) => [r.partyId, r._count._all]));
 
   const history: HostPartyHistory[] = parties.map((p) => {
-    const docs = p.payoutDocuments;
-    const firstReceiptAt = docs.length
-      ? new Date(Math.min(...docs.map((d) => d.createdAt.getTime())))
-      : null;
-    const duplicates = docs.filter((d) => d.isDuplicate).length;
+    const good = p.payoutDocuments.filter((d) => !d.isDuplicate && !d.ineligible);
     return {
       partyId: p.id,
       date: p.date,
@@ -63,18 +66,43 @@ export async function loadHostTrackRecord(
       eventTags: p.eventTags ?? [],
       photoCount: photosByParty.get(p.id) ?? 0,
       rsvpCount: p._count.guests,
-      // Receipts are party-level; attribute them to each payout of the party.
-      payouts: p.payouts.map((po) => ({
-        status: po.status,
-        createdAt: po.createdAt,
-        firstReceiptAt,
-        receiptCount: docs.length,
-        duplicateReceiptCount: duplicates,
-      })),
+      receiptCount: good.length,
+      firstReceiptAt: good.length ? new Date(Math.min(...good.map((d) => d.createdAt.getTime()))) : null,
+      hasDuplicateReceipts: p.payoutDocuments.some((d) => d.isDuplicate),
+      payouts: p.payouts.map((po) => ({ status: po.status, adminReviewed: !!po.reviewedBy })),
     };
   });
 
   return { track: computeTrackRecord(history, user.createdAt, now), accountCreatedAt: user.createdAt };
+}
+
+/**
+ * True when the acting admin is the host, a co-host, or the host user of any
+ * payout on this party. Such admins may view but never pre-approve.
+ */
+export async function isSelfInterested(
+  partyId: string,
+  actorUserId: string | undefined,
+  actorEmail: string | undefined,
+): Promise<boolean> {
+  const email = actorEmail?.toLowerCase();
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { userId: true, coHosts: true, user: { select: { email: true } } },
+  });
+  if (!party) return false;
+  if (actorUserId && party.userId === actorUserId) return true;
+  if (email && party.user?.email?.toLowerCase() === email) return true;
+  const coHosts = Array.isArray(party.coHosts) ? (party.coHosts as Array<{ email?: string }>) : [];
+  if (email && coHosts.some((c) => c?.email?.toLowerCase() === email)) return true;
+  if (actorUserId) {
+    const own = await prisma.payout.findFirst({
+      where: { partyId, hostUserId: actorUserId },
+      select: { id: true },
+    });
+    if (own) return true;
+  }
+  return false;
 }
 
 /** Admin-only. Gathers the cross-host signals and runs the flag rules. */
@@ -94,6 +122,7 @@ export async function loadReviewAssist(
     select: {
       id: true,
       userId: true,
+      date: true,
       reimbursementCapUsd: true,
       eventTags: true,
       _count: { select: { guests: true } },
@@ -141,27 +170,36 @@ export async function loadReviewAssist(
     ]).size;
   }
 
-  // Receipt reuse: same stored file, or same file name + size, or same
-  // OCR amount/currency/summary, already on a different party.
+  // Receipt reuse: same stored file, or same file name + size, already on a
+  // different party. One batched query (indexed on url), matched in memory.
   const receipts = await prisma.payoutDocument.findMany({
     where: { partyId, kind: 'receipt', isDuplicate: false },
-    select: { url: true, fileName: true, fileSize: true, ocrAmount: true, ocrCurrency: true, ocrSummary: true },
+    select: { url: true, fileName: true, fileSize: true },
   });
   let reusedReceiptCount = 0;
-  for (const r of receipts) {
-    const or: object[] = [{ url: r.url }, { fileName: r.fileName, fileSize: r.fileSize }];
-    if (r.ocrAmount != null && r.ocrSummary) {
-      or.push({ ocrAmount: r.ocrAmount, ocrCurrency: r.ocrCurrency, ocrSummary: r.ocrSummary });
-    }
-    const hit = await prisma.payoutDocument.findFirst({
-      where: { partyId: { not: partyId }, kind: 'receipt', OR: or },
-      select: { id: true },
+  if (receipts.length) {
+    const others = await prisma.payoutDocument.findMany({
+      where: {
+        partyId: { not: partyId },
+        kind: 'receipt',
+        OR: [
+          { url: { in: receipts.map((r) => r.url) } },
+          ...receipts.map((r) => ({ fileName: r.fileName, fileSize: r.fileSize })),
+        ],
+      },
+      select: { url: true, fileName: true, fileSize: true },
+      take: 500,
     });
-    if (hit) reusedReceiptCount++;
+    const urls = new Set(others.map((o) => o.url));
+    const nameSize = new Set(others.map((o) => `${o.fileName}\u0000${o.fileSize}`));
+    reusedReceiptCount = receipts.filter(
+      (r) => urls.has(r.url) || nameSize.has(`${r.fileName}\u0000${r.fileSize}`),
+    ).length;
   }
 
+  // Includes already-paid rolling payouts so a paid-then-topped-up party is caught.
   const requested = await prisma.payout.aggregate({
-    where: { partyId, purpose: 'event', status: { in: ['pending', 'approved', 'queued'] } },
+    where: { partyId, purpose: 'event', status: { in: ['pending', 'approved', 'queued', 'paid'] } },
     _sum: { finalAmountUsd: true },
   });
   const capUsd = computeEffectiveCapUsd({
@@ -172,6 +210,7 @@ export async function loadReviewAssist(
   const review = computeReviewAssist({
     track: loaded.track,
     accountCreatedAt: loaded.accountCreatedAt,
+    partyDate: party.date,
     rsvpCount: party._count.guests,
     otherHostsSharingPayee,
     reusedReceiptCount,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
+import { Checkbox } from '../Checkbox';
 import {
   approveFastPassBudget,
   fetchAdminReviewAssist,
@@ -102,9 +103,8 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
       <div className="text-xs text-theme-text-secondary">
         {t('hostReview.record', {
           hosted: track.partiesHosted,
-          receipts: track.partiesWithOnTimeReceipts,
+          verified: track.verifiedParties,
           photos: track.partiesWithPhotos,
-          paid: track.paidWithoutIssues,
           issues: track.issues,
           age: track.accountAgeDays,
         })}
@@ -137,15 +137,14 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
             const isChecked = c.auto === true || checked[c.id] === true;
             return (
               <li key={c.id} className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isChecked}
                   disabled={c.auto !== null}
-                  onChange={(e) => setChecked((m) => ({ ...m, [c.id]: e.target.checked }))}
+                  onChange={() => setChecked((m) => ({ ...m, [c.id]: !m[c.id] }))}
+                  size={14}
+                  label={t(`hostReview.check.${c.id}`, { defaultValue: c.id })}
+                  labelClassName={`text-xs ${autoFail ? 'text-red-700 font-medium' : 'text-theme-text-secondary'}`}
                 />
-                <span className={autoFail ? 'text-red-700 font-medium' : 'text-theme-text-secondary'}>
-                  {t(`hostReview.check.${c.id}`, { defaultValue: c.id })}
-                </span>
                 {c.auto !== null && (
                   <span className="text-theme-text-faint">({t('hostReview.auto')})</span>
                 )}
@@ -155,7 +154,11 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
         </ul>
       </div>
 
-      {!readOnly && (
+      {data.selfBlocked && (
+        <p className="text-[11px] text-amber-700">{t('hostReview.selfBlocked')}</p>
+      )}
+
+      {!readOnly && !data.selfBlocked && (
         <div className="border-t border-theme-stroke pt-3 space-y-2">
           <div className="text-xs font-medium text-theme-text">{t('hostReview.preapprove')}</div>
           {approval ? (
@@ -181,20 +184,21 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={data.capUsd != null ? t('hostReview.amountCap', { cap: data.capUsd }) : t('hostReview.amount')}
+                disabled={data.capUsd == null}
                 className="w-full rounded-md border border-theme-stroke px-2 py-1 text-xs bg-transparent"
               />
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((c) => (
-                  <label key={c} className="text-xs flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={covers.includes(c)}
-                      onChange={(e) =>
-                        setCovers((cur) => (e.target.checked ? [...cur, c] : cur.filter((x) => x !== c)))
-                      }
-                    />
-                    {t(`hostReview.cat.${c}`)}
-                  </label>
+                  <Checkbox
+                    key={c}
+                    checked={covers.includes(c)}
+                    onChange={() =>
+                      setCovers((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]))
+                    }
+                    size={14}
+                    label={t(`hostReview.cat.${c}`)}
+                    labelClassName="text-xs text-theme-text-secondary"
+                  />
                 ))}
               </div>
               {!data.eligibleForFastPass && (
@@ -213,6 +217,9 @@ export const ReviewAssistPanel: React.FC<Props> = ({ partyId, readOnly }) => {
               >
                 {busy ? t('hostReview.saving') : t('hostReview.approve')}
               </button>
+              {data.capUsd == null && (
+                <p className="text-[11px] text-amber-700">{t('hostReview.capRequired')}</p>
+              )}
               <p className="text-[11px] text-theme-text-faint">{t('hostReview.noPayoutNote')}</p>
             </>
           )}

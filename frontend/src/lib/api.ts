@@ -8421,11 +8421,10 @@ export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
 // None of these move money; payouts still go through the admin payout flow.
 // ---------------------------------------------------------------------------
 export interface FastPassThresholds {
-  minPartiesWithOnTimeReceipts: number;
-  minPartiesWithPhotos: number;
+  minVerifiedParties: number;
+  minRsvps: number;
   minAccountAgeDays: number;
   receiptDeadlineDays: number;
-  maxIssues: number;
 }
 export interface FastPassApproval {
   approvedAmountUsd: number;
@@ -8436,15 +8435,11 @@ export interface FastPassApproval {
 }
 export interface HostTrackView {
   partiesHosted: number;
-  partiesWithReceipts: number;
-  partiesWithOnTimeReceipts: number;
-  partiesWithPhotos: number;
-  paidWithoutIssues: number;
-  issues: number;
+  verifiedParties: number;
   accountAgeDays: number;
-  tier: 'fast_pass' | 'building' | 'new' | 'flagged';
+  tier: 'fast_pass' | 'building' | 'new';
   eligibleForFastPass: boolean;
-  missing: Array<'onTimeReceipts' | 'photos' | 'accountAge' | 'issues'>;
+  missing: Array<'verifiedParties' | 'accountAge'>;
 }
 export interface HostFastPassStatus {
   track: HostTrackView | null;
@@ -8457,7 +8452,16 @@ export function fetchHostFastPass(partyId: string): Promise<HostFastPassStatus> 
 
 export interface AdminReviewAssist {
   hostEmail: string;
-  track: HostTrackView & { issueDetails: string[] };
+  selfBlocked: boolean;
+  track: {
+    partiesHosted: number;
+    partiesWithPhotos: number;
+    verifiedParties: number;
+    issues: number;
+    partiesWithDuplicateReceipts: number;
+    accountAgeDays: number;
+    issueDetails: string[];
+  };
   review: {
     riskLevel: 'high' | 'medium' | 'low';
     flags: Array<{ id: string; severity: 'high' | 'medium' | 'low'; detail: string }>;
