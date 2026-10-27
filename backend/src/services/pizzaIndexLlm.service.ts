@@ -279,6 +279,8 @@ export interface PassResult {
   linesUpdated: number;
   errors: Array<{ documentId: string; error: string }>;
   docIds: string[];
+  /** Candidates skipped because of >= 3 failed attempts or a failure within the last hour. */
+  skippedBackoff: number;
 }
 
 function docContext(row: DocRow): DocContext | null {
@@ -289,24 +291,52 @@ function docContext(row: DocRow): DocContext | null {
   };
 }
 
+/** Docs that failed this many times, or failed within the last hour, are skipped. */
+export const MAX_PASS_ATTEMPTS = 3;
+export const PASS_ERROR_BACKOFF_MS = 60 * 60 * 1000;
+
+/** SQL: the sync row (alias s) is NOT in back-off for this pass. */
+function notBackedOff(which: 'llm' | 'vision'): Prisma.Sql {
+  const attempts = Prisma.raw(`s.${which}_attempts`);
+  const lastErr = Prisma.raw(`s.${which}_last_error_at`);
+  return Prisma.sql`(${attempts} < ${MAX_PASS_ATTEMPTS}
+    AND (${lastErr} IS NULL OR ${lastErr} < now() - interval '1 hour'))`;
+}
+
+/** Count one failed attempt and stamp the time (called from the per-doc catch). */
+export async function recordPassError(documentId: string, which: 'llm' | 'vision'): Promise<void> {
+  try {
+    await prisma.pizzaLineSync.update({
+      where: { documentId },
+      data: which === 'llm'
+        ? { llmAttempts: { increment: 1 }, llmLastErrorAt: new Date() }
+        : { visionAttempts: { increment: 1 }, visionLastErrorAt: new Date() },
+    });
+  } catch (e) {
+    console.error('[pizza-index] could not record pass error', documentId, e);
+  }
+}
+
 const ELIGIBLE_SQL = Prisma.sql`d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false
   AND d.ocr_line_items IS NOT NULL AND jsonb_typeof(d.ocr_line_items) = 'array'`;
 
 export async function runLlmPass(opts: { limit?: number; docIds?: string[]; dryRun?: boolean } = {}): Promise<PassResult> {
   const limit = Math.min(Math.max(opts.limit ?? 10, 1), 30);
   const idFilter = opts.docIds?.length ? Prisma.sql`AND d.id = ANY(${opts.docIds}::uuid[])` : Prisma.empty;
-  const where = Prisma.sql`
+  const base = Prisma.sql`
     FROM pizza_line_sync s JOIN payout_documents d ON d.id = s.document_id
     WHERE s.llm_pass_at IS NULL AND ${ELIGIBLE_SQL} ${idFilter}
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(d.ocr_line_items) e
                   WHERE lower(e->>'category') IN ('pizza','other','beverage','side'))`;
+  const where = Prisma.sql`${base} AND ${notBackedOff('llm')}`;
+  const [{ n: baseN }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${base}`);
   const picked = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT d.id ${where} ORDER BY d.created_at LIMIT ${limit}`);
   const [{ n }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${where}`);
   const models = await getLlmModels();
   const result: PassResult = {
     dryRun: !!opts.dryRun, model: models.assistant, candidates: n, processed: 0,
     remaining: Math.max(n - picked.length, 0), linesInserted: 0, linesUpdated: 0, errors: [],
-    docIds: picked.map((p) => p.id),
+    docIds: picked.map((p) => p.id), skippedBackoff: Math.max(baseN - n, 0),
   };
   if (opts.dryRun || picked.length === 0) return result;
 
@@ -371,6 +401,7 @@ export async function runLlmPass(opts: { limit?: number; docIds?: string[]; dryR
       result.linesUpdated += updates.length;
     } catch (err) {
       result.errors.push({ documentId: row.id, error: err instanceof Error ? err.message : String(err) });
+      await recordPassError(row.id, 'llm');
     }
   }
   return result;
@@ -392,12 +423,14 @@ export async function runVisionPass(opts: {
   const needs = opts.includeLowConfidence
     ? Prisma.sql`(li.area_cm2 IS NULL OR li.size_confidence < 0.7)`
     : Prisma.sql`li.area_cm2 IS NULL`;
-  const where = Prisma.sql`
+  const base = Prisma.sql`
     FROM pizza_line_sync s JOIN payout_documents d ON d.id = s.document_id
     WHERE s.vision_pass_at IS NULL AND ${ELIGIBLE_SQL} ${llmGate} ${idFilter}
       AND d.mime_type LIKE 'image/%'
       AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id
                   AND li.excluded = false AND li.is_bundle = false AND li.verified_at IS NULL AND ${needs})`;
+  const where = Prisma.sql`${base} AND ${notBackedOff('vision')}`;
+  const [{ n: baseN }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${base}`);
   const picked = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT d.id ${where} ORDER BY d.created_at LIMIT ${limit}`);
   const [{ n }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${where}`);
   const models = await getLlmModels();
@@ -405,7 +438,7 @@ export async function runVisionPass(opts: {
     dryRun: !!opts.dryRun, model: models.visionPrimary, candidates: n, processed: 0,
     remaining: Math.max(n - picked.length, 0), linesInserted: 0, linesUpdated: 0,
     errors: [] as Array<{ documentId: string; error: string }>, docIds: picked.map((p) => p.id),
-    skippedNonImage: 0,
+    skippedNonImage: 0, skippedBackoff: Math.max(baseN - n, 0),
   };
   if (opts.dryRun || picked.length === 0) return result;
 
@@ -488,6 +521,7 @@ export async function runVisionPass(opts: {
       result.linesUpdated += updates.length;
     } catch (err) {
       result.errors.push({ documentId: row.id, error: err instanceof Error ? err.message : String(err) });
+      await recordPassError(row.id, 'vision');
     }
   }
   return result;

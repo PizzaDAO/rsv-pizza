@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('../config/database.js', () => ({ prisma: {} }));
+const syncUpdate = vi.hoisted(() => vi.fn(async () => ({})));
+vi.mock('../config/database.js', () => ({ prisma: { pizzaLineSync: { update: syncUpdate } } }));
 vi.mock('../lib/openai.js', () => ({ getOpenAI: () => { throw new Error('OpenAI must not be called in tests'); } }));
 vi.mock('../lib/privateConfig.js', () => ({ getLlmModels: async () => ({ assistant: 'x', visionPrimary: 'y' }) }));
 vi.mock('./ocr.service.js', () => ({ imageUrlToBase64DataUrl: async () => '' }));
@@ -11,6 +12,9 @@ import {
   parseVisionResponse,
   sizeFromModel,
   buildTextPassUser,
+  recordPassError,
+  MAX_PASS_ATTEMPTS,
+  PASS_ERROR_BACKOFF_MS,
   type LlmLine,
 } from './pizzaIndexLlm.service.js';
 import type { DocContext, ExistingLine } from './pizzaLineSync.service.js';
@@ -134,5 +138,27 @@ describe('prompt', () => {
     const u = JSON.parse(buildTextPassUser({ merchant: 'M', country: 'Kenya', city: 'Nairobi', currency: 'KES', lines: [{ i: 0, name: 'x', qty: 1, unitPrice: 2, category: 'pizza' }] }));
     expect(u.lines[0].i).toBe(0);
     expect(u.country).toBe('Kenya');
+  });
+});
+
+describe('pass back-off bookkeeping', () => {
+  it('records a failed attempt and error time per pass', async () => {
+    syncUpdate.mockClear();
+    await recordPassError('doc1', 'llm');
+    await recordPassError('doc2', 'vision');
+    const [a, b] = syncUpdate.mock.calls.map((c: any) => c[0]);
+    expect(a.where.documentId).toBe('doc1');
+    expect(a.data.llmAttempts).toEqual({ increment: 1 });
+    expect(a.data.llmLastErrorAt).toBeInstanceOf(Date);
+    expect(b.data.visionAttempts).toEqual({ increment: 1 });
+    expect(b.data.visionLastErrorAt).toBeInstanceOf(Date);
+  });
+  it('swallows bookkeeping failures', async () => {
+    syncUpdate.mockRejectedValueOnce(new Error('db down'));
+    await expect(recordPassError('doc3', 'llm')).resolves.toBeUndefined();
+  });
+  it('limits are 3 attempts / 1 hour', () => {
+    expect(MAX_PASS_ATTEMPTS).toBe(3);
+    expect(PASS_ERROR_BACKOFF_MS).toBe(3600000);
   });
 });

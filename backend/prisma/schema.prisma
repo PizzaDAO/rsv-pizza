@@ -2780,6 +2780,10 @@ model PizzaLineSync {
   syncedAt      DateTime       @default(now()) @map("synced_at") @db.Timestamptz
   llmPassAt     DateTime?      @map("llm_pass_at") @db.Timestamptz
   visionPassAt  DateTime?      @map("vision_pass_at") @db.Timestamptz
+  llmAttempts       Int       @default(0) @map("llm_attempts")
+  llmLastErrorAt    DateTime? @map("llm_last_error_at") @db.Timestamptz
+  visionAttempts    Int       @default(0) @map("vision_attempts")
+  visionLastErrorAt DateTime? @map("vision_last_error_at") @db.Timestamptz
   discounts     Json?
   discountTotal Decimal?       @map("discount_total") @db.Decimal(14, 4)
 
