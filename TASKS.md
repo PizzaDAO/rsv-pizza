@@ -8,6 +8,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P1 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment |
+| sfincione-40417 | Pizza Price Index: size-adjusted (per cm²) pizza prices from receipts + diameter review queue + public /pizza-index | doing | P2 |  | Snax |  | plans/sfincione-40417-pizza-price-index.md |  | 2026-10-27: Decisions recorded (§12). Phase 1 = PR A backend+migration, PR B review UI |
 | diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | doing | P2 |  |  |  |  |  |  |
 | napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | doing | P2 |  |  |  |  |  |  |
 | sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | doing | P2 |  |  |  |  |  |  |
