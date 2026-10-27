@@ -7,6 +7,8 @@ export interface MapLibreMarker {
   lng: number;
   /** Custom pin element. When omitted, MapLibre's default teardrop pin is used. */
   element?: HTMLElement;
+  /** Anchor for a custom `element` (default 'bottom'; use 'center' for dots). */
+  anchor?: 'center' | 'bottom';
   /** Color for the default pin (ignored when `element` is provided). */
   color?: string;
   /** HTML popup shown when the marker is clicked. */
@@ -131,7 +133,7 @@ export default function MapLibreMap({
 
     for (const mk of markers) {
       const marker = mk.element
-        ? new maplibregl.Marker({ element: mk.element, anchor: 'bottom' })
+        ? new maplibregl.Marker({ element: mk.element, anchor: mk.anchor ?? 'bottom' })
         : new maplibregl.Marker({ color: mk.color });
       marker.setLngLat([mk.lng, mk.lat]);
 

@@ -10,6 +10,7 @@ import {
   type PizzaIndexParams,
 } from '../../lib/api';
 import { Checkbox } from '../Checkbox';
+import { PizzaIndexCharts } from './PizzaIndexCharts';
 import { ReceiptLightbox } from '../payments-shared/ReceiptLightbox';
 import { LADDER_SIZES, downloadCsv, fmtLocalPerCm2, fmtPerCm2, fmtUsd } from '../../lib/pizzaIndexUtils';
 
@@ -273,6 +274,8 @@ export function PizzaIndexView() {
           </table>
         </div>
       )}
+
+      <PizzaIndexCharts verifiedOnly={verifiedOnly} includeBundles={includeBundles} />
 
       {/* Bundles & deals (decision 12.4) */}
       {data && (
