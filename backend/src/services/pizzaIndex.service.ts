@@ -405,7 +405,7 @@ export async function fetchIndexRows(scope?: IndexScope, f: IndexFilters = {}): 
   const scopeCond = scope && !scope.full ? scopeSql(scope, 'v') : Prisma.empty;
   const rows = await prisma.$queryRaw<ViewRow[]>(Prisma.sql`
     SELECT v.* FROM pizza_price_index_lines v
-    WHERE true ${Prisma.join(cond, ' ')} ${scopeCond}`);
+    WHERE true ${cond.length ? Prisma.join(cond, ' ') : Prisma.empty} ${scopeCond}`);
   let mapped = rows.map(mapViewRow);
   if (f.continent) mapped = mapped.filter((r) => regionToContinent(r.region) === f.continent);
   return mapped;

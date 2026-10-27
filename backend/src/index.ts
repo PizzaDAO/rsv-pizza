@@ -90,6 +90,7 @@ import { publicTaxFormRequestRouter, adminTaxFormRequestRouter } from './routes/
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
+import pizzaIndexRoutes, { publicPizzaIndexRouter } from './routes/pizza-index.routes.js'; // sfincione-40417: Pizza Price Index (admin/UB review + public aggregates)
 import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
 const app = express();
@@ -165,6 +166,7 @@ app.use('/api/rsvp', rsvpLimiter);
 app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cleanup (before /api/admin catch-all)
 app.use('/api/admin/tax-form-requests', adminTaxFormRequestRouter); // calzone-70821: before /api/admin catch-all
 app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
+app.use('/api/admin/pizza-index', pizzaIndexRoutes); // sfincione-40417: admin/UB-gated, before /api/admin catch-all
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
 app.use('/api/admin/parties', partyMarkPaidRouter); // panettone-92103: party-level "mark party paid" bulk action — before /api/admin catch-all
@@ -238,6 +240,7 @@ app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-
 app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated create flow, cap, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
+app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public aggregates only (n>=3 parties, GPP 2026), cached 1h
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
 app.use('/api/service', serviceRoutes); // GPP host lookup for pizzadao.org missions (PIZZADAO_SERVICE_KEY gate)
