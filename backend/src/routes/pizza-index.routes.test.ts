@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   paymentAdmins: new Set<string>(),
   underbosses: new Map<string, { isAdmin: boolean; regions: string[]; cities: string[] }>(),
   lines: new Map<string, any>(),
+  outOfScopeCount: 0,
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -42,8 +43,9 @@ vi.mock('../config/database.js', () => ({
     pizzaSizePreset: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), create: vi.fn(async ({ data }: any) => ({ id: 'p1', createdAt: new Date(), updatedAt: null, sourceUrl: null, ...data })) },
     // count(*) aggregate queries always return exactly one row; row queries return none.
     $queryRaw: vi.fn(async (q: any) => (String(q?.strings?.join('?') ?? '').includes('count(') ? [{
+      c: h.outOfScopeCount,
       total: 0, total_lines: 0, verified_lines: 0, total_pizzas: 0, verified_pizzas: 0, unresolved: 0, outliers: 0,
-      bundles: 0, with_items: 0, synced: 0, pending_llm: 0, lines: 0, verified: 0, excluded: 0, c: 0, n: 0,
+      bundles: 0, with_items: 0, synced: 0, pending_llm: 0, lines: 0, verified: 0, excluded: 0, n: 0,
     }] : [])),
     $executeRaw: vi.fn(async () => 0),
     party: { findMany: vi.fn(async () => []) },
@@ -86,6 +88,7 @@ beforeEach(() => {
   h.paymentAdmins.clear();
   h.underbosses.clear();
   h.lines.clear();
+  h.outOfScopeCount = 0;
   h.paymentAdmins.add('admin@x.com');
   h.underbosses.set('ub@x.com', { isAdmin: false, regions: ['west-africa'], cities: [] });
   h.lines.set('line1', dbLine('west-africa'));
@@ -174,6 +177,33 @@ describe('presets auth', () => {
         .send({ scope, country: 'Peru', merchantKey: 'x', sizeLabel: 'large', shape: 'round', diameterCm: 35 });
       expect(r.status, scope).toBe(403);
     }
+  });
+});
+
+describe('underboss merchant scoping', () => {
+  const body = { scope: 'merchant', merchantName: 'Joe', sizeLabel: 'large', shape: 'round', diameterCm: 35 };
+  it('403 OUT_OF_SCOPE when the merchant has receipts outside scope', async () => {
+    h.outOfScopeCount = 2;
+    const r = await request(app()).post('/api/admin/pizza-index/presets').set('x-test-email', 'ub@x.com').send(body);
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('OUT_OF_SCOPE');
+    const a = await request(app()).post('/api/admin/pizza-index/lines/line1/apply-to-merchant').set('x-test-email', 'ub@x.com').send({});
+    expect(a.status).toBe(403);
+    expect(a.body.error.code).toBe('OUT_OF_SCOPE');
+    // admins are unaffected
+    const ok = await request(app()).post('/api/admin/pizza-index/presets').set('x-test-email', 'admin@x.com').send(body);
+    expect(ok.status).toBe(201);
+  });
+  it('hides createdBy from underbosses', async () => {
+    const r = await request(app()).post('/api/admin/pizza-index/presets').set('x-test-email', 'ub@x.com').send(body);
+    expect(r.status).toBe(201);
+    expect(r.body.preset.createdBy).toBeNull();
+  });
+  it('underboss with no scope gets a clean 403', async () => {
+    h.underbosses.set('empty@x.com', { isAdmin: false, regions: [], cities: [] });
+    const r = await request(app()).get('/api/admin/pizza-index/queue').set('x-test-email', 'empty@x.com');
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('NO_SCOPE');
   });
 });
 

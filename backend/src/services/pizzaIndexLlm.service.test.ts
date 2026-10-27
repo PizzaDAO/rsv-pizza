@@ -69,8 +69,10 @@ describe('sizeFromModel', () => {
   });
   it('falls back to a size-word preset when no dimensions', () => {
     const r = sizeFromModel(llm({ sizeLabel: 'large' }), 0.7, presets, { merchantKey: null, country: null });
-    expect(r?.sizeSource).toBe('preset');
+    expect(r?.sizeSource).toBe('llm'); // LLM-supplied label: provenance is llm, preset link kept
+    expect(r?.presetId).toBe('g-large');
     expect(r?.diameterCm).toBe(35);
+    expect(r?.sizeConfidence).toBe(0.5); // min(preset 0.5, cap 0.7, model 0.9)
   });
 });
 

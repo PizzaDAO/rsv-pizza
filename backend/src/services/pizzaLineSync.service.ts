@@ -236,6 +236,13 @@ export function resolveForItem(
   return fromText;
 }
 
+const SIZE_WORDS = new Set(['personal', 'small', 'medium', 'regular', 'large', 'xl', 'family', 'mega']);
+/** A stored size_label that is a size WORD can be fed back to the resolver as a hint. */
+export function labelHint(label: string | null | undefined): string | null {
+  const l = (label ?? '').trim().toLowerCase();
+  return SIZE_WORDS.has(l) ? l : null;
+}
+
 function currentFields(e: ExistingLine) {
   return {
     sizeLabel: e.sizeLabel, shape: e.shape, diameterCm: e.diameterCm, lengthCm: e.lengthCm,
@@ -339,7 +346,10 @@ export function planDocSync(
       const reResolve =
         !prev.verifiedAt && (prev.sizeSource === null || prev.sizeSource === 'preset' || prev.sizeSource === 'parsed');
       if (reResolve) {
-        fields = resolvedToFields(resolveForItem(item, rawName, presets, { merchantKey, country: doc.country }));
+        // Feed the stored size word back in so an OCR-printed label survives re-resolve.
+        const hint = labelHint(prev.sizeLabel);
+        const hinted: OcrItemLike = !item.size?.label && hint ? { ...item, size: { ...(item.size ?? {}), label: hint } } : item;
+        fields = resolvedToFields(resolveForItem(hinted, rawName, presets, { merchantKey, country: doc.country }));
         if (fields.sizeSource === null && prev.sizeSource === null) fields = { ...fields, style: fields.style ?? prev.style };
       }
       writes.push({
@@ -518,6 +528,8 @@ interface CandidateRow {
   payout_currency: string | null;
   payout_rate: number | null;
   hash: string;
+  prev_hash: string | null;
+  prev_discounts: unknown;
 }
 
 /** SQL fragment: docs whose items/FX/merchant changed since the last sync. */
@@ -526,6 +538,24 @@ const HASH_SQL = Prisma.sql`md5(
   || '|' || coalesce(d.ocr_currency,'') || '|' || coalesce(po.original_currency,'') || '|' || coalesce(po.exchange_rate::text,'')
   || '|' || coalesce(d.ocr_raw->'ocr'->>'merchant', d.ocr_raw->>'merchant','')
   || '|' || coalesce(jsonb_path_query_array(d.ocr_raw->'ocr'->'lineItems', '$[*] ? (@.subtotal < 0 || @.unitPrice < 0)')::text,''))`;
+
+/** Pure decision for the pizza_line_sync row (testable without a DB). */
+export function planSyncRow(a: {
+  prevHash: string | null;
+  newHash: string;
+  prevDiscounts: unknown;
+  rawDiscounts: DiscountLine[];
+}): { resetMarkers: boolean; discounts: DiscountLine[]; writeDiscounts: boolean } {
+  const prev: DiscountLine[] = Array.isArray(a.prevDiscounts)
+    ? (a.prevDiscounts as DiscountLine[]).filter((d) => d && Number(d.amount) > 0)
+    : [];
+  const hasRaw = a.rawDiscounts.length > 0;
+  return {
+    resetMarkers: a.prevHash !== a.newHash,
+    discounts: hasRaw ? a.rawDiscounts : prev,
+    writeDiscounts: hasRaw,
+  };
+}
 
 export interface SyncStats {
   docsScanned: number;
@@ -570,7 +600,7 @@ export async function syncPizzaLineItems(opts: {
            coalesce(d.ocr_raw->'ocr'->>'merchant', d.ocr_raw->>'merchant') AS merchant,
            d.original_currency, d.exchange_rate::float8 AS exchange_rate, d.ocr_currency,
            po.original_currency AS payout_currency, po.exchange_rate::float8 AS payout_rate,
-           ${HASH_SQL} AS hash
+           ${HASH_SQL} AS hash, s.items_hash AS prev_hash, s.discounts AS prev_discounts
     ${fromWhere}
     ORDER BY d.created_at
     LIMIT ${limit}`);
@@ -617,7 +647,10 @@ export async function syncPizzaLineItems(opts: {
         // don't rescan) and drop stale rows; a currency fix changes the hash.
         stats.docsSkippedNoFx += hasPizza ? 1 : 0;
       }
-      const discounts = extractDiscounts(c.raw_items);
+      const syncPlan = planSyncRow({
+        prevHash: c.prev_hash, newHash: c.hash, prevDiscounts: c.prev_discounts, rawDiscounts: extractDiscounts(c.raw_items),
+      });
+      const discounts = syncPlan.discounts;
       const plan: DocPlan = fx
         ? planDocSync(items, prevLines, {
             documentId: c.id, partyId: c.party_id, country: c.country, merchant: c.merchant,
@@ -645,11 +678,15 @@ export async function syncPizzaLineItems(opts: {
             discounts: discounts.length ? (discounts as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
             discountTotal: discountTotal || null,
           },
-          // llm/vision markers reset: the items changed so the passes should re-run.
           update: {
-            itemsHash: c.hash, syncedAt: new Date(), llmPassAt: null, visionPassAt: null,
-            discounts: discounts.length ? (discounts as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
-            discountTotal: discountTotal || null,
+            itemsHash: c.hash, syncedAt: new Date(),
+            // Pass markers reset ONLY when the hash really changed (not on force:true).
+            ...(syncPlan.resetMarkers ? { llmPassAt: null, visionPassAt: null } : {}),
+            // Discounts are rewritten only when the raw receipt has some; otherwise
+            // keep what the vision pass captured.
+            ...(syncPlan.writeDiscounts
+              ? { discounts: discounts as unknown as Prisma.InputJsonValue, discountTotal: discountTotal || null }
+              : {}),
           },
         }),
       ]);
@@ -669,21 +706,32 @@ export async function syncPizzaLineItems(opts: {
  * photos) is the same purchase read twice: exclude all but the first.
  */
 export async function markDuplicateLines(): Promise<number> {
-  const n = await prisma.$executeRaw`
-    UPDATE pizza_line_items li
-    SET excluded = true, excluded_reason = 'duplicate_line', updated_at = now()
-    FROM (
+  // Only auto-set exclusions are touched: unverified and never edited by a human
+  // (updated_by IS NULL). Manual exclusions always carry updated_by/verified_at.
+  const dupCte = Prisma.sql`
+    WITH dup AS (
       SELECT x.id FROM (
         SELECT li2.id, li2.document_id,
                first_value(li2.document_id) OVER w AS first_doc
         FROM pizza_line_items li2
         JOIN payout_documents d2 ON d2.id = li2.document_id
+        WHERE d2.is_duplicate = false AND d2.ineligible = false
         WINDOW w AS (PARTITION BY d2.url, lower(trim(li2.raw_name)), li2.qty, li2.unit_price_list
                      ORDER BY d2.created_at, d2.id, li2.line_index)
       ) x WHERE x.document_id <> x.first_doc
-    ) dup
-    WHERE li.id = dup.id AND li.excluded = false AND li.verified_at IS NULL`;
-  return Number(n);
+    )`;
+  const marked = await prisma.$executeRaw(Prisma.sql`${dupCte}
+    UPDATE pizza_line_items li
+    SET excluded = true, excluded_reason = 'duplicate_line', updated_at = now()
+    FROM dup
+    WHERE li.id = dup.id AND li.excluded = false AND li.verified_at IS NULL`);
+  // Un-mark auto exclusions that no longer apply (e.g. the original doc was flagged duplicate).
+  await prisma.$executeRaw(Prisma.sql`${dupCte}
+    UPDATE pizza_line_items li
+    SET excluded = false, excluded_reason = NULL, updated_at = now()
+    WHERE li.excluded_reason = 'duplicate_line' AND li.verified_at IS NULL AND li.updated_by IS NULL
+      AND li.id NOT IN (SELECT id FROM dup)`);
+  return Number(marked);
 }
 
 /** Rows whose document lost its line items / stopped being a receipt. */
@@ -721,7 +769,8 @@ export async function reresolveUnverified(filter: { merchantKey?: string; partyI
   let changed = 0;
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const r of rows) {
-    const resolved = resolveForItem({}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party.country });
+    const hint = labelHint(r.sizeLabel);
+    const resolved = resolveForItem(hint ? { size: { label: hint } } : {}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party.country });
     const same =
       resolved.sizeSource === r.sizeSource &&
       resolved.presetId === r.presetId &&

@@ -1,3 +1,5 @@
+SET lock_timeout = '5s';
+
 -- sfincione-40417 (Phase 1): Pizza Price Index tables.
 --
 -- Normalized side tables that hold one row per pizza line on a GPP receipt,

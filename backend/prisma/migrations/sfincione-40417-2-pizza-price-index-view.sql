@@ -1,3 +1,5 @@
+SET lock_timeout = '5s';
+
 -- sfincione-40417 (Phase 2): eligible-rows view for the Pizza Price Index.
 --
 -- Depends on sfincione-40417-1-pizza-price-index.sql (apply that first).
@@ -27,6 +29,10 @@ SELECT
   es.slug                                 AS event_series_slug,
   COALESCE(EXTRACT(YEAR FROM p.date)::int,
            EXTRACT(YEAR FROM d.created_at)::int) AS event_year,
+  d.url                                   AS document_url,
+  d.mime_type                             AS document_mime_type,
+  d.source_receipt_index,
+  d.source_receipt_count,
   li.merchant,
   li.merchant_key,
   li.raw_name,

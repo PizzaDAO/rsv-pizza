@@ -78,6 +78,9 @@ async function requireReviewer(req: PizzaRequest, _res: Response, next: NextFunc
     }
     if (await isUnderboss(email)) {
       const s = await getUnderbossScope(email);
+      if (!s.isAdmin && s.regions.length === 0 && s.cities.length === 0) {
+        throw new AppError('Your underboss account has no regions or cities assigned', 403, 'NO_SCOPE');
+      }
       req.actor = {
         email,
         kind: 'underboss',
@@ -234,7 +237,7 @@ export interface PizzaPresetDto {
 
 type DbPreset = Prisma.PizzaSizePresetGetPayload<object>;
 
-function toPresetDto(p: DbPreset): PizzaPresetDto {
+function toPresetDto(p: DbPreset, hideEmail = false): PizzaPresetDto {
   const dims = {
     shape: p.shape as PizzaShape,
     diameterCm: n(p.diameterCm), lengthCm: n(p.lengthCm), widthCm: n(p.widthCm), sliceFraction: n(p.sliceFraction),
@@ -254,7 +257,7 @@ function toPresetDto(p: DbPreset): PizzaPresetDto {
     source: p.source as PizzaPresetDto['source'],
     sourceUrl: p.sourceUrl,
     notes: p.notes,
-    createdBy: p.createdBy,
+    createdBy: hideEmail ? null : p.createdBy,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
   };
@@ -331,9 +334,26 @@ async function loadLineInScope(id: string, actor: PizzaActor) {
 
 async function scopedPartyIds(actor: PizzaActor): Promise<string[] | undefined> {
   if (actor.full) return undefined;
+  if (actor.scope.regions.length === 0 && actor.scope.cities.length === 0) return [];
   const where = buildScopedWhereClause(underbossScopeOf(actor));
   const rows = await prisma.party.findMany({ where: where ?? {}, select: { id: true } });
   return rows.map((r) => r.id);
+}
+
+/** SQL: parties (alias p) that are OUTSIDE the actor's scope. */
+function outOfScopeSql(actor: PizzaActor): Prisma.Sql {
+  const cities = actor.scope.cities.map((c) => c.trim().toLowerCase()).filter(Boolean);
+  return Prisma.sql`AND NOT (coalesce(p.region = ANY(${actor.scope.regions}::text[]), false)
+    OR coalesce(lower(trim(p.city)) = ANY(${cities}::text[]), false))`;
+}
+
+/** Underbosses may only manage a merchant whose lines are ALL within their scope. */
+async function assertMerchantInScope(actor: PizzaActor, merchantKey: string | null | undefined) {
+  if (actor.full || !merchantKey) return;
+  const [{ c }] = await prisma.$queryRaw<{ c: number }[]>(Prisma.sql`
+    SELECT count(*)::int AS c FROM pizza_line_items li JOIN parties p ON p.id = li.party_id
+    WHERE li.merchant_key = ${merchantKey} ${outOfScopeSql(actor)}`);
+  if (c > 0) throw new AppError('This merchant has receipts outside your scope', 403, 'OUT_OF_SCOPE');
 }
 
 function scopeKey(actor: PizzaActor): string {
@@ -543,7 +563,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const documentId = str(q.documentId);
     if (documentId) cond.push(Prisma.sql`li.document_id = ${documentId}::uuid`);
     const minConf = Number(q.minConfidence);
-    if (Number.isFinite(minConf)) cond.push(Prisma.sql`coalesce(li.size_confidence, 0) < ${minConf}`);
+    if (Number.isFinite(minConf)) cond.push(Prisma.sql`coalesce(li.size_confidence, 0) >= ${minConf}`);
     const sc = scopeSql(actor.scope, 'p');
     const where = Prisma.sql`WHERE ${Prisma.join(cond, ' AND ')} ${sc}`;
     const from = Prisma.sql`FROM pizza_line_items li
@@ -701,8 +721,16 @@ router.patch('/lines/:id', ...reviewerChain, async (req: PizzaRequest, res: Resp
     if (labelTouched) {
       const label = body.sizeLabel === null ? null : str(body.sizeLabel)?.toLowerCase().slice(0, 40) ?? null;
       data.sizeLabel = label;
-    } else if (sizeTouched && !cur.sizeLabel && data.diameterCm) {
-      data.sizeLabel = `${Math.round(Number(data.diameterCm))}cm`;
+    } else if (sizeTouched && !cur.sizeLabel) {
+      if (data.shape === 'slice') {
+        const frac = Number(data.sliceFraction);
+        const denom = frac > 0 ? Math.round(1 / frac) : null;
+        data.sizeLabel = `slice (${denom && Math.abs(1 / denom - frac) < 0.005 ? `1/${denom}` : frac} of ${Math.round(Number(data.diameterCm))}cm)`;
+      } else if (data.shape === 'rect') {
+        data.sizeLabel = `${Number(data.lengthCm)}x${Number(data.widthCm)}cm`;
+      } else if (data.diameterCm) {
+        data.sizeLabel = `${Math.round(Number(data.diameterCm))}cm`;
+      }
     }
     if ('style' in body) data.style = body.style === null ? null : str(body.style)?.slice(0, 20) ?? null;
     if ('notes' in body) data.notes = body.notes === null ? null : str(body.notes)?.slice(0, 500) ?? null;
@@ -781,6 +809,7 @@ router.post('/lines/:id/apply-to-merchant', ...reviewerChain, async (req: PizzaR
     const body = (req.body ?? {}) as Record<string, unknown>;
     const line = await loadLineInScope(req.params.id, actor);
     if (!line.merchantKey) throw new AppError('This line has no merchant to apply to', 400, 'NO_MERCHANT');
+    await assertMerchantInScope(actor, line.merchantKey);
     const shape = line.shape as PizzaShape | 'other' | null;
     if (!shape || shape === 'other' || !line.areaCm2) throw new AppError('Set a size on this line first', 400, 'SIZE_REQUIRED');
     const label = (str(body.sizeLabel) ?? line.sizeLabel ?? 'default').toLowerCase().slice(0, 40);
@@ -816,7 +845,7 @@ router.post('/lines/:id/apply-to-merchant', ...reviewerChain, async (req: PizzaR
         AND (li.size_source IS NULL OR li.size_source IN ('preset', 'llm', 'web'))
         AND coalesce(li.size_label, 'default') = ${label}`);
     invalidatePizzaIndexCache();
-    res.json({ preset: toPresetDto(preset), updatedLines: Number(updated) });
+    res.json({ preset: toPresetDto(preset, !actor.full), updatedLines: Number(updated) });
   } catch (err) {
     next(err);
   }
@@ -847,7 +876,17 @@ router.get('/presets', ...reviewerChain, async (req: PizzaRequest, res: Response
       orderBy: [{ scope: 'asc' }, { country: 'asc' }, { merchantKey: 'asc' }, { sizeLabel: 'asc' }],
       take: 1000,
     });
-    res.json({ presets: rows.map(toPresetDto) });
+    if (req.actor!.full) return res.json({ presets: rows.map((r) => toPresetDto(r)) });
+    // Underbosses: non-merchant presets + merchant presets seen in their scope; no emails.
+    const keys = await prisma.$queryRaw<{ k: string }[]>(Prisma.sql`
+      SELECT DISTINCT li.merchant_key AS k FROM pizza_line_items li JOIN parties p ON p.id = li.party_id
+      WHERE li.merchant_key IS NOT NULL ${scopeSql(req.actor!.scope, 'p')}`);
+    const visible = new Set(keys.map((r) => r.k));
+    res.json({
+      presets: rows
+        .filter((r) => r.scope !== 'merchant' || (r.merchantKey && visible.has(r.merchantKey)))
+        .map((r) => toPresetDto(r, true)),
+    });
   } catch (err) {
     next(err);
   }
@@ -907,13 +946,14 @@ router.post('/presets', ...reviewerChain, async (req: PizzaRequest, res: Respons
     const actor = req.actor!;
     const p = parsePresetBody((req.body ?? {}) as Record<string, unknown>);
     assertPresetWriteAllowed(actor, p.scope);
+    await assertMerchantInScope(actor, p.merchantKey);
     const dup = await prisma.pizzaSizePreset.findFirst({
       where: { scope: p.scope, merchantKey: p.merchantKey, country: p.country, sizeLabel: p.sizeLabel },
     });
     if (dup) throw new AppError('A preset with this scope/merchant/country/label already exists', 409, 'DUPLICATE');
     const created = await prisma.pizzaSizePreset.create({ data: { ...p, createdBy: actor.email } });
     const reresolved = await afterPresetChange(actor);
-    res.status(201).json({ preset: toPresetDto(created), reresolvedLines: reresolved });
+    res.status(201).json({ preset: toPresetDto(created, !actor.full), reresolvedLines: reresolved });
   } catch (err) {
     next(err);
   }
@@ -927,13 +967,15 @@ router.patch('/presets/:id', ...reviewerChain, async (req: PizzaRequest, res: Re
     assertPresetWriteAllowed(actor, cur.scope);
     const p = parsePresetBody((req.body ?? {}) as Record<string, unknown>, cur);
     assertPresetWriteAllowed(actor, p.scope);
+    await assertMerchantInScope(actor, cur.merchantKey);
+    await assertMerchantInScope(actor, p.merchantKey);
     const dup = await prisma.pizzaSizePreset.findFirst({
       where: { scope: p.scope, merchantKey: p.merchantKey, country: p.country, sizeLabel: p.sizeLabel, NOT: { id: cur.id } },
     });
     if (dup) throw new AppError('A preset with this scope/merchant/country/label already exists', 409, 'DUPLICATE');
     const updated = await prisma.pizzaSizePreset.update({ where: { id: cur.id }, data: { ...p, updatedAt: new Date() } });
     const reresolved = await afterPresetChange(actor);
-    res.json({ preset: toPresetDto(updated), reresolvedLines: reresolved });
+    res.json({ preset: toPresetDto(updated, !actor.full), reresolvedLines: reresolved });
   } catch (err) {
     next(err);
   }
@@ -945,6 +987,7 @@ router.delete('/presets/:id', ...reviewerChain, async (req: PizzaRequest, res: R
     const cur = await prisma.pizzaSizePreset.findUnique({ where: { id: req.params.id } });
     if (!cur) throw new AppError('Preset not found', 404, 'NOT_FOUND');
     assertPresetWriteAllowed(actor, cur.scope);
+    await assertMerchantInScope(actor, cur.merchantKey);
     await prisma.pizzaSizePreset.delete({ where: { id: cur.id } });
     const reresolved = await afterPresetChange(actor);
     res.json({ ok: true, reresolvedLines: reresolved });
@@ -959,6 +1002,10 @@ router.delete('/presets/:id', ...reviewerChain, async (req: PizzaRequest, res: R
 //          verifiedOnly=true|false (default false => verified OR size_confidence>=0.8; unverified outliers dropped)
 //          includeBundles=true|false (default false)
 //          publishedOnly=true|false (default false; unpublished groups are returned with published=false)
+//          sort=parties|cheapest (default parties)
+//   IndexGroup.key/label: country & continent => both the name; city => key 'city|country' (lowercase),
+//   label 'City, Country', plus plain `city` and `country`; merchant => key = merchantKey, label = display name.
+//   /index/lines + /index filters expect: country=<country name>, city=<plain city name>, continent=<name>, merchantKey=<group.key>.
 //          country, city, continent, merchantKey, year  (filters)
 // ===========================================================================
 export interface PizzaBundleRow {
@@ -968,6 +1015,8 @@ export interface PizzaBundleRow {
   totalUsd: number; perPizzaUsd: number | null;
   sizeKnown: boolean; areaCm2: number | null; usdPerCm2: number | null;
   verified: boolean; eventYear: number | null;
+  documentUrl: string | null; documentMimeType: string | null;
+  sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
 }
 export interface PizzaIndexResponse {
   level: IndexLevel;
@@ -999,8 +1048,9 @@ router.get('/index', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const verifiedOnly = bool(q.verifiedOnly) ?? false;
     const includeBundles = bool(q.includeBundles) ?? false;
     const publishedOnly = bool(q.publishedOnly) ?? false;
+    const sort = str(q.sort) === 'cheapest' ? 'cheapest' : 'parties';
     const filters = parseIndexFilters(q);
-    const key = `index:${scopeKey(actor)}:${level}:${verifiedOnly}:${includeBundles}:${publishedOnly}:${JSON.stringify(filters)}`;
+    const key = `index:${scopeKey(actor)}:${level}:${verifiedOnly}:${includeBundles}:${publishedOnly}:${sort}:${JSON.stringify(filters)}`;
     await refreshOutliers();
     const body = await cachedIndex<PizzaIndexResponse>(key, async () => {
       const rows = await fetchIndexRows(actor.scope, filters);
@@ -1015,7 +1065,7 @@ router.get('/index', ...reviewerChain, async (req: PizzaRequest, res: Response, 
           verifiedOnly, includeBundles,
           minPartiesNote: 'groups with fewer than minParties distinct parties have published=false (show greyed, "n<3")',
         },
-        groups: aggregate(rows, { level, verifiedOnly, includeBundles, publishedOnly }),
+        groups: aggregate(rows, { level, verifiedOnly, includeBundles, publishedOnly, sort }),
         bundles,
         meta: {
           rowsInView: rows.length,
@@ -1042,6 +1092,8 @@ async function fetchBundles(scope: IndexScope, f: IndexFilters): Promise<PizzaBu
            li.merchant, li.raw_name, li.qty::float8 AS qty, li.currency::text AS currency,
            li.unit_price_list::float8 AS unit_price_list, li.unit_price_usd::float8 AS unit_price_usd,
            li.area_cm2::float8 AS area_cm2, (li.verified_at IS NOT NULL) AS verified,
+           d.url AS document_url, d.mime_type AS document_mime_type,
+           d.source_receipt_index, d.source_receipt_count,
            COALESCE(EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) AS event_year
     FROM pizza_line_items li
     JOIN payout_documents d ON d.id = li.document_id
@@ -1064,6 +1116,8 @@ async function fetchBundles(scope: IndexScope, f: IndexFilters): Promise<PizzaBu
         perPizzaUsd: r.qty > 0 ? Math.round((total / r.qty) * 100) / 100 : null,
         sizeKnown: area !== null, areaCm2: area, usdPerCm2: area ? r.unit_price_usd / area : null,
         verified: !!r.verified, eventYear: r.event_year,
+        documentUrl: r.document_url, documentMimeType: r.document_mime_type,
+        sourceReceiptIndex: r.source_receipt_index, sourceReceiptCount: r.source_receipt_count,
       };
     });
 }

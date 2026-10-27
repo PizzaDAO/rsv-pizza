@@ -274,7 +274,7 @@ export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string>
  * sfincione-40417: sanitize the optional per-line printed size. Returns
  * undefined when nothing usable is present so the field stays absent.
  */
-function sanitizeLineSize(raw: unknown): OcrLineItemSize | undefined {
+export function sanitizeLineSize(raw: unknown): OcrLineItemSize | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
   const num = (v: unknown): number | null => {
@@ -482,7 +482,7 @@ export function parseSingleReceipt(parsed: any): OcrResult {
  * The model is forced to emit exactly this shape; our bare-object/bare-array
  * fallback in the parser stays as insurance against provider drift.
  */
-const RECEIPTS_JSON_SCHEMA: {
+export const RECEIPTS_JSON_SCHEMA: {
   name: string;
   strict: boolean;
   schema: Record<string, unknown>;
@@ -538,15 +538,20 @@ const RECEIPTS_JSON_SCHEMA: {
                   // sfincione-40417: strict mode needs every key required, so
                   // size is required-but-nullable (null = nothing printed).
                   size: {
-                    type: ['object', 'null'],
-                    additionalProperties: false,
-                    required: ['label', 'diameterCm', 'lengthCm', 'widthCm'],
-                    properties: {
-                      label: { type: ['string', 'null'] },
-                      diameterCm: { type: ['number', 'null'] },
-                      lengthCm: { type: ['number', 'null'] },
-                      widthCm: { type: ['number', 'null'] },
-                    },
+                    anyOf: [
+                      {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['label', 'diameterCm', 'lengthCm', 'widthCm'],
+                        properties: {
+                          label: { type: ['string', 'null'] },
+                          diameterCm: { type: ['number', 'null'] },
+                          lengthCm: { type: ['number', 'null'] },
+                          widthCm: { type: ['number', 'null'] },
+                        },
+                      },
+                      { type: 'null' },
+                    ],
                   },
                 },
               },
