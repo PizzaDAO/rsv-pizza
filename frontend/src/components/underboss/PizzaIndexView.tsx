@@ -108,8 +108,10 @@ export function PizzaIndexView() {
     }
   };
 
-  const openReceipt = (url: string | null, mimeType: string | null, label: string) => {
+  const openReceipt = (url: string | null, mimeType: string | null, label: string, archive = false) => {
     if (!url) { setError('This receipt has no image on file.'); return; }
+    // Archive receipts are Drive links, not images: open them in a new tab.
+    if (archive) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
     setLightbox({ url, fileName: label, mimeType: mimeType ?? 'image/jpeg' });
   };
 
@@ -178,7 +180,7 @@ export function PizzaIndexView() {
               </thead>
               <tbody>
                 {drillLines.map((l) => (
-                  <tr key={l.lineId} onClick={() => openReceipt(l.documentUrl, l.documentMimeType, l.rawName)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
+                  <tr key={l.lineId} onClick={() => openReceipt(l.documentUrl, l.documentMimeType, l.rawName, l.documentId === null)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
                     <td className={`${td} max-w-[220px] truncate`} title={l.rawName}>{l.rawName}</td>
                     <td className={`${td} max-w-[140px] truncate`}>{l.merchant ?? '-'}</td>
                     <td className={`${td} max-w-[160px] truncate`}>{l.partyName}</td>

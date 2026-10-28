@@ -555,7 +555,7 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
 //          outlier=true, excluded=true (show excluded lines instead of hiding them),
 //          bundles=include|exclude|only (default include), partyId, documentId, minConfidence,
 //          photoEstimate=true (only lines with a photo-pass suggestion),
-//          origin=event|history|all (default all; archive receipts are admin-only),
+//          origin=event|history|all (default event = GPP 2026 work; archive receipts are admin-only),
 //          year=YYYY (event year, or the archive receipt year),
 //          limit (receipts, 1-100, default 20), offset
 // ===========================================================================
@@ -623,7 +623,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     if (documentId) cond.push(Prisma.sql`li.document_id = ${documentId}::uuid`);
     const minConf = Number(q.minConfidence);
     if (Number.isFinite(minConf)) cond.push(Prisma.sql`coalesce(li.size_confidence, 0) >= ${minConf}`);
-    const origin = str(q.origin) ?? 'all';
+    const origin = str(q.origin) ?? 'event';
     if (!['event', 'history', 'all'].includes(origin)) throw new AppError('origin must be event, history or all', 400, 'BAD_REQUEST');
     if (origin === 'event') cond.push(Prisma.sql`li.history_receipt_id IS NULL`);
     if (origin === 'history') cond.push(Prisma.sql`li.history_receipt_id IS NOT NULL`);
@@ -633,6 +633,14 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     }
     // Archive receipts have no party, so there is no scope mapping: admins only.
     const histGuard = actor.full ? Prisma.empty : Prisma.sql`AND li.history_receipt_id IS NULL`;
+    // Progress honours the origin + year filters (but not the other review filters).
+    const progressCond: Prisma.Sql[] = [];
+    if (origin === 'event') progressCond.push(Prisma.sql`li.history_receipt_id IS NULL`);
+    if (origin === 'history') progressCond.push(Prisma.sql`li.history_receipt_id IS NOT NULL`);
+    if (Number.isFinite(yearQ) && yearQ > 2000) {
+      progressCond.push(Prisma.sql`coalesce(h.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
+    }
+    const progressWhere = progressCond.length ? Prisma.sql`AND ${Prisma.join(progressCond, ' AND ')}` : Prisma.empty;
     const sc = scopeSql(actor.scope, 'p');
     const where = Prisma.sql`WHERE ${Prisma.join(cond, ' AND ')} ${histGuard} ${sc}`;
     const from = Prisma.sql`FROM pizza_line_items li
@@ -666,7 +674,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
       LEFT JOIN payout_documents d ON d.id = li.document_id
       LEFT JOIN parties p ON p.id = li.party_id
       LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id
-      WHERE ${eligible} AND li.excluded = false ${histGuard} ${sc}`);
+      WHERE ${eligible} AND li.excluded = false ${progressWhere} ${histGuard} ${sc}`);
 
     const receipts: PizzaQueueReceipt[] = [];
     if (docIds.length) {

@@ -437,7 +437,8 @@ export async function fetchIndexRows(scope?: IndexScope, f: IndexFilters = {}): 
   if (f.city) cond.push(Prisma.sql`AND lower(trim(v.city)) = ${f.city.trim().toLowerCase()}`);
   if (f.merchantKey) cond.push(Prisma.sql`AND v.merchant_key = ${f.merchantKey}`);
   if (f.year) cond.push(Prisma.sql`AND v.event_year = ${f.year}`);
-  const scopeCond = scope && !scope.full ? scopeSql(scope, 'v') : Prisma.empty;
+  // Underbosses never see archive rows (no scope mapping): the history branch fills region/city.
+  const scopeCond = scope && !scope.full ? Prisma.sql`AND v.origin = 'event' ${scopeSql(scope, 'v')}` : Prisma.empty;
   const rows = await prisma.$queryRaw<ViewRow[]>(Prisma.sql`
     SELECT v.* FROM pizza_price_index_lines v
     WHERE true ${cond.length ? Prisma.join(cond, ' ') : Prisma.empty} ${scopeCond}`);
@@ -604,6 +605,9 @@ export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = P
   };
 }
 
+/** The default public year needs at least this many published countries. */
+export const DEFAULT_YEAR_MIN_COUNTRIES = 10;
+
 /** Per-country 30 cm price series from each year's published entries. */
 export function buildTrends(byYear: Map<number, PublicPizzaIndex>): Record<string, PublicTrendPoint[]> {
   const out: Record<string, PublicTrendPoint[]> = {};
@@ -628,7 +632,10 @@ export function buildPublicByYear(rows: IndexRow[]): { years: number[]; latest: 
   const years = [...byYear.keys()].sort((a, b) => a - b);
   const trends = buildTrends(byYear);
   for (const idx of byYear.values()) { idx.years = years; idx.trends = trends; }
-  return { years, latest: years.length ? years[years.length - 1] : PUBLIC_INDEX_YEAR, byYear };
+  // Default to the latest year with a real spread of countries so a stray row can't flip the page.
+  const solid = years.filter((y) => byYear.get(y)!.countries.length >= DEFAULT_YEAR_MIN_COUNTRIES);
+  const pool = solid.length ? solid : years;
+  return { years, latest: pool.length ? pool[pool.length - 1] : PUBLIC_INDEX_YEAR, byYear };
 }
 
 /** Party ids behind each PUBLISHED country's figure (server-side only; never serialized). History lines have no party. */

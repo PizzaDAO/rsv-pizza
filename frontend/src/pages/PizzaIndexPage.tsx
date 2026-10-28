@@ -100,6 +100,8 @@ export function PizzaIndexPage() {
   };
   const year = data?.year ?? yearParam ?? ARCHIVE_BEFORE;
   const isArchive = year < ARCHIVE_BEFORE;
+  // The extra history copy only appears once archive years exist; otherwise the page copy is unchanged.
+  const showHistoryCopy = isArchive || (data?.years.length ?? 0) > 1;
 
   const countries = data?.countries ?? [];
   const hasData = countries.length > 0 && data?.global.usdPerCm2 != null;
@@ -250,14 +252,16 @@ export function PizzaIndexPage() {
           <h2 className="text-xl font-semibold text-theme-text">How we calculate it</h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>Prices are <b className="text-theme-text">menu (list) prices</b> from pizzeria receipts submitted for Global Pizza Party {year} events. Discounts are tracked separately and not used here.</li>
-            <li>Each year is computed independently from that year's receipts, so an old price never leaks into a newer year. 2021-2025 come from archived receipts.</li>
-            <li>Prices are nominal USD at the official exchange rate on the receipt date. They are not adjusted for inflation, and countries with fast-moving currencies (for example Argentina, Nigeria, Turkey) can look pricier or cheaper than lived experience. Where a receipt has no date we assume October 1 of that year.</li>
+            {showHistoryCopy && <li>Each year is computed independently from that year's receipts, so an old price never leaks into a newer year. 2021-2025 come from archived receipts.</li>}
+            {showHistoryCopy && <li>For 2021-2025, prices are nominal USD at the official exchange rate on the receipt date (October 1 of that year when a receipt has no date). They are not adjusted for inflation, and countries with fast-moving currencies (for example Argentina, Nigeria, Turkey) can look pricier or cheaper than lived experience.</li>}
             <li>Each pizza's price is divided by its area in cm², then scaled to standard 25, 30, 35 and 40 cm sizes so countries are comparable.</li>
             <li>Each event counts once: we take the median per event, then the median across events.</li>
             <li>A country appears once at least one event has an itemized pizza price. Countries with fewer than {EARLY_BELOW} events are marked <i>early</i>: one pizzeria can swing their number.</li>
             <li>Where a country has pizzas whose size was confirmed (by a reviewer, or printed on the receipt), only those are used. Otherwise sizes are estimated from the menu item, price and local norms, and the country is marked <i>estimated</i>; those figures can be off by 20-30% until a size is confirmed.</li>
             <li>Prices that look like misreads (for example a whole bill read as one pizza) are left out of estimated countries.</li>
-            <li>Bundles and all-you-can-eat deals are excluded. Archived receipts that only show a lump sum for N pizzas are averaged per pizza (so drinks, tax and delivery can inflate them) and the country is marked <i>estimated</i>; they are dropped once a country has confirmed sizes for that year.</li>
+            {showHistoryCopy
+              ? <li>Bundles and all-you-can-eat deals are excluded. Archived receipts that only show a lump sum for N pizzas are averaged per pizza (so drinks, tax and delivery can inflate them) and the country is marked <i>estimated</i>; they are dropped once a country has confirmed sizes for that year.</li>
+              : <li>Bundles, all-you-can-eat deals and lump-sum orders are excluded.</li>}
             <li>Tax treatment varies by country (many include VAT, US prices are usually pre-tax), so US prices may look slightly low.</li>
           </ul>
           {data && <p className="text-xs text-theme-text-faint">Updated {new Date(data.generatedAt).toLocaleDateString()}.</p>}

@@ -39,7 +39,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   status: 'unverified', country: '', merchant: '', source: '', outlier: false, photoEstimate: false, excluded: false, bundles: 'include',
-  origin: 'all', year: '',
+  origin: 'event', year: '',
 };
 
 const FILTER_YEARS = [2026, 2025, 2024, 2023, 2022, 2021];
@@ -90,7 +90,7 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
         photoEstimate: applied.photoEstimate || undefined,
         excluded: applied.excluded || undefined,
         bundles: applied.bundles,
-        origin: applied.origin === 'all' ? undefined : applied.origin,
+        origin: applied.origin,
         year: applied.year ? Number(applied.year) : undefined,
         limit: PAGE_SIZE,
         offset,
@@ -232,8 +232,8 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
         </select>
         {isAdmin && (
           <select value={filters.origin} onChange={(e) => set({ origin: e.target.value as Filters['origin'] })} aria-label="Source" className="text-sm">
-            <option value="all">All receipts</option>
             <option value="event">GPP events</option>
+            <option value="all">All receipts</option>
             <option value="history">Archive (2021-2025)</option>
           </select>
         )}

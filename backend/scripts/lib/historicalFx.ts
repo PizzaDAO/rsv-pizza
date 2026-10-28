@@ -113,7 +113,7 @@ async function yahoo(cur: string, date: string, f: FetchLike): Promise<Historica
   const start = end - 10 * 86400;
   if (Date.now() < yahooBlockedUntil) return null;
   // Unofficial endpoint: throttle, try both hosts, and back off on 429/5xx.
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     for (const host of ['query1', 'query2']) {
       const wait = lastYahooAt + 400 - Date.now();
       if (wait > 0) await sleep(wait);
@@ -142,7 +142,7 @@ async function yahoo(cur: string, date: string, f: FetchLike): Promise<Historica
         /* try the next host */
       }
     }
-    await sleep(1500 * (attempt + 1));
+    if (attempt < 4) await sleep(2000 * 2 ** attempt); // 2s, 4s, 8s, 16s
   }
   yahooBlockedUntil = Date.now() + 60_000;
   return null;

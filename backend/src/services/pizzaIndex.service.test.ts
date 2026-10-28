@@ -340,3 +340,13 @@ describe('history: outlier buckets', () => {
     expect(computeOutlierIds(rows.map((r) => ({ ...r, eventYear: null }))).size).toBeGreaterThan(0);
   });
 });
+
+describe('history: default year', () => {
+  it('prefers the latest year with >= 10 published countries over a stray newer row', () => {
+    const many = (year: number, n: number) => Array.from({ length: n }, (_, i) => row({ partyId: `p${year}${i}`, usdPerCm2: 0.01, country: `C${i}`, eventYear: year }));
+    const r = buildPublicByYear([...many(2026, 12), ...many(2027, 1)]);
+    expect(r.years).toEqual([2026, 2027]);
+    expect(r.latest).toBe(2026);
+    expect(buildPublicByYear(many(2027, 2)).latest).toBe(2027); // fallback: latest with any
+  });
+});

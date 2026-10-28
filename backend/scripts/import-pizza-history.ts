@@ -81,16 +81,17 @@ async function main() {
   for (const raw of rawRecords) {
     const v = validateRecord(raw);
     if (!v.ok) { skipped.push({ id: v.sourceFileId ?? '?', reason: v.reason }); continue; }
-    if (args.year !== null && v.record.year !== args.year) continue;
     valid.push(v.record);
     (rawBySourceId.get(v.record.sourceFileId) ?? rawBySourceId.set(v.record.sourceFileId, []).get(v.record.sourceFileId)!).push(raw);
   }
   const keyed = keyReceipts(valid);
   skipped.push(...keyed.notes);
-  const seen = new Map<string, HistoryRecord>(keyed.records.map((r) => [r.sourceFileId, r]));
+  // Keys are assigned on the FULL input, then --year filters, so a partial run never re-keys a shared file.
+  const runRecords = keyed.records.filter((r) => args.year === null || r.year === args.year);
+  const seen = new Map<string, HistoryRecord>(runRecords.map((r) => [r.sourceFileId, r]));
   // raw JSON kept per final key (the original record, for audit/re-import)
   const rawById = new Map<string, unknown>();
-  for (const r of keyed.records) {
+  for (const r of runRecords) {
     const base = r.sourceFileId.split('#')[0];
     const cands = rawBySourceId.get(base) ?? [];
     const match = cands.find((c) => { const v = validateRecord(c); return v.ok && JSON.stringify({ ...v.record, sourceFileId: r.sourceFileId }) === JSON.stringify(r); });
@@ -112,6 +113,7 @@ async function main() {
   type Built = Prepared & { fx: Awaited<ReturnType<typeof getReceiptFx>>; lines: HistoryLine[] };
   const built: Built[] = [];
   const failed: Array<{ id: string; reason: string }> = [];
+  const missingFx = new Map<string, string>(); // `CUR date` -> detail
   for (const p of prepared) {
     try {
       if (p.rec.kind === 'not_pizza') {
@@ -122,6 +124,7 @@ async function main() {
       const fx = await getReceiptFx(p.rec.currency, p.rec.receiptDate, p.rec.year, { crossCheck: true });
       built.push({ ...p, fx, lines: buildHistoryLines(p.rec, presets, fx.rate, p.country) });
     } catch (e) {
+      if (e instanceof FxUnavailableError) missingFx.set(`${e.currency} ${e.date}`, p.country);
       failed.push({ id: p.rec.sourceFileId, reason: e instanceof FxUnavailableError ? e.message : String(e) });
     }
   }
@@ -139,6 +142,42 @@ async function main() {
     console.log('\n== FAILED (no FX rate; add scripts/data/pizza-history-fx-overrides.json)');
     for (const s of failed) console.log(`  ${s.id}: ${s.reason}`);
   }
+
+  if (missingFx.size) {
+    console.log(`\n== Missing FX (${missingFx.size} currency/date pairs). Fill scripts/data/pizza-history-fx-overrides.json, e.g. "NGN:2023-05" (month) or "NGN:2023-05-22" (day) -> {"rate": <USD per 1 unit>, "source": "..."}`);
+    for (const [k, c] of [...missingFx].sort()) console.log(`  ${k}  (${c})`);
+    console.log('  skeleton: ' + JSON.stringify(Object.fromEntries([...missingFx.keys()].sort().map((k) => [k.replace(' ', ':'), { rate: 0, source: '' }]))));
+  }
+
+  // Stale rows: receipts of these source files whose key is no longer in this run (a shared file re-keyed, or
+  // a field fix that changed the hash) would otherwise survive and double-count.
+  const currentKeys = new Set(runRecords.map((r) => r.sourceFileId));
+  const bases = [...new Set(runRecords.map((r) => r.sourceFileId.split('#')[0]))];
+  type Stale = { id: string; key: string; human: number };
+  const stale: Stale[] = [];
+  let staleCheck = '';
+  if (!args.noDb) {
+    try {
+      const { prisma: db } = await import('../src/config/database.js');
+      for (let i = 0; i < bases.length; i += 100) {
+        const chunk = bases.slice(i, i + 100);
+        const rows = await db.pizzaHistoryReceipt.findMany({
+          where: { OR: chunk.flatMap((f) => [{ sourceFileId: f }, { sourceFileId: { startsWith: `${f}#` } }]) },
+          select: { id: true, sourceFileId: true },
+        });
+        for (const r of rows.filter((x) => !currentKeys.has(x.sourceFileId))) {
+          const human = await db.pizzaLineItem.count({
+            where: { historyReceiptId: r.id, OR: [{ verifiedAt: { not: null } }, { updatedBy: { not: null } }] },
+          });
+          stale.push({ id: r.id, key: r.sourceFileId, human });
+        }
+      }
+    } catch (e) {
+      staleCheck = `could not check (history tables missing or DB unreachable): ${(e as Error).message.split('\n')[0]}`;
+    }
+  } else staleCheck = 'skipped (--no-db)';
+  console.log(`\n== Stale existing receipts (source file in this run, key not): ${staleCheck || stale.length}`);
+  for (const s of stale) console.log(`  ${s.key}${s.human ? `  [${s.human} human-reviewed lines: ${args.force ? 'will delete (--force)' : 'kept; use --force'}]` : args.apply ? '  [will delete]' : '  [would delete with --apply]'}`);
 
   console.log('\n== FX source mix');
   for (const [k, n] of [...countBy(built, (b) => b.fx.source.split(':')[0])].sort()) console.log(`  ${pad(k, 20)} ${n}`);
@@ -195,7 +234,12 @@ async function main() {
   // 6. writes
   const { prisma } = await import('../src/config/database.js');
   const { flagOutliers } = await import('../src/services/pizzaIndex.service.js');
-  const stats = { written: 0, skippedHuman: 0, lines: 0 };
+  const stats = { written: 0, skippedHuman: 0, lines: 0, staleDeleted: 0 };
+  for (const s of stale) {
+    if (s.human > 0 && !args.force) continue;
+    await prisma.pizzaHistoryReceipt.delete({ where: { id: s.id } }); // lines cascade
+    stats.staleDeleted += 1;
+  }
   for (const b of built) {
     const outcome = await prisma.$transaction(async (tx) => {
       const existing = await tx.pizzaHistoryReceipt.findUnique({ where: { sourceFileId: b.rec.sourceFileId }, select: { id: true } });
@@ -231,7 +275,7 @@ async function main() {
     if (outcome === 'written') { stats.written += 1; stats.lines += b.lines.length; } else stats.skippedHuman += 1;
   }
   const outliers = await flagOutliers();
-  console.log(`\nApplied: ${stats.written} receipts written (${stats.lines} lines), ${stats.skippedHuman} skipped (human-reviewed; use --force), outliers flagged: ${outliers.flagged}`);
+  console.log(`\nApplied: ${stats.written} receipts written (${stats.lines} lines), ${stats.skippedHuman} skipped (human-reviewed; use --force), ${stats.staleDeleted} stale deleted, outliers flagged: ${outliers.flagged}`);
   await prisma.$disconnect();
 }
 

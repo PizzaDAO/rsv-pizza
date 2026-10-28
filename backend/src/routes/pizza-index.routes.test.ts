@@ -237,6 +237,23 @@ describe('archive (history) lines', () => {
 
   const sqlOf = () => (prisma.$queryRaw as any).mock.calls.map((c: any[]) => String(c[0]?.strings?.join('?') ?? '')).join('\n');
 
+  it('index + index/lines: underbosses are restricted to event rows; admins are not', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    for (const path of ['index', 'index/lines']) {
+      expect((await request(app()).get(`/api/admin/pizza-index/${path}?year=2022`).set('x-test-email', 'ub@x.com')).status).toBe(200);
+    }
+    expect(sqlOf()).toContain("v.origin = 'event'");
+    (prisma.$queryRaw as any).mockClear();
+    await request(app()).get('/api/admin/pizza-index/index/lines?year=2022').set('x-test-email', 'admin@x.com');
+    expect(sqlOf()).not.toContain("v.origin = 'event'");
+  });
+
+  it('queue defaults to event receipts', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    await request(app()).get('/api/admin/pizza-index/queue').set('x-test-email', 'admin@x.com');
+    expect(sqlOf()).toContain('li.history_receipt_id IS NULL');
+  });
+
   it('queue: underbosses never see archive receipts (no scope mapping); admins can filter them', async () => {
     (prisma.$queryRaw as any).mockClear();
     const ub = await request(app()).get('/api/admin/pizza-index/queue?origin=history&year=2022').set('x-test-email', 'ub@x.com');
