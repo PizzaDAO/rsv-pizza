@@ -222,18 +222,35 @@ describe('public index', () => {
     const rows = [
       ...['A', 'B', 'C'].map((p) => row({ partyId: p, usdPerCm2: 0.02 })),
       row({ partyId: 'D', usdPerCm2: 0.05, country: 'Peru', region: 'south-america' }),
-      // low-confidence, unverified size: never public
-      row({ partyId: 'E', usdPerCm2: 0.03, country: 'Chile', region: 'south-america', sizeConfidence: 0.5, isVerified: false }),
     ];
     const pub = buildPublicIndexFromRows(rows);
     expect(pub.countries.map((c) => c.country)).toEqual(['India', 'Peru']);
+    expect(pub.countries.every((c) => !c.estimated)).toBe(true);
     expect(pub.global.nCountries).toBe(2);
     const json = JSON.stringify(pub);
     expect(json).not.toContain('Party A');
     expect(json).not.toContain('partyId');
     expect(json).not.toContain('merchant');
-    expect(json).not.toContain('Chile'); // a country with only low-confidence sizes must not leak
     expect(pub.countries[0].ladderUsd['30']).toBeGreaterThan(0);
     expect(pub.countries[0].countryCode).toBe('IN');
+  });
+
+  it('falls back to estimated sizes only for countries with no confirmed size', () => {
+    const rows = [
+      row({ partyId: 'A', usdPerCm2: 0.02 }),
+      row({ partyId: 'B', usdPerCm2: 0.09, sizeConfidence: 0.5 }), // India has a confirmed size: estimate ignored
+      row({ partyId: 'C', usdPerCm2: 0.03, country: 'Chile', region: 'south-america', sizeConfidence: 0.55 }),
+      row({ partyId: 'D', usdPerCm2: 0.9, country: 'Chile', region: 'south-america', sizeConfidence: 0.55 }), // misread: outside band
+      row({ partyId: 'E', usdPerCm2: 0.03, country: 'Togo', region: 'west-africa', sizeConfidence: 0.5, outlierFlag: true }),
+    ];
+    const pub = buildPublicIndexFromRows(rows);
+    const india = pub.countries.find((c) => c.country === 'India')!;
+    const chile = pub.countries.find((c) => c.country === 'Chile')!;
+    expect(india.estimated).toBe(false);
+    expect(india.usdPerCm2).toBeCloseTo(0.02, 6);
+    expect(chile.estimated).toBe(true);
+    expect(chile.nParties).toBe(1);
+    expect(chile.usdPerCm2).toBeCloseTo(0.03, 6);
+    expect(pub.countries.find((c) => c.country === 'Togo')).toBeUndefined(); // only an unverified outlier
   });
 });

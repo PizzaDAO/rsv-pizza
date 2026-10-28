@@ -8351,6 +8351,8 @@ export interface PublicPizzaCountry {
   localCurrency: string | null;
   localPerCm2: number | null;
   ladderLocal: PizzaSizeLadder;
+  /** No confirmed pizza size yet; the figure uses estimated sizes. Optional until the backend ships it. */
+  estimated?: boolean;
 }
 
 export interface PublicPizzaIndex {

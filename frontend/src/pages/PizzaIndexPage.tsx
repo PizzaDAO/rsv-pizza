@@ -105,7 +105,7 @@ export function PizzaIndexPage() {
           <div className="rounded-2xl border border-theme-stroke bg-white/5 p-8 text-center space-y-2">
             <div className="text-lg font-semibold text-theme-text">The index is still being cooked.</div>
             <p className="text-sm text-theme-text-muted">
-              We publish a country once one of its events has a verified pizza size. Check back soon.
+              We publish a country once one of its events has an itemized pizza price. Check back soon.
             </p>
           </div>
         )}
@@ -167,6 +167,14 @@ export function PizzaIndexPage() {
                             {openCountry === c.country ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             {c.countryCode ? `${flagEmoji(c.countryCode)} ` : ''}{c.country}
                           </button>
+                          {c.estimated && (
+                            <span
+                              className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-500"
+                              title="No pizza size confirmed yet for this country; sizes are estimated"
+                            >
+                              estimated
+                            </span>
+                          )}
                         </td>
                         <td className={td}>{fmtPerCm2(c.usdPerCm2)}</td>
                         <td className={td}>{fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}</td>
@@ -199,8 +207,9 @@ export function PizzaIndexPage() {
             <li>Prices are <b className="text-theme-text">menu (list) prices</b> from pizzeria receipts submitted for Global Pizza Party {data?.year ?? 2026} events. Discounts are tracked separately and not used here.</li>
             <li>Each pizza's price is divided by its area in cm², then scaled to standard 25, 30, 35 and 40 cm sizes so countries are comparable.</li>
             <li>Each event counts once: we take the median per event, then the median across events.</li>
-            <li>A country appears once at least one event has a confirmed pizza size. Countries with fewer than {EARLY_BELOW} events are marked <i>early</i>: one pizzeria can swing their number.</li>
-            <li>Only pizzas whose size is verified by a reviewer or read with high confidence are used.</li>
+            <li>A country appears once at least one event has an itemized pizza price. Countries with fewer than {EARLY_BELOW} events are marked <i>early</i>: one pizzeria can swing their number.</li>
+            <li>Where a country has pizzas whose size was confirmed (by a reviewer, or printed on the receipt), only those are used. Otherwise sizes are estimated from the menu item, price and local norms, and the country is marked <i>estimated</i>; those figures can be off by 20-30% until a size is confirmed.</li>
+            <li>Prices that look like misreads (for example a whole bill read as one pizza) are left out of estimated countries.</li>
             <li>Bundles, all-you-can-eat deals and lump-sum orders are excluded.</li>
             <li>Tax treatment varies by country (many include VAT, US prices are usually pre-tax), so US prices may look slightly low.</li>
           </ul>
