@@ -3,8 +3,9 @@
  *
  * Per party: send gpt-4o (`getLlmModels().visionPrimary`) the party's pizza
  * photos (payout `kind='pizza'` uploads first, then approved gallery photos)
- * plus its still-unsized pizza lines, and ask for a diameter estimated from
- * scale references (boxes, plates, cans, hands).
+ * plus its still-unsized pizza lines, and ask for the pizza's size as a RATIO
+ * to an allowed reference object (plates, cans, phones; never boxes). The
+ * diameter is computed here, and estimates with an implausible USD/cm^2 dropped.
  *
  * The result is only a SUGGESTION: it is stored in `pizza_line_items.photo_estimate`
  * and never written to diameter_cm / area_cm2, so it can't reach the index until
@@ -48,22 +49,51 @@ export interface PhotoPassLine {
   note: string;
 }
 
-export const PHOTO_PASS_SYSTEM = `You estimate the SIZE of pizzas shown in event photos, for a pizza price study.
-You get the event's country, the pizzeria (if known), the receipt's pizza lines that have NO known size (index i, name, qty, unit price, currency), a few lines from the same event whose size IS known (for reference), and up to 6 photos numbered 0..n-1 in the order given.
-Estimate size from scale references in the photo: pizza boxes, dinner plates (~26 cm), side plates (~20 cm), drink cans (12 cm tall, 6.6 cm wide), 500 ml bottles (~21 cm tall), hands (palm ~8.5 cm wide), phones (~15 cm), people.
-Rules:
-- Estimate a line ONLY if a photo plausibly shows that pizza, or every visible pizza is clearly the same size and the line's price fits with the others. Otherwise return null sizes for it.
-- Round pizzas: shape "round" and diameterCm. Rectangular/sheet pizzas: shape "rect" with lengthCm and widthCm.
-- confidence 0..1 is how sure you are of the measurement; photo estimates are rough, so most should be 0.3-0.6.
-- photo: the index of the photo you measured from. note: at most 80 characters naming the scale reference you used.
-Return ONLY JSON: { "photos": [ { "p": number, "pizzaVisible": boolean } ], "lines": [ { "i": number, "photo": number|null, "shape": "round"|"rect"|null, "diameterCm": number|null, "lengthCm": number|null, "widthCm": number|null, "confidence": number, "note": string } ] }`;
+/**
+ * Scale references the model may measure against (cm). Pizza boxes are NOT on
+ * the list: a box is sized to its pizza, so "measured against the box" is
+ * circular, and the first prod run showed it collapsing to a default 30 cm.
+ */
+export const REFERENCE_SIZES_CM = {
+  dinner_plate: 26,
+  side_plate: 20,
+  can_height: 12.2,
+  can_width: 6.6,
+  bottle_500ml_height: 21,
+  bottle_1500ml_height: 32,
+  palm_width: 8.5,
+  phone_length: 15,
+  a4_long_side: 29.7,
+  standard_door_width: 85,
+} as const;
+export type ReferenceKey = keyof typeof REFERENCE_SIZES_CM;
 
-const dim = (v: unknown, min: number, max: number): number | null => {
+/** Plausible USD per cm^2 (same band as the review editor's sanity warning). */
+export const SANE_USD_PER_CM2 = { min: 0.002, max: 0.2 } as const;
+
+export const PHOTO_PASS_SYSTEM = `You MEASURE pizzas in event photos against a known reference object, for a pizza price study.
+You get the event's country, the pizzeria (if known), the receipt's pizza lines with NO known size (index i, name, qty, unit price, currency, unitPriceUsd), some lines from the same event whose size IS known, and up to 6 photos numbered 0..n-1 in the order given.
+Allowed reference objects (key: real size): ${Object.entries(REFERENCE_SIZES_CM).map(([k, v]) => `${k} ${v} cm`).join(', ')}.
+For a line you can measure: pick ONE reference object that is in the same photo, close to the pizza and at a similar distance from the camera, and report "ratio" = pizza diameter / reference size (for rectangular pizzas "lengthRatio" and "widthRatio"). Do the comparison visually, step by step; do NOT start from a typical pizza size.
+Rules:
+- NEVER use a pizza box, another pizza, or a typical size as the reference. If no allowed reference is clearly visible next to the pizza, return null for that line. Null is the right answer for most crowd shots.
+- Match pizzas to lines carefully. If the photos show pizzas of clearly different sizes, larger pizzas belong to higher-priced lines. A giant party pizza is not the same pizza as a cheap menu line.
+- confidence 0..1: how sure you are of the measurement (most should be 0.3-0.6).
+- photo: the photo index you measured in. note: at most 80 characters saying what you compared.
+Return ONLY JSON: { "lines": [ { "i": number, "photo": number|null, "ref": string|null, "shape": "round"|"rect"|null, "ratio": number|null, "lengthRatio": number|null, "widthRatio": number|null, "confidence": number, "note": string } ] }`;
+
+const dim = (v: number, min: number, max: number): number | null =>
+  Number.isFinite(v) && v >= min && v <= max ? Math.round(v * 10) / 10 : null;
+const pos = (v: unknown): number => {
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
-  return Number.isFinite(n) && n >= min && n <= max ? Math.round(n * 10) / 10 : null;
+  return Number.isFinite(n) && n > 0 ? n : NaN;
 };
 
-/** Tolerant parse; drops unknown indexes and entries without a plausible size. */
+/**
+ * Tolerant parse. Sizes are computed here from ratio x reference size, so the
+ * model can't hand back a remembered "typical" diameter; entries without an
+ * allowed reference or with an implausible size are dropped.
+ */
 export function parsePhotoPassResponse(
   content: string | null | undefined,
   validIndexes: Set<number>,
@@ -84,25 +114,38 @@ export function parsePhotoPassResponse(
     const r = e as Record<string, unknown>;
     const i = Number(r.i);
     if (!Number.isInteger(i) || !validIndexes.has(i) || seen.has(i)) continue;
+    const ref = typeof r.ref === 'string' && r.ref in REFERENCE_SIZES_CM ? (r.ref as ReferenceKey) : null;
+    if (!ref) continue;
+    const refCm = REFERENCE_SIZES_CM[ref];
     const p = Number(r.photo);
     const photo = Number.isInteger(p) && p >= 0 && p < photoCount ? p : null;
     const conf = Number(r.confidence);
     const confidence = Math.round(Math.min(Number.isFinite(conf) ? Math.max(conf, 0) : 0.3, PHOTO_CONFIDENCE_CAP) * 100) / 100;
-    const note = typeof r.note === 'string' ? r.note.slice(0, 80) : '';
+    const note = `${typeof r.note === 'string' ? r.note.slice(0, 80) : ''} [${ref.replace(/_/g, ' ')}]`.trim();
     if (r.shape === 'rect') {
-      const lengthCm = dim(r.lengthCm, 10, 200);
-      const widthCm = dim(r.widthCm, 10, 200);
+      const lengthCm = dim(pos(r.lengthRatio) * refCm, 10, 200);
+      const widthCm = dim(pos(r.widthRatio) * refCm, 10, 200);
       if (lengthCm === null || widthCm === null) continue;
       seen.add(i);
       out.push({ i, photo, shape: 'rect', diameterCm: null, lengthCm, widthCm, confidence, note });
     } else {
-      const diameterCm = dim(r.diameterCm, 10, 120);
+      const diameterCm = dim(pos(r.ratio) * refCm, 10, 120);
       if (diameterCm === null) continue;
       seen.add(i);
       out.push({ i, photo, shape: 'round', diameterCm, lengthCm: null, widthCm: null, confidence, note });
     }
   }
   return out;
+}
+
+/** Drop an estimate whose implied USD/cm^2 is outside the sanity band (e.g. a giant pizza matched to a cheap line). */
+export function priceIsPlausible(l: PhotoPassLine, unitPriceUsd: number): boolean {
+  const area = l.shape === 'rect'
+    ? (l.lengthCm ?? 0) * (l.widthCm ?? 0)
+    : Math.PI * ((l.diameterCm ?? 0) / 2) ** 2;
+  if (!(area > 0) || !(unitPriceUsd > 0)) return false;
+  const per = unitPriceUsd / area;
+  return per >= SANE_USD_PER_CM2.min && per <= SANE_USD_PER_CM2.max;
 }
 
 export function toPhotoEstimate(l: PhotoPassLine, photoUrls: string[], model: string, at: Date): PhotoEstimate {
@@ -274,8 +317,9 @@ export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; 
 
   for (const partyId of partyIds) {
     try {
-      const todo = await prisma.$queryRaw<Array<{ id: string; raw_name: string; qty: number; unit_price_list: number; currency: string; merchant: string | null }>>(Prisma.sql`
-        SELECT li.id, li.raw_name, li.qty::float8 AS qty, li.unit_price_list::float8 AS unit_price_list, li.currency, li.merchant
+      const todo = await prisma.$queryRaw<Array<{ id: string; raw_name: string; qty: number; unit_price_list: number; unit_price_usd: number; currency: string; merchant: string | null }>>(Prisma.sql`
+        SELECT li.id, li.raw_name, li.qty::float8 AS qty, li.unit_price_list::float8 AS unit_price_list,
+               li.unit_price_usd::float8 AS unit_price_usd, li.currency, li.merchant
         FROM pizza_line_items li JOIN payout_documents d ON d.id = li.document_id
         WHERE li.party_id = ${partyId}::uuid AND ${NEEDS_SIZE}
         ORDER BY li.document_id, li.line_index LIMIT ${MAX_LINES_PER_PARTY}`);
@@ -320,7 +364,10 @@ export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; 
                 text: JSON.stringify({
                   country: party?.country ?? null, city: party?.city ?? null,
                   merchant: todo.find((t) => t.merchant)?.merchant ?? null,
-                  unsizedLines: todo.map((t, i) => ({ i, name: t.raw_name, qty: t.qty, unitPrice: t.unit_price_list, currency: t.currency })),
+                  unsizedLines: todo.map((t, i) => ({
+                    i, name: t.raw_name, qty: t.qty, unitPrice: t.unit_price_list, currency: t.currency,
+                    unitPriceUsd: Math.round(t.unit_price_usd * 100) / 100,
+                  })),
                   knownSizes: refs.map((r) => ({ name: r.raw_name, diameterCm: r.diameter_cm, unitPrice: r.unit_price_list })),
                   photoCount: images.length,
                 }),
@@ -331,7 +378,8 @@ export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; 
         ],
       });
       const sentUrls = images.map((img) => img.url);
-      const lines = parsePhotoPassResponse(resp.choices[0]?.message?.content, new Set(todo.map((_, i) => i)), images.length);
+      const lines = parsePhotoPassResponse(resp.choices[0]?.message?.content, new Set(todo.map((_, i) => i)), images.length)
+        .filter((l) => priceIsPlausible(l, todo[l.i].unit_price_usd));
       const now = new Date();
       await prisma.$transaction([
         // verifiedAt: null guards against a reviewer verifying the line mid-pass.
