@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Ruler, Store, Tag, Ban, Package, AlertTriangle, Hash, DollarSign } from 'lucide-react';
+import { Check, Loader2, Ruler, Store, Tag, Ban, Package, AlertTriangle, Hash, DollarSign, Camera, X } from 'lucide-react';
 import {
   applyPizzaLineToMerchant,
   patchPizzaLine,
   type PizzaExcludedReason,
   type PizzaLineDto,
   type PizzaLinePatch,
+  type PizzaPhotoEstimate,
   type PizzaQueueReceipt,
   type PizzaShape,
 } from '../../lib/api';
@@ -27,7 +28,8 @@ import {
  *
  * Keyboard (when focus is not in a text field, except Enter):
  *   Enter = verify current line and advance, Up/Down = move between lines,
- *   1-6 = 25/30/33/35/40/45 cm, 7-0 = 10/12/14/16 inch, N = next receipt
+ *   1-6 = 25/30/33/35/40/45 cm, 7-0 = 10/12/14/16 inch, P = use the photo
+ *   estimate, N = next receipt
  *   (Left/Right arrows are handled by the lightbox itself).
  */
 
@@ -104,6 +106,14 @@ function draftDims(d: Draft) {
   };
 }
 
+function fmtEstimate(e: PizzaPhotoEstimate): string {
+  return e.shape === 'rect' ? `${Math.round(e.lengthCm ?? 0)}×${Math.round(e.widthCm ?? 0)} cm` : `${Math.round(e.diameterCm ?? 0)} cm`;
+}
+
+/** A suggestion worth showing: unverified line that still has no size. */
+const openEstimate = (l: PizzaLineDto | undefined): PizzaPhotoEstimate | null =>
+  l && !l.verifiedAt && l.areaCm2 === null ? l.photoEstimate ?? null : null;
+
 function SourceBadge({ line }: { line: PizzaLineDto }) {
   const src = line.sizeSource ?? 'none';
   return (
@@ -137,6 +147,11 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
+
+  const payoutPhotos = receipt.pizzaPhotoUrls;
+  const eventPhotos = receipt.galleryPhotoUrls ?? [];
+  const estimate = openEstimate(line);
 
   // Reset the draft whenever the selected line (or its saved state) changes.
   useEffect(() => {
@@ -144,6 +159,12 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line?.id, line?.verifiedAt, line?.updatedBy, line?.areaCm2, line?.excluded, line?.isBundle]);
+
+  // Open the photo the estimate was measured from when its line is selected.
+  useEffect(() => {
+    if (estimate?.photoUrl) setViewPhoto(estimate.photoUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [line?.id]);
 
   const dirty = useMemo(
     () => !!line && !!draft && JSON.stringify(draft) !== JSON.stringify(draftFromLine(line)),
@@ -173,6 +194,15 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
   const setCm = useCallback((cm: number) => {
     update({ shape: 'round', diameter: numStr(cm), length: '', width: '', fraction: '' });
   }, [update]);
+
+  const applyEstimate = useCallback(() => {
+    if (!estimate) return;
+    if (estimate.shape === 'rect') {
+      update({ shape: 'rect', diameter: '', length: numStr(estimate.lengthCm), width: numStr(estimate.widthCm), fraction: '' });
+    } else if (estimate.diameterCm !== null) {
+      setCm(estimate.diameterCm);
+    }
+  }, [estimate, update, setCm]);
 
   const nextTodoIdx = useCallback((from: number): number => {
     for (let i = from + 1; i < lines.length; i++) if (!lines[i].verifiedAt && !lines[i].excluded) return i;
@@ -333,6 +363,9 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
       } else if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         void applyToMerchant();
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        applyEstimate();
       } else if (IN_KEYS.includes(e.key)) {
         e.preventDefault();
         setCm(Math.round(QUICK_IN[IN_KEYS.indexOf(e.key)] * IN_TO_CM * 10) / 10);
@@ -340,7 +373,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [verifyAndAdvance, lines.length, onNextReceipt, setCm, update, applyToMerchant]);
+  }, [verifyAndAdvance, lines.length, onNextReceipt, setCm, update, applyToMerchant, applyEstimate]);
 
   if (!line || !draft) {
     return <div className="p-4 text-sm text-theme-text-muted">This receipt has no pizza lines.</div>;
@@ -376,14 +409,35 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
         </div>
       )}
 
-      {/* Pizza photos (context only) */}
-      {receipt.pizzaPhotoUrls.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {receipt.pizzaPhotoUrls.map((u) => (
-            <a key={u} href={u} target="_blank" rel="noreferrer" className="flex-shrink-0">
-              <img src={u} alt="Pizza from this party" loading="lazy" className="h-16 w-16 object-cover rounded-md border border-theme-stroke" />
-            </a>
-          ))}
+      {/* Photos from this party: payout pizza photos first, event gallery as fallback */}
+      {(payoutPhotos.length > 0 || eventPhotos.length > 0) && (
+        <div className="space-y-2">
+          {viewPhoto && (
+            <div className="relative rounded-lg border border-theme-stroke bg-black/40">
+              <img src={viewPhoto} alt="Selected party photo" className="w-full max-h-80 object-contain rounded-lg" />
+              <div className="absolute top-1 right-1 flex gap-1">
+                <a href={viewPhoto} target="_blank" rel="noreferrer" className="px-2 py-1 rounded bg-black/60 text-xs text-white hover:bg-black/80">
+                  Full size
+                </a>
+                <button type="button" onClick={() => setViewPhoto(null)} aria-label="Close photo" className="p-1 rounded bg-black/60 text-white hover:bg-black/80">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[...payoutPhotos.map((u) => ({ u, event: false })), ...eventPhotos.map((u) => ({ u, event: true }))].map(({ u, event }) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => setViewPhoto(viewPhoto === u ? null : u)}
+                className={`relative flex-shrink-0 rounded-md border ${viewPhoto === u ? 'border-red-500' : 'border-theme-stroke'}`}
+              >
+                <img src={u} alt={event ? 'Event photo' : 'Pizza photo from this party'} loading="lazy" className="h-20 w-20 object-cover rounded-md" />
+                {event && <span className="absolute bottom-0.5 left-0.5 px-1 rounded bg-black/60 text-[9px] text-white">event</span>}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -422,6 +476,11 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
                 </span>
               )}
               {l.usdPerCm2 !== null && <span className="text-xs text-theme-text-muted">{fmtPerCm2(l.usdPerCm2)}/cm²</span>}
+              {openEstimate(l) && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">
+                  <Camera size={10} /> ~{fmtEstimate(openEstimate(l)!)}
+                </span>
+              )}
             </div>
           </button>
         ))}
@@ -446,6 +505,30 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
           <div className="text-xs text-emerald-400">
             Verified{line.verifiedBy ? ` by ${line.verifiedBy}` : ''}.{' '}
             <button type="button" className="underline" onClick={unverify} disabled={saving}>Unverify</button>
+          </div>
+        )}
+
+        {/* Photo-pass suggestion */}
+        {estimate && (
+          <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs space-y-1.5">
+            <div className="flex items-center gap-1.5 text-cyan-300">
+              <Camera size={14} />
+              <span>
+                Photo estimate: <b>~{fmtEstimate(estimate)}</b> {estimate.shape === 'rect' ? 'rectangle' : 'round'} ({Math.round(estimate.confidence * 100)}%)
+              </span>
+            </div>
+            {estimate.note && <div className="text-theme-text-muted">{estimate.note}</div>}
+            <div className="flex gap-2">
+              <button type="button" onClick={applyEstimate} className="px-2 py-1 rounded-md border border-cyan-500/40 hover:bg-cyan-500/20">
+                Use estimate <span className="text-theme-text-faint">[p]</span>
+              </button>
+              {estimate.photoUrl && (
+                <button type="button" onClick={() => setViewPhoto(estimate.photoUrl)} className="px-2 py-1 rounded-md border border-theme-stroke hover:bg-white/10">
+                  Show photo
+                </button>
+              )}
+            </div>
+            <div className="text-theme-text-faint">Rough guess from a photo. Check it against the photo before you verify.</div>
           </div>
         )}
 
@@ -602,7 +685,7 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
           </button>
         </div>
         <div className="text-[11px] text-theme-text-faint">
-          Up/Down = line · 1-6 = cm sizes · 7-0 = 10/12/14/16″ · r/s/x = round/slice/rect · e = exclude · m = apply to pizzeria · N or → = next receipt
+          Up/Down = line · 1-6 = cm sizes · 7-0 = 10/12/14/16″ · p = use photo estimate · r/s/x = round/slice/rect · e = exclude · m = apply to pizzeria · N or → = next receipt
         </div>
       </div>
     </div>

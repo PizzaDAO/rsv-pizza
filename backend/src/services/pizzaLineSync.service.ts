@@ -119,6 +119,8 @@ export interface LineWrite {
   isBundle: boolean;
   outlierFlag: boolean;
   notes: string | null;
+  /** Set when an existing row's text changed: its photo-pass suggestion no longer applies. */
+  clearPhotoEstimate?: boolean;
 }
 
 export interface DocPlan {
@@ -264,6 +266,7 @@ export function buildFreshWrite(
   merchantKey: string | null,
 ): LineWrite {
   const rawName = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '[illegible]';
+  const clearPhotoEstimate = existingId !== null;
   const qtyRaw = num(item.qty, 1);
   const qty = Math.min(Math.max(qtyRaw, 0), MAX_QTY);
   const unit = Math.max(num(item.unitPrice, 0), 0);
@@ -271,6 +274,7 @@ export function buildFreshWrite(
   const zero = unit <= 0 || qty <= 0;
   return {
     existingId,
+    ...(clearPhotoEstimate ? { clearPhotoEstimate } : {}),
     documentId: doc.documentId,
     partyId: doc.partyId,
     lineIndex: idx,
@@ -681,7 +685,10 @@ export async function syncPizzaLineItems(opts: {
         ...(creates.length ? [prisma.pizzaLineItem.createMany({ data: creates, skipDuplicates: true })] : []),
         ...updates.map((w) => {
           const { documentId: _d, partyId: _p, lineIndex: _l, ...data } = writeToData(w);
-          return prisma.pizzaLineItem.update({ where: { id: w.existingId! }, data });
+          return prisma.pizzaLineItem.update({
+            where: { id: w.existingId! },
+            data: w.clearPhotoEstimate ? { ...data, photoEstimate: Prisma.DbNull } : data,
+          });
         }),
         prisma.pizzaLineSync.upsert({
           where: { documentId: c.id },

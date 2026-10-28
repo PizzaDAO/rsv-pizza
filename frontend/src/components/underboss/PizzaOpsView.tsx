@@ -3,23 +3,25 @@ import { Loader2, Play, RefreshCw, Square } from 'lucide-react';
 import {
   fetchPizzaStatus,
   runPizzaLlmPass,
+  runPizzaPhotoPass,
   runPizzaSync,
   runPizzaVisionPass,
   type PizzaStatusResponse,
 } from '../../lib/api';
 
 /**
- * sfincione-40417: full-admin ops. Sync -> LLM pass -> Vision pass. LLM/vision
- * cost money (OpenAI), so they require a dry run first; "Run until done" loops
+ * sfincione-40417: full-admin ops. Sync -> LLM pass -> Vision pass -> Photo pass.
+ * The OpenAI passes cost money, so they require a dry run first; "Run until done" loops
  * batches until `remaining` hits 0, the batch makes no progress, or you stop it.
  */
 
-type OpKey = 'sync' | 'llm' | 'vision';
+type OpKey = 'sync' | 'llm' | 'vision' | 'photo';
 
 const OPS: Array<{ key: OpKey; title: string; blurb: string; batch: number; hasDryRun: boolean }> = [
   { key: 'sync', title: '1. Sync lines', blurb: 'Parse OCR line items into pizza lines (hash-based, resets verification only when a line changed).', batch: 100, hasDryRun: false },
   { key: 'llm', title: '2. LLM size pass', blurb: 'Classify lines and guess sizes from the receipt text (OpenAI, text only).', batch: 10, hasDryRun: true },
   { key: 'vision', title: '3. Vision pass', blurb: 'Read sizes from the receipt image for lines still without a size (OpenAI vision, higher cost).', batch: 10, hasDryRun: true },
+  { key: 'photo', title: '4. Photo pass', blurb: 'Estimate sizes from each event\'s pizza photos. Suggestions only: they show in Review and count once a reviewer accepts them (OpenAI vision).', batch: 5, hasDryRun: true },
 ];
 
 // Module-level guard so a remount (tab switch) can never start a second loop.
@@ -39,7 +41,7 @@ export function PizzaOpsView() {
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<OpKey | null>(activeLoop.current?.key ?? null);
   const [log, setLog] = useState<string[]>([]);
-  const [dryRunDone, setDryRunDone] = useState<Record<OpKey, boolean>>({ sync: true, llm: false, vision: false });
+  const [dryRunDone, setDryRunDone] = useState<Record<OpKey, boolean>>({ sync: true, llm: false, vision: false, photo: false });
   // In-page spend confirmation (a native confirm() dialog blocks browser automation).
   const [armed, setArmed] = useState<OpKey | null>(null);
   const [progress, setProgress] = useState<{ done: number; remaining: number | null } | null>(null);
@@ -75,11 +77,16 @@ export function PizzaOpsView() {
       addLog(`sync: ${r.docsSynced} docs synced, ${r.linesWritten} lines written, ${r.linesDeleted} deleted, ${r.remaining} docs remaining, ${r.outliersFlagged} outliers flagged`);
       return { remaining: r.remaining, processed: r.docsSynced, errors: 0 };
     }
-    const r = key === 'llm' ? await runPizzaLlmPass({ limit, dryRun }) : await runPizzaVisionPass({ limit, dryRun });
+    const r = key === 'llm'
+      ? await runPizzaLlmPass({ limit, dryRun })
+      : key === 'vision'
+        ? await runPizzaVisionPass({ limit, dryRun })
+        : await runPizzaPhotoPass({ limit, dryRun });
+    const unit = key === 'photo' ? 'events' : 'candidates';
     addLog(
-      `${key}${dryRun ? ' (dry run)' : ''}: ${r.candidates} candidates, ${r.processed} processed, ${r.linesInserted} inserted, ${r.linesUpdated} updated, ${r.remaining} remaining${r.errors.length ? `, ${r.errors.length} errors` : ''} [${r.model}]`,
+      `${key}${dryRun ? ' (dry run)' : ''}: ${r.candidates} ${unit}, ${r.processed} processed, ${r.linesInserted} inserted, ${r.linesUpdated} ${key === 'photo' ? 'suggested' : 'updated'}, ${r.remaining} remaining${r.errors.length ? `, ${r.errors.length} errors` : ''} [${r.model}]`,
     );
-    r.errors.slice(0, 3).forEach((e) => addLog(`  error ${e.documentId}: ${e.error}`));
+    r.errors.slice(0, 3).forEach((e) => addLog(`  error ${key === 'photo' ? 'party ' : ''}${e.documentId}: ${e.error}`));
     return { remaining: r.remaining, processed: r.processed, errors: r.errors.length };
   };
 
@@ -155,6 +162,8 @@ export function PizzaOpsView() {
             <Stat label="Pending sync" value={status.docsPendingSync} />
             <Stat label="Pending LLM pass" value={status.docsPendingLlm} />
             <Stat label="Pending vision pass" value={status.docsPendingVision} />
+            {status.partiesPendingPhoto !== undefined && <Stat label="Events pending photo pass" value={status.partiesPendingPhoto} />}
+            {status.linesWithPhotoEstimate !== undefined && <Stat label="Photo suggestions to review" value={status.linesWithPhotoEstimate} />}
             <Stat label="Lines" value={status.lines} />
             <Stat label="Verified" value={status.verifiedLines} />
             <Stat label="Unresolved size" value={status.unresolvedLines} />
@@ -169,7 +178,7 @@ export function PizzaOpsView() {
       )}
       {error && <div className="text-sm text-red-400">{error}</div>}
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {OPS.map((op) => {
           const busy = running === op.key;
           const canRun = !running && (!op.hasDryRun || dryRunDone[op.key]);

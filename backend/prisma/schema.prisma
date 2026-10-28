@@ -2790,6 +2790,7 @@ model PizzaLineItem {
   isBundle        Boolean        @default(false) @map("is_bundle")
   outlierFlag     Boolean        @default(false) @map("outlier_flag")
   notes           String?
+  photoEstimate   Json?          @map("photo_estimate") // photo-pass size suggestion; never feeds the index
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime?      @map("updated_at") @db.Timestamptz
 
@@ -2814,4 +2815,16 @@ model PizzaLineSync {
   discountTotal Decimal?       @map("discount_total") @db.Decimal(14, 4)
 
   @@map("pizza_line_sync")
+}
+
+// sfincione-40417: per-party state for the photo size pass.
+model PizzaPhotoPass {
+  partyId     String    @id @map("party_id") @db.Uuid
+  passAt      DateTime? @map("pass_at") @db.Timestamptz
+  attempts    Int       @default(0)
+  lastErrorAt DateTime? @map("last_error_at") @db.Timestamptz
+  photoUrls   Json?     @map("photo_urls")
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("pizza_photo_pass")
 }

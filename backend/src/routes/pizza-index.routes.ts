@@ -7,7 +7,7 @@
  * Auth (decision 12.3): superadmins / admins / payment admins (full access),
  * AND active underbosses, who are restricted to parties in their scope
  * (regions + cities, reusing helpers/underbossScope). Spend-incurring /
- * bulk-ops endpoints (sync, llm-pass, vision-pass) and non-merchant preset
+ * bulk-ops endpoints (sync, llm-pass, vision-pass, photo-pass) and non-merchant preset
  * writes are full-admin only. Every edit records verified_by / updated_by.
  *
  * This router NEVER writes to payout_documents.
@@ -34,6 +34,15 @@ import {
 } from '../services/pizzaLineSync.service.js';
 import { reallocateDocDiscounts } from '../services/pizzaLineDocs.service.js';
 import { runLlmPass, runVisionPass } from '../services/pizzaIndexLlm.service.js';
+import {
+  MAX_PHOTOS_PER_PARTY,
+  galleryPhotos,
+  payoutPizzaPhotos,
+  photoCandidatesSql,
+  readPhotoEstimate,
+  runPhotoPass,
+  type PhotoEstimate,
+} from '../services/pizzaPhotoPass.service.js';
 import {
   INDEX_LEVELS,
   aggregate,
@@ -155,6 +164,8 @@ export interface PizzaLineDto {
   localPerCm2: number | null;
   /** What this line's per-cm^2 price implies for a 25/30/35/40 cm pizza (USD). */
   sizeLadderUsd: SizeLadder | null;
+  /** Photo-pass size suggestion (never counted in the index until a reviewer accepts it). */
+  photoEstimate: PhotoEstimate | null;
 }
 
 type DbLine = Prisma.PizzaLineItemGetPayload<object>;
@@ -212,6 +223,7 @@ export function toLineDto(r: DbLine): PizzaLineDto {
     usdPerCm2,
     localPerCm2: area && area > 0 && list > 0 ? list / area : null,
     sizeLadderUsd: ladderFor(usdPerCm2),
+    photoEstimate: readPhotoEstimate(r.photoEstimate),
   };
 }
 
@@ -365,6 +377,7 @@ function scopeKey(actor: PizzaActor): string {
 // ---------------------------------------------------------------------------
 
 const router = Router();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ===========================================================================
 // POST /sync   (full admin)  body: { limit?: 1-300 (default 100), force?: boolean, forceBefore?: ISO string, docIds?: string[] }
@@ -430,6 +443,22 @@ router.post('/vision-pass', ...fullChain, async (req: PizzaRequest, res: Respons
 });
 
 // ===========================================================================
+// POST /photo-pass   (full admin)  body: { limit?: 1-10 parties (default 5), partyIds?, dryRun? }
+//   Stores a size SUGGESTION per unsized line from the party's pizza photos; the
+//   index is unchanged until a reviewer accepts it.
+// ===========================================================================
+router.post('/photo-pass', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const partyIds = Array.isArray(body.partyIds) ? body.partyIds.filter((x): x is string => typeof x === 'string') : undefined;
+    if (partyIds?.some((id) => !UUID_RE.test(id))) throw new AppError('partyIds must be UUIDs', 400, 'INVALID_PARTY_ID');
+    res.json(await runPhotoPass({ limit: intQ(body.limit, 5, 1, 10), partyIds, dryRun: bool(body.dryRun) ?? false }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===========================================================================
 // GET /status   (reviewers; scoped for underbosses)
 // ===========================================================================
 export interface PizzaStatusResponse {
@@ -445,6 +474,10 @@ export interface PizzaStatusResponse {
   bundleLines: number;
   outlierLines: number;
   bySource: Record<string, number>;
+  /** Parties with unsized lines and photos that the photo pass hasn't covered yet. */
+  partiesPendingPhoto: number;
+  /** Unverified, unsized lines that have a photo-pass suggestion waiting. */
+  linesWithPhotoEstimate: number;
 }
 router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
   try {
@@ -464,7 +497,9 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
              count(*) FILTER (WHERE li.area_cm2 IS NULL AND NOT li.excluded AND NOT li.is_bundle)::int AS unresolved,
              count(*) FILTER (WHERE li.excluded)::int AS excluded,
              count(*) FILTER (WHERE li.is_bundle)::int AS bundles,
-             count(*) FILTER (WHERE li.outlier_flag AND li.verified_at IS NULL)::int AS outliers
+             count(*) FILTER (WHERE li.outlier_flag AND li.verified_at IS NULL)::int AS outliers,
+             count(*) FILTER (WHERE li.photo_estimate IS NOT NULL AND li.area_cm2 IS NULL AND li.verified_at IS NULL
+                              AND NOT li.excluded AND NOT li.is_bundle)::int AS photo_estimates
       FROM pizza_line_items li JOIN parties p ON p.id = li.party_id
       JOIN payout_documents d ON d.id = li.document_id
       WHERE d.is_duplicate = false AND d.ineligible = false ${sc}`);
@@ -487,6 +522,8 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
       bundleLines: lines.bundles,
       outlierLines: lines.outliers,
       bySource: Object.fromEntries(sources.map((s) => [s.src, s.c])),
+      partiesPendingPhoto: 0,
+      linesWithPhotoEstimate: lines.photo_estimates,
     };
     const [v] = await prisma.$queryRaw<Array<{ c: number }>>(Prisma.sql`
       SELECT count(DISTINCT d.id)::int AS c
@@ -496,6 +533,10 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
         AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id AND NOT li.excluded
                     AND NOT li.is_bundle AND li.verified_at IS NULL AND li.area_cm2 IS NULL)`);
     body.docsPendingVision = v.c;
+    // Same candidate rule as the pass itself (incl. back-off), so "run until done" can reach 0.
+    const [ph] = await prisma.$queryRaw<Array<{ c: number }>>(Prisma.sql`
+      SELECT count(*)::int AS c ${photoCandidatesSql({ scope: sc })}`);
+    body.partiesPendingPhoto = ph.c;
     res.json(body);
   } catch (err) {
     next(err);
@@ -508,6 +549,7 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
 //          country, merchant (substring of merchant key), source=parsed|preset|llm|web|manual|none,
 //          outlier=true, excluded=true (show excluded lines instead of hiding them),
 //          bundles=include|exclude|only (default include), partyId, documentId, minConfidence,
+//          photoEstimate=true (only lines with a photo-pass suggestion),
 //          limit (receipts, 1-100, default 20), offset
 // ===========================================================================
 export interface PizzaQueueReceipt {
@@ -522,6 +564,8 @@ export interface PizzaQueueReceipt {
   lines: PizzaLineDto[];
   /** kind='pizza' photos from the same party (context only). */
   pizzaPhotoUrls: string[];
+  /** Approved event-gallery photos (pizza-tagged/starred first), minus any already in pizzaPhotoUrls. */
+  galleryPhotoUrls: string[];
 }
 export interface PizzaQueueResponse {
   total: number;
@@ -560,6 +604,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     if (source === 'none') cond.push(Prisma.sql`li.size_source IS NULL`);
     else if (source) cond.push(Prisma.sql`li.size_source = ${source}`);
     if (bool(q.outlier)) cond.push(Prisma.sql`li.outlier_flag = true`);
+    if (bool(q.photoEstimate)) cond.push(Prisma.sql`li.photo_estimate IS NOT NULL`);
     const bundles = str(q.bundles) ?? 'include';
     if (bundles === 'exclude') cond.push(Prisma.sql`li.is_bundle = false`);
     if (bundles === 'only') cond.push(Prisma.sql`li.is_bundle = true`);
@@ -615,17 +660,10 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
         prisma.pizzaLineSync.findMany({ where: { documentId: { in: docIds } }, select: { documentId: true, discounts: true } }),
       ]);
       const partyIds = [...new Set(docs.map((d) => d.party.id))];
-      const pizzaPhotos = await prisma.payoutDocument.findMany({
-        where: { kind: 'pizza', partyId: { in: partyIds } },
-        select: { partyId: true, url: true },
-        orderBy: { createdAt: 'asc' },
-      });
-      const photoByParty = new Map<string, string[]>();
-      for (const p of pizzaPhotos) {
-        const a = photoByParty.get(p.partyId) ?? [];
-        if (a.length < 6) a.push(p.url);
-        photoByParty.set(p.partyId, a);
-      }
+      const [photoByParty, galleryByParty] = await Promise.all([
+        payoutPizzaPhotos(partyIds, MAX_PHOTOS_PER_PARTY),
+        galleryPhotos(partyIds, MAX_PHOTOS_PER_PARTY),
+      ]);
       const linesByDoc = new Map<string, PizzaLineDto[]>();
       for (const l of lines) {
         const a = linesByDoc.get(l.documentId) ?? [];
@@ -653,6 +691,9 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
           receiptDiscounts: Array.isArray(disc) ? (disc as unknown as Array<{ label: string; amount: number }>) : [],
           lines: ls,
           pizzaPhotoUrls: photoByParty.get(d.party.id) ?? [],
+          galleryPhotoUrls: (galleryByParty.get(d.party.id) ?? []).filter(
+            (u) => !(photoByParty.get(d.party.id) ?? []).includes(u),
+          ),
         });
       }
     }
