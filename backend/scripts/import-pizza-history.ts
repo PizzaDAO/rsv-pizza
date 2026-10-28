@@ -63,7 +63,7 @@ const countBy = <T>(xs: T[], key: (x: T) => string) => {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const [{ validateRecord, normalizeCountry, buildHistoryLines, medianOf }, { getReceiptFx, FxUnavailableError }, sizeSvc] = await Promise.all([
+  const [{ validateRecord, keyReceipts, normalizeCountry, buildHistoryLines, medianOf }, { getReceiptFx, FxUnavailableError }, sizeSvc] = await Promise.all([
     import('./lib/historyImport.js'),
     import('./lib/historicalFx.js'),
     import('../src/services/pizzaSize.service.js'),
@@ -76,21 +76,25 @@ async function main() {
 
   // 1. validate + dedupe + year filter
   const skipped: Array<{ id: string; reason: string }> = [];
-  const seen = new Map<string, HistoryRecord>();
-  const rawById = new Map<string, unknown>();
+  const valid: HistoryRecord[] = [];
+  const rawBySourceId = new Map<string, unknown[]>();
   for (const raw of rawRecords) {
     const v = validateRecord(raw);
     if (!v.ok) { skipped.push({ id: v.sourceFileId ?? '?', reason: v.reason }); continue; }
-    const r = v.record;
-    if (args.year !== null && r.year !== args.year) continue;
-    const prev = seen.get(r.sourceFileId);
-    if (prev) {
-      const same = JSON.stringify(prev) === JSON.stringify(r);
-      skipped.push({ id: r.sourceFileId, reason: same ? 'duplicate sourceFileId (identical)' : 'duplicate sourceFileId with DIFFERENT content (kept the first)' });
-      continue;
-    }
-    seen.set(r.sourceFileId, r);
-    rawById.set(r.sourceFileId, raw);
+    if (args.year !== null && v.record.year !== args.year) continue;
+    valid.push(v.record);
+    (rawBySourceId.get(v.record.sourceFileId) ?? rawBySourceId.set(v.record.sourceFileId, []).get(v.record.sourceFileId)!).push(raw);
+  }
+  const keyed = keyReceipts(valid);
+  skipped.push(...keyed.notes);
+  const seen = new Map<string, HistoryRecord>(keyed.records.map((r) => [r.sourceFileId, r]));
+  // raw JSON kept per final key (the original record, for audit/re-import)
+  const rawById = new Map<string, unknown>();
+  for (const r of keyed.records) {
+    const base = r.sourceFileId.split('#')[0];
+    const cands = rawBySourceId.get(base) ?? [];
+    const match = cands.find((c) => { const v = validateRecord(c); return v.ok && JSON.stringify({ ...v.record, sourceFileId: r.sourceFileId }) === JSON.stringify(r); });
+    rawById.set(r.sourceFileId, match ?? cands[0]);
   }
 
   // 2. country normalisation

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../src/config/database.js', () => ({ prisma: {} }));
 
-import { buildHistoryLines, normalizeCountry, validateRecord, type HistoryRecord } from './historyImport.js';
+import { buildHistoryLines, keyReceipts, normalizeCountry, validateRecord, type HistoryRecord } from './historyImport.js';
 import type { SizePreset } from '../../src/services/pizzaSize.service.js';
 
 const presets: SizePreset[] = [
@@ -105,5 +105,24 @@ describe('buildHistoryLines', () => {
   it('lump sum without a pizza count or total stores the receipt only', () => {
     expect(buildHistoryLines(rec({ kind: 'lump_sum', total: 600, pizzaCount: null }), presets, 1)).toEqual([]);
     expect(buildHistoryLines(rec({ kind: 'lump_sum', total: null, pizzaCount: 10 }), presets, 1)).toEqual([]);
+  });
+});
+
+describe('keyReceipts', () => {
+  it('keeps unique ids as-is and drops identical repeats', () => {
+    const a = rec({ sourceFileId: 'a' });
+    const r = keyReceipts([a, { ...a }, rec({ sourceFileId: 'b' })]);
+    expect(r.records.map((x) => x.sourceFileId)).toEqual(['a', 'b']);
+    expect(r.notes.some((n) => /identical/.test(n.reason))).toBe(true);
+  });
+  it('a shared multi-receipt file id yields one stable keyed receipt per distinct receipt', () => {
+    const mk = (city: string, total: number) => rec({ sourceFileId: 'sheet', city, total });
+    const r1 = keyReceipts([mk('Quito', 10), mk('Cuenca', 20)]);
+    expect(r1.records).toHaveLength(2);
+    expect(r1.records.every((x) => x.sourceFileId.startsWith('sheet#'))).toBe(true);
+    expect(new Set(r1.records.map((x) => x.sourceFileId)).size).toBe(2);
+    // order-independent: the same receipt gets the same key on a re-import
+    const r2 = keyReceipts([mk('Cuenca', 20), mk('Quito', 10)]);
+    expect(r2.records.find((x) => x.city === 'Quito')!.sourceFileId).toBe(r1.records.find((x) => x.city === 'Quito')!.sourceFileId);
   });
 });

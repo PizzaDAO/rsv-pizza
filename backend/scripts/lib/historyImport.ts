@@ -3,6 +3,7 @@
  * (record validation, country normalisation, line building). No DB access, so
  * they are unit tested (historyImport.test.ts).
  */
+import crypto from 'node:crypto';
 import { getCountryCode } from '../../src/lib/countryCode.js';
 import { canonicalizeCountryName } from '../../src/lib/canonicalCountryName.js';
 import { countryCodeToRegion, countryNameToRegion } from '../../src/lib/countryRegion.js';
@@ -224,4 +225,36 @@ export function medianOf(xs: number[]): number | null {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/**
+ * Dedupe key = Drive file id. A multi-receipt document (one Drive sheet holding
+ * many receipts) shares ONE file id across distinct receipts, so when the same id
+ * appears with different content every occurrence gets `#<hash of city|date|merchant|total|currency>`
+ * and is kept (stable across re-imports). Identical repeats, or two records that
+ * still collide after that, keep the first and are reported.
+ */
+export function keyReceipts(records: HistoryRecord[]): { records: HistoryRecord[]; notes: Array<{ id: string; reason: string }> } {
+  const byId = new Map<string, HistoryRecord[]>();
+  for (const r of records) (byId.get(r.sourceFileId) ?? byId.set(r.sourceFileId, []).get(r.sourceFileId)!).push(r);
+  const out: HistoryRecord[] = [];
+  const notes: Array<{ id: string; reason: string }> = [];
+  for (const [id, group] of byId) {
+    const distinct: HistoryRecord[] = [];
+    for (const r of group) {
+      if (distinct.some((d) => JSON.stringify(d) === JSON.stringify(r))) notes.push({ id, reason: 'duplicate sourceFileId (identical)' });
+      else distinct.push(r);
+    }
+    if (distinct.length === 1) { out.push(distinct[0]); continue; }
+    const seen = new Set<string>();
+    for (const r of distinct) {
+      const h = crypto.createHash('md5').update([r.city, r.receiptDate, r.merchant, r.total, r.currency].join('|')).digest('hex').slice(0, 8);
+      const key = `${id}#${h}`;
+      if (seen.has(key)) { notes.push({ id: key, reason: 'two different records collide on city/date/merchant/total (kept the first)' }); continue; }
+      seen.add(key);
+      out.push({ ...r, sourceFileId: key });
+    }
+    notes.push({ id, reason: `shared by ${distinct.length} different receipts; keyed as ${id}#<hash>` });
+  }
+  return { records: out, notes };
 }

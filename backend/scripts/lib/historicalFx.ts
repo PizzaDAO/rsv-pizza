@@ -84,6 +84,7 @@ function writeDisk(file: string, key: string, v: HistoricalRate): void {
 export function resetFxCaches(): void {
   memoryCache.clear();
   diskCache = null;
+  yahooBlockedUntil = 0;
 }
 
 const defaultFetch: FetchLike = (url, init) => fetch(url, init) as unknown as ReturnType<FetchLike>;
@@ -103,13 +104,16 @@ async function frankfurter(cur: string, date: string, f: FetchLike): Promise<His
 }
 
 let lastYahooAt = 0;
+/** Circuit breaker: after a full round of 429s, skip Yahoo for a minute instead of stalling every receipt. */
+let yahooBlockedUntil = 0;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function yahoo(cur: string, date: string, f: FetchLike): Promise<HistoricalRate | null> {
   const end = Date.parse(`${date}T23:59:59Z`) / 1000;
   const start = end - 10 * 86400;
+  if (Date.now() < yahooBlockedUntil) return null;
   // Unofficial endpoint: throttle, try both hosts, and back off on 429/5xx.
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     for (const host of ['query1', 'query2']) {
       const wait = lastYahooAt + 400 - Date.now();
       if (wait > 0) await sleep(wait);
@@ -140,6 +144,7 @@ async function yahoo(cur: string, date: string, f: FetchLike): Promise<Historica
     }
     await sleep(1500 * (attempt + 1));
   }
+  yahooBlockedUntil = Date.now() + 60_000;
   return null;
 }
 
