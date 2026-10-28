@@ -76,11 +76,12 @@ You get the event's country, the pizzeria (if known), the receipt's pizza lines 
 Allowed reference objects (key: real size): ${Object.entries(REFERENCE_SIZES_CM).map(([k, v]) => `${k} ${v} cm`).join(', ')}.
 For a line you can measure: pick ONE reference object that is in the same photo, close to the pizza and at a similar distance from the camera, and report "ratio" = pizza diameter / reference size (for rectangular pizzas "lengthRatio" and "widthRatio"). Do the comparison visually, step by step; do NOT start from a typical pizza size.
 Rules:
+- Measure only a WHOLE (or nearly whole) pizza seen from above or at a moderate angle. A single slice, a half-eaten pie, an empty box, or a pizza far in the background cannot be measured: set "wholePizzaVisible": false and return null.
 - NEVER use a pizza box, another pizza, or a typical size as the reference. If no allowed reference is clearly visible next to the pizza, return null for that line. Null is the right answer for most crowd shots.
 - Match pizzas to lines carefully. If the photos show pizzas of clearly different sizes, larger pizzas belong to higher-priced lines. A giant party pizza is not the same pizza as a cheap menu line.
 - confidence 0..1: how sure you are of the measurement (most should be 0.3-0.6).
 - photo: the photo index you measured in. note: at most 80 characters saying what you compared.
-Return ONLY JSON: { "lines": [ { "i": number, "photo": number|null, "ref": string|null, "shape": "round"|"rect"|null, "ratio": number|null, "lengthRatio": number|null, "widthRatio": number|null, "confidence": number, "note": string } ] }`;
+Return ONLY JSON: { "lines": [ { "i": number, "photo": number|null, "wholePizzaVisible": boolean, "ref": string|null, "shape": "round"|"rect"|null, "ratio": number|null, "lengthRatio": number|null, "widthRatio": number|null, "confidence": number, "note": string } ] }`;
 
 const dim = (v: number, min: number, max: number): number | null =>
   Number.isFinite(v) && v >= min && v <= max ? Math.round(v * 10) / 10 : null;
@@ -114,6 +115,8 @@ export function parsePhotoPassResponse(
     const r = e as Record<string, unknown>;
     const i = Number(r.i);
     if (!Number.isInteger(i) || !validIndexes.has(i) || seen.has(i)) continue;
+    // Slices, half-eaten pies and empty boxes measured as "pizzas" were the other prod failure.
+    if (r.wholePizzaVisible !== true) continue;
     const ref = typeof r.ref === 'string' && r.ref in REFERENCE_SIZES_CM ? (r.ref as ReferenceKey) : null;
     if (!ref) continue;
     const refCm = REFERENCE_SIZES_CM[ref];

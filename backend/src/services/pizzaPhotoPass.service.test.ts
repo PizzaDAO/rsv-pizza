@@ -18,8 +18,8 @@ describe('parsePhotoPassResponse', () => {
   it('computes sizes from ratio x reference and caps confidence', () => {
     const out = parsePhotoPassResponse(JSON.stringify({
       lines: [
-        { i: 0, photo: 1, ref: 'dinner_plate', shape: 'round', ratio: 1.3, confidence: 0.9, note: 'plate beside pie' },
-        { i: 1, photo: 0, ref: 'phone_length', shape: 'rect', lengthRatio: 4, widthRatio: 2.5, confidence: 0.4, note: 'phone on tray' },
+        { i: 0, photo: 1, wholePizzaVisible: true, ref: 'dinner_plate', shape: 'round', ratio: 1.3, confidence: 0.9, note: 'plate beside pie' },
+        { i: 1, photo: 0, wholePizzaVisible: true, ref: 'phone_length', shape: 'rect', lengthRatio: 4, widthRatio: 2.5, confidence: 0.4, note: 'phone on tray' },
       ],
     }), idx, 2);
     expect(out).toEqual([
@@ -44,13 +44,23 @@ describe('parsePhotoPassResponse', () => {
         { i: 0, ref: 'dinner_plate', shape: 'round', ratio: null },
         { i: 1, ref: 'dinner_plate', shape: 'round', ratio: 10 },
         { i: 9, ref: 'dinner_plate', shape: 'round', ratio: 1.2 },
-        { i: 2, ref: 'side_plate', shape: 'round', ratio: 1.5, photo: 7 },
+        { i: 2, wholePizzaVisible: true, ref: 'side_plate', shape: 'round', ratio: 1.5, photo: 7 },
         { i: 2, ref: 'side_plate', shape: 'round', ratio: 2 },
         { i: 1, ref: 'phone_length', shape: 'rect', lengthRatio: 3, widthRatio: null },
       ],
     }), idx, 2);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ i: 2, diameterCm: 30, photo: null });
+  });
+
+  it('rejects lines without a whole pizza in view (slices, empty boxes)', () => {
+    const out = parsePhotoPassResponse(JSON.stringify({
+      lines: [
+        { i: 0, wholePizzaVisible: false, ref: 'phone_length', shape: 'round', ratio: 1.2, note: 'slice next to phone' },
+        { i: 1, ref: 'dinner_plate', shape: 'round', ratio: 1.15 },
+      ],
+    }), idx, 1);
+    expect(out).toEqual([]);
   });
 
   it('returns [] for junk', () => {
