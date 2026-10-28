@@ -642,6 +642,7 @@ export async function syncPizzaLineItems(opts: {
     });
     const existingByDoc = new Map<string, ExistingLine[]>();
     for (const r of existingAll) {
+      if (!r.documentId) continue; // archive (history) lines have no document
       const arr = existingByDoc.get(r.documentId) ?? [];
       arr.push(dbLineToExisting(r));
       existingByDoc.set(r.documentId, arr);
@@ -783,13 +784,13 @@ export async function reresolveUnverified(filter: { merchantKey?: string; partyI
       ...(filter.merchantKey ? { merchantKey: filter.merchantKey } : {}),
       ...(filter.partyIds ? { partyId: { in: filter.partyIds } } : {}),
     },
-    include: { party: { select: { country: true } } },
+    include: { party: { select: { country: true } }, historyReceipt: { select: { country: true } } },
   });
   let changed = 0;
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const r of rows) {
     const hint = labelHint(r.sizeLabel);
-    const resolved = resolveForItem(hint ? { size: { label: hint } } : {}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party.country });
+    const resolved = resolveForItem(hint ? { size: { label: hint } } : {}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party?.country ?? r.historyReceipt?.country ?? null });
     const same =
       resolved.sizeSource === r.sizeSource &&
       resolved.presetId === r.presetId &&

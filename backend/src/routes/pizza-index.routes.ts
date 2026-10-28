@@ -126,8 +126,10 @@ export const EXCLUDED_REASONS: ExcludedReason[] = ['lump_sum', 'not_pizza', 'zer
 
 export interface PizzaLineDto {
   id: string;
-  documentId: string;
-  partyId: string;
+  /** null for archive (pre-2026) lines, which point at historyReceiptId instead. */
+  documentId: string | null;
+  partyId: string | null;
+  historyReceiptId: string | null;
   lineIndex: number;
   rawName: string;
   merchant: string | null;
@@ -189,6 +191,7 @@ export function toLineDto(r: DbLine): PizzaLineDto {
     id: r.id,
     documentId: r.documentId,
     partyId: r.partyId,
+    historyReceiptId: r.historyReceiptId,
     lineIndex: r.lineIndex,
     rawName: r.rawName,
     merchant: r.merchant,
@@ -339,7 +342,8 @@ async function loadLineInScope(id: string, actor: PizzaActor) {
     include: { party: { select: { region: true, city: true, name: true, eventType: true } } },
   });
   if (!line) throw new AppError('Pizza line not found', 404, 'NOT_FOUND');
-  if (!actor.full && !partyMatchesScope(line.party, underbossScopeOf(actor))) {
+  // Archive lines have no party: only full admins may touch them.
+  if (!actor.full && (!line.party || !partyMatchesScope(line.party, underbossScopeOf(actor)))) {
     throw new AppError('This line is outside your scope', 403, 'FORBIDDEN');
   }
   return line;
@@ -551,14 +555,20 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
 //          outlier=true, excluded=true (show excluded lines instead of hiding them),
 //          bundles=include|exclude|only (default include), partyId, documentId, minConfidence,
 //          photoEstimate=true (only lines with a photo-pass suggestion),
+//          origin=event|history|all (default all; archive receipts are admin-only),
+//          year=YYYY (event year, or the archive receipt year),
 //          limit (receipts, 1-100, default 20), offset
 // ===========================================================================
 export interface PizzaQueueReceipt {
+  /** 'history' = archive receipt (url is the Drive link, no preview, no photos). */
+  origin: 'event' | 'history';
+  /** Event year (party date) or archive receipt year. */
+  year: number | null;
   document: {
-    id: string; url: string; mimeType: string; fileName: string;
+    id: string; url: string; mimeType: string | null; fileName: string | null;
     sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
   };
-  party: { id: string; name: string; city: string | null; country: string | null; region: string | null; date: string | null };
+  party: { id: string | null; name: string; city: string | null; country: string | null; region: string | null; date: string | null };
   merchant: string | null;
   currency: string | null;
   receiptDiscounts: Array<{ label: string; amount: number }>;
@@ -588,17 +598,15 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const offset = intQ(q.offset, 0, 0, 100000);
     await refreshOutliers();
 
-    const cond: Prisma.Sql[] = [
-      Prisma.sql`d.kind = 'receipt'`,
-      Prisma.sql`d.is_duplicate = false`,
-      Prisma.sql`d.ineligible = false`,
-    ];
+    const eligible = Prisma.sql`((d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false)
+      OR (h.id IS NOT NULL AND h.kind <> 'not_pizza'))`;
+    const cond: Prisma.Sql[] = [eligible];
     if (bool(q.excluded)) cond.push(Prisma.sql`li.excluded = true`);
     else cond.push(Prisma.sql`li.excluded = false`);
     if (status === 'unverified') cond.push(Prisma.sql`li.verified_at IS NULL`);
     else if (status === 'verified') cond.push(Prisma.sql`li.verified_at IS NOT NULL`);
     const country = str(q.country);
-    if (country) cond.push(Prisma.sql`p.country = ${country}`);
+    if (country) cond.push(Prisma.sql`coalesce(p.country, h.country) = ${country}`);
     const merchant = str(q.merchant);
     if (merchant) cond.push(Prisma.sql`li.merchant_key ILIKE ${'%' + (normalizeMerchantKey(merchant) ?? merchant) + '%'}`);
     const source = str(q.source);
@@ -615,22 +623,34 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     if (documentId) cond.push(Prisma.sql`li.document_id = ${documentId}::uuid`);
     const minConf = Number(q.minConfidence);
     if (Number.isFinite(minConf)) cond.push(Prisma.sql`coalesce(li.size_confidence, 0) >= ${minConf}`);
+    const origin = str(q.origin) ?? 'all';
+    if (!['event', 'history', 'all'].includes(origin)) throw new AppError('origin must be event, history or all', 400, 'BAD_REQUEST');
+    if (origin === 'event') cond.push(Prisma.sql`li.history_receipt_id IS NULL`);
+    if (origin === 'history') cond.push(Prisma.sql`li.history_receipt_id IS NOT NULL`);
+    const yearQ = Number(q.year);
+    if (Number.isFinite(yearQ) && yearQ > 2000) {
+      cond.push(Prisma.sql`coalesce(h.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
+    }
+    // Archive receipts have no party, so there is no scope mapping: admins only.
+    const histGuard = actor.full ? Prisma.empty : Prisma.sql`AND li.history_receipt_id IS NULL`;
     const sc = scopeSql(actor.scope, 'p');
-    const where = Prisma.sql`WHERE ${Prisma.join(cond, ' AND ')} ${sc}`;
+    const where = Prisma.sql`WHERE ${Prisma.join(cond, ' AND ')} ${histGuard} ${sc}`;
     const from = Prisma.sql`FROM pizza_line_items li
-      JOIN payout_documents d ON d.id = li.document_id
-      JOIN parties p ON p.id = li.party_id`;
+      LEFT JOIN payout_documents d ON d.id = li.document_id
+      LEFT JOIN parties p ON p.id = li.party_id
+      LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id`;
+    const groupKey = Prisma.sql`coalesce(li.document_id, li.history_receipt_id)`;
 
     const [{ total }] = await prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
-      SELECT count(DISTINCT li.document_id)::int AS total ${from} ${where}`);
+      SELECT count(DISTINCT ${groupKey})::int AS total ${from} ${where}`);
     const docRows = await prisma.$queryRaw<{ document_id: string }[]>(Prisma.sql`
-      SELECT li.document_id ${from} ${where}
-      GROUP BY li.document_id
+      SELECT ${groupKey} AS document_id ${from} ${where}
+      GROUP BY ${groupKey}
       ORDER BY bool_or(li.verified_at IS NULL) DESC,
                bool_or(li.outlier_flag) DESC,
                min(coalesce(li.size_confidence, 0)) ASC,
                max(li.qty) DESC,
-               li.document_id
+               ${groupKey}
       LIMIT ${limit} OFFSET ${offset}`);
     const docIds = docRows.map((r) => r.document_id);
 
@@ -643,14 +663,18 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
              count(*) FILTER (WHERE li.outlier_flag AND li.verified_at IS NULL)::int AS outliers,
              count(*) FILTER (WHERE li.is_bundle)::int AS bundles
       FROM pizza_line_items li
-      JOIN payout_documents d ON d.id = li.document_id
-      JOIN parties p ON p.id = li.party_id
-      WHERE d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false AND li.excluded = false ${sc}`);
+      LEFT JOIN payout_documents d ON d.id = li.document_id
+      LEFT JOIN parties p ON p.id = li.party_id
+      LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id
+      WHERE ${eligible} AND li.excluded = false ${histGuard} ${sc}`);
 
     const receipts: PizzaQueueReceipt[] = [];
     if (docIds.length) {
-      const [lines, docs, syncs] = await Promise.all([
-        prisma.pizzaLineItem.findMany({ where: { documentId: { in: docIds } }, orderBy: [{ lineIndex: 'asc' }] }),
+      const [lines, docs, syncs, histories] = await Promise.all([
+        prisma.pizzaLineItem.findMany({
+          where: { OR: [{ documentId: { in: docIds } }, { historyReceiptId: { in: docIds } }] },
+          orderBy: [{ lineIndex: 'asc' }],
+        }),
         prisma.payoutDocument.findMany({
           where: { id: { in: docIds } },
           select: {
@@ -659,7 +683,9 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
           },
         }),
         prisma.pizzaLineSync.findMany({ where: { documentId: { in: docIds } }, select: { documentId: true, discounts: true } }),
+        prisma.pizzaHistoryReceipt.findMany({ where: { id: { in: docIds } } }),
       ]);
+      const histById = new Map(histories.map((h) => [h.id, h]));
       const partyIds = [...new Set(docs.map((d) => d.party.id))];
       const [photoByParty, galleryByParty] = await Promise.all([
         payoutPizzaPhotos(partyIds, MAX_PHOTOS_PER_PARTY),
@@ -667,18 +693,42 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
       ]);
       const linesByDoc = new Map<string, PizzaLineDto[]>();
       for (const l of lines) {
-        const a = linesByDoc.get(l.documentId) ?? [];
+        const key = l.documentId ?? l.historyReceiptId;
+        if (!key) continue;
+        const a = linesByDoc.get(key) ?? [];
         a.push(toLineDto(l));
-        linesByDoc.set(l.documentId, a);
+        linesByDoc.set(key, a);
       }
       const docById = new Map(docs.map((d) => [d.id, d]));
       const syncById = new Map(syncs.map((s) => [s.documentId, s]));
       for (const id of docIds) {
+        const h = histById.get(id);
+        if (h) {
+          const ls = linesByDoc.get(id) ?? [];
+          receipts.push({
+            origin: 'history',
+            year: h.year,
+            document: { id: h.id, url: h.sourceUrl ?? '', mimeType: null, fileName: h.sourceTitle, sourceReceiptIndex: null, sourceReceiptCount: null },
+            party: {
+              id: null, name: `${h.year} ${h.city ?? h.country}`, city: h.city, country: h.country, region: h.region,
+              date: h.receiptDate ? h.receiptDate.toISOString() : null,
+            },
+            merchant: h.merchant ?? ls.find((l) => l.merchant)?.merchant ?? null,
+            currency: h.currency ?? ls[0]?.currency ?? null,
+            receiptDiscounts: [],
+            lines: ls,
+            pizzaPhotoUrls: [],
+            galleryPhotoUrls: [],
+          });
+          continue;
+        }
         const d = docById.get(id);
         if (!d) continue;
         const ls = linesByDoc.get(id) ?? [];
         const disc = syncById.get(id)?.discounts;
         receipts.push({
+          origin: 'event',
+          year: d.party.date ? d.party.date.getUTCFullYear() : null,
           document: {
             id: d.id, url: d.url, mimeType: d.mimeType, fileName: d.fileName,
             sourceReceiptIndex: d.sourceReceiptIndex, sourceReceiptCount: d.sourceReceiptCount,
@@ -832,7 +882,7 @@ router.patch('/lines/:id', ...reviewerChain, async (req: PizzaRequest, res: Resp
     }
 
     const updated = await prisma.pizzaLineItem.update({ where: { id: cur.id }, data });
-    if (qty !== undefined || unit !== undefined) await reallocateDocDiscounts(cur.documentId);
+    if ((qty !== undefined || unit !== undefined) && cur.documentId) await reallocateDocDiscounts(cur.documentId);
     invalidatePizzaIndexCache();
     const fresh = qty !== undefined || unit !== undefined
       ? await prisma.pizzaLineItem.findUniqueOrThrow({ where: { id: updated.id } })
@@ -893,8 +943,21 @@ router.post('/lines/:id/apply-to-merchant', ...reviewerChain, async (req: PizzaR
         AND li.verified_at IS NULL AND li.excluded = false AND li.is_bundle = false
         AND (li.size_source IS NULL OR li.size_source IN ('preset', 'llm', 'web'))
         AND coalesce(li.size_label, 'default') = ${label}`);
+    // Archive receipts have no party/scope: only full admins re-resolve those siblings.
+    const updatedHistory = !actor.full ? 0 : Number(await prisma.$executeRaw(Prisma.sql`
+      UPDATE pizza_line_items li SET
+        shape = ${dims.shape}, diameter_cm = ${dims.diameterCm}, length_cm = ${dims.lengthCm},
+        width_cm = ${dims.widthCm}, slice_fraction = ${dims.sliceFraction}, area_cm2 = ${dims.areaCm2},
+        size_label = ${label}, size_source = 'preset', size_confidence = ${CONFIDENCE.merchant},
+        preset_id = ${preset.id}::uuid, updated_by = ${actor.email}, updated_at = now()
+      WHERE li.history_receipt_id IS NOT NULL
+        AND li.merchant_key = ${line.merchantKey}
+        AND li.id <> ${line.id}::uuid
+        AND li.verified_at IS NULL AND li.excluded = false AND li.is_bundle = false
+        AND (li.size_source IS NULL OR li.size_source IN ('preset', 'llm', 'web'))
+        AND coalesce(li.size_label, 'default') = ${label}`));
     invalidatePizzaIndexCache();
-    res.json({ preset: toPresetDto(preset, !actor.full), updatedLines: Number(updated) });
+    res.json({ preset: toPresetDto(preset, !actor.full), updatedLines: Number(updated) + updatedHistory });
   } catch (err) {
     next(err);
   }
@@ -1205,15 +1268,21 @@ export default router;
 
 // ===========================================================================
 // PUBLIC  GET /api/pizza-index   (no auth)
-//   Aggregates only: country level, >= 3 parties, GPP 2026 data, verified or
+//   Aggregates only: country level, one year at a time (?year=, default latest; 2021-2025 come
+//   from the archive), verified or
 //   high-confidence sizes, bundles excluded. No party names, merchants, or
 //   receipt images. Cached 1h (in-process + Cache-Control).
 //   Response: PublicPizzaIndex (see services/pizzaIndex.service.ts)
 // ===========================================================================
 export const publicPizzaIndexRouter = Router();
-publicPizzaIndexRouter.get('/', async (_req, res: Response, next: NextFunction) => {
+publicPizzaIndexRouter.get('/', async (req, res: Response, next: NextFunction) => {
   try {
-    const body = await getPublicPizzaIndex();
+    const year = parsePublicYear(req.query.year);
+    let body = await getPublicPizzaIndex();
+    if (year !== undefined && year !== body.year) {
+      if (!body.years.includes(year)) throw new AppError('No pizza index for that year', 400, 'BAD_YEAR');
+      body = await getPublicPizzaIndex(year);
+    }
     res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
     res.json(body);
   } catch (err) {
@@ -1221,13 +1290,21 @@ publicPizzaIndexRouter.get('/', async (_req, res: Response, next: NextFunction) 
   }
 });
 
-// GET /api/pizza-index/photos?country=India  -> { country, photos: [{ url, thumbnailUrl, city }] }
-// Only for countries on the public index; 404 otherwise.
+/** ?year= must be 4 digits; membership in the published years is checked by the caller. */
+function parsePublicYear(v: unknown): number | undefined {
+  if (v === undefined || v === '') return undefined;
+  if (typeof v !== 'string' || !/^\d{4}$/.test(v)) throw new AppError('year must be a 4-digit year', 400, 'BAD_YEAR');
+  return Number(v);
+}
+
+// GET /api/pizza-index/photos?country=India[&year=2025]  -> { country, photos: [{ url, thumbnailUrl, city }] }
+// Only for countries on that year's public index; 404 otherwise. Archive years have no photos ([]).
 publicPizzaIndexRouter.get('/photos', async (req, res: Response, next: NextFunction) => {
   try {
     const country = typeof req.query.country === 'string' ? req.query.country.trim().slice(0, 80) : '';
     if (!country) throw new AppError('country is required', 400, 'COUNTRY_REQUIRED');
-    const photos = await getPublicCountryPhotos(country);
+    const year = parsePublicYear(req.query.year);
+    const photos = await getPublicCountryPhotos(country, year);
     if (!photos) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
     res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
     res.json({ country, photos });

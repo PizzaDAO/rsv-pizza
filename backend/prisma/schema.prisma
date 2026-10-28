@@ -2752,10 +2752,13 @@ model PizzaSizePreset {
 
 model PizzaLineItem {
   id              String         @id @default(uuid()) @db.Uuid
-  documentId      String         @map("document_id") @db.Uuid
-  document        PayoutDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  partyId         String         @map("party_id") @db.Uuid
-  party           Party          @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  documentId      String?        @map("document_id") @db.Uuid
+  document        PayoutDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  partyId         String?        @map("party_id") @db.Uuid
+  party           Party?         @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  // Archive (pre-2026) lines point at a history receipt instead of a document/party.
+  historyReceiptId String?       @map("history_receipt_id") @db.Uuid
+  historyReceipt  PizzaHistoryReceipt? @relation(fields: [historyReceiptId], references: [id], onDelete: Cascade)
   lineIndex       Int            @map("line_index")
   lineFingerprint String         @map("line_fingerprint")
   sourceCategory  String         @default("pizza") @map("source_category")
@@ -2798,6 +2801,35 @@ model PizzaLineItem {
   @@index([partyId], map: "pizza_line_items_party")
   @@index([merchantKey], map: "pizza_line_items_merchant")
   @@map("pizza_line_items")
+}
+
+model PizzaHistoryReceipt {
+  id            String    @id @default(uuid()) @db.Uuid
+  sourceFileId  String    @unique @map("source_file_id")
+  sourceTitle   String?   @map("source_title")
+  sourceUrl     String?   @map("source_url")
+  year          Int
+  receiptDate   DateTime? @map("receipt_date") @db.Date
+  country       String
+  city          String?
+  region        String?
+  merchant      String?
+  merchantKey   String?   @map("merchant_key")
+  currency      String    @db.Char(3)
+  total         Decimal?  @db.Decimal(14, 4)
+  kind          String // 'itemized' | 'lump_sum' | 'not_pizza'
+  pizzaCount    Decimal?  @map("pizza_count") @db.Decimal(8, 2)
+  fxRate        Decimal?  @map("fx_rate") @db.Decimal(18, 8)
+  fxSource      String?   @map("fx_source")
+  fxDate        DateTime? @map("fx_date") @db.Date
+  eventKey      String?   @map("event_key") // generated column; never written by Prisma
+  raw           Json
+  importBatch   String?   @map("import_batch")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime? @map("updated_at") @db.Timestamptz
+  lines         PizzaLineItem[]
+
+  @@map("pizza_history_receipts")
 }
 
 model PizzaLineSync {

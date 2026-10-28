@@ -25,8 +25,9 @@ export const INDEX_LEVELS: IndexLevel[] = ['global', 'continent', 'country', 'ci
 
 export interface IndexRow {
   lineId: string;
-  documentId: string;
-  partyId: string;
+  /** null for archive (history) lines. */
+  documentId: string | null;
+  partyId: string | null;
   partyName: string;
   country: string | null;
   city: string | null;
@@ -62,6 +63,15 @@ export interface IndexRow {
   usdPerCm2: number;
   localPerCm2: number;
   netUsdPerCm2: number | null;
+  /**
+   * What counts as one "event" for MIN_PARTIES: party_id for DB events;
+   * `hist:{year}:{city}|{country}` for archive receipts (one city-year = one event).
+   */
+  eventKey: string;
+  origin: 'event' | 'history';
+  fxSource: string | null;
+  /** Archive lump-sum receipt line (one synthetic line per receipt): estimated tier only. */
+  isLumpSum: boolean;
 }
 
 export type SizeLadder = Record<'25' | '30' | '35' | '40', number | null>;
@@ -196,6 +206,7 @@ function ladder(perCm2: number | null): SizeLadder {
 export function selectRows(rows: IndexRow[], opts: Pick<IndexOptions, 'verifiedOnly' | 'includeBundles'>): IndexRow[] {
   return rows.filter((r) => {
     if (!(r.areaCm2 > 0) || !(r.usdPerCm2 > 0)) return false;
+    if (r.isLumpSum) return false; // lump sums (drinks, tax, delivery) only ever feed the estimated tier
     if (r.isBundle && !opts.includeBundles) return false;
     if (opts.verifiedOnly) return r.isVerified;
     if (r.isVerified) return true; // a human-verified outlier is real
@@ -216,9 +227,9 @@ function modalCurrency(rows: IndexRow[]): string | null {
 export function summarize(rows: IndexRow[]): GroupSummary {
   const byParty = new Map<string, IndexRow[]>();
   for (const r of rows) {
-    const a = byParty.get(r.partyId) ?? [];
+    const a = byParty.get(r.eventKey) ?? [];
     a.push(r);
-    byParty.set(r.partyId, a);
+    byParty.set(r.eventKey, a);
   }
   const currency = modalCurrency(rows);
   const partyUsd: number[] = [];
@@ -324,9 +335,10 @@ const MIN_COUNTRY_SAMPLE = 5;
  * Flag lines whose log(usd_per_cm2) is more than 3.5 modified-z (MAD-based,
  * 0.6745 * |x - median| / MAD) from their country median, or outside the
  * global sanity band. Countries with < 5 lines only get the band check.
+ * Buckets are country + event year, so a 2021 ARS price is never compared to 2026.
  */
 export function computeOutlierIds(
-  rows: Array<{ id: string; country: string | null; usdPerCm2: number }>,
+  rows: Array<{ id: string; country: string | null; usdPerCm2: number; eventYear?: number | null }>,
 ): Set<string> {
   const flagged = new Set<string>();
   const byCountry = new Map<string, Array<{ id: string; x: number }>>();
@@ -337,9 +349,10 @@ export function computeOutlierIds(
       continue;
     }
     if (!r.country) continue;
-    const a = byCountry.get(r.country) ?? [];
+    const bucket = `${r.country}|${r.eventYear ?? ''}`;
+    const a = byCountry.get(bucket) ?? [];
     a.push({ id: r.id, x: Math.log(r.usdPerCm2) });
-    byCountry.set(r.country, a);
+    byCountry.set(bucket, a);
   }
   for (const list of byCountry.values()) {
     if (list.length < MIN_COUNTRY_SAMPLE) continue;
@@ -373,7 +386,7 @@ export interface IndexFilters {
 }
 
 interface ViewRow {
-  line_id: string; document_id: string; party_id: string; party_name: string;
+  line_id: string; document_id: string | null; party_id: string | null; party_name: string;
   country: string | null; city: string | null; region: string | null;
   event_year: number | null; event_series_slug: string | null;
   document_url: string | null; document_mime_type: string | null;
@@ -386,6 +399,7 @@ interface ViewRow {
   verified_at: Date | null; verified_by: string | null; is_verified: boolean;
   outlier_flag: boolean; is_bundle: boolean;
   usd_per_cm2: number; local_per_cm2: number; net_usd_per_cm2: number | null;
+  event_key: string; origin: string; fx_source: string | null; is_lump_sum: boolean;
 }
 
 function mapViewRow(v: ViewRow): IndexRow {
@@ -402,6 +416,8 @@ function mapViewRow(v: ViewRow): IndexRow {
     sizeConfidence: v.size_confidence, verifiedAt: v.verified_at, verifiedBy: v.verified_by,
     isVerified: v.is_verified, outlierFlag: v.outlier_flag, isBundle: v.is_bundle,
     usdPerCm2: v.usd_per_cm2, localPerCm2: v.local_per_cm2, netUsdPerCm2: v.net_usd_per_cm2,
+    eventKey: v.event_key, origin: v.origin === 'history' ? 'history' : 'event',
+    fxSource: v.fx_source, isLumpSum: !!v.is_lump_sum,
   };
 }
 
@@ -435,9 +451,9 @@ export async function fetchIndexRows(scope?: IndexScope, f: IndexFilters = {}): 
  * persist the diff. Returns the number of flagged lines. Cheap: < 5k rows.
  */
 export async function flagOutliers(): Promise<{ flagged: number; changed: number }> {
-  const rows = await prisma.$queryRaw<Array<{ line_id: string; country: string | null; usd_per_cm2: number }>>(Prisma.sql`
-    SELECT line_id, country, usd_per_cm2 FROM pizza_price_index_lines WHERE is_bundle = false`);
-  const flagged = computeOutlierIds(rows.map((r) => ({ id: r.line_id, country: r.country, usdPerCm2: r.usd_per_cm2 })));
+  const rows = await prisma.$queryRaw<Array<{ line_id: string; country: string | null; usd_per_cm2: number; event_year: number | null }>>(Prisma.sql`
+    SELECT line_id, country, usd_per_cm2, event_year FROM pizza_price_index_lines WHERE is_bundle = false`);
+  const flagged = computeOutlierIds(rows.map((r) => ({ id: r.line_id, country: r.country, usdPerCm2: r.usd_per_cm2, eventYear: r.event_year })));
   const ids = [...flagged];
   const on = await prisma.$executeRaw`
     UPDATE pizza_line_items SET outlier_flag = true, updated_at = now()
@@ -484,7 +500,7 @@ export function cachedIndex<T>(key: string, fn: () => Promise<T>): Promise<T> {
 // Public (Phase 3): aggregates only
 // ---------------------------------------------------------------------------
 
-/** Public page launches with GPP 2026 data (decision 12.6). */
+/** Fallback "latest" year when no year has a published country (GPP 2026, decision 12.6). */
 export const PUBLIC_INDEX_YEAR = 2026;
 const PUBLIC_TTL_MS = 60 * 60 * 1000;
 
@@ -505,8 +521,20 @@ export interface PublicCountryEntry {
   estimated: boolean;
 }
 
+/** One point on a country's price trend: that year's published 30 cm price (nominal USD). */
+export interface PublicTrendPoint {
+  year: number;
+  usd30: number;
+  nParties: number;
+  estimated: boolean;
+}
+
 export interface PublicPizzaIndex {
   year: number;
+  /** Years with at least one published country, ascending. Same on every year's response. */
+  years: number[];
+  /** Per-country price trend across `years` (only countries published in >= 1 year). */
+  trends: Record<string, PublicTrendPoint[]>;
   generatedAt: string;
   minParties: number;
   basis: string;
@@ -536,7 +564,13 @@ export function selectPublicRows(rows: IndexRow[]): { rows: IndexRow[]; estimate
   };
 }
 
-export function buildPublicIndexFromRows(allRows: IndexRow[]): PublicPizzaIndex {
+/**
+ * One year's public index. Only that year's rows are used, so each year is
+ * computed independently (a 2021 receipt never touches 2026).
+ * `years`/`trends` are filled in by `buildPublicByYear` once every year is built.
+ */
+export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = PUBLIC_INDEX_YEAR): PublicPizzaIndex {
+  const allRows = allRowsIn.filter((r) => r.eventYear === year);
   const { rows, estimatedCountries } = selectPublicRows(allRows);
   const countries = aggregate(rows, { level: 'country', includeBundles: false, publishedOnly: true, preselected: true })
     .filter((g) => g.usdPerCm2.median !== null && g.country)
@@ -559,7 +593,9 @@ export function buildPublicIndexFromRows(allRows: IndexRow[]): PublicPizzaIndex 
   const publishedNames = new Set(countries.map((c) => c.country));
   const g = summarize(rows.filter((r) => r.country && publishedNames.has(r.country)));
   return {
-    year: PUBLIC_INDEX_YEAR,
+    year,
+    years: [],
+    trends: {},
     generatedAt: new Date().toISOString(),
     minParties: MIN_PARTIES.country,
     basis: 'median of per-event medians; menu (list) prices; confirmed sizes where a country has any, otherwise estimated sizes (flagged); bundles excluded',
@@ -568,29 +604,70 @@ export function buildPublicIndexFromRows(allRows: IndexRow[]): PublicPizzaIndex 
   };
 }
 
-/** Party ids behind each PUBLISHED country's figure (server-side only; never serialized). */
+/** Per-country 30 cm price series from each year's published entries. */
+export function buildTrends(byYear: Map<number, PublicPizzaIndex>): Record<string, PublicTrendPoint[]> {
+  const out: Record<string, PublicTrendPoint[]> = {};
+  for (const year of [...byYear.keys()].sort((a, b) => a - b)) {
+    for (const c of byYear.get(year)!.countries) {
+      const usd30 = c.ladderUsd['30'];
+      if (usd30 === null || usd30 === undefined) continue;
+      (out[c.country] ??= []).push({ year, usd30, nParties: c.nParties, estimated: c.estimated });
+    }
+  }
+  return out;
+}
+
+/** Build every year's public index from all view rows; `years`/`trends` are shared by all of them. */
+export function buildPublicByYear(rows: IndexRow[]): { years: number[]; latest: number; byYear: Map<number, PublicPizzaIndex> } {
+  const allYears = [...new Set(rows.map((r) => r.eventYear).filter((y): y is number => y !== null))].sort((a, b) => a - b);
+  const byYear = new Map<number, PublicPizzaIndex>();
+  for (const y of allYears) {
+    const idx = buildPublicIndexFromRows(rows, y);
+    if (idx.countries.length > 0) byYear.set(y, idx);
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  const trends = buildTrends(byYear);
+  for (const idx of byYear.values()) { idx.years = years; idx.trends = trends; }
+  return { years, latest: years.length ? years[years.length - 1] : PUBLIC_INDEX_YEAR, byYear };
+}
+
+/** Party ids behind each PUBLISHED country's figure (server-side only; never serialized). History lines have no party. */
 export function publicPartiesByCountry(rows: IndexRow[], published: Set<string>): Map<string, string[]> {
   const out = new Map<string, Set<string>>();
   for (const r of selectPublicRows(rows).rows) {
-    if (!r.country || !published.has(r.country)) continue;
+    if (!r.country || !published.has(r.country) || !r.partyId) continue;
     (out.get(r.country) ?? out.set(r.country, new Set()).get(r.country)!).add(r.partyId);
   }
   return new Map([...out].map(([k, v]) => [k, [...v]]));
 }
 
-let publicCache: { at: number; value: PublicPizzaIndex; parties: Map<string, string[]> } | null = null;
+interface PublicCache {
+  at: number;
+  years: number[];
+  latest: number;
+  byYear: Map<number, PublicPizzaIndex>;
+  partiesByYear: Map<number, Map<string, string[]>>;
+}
+let publicCache: PublicCache | null = null;
 
-async function loadPublic() {
+async function loadPublic(): Promise<PublicCache> {
   if (publicCache && Date.now() - publicCache.at < PUBLIC_TTL_MS) return publicCache;
-  const rows = await fetchIndexRows(undefined, { year: PUBLIC_INDEX_YEAR });
-  const value = buildPublicIndexFromRows(rows);
-  const parties = publicPartiesByCountry(rows, new Set(value.countries.map((c) => c.country)));
-  publicCache = { at: Date.now(), value, parties };
+  const rows = await fetchIndexRows(undefined, {});
+  const { years, latest, byYear } = buildPublicByYear(rows);
+  const partiesByYear = new Map<number, Map<string, string[]>>();
+  for (const [y, idx] of byYear) {
+    partiesByYear.set(y, publicPartiesByCountry(
+      rows.filter((r) => r.eventYear === y), new Set(idx.countries.map((c) => c.country))));
+  }
+  publicCache = { at: Date.now(), years, latest, byYear, partiesByYear };
   return publicCache;
 }
 
-export async function getPublicPizzaIndex(): Promise<PublicPizzaIndex> {
-  return (await loadPublic()).value;
+/** The public index for `year` (default: latest year with data). Unknown years yield an empty index. */
+export async function getPublicPizzaIndex(year?: number): Promise<PublicPizzaIndex> {
+  const c = await loadPublic();
+  const y = year ?? c.latest;
+  return c.byYear.get(y) ?? { ...buildPublicIndexFromRows([], y), years: c.years };
 }
 
 export interface PublicCountryPhoto {
@@ -610,11 +687,13 @@ export const PUBLIC_PHOTOS_PER_COUNTRY = 12;
  * the grid shows pizza rather than people. At most 3 per event so one party
  * can't fill the strip. null = not published.
  */
-export async function getPublicCountryPhotos(country: string): Promise<PublicCountryPhoto[] | null> {
-  const { parties } = await loadPublic();
-  const ids = parties.get(country);
-  if (!ids?.length) return null;
-  return cached(`public-photos:${country}`, PUBLIC_TTL_MS, async () => {
+export async function getPublicCountryPhotos(country: string, year?: number): Promise<PublicCountryPhoto[] | null> {
+  const c = await loadPublic();
+  const y = year ?? c.latest;
+  if (!c.byYear.get(y)?.countries.some((e) => e.country === country)) return null;
+  const ids = c.partiesByYear.get(y)?.get(country);
+  if (!ids?.length) return []; // archive years have no parties, so no photos
+  return cached(`public-photos:${y}:${country}`, PUBLIC_TTL_MS, async () => {
     const rows = await prisma.$queryRaw<Array<{ url: string; thumbnail_url: string | null; city: string | null }>>(Prisma.sql`
       SELECT url, thumbnail_url, city FROM (
         SELECT ph.url, ph.thumbnail_url, pa.city, ph.party_id,
