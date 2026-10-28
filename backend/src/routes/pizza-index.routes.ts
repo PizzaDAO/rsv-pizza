@@ -49,6 +49,7 @@ import {
   cachedIndex,
   fetchIndexRows,
   flagOutliers,
+  getPublicCountryPhotos,
   getPublicPizzaIndex,
   invalidatePizzaIndexCache,
   refreshOutliers,
@@ -1215,6 +1216,21 @@ publicPizzaIndexRouter.get('/', async (_req, res: Response, next: NextFunction) 
     const body = await getPublicPizzaIndex();
     res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
     res.json(body);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/pizza-index/photos?country=India  -> { country, photos: [{ url, thumbnailUrl, city }] }
+// Only for countries on the public index; 404 otherwise.
+publicPizzaIndexRouter.get('/photos', async (req, res: Response, next: NextFunction) => {
+  try {
+    const country = typeof req.query.country === 'string' ? req.query.country.trim().slice(0, 80) : '';
+    if (!country) throw new AppError('country is required', 400, 'COUNTRY_REQUIRED');
+    const photos = await getPublicCountryPhotos(country);
+    if (!photos) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
+    res.json({ country, photos });
   } catch (err) {
     next(err);
   }
