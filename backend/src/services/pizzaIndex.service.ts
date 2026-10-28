@@ -101,7 +101,7 @@ export interface IndexGroup extends GroupSummary {
   /** Plain city name (city level only). */
   city: string | null;
   continent: string | null;
-  /** >= minParties distinct parties; unpublished groups are shown greyed ("n<3"). */
+  /** >= minParties distinct parties; unpublished groups are shown greyed. */
   published: boolean;
   minParties: number;
   yearly: Record<string, GroupSummary>;
@@ -120,8 +120,9 @@ export interface IndexOptions {
 }
 
 export const HIGH_CONFIDENCE = 0.8;
+// Snax 2026-10-28: a country may publish from a single event (shown as "early" on the page).
 export const MIN_PARTIES: Record<IndexLevel, number> = {
-  global: 3, continent: 10, country: 3, city: 3, merchant: 3,
+  global: 3, continent: 3, country: 1, city: 3, merchant: 3,
 };
 
 // ---------------------------------------------------------------------------
