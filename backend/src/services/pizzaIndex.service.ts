@@ -117,6 +117,8 @@ export interface IndexOptions {
   publishedOnly?: boolean;
   /** 'parties' (default): most parties first. 'cheapest': lowest USD/cm^2 first. */
   sort?: 'parties' | 'cheapest';
+  /** Rows were already filtered by the caller (public tiers); skip selectRows. */
+  preselected?: boolean;
 }
 
 export const HIGH_CONFIDENCE = 0.8;
@@ -275,7 +277,7 @@ function groupKeyFor(level: IndexLevel, r: IndexRow): GroupKey | null {
 }
 
 export function aggregate(allRows: IndexRow[], opts: IndexOptions): IndexGroup[] {
-  const rows = selectRows(allRows, opts);
+  const rows = opts.preselected ? allRows : selectRows(allRows, opts);
   const groups = new Map<string, { gk: GroupKey; rows: IndexRow[] }>();
   for (const r of rows) {
     const gk = groupKeyFor(opts.level, r);
@@ -499,6 +501,8 @@ export interface PublicCountryEntry {
   localCurrency: string | null;
   localPerCm2: number | null;
   ladderLocal: SizeLadder;
+  /** true when no size in this country is confirmed yet and the figure uses estimated sizes. */
+  estimated: boolean;
 }
 
 export interface PublicPizzaIndex {
@@ -510,8 +514,31 @@ export interface PublicPizzaIndex {
   countries: PublicCountryEntry[];
 }
 
-export function buildPublicIndexFromRows(rows: IndexRow[]): PublicPizzaIndex {
-  const countries = aggregate(rows, { level: 'country', verifiedOnly: false, includeBundles: false, publishedOnly: true })
+/** Estimated-tier rows outside this USD/cm^2 band are treated as misreads (wrong currency, totals as unit prices). */
+export const ESTIMATE_SANE_USD_PER_CM2 = { min: 0.002, max: 0.2 } as const;
+
+/**
+ * Rows behind the public figures (Snax 2026-10-28: show every country we have).
+ * A country with any confirmed size (verified or >= 0.8) uses only those rows.
+ * A country with none falls back to estimated sizes (any confidence), minus
+ * unverified outliers and anything outside the sanity band, and is flagged.
+ */
+export function selectPublicRows(rows: IndexRow[]): { rows: IndexRow[]; estimatedCountries: Set<string> } {
+  const confirmed = selectRows(rows, { verifiedOnly: false, includeBundles: false });
+  const confirmedCountries = new Set(confirmed.map((r) => r.country).filter((c): c is string => !!c));
+  const estimated = rows.filter((r) =>
+    r.country && !confirmedCountries.has(r.country) &&
+    r.areaCm2 > 0 && r.usdPerCm2 > 0 && !r.isBundle && !r.outlierFlag &&
+    r.usdPerCm2 >= ESTIMATE_SANE_USD_PER_CM2.min && r.usdPerCm2 <= ESTIMATE_SANE_USD_PER_CM2.max);
+  return {
+    rows: [...confirmed, ...estimated],
+    estimatedCountries: new Set(estimated.map((r) => r.country!)),
+  };
+}
+
+export function buildPublicIndexFromRows(allRows: IndexRow[]): PublicPizzaIndex {
+  const { rows, estimatedCountries } = selectPublicRows(allRows);
+  const countries = aggregate(rows, { level: 'country', includeBundles: false, publishedOnly: true, preselected: true })
     .filter((g) => g.usdPerCm2.median !== null && g.country)
     .map<PublicCountryEntry>((g) => ({
       country: g.country!,
@@ -525,16 +552,17 @@ export function buildPublicIndexFromRows(rows: IndexRow[]): PublicPizzaIndex {
       localCurrency: g.localCurrency,
       localPerCm2: g.localPerCm2,
       ladderLocal: g.ladderLocal,
+      estimated: estimatedCountries.has(g.country!),
     }))
     .sort((a, b) => a.usdPerCm2 - b.usdPerCm2);
   // Global figure only over published countries so unpublished data never leaks in.
   const publishedNames = new Set(countries.map((c) => c.country));
-  const g = summarize(selectRows(rows, { verifiedOnly: false, includeBundles: false }).filter((r) => r.country && publishedNames.has(r.country)));
+  const g = summarize(rows.filter((r) => r.country && publishedNames.has(r.country)));
   return {
     year: PUBLIC_INDEX_YEAR,
     generatedAt: new Date().toISOString(),
     minParties: MIN_PARTIES.country,
-    basis: 'median of per-event medians; menu (list) prices; verified or high-confidence sizes only; bundles excluded',
+    basis: 'median of per-event medians; menu (list) prices; confirmed sizes where a country has any, otherwise estimated sizes (flagged); bundles excluded',
     global: { nParties: g.nParties, nCountries: countries.length, usdPerCm2: g.usdPerCm2.median, ladderUsd: g.ladderUsd },
     countries,
   };
@@ -543,7 +571,7 @@ export function buildPublicIndexFromRows(rows: IndexRow[]): PublicPizzaIndex {
 /** Party ids behind each PUBLISHED country's figure (server-side only; never serialized). */
 export function publicPartiesByCountry(rows: IndexRow[], published: Set<string>): Map<string, string[]> {
   const out = new Map<string, Set<string>>();
-  for (const r of selectRows(rows, { verifiedOnly: false, includeBundles: false })) {
+  for (const r of selectPublicRows(rows).rows) {
     if (!r.country || !published.has(r.country)) continue;
     (out.get(r.country) ?? out.set(r.country, new Set()).get(r.country)!).add(r.partyId);
   }
