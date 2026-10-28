@@ -605,8 +605,10 @@ export const PUBLIC_PHOTOS_PER_COUNTRY = 12;
  * Pizza photos from the events behind a published country's figure, for the
  * public page's country drill-down. Same visibility rules as the public photo
  * feed (approved, not deleted, event photos public + enabled, event approved).
- * Payout "pizza" photos first, then pizza-captioned/tagged, starred, most voted;
- * at most 3 per event so one party can't fill the strip. null = not published.
+ * Order: payout "pizza" photos, then "box_stack", then other photos (pizza-
+ * captioned/tagged, starred, most voted first), and "group" shots last, so
+ * the grid shows pizza rather than people. At most 3 per event so one party
+ * can't fill the strip. null = not published.
  */
 export async function getPublicCountryPhotos(country: string): Promise<PublicCountryPhoto[] | null> {
   const { parties } = await loadPublic();
@@ -616,12 +618,12 @@ export async function getPublicCountryPhotos(country: string): Promise<PublicCou
     const rows = await prisma.$queryRaw<Array<{ url: string; thumbnail_url: string | null; city: string | null }>>(Prisma.sql`
       SELECT url, thumbnail_url, city FROM (
         SELECT ph.url, ph.thumbnail_url, pa.city, ph.party_id,
-          (ph.payout_role = 'pizza') AS is_pizza_role,
+          CASE ph.payout_role WHEN 'pizza' THEN 0 WHEN 'box_stack' THEN 1 WHEN 'group' THEN 3 ELSE 2 END AS role_rank,
           (coalesce(ph.caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(ph.tags)) AS is_pizza_tag,
           ph.starred, ph.vote_count, ph.created_at,
           row_number() OVER (
             PARTITION BY ph.party_id
-            ORDER BY (ph.payout_role = 'pizza') DESC NULLS LAST,
+            ORDER BY CASE ph.payout_role WHEN 'pizza' THEN 0 WHEN 'box_stack' THEN 1 WHEN 'group' THEN 3 ELSE 2 END,
                      (coalesce(ph.caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(ph.tags)) DESC,
                      ph.starred DESC, ph.vote_count DESC, ph.created_at
           ) AS rn
@@ -632,7 +634,7 @@ export async function getPublicCountryPhotos(country: string): Promise<PublicCou
           AND pa.underboss_status = 'approved' AND pa.photos_public = true AND pa.photos_enabled = true
       ) x
       WHERE rn <= 3
-      ORDER BY rn, is_pizza_role DESC NULLS LAST, is_pizza_tag DESC, starred DESC, vote_count DESC, party_id
+      ORDER BY role_rank, rn, is_pizza_tag DESC, starred DESC, vote_count DESC, party_id
       LIMIT ${PUBLIC_PHOTOS_PER_COUNTRY}`);
     return rows.map((r) => ({ url: r.url, thumbnailUrl: r.thumbnail_url, city: r.city }));
   });
