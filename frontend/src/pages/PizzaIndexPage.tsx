@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Pizza } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Pizza } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';
-import { fetchPublicPizzaIndex, type PublicPizzaIndex } from '../lib/api';
+import {
+  fetchPublicPizzaCountryPhotos,
+  fetchPublicPizzaIndex,
+  type PublicPizzaCountryPhoto,
+  type PublicPizzaIndex,
+} from '../lib/api';
 import { LADDER_SIZES, fmtLocalPerCm2, fmtPerCm2, fmtUsd } from '../lib/pizzaIndexUtils';
 import { flagEmoji } from '../lib/iso4217';
 import { PizzaIndexMap } from '../components/PizzaIndexMap';
@@ -13,7 +18,7 @@ const EARLY_BELOW = 3;
 
 /**
  * sfincione-40417 Phase 3: public Pizza Price Index. Aggregates only
- * (n>=3 parties per country, GPP 2026 receipts, verified or high-confidence
+ * (GPP 2026 receipts, verified or high-confidence
  * sizes, bundles excluded). Handles an empty dataset gracefully.
  * Map: PizzaIndexMap puts a sized/coloured marker on each published country's centroid.
  */
@@ -25,10 +30,43 @@ const LADDER_LABEL: Record<(typeof LADDER_SIZES)[number], string> = {
   '40': '40 cm (≈16″)',
 };
 
+/** Photo strip for one country, shown when its table row is opened. */
+function CountryPhotos({ country }: { country: string }) {
+  const [photos, setPhotos] = useState<PublicPizzaCountryPhoto[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicPizzaCountryPhotos(country)
+      .then((r) => { if (!cancelled) setPhotos(r.photos); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [country]);
+
+  if (failed) return <div className="text-xs text-theme-text-muted">Couldn't load photos.</div>;
+  if (!photos) return <div className="py-4 flex justify-center"><Loader2 size={18} className="animate-spin text-theme-text-muted" /></div>;
+  if (photos.length === 0) return <div className="text-xs text-theme-text-muted">No photos from these events yet.</div>;
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+      {photos.map((p) => (
+        <a key={p.url} href={p.url} target="_blank" rel="noreferrer" className="block">
+          <img
+            src={p.thumbnailUrl || p.url}
+            alt={`Pizza from a Global Pizza Party event${p.city ? ` in ${p.city}` : ''}, ${country}`}
+            loading="lazy"
+            className="aspect-square w-full object-cover rounded-lg border border-theme-stroke hover:opacity-90"
+          />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function PizzaIndexPage() {
   const [data, setData] = useState<PublicPizzaIndex | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openCountry, setOpenCountry] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +136,7 @@ export function PizzaIndexPage() {
             {/* Leaderboard */}
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-theme-text">Cheapest to priciest</h2>
+              <p className="text-xs text-theme-text-faint">Tap a country to see pizzas from its events.</p>
               <div className="overflow-x-auto rounded-xl border border-theme-stroke">
                 <table className="w-full">
                   <thead className="bg-white/5">
@@ -112,10 +151,22 @@ export function PizzaIndexPage() {
                   </thead>
                   <tbody>
                     {countries.map((c, i) => (
-                      <tr key={c.country} className="border-t border-theme-stroke hover:bg-white/5">
+                      <Fragment key={c.country}>
+                      <tr
+                        className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer"
+                        onClick={() => setOpenCountry(openCountry === c.country ? null : c.country)}
+                        aria-expanded={openCountry === c.country}
+                      >
                         <td className={`${td} text-theme-text-muted`}>{i + 1}</td>
                         <td className={`${td} font-medium text-theme-text`}>
-                          {c.countryCode ? `${flagEmoji(c.countryCode)} ` : ''}{c.country}
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1"
+                            aria-label={`${openCountry === c.country ? 'Hide' : 'Show'} pizza photos from ${c.country}`}
+                          >
+                            {openCountry === c.country ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            {c.countryCode ? `${flagEmoji(c.countryCode)} ` : ''}{c.country}
+                          </button>
                         </td>
                         <td className={td}>{fmtPerCm2(c.usdPerCm2)}</td>
                         <td className={td}>{fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}</td>
@@ -125,6 +176,14 @@ export function PizzaIndexPage() {
                           {c.nParties < EARLY_BELOW && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-theme-text-faint">early</span>}
                         </td>
                       </tr>
+                      {openCountry === c.country && (
+                        <tr className="bg-black/10">
+                          <td colSpan={5 + LADDER_SIZES.length} className="px-3 py-3">
+                            <CountryPhotos country={c.country} />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

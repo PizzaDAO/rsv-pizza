@@ -8437,6 +8437,14 @@ export function runPizzaPhotoPass(body: { limit?: number; dryRun?: boolean; part
 export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
   return apiRequest<PublicPizzaIndex>('/api/pizza-index', { requireAuth: false });
 }
+export interface PublicPizzaCountryPhoto {
+  url: string;
+  thumbnailUrl: string | null;
+  city: string | null;
+}
+export function fetchPublicPizzaCountryPhotos(country: string): Promise<{ country: string; photos: PublicPizzaCountryPhoto[] }> {
+  return apiRequest(`/api/pizza-index/photos?country=${encodeURIComponent(country)}`, { requireAuth: false });
+}
 
 // ---------------------------------------------------------------------------
 // Host fast pass: track record, review assist, budget pre-approval.

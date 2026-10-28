@@ -5,6 +5,7 @@ vi.mock('../config/database.js', () => ({ prisma: {} }));
 import {
   aggregate,
   buildPublicIndexFromRows,
+  publicPartiesByCountry,
   computeOutlierIds,
   median,
   quantile,
@@ -200,6 +201,19 @@ describe('computeOutlierIds', () => {
   it('does not apply MAD flagging to tiny samples', () => {
     const rows = [0.02, 0.021, 0.15].map((v, i) => ({ id: `n${i}`, country: 'US', usdPerCm2: v }));
     expect(computeOutlierIds(rows).size).toBe(0);
+  });
+});
+
+describe('publicPartiesByCountry', () => {
+  it('only returns parties behind published countries, using the public row rules', () => {
+    const rows = [
+      row({ partyId: 'A', usdPerCm2: 0.02 }),
+      row({ partyId: 'B', usdPerCm2: 0.02, sizeConfidence: 0.5 }), // low confidence: not public
+      row({ partyId: 'C', usdPerCm2: 0.02, country: 'Peru' }),
+    ];
+    const m = publicPartiesByCountry(rows, new Set(['India']));
+    expect([...m.keys()]).toEqual(['India']);
+    expect(m.get('India')).toEqual(['A']);
   });
 });
 

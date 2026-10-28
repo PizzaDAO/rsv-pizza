@@ -540,12 +540,72 @@ export function buildPublicIndexFromRows(rows: IndexRow[]): PublicPizzaIndex {
   };
 }
 
-let publicCache: { at: number; value: PublicPizzaIndex } | null = null;
+/** Party ids behind each PUBLISHED country's figure (server-side only; never serialized). */
+export function publicPartiesByCountry(rows: IndexRow[], published: Set<string>): Map<string, string[]> {
+  const out = new Map<string, Set<string>>();
+  for (const r of selectRows(rows, { verifiedOnly: false, includeBundles: false })) {
+    if (!r.country || !published.has(r.country)) continue;
+    (out.get(r.country) ?? out.set(r.country, new Set()).get(r.country)!).add(r.partyId);
+  }
+  return new Map([...out].map(([k, v]) => [k, [...v]]));
+}
 
-export async function getPublicPizzaIndex(): Promise<PublicPizzaIndex> {
-  if (publicCache && Date.now() - publicCache.at < PUBLIC_TTL_MS) return publicCache.value;
+let publicCache: { at: number; value: PublicPizzaIndex; parties: Map<string, string[]> } | null = null;
+
+async function loadPublic() {
+  if (publicCache && Date.now() - publicCache.at < PUBLIC_TTL_MS) return publicCache;
   const rows = await fetchIndexRows(undefined, { year: PUBLIC_INDEX_YEAR });
   const value = buildPublicIndexFromRows(rows);
-  publicCache = { at: Date.now(), value };
-  return value;
+  const parties = publicPartiesByCountry(rows, new Set(value.countries.map((c) => c.country)));
+  publicCache = { at: Date.now(), value, parties };
+  return publicCache;
+}
+
+export async function getPublicPizzaIndex(): Promise<PublicPizzaIndex> {
+  return (await loadPublic()).value;
+}
+
+export interface PublicCountryPhoto {
+  url: string;
+  thumbnailUrl: string | null;
+  city: string | null;
+}
+
+export const PUBLIC_PHOTOS_PER_COUNTRY = 12;
+
+/**
+ * Pizza photos from the events behind a published country's figure, for the
+ * public page's country drill-down. Same visibility rules as the public photo
+ * feed (approved, not deleted, event photos public + enabled, event approved).
+ * Payout "pizza" photos first, then pizza-captioned/tagged, starred, most voted;
+ * at most 3 per event so one party can't fill the strip. null = not published.
+ */
+export async function getPublicCountryPhotos(country: string): Promise<PublicCountryPhoto[] | null> {
+  const { parties } = await loadPublic();
+  const ids = parties.get(country);
+  if (!ids?.length) return null;
+  return cached(`public-photos:${country}`, PUBLIC_TTL_MS, async () => {
+    const rows = await prisma.$queryRaw<Array<{ url: string; thumbnail_url: string | null; city: string | null }>>(Prisma.sql`
+      SELECT url, thumbnail_url, city FROM (
+        SELECT ph.url, ph.thumbnail_url, pa.city, ph.party_id,
+          (ph.payout_role = 'pizza') AS is_pizza_role,
+          (coalesce(ph.caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(ph.tags)) AS is_pizza_tag,
+          ph.starred, ph.vote_count, ph.created_at,
+          row_number() OVER (
+            PARTITION BY ph.party_id
+            ORDER BY (ph.payout_role = 'pizza') DESC NULLS LAST,
+                     (coalesce(ph.caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(ph.tags)) DESC,
+                     ph.starred DESC, ph.vote_count DESC, ph.created_at
+          ) AS rn
+        FROM photos ph JOIN parties pa ON pa.id = ph.party_id
+        WHERE ph.party_id = ANY(${ids}::uuid[])
+          AND ph.status = 'approved' AND ph.deleted_at IS NULL
+          AND ph.mime_type IN ('image/jpeg', 'image/png', 'image/webp')
+          AND pa.underboss_status = 'approved' AND pa.photos_public = true AND pa.photos_enabled = true
+      ) x
+      WHERE rn <= 3
+      ORDER BY rn, is_pizza_role DESC NULLS LAST, is_pizza_tag DESC, starred DESC, vote_count DESC, party_id
+      LIMIT ${PUBLIC_PHOTOS_PER_COUNTRY}`);
+    return rows.map((r) => ({ url: r.url, thumbnailUrl: r.thumbnail_url, city: r.city }));
+  });
 }
