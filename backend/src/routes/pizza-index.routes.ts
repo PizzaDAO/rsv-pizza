@@ -38,6 +38,7 @@ import {
   MAX_PHOTOS_PER_PARTY,
   galleryPhotos,
   payoutPizzaPhotos,
+  photoCandidatesSql,
   readPhotoEstimate,
   runPhotoPass,
   type PhotoEstimate,
@@ -376,6 +377,7 @@ function scopeKey(actor: PizzaActor): string {
 // ---------------------------------------------------------------------------
 
 const router = Router();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ===========================================================================
 // POST /sync   (full admin)  body: { limit?: 1-300 (default 100), force?: boolean, forceBefore?: ISO string, docIds?: string[] }
@@ -449,6 +451,7 @@ router.post('/photo-pass', ...fullChain, async (req: PizzaRequest, res: Response
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const partyIds = Array.isArray(body.partyIds) ? body.partyIds.filter((x): x is string => typeof x === 'string') : undefined;
+    if (partyIds?.some((id) => !UUID_RE.test(id))) throw new AppError('partyIds must be UUIDs', 400, 'INVALID_PARTY_ID');
     res.json(await runPhotoPass({ limit: intQ(body.limit, 5, 1, 10), partyIds, dryRun: bool(body.dryRun) ?? false }));
   } catch (err) {
     next(err);
@@ -530,16 +533,9 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
         AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id AND NOT li.excluded
                     AND NOT li.is_bundle AND li.verified_at IS NULL AND li.area_cm2 IS NULL)`);
     body.docsPendingVision = v.c;
+    // Same candidate rule as the pass itself (incl. back-off), so "run until done" can reach 0.
     const [ph] = await prisma.$queryRaw<Array<{ c: number }>>(Prisma.sql`
-      SELECT count(DISTINCT li.party_id)::int AS c
-      FROM pizza_line_items li JOIN parties p ON p.id = li.party_id
-      JOIN payout_documents d ON d.id = li.document_id
-      LEFT JOIN pizza_photo_pass pp ON pp.party_id = li.party_id
-      WHERE li.area_cm2 IS NULL AND NOT li.excluded AND NOT li.is_bundle AND li.verified_at IS NULL
-        AND li.photo_estimate IS NULL AND pp.pass_at IS NULL
-        AND d.is_duplicate = false AND d.ineligible = false ${sc}
-        AND (EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = li.party_id AND pd.kind = 'pizza')
-             OR EXISTS (SELECT 1 FROM photos g WHERE g.party_id = li.party_id AND g.status = 'approved'))`);
+      SELECT count(*)::int AS c ${photoCandidatesSql({ scope: sc })}`);
     body.partiesPendingPhoto = ph.c;
     res.json(body);
   } catch (err) {

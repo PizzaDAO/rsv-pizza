@@ -102,6 +102,7 @@ describe('planDocSync: re-sync semantics', () => {
     expect(w.verifiedAt).toEqual(new Date('2026-10-01'));
     expect(w.diameterCm).toBe(27);
     expect(w.sizeSource).toBe('manual');
+    expect(w.clearPhotoEstimate).toBeUndefined();
   });
 
   it('keeps qty/price overrides made by a reviewer when the OCR line is unchanged', () => {
@@ -138,6 +139,7 @@ describe('planDocSync: re-sync semantics', () => {
     const plan = planDocSync(changed, [verified], doc, presets);
     const w = plan.writes[0];
     expect(w.existingId).toBe(verified.id); // same row slot is updated in place
+    expect(w.clearPhotoEstimate).toBe(true); // a photo suggestion for the old text no longer applies
     expect(w.verifiedAt).toBeNull();
     expect(w.verifiedBy).toBeNull();
     expect(w.sizeSource).toBe('preset');

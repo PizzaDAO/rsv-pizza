@@ -161,7 +161,8 @@ export async function galleryPhotos(partyIds: string[], perParty: number): Promi
         ORDER BY (coalesce(caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(tags)) DESC, starred DESC, created_at
       ) AS rn
       FROM photos
-      WHERE party_id = ANY(${partyIds}::uuid[]) AND status = 'approved' AND mime_type = ANY(${PHOTO_MIMES}::text[])
+      WHERE party_id = ANY(${partyIds}::uuid[]) AND status = 'approved' AND deleted_at IS NULL
+        AND mime_type = ANY(${PHOTO_MIMES}::text[])
     ) x WHERE rn <= ${perParty} ORDER BY party_id, rn`);
   for (const r of rows) {
     const a = out.get(r.party_id) ?? [];
@@ -202,11 +203,36 @@ const NEEDS_SIZE = Prisma.sql`li.area_cm2 IS NULL AND NOT li.excluded AND NOT li
   AND li.verified_at IS NULL AND li.photo_estimate IS NULL
   AND d.is_duplicate = false AND d.ineligible = false`;
 
-const HAS_PHOTO = Prisma.sql`(
-  EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = c.party_id AND pd.kind = 'pizza'
-          AND pd.mime_type = ANY(${PHOTO_MIMES}::text[]))
-  OR EXISTS (SELECT 1 FROM photos ph WHERE ph.party_id = c.party_id AND ph.status = 'approved'
-             AND ph.mime_type = ANY(${PHOTO_MIMES}::text[])))`;
+/**
+ * FROM/WHERE for parties the photo pass should (re)visit: unsized lines with no
+ * suggestion, readable photos, and either never passed or a line created/changed
+ * since the last pass. `explicit` (admin re-run by id) skips the pass and back-off
+ * gates; `scope` is an extra condition on parties alias `p` (underboss scoping).
+ */
+export function photoCandidatesSql(opts: {
+  partyIds?: string[]; explicit?: boolean; backoff?: boolean; scope?: Prisma.Sql;
+} = {}): Prisma.Sql {
+  const idFilter = opts.partyIds?.length ? Prisma.sql`AND li.party_id = ANY(${opts.partyIds}::uuid[])` : Prisma.empty;
+  const passGate = opts.explicit
+    ? Prisma.empty
+    : Prisma.sql`AND (pp.pass_at IS NULL OR coalesce(li.updated_at, li.created_at) > pp.pass_at)`;
+  const backoff = opts.explicit || opts.backoff === false
+    ? Prisma.empty
+    : Prisma.sql`AND (pp.party_id IS NULL OR (pp.attempts < ${MAX_PHOTO_ATTEMPTS}
+        AND (pp.last_error_at IS NULL OR pp.last_error_at < now() - interval '1 hour')))`;
+  return Prisma.sql`
+    FROM (SELECT DISTINCT li.party_id
+          FROM pizza_line_items li
+          JOIN payout_documents d ON d.id = li.document_id
+          JOIN parties p ON p.id = li.party_id
+          LEFT JOIN pizza_photo_pass pp ON pp.party_id = li.party_id
+          WHERE ${NEEDS_SIZE} ${idFilter} ${passGate} ${backoff} ${opts.scope ?? Prisma.empty}) c
+    WHERE (
+      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = c.party_id AND pd.kind = 'pizza'
+              AND pd.mime_type = ANY(${PHOTO_MIMES}::text[]))
+      OR EXISTS (SELECT 1 FROM photos ph WHERE ph.party_id = c.party_id AND ph.status = 'approved'
+                 AND ph.deleted_at IS NULL AND ph.mime_type = ANY(${PHOTO_MIMES}::text[])))`;
+}
 
 async function recordPhotoError(partyId: string): Promise<void> {
   try {
@@ -222,17 +248,10 @@ async function recordPhotoError(partyId: string): Promise<void> {
 
 export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; dryRun?: boolean } = {}): Promise<PhotoPassResult> {
   const limit = Math.min(Math.max(opts.limit ?? 5, 1), 10);
-  // Explicit partyIds re-run parties that already had a pass.
+  // Explicit partyIds re-run parties regardless of earlier passes or back-off.
   const explicit = !!opts.partyIds?.length;
-  const idFilter = explicit ? Prisma.sql`AND c.party_id = ANY(${opts.partyIds}::uuid[])` : Prisma.empty;
-  const passGate = explicit ? Prisma.empty : Prisma.sql`AND pp.pass_at IS NULL`;
-  const base = Prisma.sql`
-    FROM (SELECT DISTINCT li.party_id FROM pizza_line_items li JOIN payout_documents d ON d.id = li.document_id
-          WHERE ${NEEDS_SIZE}) c
-    LEFT JOIN pizza_photo_pass pp ON pp.party_id = c.party_id
-    WHERE ${HAS_PHOTO} ${passGate} ${idFilter}`;
-  const where = Prisma.sql`${base} AND (pp.party_id IS NULL OR (pp.attempts < ${MAX_PHOTO_ATTEMPTS}
-    AND (pp.last_error_at IS NULL OR pp.last_error_at < now() - interval '1 hour')))`;
+  const base = photoCandidatesSql({ partyIds: opts.partyIds, explicit, backoff: false });
+  const where = photoCandidatesSql({ partyIds: opts.partyIds, explicit });
   const [{ n: baseN }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${base}`);
   const [{ n }] = await prisma.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${where}`);
   const picked = await prisma.$queryRaw<{ party_id: string }[]>(Prisma.sql`
@@ -280,7 +299,7 @@ export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; 
         await prisma.pizzaPhotoPass.upsert({
           where: { partyId },
           create: { partyId, passAt: new Date(), photoUrls: [] },
-          update: { passAt: new Date(), updatedAt: new Date() },
+          update: { passAt: new Date(), attempts: 0, lastErrorAt: null, updatedAt: new Date() },
         });
         result.processed += 1;
         continue;
@@ -323,7 +342,7 @@ export async function runPhotoPass(opts: { limit?: number; partyIds?: string[]; 
         prisma.pizzaPhotoPass.upsert({
           where: { partyId },
           create: { partyId, passAt: now, photoUrls: sentUrls },
-          update: { passAt: now, photoUrls: sentUrls, updatedAt: now },
+          update: { passAt: now, photoUrls: sentUrls, attempts: 0, lastErrorAt: null, updatedAt: now },
         }),
       ]);
       result.processed += 1;
