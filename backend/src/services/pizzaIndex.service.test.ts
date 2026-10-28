@@ -109,14 +109,14 @@ describe('aggregate', () => {
     expect(g.ladderLocal['30']).toBeCloseTo((0.02 / 0.0105) * 706.858, 2);
   });
 
-  it('publishes only with >= 3 parties (continent >= 10)', () => {
+  it('publishes a country from one party; continent and city need >= 3', () => {
+    const one = [row({ partyId: 'A', usdPerCm2: 0.01 })];
+    expect(aggregate(one, { level: 'country' })[0].published).toBe(true);
     const two = [row({ partyId: 'A', usdPerCm2: 0.01 }), row({ partyId: 'B', usdPerCm2: 0.02 })];
-    expect(aggregate(two, { level: 'country' })[0].published).toBe(false);
-    expect(aggregate(two, { level: 'country', publishedOnly: true })).toHaveLength(0);
-    const five = ['A', 'B', 'C', 'D', 'E'].map((p) => row({ partyId: p, usdPerCm2: 0.01 }));
-    expect(aggregate(five, { level: 'continent' })[0].published).toBe(false);
-    const ten = 'ABCDEFGHIJ'.split('').map((p) => row({ partyId: p, usdPerCm2: 0.01 }));
-    expect(aggregate(ten, { level: 'continent' })[0].published).toBe(true);
+    expect(aggregate(two, { level: 'continent' })[0].published).toBe(false);
+    expect(aggregate(two, { level: 'city', publishedOnly: true })).toHaveLength(0);
+    const three = ['A', 'B', 'C'].map((p) => row({ partyId: p, usdPerCm2: 0.01 }));
+    expect(aggregate(three, { level: 'continent' })[0].published).toBe(true);
   });
 
   it('local figures only use the modal currency', () => {
@@ -204,19 +204,21 @@ describe('computeOutlierIds', () => {
 });
 
 describe('public index', () => {
-  it('exposes aggregates only, for countries with >= 3 parties', () => {
+  it('exposes aggregates only; single-event countries publish', () => {
     const rows = [
       ...['A', 'B', 'C'].map((p) => row({ partyId: p, usdPerCm2: 0.02 })),
-      ...['D', 'E'].map((p) => row({ partyId: p, usdPerCm2: 0.05, country: 'Peru', region: 'south-america' })),
+      row({ partyId: 'D', usdPerCm2: 0.05, country: 'Peru', region: 'south-america' }),
+      // low-confidence, unverified size: never public
+      row({ partyId: 'E', usdPerCm2: 0.03, country: 'Chile', region: 'south-america', sizeConfidence: 0.5, isVerified: false }),
     ];
     const pub = buildPublicIndexFromRows(rows);
-    expect(pub.countries.map((c) => c.country)).toEqual(['India']);
-    expect(pub.global.nCountries).toBe(1);
+    expect(pub.countries.map((c) => c.country)).toEqual(['India', 'Peru']);
+    expect(pub.global.nCountries).toBe(2);
     const json = JSON.stringify(pub);
     expect(json).not.toContain('Party A');
     expect(json).not.toContain('partyId');
     expect(json).not.toContain('merchant');
-    expect(json).not.toContain('Peru'); // unpublished country must not leak
+    expect(json).not.toContain('Chile'); // a country with only low-confidence sizes must not leak
     expect(pub.countries[0].ladderUsd['30']).toBeGreaterThan(0);
     expect(pub.countries[0].countryCode).toBe('IN');
   });
