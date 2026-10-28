@@ -8121,6 +8121,20 @@ export interface PizzaLineDto {
   usdPerCm2: number | null;
   localPerCm2: number | null;
   sizeLadderUsd: PizzaSizeLadder | null;
+  /** Photo-pass size suggestion; not counted in the index until a reviewer accepts it. */
+  photoEstimate?: PizzaPhotoEstimate | null;
+}
+
+export interface PizzaPhotoEstimate {
+  shape: 'round' | 'rect';
+  diameterCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  confidence: number;
+  photoUrl: string | null;
+  note: string;
+  model: string;
+  at: string;
 }
 
 export interface PizzaPresetDto {
@@ -8154,6 +8168,8 @@ export interface PizzaQueueReceipt {
   receiptDiscounts: Array<{ label: string; amount: number }>;
   lines: PizzaLineDto[];
   pizzaPhotoUrls: string[];
+  /** Event-gallery photos (fallback context); optional until the backend ships it. */
+  galleryPhotoUrls?: string[];
 }
 
 export interface PizzaQueueProgress {
@@ -8175,6 +8191,7 @@ export interface PizzaQueueParams {
   merchant?: string;
   source?: string;
   outlier?: boolean;
+  photoEstimate?: boolean;
   excluded?: boolean;
   bundles?: 'include' | 'exclude' | 'only';
   partyId?: string;
@@ -8196,6 +8213,8 @@ export interface PizzaStatusResponse {
   bundleLines: number;
   outlierLines: number;
   bySource: Record<string, number>;
+  partiesPendingPhoto?: number;
+  linesWithPhotoEstimate?: number;
 }
 
 export interface PizzaLinePatch {
@@ -8411,6 +8430,9 @@ export function runPizzaLlmPass(body: { limit?: number; dryRun?: boolean } = {})
 }
 export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; requireLlmPass?: boolean; includeLowConfidence?: boolean } = {}): Promise<PizzaPassResult> {
   return apiRequest(`${PIZZA_BASE}/vision-pass`, { method: 'POST', body, timeoutMs: 180_000 });
+}
+export function runPizzaPhotoPass(body: { limit?: number; dryRun?: boolean; partyIds?: string[] } = {}): Promise<PizzaPassResult> {
+  return apiRequest(`${PIZZA_BASE}/photo-pass`, { method: 'POST', body, timeoutMs: 240_000 });
 }
 export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
   return apiRequest<PublicPizzaIndex>('/api/pizza-index', { requireAuth: false });

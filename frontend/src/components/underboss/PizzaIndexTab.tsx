@@ -29,12 +29,13 @@ interface Filters {
   merchant: string;
   source: string;
   outlier: boolean;
+  photoEstimate: boolean;
   excluded: boolean;
   bundles: NonNullable<PizzaQueueParams['bundles']>;
 }
 
 const DEFAULT_FILTERS: Filters = {
-  status: 'unverified', country: '', merchant: '', source: '', outlier: false, excluded: false, bundles: 'include',
+  status: 'unverified', country: '', merchant: '', source: '', outlier: false, photoEstimate: false, excluded: false, bundles: 'include',
 };
 
 function ProgressBar({ label, done, total }: { label: string; done: number; total: number }) {
@@ -80,6 +81,7 @@ function ReviewView() {
         merchant: applied.merchant.trim() || undefined,
         source: applied.source || undefined,
         outlier: applied.outlier || undefined,
+        photoEstimate: applied.photoEstimate || undefined,
         excluded: applied.excluded || undefined,
         bundles: applied.bundles,
         limit: PAGE_SIZE,
@@ -222,6 +224,7 @@ function ReviewView() {
         <div className="w-44"><IconInput icon={Globe} placeholder="Country" value={filters.country} onChange={(e) => set({ country: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyFilters()} /></div>
         <div className="w-44"><IconInput icon={Store} placeholder="Pizzeria" value={filters.merchant} onChange={(e) => set({ merchant: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyFilters()} /></div>
         <Checkbox checked={filters.outlier} onChange={() => set({ outlier: !filters.outlier })} label="Outliers only" />
+        <Checkbox checked={filters.photoEstimate} onChange={() => set({ photoEstimate: !filters.photoEstimate })} label="Photo estimates only" />
         <Checkbox checked={filters.excluded} onChange={() => set({ excluded: !filters.excluded })} label="Show excluded" />
         <button type="button" onClick={applyFilters} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm">
           <Search size={14} /> Apply
