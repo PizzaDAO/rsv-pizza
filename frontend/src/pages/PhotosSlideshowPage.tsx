@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, X, Pause, Play, MapPin, ThumbsUp } from 'lucide-react';
+import { Loader2, X, Pause, Play, MapPin, ThumbsUp, SkipBack, SkipForward } from 'lucide-react';
 import { cdnUrl } from '../lib/supabase';
 import { getPhotosFeed, togglePhotoVote, togglePayoutPhotoVote, FeedPhoto } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { countryNameToAlpha2, alpha2ToCountryNames } from '../utils/countryFlag';
 import { gppCityBySlug } from '../utils/gppCity';
 import { CircleFlag } from '../components/CircleFlag';
+import { BRAND } from '../config/brand';
 
 // crespelle-58543: /photos/play — a fullscreen slideshow that shows a fresh
 // random photo every few seconds. It walks a randomly-shuffled feed (the same
@@ -20,6 +21,13 @@ const ADVANCE_MS = 3000;
 const PAGE_SIZE = 30;
 // Prefetch the next page once we get this close to the end of the loaded deck.
 const PREFETCH_WHEN_REMAINING = 6;
+// funghi-91314: controls fade out after this long without pointer/touch/key
+// activity (the page is used fullscreen on a livestream).
+const CONTROLS_HIDE_MS = 3000;
+// Max photos remembered for the Back button.
+const HISTORY_MAX = 500;
+// Touch: horizontal travel (px) that counts as a swipe rather than a tap.
+const SWIPE_MIN_PX = 50;
 
 function parseCsvParam(v: string | null): string[] {
   if (!v) return [];
@@ -52,6 +60,16 @@ export function PhotosSlideshowPage() {
   const [photos, setPhotos] = useState<FeedPhoto[]>([]);
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
+  // funghi-91314: every photo shown, in order (across reshuffles), so Back can
+  // walk through them. `histPos` is null while viewing the live deck photo;
+  // otherwise it indexes the history entry being re-viewed.
+  const [history, setHistory] = useState<FeedPhoto[]>([]);
+  const [histPos, setHistPos] = useState<number | null>(null);
+  // Bumped on manual navigation so the auto-advance timer restarts.
+  const [timerKey, setTimerKey] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimerRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +87,11 @@ export function PhotosSlideshowPage() {
   const hasMoreRef = useRef(true);
   const loadingRef = useRef(false);
   const seedRef = useRef<string>(searchParams.get('seed') || genSeed());
+  const historyRef = useRef<FeedPhoto[]>([]);
+  const histPosRef = useRef<number | null>(null);
   photosRef.current = photos;
+  historyRef.current = history;
+  histPosRef.current = histPos;
   idxRef.current = idx;
 
   // Filters are stable for the life of the page; capture them in a ref so
@@ -127,24 +149,76 @@ export function PhotosSlideshowPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Step forward one photo: through re-viewed history first, then the live
+  // deck (reshuffling when it runs out). Only reads refs, so it is safe to
+  // call from the timer, keys and touch handlers.
+  const goNext = useCallback(() => {
+    const hp = histPosRef.current;
+    const hist = historyRef.current;
+    if (hp !== null) {
+      const np = hp + 1;
+      setHistPos(np >= hist.length - 1 ? null : np);
+      return;
+    }
+    const deck = photosRef.current;
+    if (deck.length === 0) return;
+    const next = idxRef.current + 1;
+    if (next < deck.length) {
+      setIdx(next);
+    } else if (!hasMoreRef.current) {
+      reshuffle();
+    }
+    // else: next page not in hand yet — hold; the prefetch effect is loading it.
+  }, [reshuffle]);
+
+  // Step back one photo through the history.
+  const goBack = useCallback(() => {
+    const hist = historyRef.current;
+    const from = histPosRef.current ?? hist.length - 1;
+    if (from > 0) setHistPos(from - 1);
+  }, []);
+
+  const manualNav = useCallback((dir: 'back' | 'next') => {
+    if (dir === 'back') goBack(); else goNext();
+    setTimerKey((k) => k + 1); // restart the 3s timer; paused stays paused
+  }, [goBack, goNext]);
+
   // Auto-advance.
   useEffect(() => {
     if (paused) return;
-    const t = window.setInterval(() => {
-      const deck = photosRef.current;
-      if (deck.length === 0) return;
-      const next = idxRef.current + 1;
-      if (next < deck.length) {
-        setIdx(next);
-      } else if (hasMoreRef.current) {
-        // Next page not in hand yet — hold on the current photo for one tick;
-        // the prefetch effect is already loading it.
-      } else {
-        reshuffle();
-      }
-    }, ADVANCE_MS);
+    const t = window.setInterval(goNext, ADVANCE_MS);
     return () => window.clearInterval(t);
-  }, [paused, reshuffle]);
+  }, [paused, goNext, timerKey]);
+
+  // Record each live photo in the history as it appears.
+  const liveId = photos[idx]?.id;
+  useEffect(() => {
+    const live = photosRef.current[idxRef.current];
+    if (!live) return;
+    setHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].id === live.id) return prev;
+      const next = [...prev, live];
+      // Only trim while following the live photo, so histPos stays valid.
+      return next.length > HISTORY_MAX && histPosRef.current === null
+        ? next.slice(next.length - HISTORY_MAX)
+        : next;
+    });
+  }, [liveId]);
+
+  // Show controls, then hide them again after a quiet spell.
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_MS);
+  }, []);
+
+  useEffect(() => {
+    // Controls start visible; schedule their first auto-hide.
+    hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_MS);
+    return () => {
+      if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
+    };
+  }, []);
 
   // Prefetch the next page as we near the end of the loaded deck.
   useEffect(() => {
@@ -162,19 +236,55 @@ export function PhotosSlideshowPage() {
     }
   }, [idx, photos]);
 
-  // Keyboard: Esc exits (handled by the Link), Space toggles pause.
+  // Keyboard: Esc exits (handled by the Link), Space toggles pause,
+  // Left/Right arrows go back/next.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault();
         setPaused((p) => !p);
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        manualNav('back');
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        manualNav('next');
+      } else {
+        return;
       }
+      revealControls();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [manualNav, revealControls]);
 
-  const current = photos[idx];
+  // Touch: swipe left/right = next/back; tap left/right third = back/next;
+  // tap the middle third just reveals the controls.
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+    revealControls();
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const t = e.changedTouches[0];
+    if (!start || !t) return;
+    if ((e.target as HTMLElement).closest('button, a')) return; // controls handle themselves
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy)) {
+      manualNav(dx < 0 ? 'next' : 'back');
+    } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      const third = window.innerWidth / 3;
+      if (t.clientX < third) manualNav('back');
+      else if (t.clientX > third * 2) manualNav('next');
+    }
+  };
+
+  const live = photos[idx];
+  // The photo on screen: a re-viewed history entry, or the live deck photo.
+  const current = histPos !== null ? history[histPos] ?? live : live;
   const isVideo = current?.mimeType?.startsWith('video/');
 
   // sfoglia-58543: toggle a vote on the current photo. Source-aware dispatch
@@ -189,19 +299,30 @@ export function PhotosSlideshowPage() {
       : await togglePhotoVote(current.party.id, current.id);
     setVoting(false);
     if (res) {
-      setPhotos((prev) => prev.map((p) =>
-        p.id === current.id ? { ...p, voteCount: res.voteCount, votedByMe: res.voted } : p));
+      const patch = (p: FeedPhoto) =>
+        p.id === current.id ? { ...p, voteCount: res.voteCount, votedByMe: res.voted } : p;
+      setHistory((prev) => prev.map(patch));
+      setPhotos((prev) => prev.map(patch));
     }
   };
+
+  const hideCls = controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none';
 
   const gpp = current ? gppCityBySlug(current.party.slug) : undefined;
   const displayCity = gpp?.name ?? current?.party.city;
   const displayCountry = gpp?.country ?? current?.party.country;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden">
+    <div
+      className={`fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden ${
+        controlsVisible ? '' : 'cursor-none'
+      }`}
+      onMouseMove={revealControls}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       <Helmet>
-        <title>Photo Slideshow · RSV.Pizza</title>
+        <title>{`Photo Slideshow · ${BRAND.name}`}</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -209,7 +330,7 @@ export function PhotosSlideshowPage() {
       <Link
         to="/photos"
         aria-label="Exit slideshow"
-        className="absolute top-4 right-4 z-20 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors"
+        className={`absolute top-4 right-4 z-20 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-all duration-300 ${hideCls}`}
       >
         <X size={24} />
       </Link>
@@ -223,24 +344,45 @@ export function PhotosSlideshowPage() {
           disabled={!user || voting}
           aria-label={current.votedByMe ? 'Remove vote' : 'Thumbs up'}
           title={user ? (current.votedByMe ? 'Remove vote' : 'Thumbs up') : 'Log in to vote'}
-          className={`absolute bottom-4 right-16 z-20 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors ${
+          className={`absolute bottom-4 right-[10.5rem] z-20 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-all duration-300 ${
             !user || voting ? 'opacity-60 cursor-not-allowed' : ''
-          }`}
+          } ${hideCls}`}
         >
           <ThumbsUp size={20} fill={current.votedByMe ? 'white' : 'none'} />
           <span className="text-sm font-medium">{current.voteCount}</span>
         </button>
       )}
 
-      {/* Pause / play */}
+      {/* funghi-91314: Back / Pause-Play / Next, bottom-right. Fade out after a
+          few seconds idle; reappear on mouse move, tap or key press. */}
       {photos.length > 0 && (
-        <button
-          onClick={() => setPaused((p) => !p)}
-          aria-label={paused ? 'Resume slideshow' : 'Pause slideshow'}
-          className="absolute bottom-4 right-4 z-20 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors"
-        >
-          {paused ? <Play size={22} className="fill-white" /> : <Pause size={22} className="fill-white" />}
-        </button>
+        <div className={`absolute bottom-4 right-4 z-20 flex items-center gap-2 transition-all duration-300 ${hideCls}`}>
+          <button
+            onClick={() => manualNav('back')}
+            disabled={(histPos ?? history.length - 1) <= 0}
+            aria-label="Previous photo"
+            title="Previous (Left arrow)"
+            className="p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <SkipBack size={22} className="fill-white" />
+          </button>
+          <button
+            onClick={() => setPaused((p) => !p)}
+            aria-label={paused ? 'Resume slideshow' : 'Pause slideshow'}
+            title={paused ? 'Play (Space)' : 'Pause (Space)'}
+            className="p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors"
+          >
+            {paused ? <Play size={22} className="fill-white" /> : <Pause size={22} className="fill-white" />}
+          </button>
+          <button
+            onClick={() => manualNav('next')}
+            aria-label="Next photo"
+            title="Next (Right arrow)"
+            className="p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors"
+          >
+            <SkipForward size={22} className="fill-white" />
+          </button>
+        </div>
       )}
 
       {loading ? (
