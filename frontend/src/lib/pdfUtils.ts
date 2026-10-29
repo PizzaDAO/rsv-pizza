@@ -12,12 +12,17 @@
  * the frontend display logic and the backend OCR pipeline derive the
  * thumbnail URL by string manipulation.
  */
-import * as pdfjsLib from 'pdfjs-dist';
-// Vite-friendly worker import — see https://github.com/mozilla/pdf.js/issues/15531
-// for the `?url` query hint that ships the worker as a static asset.
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+// forno-81402: pdfjs-dist is loaded lazily (dynamic import) so it stays out of
+// the entry chunk. It uses Promise.withResolvers (Safari 17.4+) and would
+// crash older iOS Safari at module-eval time if loaded eagerly.
+async function loadPdfjs() {
+  const pdfjsLib = await import('pdfjs-dist');
+  // Vite-friendly worker import — see https://github.com/mozilla/pdf.js/issues/15531
+  // for the `?url` query hint that ships the worker as a static asset.
+  const { default: pdfWorkerUrl } = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+  return pdfjsLib;
+}
 
 /**
  * Detect whether a file / URL / mimeType describes a PDF. Used at every
@@ -62,6 +67,7 @@ export async function renderPdfPageOneToPng(
   targetMaxWidth = 1600,
 ): Promise<Blob | null> {
   try {
+    const pdfjsLib = await loadPdfjs();
     const buffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const pdf = await loadingTask.promise;

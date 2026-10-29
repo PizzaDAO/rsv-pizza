@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
+import { markdownRemarkPlugins } from '../lib/safeMarkdown';
+import { MarkdownBoundary } from '../components/ErrorBoundary';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
@@ -1405,8 +1405,9 @@ export function EventPage() {
                         const isDefaultGpp = event.description!.startsWith('On May 22, 2010, two pizzas changed the world');
                         const displayDescription = (isDefaultGpp && i18n.language !== 'en') ? t('gppDefaultDescription') : event.description!;
                         return (
+                        <MarkdownBoundary text={displayDescription}>
                         <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          remarkPlugins={markdownRemarkPlugins}
                           components={{
                             a: ({ node, ...props }) => (
                               <a
@@ -1466,6 +1467,7 @@ export function EventPage() {
                         >
                           {displayDescription}
                         </ReactMarkdown>
+                        </MarkdownBoundary>
                         );
                       })()}
                       <div className={event.description ? 'mt-4 pt-4 border-t border-theme-stroke/50' : ''}>
