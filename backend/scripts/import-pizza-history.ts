@@ -95,7 +95,7 @@ async function main() {
     const base = r.sourceFileId.split('#')[0];
     const cands = rawBySourceId.get(base) ?? [];
     const match = cands.find((c) => { const v = validateRecord(c); return v.ok && JSON.stringify({ ...v.record, sourceFileId: r.sourceFileId }) === JSON.stringify(r); });
-    rawById.set(r.sourceFileId, match ?? cands[0]);
+    rawById.set(r.sourceFileId, match ?? cands[0] ?? r);
   }
 
   // 2. country normalisation
@@ -258,7 +258,7 @@ async function main() {
         fxRate: b.rec.kind === 'not_pizza' ? null : b.fx.rate,
         fxSource: b.rec.kind === 'not_pizza' ? null : b.fx.source,
         fxDate: b.rec.kind === 'not_pizza' ? null : new Date(`${b.fx.date}T00:00:00Z`),
-        raw: rawById.get(b.rec.sourceFileId) as object, importBatch: args.batch,
+        raw: (rawById.get(b.rec.sourceFileId) ?? b.rec) as object, importBatch: args.batch,
       };
       const receipt = await tx.pizzaHistoryReceipt.upsert({
         where: { sourceFileId: b.rec.sourceFileId },
