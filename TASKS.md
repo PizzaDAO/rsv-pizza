@@ -16,10 +16,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | stuck | P1 |  |  |  |  |  |  |
 | sicilian-47246 | Partner timeseries chart visible to all partners (not just admin) | stuck | P2 |  |  |  |  |  | 2026-05-17: PR #363 merged (89d55344). Backend deploy from master-deploy worktree. |
 | sausage-24183 | Bulk-DM hosts via Telegram bot in TelegramBroadcast modal (add Recipients: Groups \| Hosts \| Both toggle; hosts opt-in via /start deeplink stored on parties.host_telegram_chat_id; new webhook route + host-broadcast route) | todo | P1 |  |  |  |  |  | 2026-05-17: PR 336 (backend) + PR 341 (frontend) merged. Backend deployed to api.rsv.pizza. Telegram webhook live on @MoltoBeneBot. Smoke tests passed. |
-| funghi-91314 | Pull photos from Rsv.pizza host pages and upload it to Sauce to be played during the livestream. | todo | P1 |  |  |  |  |  |  |
-| truffle-83044 | add event search feature based by region, key words, could country, continent, etc | todo | P1 |  |  |  |  |  |  |
-| buffalo-35201 | if event requires approval, don't mint nft until approval has been granted | todo | P1 |  |  |  |  |  |  |
-| forno-81402 | iphone 8 couldn't load page | todo | P1 |  |  |  |  |  |  |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
 | bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | todo | P1 |  |  |  |  |  |  |
 | basil-14648 | AI ordering | todo | P1 |  |  |  |  |  |  |
@@ -89,6 +85,10 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| funghi-91314 | Pull photos from Rsv.pizza host pages and upload it to Sauce to be played during the livestream. | P1 | 2026-10-29 | #1163 | 2026-10-29: back/pause/next on /photos/play; Sauce integration still open (need repo) |
+| truffle-83044 | add event search feature based by region, key words, could country, continent, etc | P1 | 2026-10-29 | #1160 |  |
+| buffalo-35201 | if event requires approval, don't mint nft until approval has been granted | P1 | 2026-10-29 | #1162 | 2026-10-29: needs `supabase functions deploy mint-nft` |
+| forno-81402 | iphone 8 couldn't load page | P1 | 2026-10-29 | #1164 |  |
 | pineapple-80595 | Payment Portal Widget for host reimbursements | P1 | 2026-10-29 | #962 | 2026-10-29: closed — invoice portal shipped in #962; host reimbursements live in /host/:inviteCode/payments (PayoutsTab). PR #158 superseded by #962. |
 | pineapple-25629 | Order dairy free cheese for vegans | P1 | 2026-10-29 | | 2026-10-29: closed — ops to-do, not code |
 | sfincione-40417 | Pizza Price Index: size-adjusted (per cm²) pizza prices from receipts + diameter review queue + public /pizza-index | P2 | 2026-10-27 | #1146, #1147, #1148, #1149, #1151 | Live at /pizza-index + Underboss → Pizza Index. Backfill/sync/LLM/vision passes run; ~650 lines still need sizes via the review queue |
