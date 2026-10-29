@@ -39,6 +39,18 @@
     "rate": 0.074411248639,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "BWP:2025-05-22": {
+    "rate": 0.074185231466,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "BZD:2025-05-21": {
+    "rate": 0.498861343994,
+    "source": "fawazahmed0 currency-api 2025-05-21"
+  },
+  "BZD:2025-05-22": {
+    "rate": 0.496829996083,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
   "CLP:2025-05-22": {
     "rate": 0.0010595924,
     "source": "fawazahmed0 currency-api 2025-05-22"
@@ -51,6 +63,10 @@
     "rate": 0.021398957149,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "EGP:2025-05-22": {
+    "rate": 0.020038376204,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
   "ETB:2023-05-22": {
     "rate": 0.0184501842,
     "source": "yahoo ETB=X close on/before 2023-05-22"
@@ -58,6 +74,10 @@
   "ETB:2024-05-22": {
     "rate": 0.017393368266,
     "source": "fawazahmed0 currency-api 2024-05-22"
+  },
+  "GHS:2025-05-22": {
+    "rate": 0.084222908254,
+    "source": "fawazahmed0 currency-api 2025-05-22"
   },
   "GTQ:2022-05-17": {
     "rate": 0.1338230165,
@@ -75,9 +95,17 @@
     "rate": 0.0072385092,
     "source": "yahoo KES=X close on/before 2023-05-25"
   },
+  "KES:2024-09-10": {
+    "rate": 0.007752732735,
+    "source": "fawazahmed0 currency-api 2024-09-10"
+  },
   "KES:2025-05-22": {
     "rate": 0.0077235886,
     "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "KES:2025-07-29": {
+    "rate": 0.007733937438,
+    "source": "fawazahmed0 currency-api 2025-07-29"
   },
   "KES:2025-07-30": {
     "rate": 0.0077323075,
@@ -111,6 +139,10 @@
     "rate": 0.102866611535,
     "source": "fawazahmed0 currency-api 2024-10-01"
   },
+  "MNT:2025-05-16": {
+    "rate": 0.00027902255,
+    "source": "fawazahmed0 currency-api 2025-05-16"
+  },
   "NGN:2024-05-21": {
     "rate": 0.000652667066,
     "source": "fawazahmed0 currency-api 2024-05-21"
@@ -122,6 +154,14 @@
   "NGN:2024-05-23": {
     "rate": 0.00069795239,
     "source": "fawazahmed0 currency-api 2024-05-23"
+  },
+  "NGN:2025-05-20": {
+    "rate": 0.000622182222,
+    "source": "fawazahmed0 currency-api 2025-05-20"
+  },
+  "NGN:2025-05-21": {
+    "rate": 0.000626464354,
+    "source": "fawazahmed0 currency-api 2025-05-21"
   },
   "NGN:2025-05-22": {
     "rate": 0.0006277261,
@@ -135,6 +175,10 @@
     "rate": 0.003589353039,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "PKR:2025-05-22": {
+    "rate": 0.003545452672,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
   "PKR:2025-06-04": {
     "rate": 0.0035357111,
     "source": "fawazahmed0 currency-api 2025-06-04"
@@ -147,9 +191,25 @@
     "rate": 0.274725274725,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "QAR:2025-05-23": {
+    "rate": 0.274725274725,
+    "source": "fawazahmed0 currency-api 2025-05-23"
+  },
   "RUB:2024-05-22": {
     "rate": 0.011019788726,
     "source": "fawazahmed0 currency-api 2024-05-22"
+  },
+  "RUB:2025-05-21": {
+    "rate": 0.012393413574,
+    "source": "fawazahmed0 currency-api 2025-05-21"
+  },
+  "RUB:2025-05-22": {
+    "rate": 0.012521875615,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "RWF:2025-05-22": {
+    "rate": 0.000702202768,
+    "source": "fawazahmed0 currency-api 2025-05-22"
   },
   "TWD:2024-05-22": {
     "rate": 0.030952238795,
@@ -157,6 +217,10 @@
   },
   "TWD:2025-05-22": {
     "rate": 0.0333876637,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "TZS:2025-05-22": {
+    "rate": 0.00037016182,
     "source": "fawazahmed0 currency-api 2025-05-22"
   },
   "UGX:2024-05-22": {
@@ -167,6 +231,14 @@
     "rate": 0.0002737985,
     "source": "fawazahmed0 currency-api 2025-05-22"
   },
+  "VES:2025-05-22": {
+    "rate": 0.010543203984,
+    "source": "fawazahmed0 currency-api 2025-05-22 (official rate)"
+  },
+  "VES:2025-05-24": {
+    "rate": 0.010535297875,
+    "source": "fawazahmed0 currency-api 2025-05-24 (official rate)"
+  },
   "VND:2024-05-21": {
     "rate": 3.92192e-05,
     "source": "fawazahmed0 currency-api 2024-05-21"
@@ -175,9 +247,21 @@
     "rate": 3.9175546e-05,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "VND:2025-05-20": {
+    "rate": 3.852932e-05,
+    "source": "fawazahmed0 currency-api 2025-05-20"
+  },
   "VND:2025-05-22": {
     "rate": 3.85144e-05,
     "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "VND:2025-05-27": {
+    "rate": 3.8574721e-05,
+    "source": "fawazahmed0 currency-api 2025-05-27"
+  },
+  "VND:2025-10-01": {
+    "rate": 3.7837729e-05,
+    "source": "fawazahmed0 currency-api 2025-10-01"
   },
   "XCD:2024-05-22": {
     "rate": 0.370068882105,
@@ -186,6 +270,14 @@
   "XOF:2024-05-21": {
     "rate": 0.001655482675,
     "source": "fawazahmed0 currency-api 2024-05-21"
+  },
+  "XOF:2025-05-26": {
+    "rate": 0.001739733069,
+    "source": "fawazahmed0 currency-api 2025-05-26"
+  },
+  "XPF:2025-05-22": {
+    "rate": 0.009501959607,
+    "source": "fawazahmed0 currency-api 2025-05-22"
   },
   "ZMW:2024-05-22": {
     "rate": 0.038687178229,
