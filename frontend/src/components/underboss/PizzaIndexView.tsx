@@ -3,6 +3,7 @@ import { Download, Loader2, ChevronLeft, Package } from 'lucide-react';
 import {
   fetchPizzaIndex,
   fetchPizzaIndexLines,
+  fetchPublicPizzaIndex,
   type PizzaIndexGroup,
   type PizzaIndexLevel,
   type PizzaIndexLineRow,
@@ -44,6 +45,10 @@ export function PizzaIndexView() {
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [includeBundles, setIncludeBundles] = useState(false);
   const [sortBy, setSortBy] = useState<'parties' | 'cheapest'>('parties');
+  // Each year is its own index. Default to the latest year so the overall figure never mixes years;
+  // 0 = all years (mixed, explicit opt-in). null = still resolving the latest year.
+  const [year, setYear] = useState<number | null>(null);
+  const [years, setYears] = useState<number[]>([]);
   const [data, setData] = useState<PizzaIndexResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,17 +61,28 @@ export function PizzaIndexView() {
 
   const [lightbox, setLightbox] = useState<{ url: string; fileName: string; mimeType: string } | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicPizzaIndex()
+      .then((d) => { if (!cancelled) { setYears(d.years); setYear((y) => y ?? d.year); } })
+      .catch(() => { if (!cancelled) setYear((y) => y ?? 0); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const yearFilter = year ? year : undefined;
+
   const load = useCallback(async () => {
+    if (year === null) return;
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchPizzaIndex({ level, verifiedOnly, includeBundles, sort: sortBy }));
+      setData(await fetchPizzaIndex({ level, verifiedOnly, includeBundles, sort: sortBy, year: yearFilter }));
     } catch (e: any) {
       setError(e?.message || 'Failed to load index');
     } finally {
       setLoading(false);
     }
-  }, [level, verifiedOnly, includeBundles, sortBy]);
+  }, [level, verifiedOnly, includeBundles, sortBy, year, yearFilter]);
 
   useEffect(() => {
     void load();
@@ -82,7 +98,7 @@ export function PizzaIndexView() {
     setDrillError(null);
     setDrillLoading(true);
     try {
-      const res = await fetchPizzaIndexLines({ ...drillFilters(g), verifiedOnly, includeBundles, limit: 300 });
+      const res = await fetchPizzaIndexLines({ ...drillFilters(g), verifiedOnly, includeBundles, year: yearFilter, limit: 300 });
       setDrillLines(res.lines);
       setDrillTotal(res.total);
     } catch (e: any) {
@@ -92,8 +108,10 @@ export function PizzaIndexView() {
     }
   };
 
-  const openReceipt = (url: string | null, mimeType: string | null, label: string) => {
+  const openReceipt = (url: string | null, mimeType: string | null, label: string, archive = false) => {
     if (!url) { setError('This receipt has no image on file.'); return; }
+    // Archive receipts are Drive links, not images: open them in a new tab.
+    if (archive) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
     setLightbox({ url, fileName: label, mimeType: mimeType ?? 'image/jpeg' });
   };
 
@@ -162,7 +180,7 @@ export function PizzaIndexView() {
               </thead>
               <tbody>
                 {drillLines.map((l) => (
-                  <tr key={l.lineId} onClick={() => openReceipt(l.documentUrl, l.documentMimeType, l.rawName)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
+                  <tr key={l.lineId} onClick={() => openReceipt(l.documentUrl, l.documentMimeType, l.rawName, l.documentId === null)} className="border-t border-theme-stroke hover:bg-white/5 cursor-pointer">
                     <td className={`${td} max-w-[220px] truncate`} title={l.rawName}>{l.rawName}</td>
                     <td className={`${td} max-w-[140px] truncate`}>{l.merchant ?? '-'}</td>
                     <td className={`${td} max-w-[160px] truncate`}>{l.partyName}</td>
@@ -211,6 +229,10 @@ export function PizzaIndexView() {
         </div>
         <Checkbox checked={verifiedOnly} onChange={() => setVerifiedOnly((v) => !v)} label="Verified only" />
         <Checkbox checked={includeBundles} onChange={() => setIncludeBundles((v) => !v)} label="Include bundles" />
+        <select value={year ?? ''} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year" className="text-sm">
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          <option value={0}>All years (mixed)</option>
+        </select>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'parties' | 'cheapest')} aria-label="Sort" className="text-sm">
           <option value="parties">Sort: most parties</option>
           <option value="cheapest">Sort: cheapest first</option>
@@ -275,7 +297,7 @@ export function PizzaIndexView() {
         </div>
       )}
 
-      <PizzaIndexCharts verifiedOnly={verifiedOnly} includeBundles={includeBundles} />
+      <PizzaIndexCharts verifiedOnly={verifiedOnly} includeBundles={includeBundles} year={yearFilter} />
 
       {/* Bundles & deals (decision 12.4) */}
       {data && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Loader2, Package, Search, Store, Globe } from 'lucide-react';
+import { Archive, Check, ChevronLeft, ChevronRight, ExternalLink, Loader2, Package, Search, Store, Globe, X } from 'lucide-react';
 import {
   fetchPizzaQueue,
   type PizzaLineDto,
@@ -32,11 +32,17 @@ interface Filters {
   photoEstimate: boolean;
   excluded: boolean;
   bundles: NonNullable<PizzaQueueParams['bundles']>;
+  /** GPP events vs the 2021-2025 archive (archive is admin-only). */
+  origin: NonNullable<PizzaQueueParams['origin']>;
+  year: string;
 }
 
 const DEFAULT_FILTERS: Filters = {
   status: 'unverified', country: '', merchant: '', source: '', outlier: false, photoEstimate: false, excluded: false, bundles: 'include',
+  origin: 'event', year: '',
 };
+
+const FILTER_YEARS = [2026, 2025, 2024, 2023, 2022, 2021];
 
 function ProgressBar({ label, done, total }: { label: string; done: number; total: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -53,7 +59,7 @@ function ProgressBar({ label, done, total }: { label: string; done: number; tota
   );
 }
 
-function ReviewView() {
+function ReviewView({ isAdmin }: { isAdmin: boolean }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [applied, setApplied] = useState<Filters>(DEFAULT_FILTERS);
   const [offset, setOffset] = useState(0);
@@ -84,6 +90,8 @@ function ReviewView() {
         photoEstimate: applied.photoEstimate || undefined,
         excluded: applied.excluded || undefined,
         bundles: applied.bundles,
+        origin: applied.origin,
+        year: applied.year ? Number(applied.year) : undefined,
         limit: PAGE_SIZE,
         offset,
       };
@@ -110,15 +118,16 @@ function ReviewView() {
   const images: ReceiptLightboxImage[] = useMemo(
     () => receipts.map((r) => ({
       url: r.document.url,
-      fileName: r.document.fileName,
-      mimeType: r.document.mimeType,
+      fileName: r.document.fileName ?? '',
+      mimeType: r.document.mimeType ?? undefined,
       caption: `${r.merchant ?? 'Unknown pizzeria'} · ${r.party.name}${r.party.country ? ` · ${r.party.country}` : ''}`,
     })),
     [receipts],
   );
 
   const onLineUpdated = useCallback((line: PizzaLineDto) => {
-    setReceipts((rs) => rs.map((r) => (r.document.id === line.documentId
+    const receiptId = line.documentId ?? line.historyReceiptId;
+    setReceipts((rs) => rs.map((r) => (r.document.id === receiptId
       ? { ...r, lines: r.lines.map((l) => (l.id === line.id ? line : l)) }
       : r)));
   }, []);
@@ -221,6 +230,17 @@ function ReviewView() {
           <option value="exclude">Bundles: hide</option>
           <option value="only">Bundles: only</option>
         </select>
+        {isAdmin && (
+          <select value={filters.origin} onChange={(e) => set({ origin: e.target.value as Filters['origin'] })} aria-label="Source" className="text-sm">
+            <option value="event">GPP events</option>
+            <option value="all">All receipts</option>
+            <option value="history">Archive (2021-2025)</option>
+          </select>
+        )}
+        <select value={filters.year} onChange={(e) => set({ year: e.target.value })} aria-label="Year" className="text-sm">
+          <option value="">Any year</option>
+          {FILTER_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
         <div className="w-44"><IconInput icon={Globe} placeholder="Country" value={filters.country} onChange={(e) => set({ country: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyFilters()} /></div>
         <div className="w-44"><IconInput icon={Store} placeholder="Pizzeria" value={filters.merchant} onChange={(e) => set({ merchant: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyFilters()} /></div>
         <Checkbox checked={filters.outlier} onChange={() => set({ outlier: !filters.outlier })} label="Outliers only" />
@@ -254,7 +274,14 @@ function ReviewView() {
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-theme-text truncate">{r.merchant ?? 'Unknown pizzeria'}</div>
+                    <div className="font-medium text-theme-text truncate">
+                      {r.merchant ?? 'Unknown pizzeria'}
+                      {r.origin === 'history' && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 align-middle">
+                          <Archive size={10} />{r.year} archive
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-theme-text-muted truncate">
                       {r.party.name}{r.party.city ? ` · ${r.party.city}` : ''}{r.party.country ? `, ${r.party.country}` : ''}
                       {r.party.date ? ` · ${new Date(r.party.date).toLocaleDateString()}` : ''}
@@ -287,8 +314,40 @@ function ReviewView() {
         </div>
       )}
 
+      {/* Archive receipts have no image to preview: show the editor with a Drive link instead. */}
+      {lightboxOpen && current?.origin === 'history' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
+        >
+          <div className="card relative w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 px-4 pt-3">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-300">
+                <Archive size={12} />{current.year} archive
+              </span>
+              <div className="flex items-center gap-3">
+                {current.document.url && (
+                  <a href={current.document.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline">
+                    <ExternalLink size={12} />Drive
+                  </a>
+                )}
+                <button type="button" onClick={closeLightbox} aria-label="Close" className="p-1 text-theme-text-muted hover:text-theme-text"><X size={18} /></button>
+              </div>
+            </div>
+            <PizzaSizeEditor
+              key={current.document.id}
+              receipt={current}
+              onLineUpdated={onLineUpdated}
+              onNextReceipt={nextReceipt}
+              onDirtyChange={onDirtyChange}
+              onMerchantApplied={refreshMerchant}
+            />
+          </div>
+        </div>
+      )}
+
       <ReceiptLightbox
-        isOpen={lightboxOpen}
+        isOpen={lightboxOpen && current?.origin !== 'history'}
         images={images}
         initialIndex={startIndex}
         onClose={closeLightbox}
@@ -333,7 +392,7 @@ export function PizzaIndexTab({ isAdmin }: { isAdmin: boolean }) {
           </button>
         ))}
       </div>
-      {view === 'review' && <ReviewView />}
+      {view === 'review' && <ReviewView isAdmin={isAdmin} />}
       {view === 'index' && <PizzaIndexView />}
       {view === 'presets' && <PizzaPresetsView isAdmin={isAdmin} />}
       {view === 'ops' && isAdmin && <PizzaOpsView />}

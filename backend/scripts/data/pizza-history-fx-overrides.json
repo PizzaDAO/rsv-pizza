@@ -1,0 +1,102 @@
+{
+  "AED:2023-05-24": {
+    "rate": 0.2722940776,
+    "source": "fixed USD peg"
+  },
+  "AED:2025-05-22": {
+    "rate": 0.2722940776,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "AMD:2025-05-22": {
+    "rate": 0.00261566,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "ARS:2025-05-22": {
+    "rate": 0.0008741199,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "BBD:2022-05-20": {
+    "rate": 0.5,
+    "source": "fixed USD peg"
+  },
+  "BOB:2025-05-22": {
+    "rate": 0.144618739,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "CLP:2025-05-22": {
+    "rate": 0.0010595924,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "DOP:2022-05-22": {
+    "rate": 0.0181488208,
+    "source": "yahoo DOP=X close on/before 2022-05-22"
+  },
+  "ETB:2023-05-22": {
+    "rate": 0.0184501842,
+    "source": "yahoo ETB=X close on/before 2023-05-22"
+  },
+  "GTQ:2022-05-17": {
+    "rate": 0.1338230165,
+    "source": "yahoo GTQ=X close on/before 2022-05-17"
+  },
+  "GTQ:2025-06-20": {
+    "rate": 0.1301533473,
+    "source": "fawazahmed0 currency-api 2025-06-20"
+  },
+  "KES:2022-04-15": {
+    "rate": 0.0086730267,
+    "source": "yahoo KES=X close on/before 2022-04-15"
+  },
+  "KES:2023-05-25": {
+    "rate": 0.0072385092,
+    "source": "yahoo KES=X close on/before 2023-05-25"
+  },
+  "KES:2025-05-22": {
+    "rate": 0.0077235886,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "KES:2025-07-30": {
+    "rate": 0.0077323075,
+    "source": "fawazahmed0 currency-api 2025-07-30"
+  },
+  "KYD:2025-05-22": {
+    "rate": 1.2041845413,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "LKR:2025-05-22": {
+    "rate": 0.0033339131,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "NGN:2025-05-22": {
+    "rate": 0.0006277261,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "PEN:2025-05-20": {
+    "rate": 0.2705968924,
+    "source": "fawazahmed0 currency-api 2025-05-20"
+  },
+  "PKR:2025-06-04": {
+    "rate": 0.0035357111,
+    "source": "fawazahmed0 currency-api 2025-06-04"
+  },
+  "QAR:2023-05-21": {
+    "rate": 0.2747252747,
+    "source": "fixed USD peg"
+  },
+  "TWD:2025-05-22": {
+    "rate": 0.0333876637,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "UGX:2025-05-22": {
+    "rate": 0.0002737985,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "VND:2024-05-21": {
+    "rate": 3.92192e-05,
+    "source": "fawazahmed0 currency-api 2024-05-21"
+  },
+  "VND:2025-05-22": {
+    "rate": 3.85144e-05,
+    "source": "fawazahmed0 currency-api 2025-05-22"
+  }
+}

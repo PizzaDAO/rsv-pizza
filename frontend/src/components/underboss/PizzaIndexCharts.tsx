@@ -26,7 +26,7 @@ const TOOLTIP_STYLE = { background: '#1a1a1a', border: '1px solid rgba(255,255,2
 
 interface ScatterPoint { x: number; y: number; name: string; party: string; verified: boolean }
 
-export function PizzaIndexCharts({ verifiedOnly, includeBundles }: { verifiedOnly: boolean; includeBundles: boolean }) {
+export function PizzaIndexCharts({ verifiedOnly, includeBundles, year }: { verifiedOnly: boolean; includeBundles: boolean; year?: number }) {
   const [lines, setLines] = useState<PizzaIndexLineRow[]>([]);
   const [total, setTotal] = useState(0);
   const [continents, setContinents] = useState<PizzaIndexGroup[]>([]);
@@ -38,8 +38,8 @@ export function PizzaIndexCharts({ verifiedOnly, includeBundles }: { verifiedOnl
     setLoading(true);
     setError(null);
     Promise.all([
-      fetchPizzaIndexLines({ verifiedOnly, includeBundles, limit: 500 }),
-      fetchPizzaIndex({ level: 'continent', verifiedOnly, includeBundles }),
+      fetchPizzaIndexLines({ verifiedOnly, includeBundles, year, limit: 500 }),
+      fetchPizzaIndex({ level: 'continent', verifiedOnly, includeBundles, year }),
     ])
       .then(([l, c]) => {
         if (cancelled) return;
@@ -50,7 +50,7 @@ export function PizzaIndexCharts({ verifiedOnly, includeBundles }: { verifiedOnl
       .catch((e: any) => { if (!cancelled) setError(e?.message || 'Failed to load charts'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [verifiedOnly, includeBundles]);
+  }, [verifiedOnly, includeBundles, year]);
 
   const points = useMemo<ScatterPoint[]>(
     () => lines

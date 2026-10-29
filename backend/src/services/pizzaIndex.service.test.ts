@@ -4,7 +4,9 @@ vi.mock('../config/database.js', () => ({ prisma: {} }));
 
 import {
   aggregate,
+  buildPublicByYear,
   buildPublicIndexFromRows,
+  buildTrends,
   publicPartiesByCountry,
   computeOutlierIds,
   median,
@@ -26,7 +28,8 @@ function row(p: Partial<IndexRow> & { partyId: string; usdPerCm2: number }): Ind
     unitPriceUsd: p.usdPerCm2 * area, unitPriceNetUsd: null, sizeLabel: 'large', shape: 'round', diameterCm: 30,
     areaCm2: area, style: null, sizeSource: 'parsed', sizeConfidence: 0.95, verifiedAt: null, verifiedBy: null,
     isVerified: false, outlierFlag: false, isBundle: false, localPerCm2: p.usdPerCm2 / 0.0105,
-    netUsdPerCm2: null, ...p,
+    netUsdPerCm2: null,
+    eventKey: p.partyId, origin: 'event', fxSource: null, isLumpSum: false, ...p,
   };
 }
 
@@ -252,5 +255,98 @@ describe('public index', () => {
     expect(chile.nParties).toBe(1);
     expect(chile.usdPerCm2).toBeCloseTo(0.03, 6);
     expect(pub.countries.find((c) => c.country === 'Togo')).toBeUndefined(); // only an unverified outlier
+  });
+});
+
+// --- history (archive years) -------------------------------------------------
+function hist(city: string, year: number, usdPerCm2: number, p: Partial<IndexRow> = {}): IndexRow {
+  const r = row({
+    usdPerCm2, city, eventYear: year, origin: 'history', documentId: null,
+    eventKey: `hist:${year}:${city.toLowerCase()}|India`, fxSource: 'frankfurter:2022-05-21', ...p, partyId: 'x',
+  });
+  return { ...r, partyId: null };
+}
+
+describe('history: event counting', () => {
+  it('summarize counts events by eventKey (same city-year = 1 event, other city = 2)', () => {
+    const same = [hist('Delhi', 2022, 0.01), hist('Delhi', 2022, 0.012)];
+    expect(summarize(same).nParties).toBe(1);
+    const two = [...same, hist('Mumbai', 2022, 0.011)];
+    expect(summarize(two).nParties).toBe(2);
+  });
+});
+
+describe('history: selectRows lump sums', () => {
+  it('lump-sum lines never reach the confirmed tier, but the estimated tier takes them', () => {
+    const lump = hist('Delhi', 2022, 0.01, { isLumpSum: true, sizeConfidence: 0.5 });
+    expect(selectRows([lump], {})).toHaveLength(0);
+    expect(selectRows([{ ...lump, sizeConfidence: 0.95, isVerified: true }], {})).toHaveLength(0);
+    const pub = buildPublicIndexFromRows([lump], 2022);
+    expect(pub.countries).toHaveLength(1);
+    expect(pub.countries[0].estimated).toBe(true);
+  });
+  it('a country-year with confirmed lines drops its lump sums', () => {
+    const lump = hist('Delhi', 2022, 0.05, { isLumpSum: true, sizeConfidence: 0.5 });
+    const ok = hist('Mumbai', 2022, 0.01);
+    const pub = buildPublicIndexFromRows([lump, ok], 2022);
+    expect(pub.countries[0].estimated).toBe(false);
+    expect(pub.countries[0].usdPerCm2).toBeCloseTo(0.01);
+  });
+});
+
+describe('history: per-year public index', () => {
+  const y26 = [row({ partyId: 'a', usdPerCm2: 0.02 }), row({ partyId: 'b', usdPerCm2: 0.03 })];
+  it('adding 2022 rows does not change the 2026 figure', () => {
+    const before = buildPublicIndexFromRows(y26, 2026);
+    const after = buildPublicIndexFromRows([...y26, hist('Delhi', 2022, 0.005), hist('Pune', 2022, 0.006)], 2026);
+    expect(after.countries[0].usdPerCm2).toBe(before.countries[0].usdPerCm2);
+    expect(after.countries[0].nParties).toBe(before.countries[0].nParties);
+  });
+  it('buildPublicByYear lists years with data, shares years/trends, picks the latest', () => {
+    const rows = [...y26, hist('Delhi', 2022, 0.005), hist('Delhi', 2023, 0.007), hist('Nowhere', 2024, 0.01, { country: null })];
+    const r = buildPublicByYear(rows);
+    expect(r.years).toEqual([2022, 2023, 2026]);
+    expect(r.latest).toBe(2026);
+    expect(r.byYear.get(2026)!.years).toEqual([2022, 2023, 2026]);
+    expect(r.byYear.get(2022)!.countries[0].usdPerCm2).toBeCloseTo(0.005);
+  });
+  it('falls back to 2026 when nothing is published', () => {
+    expect(buildPublicByYear([]).latest).toBe(2026);
+    expect(buildPublicByYear([]).years).toEqual([]);
+  });
+  it('trends only contain published year entries, oldest first', () => {
+    const rows = [...y26, hist('Delhi', 2022, 0.005), hist('Delhi', 2023, 0.007, { outlierFlag: true, sizeConfidence: 0.3 })];
+    const { byYear } = buildPublicByYear(rows);
+    const trend = buildTrends(byYear).India;
+    expect(trend.map((t) => t.year)).toEqual([2022, 2026]);
+    expect(trend[0].usd30).toBeCloseTo(0.005 * 706.9, 1);
+    expect(trend[0].nParties).toBe(1);
+  });
+  it('publicPartiesByCountry skips archive lines (no party)', () => {
+    const parties = publicPartiesByCountry([...y26, hist('Delhi', 2026, 0.01)], new Set(['India']));
+    expect(parties.get('India')!.sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('history: outlier buckets', () => {
+  it('buckets by country + year: an ARS 2021 vs 2026 jump is not flagged', () => {
+    const mk = (id: string, year: number, v: number) => ({ id, country: 'Argentina', usdPerCm2: v, eventYear: year });
+    const rows = [
+      ...[0.010, 0.011, 0.0105, 0.0102, 0.0108, 0.0103, 0.0107, 0.0101, 0.0106].map((v, i) => mk(`o${i}`, 2021, v)),
+      ...[0.04, 0.042, 0.041, 0.0405, 0.043].map((v, i) => mk(`n${i}`, 2026, v)),
+    ];
+    expect(computeOutlierIds(rows).size).toBe(0);
+    // sanity: pooled together (no year) the same data would flag the minority bucket
+    expect(computeOutlierIds(rows.map((r) => ({ ...r, eventYear: null }))).size).toBeGreaterThan(0);
+  });
+});
+
+describe('history: default year', () => {
+  it('prefers the latest year with >= 10 published countries over a stray newer row', () => {
+    const many = (year: number, n: number) => Array.from({ length: n }, (_, i) => row({ partyId: `p${year}${i}`, usdPerCm2: 0.01, country: `C${i}`, eventYear: year }));
+    const r = buildPublicByYear([...many(2026, 12), ...many(2027, 1)]);
+    expect(r.years).toEqual([2026, 2027]);
+    expect(r.latest).toBe(2026);
+    expect(buildPublicByYear(many(2027, 2)).latest).toBe(2027); // fallback: latest with any
   });
 });

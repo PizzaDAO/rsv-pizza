@@ -8084,8 +8084,10 @@ export type PizzaSizeLadder = Record<'25' | '30' | '35' | '40', number | null>;
 
 export interface PizzaLineDto {
   id: string;
-  documentId: string;
-  partyId: string;
+  /** null for archive (pre-2026) lines, which carry historyReceiptId instead. */
+  documentId: string | null;
+  partyId: string | null;
+  historyReceiptId: string | null;
   lineIndex: number;
   rawName: string;
   merchant: string | null;
@@ -8158,11 +8160,15 @@ export interface PizzaPresetDto {
 }
 
 export interface PizzaQueueReceipt {
+  /** 'history' = archive receipt (url is the Drive link; no preview, no photos). */
+  origin: 'event' | 'history';
+  /** Event year, or the archive receipt year. */
+  year: number | null;
   document: {
-    id: string; url: string; mimeType: string; fileName: string;
+    id: string; url: string; mimeType: string | null; fileName: string | null;
     sourceReceiptIndex: number | null; sourceReceiptCount: number | null;
   };
-  party: { id: string; name: string; city: string | null; country: string | null; region: string | null; date: string | null };
+  party: { id: string | null; name: string; city: string | null; country: string | null; region: string | null; date: string | null };
   merchant: string | null;
   currency: string | null;
   receiptDiscounts: Array<{ label: string; amount: number }>;
@@ -8196,6 +8202,9 @@ export interface PizzaQueueParams {
   bundles?: 'include' | 'exclude' | 'only';
   partyId?: string;
   documentId?: string;
+  /** Archive (2021-2025) receipts vs GPP event receipts. Archive is admin-only. */
+  origin?: 'event' | 'history' | 'all';
+  year?: number;
   limit?: number;
   offset?: number;
 }
@@ -8300,7 +8309,7 @@ export interface PizzaIndexParams {
 
 /** Row returned by GET /index/lines (backend IndexRow + verifiedAt ISO + ladder). */
 export interface PizzaIndexLineRow {
-  lineId: string; documentId: string; partyId: string; partyName: string;
+  lineId: string; documentId: string | null; partyId: string | null; partyName: string;
   country: string | null; city: string | null; region: string | null;
   eventYear: number | null; merchant: string | null; merchantKey: string | null;
   rawName: string; qty: number; currency: string; unitPriceList: number; unitPriceUsd: number;
@@ -8355,8 +8364,20 @@ export interface PublicPizzaCountry {
   estimated?: boolean;
 }
 
+export interface PublicPizzaTrendPoint {
+  year: number;
+  /** Nominal USD for a 30 cm pizza. */
+  usd30: number;
+  nParties: number;
+  estimated: boolean;
+}
+
 export interface PublicPizzaIndex {
   year: number;
+  /** Years with at least one published country, ascending. */
+  years: number[];
+  /** Per-country price trend across `years`. */
+  trends: Record<string, PublicPizzaTrendPoint[]>;
   generatedAt: string;
   minParties: number;
   basis: string;
@@ -8436,16 +8457,16 @@ export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; req
 export function runPizzaPhotoPass(body: { limit?: number; dryRun?: boolean; partyIds?: string[] } = {}): Promise<PizzaPassResult> {
   return apiRequest(`${PIZZA_BASE}/photo-pass`, { method: 'POST', body, timeoutMs: 240_000 });
 }
-export function fetchPublicPizzaIndex(): Promise<PublicPizzaIndex> {
-  return apiRequest<PublicPizzaIndex>('/api/pizza-index', { requireAuth: false });
+export function fetchPublicPizzaIndex(year?: number): Promise<PublicPizzaIndex> {
+  return apiRequest<PublicPizzaIndex>(`/api/pizza-index${year ? `?year=${year}` : ''}`, { requireAuth: false });
 }
 export interface PublicPizzaCountryPhoto {
   url: string;
   thumbnailUrl: string | null;
   city: string | null;
 }
-export function fetchPublicPizzaCountryPhotos(country: string): Promise<{ country: string; photos: PublicPizzaCountryPhoto[] }> {
-  return apiRequest(`/api/pizza-index/photos?country=${encodeURIComponent(country)}`, { requireAuth: false });
+export function fetchPublicPizzaCountryPhotos(country: string, year?: number): Promise<{ country: string; photos: PublicPizzaCountryPhoto[] }> {
+  return apiRequest(`/api/pizza-index/photos?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
 }
 
 // ---------------------------------------------------------------------------

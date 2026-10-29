@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   underbosses: new Map<string, { isAdmin: boolean; regions: string[]; cities: string[] }>(),
   lines: new Map<string, any>(),
   outOfScopeCount: 0,
+  viewRows: [] as any[],
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -42,7 +43,7 @@ vi.mock('../config/database.js', () => ({
     },
     pizzaSizePreset: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), create: vi.fn(async ({ data }: any) => ({ id: 'p1', createdAt: new Date(), updatedAt: null, sourceUrl: null, ...data })) },
     // count(*) aggregate queries always return exactly one row; row queries return none.
-    $queryRaw: vi.fn(async (q: any) => (String(q?.strings?.join('?') ?? '').includes('count(') ? [{
+    $queryRaw: vi.fn(async (q: any) => (String(q?.strings?.join('?') ?? '').includes('FROM pizza_price_index_lines v') ? h.viewRows : String(q?.strings?.join('?') ?? '').includes('count(') ? [{
       c: h.outOfScopeCount,
       total: 0, total_lines: 0, verified_lines: 0, total_pizzas: 0, verified_pizzas: 0, unresolved: 0, outliers: 0,
       bundles: 0, with_items: 0, synced: 0, pending_llm: 0, lines: 0, verified: 0, excluded: 0, n: 0,
@@ -62,6 +63,8 @@ vi.mock('../services/pizzaIndexLlm.service.js', () => ({
 }));
 
 import router, { publicPizzaIndexRouter } from './pizza-index.routes.js';
+import { invalidatePizzaIndexCache } from '../services/pizzaIndex.service.js';
+import { prisma } from '../config/database.js';
 
 function app() {
   const a = express();
@@ -89,10 +92,14 @@ beforeEach(() => {
   h.underbosses.clear();
   h.lines.clear();
   h.outOfScopeCount = 0;
+  h.viewRows = [];
+  invalidatePizzaIndexCache();
   h.paymentAdmins.add('admin@x.com');
   h.underbosses.set('ub@x.com', { isAdmin: false, regions: ['west-africa'], cities: [] });
   h.lines.set('line1', dbLine('west-africa'));
   h.lines.set('line2', { ...dbLine('usa'), id: 'line2' });
+  // archive line: no document, no party
+  h.lines.set('hist1', { ...dbLine('west-africa'), id: 'hist1', documentId: null, partyId: null, party: null, historyReceiptId: 'hr1' });
 });
 
 describe('auth gates', () => {
@@ -214,5 +221,93 @@ describe('public endpoint', () => {
     expect(r.body.year).toBe(2026);
     expect(Array.isArray(r.body.countries)).toBe(true);
     expect(r.headers['cache-control']).toContain('max-age=3600');
+  });
+});
+
+describe('archive (history) lines', () => {
+  it('admin can PATCH a history line; an underboss gets 403', async () => {
+    const ok = await request(app()).patch('/api/admin/pizza-index/lines/hist1').set('x-test-email', 'admin@x.com').send({ diameterCm: 30, shape: 'round' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.line.documentId).toBeNull();
+    expect(ok.body.line.historyReceiptId).toBe('hr1');
+    expect(ok.body.line.verifiedBy).toBe('admin@x.com');
+    const ub = await request(app()).patch('/api/admin/pizza-index/lines/hist1').set('x-test-email', 'ub@x.com').send({ diameterCm: 30, shape: 'round' });
+    expect(ub.status).toBe(403);
+  });
+
+  const sqlOf = () => (prisma.$queryRaw as any).mock.calls.map((c: any[]) => String(c[0]?.strings?.join('?') ?? '')).join('\n');
+
+  it('index + index/lines: underbosses are restricted to event rows; admins are not', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    for (const path of ['index', 'index/lines']) {
+      expect((await request(app()).get(`/api/admin/pizza-index/${path}?year=2022`).set('x-test-email', 'ub@x.com')).status).toBe(200);
+    }
+    expect(sqlOf()).toContain("v.origin = 'event'");
+    (prisma.$queryRaw as any).mockClear();
+    await request(app()).get('/api/admin/pizza-index/index/lines?year=2022').set('x-test-email', 'admin@x.com');
+    expect(sqlOf()).not.toContain("v.origin = 'event'");
+  });
+
+  it('queue defaults to event receipts', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    await request(app()).get('/api/admin/pizza-index/queue').set('x-test-email', 'admin@x.com');
+    expect(sqlOf()).toContain('li.history_receipt_id IS NULL');
+  });
+
+  it('queue: underbosses never see archive receipts (no scope mapping); admins can filter them', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    const ub = await request(app()).get('/api/admin/pizza-index/queue?origin=history&year=2022').set('x-test-email', 'ub@x.com');
+    expect(ub.status).toBe(200);
+    expect(ub.body.receipts).toEqual([]);
+    expect(sqlOf()).toContain('li.history_receipt_id IS NULL');
+    (prisma.$queryRaw as any).mockClear();
+    const ad = await request(app()).get('/api/admin/pizza-index/queue?origin=history&year=2022').set('x-test-email', 'admin@x.com');
+    expect(ad.status).toBe(200);
+    expect(sqlOf()).toContain('li.history_receipt_id IS NOT NULL');
+    const bad = await request(app()).get('/api/admin/pizza-index/queue?origin=nope').set('x-test-email', 'admin@x.com');
+    expect(bad.status).toBe(400);
+  });
+});
+
+describe('public endpoint: years + trends', () => {
+  const vrow = (year: number, key: string, usd = 0.01) => ({
+    line_id: `${year}${key}`, document_id: null, party_id: null, party_name: `${year} X`, country: 'India', city: 'Delhi', region: 'india',
+    event_year: year, event_series_slug: null, document_url: null, document_mime_type: null, source_receipt_index: null, source_receipt_count: null,
+    merchant: 'M', merchant_key: 'm', raw_name: 'Pizza', qty: 1, currency: 'INR', fx_rate: 0.012, unit_price_list: 100, unit_price_net: null,
+    unit_price_usd: usd * 706.9, unit_price_net_usd: null, size_label: 'large', shape: 'round', diameter_cm: 30, area_cm2: 706.9, style: null,
+    size_source: 'parsed', size_confidence: 0.9, verified_at: null, verified_by: null, is_verified: false, outlier_flag: false, is_bundle: false,
+    usd_per_cm2: usd, local_per_cm2: usd / 0.012, net_usd_per_cm2: null,
+    event_key: `hist:${year}:${key}|India`, origin: 'history', fx_source: 'frankfurter:x', is_lump_sum: false,
+  });
+  beforeEach(() => {
+    h.viewRows = [vrow(2022, 'delhi', 0.005), vrow(2023, 'delhi', 0.007), vrow(2026, 'delhi', 0.012)];
+  });
+
+  it('defaults to the latest year and exposes years + trends', async () => {
+    const r = await request(app()).get('/api/pizza-index');
+    expect(r.status).toBe(200);
+    expect(r.body.year).toBe(2026);
+    expect(r.body.years).toEqual([2022, 2023, 2026]);
+    expect(r.body.trends.India.map((t: any) => t.year)).toEqual([2022, 2023, 2026]);
+  });
+  it('?year= selects a published year', async () => {
+    const r = await request(app()).get('/api/pizza-index?year=2023');
+    expect(r.status).toBe(200);
+    expect(r.body.year).toBe(2023);
+    expect(r.body.countries[0].ladderUsd['30']).toBeCloseTo(0.007 * 706.9, 1);
+  });
+  it('rejects unknown or malformed years with 400', async () => {
+    for (const y of ['1999', 'abc', '2024', '20231']) {
+      const r = await request(app()).get(`/api/pizza-index?year=${y}`);
+      expect(r.status, y).toBe(400);
+      expect(r.body.error.code).toBe('BAD_YEAR');
+    }
+  });
+  it('photos: archive years return an empty list for a published country', async () => {
+    const r = await request(app()).get('/api/pizza-index/photos?country=India&year=2022');
+    expect(r.status).toBe(200);
+    expect(r.body.photos).toEqual([]);
+    expect((await request(app()).get('/api/pizza-index/photos?country=India&year=2024')).status).toBe(404);
+    expect((await request(app()).get('/api/pizza-index/photos?country=India&year=abc')).status).toBe(400);
   });
 });
