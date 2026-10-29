@@ -22,6 +22,7 @@ import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { brand } from '../config/brand.js';
+import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 
 // Helper function to get party with ownership check
@@ -1945,6 +1946,14 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
         console.error('Failed to send approval email:', emailError);
         // Don't fail the approval if email fails
       }
+    }
+
+    // buffalo-35201: mint the NFT now that the guest is approved (it is
+    // withheld at RSVP time on approval-required events). Awaited so the
+    // serverless function isn't frozen mid-mint; never throws, never blocks
+    // the approval result. Already-minted tokens are left alone on decline.
+    if (approved === true) {
+      await mintNftOnApproval(partyId, guestId);
     }
 
     res.json({ guest });

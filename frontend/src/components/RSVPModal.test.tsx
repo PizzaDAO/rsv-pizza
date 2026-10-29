@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '../i18n';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RSVPModal } from './RSVPModal';
@@ -21,12 +22,23 @@ vi.mock('../lib/ordering', () => ({
   geocodeAddress: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('wagmi', () => ({
+  useAccount: () => ({ address: undefined, isConnected: false }),
+}));
+
+vi.mock('connectkit', () => ({
+  ConnectKitButton: { Custom: () => null },
+}));
+
+const mockMint = vi.hoisted(() => vi.fn());
 vi.mock('../hooks/useMintNFT', () => ({
-  useMintNFT: () => ({ mint: vi.fn() }),
+  useMintNFT: () => ({ mint: mockMint }),
 }));
 
 vi.mock('../lib/nftContract', () => ({
   NFT_CONTRACT_ADDRESS: '0x0000000000000000000000000000000000000000',
+  getNFTViewUrl: () => 'http://nft',
+  getChainConfig: () => ({ explorerUrl: 'http://explorer' }),
 }));
 
 const makeEvent = (overrides?: Partial<PublicEvent>): PublicEvent => ({
@@ -146,5 +158,46 @@ describe('RSVPModal', () => {
     // not reset back to step 1
     expect(screen.getByText('RSVP Updated')).toBeInTheDocument();
     expect(screen.queryByText('Step 1 of 2')).not.toBeInTheDocument();
+  });
+
+  // buffalo-35201: no NFT mint at RSVP time while the host has not approved
+  describe.each([
+    [true, false],
+    [false, true],
+  ])('NFT minting with requireApproval=%s', (requireApproval, shouldMint) => {
+    it(`${shouldMint ? 'mints' : 'does not mint'} on RSVP submit`, async () => {
+      const user = userEvent.setup();
+      const { addGuestToParty } = await import('../lib/supabase');
+      vi.mocked(addGuestToParty).mockResolvedValue({
+        guest: { id: 'guest-1', party_id: 'party-1', name: 'Test User' } as any,
+        alreadyRegistered: false,
+        requireApproval,
+        updated: false,
+        waitlisted: false,
+        waitlistPosition: null,
+        walletShared: null,
+      });
+      mockMint.mockResolvedValue({});
+
+      render(
+        <RSVPModal
+          isOpen={true}
+          onClose={vi.fn()}
+          event={makeEvent({ nftEnabled: true, eventImageUrl: 'http://img/x.png' })}
+          existingGuest={makeExistingGuest({ ethereumAddress: '0x' + 'a'.repeat(40) })}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await user.click(screen.getByRole('button', { name: /edit rsvp/i }));
+
+      await waitFor(() => expect(vi.mocked(addGuestToParty)).toHaveBeenCalled());
+      if (shouldMint) {
+        await waitFor(() => expect(mockMint).toHaveBeenCalled());
+      } else {
+        await waitFor(() => expect(screen.getByText(/once the host approves you/i)).toBeInTheDocument());
+        expect(mockMint).not.toHaveBeenCalled();
+      }
+    });
   });
 });

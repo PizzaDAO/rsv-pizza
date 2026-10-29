@@ -42,8 +42,10 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
   const handleSuccess = async (result: RSVPSubmitResult) => {
     onRSVPSuccess?.();
 
-    // Auto-mint NFT if enabled, wallet address provided, and event has an image
-    if (event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
+    // Auto-mint NFT if enabled, wallet address provided, and event has an image.
+    // buffalo-35201: never mint at RSVP time on approval-required events; the
+    // backend mints when the host approves the guest.
+    if (!result.requireApproval && event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && result.guest?.id) {
       setMintStatus('minting');
       try {
         const mintRes = await mintNFT({
