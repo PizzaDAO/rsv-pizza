@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, MapPin, Search, Users, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { BRAND } from '../config/brand';
 import { IconInput } from '../components/IconInput';
 import { fetchPublicEventsForSearch } from '../lib/api';
 import { GPP_REGIONS } from '../types';
@@ -101,7 +102,7 @@ export function EventsSearchPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Find Events | RSV.Pizza</title>
+        <title>{`Find Events | ${BRAND.name}`}</title>
         <meta name="description" content="Search pizza parties by keyword, continent, country, region, or city." />
       </Helmet>
       <div className="max-w-6xl mx-auto px-4 py-8">
