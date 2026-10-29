@@ -39,6 +39,10 @@
     "rate": 0.074411248639,
     "source": "fawazahmed0 currency-api 2024-05-22"
   },
+  "BWP:2025-02-15": {
+    "rate": 0.07208855918,
+    "source": "fawazahmed0 currency-api 2025-02-15"
+  },
   "BWP:2025-05-22": {
     "rate": 0.074185231466,
     "source": "fawazahmed0 currency-api 2025-05-22"
@@ -58,6 +62,10 @@
   "DOP:2022-05-22": {
     "rate": 0.0181488208,
     "source": "yahoo DOP=X close on/before 2022-05-22"
+  },
+  "EGP:2023-05-22": {
+    "rate": 0.032391611499,
+    "source": "yahoo EGP=X close on/before 2023-05-22"
   },
   "EGP:2024-05-22": {
     "rate": 0.021398957149,
@@ -118,6 +126,10 @@
   "KYD:2025-05-22": {
     "rate": 1.2041845413,
     "source": "fawazahmed0 currency-api 2025-05-22"
+  },
+  "LAK:2024-05-22": {
+    "rate": 4.6651452e-05,
+    "source": "fawazahmed0 currency-api 2024-05-22"
   },
   "LBP:2024-05-22": {
     "rate": 1.0954053e-05,
@@ -246,6 +258,10 @@
   "VND:2024-05-22": {
     "rate": 3.9175546e-05,
     "source": "fawazahmed0 currency-api 2024-05-22"
+  },
+  "VND:2024-10-01": {
+    "rate": 4.0818564e-05,
+    "source": "fawazahmed0 currency-api 2024-10-01"
   },
   "VND:2025-05-20": {
     "rate": 3.852932e-05,
