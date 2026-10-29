@@ -147,7 +147,14 @@ export function RSVPFlowContent({
           />
         )}
         {/* NFT Minting Status */}
-        {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && (
+        {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && form.pendingApproval && !form.alreadyRegistered && (
+          <div className="mt-4 pt-4 border-t border-theme-stroke">
+            <p className="text-theme-text-secondary text-sm text-center">
+              You'll get your NFT once the host approves you.
+            </p>
+          </div>
+        )}
+        {event.nftEnabled && form.ethereumAddress.trim() && event.eventImageUrl && !form.pendingApproval && (
           <div className="mt-4 pt-4 border-t border-theme-stroke">
             {mintStatus === 'minting' && (
               <div className="flex items-center gap-2 text-theme-text-secondary justify-center">

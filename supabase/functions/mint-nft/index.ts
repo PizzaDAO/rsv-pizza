@@ -9,6 +9,8 @@ const BASE_NFT_CONTRACT_ADDRESS = Deno.env.get('BASE_NFT_CONTRACT_ADDRESS') || D
 const BASE_RPC_URL = Deno.env.get('BASE_RPC_URL') || 'https://mainnet.base.org';
 const MONAD_NFT_CONTRACT_ADDRESS = Deno.env.get('MONAD_NFT_CONTRACT_ADDRESS') || '';
 const MONAD_RPC_URL = Deno.env.get('MONAD_RPC_URL') || 'https://rpc.monad.xyz';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // Monad chain definition (not yet built into viem)
 const monad = defineChain({
@@ -79,6 +81,37 @@ interface MintRequest {
   chain?: SupportedChain;
 }
 
+// buffalo-35201: events that require approval must not mint until the host approves.
+// Returns an error message when minting must be refused, or null when allowed.
+async function checkMintAllowed(partyId: string, guestId: string): Promise<{ status: number; error: string } | null> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return { status: 500, error: 'NFT minting not configured (missing database credentials)' };
+  }
+  if (!guestId) {
+    return { status: 400, error: 'guestId is required' };
+  }
+  const headers = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  const q = (table: string, query: string) =>
+    fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}&select=*`, { headers }).then((r) => (r.ok ? r.json() : null));
+
+  const [guests, parties] = await Promise.all([
+    q('guests', `id=eq.${encodeURIComponent(guestId)}&party_id=eq.${encodeURIComponent(partyId)}`),
+    q('parties', `id=eq.${encodeURIComponent(partyId)}`),
+  ]);
+  const guest = guests?.[0];
+  const party = parties?.[0];
+  if (!guest || !party) {
+    return { status: 404, error: 'Guest or event not found' };
+  }
+  if (party.require_approval && guest.approved !== true) {
+    return { status: 403, error: 'Guest has not been approved by the host yet' };
+  }
+  return null;
+}
+
 serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -98,6 +131,14 @@ serve(async (req) => {
 
     const request: MintRequest = await req.json();
     const { recipient, partyId } = request;
+
+    const denied = await checkMintAllowed(partyId, request.guestId);
+    if (denied) {
+      return new Response(
+        JSON.stringify({ error: denied.error }),
+        { status: denied.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Select chain config (default to base for backwards compatibility)
     const selectedChain: SupportedChain = request.chain || 'base';
