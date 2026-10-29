@@ -13,12 +13,12 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | doing | P2 |  |  |  |  |  |  |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
 | blackolive-76568 | Add Google Maps geocoding fallback in VenueMap when Nominatim returns no results (e.g. Chinese addresses like Shenzhen) | doing | P2 |  |  |  |  |  |  |
-| deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | stuck | P1 |  |  |  |  |  |  |
+| deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | stuck | P1 |  |  |  |  |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that |
 | sicilian-47246 | Partner timeseries chart visible to all partners (not just admin) | stuck | P2 |  |  |  |  |  | 2026-05-17: PR #363 merged (89d55344). Backend deploy from master-deploy worktree. |
 | sausage-24183 | Bulk-DM hosts via Telegram bot in TelegramBroadcast modal (add Recipients: Groups \| Hosts \| Both toggle; hosts opt-in via /start deeplink stored on parties.host_telegram_chat_id; new webhook route + host-broadcast route) | todo | P1 |  |  |  |  |  | 2026-05-17: PR 336 (backend) + PR 341 (frontend) merged. Backend deployed to api.rsv.pizza. Telegram webhook live on @MoltoBeneBot. Smoke tests passed. |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
 | bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | todo | P1 |  |  |  |  |  |  |
-| basil-14648 | AI ordering | todo | P1 |  |  |  |  |  |  |
+| basil-14648 | AI ordering | todo | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md |
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
 | onion-42535 | iphone 8 couldn't load page | todo | P2 |  |  |  |  |  |  |
