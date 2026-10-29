@@ -1,4 +1,5 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, OneSheetConfig, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData, MercuryWireMatch, MercuryReconcileResult } from '../types';
+import type { SearchableEvent } from '../utils/eventSearch';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -4743,6 +4744,7 @@ interface GPPEventApiResponse {
   longitude: number | null;
   guestCount: number;
   country: string | null;
+  region?: string | null;
   underbossStatus?: string | null;
   eventTags?: string[];
   telegramGroup: string | null;
@@ -4796,6 +4798,28 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
     events = events.filter((e) => e.underbossStatus === 'approved');
   }
   return events;
+}
+
+// truffle-83044: public event search. Uses the curated (approved + listed,
+// non-cancelled) public GPP listing; filtering happens client-side.
+export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
+  const data = await apiRequest<GPPEventsApiPayload>(
+    '/api/gpp/events?limit=2000&curated=1',
+    { requireAuth: false }
+  );
+  return (data.events || []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    city: e.city,
+    slug: e.customUrl || e.inviteCode,
+    date: e.date,
+    venueName: e.venueName,
+    address: e.address,
+    country: e.country,
+    region: e.region ?? null,
+    rsvpCount: e.guestCount ?? 0,
+    eventImageUrl: e.eventImageUrl ?? null,
+  }));
 }
 
 // GPP Partners (aggregated across approved GPP events)

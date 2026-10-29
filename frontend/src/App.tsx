@@ -51,6 +51,7 @@ const OneSheetPage = React.lazy(() => import('./pages/OneSheetPage').then(m => (
 import { GPPPizzeriasPage } from './pages/GPPPizzeriasPage';
 const PizzaIndexPage = React.lazy(() => import('./pages/PizzaIndexPage').then(m => ({ default: m.PizzaIndexPage })));
 import { EventsMapPage } from './pages/EventsMapPage';
+const EventsSearchPage = React.lazy(() => import('./pages/EventsSearchPage').then(m => ({ default: m.EventsSearchPage })));
 const AdminLogoCleanup = React.lazy(() => import('./pages/AdminLogoCleanup').then(m => ({ default: m.AdminLogoCleanup })));
 import { PartnersPage } from './pages/PartnersPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
@@ -107,6 +108,7 @@ function App() {
             {/* sfincione-40417: public Pizza Price Index; must come before /:slug */}
             <Route path="/pizza-index" element={<Suspense fallback={null}><PizzaIndexPage /></Suspense>} />
             {/* /map must come before /:slug */}
+            <Route path="/events" element={<Suspense fallback={null}><EventsSearchPage /></Suspense>} />
             <Route path="/map" element={<EventsMapPage />} />
             {/* cacciatore-72814: /map/swc super-admin-only variant; must come before /:slug */}
             <Route path="/map/swc" element={<Suspense fallback={null}><EventsMapSwcPage /></Suspense>} />
