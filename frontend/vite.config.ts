@@ -7,6 +7,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   base: '/',
+  build: {
+    // forno-81402: iPhone 8 tops out at iOS 16 (Safari 16).
+    target: ['es2020', 'safari15'],
+  },
   server: {
     port: 5176,
   },

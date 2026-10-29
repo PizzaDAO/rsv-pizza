@@ -27,6 +27,16 @@ interface ApiOptions {
 }
 
 // Custom event name for auth expiration
+/** AbortSignal.timeout is Safari 16+; fall back to AbortController elsewhere. */
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export const AUTH_EXPIRED_EVENT = 'auth-expired';
 
 export async function apiRequest<T>(
@@ -60,7 +70,7 @@ export async function apiRequest<T>(
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-      ...(timeoutMs && timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+      ...(timeoutMs && timeoutMs > 0 ? { signal: timeoutSignal(timeoutMs) } : {}),
     });
   } catch (e: any) {
     if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
