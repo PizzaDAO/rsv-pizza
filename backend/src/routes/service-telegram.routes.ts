@@ -11,6 +11,7 @@
  *   (else 503 { ok:false, reason:'disabled' }):
  *     /dm, /probe   PIZZADAO_TELEGRAM_DM_ENABLED
  *     /city-post    PIZZADAO_TELEGRAM_GROUPS_ENABLED
+ *     /host-match   PIZZADAO_HOST_MATCH_ENABLED
  *   /city-groups needs only the key. Identifiers go in bodies, never URLs.
  *
  *   GET  /city-groups -> { ok, groups:[{ cityKey, title, country, region, chatUrl, hasChat }] }
@@ -19,18 +20,29 @@
  *   POST /probe    { telegramUserId } -> { ok, reachable, code? }
  *   POST /city-post { cityKey, text, idempotencyKey }
  *                  -> { ok:true, messageId?, migratedTo?, replay? } | { ok:false, code, retryAfter? }
+ *   POST /host-match { emailHashes: string[1..100] }  (sha256 hex of lower(trim(email)))
+ *                  -> { ok:true, matches:[{ emailHash, telegramUserId, handleHint }] }
+ *                  Only party owners with a positive host chat id that is backed by a
+ *                  party_telegram_hosts row whose username equals the owner's own
+ *                  handle (host_telegram_chat_id can be a co-host's chat). An email
+ *                  whose parties disagree on the chat id is omitted.
+ *                  10 requests/min and 2000 hashes/day (per instance, in memory).
+ *                  The key is the real protection. Hashing only keeps plaintext
+ *                  addresses out of the wire and logs; it does not stop guessing.
  *
  * Every Telegram outcome is HTTP 200; 4xx/5xx mean our own validation, auth or
  * config. DM codes: not_started | blocked | rate_limited | bad_request | uncertain.
  * City-post codes: no_group | kicked | rate_limited | bad_request | uncertain.
  * `uncertain` means the message may have been delivered; do not auto-retry.
  */
+import { createHash } from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { safeEqual } from './service.routes.js';
 import { sendServiceDm, sendServiceTyping, TelegramApiResult } from '../services/telegramSend.js';
+import { normalizeTgHandle } from './telegram-link-callback.routes.js';
 import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 
 const router = Router();
@@ -415,6 +427,113 @@ router.post(
       );
       if (out === null) return res.status(409).json({ ok: false, reason: 'idempotencyKey reused' });
       res.json(out);
+    } catch (e) {
+      fail(res, next, e);
+    }
+  },
+);
+
+// --- POST /host-match -------------------------------------------------------
+
+const MAX_HASHES = 100;
+const HASH_RE = /^[0-9a-f]{64}$/;
+
+const DAILY_HASH_CAP = 2000;
+let daily = { day: '', count: 0 };
+export function resetHostMatchMinuteLimit() {
+  hostMatchLimiter.resetKey('pizzadao');
+}
+export function resetHostMatchLimit() {
+  hostMatchLimiter.resetKey('pizzadao');
+  daily = { day: '', count: 0 };
+}
+
+const hostMatchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: () => 'pizzadao',
+  message: { ok: false, reason: 'rate limited' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
+
+export function emailHash(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+}
+
+function handleHint(handle: string | null | undefined): string | null {
+  const h = normalizeTgHandle(handle);
+  return h ? `${Array.from(h).slice(0, 2).join('')}\u2026` : null;
+}
+
+router.post(
+  '/host-match',
+  requireFlag('PIZZADAO_HOST_MATCH_ENABLED'),
+  hostMatchLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const raw = req.body?.emailHashes;
+      if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_HASHES) {
+        throw new BadInput(`emailHashes must be an array of 1 to ${MAX_HASHES} hashes`);
+      }
+      const wanted = new Set<string>();
+      for (const h of raw) {
+        const v = typeof h === 'string' ? h.trim().toLowerCase() : '';
+        if (!HASH_RE.test(v)) throw new BadInput('emailHashes must be lowercase sha256 hex strings');
+        wanted.add(v);
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      if (daily.day !== today) daily = { day: today, count: 0 };
+      if (daily.count + wanted.size > DAILY_HASH_CAP) {
+        return res.status(429).json({ ok: false, reason: 'daily cap' });
+      }
+      daily.count += wanted.size;
+
+      // Owners of at least one party with a verified positive host chat id,
+      // most recently updated party first.
+      const parties = await prisma.party.findMany({
+        where: { hostTelegramChatId: { gt: 0n }, userId: { not: null } },
+        select: {
+          hostTelegramChatId: true,
+          user: { select: { email: true, telegram: true } },
+          telegramHosts: { select: { chatId: true, telegramUserId: true, username: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      const byHash = new Map<string, { chats: Set<string>; first: string; handle: string | null }>();
+      for (const p of parties) {
+        if (!p.user?.email || p.hostTelegramChatId === null || p.hostTelegramChatId <= 0n) continue;
+        const h = emailHash(p.user.email);
+        if (!wanted.has(h)) continue;
+        // The primary chat can belong to a co-host: require a verified row for
+        // this chat whose handle is the owner's own.
+        const owner = normalizeTgHandle(p.user.telegram);
+        const row = owner
+          ? p.telegramHosts?.find(
+              (t) => t.chatId === p.hostTelegramChatId && normalizeTgHandle(t.username) === owner,
+            )
+          : undefined;
+        if (!row) continue;
+        const chat = (row.telegramUserId !== null && row.telegramUserId > 0n
+          ? row.telegramUserId
+          : p.hostTelegramChatId
+        ).toString();
+        const entry = byHash.get(h);
+        if (entry) entry.chats.add(chat);
+        else byHash.set(h, { chats: new Set([chat]), first: chat, handle: p.user.telegram ?? null });
+      }
+
+      const matches = [...byHash.entries()]
+        .filter(([, e]) => e.chats.size === 1) // ambiguous -> none
+        .map(([hash, e]) => ({
+          emailHash: hash,
+          telegramUserId: e.first,
+          handleHint: handleHint(e.handle),
+        }));
+      res.json({ ok: true, matches });
     } catch (e) {
       fail(res, next, e);
     }
