@@ -70,7 +70,7 @@ export interface IndexRow {
   eventKey: string;
   origin: 'event' | 'history';
   fxSource: string | null;
-  /** Archive lump-sum receipt line (one synthetic line per receipt): estimated tier only. */
+  /** Lump-sum line (archive receipt, or a live receipt's pizza count; one synthetic line per receipt): estimated tier only. */
   isLumpSum: boolean;
 }
 

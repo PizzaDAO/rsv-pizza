@@ -32,6 +32,7 @@ import {
   getYtdPayoutTotalUsd,
 } from './tax-form.routes.js';
 import { getPayoutCaps } from '../lib/privateConfig.js';
+import { pizzaAutofillColumns, parsePizzaCountPatch } from '../services/pizzaCountAutofill.js';
 import {
   NON_TERMINAL_PAYOUT_STATUSES,
   payoutRowSnapshotFromUser,
@@ -233,6 +234,14 @@ function serializeDocument(d: any) {
     isDuplicate: d.isDuplicate ?? false,
     ineligible: d.ineligible ?? false,
     ocrLineItems: d.ocrLineItems ?? null,
+    // sfincione-40417 (pizza count): auto-filled / host-corrected pizzas per receipt.
+    pizzaCount: d.pizzaCount ?? null,
+    pizzaCountSource: d.pizzaCountSource ?? null,
+    pizzaCountConfidence: d.pizzaCountConfidence != null ? numberFromDecimal(d.pizzaCountConfidence) : null,
+    pizzaSizeCm: d.pizzaSizeCm != null ? numberFromDecimal(d.pizzaSizeCm) : null,
+    pizzaSizeLabel: d.pizzaSizeLabel ?? null,
+    pizzaSizeSource: d.pizzaSizeSource ?? null,
+    pizzaSizeConfidence: d.pizzaSizeConfidence != null ? numberFromDecimal(d.pizzaSizeConfidence) : null,
     // pancetta-37195: surface the per-doc uploader so cohosts can tell who
     // attached each receipt/photo. Live name from the join; cached email is
     // the fallback if the User row is later deleted.
@@ -1467,6 +1476,8 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
             // at the OCR source; defensively re-sanitize here before the insert).
             ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
             ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
+            // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
+            ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
             photoId: null,
           });
         });
@@ -2386,6 +2397,8 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           // bruschetta-58519: persist OCR language + English summary (sanitized).
           ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
           ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
+          // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
+          ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
           photoId: null,
         });
       } else {
@@ -3156,6 +3169,8 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
             // bruschetta-58519: persist OCR language + English summary (sanitized).
             ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
             ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
+            // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
+            ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
           });
         });
       } else {
@@ -3382,6 +3397,50 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
       eligibleTotalUsd: Number(updated.finalAmountUsd.toString()),
       capWarning,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- PATCH /:partyId/reimbursement/receipts/:docId ----------
+
+/**
+ * sfincione-40417 (pizza count): correct (or fill in) how many pizzas / what
+ * size a receipt covers. Any co-host can edit any of the party's receipts, at
+ * any time (also after submit/payment): this never changes money, so it does
+ * not recompute anything and does not touch the pizza line sync (the next
+ * sync picks it up through pizza_line_sync.count_hash).
+ * Body: { pizzaCount?: number|null, pizzaSizeCm?: number|null, pizzaSizeMixed?: boolean }
+ */
+router.patch('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { partyId, docId } = req.params;
+    const canEdit = await canUserEditParty(partyId, req.userId, req.userEmail);
+    if (!canEdit) {
+      throw new AppError('Party not found', 404, 'NOT_FOUND');
+    }
+    const parsed = parsePizzaCountPatch(req.body);
+    if (!parsed.ok) {
+      throw new AppError(parsed.error, 400, 'INVALID_PIZZA_COUNT');
+    }
+    const doc = await prisma.payoutDocument.findFirst({
+      where: { id: docId, partyId, kind: 'receipt' },
+      select: { id: true },
+    });
+    if (!doc) {
+      throw new AppError('Receipt not found', 404, 'NOT_FOUND');
+    }
+    const updated = parsed.changed
+      ? await prisma.payoutDocument.update({
+          where: { id: docId },
+          data: parsed.data,
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        })
+      : await prisma.payoutDocument.findUniqueOrThrow({
+          where: { id: docId },
+          include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+        });
+    res.json({ receipt: serializeDocument(updated) });
   } catch (error) {
     next(error);
   }

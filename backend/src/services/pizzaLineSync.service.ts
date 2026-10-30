@@ -6,6 +6,11 @@
  * table). It only reads them and writes the pizza_* side tables, so it cannot
  * regress the payout flow.
  *
+ * sfincione-40417 (pizza count): a receipt with NO priceable itemized pizza line
+ * but a pizza count (auto-filled or host-entered) gets ONE synthetic estimated
+ * line (line_index -1, source_category 'lump_sum') = base / count. The index
+ * view flags it is_lump_sum (estimated tier only).
+ *
  * Shape: a pure planner (`planDocSync`, unit tested) + a thin DB layer
  * (`syncPizzaLineItems`).
  */
@@ -50,7 +55,24 @@ export interface DocContext {
   currency: string;
   fxRate: number;
   discounts: DiscountLine[];
+  /** sfincione-40417 (pizza count): the receipt's count/size + total, when known. */
+  count?: DocCount | null;
 }
+
+export interface DocCount {
+  pizzaCount: number | null;
+  countSource: string | null; // 'ocr' | 'llm' | 'host'
+  sizeCm: number | null;
+  sizeLabel: string | null;
+  sizeSource: string | null;
+  /** Receipt total in `totalCurrency` (null = unknown -> no receipt_total line). */
+  receiptTotal: number | null;
+  totalCurrency: string | null;
+  totalFxRate: number | null;
+}
+
+/** line_index of the synthetic per-receipt lump-sum line (real lines are >= 0). */
+export const LUMP_SUM_LINE_INDEX = -1;
 
 /** Numeric/plain view of an existing pizza_line_items row. */
 export interface ExistingLine {
@@ -393,8 +415,115 @@ export function planDocSync(
 
   allocateDiscounts(writes, doc.discounts);
 
+  // sfincione-40417 (pizza count): AFTER discounts, so they never land on the synthetic line.
+  const lump = buildLumpSumWrite(items, writes, existing, doc, presets);
+  if (lump) {
+    writes.push(lump);
+    keep.add(LUMP_SUM_LINE_INDEX);
+  }
+
   const deleteLineIndexes = existing.filter((e) => !keep.has(e.lineIndex)).map((e) => e.lineIndex);
   return { writes, deleteLineIndexes };
+}
+
+/**
+ * The synthetic estimated per-pizza line for a receipt with a count but no
+ * priceable itemized pizza line. Pure. Returns null when it doesn't apply
+ * (a stale existing -1 line is then deleted by the caller via `keep`).
+ */
+export function buildLumpSumWrite(
+  items: OcrItemLike[],
+  writes: LineWrite[],
+  existing: ExistingLine[],
+  doc: DocContext,
+  presets: SizePreset[],
+): LineWrite | null {
+  const c = doc.count;
+  const count = c?.pizzaCount ?? 0;
+  if (!c || !(count > 0)) return null;
+  // Itemized lines always win.
+  if (writes.some((w) => !w.excluded && w.unitPriceList > 0)) return null;
+
+  // Base: the pizza-ish lines when there are any (trims tax/tip/drinks the OCR split
+  // off), else the receipt total.
+  let base = 0;
+  let mode: 'pizza_lines' | 'receipt_total' = 'receipt_total';
+  let currency = doc.currency;
+  let fxRate = doc.fxRate;
+  const pizzaish = writes.filter((w) => w.lineIndex >= 0 && (w.sourceCategory === 'pizza' || w.excludedReason === 'lump_sum'));
+  if (pizzaish.length > 0) {
+    mode = 'pizza_lines';
+    for (const w of pizzaish) {
+      const it = items[w.lineIndex];
+      const sub = it ? num((it as OcrItemLike).subtotal, 0) : 0;
+      base += sub > 0 ? sub : w.qty * w.unitPriceList;
+    }
+  } else {
+    if (!(c.receiptTotal && c.receiptTotal > 0) || !c.totalCurrency || !(c.totalFxRate && c.totalFxRate > 0)) return null;
+    base = c.receiptTotal;
+    currency = c.totalCurrency;
+    fxRate = c.totalFxRate;
+  }
+  if (!(base > 0)) return null;
+
+  const qty = Math.min(count, MAX_QTY);
+  const unit = base / count;
+  const rawName = `Lump sum: ${count} pizzas${c.sizeCm ? ` (${c.sizeCm} cm)` : ''}`;
+  const fp = lineFingerprint(rawName, count, round4(unit));
+  const prev = existing.find((e) => e.lineIndex === LUMP_SUM_LINE_INDEX);
+  const merchant = doc.merchant ?? prev?.merchant ?? null;
+  const merchantKey = normalizeMerchantKey(merchant);
+  const notes = `lump_sum:${c.countSource ?? 'ocr'}:${mode}`;
+
+  const sameFp = !!prev && prev.lineFingerprint === fp;
+  let fields: ReturnType<typeof currentFields>;
+  if (sameFp && prev && prev.verifiedAt) {
+    fields = currentFields(prev); // a human verified this size: keep it
+  } else {
+    const src: 'manual' | 'parsed' | 'llm' = c.sizeSource === 'host' ? 'manual' : c.sizeSource === 'llm' ? 'llm' : 'parsed';
+    let resolved: ResolvedSize | null = null;
+    if (c.sizeCm) {
+      resolved = resolveFromReportedDims({ shape: 'round', diameterCm: c.sizeCm }, 0.5, src);
+    }
+    if (!resolved) {
+      const word = c.sizeLabel && c.sizeLabel !== 'mixed' ? c.sizeLabel : null;
+      resolved = resolveForItem(word ? { size: { label: word } } : {}, 'pizza', presets, { merchantKey, country: doc.country });
+    }
+    const capped: ResolvedSize = {
+      ...resolved,
+      sizeConfidence: resolved.sizeConfidence === null ? null : Math.min(resolved.sizeConfidence, 0.5),
+    };
+    fields = resolvedToFields(capped);
+  }
+
+  return {
+    existingId: prev?.id ?? null,
+    ...(prev && !sameFp ? { clearPhotoEstimate: true } : {}),
+    documentId: doc.documentId,
+    partyId: doc.partyId,
+    lineIndex: LUMP_SUM_LINE_INDEX,
+    lineFingerprint: fp,
+    sourceCategory: 'lump_sum',
+    rawName,
+    merchant,
+    merchantKey,
+    qty,
+    unitPriceList: unit,
+    unitPriceNet: null,
+    discountAmount: null,
+    discountLabel: null,
+    currency,
+    fxRate,
+    unitPriceUsd: round4(unit * fxRate),
+    ...fields,
+    verifiedAt: sameFp && prev ? prev.verifiedAt : null,
+    verifiedBy: sameFp && prev ? prev.verifiedBy : null,
+    excluded: sameFp && prev ? prev.excluded : false,
+    excludedReason: sameFp && prev ? prev.excludedReason : null,
+    isBundle: false,
+    outlierFlag: sameFp && prev ? prev.outlierFlag : false,
+    notes,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -536,14 +665,36 @@ interface CandidateRow {
   hash: string;
   prev_hash: string | null;
   prev_discounts: unknown;
+  // sfincione-40417 (pizza count)
+  count_hash: string | null;
+  pizza_count: number | null;
+  pizza_count_source: string | null;
+  pizza_size_cm: number | null;
+  pizza_size_label: string | null;
+  pizza_size_source: string | null;
+  original_amount: number | null;
+  ocr_amount: number | null;
 }
 
 /** SQL fragment: docs whose items/FX/merchant changed since the last sync. */
-const HASH_SQL = Prisma.sql`md5(
+export const HASH_SQL = Prisma.sql`md5(
   d.ocr_line_items::text || '|' || coalesce(d.original_currency,'') || '|' || coalesce(d.exchange_rate::text,'')
   || '|' || coalesce(d.ocr_currency,'') || '|' || coalesce(po.original_currency,'') || '|' || coalesce(po.exchange_rate::text,'')
   || '|' || coalesce(d.ocr_raw->'ocr'->>'merchant', d.ocr_raw->>'merchant','')
   || '|' || coalesce(jsonb_path_query_array(d.ocr_raw->'ocr'->'lineItems', '$[*] ? (@.subtotal < 0 || @.unitPrice < 0)')::text,''))`;
+
+/**
+ * sfincione-40417 (pizza count): hash of the receipt's count/size/amount, kept
+ * SEPARATE from HASH_SQL on purpose. HASH_SQL must stay byte-identical (changing
+ * it would make every doc a candidate and reset llm_pass_at/vision_pass_at,
+ * re-spending OpenAI quota). NULL when the doc has no count and no size, so
+ * untouched docs keep count_hash NULL (IS DISTINCT FROM -> not a candidate).
+ */
+export const COUNT_HASH_SQL = Prisma.sql`CASE WHEN d.pizza_count IS NULL AND d.pizza_size_cm IS NULL AND d.pizza_size_label IS NULL THEN NULL
+  ELSE md5(coalesce(d.pizza_count::text,'') || '|' || coalesce(d.pizza_count_source,'') || '|' ||
+           coalesce(d.pizza_size_cm::text,'') || '|' || coalesce(d.pizza_size_label,'') || '|' ||
+           coalesce(d.pizza_size_source,'') || '|' || coalesce(d.original_amount::text,'') || '|' ||
+           coalesce(d.ocr_amount::text,'')) END`;
 
 /** Pure decision for the pizza_line_sync row (testable without a DB). */
 export function planSyncRow(a: {
@@ -560,6 +711,36 @@ export function planSyncRow(a: {
     resetMarkers: a.prevHash !== a.newHash,
     discounts: hasRaw ? a.rawDiscounts : prev,
     writeDiscounts: hasRaw,
+  };
+}
+
+/** The DocContext.count for a candidate row (receipt total in the FX currency, else USD at rate 1). */
+export function docCountFromRow(
+  c: Pick<CandidateRow, 'pizza_count' | 'pizza_count_source' | 'pizza_size_cm' | 'pizza_size_label' | 'pizza_size_source' | 'original_amount' | 'ocr_amount' | 'original_currency'>,
+  fx: { currency: string; fxRate: number },
+): DocCount | null {
+  if (!c.pizza_count || c.pizza_count <= 0) return null;
+  let receiptTotal: number | null = null;
+  let totalCurrency: string | null = null;
+  let totalFxRate: number | null = null;
+  if (c.original_amount && c.original_amount > 0 && c.original_currency && c.original_currency.trim().toUpperCase() === fx.currency) {
+    receiptTotal = c.original_amount;
+    totalCurrency = fx.currency;
+    totalFxRate = fx.fxRate;
+  } else if (c.ocr_amount && c.ocr_amount > 0) {
+    receiptTotal = c.ocr_amount;
+    totalCurrency = 'USD';
+    totalFxRate = 1;
+  }
+  return {
+    pizzaCount: c.pizza_count,
+    countSource: c.pizza_count_source,
+    sizeCm: c.pizza_size_cm,
+    sizeLabel: c.pizza_size_label,
+    sizeSource: c.pizza_size_source,
+    receiptTotal,
+    totalCurrency,
+    totalFxRate,
   };
 }
 
@@ -598,7 +779,7 @@ export async function syncPizzaLineItems(opts: {
   const forceBefore = opts.forceBefore ?? new Date();
   const changedFilter = opts.force
     ? Prisma.sql`AND (s.synced_at IS NULL OR s.synced_at < ${forceBefore})`
-    : Prisma.sql`AND (s.items_hash IS NULL OR s.items_hash <> ${HASH_SQL})`;
+    : Prisma.sql`AND (s.items_hash IS NULL OR s.items_hash <> ${HASH_SQL} OR s.count_hash IS DISTINCT FROM ${COUNT_HASH_SQL})`;
 
   const fromWhere = Prisma.sql`
     FROM payout_documents d
@@ -606,8 +787,7 @@ export async function syncPizzaLineItems(opts: {
     LEFT JOIN payouts po ON po.id = d.payout_id
     LEFT JOIN pizza_line_sync s ON s.document_id = d.id
     WHERE d.kind = 'receipt'
-      AND d.ocr_line_items IS NOT NULL
-      AND jsonb_typeof(d.ocr_line_items) = 'array'
+      AND ((d.ocr_line_items IS NOT NULL AND jsonb_typeof(d.ocr_line_items) = 'array') OR d.pizza_count IS NOT NULL)
       ${docFilter} ${changedFilter}`;
 
   const candidates = await prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
@@ -615,7 +795,11 @@ export async function syncPizzaLineItems(opts: {
            coalesce(d.ocr_raw->'ocr'->>'merchant', d.ocr_raw->>'merchant') AS merchant,
            d.original_currency, d.exchange_rate::float8 AS exchange_rate, d.ocr_currency,
            po.original_currency AS payout_currency, po.exchange_rate::float8 AS payout_rate,
-           ${HASH_SQL} AS hash, s.items_hash AS prev_hash, s.discounts AS prev_discounts
+           coalesce(${HASH_SQL}, 'no-items') AS hash, s.items_hash AS prev_hash, s.discounts AS prev_discounts,
+           ${COUNT_HASH_SQL} AS count_hash,
+           d.pizza_count, d.pizza_count_source, d.pizza_size_cm::float8 AS pizza_size_cm,
+           d.pizza_size_label, d.pizza_size_source,
+           d.original_amount::float8 AS original_amount, d.ocr_amount::float8 AS ocr_amount
     ${fromWhere}
     ORDER BY d.created_at
     LIMIT ${limit}`);
@@ -672,6 +856,7 @@ export async function syncPizzaLineItems(opts: {
         ? planDocSync(items, prevLines, {
             documentId: c.id, partyId: c.party_id, country: c.country, merchant: c.merchant,
             currency: fx.currency, fxRate: fx.fxRate, discounts,
+            count: docCountFromRow(c, fx),
           }, presets)
         : { writes: [], deleteLineIndexes: prevLines.map((l) => l.lineIndex) };
 
@@ -694,12 +879,12 @@ export async function syncPizzaLineItems(opts: {
         prisma.pizzaLineSync.upsert({
           where: { documentId: c.id },
           create: {
-            documentId: c.id, itemsHash: c.hash,
+            documentId: c.id, itemsHash: c.hash, countHash: c.count_hash,
             discounts: discounts.length ? (discounts as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
             discountTotal: discountTotal || null,
           },
           update: {
-            itemsHash: c.hash, syncedAt: new Date(),
+            itemsHash: c.hash, countHash: c.count_hash, syncedAt: new Date(),
             // Pass markers reset ONLY when the hash really changed (not on force:true).
             ...(syncPlan.resetMarkers ? { llmPassAt: null, visionPassAt: null } : {}),
             // Discounts are rewritten only when the raw receipt has some; otherwise
@@ -759,12 +944,12 @@ export async function removeOrphans(): Promise<number> {
   const n = await prisma.$executeRaw`
     DELETE FROM pizza_line_items li
     USING payout_documents d
-    WHERE li.document_id = d.id AND (d.ocr_line_items IS NULL OR d.kind <> 'receipt'
-          OR jsonb_typeof(d.ocr_line_items) <> 'array')`;
+    WHERE li.document_id = d.id AND (d.kind <> 'receipt'
+          OR ((d.ocr_line_items IS NULL OR jsonb_typeof(d.ocr_line_items) <> 'array') AND d.pizza_count IS NULL))`;
   await prisma.$executeRaw`
     DELETE FROM pizza_line_sync s
     USING payout_documents d
-    WHERE s.document_id = d.id AND (d.ocr_line_items IS NULL OR d.kind <> 'receipt')`;
+    WHERE s.document_id = d.id AND (d.kind <> 'receipt' OR (d.ocr_line_items IS NULL AND d.pizza_count IS NULL))`;
   return Number(n);
 }
 
@@ -778,6 +963,9 @@ export async function reresolveUnverified(filter: { merchantKey?: string; partyI
     where: {
       verifiedAt: null,
       excluded: false,
+      // sfincione-40417: the synthetic lump-sum line's size comes from doc fields
+      // the rawName can't reproduce.
+      sourceCategory: { not: 'lump_sum' },
       // 'parsed' rows are deterministic (and may come from OCR-printed dims that
       // we can't reconstruct from the name alone), so leave them alone here.
       OR: [{ sizeSource: null }, { sizeSource: 'preset' }],
