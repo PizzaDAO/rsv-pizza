@@ -3673,6 +3673,37 @@ export async function fetchUnderbossDashboard(
   return apiRequest<UnderbossDashboardData>(`/api/underboss/${region}`);
 }
 
+// bellpepper-36121: GPP27 RSVP-page verification (admin / in-scope underboss)
+export type GppCheckStatus = 'pass' | 'warn' | 'fail';
+export interface GppVerificationCheck {
+  id: string;
+  label: string;
+  status: GppCheckStatus;
+  reason: string;
+}
+export interface GppVerificationRow {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  region: string | null;
+  slug: string;
+  inviteCode: string;
+  date: string | null;
+  underbossStatus: string;
+  status: GppCheckStatus;
+  checks: GppVerificationCheck[];
+}
+export interface GppVerificationResponse {
+  year: number;
+  generatedAt: string;
+  summary: { total: number; pass: number; warn: number; fail: number };
+  rows: GppVerificationRow[];
+}
+export async function fetchGppVerification(): Promise<GppVerificationResponse> {
+  return apiRequest<GppVerificationResponse>('/api/underboss/gpp-verification');
+}
+
 // Fetch fake-event detection review queue (blackolive-74932)
 export async function fetchFakeDetection(): Promise<FakeDetectionResponse> {
   return apiRequest<FakeDetectionResponse>('/api/underboss/fake-detection');

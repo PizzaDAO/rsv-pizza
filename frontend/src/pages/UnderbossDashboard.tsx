@@ -7,7 +7,7 @@ import { Loader2, Shield, AlertCircle, Globe, ChevronDown, LogIn, UserPlus, X, C
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoginModal } from '../components/LoginModal';
-import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, HostSurveyResponsesTab, OutreachTab, TelegramGroupsTab, PizzaIndexTab } from '../components/underboss';
+import { RegionStats, RegionBreakdown, EventTable, TelegramBroadcast, CitiesTable, PartnerManager, CityScopePicker, FakeDetectionTable, SuperlativesTab, SurveyQuestionsTab, SurveyResponsesTab, HostSurveyResponsesTab, OutreachTab, TelegramGroupsTab, PizzaIndexTab, GppVerificationTab } from '../components/underboss';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 // montanara-58497: URL <-> EventTable filters + active tab (de)serializer so a
 // refresh / shared link restores the exact filtered view.
@@ -784,7 +784,9 @@ export function UnderbossDashboard() {
               }`}
             >
               {t('underbossDashboard.tabs.hostSurveyResponses', 'Host Survey Responses')}
-              {activeTab === 'host-survey-responses' && (
+              {activeTab === 'verification' && <GppVerificationTab />}
+
+          {activeTab === 'host-survey-responses' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>
@@ -811,6 +813,19 @@ export function UnderbossDashboard() {
             >
               {t('underbossDashboard.tabs.telegramGroups', 'Telegram Groups')}
               {activeTab === 'telegram-groups' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('verification')}
+              className={`pb-3 text-lg font-semibold transition-all whitespace-nowrap relative ${
+                activeTab === 'verification'
+                  ? 'text-theme-text'
+                  : 'text-theme-text-muted hover:text-theme-text-secondary'
+              }`}
+            >
+              {t('underbossDashboard.tabs.verification', 'Verification')}
+              {activeTab === 'verification' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
               )}
             </button>

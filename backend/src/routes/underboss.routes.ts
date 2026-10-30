@@ -12,6 +12,8 @@ import { scorePartiesByIds, buildSybilWalletSetFromDb } from '../lib/fakeDetecti
 import { emailHostOfStatusChange } from '../services/partyStatusEmailNotify.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { loadHostQuestionSet } from '../lib/hostSurveyQuestions.js';
+import { runChecks, worstStatus, cityIdentity, RESERVED_SLUGS } from '../lib/gppVerification.js';
+import { GPP27_YEAR, GPP27_TAG } from '../helpers/gpp27.js';
 
 // Re-export the request type under the local name used throughout this file
 type UnderbossRequest = UnderbossAuthRequest;
@@ -489,6 +491,114 @@ function formatOutreachCommunity(community: any) {
     updatedAt: community.updatedAt instanceof Date ? community.updatedAt.toISOString() : community.updatedAt,
   };
 }
+
+// bellpepper-36121: GET /api/underboss/gpp-verification - RSVP-page verification
+// for every approved/listed GPP27 city. Admin or in-scope underboss only (same
+// requireAuth + requireUnderbossAuth guard + scope filter as the dashboard).
+// Fixed query count: 1 parties query (host joined) + 1 invite-code collision query.
+// Registered BEFORE the /:region catch-all.
+router.get('/gpp-verification', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {
+  try {
+    const scope = scopeFromReq(req);
+    const scopedWhere = buildScopedWhereClause(scope);
+    const yearStart = new Date(Date.UTC(GPP27_YEAR, 0, 1));
+    const yearEnd = new Date(Date.UTC(GPP27_YEAR + 1, 0, 1));
+    const base: any = {
+      eventType: 'gpp',
+      underbossStatus: { in: ['approved', 'listed'] },
+      OR: [{ eventTags: { has: GPP27_TAG } }, { date: { gte: yearStart, lt: yearEnd } }],
+    };
+
+    const parties = await prisma.party.findMany({
+      where: scopedWhere ? { AND: [base, scopedWhere] } : base,
+      select: {
+        id: true, name: true, inviteCode: true, customUrl: true, date: true, timezone: true,
+        venueName: true, address: true, addressIsCityDefault: true, eventImageUrl: true,
+        description: true, maxGuests: true, venueCapacity: true, expectedGuests: true,
+        rsvpClosedAt: true, cancelledAt: true, requireApproval: true, nftEnabled: true,
+        eventTags: true, city: true, country: true, region: true, coHosts: true,
+        underbossStatus: true,
+        user: { select: { email: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // One query for slug/invite-code collisions (the public resolver tries inviteCode first).
+    const slugs = parties.map((p) => (p.customUrl || '').toLowerCase()).filter(Boolean);
+    const collisions = slugs.length
+      ? await prisma.party.findMany({
+          where: { inviteCode: { in: slugs } },
+          select: { id: true, inviteCode: true },
+        })
+      : [];
+    const inviteCodeOwners = new Map<string, string>();
+    for (const c of collisions) inviteCodeOwners.set(c.inviteCode.toLowerCase(), c.id);
+
+    // Duplicate detection among live (non-cancelled) approved events, keyed by city+country.
+    const byCity = new Map<string, string[]>();
+    for (const p of parties) {
+      if (p.cancelledAt) continue;
+      const key = cityIdentity(p);
+      if (!key) continue;
+      const arr = byCity.get(key) || [];
+      arr.push(p.id);
+      byCity.set(key, arr);
+    }
+
+    const now = new Date();
+    const rows = parties.map((p) => {
+      const slug = (p.customUrl || '').toLowerCase();
+      const ownerId = slug ? inviteCodeOwners.get(slug) : undefined;
+      const dupKey = p.cancelledAt ? '' : cityIdentity(p);
+      const results = runChecks(
+        {
+          ...p,
+          eventTags: p.eventTags || [],
+          hostEmail: p.user?.email ?? null,
+          hostName: p.user?.name ?? null,
+        },
+        {
+          now,
+          year: GPP27_YEAR,
+          yearTag: GPP27_TAG,
+          otherInviteCodes: new Set(ownerId && ownerId !== p.id ? [slug] : []),
+          reservedSlugs: RESERVED_SLUGS,
+          duplicateIds: dupKey ? (byCity.get(dupKey) || []).filter((id) => id !== p.id) : [],
+        },
+      );
+      return {
+        id: p.id,
+        name: p.name,
+        city: p.city,
+        country: p.country,
+        region: p.region,
+        slug: p.customUrl || p.inviteCode,
+        inviteCode: p.inviteCode,
+        date: p.date ? p.date.toISOString() : null,
+        underbossStatus: p.underbossStatus,
+        status: worstStatus(results),
+        checks: results,
+      };
+    });
+
+    const order = { fail: 0, warn: 1, pass: 2 } as const;
+    rows.sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
+
+    res.json({
+      year: GPP27_YEAR,
+      generatedAt: now.toISOString(),
+      summary: {
+        total: rows.length,
+        pass: rows.filter((r) => r.status === 'pass').length,
+        warn: rows.filter((r) => r.status === 'warn').length,
+        fail: rows.filter((r) => r.status === 'fail').length,
+      },
+      rows,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/underboss/outreach/communities - List outreach candidates with latest attempt
 router.get('/outreach/communities', requireAuth, requireUnderbossAuth, async (req: UnderbossRequest, res: Response, next: NextFunction) => {

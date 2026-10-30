@@ -18,3 +18,4 @@ export { TelegramGroupsTab } from './TelegramGroupsTab';
 export { ReimbursementCapCell } from './ReimbursementCapCell';
 export { AppealHistoryModal } from './AppealHistoryModal';
 export { PizzaIndexTab } from './PizzaIndexTab';
+export { GppVerificationTab } from './GppVerificationTab';

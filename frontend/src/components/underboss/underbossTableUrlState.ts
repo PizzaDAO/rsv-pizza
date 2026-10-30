@@ -22,7 +22,8 @@ export type UnderbossTab =
   | 'host-survey-responses'
   | 'outreach'
   | 'telegram-groups'
-  | 'pizza-index';
+  | 'pizza-index'
+  | 'verification';
 
 const UNDERBOSS_TABS: UnderbossTab[] = [
   'events',
@@ -36,6 +37,7 @@ const UNDERBOSS_TABS: UnderbossTab[] = [
   'outreach',
   'telegram-groups',
   'pizza-index',
+  'verification',
 ];
 
 // The default tab UnderbossDashboard mounts on. Skipped from the query string.
