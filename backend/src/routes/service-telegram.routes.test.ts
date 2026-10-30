@@ -26,7 +26,7 @@ const mockSendToCityGroup = vi.hoisted(() => vi.fn());
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 vi.mock('../services/cityTelegramGroup.js', () => ({ sendToCityGroup: mockSendToCityGroup }));
 
-import router, { emailHash, resetHostMatchLimit, resetCityFloor, resetDirectoryCache } from './service-telegram.routes.js';
+import router, { emailHash, resetHostMatchLimit, resetHostMatchMinuteLimit, resetCityFloor, resetDirectoryCache } from './service-telegram.routes.js';
 import { Prisma } from '@prisma/client';
 import { errorHandler } from '../middleware/error.js';
 
@@ -411,6 +411,8 @@ describe('POST /host-match', () => {
   const party = (email: string, chat: bigint | null, telegram: string | null = '@alice') => ({
     hostTelegramChatId: chat,
     user: { email, telegram },
+    telegramHosts:
+      chat === null ? [] : [{ chatId: chat, telegramUserId: null, username: telegram ? `t.me/${telegram.replace('@', '')}` : null }],
   });
   const H = emailHash('Host@Example.org');
 
@@ -462,15 +464,41 @@ describe('POST /host-match', () => {
     expect(res.body.matches).toHaveLength(1);
     expect(res.body.matches[0].telegramUserId).toBe('555');
   });
+  it('omits a co-host chat (row username is not the owner) and a missing row', async () => {
+    const co = { ...party('host@example.org', 555n), telegramHosts: [{ chatId: 555n, telegramUserId: 555n, username: 'bob' }] };
+    const none = { ...party('host@example.org', 555n), telegramHosts: [] };
+    mockPrisma.party.findMany.mockResolvedValue([co, none]);
+    const res = await post('/host-match', { emailHashes: [H] });
+    expect(res.body).toEqual({ ok: true, matches: [] });
+  });
+  it('prefers the verified row telegramUserId and normalizes the hint', async () => {
+    const p = { ...party('host@example.org', 555n, 'https://t.me/Alice'), telegramHosts: [{ chatId: 555n, telegramUserId: 999n, username: '@ALICE' }] };
+    mockPrisma.party.findMany.mockResolvedValue([p]);
+    const res = await post('/host-match', { emailHashes: [H] });
+    expect(res.body.matches).toEqual([{ emailHash: H, telegramUserId: '999', handleHint: 'al\u2026' }]);
+  });
+  it('caps hashes per day', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([]);
+    const a = app();
+    const send = (n: number) => request(a).post('/api/service/telegram/host-match').set('x-pizzadao-telegram-key', KEY)
+      .send({ emailHashes: Array.from({ length: n }, (_, i) => emailHash(`d${n}-${i}@example.org`)) });
+    expect((await send(100)).status).toBe(200);
+    // 10/min limit: reset it but keep the daily count
+    for (let i = 0; i < 19; i++) { resetHostMatchMinuteLimit(); expect((await send(100)).status).toBe(200); }
+    resetHostMatchMinuteLimit();
+    const over = await send(100);
+    expect(over.status).toBe(429);
+    expect(over.body.reason).toBe('daily cap');
+  });
   it('omits an email whose parties disagree on the chat id', async () => {
     mockPrisma.party.findMany.mockResolvedValue([party('host@example.org', 555n), party('host@example.org', 556n)]);
     const res = await post('/host-match', { emailHashes: [H] });
     expect(res.body).toEqual({ ok: true, matches: [] });
   });
-  it('handleHint is null without a handle', async () => {
+  it('omits an owner who has no handle of their own', async () => {
     mockPrisma.party.findMany.mockResolvedValue([party('host@example.org', 555n, null)]);
     const res = await post('/host-match', { emailHashes: [H] });
-    expect(res.body.matches[0].handleHint).toBeNull();
+    expect(res.body.matches).toEqual([]);
   });
   it('has its own limit of 10 requests per minute', async () => {
     mockPrisma.party.findMany.mockResolvedValue([]);
