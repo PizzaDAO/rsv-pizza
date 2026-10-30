@@ -1,8 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createPublicClient, createWalletClient, http, parseAbi, defineChain } from 'https://esm.sh/viem@2.21.0';
-import { privateKeyToAccount } from 'https://esm.sh/viem@2.21.0/accounts';
-import { base, mainnet } from 'https://esm.sh/viem@2.21.0/chains';
-import { normalize } from 'https://esm.sh/viem@2.21.0/ens';
+import { createPublicClient, createWalletClient, http, parseAbi, defineChain } from 'npm:viem@2.21.0';
+import { privateKeyToAccount } from 'npm:viem@2.21.0/accounts';
+import { base, mainnet } from 'npm:viem@2.21.0/chains';
+import { normalize } from 'npm:viem@2.21.0/ens';
 
 const MINTER_PRIVATE_KEY = Deno.env.get('MINTER_PRIVATE_KEY') || '';
 const BASE_NFT_CONTRACT_ADDRESS = Deno.env.get('BASE_NFT_CONTRACT_ADDRESS') || Deno.env.get('NFT_CONTRACT_ADDRESS') || '';
