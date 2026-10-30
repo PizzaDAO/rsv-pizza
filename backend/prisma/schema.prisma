@@ -2282,6 +2282,17 @@ model PayoutDocument {
   // language tag + English summary on /payments so admins can review at a glance.
   ocrLanguage        String? @map("ocr_language")
   ocrSummary         String? @map("ocr_summary")
+  // sfincione-40417 (pizza count): optional pizzas-per-receipt + size, auto-filled
+  // from OCR/LLM (source 'ocr'|'llm') and host-correctable (source 'host', sticky).
+  // Never affects any money amount. Migration: sfincione-40417-7-pizza-count.sql
+  // (apply to prod BEFORE merging field additions here).
+  pizzaCount           Int?     @map("pizza_count")
+  pizzaCountSource     String?  @map("pizza_count_source")
+  pizzaCountConfidence Decimal? @map("pizza_count_confidence") @db.Decimal(3, 2)
+  pizzaSizeCm          Decimal? @map("pizza_size_cm") @db.Decimal(5, 1)
+  pizzaSizeLabel       String?  @map("pizza_size_label")
+  pizzaSizeSource      String?  @map("pizza_size_source")
+  pizzaSizeConfidence  Decimal? @map("pizza_size_confidence") @db.Decimal(3, 2)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in
@@ -2845,6 +2856,10 @@ model PizzaLineSync {
   visionLastErrorAt DateTime? @map("vision_last_error_at") @db.Timestamptz
   discounts     Json?
   discountTotal Decimal?       @map("discount_total") @db.Decimal(14, 4)
+  // sfincione-40417 (pizza count): hash of the receipt's count/size/amount, kept
+  // separate from itemsHash so count changes re-plan the doc without resetting
+  // the LLM/vision pass markers. NULL for docs with no count/size.
+  countHash     String?        @map("count_hash")
 
   @@map("pizza_line_sync")
 }

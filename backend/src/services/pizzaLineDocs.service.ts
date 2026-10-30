@@ -78,7 +78,8 @@ export async function reallocateDocDiscounts(documentId: string): Promise<void> 
   const discounts: DiscountLine[] = Array.isArray(sync?.discounts)
     ? (sync!.discounts as unknown as DiscountLine[]).filter((d) => d && Number(d.amount) > 0)
     : [];
-  const rows = await prisma.pizzaLineItem.findMany({ where: { documentId } });
+  // sfincione-40417: the synthetic lump-sum line never takes a discount share.
+  const rows = await prisma.pizzaLineItem.findMany({ where: { documentId, sourceCategory: { not: 'lump_sum' } } });
   if (rows.length === 0) return;
   const pseudo = rows.map((r) => ({
     id: r.id,

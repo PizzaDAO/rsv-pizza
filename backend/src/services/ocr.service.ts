@@ -76,6 +76,10 @@ export interface OcrResult {
   // hard-capped 280) describing what the receipt is for, regardless of the
   // receipt's printed language. Null if undeterminable.
   summary?: string | null;
+  // sfincione-40417 (pizza count): OPTIONAL, sanitized model reads. Never feed
+  // into amount/currency/confidence; consumed by pizzaCountAutofill (source c).
+  pizzaCount?: number | null;
+  pizzaSize?: { label: string | null; diameterCm: number | null } | null;
   raw: unknown;
 }
 
@@ -158,6 +162,8 @@ Return ONLY a JSON object with these fields:
     size?: { label: string | null, diameterCm: number | null, lengthCm: number | null, widthCm: number | null }  // OPTIONAL, pizza lines only: any size PRINTED on the receipt line (e.g. "Large", "12 inch", "33 cm", "30x40 cm"); null for fields not printed. Omit or set null if no size is printed. Never guess.
   }>
 - items: string[] (legacy fallback — flat list of item names; will be deprecated)
+- pizzaCount: integer | null (the total number of whole pizzas this receipt pays for, ONLY if it is stated or clearly countable from the receipt; null otherwise. Never infer it from the amount.)
+- pizzaSize: { label: string | null, diameterCm: number | null } | null (the size of those pizzas if printed on the receipt, e.g. "Large" or 33 cm; null if not printed. Never guess.)
 
 Be exhaustive with lineItems — extract every line on the receipt. If a line is illegible, set name to "[illegible]" and other numeric fields to 0.
 Use your best judgment for category. Default "other". Use "drink" for any beverage.
@@ -208,7 +214,7 @@ export function buildMultiSystemPrompt(partyCountry?: string | null): string {
 Return ONLY a JSON object of the form:
 { "receipts": Receipt[] }
 
-Each Receipt object has EXACTLY the fields described below (amount, currency, confidence, merchant, receiptDate, language, summary, lineItems, items), PLUS one optional field:
+Each Receipt object has EXACTLY the fields described below (amount, currency, confidence, merchant, receiptDate, language, summary, lineItems, items, pizzaCount, pizzaSize), PLUS one optional field:
 - boundingHint: string | null (a short human locator for where this receipt sits in the image, e.g. "left half", "top", "right receipt". Null if there is only one receipt or you can't tell.)
 
 CRITICAL splitting rules (UNDER-SPLIT — when unsure, MERGE):
@@ -292,6 +298,31 @@ export function sanitizeLineSize(raw: unknown): OcrLineItemSize | undefined {
   };
   if (!size.label && size.diameterCm === null && size.lengthCm === null && size.widthCm === null) return undefined;
   return size;
+}
+
+/**
+ * sfincione-40417 (pizza count): sanitize the model's optional pizzaCount to an
+ * integer 1..5000, else null.
+ */
+export function sanitizePizzaCount(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '' || typeof raw === 'boolean') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > 5000) return null;
+  return n;
+}
+
+/**
+ * sfincione-40417 (pizza count): sanitize the model's optional pizzaSize:
+ * label <= 40 chars, diameter 15..80 cm. Null when nothing usable.
+ */
+export function sanitizePizzaSize(raw: unknown): { label: string | null; diameterCm: number | null } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const label = typeof r.label === 'string' && r.label.trim() ? sanitizePgString(r.label.trim().slice(0, 40)) : null;
+  const d = r.diameterCm === null || r.diameterCm === undefined || r.diameterCm === '' ? NaN : Number(r.diameterCm);
+  const diameterCm = Number.isFinite(d) && d >= 15 && d <= 80 ? d : null;
+  if (!label && diameterCm === null) return null;
+  return { label, diameterCm };
 }
 
 /**
@@ -439,10 +470,17 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     }
   }
 
+  // sfincione-40417 (pizza count): optional, defensive; independent of the
+  // amount/currency/confidence logic above.
+  const pizzaCount = sanitizePizzaCount(parsed?.pizzaCount);
+  const pizzaSize = sanitizePizzaSize(parsed?.pizzaSize);
+
   return {
     amount,
     currency,
     confidence,
+    pizzaCount,
+    pizzaSize,
     items: Array.isArray(parsed?.items)
       ? parsed.items.filter((s: unknown): s is string => typeof s === 'string').map((s: string) => sanitizePgString(s))
       : undefined,
@@ -452,7 +490,8 @@ export function parseSingleReceipt(parsed: any): OcrResult {
     boundingHint,
     language,
     summary,
-    raw: parsed,
+    // Sanitized pizza fields replace the model's raw ones so ocr_raw never holds junk.
+    raw: parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...parsed, pizzaCount, pizzaSize } : parsed,
   };
 }
 
@@ -510,6 +549,8 @@ export const RECEIPTS_JSON_SCHEMA: {
             'summary',
             'lineItems',
             'items',
+            'pizzaCount',
+            'pizzaSize',
           ],
           properties: {
             amount: { type: 'number' },
@@ -559,6 +600,23 @@ export const RECEIPTS_JSON_SCHEMA: {
             items: {
               type: 'array',
               items: { type: 'string' },
+            },
+            // sfincione-40417 (pizza count): appended, required-but-nullable
+            // (strict mode). null = not stated on the receipt.
+            pizzaCount: { type: ['integer', 'null'] },
+            pizzaSize: {
+              anyOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['label', 'diameterCm'],
+                  properties: {
+                    label: { type: ['string', 'null'] },
+                    diameterCm: { type: ['number', 'null'] },
+                  },
+                },
+                { type: 'null' },
+              ],
             },
           },
         },

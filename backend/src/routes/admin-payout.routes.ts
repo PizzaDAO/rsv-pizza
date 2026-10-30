@@ -64,6 +64,7 @@ import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { sendTelegramMessage } from '../services/telegramSend.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
+import { parsePizzaCountPatch, pizzaAutofillPatch, pizzaAutofillColumns, pizzaFieldsFromDoc } from '../services/pizzaCountAutofill.js';
 import { sanitizeLineSize, type OcrLineItemSize } from '../services/ocr.service.js'; // sfincione-40417
 
 const router = Router();
@@ -900,6 +901,7 @@ function serializePayout(row: any): any {
       // bruschetta-58519: OCR language (ISO-639-1) + English summary.
       ocrLanguage: d.ocrLanguage ?? null,
       ocrSummary: d.ocrSummary ?? null,
+      ...adminPizzaFields(d),
       // culatello-92104: admin-flagged duplicate receipts. Reviewer modal
       // dims these rows + excludes them from the OCR sum + the host PATCH
       // finalAmountUsd recompute path.
@@ -1062,6 +1064,20 @@ async function fetchFlaggedReadyByPayoutId(
 //   - Must be declared BEFORE GET /:id so the literal path wins.
 //   - Empty / <2 char query returns []  — we don't dump the full party list.
 // ============================================
+/** sfincione-40417 (pizza count): serialized pizza_* fields for admin document payloads. */
+function adminPizzaFields(d: any) {
+  const n = (v: any) => (v == null ? null : Number(v.toString()));
+  return {
+    pizzaCount: d.pizzaCount ?? null,
+    pizzaCountSource: d.pizzaCountSource ?? null,
+    pizzaCountConfidence: n(d.pizzaCountConfidence),
+    pizzaSizeCm: n(d.pizzaSizeCm),
+    pizzaSizeLabel: d.pizzaSizeLabel ?? null,
+    pizzaSizeSource: d.pizzaSizeSource ?? null,
+    pizzaSizeConfidence: n(d.pizzaSizeConfidence),
+  };
+}
+
 router.get(
   '/parties/search',
   requireAuth,
@@ -5522,6 +5538,15 @@ router.patch(
           // record the transition (marked vs unmarked) — same pattern as
           // culatello-92104.
           ineligible: true,
+          // sfincione-40417 (pizza count): current values for merge + audit.
+          ocrConfidence: true,
+          pizzaCount: true,
+          pizzaCountSource: true,
+          pizzaCountConfidence: true,
+          pizzaSizeCm: true,
+          pizzaSizeLabel: true,
+          pizzaSizeSource: true,
+          pizzaSizeConfidence: true,
         },
       });
       if (!doc) {
@@ -5915,7 +5940,27 @@ router.patch(
         data.exchangeRate = fx.exchangeRate;
       }
 
-      if (Object.keys(data).length === 0) {
+      // sfincione-40417 (pizza count): admin-entered count/size count as 'host'
+      // (human) values. Any range 15-80 cm is allowed. When the line items were
+      // edited and no explicit pizza fields came with them, re-run the
+      // auto-fill (host values stay sticky). Never touches money.
+      let pizzaData: Record<string, unknown> = {};
+      let pizzaExplicit = false;
+      if ('pizzaCount' in body || 'pizzaSizeCm' in body || 'pizzaSizeMixed' in body) {
+        const parsedPizza = parsePizzaCountPatch(body, { allowAnySize: true });
+        if (!parsedPizza.ok) {
+          throw new AppError(parsedPizza.error, 400, 'INVALID_PIZZA_COUNT');
+        }
+        pizzaData = parsedPizza.data;
+        pizzaExplicit = parsedPizza.changed;
+      } else if (data.ocrLineItems !== undefined) {
+        pizzaData = pizzaAutofillPatch(
+          doc, Array.isArray(data.ocrLineItems) ? data.ocrLineItems : null, doc.ocrRaw,
+          doc.ocrConfidence == null ? null : Number(doc.ocrConfidence.toString()),
+        );
+      }
+
+      if (Object.keys(data).length === 0 && !pizzaExplicit) {
         throw new AppError('No editable fields supplied', 400, 'VALIDATION_ERROR');
       }
 
@@ -5978,8 +6023,27 @@ router.patch(
             ineligible: data.ineligible === undefined
               ? undefined
               : data.ineligible,
+            ...pizzaData,
           },
         });
+
+        if (doc.payoutId && pizzaExplicit) {
+          await tx.payoutAudit.create({
+            data: {
+              payoutId: doc.payoutId,
+              action: 'edit_documents',
+              actorEmail: actor.email,
+              actorKind: actor.actorKind,
+              note: JSON.stringify({
+                scope: 'receipt',
+                documentId: docId,
+                message: 'edited pizza count/size',
+                old: pizzaFieldsFromDoc(doc as unknown as Record<string, unknown>),
+                new: pizzaData,
+              }),
+            },
+          });
+        }
 
         if (doc.payoutId) {
           // Use action='edit_amount' (existing enum value) and stash the
@@ -6141,6 +6205,7 @@ router.patch(
           ocrLanguage: updated.ocrLanguage ?? null,
           ocrSummary: updated.ocrSummary ?? null,
           uploadedByUserId: updated.uploadedByUserId ?? null,
+          ...adminPizzaFields(updated),
         },
       });
     } catch (error) {
@@ -6242,7 +6307,11 @@ router.post(
         },
         orderBy: { createdAt: 'asc' },
         take: limit,
-        select: { id: true, url: true },
+        select: {
+          id: true, url: true,
+          pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
+          pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
+        },
       });
 
       const failed: Array<{ id: string; error: string }> = [];
@@ -6268,6 +6337,8 @@ router.post(
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
               ocrError: null,
+              // sfincione-40417 (pizza count): host values stay sticky; never throws.
+              ...pizzaAutofillPatch(doc, result.lineItems, result.raw, result.confidence),
             },
           });
           succeeded += 1;
@@ -6363,7 +6434,11 @@ router.post(
 
       const existing = await prisma.payoutDocument.findUnique({
         where: { id: docId },
-        select: { id: true, url: true, kind: true, party: { select: { country: true } } },
+        select: {
+          id: true, url: true, kind: true, party: { select: { country: true } },
+          pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
+          pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
+        },
       });
       if (!existing) {
         throw new AppError('Document not found', 404, 'NOT_FOUND');
@@ -6422,6 +6497,8 @@ router.post(
               ocrError: unresolved ? 'CURRENCY_UNRESOLVED' : null,
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
+              // sfincione-40417 (pizza count): host values stay sticky; never throws.
+              ...pizzaAutofillPatch(existing, result.lineItems, result.raw, result.confidence),
             },
           });
           ranInline = true;
@@ -6465,6 +6542,8 @@ router.post(
           // bruschetta-58519: surface OCR language + English summary.
           ocrLanguage: true,
           ocrSummary: true,
+          pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
+          pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
         },
       });
 
@@ -6499,6 +6578,7 @@ router.post(
           // bruschetta-58519
           ocrLanguage: updated.ocrLanguage ?? null,
           ocrSummary: updated.ocrSummary ?? null,
+          ...adminPizzaFields(updated),
         },
         ranInline,
         inlineError,
@@ -6828,6 +6908,8 @@ router.post(
       // bruschetta-58519: OCR language + English summary.
       let ocrLanguage: string | null = null;
       let ocrSummary: string | null = null;
+      // sfincione-40417 (pizza count): auto-filled on receipts (never throws).
+      let pizzaCols: Record<string, unknown> = {};
 
       if (docKind === 'receipt') {
         const { analyzeReceipt } = await import('../services/ocr.service.js');
@@ -6861,6 +6943,7 @@ router.post(
           ocrLanguage = result.language ? sanitizePgString(result.language) : null;
           ocrSummary = result.summary ? sanitizePgString(result.summary) : null;
           ocrError = unresolved ? 'CURRENCY_UNRESOLVED' : null;
+          pizzaCols = pizzaAutofillColumns(result.lineItems, result.raw, result.confidence);
         } catch (err: any) {
           // Don't fail the request — persist the doc with the error so the
           // admin can fix the amount via the existing edit / retry-ocr UI.
@@ -6932,6 +7015,7 @@ router.post(
             // bruschetta-58519: persist OCR language + English summary.
             ocrLanguage,
             ocrSummary,
+            ...pizzaCols,
           },
           select: {
             id: true,
@@ -6958,6 +7042,8 @@ router.post(
             ocrLanguage: true,
             ocrSummary: true,
             uploadedByUserId: true,
+            pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
+            pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
           },
         });
 
@@ -7013,6 +7099,7 @@ router.post(
           ocrLanguage: created.ocrLanguage ?? null,
           ocrSummary: created.ocrSummary ?? null,
           uploadedByUserId: created.uploadedByUserId ?? null,
+          ...adminPizzaFields(created),
         },
       });
     } catch (err) {
