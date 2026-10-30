@@ -38,7 +38,7 @@ ALTER TABLE payout_documents VALIDATE CONSTRAINT payout_documents_pizza_size_chk
 
 -- View: sfincione-40417-6's definition verbatim, with ONE change in the event branch:
 --   false AS is_lump_sum   ->   (li.source_category = 'lump_sum') AS is_lump_sum
--- View: existing columns unchanged (same names/types/order), new ones appended.
+-- (sfincione-40417-6 comment, kept verbatim: existing columns unchanged; no columns are added here.)
 CREATE OR REPLACE VIEW pizza_price_index_lines
 WITH (security_invoker = true) AS
 SELECT

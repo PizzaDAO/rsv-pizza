@@ -46,11 +46,11 @@ async function main() {
     WHERE d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false
       AND d.pizza_count IS NULL AND d.pizza_count_source IS NULL
       AND COALESCE(EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${args.year}
-      AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id AND li.excluded_reason = 'lump_sum')
+      AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id AND (li.is_bundle = true OR li.excluded_reason = 'lump_sum'))
     ORDER BY d.created_at
     LIMIT ${args.limit}`);
 
-  console.log(`${args.apply ? 'APPLY' : 'DRY RUN (no LLM calls, nothing written)'}: ${docs.length} ${args.year} receipt(s) with a lump_sum-excluded line and no count`);
+  console.log(`${args.apply ? 'APPLY' : 'DRY RUN (no LLM calls, nothing written)'}: ${docs.length} ${args.year} receipt(s) with a bundle / lump_sum line and no count`);
   for (const d of docs.slice(0, 50)) console.log(`  ${d.id}  ${d.name}  "${(d.summary ?? '').slice(0, 70)}"`);
   if (docs.length > 50) console.log(`  ... and ${docs.length - 50} more`);
 
