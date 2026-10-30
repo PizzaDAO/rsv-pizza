@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import fs from 'fs';
+import { createHash } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,6 +11,7 @@ const store = vi.hoisted(() => new Map<string, any>());
 
 const mockPrisma = vi.hoisted(() => ({
   cityTelegramGroup: { findMany: vi.fn() },
+  party: { findMany: vi.fn() },
   pizzadaoServiceSend: {
     findUnique: vi.fn(),
     create: vi.fn(),
@@ -24,7 +26,7 @@ const mockSendToCityGroup = vi.hoisted(() => vi.fn());
 vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 vi.mock('../services/cityTelegramGroup.js', () => ({ sendToCityGroup: mockSendToCityGroup }));
 
-import router, { resetCityFloor, resetDirectoryCache } from './service-telegram.routes.js';
+import router, { emailHash, resetHostMatchLimit, resetCityFloor, resetDirectoryCache } from './service-telegram.routes.js';
 import { Prisma } from '@prisma/client';
 import { errorHandler } from '../middleware/error.js';
 
@@ -61,9 +63,11 @@ beforeEach(() => {
   store.clear();
   resetCityFloor();
   resetDirectoryCache();
+  resetHostMatchLimit();
   process.env.PIZZADAO_TELEGRAM_SERVICE_KEY = KEY;
   process.env.PIZZADAO_TELEGRAM_DM_ENABLED = '1';
   process.env.PIZZADAO_TELEGRAM_GROUPS_ENABLED = '1';
+  process.env.PIZZADAO_HOST_MATCH_ENABLED = '1';
   process.env.PIZZADAO_TELEGRAM_BUTTON_HOSTS = 'app.example.org';
   process.env.TELEGRAM_BOT_TOKEN = 'test-token';
   vi.stubGlobal('fetch', fetchMock);
@@ -400,6 +404,82 @@ describe('GET /city-groups', () => {
     mockPrisma.cityTelegramGroup.findMany.mockResolvedValue([]);
     expect((await request(app()).get('/api/service/telegram/city-groups').set('x-pizzadao-telegram-key', KEY)).status).toBe(200);
     expect((await request(app()).get('/api/service/telegram/city-groups')).status).toBe(401);
+  });
+});
+
+describe('POST /host-match', () => {
+  const party = (email: string, chat: bigint | null, telegram: string | null = '@alice') => ({
+    hostTelegramChatId: chat,
+    user: { email, telegram },
+  });
+  const H = emailHash('Host@Example.org');
+
+  it('503 disabled without the flag, 401 without the key; no query', async () => {
+    delete process.env.PIZZADAO_HOST_MATCH_ENABLED;
+    expect((await post('/host-match', { emailHashes: [H] })).status).toBe(503);
+    process.env.PIZZADAO_HOST_MATCH_ENABLED = '1';
+    expect((await post('/host-match', { emailHashes: [H] }, null)).status).toBe(401);
+    expect(mockPrisma.party.findMany).not.toHaveBeenCalled();
+  });
+  it('hashes lower(trim(email)) as sha256 hex', () => {
+    expect(emailHash('  Host@Example.org ')).toBe(emailHash('host@example.org'));
+    expect(emailHash('host@example.org')).toBe(createHash('sha256').update('host@example.org').digest('hex'));
+  });
+  it('validates the hash list and its size', async () => {
+    expect((await post('/host-match', {})).status).toBe(400);
+    expect((await post('/host-match', { emailHashes: [] })).status).toBe(400);
+    expect((await post('/host-match', { emailHashes: ['host@example.org'] })).status).toBe(400);
+    expect((await post('/host-match', { emailHashes: [H, 5] })).status).toBe(400);
+    const many = Array.from({ length: 101 }, (_, i) => emailHash(`u${i}@example.org`));
+    expect((await post('/host-match', { emailHashes: many })).status).toBe(400);
+    expect(mockPrisma.party.findMany).not.toHaveBeenCalled();
+    mockPrisma.party.findMany.mockResolvedValue([]);
+    expect((await post('/host-match', { emailHashes: many.slice(0, 100) })).status).toBe(200);
+  });
+  it('queries only positive chat ids and returns the minimal fields', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([
+      party('host@example.org', 555n),
+      party('Host@Example.org', 555n), // older party, same chat
+      party('other@example.org', 777n), // not requested
+    ]);
+    const res = await post('/host-match', { emailHashes: [H.toUpperCase()] });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      ok: true,
+      matches: [{ emailHash: H, telegramUserId: '555', handleHint: 'al\u2026' }],
+    });
+    const arg = mockPrisma.party.findMany.mock.calls[0][0];
+    expect(arg.where.hostTelegramChatId).toEqual({ gt: 0n });
+    expect(JSON.stringify(res.body)).not.toMatch(/example\.org|alice|777/);
+  });
+  it('uses the most recently updated party and drops negative or null ids', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([
+      party('host@example.org', -100123n),
+      party('host@example.org', null),
+      party('host@example.org', 555n),
+    ]);
+    const res = await post('/host-match', { emailHashes: [H] });
+    expect(res.body.matches).toHaveLength(1);
+    expect(res.body.matches[0].telegramUserId).toBe('555');
+  });
+  it('omits an email whose parties disagree on the chat id', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([party('host@example.org', 555n), party('host@example.org', 556n)]);
+    const res = await post('/host-match', { emailHashes: [H] });
+    expect(res.body).toEqual({ ok: true, matches: [] });
+  });
+  it('handleHint is null without a handle', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([party('host@example.org', 555n, null)]);
+    const res = await post('/host-match', { emailHashes: [H] });
+    expect(res.body.matches[0].handleHint).toBeNull();
+  });
+  it('has its own limit of 10 requests per minute', async () => {
+    mockPrisma.party.findMany.mockResolvedValue([]);
+    const a = app();
+    let last = 0;
+    for (let i = 0; i < 11; i++) {
+      last = (await request(a).post('/api/service/telegram/host-match').set('x-pizzadao-telegram-key', KEY).send({ emailHashes: [H] })).status;
+    }
+    expect(last).toBe(429);
   });
 });
 

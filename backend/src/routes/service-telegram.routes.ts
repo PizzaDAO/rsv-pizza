@@ -11,6 +11,7 @@
  *   (else 503 { ok:false, reason:'disabled' }):
  *     /dm, /probe   PIZZADAO_TELEGRAM_DM_ENABLED
  *     /city-post    PIZZADAO_TELEGRAM_GROUPS_ENABLED
+ *     /host-match   PIZZADAO_HOST_MATCH_ENABLED
  *   /city-groups needs only the key. Identifiers go in bodies, never URLs.
  *
  *   GET  /city-groups -> { ok, groups:[{ cityKey, title, country, region, chatUrl, hasChat }] }
@@ -19,12 +20,17 @@
  *   POST /probe    { telegramUserId } -> { ok, reachable, code? }
  *   POST /city-post { cityKey, text, idempotencyKey }
  *                  -> { ok:true, messageId?, migratedTo?, replay? } | { ok:false, code, retryAfter? }
+ *   POST /host-match { emailHashes: string[1..100] }  (sha256 hex of lower(trim(email)))
+ *                  -> { ok:true, matches:[{ emailHash, telegramUserId, handleHint }] }
+ *                  Only party owners with a positive host chat id; an email whose
+ *                  parties disagree on the chat id is omitted. 10 requests/min.
  *
  * Every Telegram outcome is HTTP 200; 4xx/5xx mean our own validation, auth or
  * config. DM codes: not_started | blocked | rate_limited | bad_request | uncertain.
  * City-post codes: no_group | kicked | rate_limited | bad_request | uncertain.
  * `uncertain` means the message may have been delivered; do not auto-retry.
  */
+import { createHash } from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { Prisma } from '@prisma/client';
@@ -415,6 +421,87 @@ router.post(
       );
       if (out === null) return res.status(409).json({ ok: false, reason: 'idempotencyKey reused' });
       res.json(out);
+    } catch (e) {
+      fail(res, next, e);
+    }
+  },
+);
+
+// --- POST /host-match -------------------------------------------------------
+
+const MAX_HASHES = 100;
+const HASH_RE = /^[0-9a-f]{64}$/;
+
+const hostMatchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: () => 'pizzadao',
+  message: { ok: false, reason: 'rate limited' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
+
+export function resetHostMatchLimit() {
+  hostMatchLimiter.resetKey('pizzadao');
+}
+
+export function emailHash(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+}
+
+function handleHint(handle: string | null | undefined): string | null {
+  const h = (handle || '').trim().replace(/^@/, '');
+  return h ? `${Array.from(h).slice(0, 2).join('')}\u2026` : null;
+}
+
+router.post(
+  '/host-match',
+  requireFlag('PIZZADAO_HOST_MATCH_ENABLED'),
+  hostMatchLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const raw = req.body?.emailHashes;
+      if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_HASHES) {
+        throw new BadInput(`emailHashes must be an array of 1 to ${MAX_HASHES} hashes`);
+      }
+      const wanted = new Set<string>();
+      for (const h of raw) {
+        const v = typeof h === 'string' ? h.trim().toLowerCase() : '';
+        if (!HASH_RE.test(v)) throw new BadInput('emailHashes must be lowercase sha256 hex strings');
+        wanted.add(v);
+      }
+
+      // Owners of at least one party with a verified positive host chat id,
+      // most recently updated party first.
+      const parties = await prisma.party.findMany({
+        where: { hostTelegramChatId: { gt: 0n }, userId: { not: null } },
+        select: {
+          hostTelegramChatId: true,
+          user: { select: { email: true, telegram: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      const byHash = new Map<string, { chats: Set<string>; first: string; handle: string | null }>();
+      for (const p of parties) {
+        if (!p.user?.email || p.hostTelegramChatId === null || p.hostTelegramChatId <= 0n) continue;
+        const h = emailHash(p.user.email);
+        if (!wanted.has(h)) continue;
+        const chat = p.hostTelegramChatId.toString();
+        const entry = byHash.get(h);
+        if (entry) entry.chats.add(chat);
+        else byHash.set(h, { chats: new Set([chat]), first: chat, handle: p.user.telegram ?? null });
+      }
+
+      const matches = [...byHash.entries()]
+        .filter(([, e]) => e.chats.size === 1) // ambiguous -> none
+        .map(([hash, e]) => ({
+          emailHash: hash,
+          telegramUserId: e.first,
+          handleHint: handleHint(e.handle),
+        }));
+      res.json({ ok: true, matches });
     } catch (e) {
       fail(res, next, e);
     }
