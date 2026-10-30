@@ -121,3 +121,15 @@ export function lumpSumPill(line: { sourceCategory?: string | null; notes?: stri
   const src = m ? PIZZA_SOURCE_LABEL[m[1] as PizzaSource] : null;
   return src ? `Lump sum (count from ${src})` : 'Lump sum';
 }
+
+/**
+ * Should a count-input blur save? Never store a sticky host NULL just because the
+ * field was focused and blurred empty over an auto/low-confidence value; an
+ * unchanged auto value is saved once (records the host's confirmation).
+ */
+export function shouldSaveCount(parsed: number | null, d: PizzaCountFieldsLike): boolean {
+  if (parsed === null && d.pizzaCountSource !== 'host') return false;
+  const unchanged = parsed === (d.pizzaCount ?? null);
+  const confirmsAuto = parsed !== null && d.pizzaCountSource !== 'host';
+  return !unchanged || confirmsAuto;
+}

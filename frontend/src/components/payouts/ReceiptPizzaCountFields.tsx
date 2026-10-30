@@ -13,6 +13,7 @@ import {
   pickPizzaCountView,
   sizeSelectToBody,
   sizeSelectValue,
+  shouldSaveCount,
   summarizeSize,
 } from '../../utils/pizzaCount';
 
@@ -75,11 +76,7 @@ export const ReceiptPizzaCountFields: React.FC<ReceiptPizzaCountFieldsProps> = (
       setCountDraft(doc.pizzaCount != null && view !== 'prompt' ? String(doc.pizzaCount) : '');
       return;
     }
-    const unchanged = parsed === (doc.pizzaCount ?? null);
-    // An unchanged auto value still gets saved once: that records the host's confirmation.
-    const confirmsAuto = parsed !== null && doc.pizzaCountSource !== 'host';
-    if (unchanged && !confirmsAuto) return;
-    if (parsed === null && doc.pizzaCountSource == null) return; // nothing there, nothing typed
+    if (!shouldSaveCount(parsed, doc)) return;
     void save({ pizzaCount: parsed });
   };
 

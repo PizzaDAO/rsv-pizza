@@ -9,6 +9,7 @@ import {
   sizeSelectToBody,
   formatPizzaChip,
   lumpSumPill,
+  shouldSaveCount,
 } from './pizzaCount';
 
 describe('pickPizzaCountView', () => {
@@ -73,5 +74,17 @@ describe('size helpers', () => {
     expect(lumpSumPill({ sourceCategory: 'lump_sum', notes: 'lump_sum:llm:pizza_lines' })).toBe('Lump sum (count from AI)');
     expect(lumpSumPill({ sourceCategory: 'lump_sum', notes: null })).toBe('Lump sum');
     expect(lumpSumPill({ sourceCategory: 'pizza', notes: 'lump_sum:host:x' })).toBeNull();
+  });
+});
+
+describe('shouldSaveCount', () => {
+  it('empty blur over an auto value saves nothing', () => {
+    expect(shouldSaveCount(null, { pizzaCount: 20, pizzaCountSource: 'ocr', pizzaCountConfidence: 0.5 })).toBe(false);
+    expect(shouldSaveCount(null, {})).toBe(false);
+  });
+  it('host clear saves; unchanged auto confirms; unchanged host does not', () => {
+    expect(shouldSaveCount(null, { pizzaCount: 5, pizzaCountSource: 'host' })).toBe(true);
+    expect(shouldSaveCount(20, { pizzaCount: 20, pizzaCountSource: 'ocr' })).toBe(true);
+    expect(shouldSaveCount(5, { pizzaCount: 5, pizzaCountSource: 'host' })).toBe(false);
   });
 });

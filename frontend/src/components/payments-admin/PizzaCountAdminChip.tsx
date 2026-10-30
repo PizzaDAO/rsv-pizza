@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pizza, Pencil } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { updatePayoutDocument } from '../../lib/api';
@@ -33,6 +33,16 @@ export const PizzaCountAdminChip: React.FC<Props> = ({ doc, onSaved }) => {
     pizzaSizeLabel: doc.pizzaSizeLabel ?? null,
     pizzaSizeSource: doc.pizzaSizeSource ?? null,
   });
+  useEffect(() => {
+    setFields({
+      pizzaCount: doc.pizzaCount ?? null,
+      pizzaCountSource: doc.pizzaCountSource ?? null,
+      pizzaCountConfidence: doc.pizzaCountConfidence ?? null,
+      pizzaSizeCm: doc.pizzaSizeCm ?? null,
+      pizzaSizeLabel: doc.pizzaSizeLabel ?? null,
+      pizzaSizeSource: doc.pizzaSizeSource ?? null,
+    });
+  }, [doc.id, doc.pizzaCount, doc.pizzaCountSource, doc.pizzaCountConfidence, doc.pizzaSizeCm, doc.pizzaSizeLabel, doc.pizzaSizeSource]);
   const [editing, setEditing] = useState(false);
   const [countDraft, setCountDraft] = useState('');
   const [sizeDraft, setSizeDraft] = useState('');
@@ -71,9 +81,21 @@ export const PizzaCountAdminChip: React.FC<Props> = ({ doc, onSaved }) => {
     setSaving(true);
     setError(null);
     try {
-      const patch: Parameters<typeof updatePayoutDocument>[1] = { pizzaCount: parsed };
-      if (sizeDraft === 'mixed') patch.pizzaSizeMixed = true;
-      else patch.pizzaSizeCm = sizeNum;
+      // Only send what changed from the opening value: re-sending an unchanged
+      // field would flip its source to 'host' (or null an auto size label).
+      const openCount = fields.pizzaCount != null ? String(fields.pizzaCount) : '';
+      const openSize = fields.pizzaSizeCm != null ? String(fields.pizzaSizeCm) : fields.pizzaSizeLabel === 'mixed' ? 'mixed' : '';
+      const patch: Parameters<typeof updatePayoutDocument>[1] = {};
+      if (countDraft.trim() !== openCount) patch.pizzaCount = parsed;
+      if (sizeDraft !== openSize) {
+        if (sizeDraft === 'mixed') patch.pizzaSizeMixed = true;
+        else patch.pizzaSizeCm = sizeNum;
+      }
+      if (Object.keys(patch).length === 0) {
+        setEditing(false);
+        setSaving(false);
+        return;
+      }
       const res = await updatePayoutDocument(doc.id, patch);
       const next: PizzaCountFieldsLike = {
         pizzaCount: res.pizzaCount ?? null,

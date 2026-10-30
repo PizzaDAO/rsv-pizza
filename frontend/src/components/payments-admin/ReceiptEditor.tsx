@@ -60,6 +60,8 @@ export type LineItemDraft = {
 
 interface ReceiptEditorProps {
   doc: PayoutDocument;
+  /** sfincione-40417: lets the parent sync its copy of the doc after a pizza count/size save. */
+  onPizzaSaved?: (fields: import('../../utils/pizzaCount').PizzaCountFieldsLike) => void;
   /** Amount/currency draft for this receipt. */
   draft: ReceiptDraft;
   onDraftChange: (next: ReceiptDraft) => void;
@@ -183,6 +185,7 @@ function formatUploadedAt(iso: string): string {
 
 export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
   doc,
+  onPizzaSaved,
   draft,
   onDraftChange,
   saving,
@@ -343,7 +346,7 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
             </p>
           )}
           {/* sfincione-40417: pizza count chip + editor (never touches money). */}
-          <PizzaCountAdminChip doc={doc} />
+          <PizzaCountAdminChip doc={doc} onSaved={onPizzaSaved} />
           {/* stracciatella-92114: multi-receipt-per-photo label. Only when a
               single photo resolved to >1 detected receipts. */}
           {doc.sourceReceiptCount != null && doc.sourceReceiptCount > 1 && (
