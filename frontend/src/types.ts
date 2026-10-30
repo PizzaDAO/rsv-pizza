@@ -1904,6 +1904,17 @@ export interface PayoutDocument {
   // persists the new array wholesale. `null` when OCR didn't extract any
   // line items (pre-formaggi rows or unparseable receipts).
   ocrLineItems?: ReceiptLineItem[] | null;
+  // sfincione-40417 (pizza count): pizzas this receipt covers + their size,
+  // auto-filled from OCR/LLM ('ocr'|'llm') and host-correctable ('host', sticky).
+  // All optional/nullable: never affects any money amount.
+  pizzaCount?: number | null;
+  pizzaCountSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaCountConfidence?: number | null;
+  pizzaSizeCm?: number | null;
+  /** A size word ("large") when no cm is known, or 'mixed'. */
+  pizzaSizeLabel?: string | null;
+  pizzaSizeSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaSizeConfidence?: number | null;
   // culatello-92104: admin-marked duplicate flag. When true the reviewer
   // modal dims the row + excludes its OCR amount from the receipt sum and
   // the host PATCH finalAmountUsd recompute path. Optional on the wire so

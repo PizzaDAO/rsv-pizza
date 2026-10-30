@@ -3,6 +3,7 @@ import { Loader2, Plus, Trash2, Copy, DollarSign, AlertTriangle, RefreshCw, Rece
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import { CurrencyPicker } from './CurrencyPicker';
+import { PizzaCountAdminChip } from './PizzaCountAdminChip';
 import type { PayoutDocument, ReceiptLineItem, ReceiptLineItemCategory } from '../../types';
 
 /**
@@ -341,6 +342,8 @@ export const ReceiptEditor: React.FC<ReceiptEditorProps> = ({
               {uploader && <>{doc.createdAt ? ' by ' : 'Uploaded by '}{uploader}</>}
             </p>
           )}
+          {/* sfincione-40417: pizza count chip + editor (never touches money). */}
+          <PizzaCountAdminChip doc={doc} />
           {/* stracciatella-92114: multi-receipt-per-photo label. Only when a
               single photo resolved to >1 detected receipts. */}
           {doc.sourceReceiptCount != null && doc.sourceReceiptCount > 1 && (

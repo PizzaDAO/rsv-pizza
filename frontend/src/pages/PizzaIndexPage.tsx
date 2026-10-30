@@ -259,9 +259,7 @@ export function PizzaIndexPage() {
             <li>A country appears once at least one event has an itemized pizza price. Countries with fewer than {EARLY_BELOW} events are marked <i>early</i>: one pizzeria can swing their number.</li>
             <li>Where a country has pizzas whose size was confirmed (by a reviewer, or printed on the receipt), only those are used. Otherwise sizes are estimated from the menu item, price and local norms, and the country is marked <i>estimated</i>; those figures can be off by 20-30% until a size is confirmed.</li>
             <li>Prices that look like misreads (for example a whole bill read as one pizza) are left out of estimated countries.</li>
-            {showHistoryCopy
-              ? <li>Bundles and all-you-can-eat deals are excluded. Archived receipts that only show a lump sum for N pizzas are averaged per pizza (so drinks, tax and delivery can inflate them) and the country is marked <i>estimated</i>; they are dropped once a country has confirmed sizes for that year.</li>
-              : <li>Bundles, all-you-can-eat deals and lump-sum orders are excluded.</li>}
+            <li>Bundles and all-you-can-eat deals are excluded. Receipts that only show a total for N pizzas (stated on the receipt or entered by the host) are averaged per pizza (so drinks, tax and delivery can inflate them) and the country is marked <i>estimated</i>; they are dropped once a country has confirmed sizes for that year.</li>
             <li>Tax treatment varies by country (many include VAT, US prices are usually pre-tax), so US prices may look slightly low.</li>
           </ul>
           {data && <p className="text-xs text-theme-text-faint">Updated {new Date(data.generatedAt).toLocaleDateString()}.</p>}

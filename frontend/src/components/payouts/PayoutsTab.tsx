@@ -12,7 +12,7 @@ import {
   Clock,
   Users,
 } from 'lucide-react';
-import { TaxFormType } from '../../types';
+import { TaxFormType, PayoutDocument } from '../../types';
 import {
   fetchMyReimbursement,
   addReimbursementReceipts,
@@ -38,6 +38,7 @@ import { AppealCapModal } from './AppealCapModal';
 import { ReceiptsLibrary } from './ReceiptsLibrary';
 import { TaxFormSection } from './TaxFormSection';
 import { ReceiptUpload, ReceiptItem } from './ReceiptUpload';
+import { ReceiptPizzaCountFields } from './ReceiptPizzaCountFields';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 import { RecipientPickerModal } from './RecipientPickerModal';
 
@@ -472,6 +473,14 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
     }
   };
 
+  // sfincione-40417: patch one receipt in place after a pizza count/size save.
+  // No loading flip (ziti-58300: a loading toggle remounts the upload list).
+  const handlePizzaSaved = useCallback((receipt: PayoutDocument) => {
+    setData((prev) =>
+      prev ? { ...prev, receipts: prev.receipts.map((r) => (r.id === receipt.id ? { ...r, ...receipt } : r)) } : prev
+    );
+  }, []);
+
   // --- Submit / reopen -------------------------------------------------------
 
   const readyToSubmit = readiness?.readyToSubmit === true;
@@ -822,6 +831,8 @@ export const PayoutsTab: React.FC<PayoutsTabProps> = ({
                       {doc.ocrAmount.toFixed(2)} {doc.ocrCurrency}
                     </div>
                   )}
+                  {/* sfincione-40417: optional pizza count + size (auto-read, host-correctable). */}
+                  <ReceiptPizzaCountFields partyId={partyId} doc={doc} onSaved={handlePizzaSaved} />
                 </div>
                 <button
                   type="button"

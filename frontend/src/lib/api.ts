@@ -5518,6 +5518,11 @@ export async function updatePayoutDocument(
     // under policy — alcohol, tips, personal items). Reversible. Same
     // exclusion semantics as `isDuplicate` everywhere it's read.
     ineligible?: boolean;
+    // sfincione-40417 (pizza count): admin-entered values count as 'host'
+    // (human). Any size 15-80 cm; pizzaSizeMixed records "mixed / not sure".
+    pizzaCount?: number | null;
+    pizzaSizeCm?: number | null;
+    pizzaSizeMixed?: boolean;
   },
 ): Promise<{
   id: string;
@@ -5540,6 +5545,13 @@ export async function updatePayoutDocument(
   ocrError: string | null;
   sortOrder: number;
   uploadedByUserId: string | null;
+  pizzaCount?: number | null;
+  pizzaCountSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaCountConfidence?: number | null;
+  pizzaSizeCm?: number | null;
+  pizzaSizeLabel?: string | null;
+  pizzaSizeSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaSizeConfidence?: number | null;
 }> {
   const res = await apiRequest<{ document: any }>(
     `/api/admin/payouts/documents/${docId}`,
@@ -6787,6 +6799,23 @@ export async function removeReimbursementReceipt(
   return apiRequest<ReimbursementMutationResponse>(
     `/api/parties/${partyId}/reimbursement/receipts/${docId}`,
     { method: 'DELETE', requireAuth: true }
+  );
+}
+
+/**
+ * sfincione-40417 (pizza count): correct (or fill in) how many pizzas / what size
+ * a receipt covers. Any co-host, any time (also after submit); never changes money.
+ * `pizzaSizeCm` must be one of 25/30/35/40/45 (or null to clear); `pizzaSizeMixed`
+ * records "mixed / not sure". Sending a key marks that value as host-entered.
+ */
+export async function updateReimbursementReceiptPizza(
+  partyId: string,
+  docId: string,
+  body: { pizzaCount?: number | null; pizzaSizeCm?: number | null; pizzaSizeMixed?: boolean }
+): Promise<{ receipt: PayoutDocument }> {
+  return apiRequest<{ receipt: PayoutDocument }>(
+    `/api/parties/${partyId}/reimbursement/receipts/${docId}`,
+    { method: 'PATCH', body, requireAuth: true }
   );
 }
 
