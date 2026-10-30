@@ -17,7 +17,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | sicilian-47246 | Partner timeseries chart visible to all partners (not just admin) | stuck | P2 |  |  |  |  |  | 2026-05-17: PR #363 merged (89d55344). Backend deploy from master-deploy worktree. |
 | sausage-24183 | Bulk-DM hosts via Telegram bot in TelegramBroadcast modal (add Recipients: Groups \| Hosts \| Both toggle; hosts opt-in via /start deeplink stored on parties.host_telegram_chat_id; new webhook route + host-broadcast route) | todo | P1 |  |  |  |  |  | 2026-05-17: PR 336 (backend) + PR 341 (frontend) merged. Backend deployed to api.rsv.pizza. Telegram webhook live on @MoltoBeneBot. Smoke tests passed. |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
-| bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | todo | P1 |  |  |  |  |  |  |
 | basil-14648 | AI ordering | todo | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md |
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
@@ -85,6 +84,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | P1 | 2026-10-30 | #1166 | Verification tab on /underboss; daily failure email is a follow-up |
 | funghi-91314 | Pull photos from Rsv.pizza host pages and upload it to Sauce to be played during the livestream. | P1 | 2026-10-29 | #1163 | 2026-10-29: back/pause/next on /photos/play; Sauce integration still open (need repo) |
 | truffle-83044 | add event search feature based by region, key words, could country, continent, etc | P1 | 2026-10-29 | #1160 |  |
 | buffalo-35201 | if event requires approval, don't mint nft until approval has been granted | P1 | 2026-10-29 | #1162 | 2026-10-29: needs `supabase functions deploy mint-nft` |
