@@ -2860,3 +2860,20 @@ model PizzaPhotoPass {
 
   @@map("pizza_photo_pass")
 }
+
+// Idempotency + audit log for sends made on behalf of the PizzaDAO member app
+// through /api/service/telegram/* (kind: dm | city_post). One row per
+// caller-supplied idempotency key; pruned after 60 days.
+model PizzadaoServiceSend {
+  idempotencyKey String   @id @map("idempotency_key")
+  kind           String   // dm | city_post
+  target         String   // telegram user id, or city key
+  status         String   // pending | sent | failed | uncertain
+  messageId      BigInt?  @map("message_id")
+  code           String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([kind, target, createdAt], map: "pizzadao_service_sends_target_idx")
+  @@map("pizzadao_service_sends")
+}

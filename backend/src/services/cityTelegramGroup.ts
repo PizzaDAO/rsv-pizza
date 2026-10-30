@@ -79,6 +79,12 @@ export interface SendToCityGroupResult {
   chatId?: string;
   /** Set when the group had migrated to a supergroup and we persisted the new id. */
   migratedTo?: string;
+  /** Telegram message_id of the delivered message, when the send succeeded. */
+  messageId?: number;
+  /** Telegram error_code of the final failed attempt (absent for network errors). */
+  errorCode?: number;
+  /** Telegram parameters.retry_after (seconds) on a 429. */
+  retryAfter?: number;
 }
 
 /**
@@ -173,13 +179,20 @@ export async function sendToCityGroup(
       if (result.ok) {
         // Send succeeded; failing to persist must not flip the result to error.
         await persistCityGroupMigration(key, newChatId);
-        return { ok: true, chatId: newChatId, migratedTo: newChatId };
+        return {
+          ok: true,
+          chatId: newChatId,
+          migratedTo: newChatId,
+          messageId: result.result?.message_id,
+        };
       }
 
       return {
         ok: false,
         reason: result.description || 'Failed after migration retry',
         chatId: newChatId,
+        errorCode: result.error_code,
+        retryAfter: result.parameters?.retry_after,
       };
     }
 
@@ -210,13 +223,15 @@ export async function sendToCityGroup(
           touchErr?.message || touchErr,
         );
       }
-      return { ok: true, chatId: originalChatId };
+      return { ok: true, chatId: originalChatId, messageId: result.result?.message_id };
     }
 
     return {
       ok: false,
       reason: result.description || 'Unknown Telegram error',
       chatId: originalChatId,
+      errorCode: result.error_code,
+      retryAfter: result.parameters?.retry_after,
     };
   } catch (err: any) {
     return {
