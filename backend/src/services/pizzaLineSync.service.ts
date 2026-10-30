@@ -442,7 +442,7 @@ export function buildLumpSumWrite(
   const count = c?.pizzaCount ?? 0;
   if (!c || !(count > 0)) return null;
   // Itemized lines always win.
-  if (writes.some((w) => !w.excluded && w.unitPriceList > 0)) return null;
+  if (writes.some((w) => !w.excluded && !w.isBundle && w.unitPriceList > 0)) return null;
 
   // Base: the pizza-ish lines when there are any (trims tax/tip/drinks the OCR split
   // off), else the receipt total.
@@ -450,7 +450,10 @@ export function buildLumpSumWrite(
   let mode: 'pizza_lines' | 'receipt_total' = 'receipt_total';
   let currency = doc.currency;
   let fxRate = doc.fxRate;
-  const pizzaish = writes.filter((w) => w.lineIndex >= 0 && (w.sourceCategory === 'pizza' || w.excludedReason === 'lump_sum'));
+  // Excluded lines are skipped (except lump_sum ones); LLM-flagged bundle lines ARE the lump sum.
+  const pizzaish = writes.filter(
+    (w) => w.lineIndex >= 0 && (w.excludedReason === 'lump_sum' || (!w.excluded && (w.sourceCategory === 'pizza' || w.isBundle))),
+  );
   if (pizzaish.length > 0) {
     mode = 'pizza_lines';
     for (const w of pizzaish) {
@@ -694,7 +697,8 @@ export const COUNT_HASH_SQL = Prisma.sql`CASE WHEN d.pizza_count IS NULL AND d.p
   ELSE md5(coalesce(d.pizza_count::text,'') || '|' || coalesce(d.pizza_count_source,'') || '|' ||
            coalesce(d.pizza_size_cm::text,'') || '|' || coalesce(d.pizza_size_label,'') || '|' ||
            coalesce(d.pizza_size_source,'') || '|' || coalesce(d.original_amount::text,'') || '|' ||
-           coalesce(d.ocr_amount::text,'')) END`;
+           coalesce(d.ocr_amount::text,'') || '|' || coalesce(d.original_currency,'') || '|' ||
+           coalesce(d.exchange_rate::text,'')) END`;
 
 /** Pure decision for the pizza_line_sync row (testable without a DB). */
 export function planSyncRow(a: {

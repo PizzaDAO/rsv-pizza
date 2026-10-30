@@ -438,6 +438,7 @@ export async function runLlmPass(opts: {
 
   const presets = await loadPresets();
   const docs = await loadDocRows(picked.map((p) => p.id));
+  const touched: string[] = [];
   for (const row of docs) {
     try {
       const ctx = docContext(row);
@@ -480,7 +481,7 @@ export async function runLlmPass(opts: {
       if (countOnly) {
         // One-time backfill: count only. No lines applied, no pass markers touched.
         if (lumpSum && (await writeLumpSumToDoc(row.id, lumpSum))) {
-          await syncPizzaLineItems({ docIds: [row.id], force: true });
+          touched.push(row.id);
           result.linesUpdated += 1;
         }
         result.processed += 1;
@@ -507,15 +508,22 @@ export async function runLlmPass(opts: {
       // this doc so the synthetic per-pizza line appears/disappears. force doesn't
       // reset the pass markers, so there is no loop.
       const wroteCount = lumpSum ? await writeLumpSumToDoc(row.id, lumpSum) : false;
-      if (wroteCount || inserts.length || updates.length) {
-        await syncPizzaLineItems({ docIds: [row.id], force: true });
-      }
+      if (wroteCount || inserts.length || updates.length) touched.push(row.id);
       result.processed += 1;
       result.linesInserted += inserts.length;
       result.linesUpdated += updates.length;
     } catch (err) {
       result.errors.push({ documentId: row.id, error: err instanceof Error ? err.message : String(err) });
       await recordPassError(row.id, 'llm');
+    }
+  }
+  // ONE re-sync for every touched doc (after the loop, so a sync failure never
+  // counts as a pass error / backoff attempt). force doesn't reset pass markers.
+  if (touched.length) {
+    try {
+      await syncPizzaLineItems({ docIds: touched, force: true, limit: 300 });
+    } catch (err) {
+      console.error('[pizzaIndexLlm] post-pass resync failed (will self-heal on next sync):', err instanceof Error ? err.message : err);
     }
   }
   return result;

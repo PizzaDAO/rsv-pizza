@@ -154,6 +154,30 @@ describe('planDocSync: synthetic lump-sum line from a pizza count', () => {
   });
 });
 
+describe('planDocSync: LLM-bundle lump sums (B2)', () => {
+  const bundleExisting = (w: LineWrite): ExistingLine => existingFrom(w, { isBundle: true });
+  it('an isBundle "Pizzas x20" qty1 $300 line + count 20 produces the -1 line from pizza_lines', () => {
+    const items = [item('Pizzas x20', 1, 300), item('Tax', 1, 48, 'tax')];
+    const first = planDocSync(items, [], doc(count({ pizzaCount: 20, receiptTotal: 348 })), presets).writes.find((w) => w.lineIndex === 0)!;
+    const plan = planDocSync(items, [bundleExisting(first)], doc(count({ pizzaCount: 20, receiptTotal: 348 })), presets);
+    const lump = plan.writes.find((w) => w.lineIndex === LUMP_SUM_LINE_INDEX)!;
+    expect(lump).toBeTruthy();
+    expect(lump.qty).toBe(20);
+    expect(lump.unitPriceList).toBe(15); // 300 / 20, tax trimmed
+    expect(lump.notes).toBe('lump_sum:host:pizza_lines');
+  });
+  it('an excluded non-lump_sum line does not contribute to the pizza_lines base', () => {
+    const items = [item('Pizzas x20', 1, 300), item('Pizza refund', 1, 50)];
+    const first = planDocSync(items, [], doc(count({ pizzaCount: 20 })), presets).writes;
+    const prev = [
+      existingFrom(first[0], { isBundle: true }),
+      existingFrom(first[1], { excluded: true, excludedReason: 'duplicate_line' }),
+    ];
+    const lump = planDocSync(items, prev, doc(count({ pizzaCount: 20 })), presets).writes.find((w) => w.lineIndex === LUMP_SUM_LINE_INDEX)!;
+    expect(lump.unitPriceList).toBe(15);
+  });
+});
+
 describe('docCountFromRow', () => {
   const row = {
     pizza_count: 12, pizza_count_source: 'host', pizza_size_cm: null, pizza_size_label: null, pizza_size_source: null,

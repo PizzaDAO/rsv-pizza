@@ -24,4 +24,5 @@ WHERE s.count_hash IS DISTINCT FROM
        ELSE md5(coalesce(d.pizza_count::text,'') || '|' || coalesce(d.pizza_count_source,'') || '|' ||
                 coalesce(d.pizza_size_cm::text,'') || '|' || coalesce(d.pizza_size_label,'') || '|' ||
                 coalesce(d.pizza_size_source,'') || '|' || coalesce(d.original_amount::text,'') || '|' ||
-                coalesce(d.ocr_amount::text,'')) END;
+                coalesce(d.ocr_amount::text,'') || '|' || coalesce(d.original_currency,'') || '|' ||
+                coalesce(d.exchange_rate::text,'')) END;
