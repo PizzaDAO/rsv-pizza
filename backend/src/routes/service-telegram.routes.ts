@@ -41,6 +41,8 @@ const USER_ID_RE = /^\d{1,20}$/;
 
 class BadInput extends Error {}
 class NotConfigured extends Error {}
+/** Failed before any request to Telegram: definitely not delivered. */
+class NotSent extends Error {}
 
 // --- auth / flags / limiter -------------------------------------------------
 
@@ -145,6 +147,8 @@ async function sendOnce<C extends string>(
     if (existing.kind !== kind || existing.target !== target) return null;
     const retryable = existing.status === 'failed' && existing.code === 'rate_limited';
     if (!retryable) return storedToResponse(existing);
+    const early = precheck?.();
+    if (early) return { ...early };
     const claimed = await prisma.pizzadaoServiceSend.updateMany({
       where: { idempotencyKey: key, status: 'failed', code: 'rate_limited' },
       data: { status: 'pending', code: null },
@@ -174,7 +178,7 @@ async function sendOnce<C extends string>(
   try {
     outcome = await send();
   } catch (e) {
-    if (e instanceof NotConfigured) {
+    if (e instanceof NotConfigured || e instanceof NotSent) {
       // Nothing was sent: free the key so a retry after configuring works.
       await prisma.pizzadaoServiceSend.delete({ where: { idempotencyKey: key } }).catch(() => undefined);
       throw e;
@@ -258,6 +262,7 @@ function parseButtons(v: unknown): { text: string; url: string }[][] | undefined
 function fail(res: Response, next: NextFunction, e: unknown) {
   if (e instanceof BadInput) return res.status(400).json({ ok: false, reason: e.message });
   if (e instanceof NotConfigured) return res.status(503).json({ ok: false, reason: 'not configured' });
+  if (e instanceof NotSent) return res.status(503).json({ ok: false, reason: 'unavailable' });
   return next(e);
 }
 
@@ -344,7 +349,7 @@ export function resetCityFloor() {
   cityPosts.clear();
 }
 
-/** Returns a rate_limited outcome if this city is over its floor; else records the post. */
+/** Returns a rate_limited outcome if this city is over its floor. Does not record. */
 function cityFloor(cityKey: string): Outcome<PostCode> | null {
   const now = Date.now();
   const recent = (cityPosts.get(cityKey) || []).filter((t) => now - t < 60_000);
@@ -355,9 +360,15 @@ function cityFloor(cityKey: string): Outcome<PostCode> | null {
   if (recent.length >= CITY_PER_MIN) {
     return { ok: false, code: 'rate_limited', retryAfter: Math.max(1, Math.ceil((60_000 - (now - recent[0])) / 1000)) };
   }
+  return null;
+}
+
+/** Record a post attempt against the floor (call only once a send was really attempted). */
+function recordCityPost(cityKey: string) {
+  const now = Date.now();
+  const recent = (cityPosts.get(cityKey) || []).filter((t) => now - t < 60_000);
   recent.push(now);
   cityPosts.set(cityKey, recent);
-  return null;
 }
 
 router.post(
@@ -377,7 +388,15 @@ router.post(
         cityKey,
         key,
         async () => {
-          const r = await sendToCityGroup(cityKey, text);
+          let r;
+          try {
+            r = await sendToCityGroup(cityKey, text);
+          } catch {
+            // sendToCityGroup catches its own send errors, so a throw is a
+            // group lookup failure that happened before any request to Telegram.
+            throw new NotSent();
+          }
+          if (!r.skipped && !r.reason?.startsWith('TELEGRAM_BOT_TOKEN')) recordCityPost(cityKey);
           if (r.ok) return { ok: true, messageId: r.messageId, ...(r.migratedTo && { migratedTo: r.migratedTo }) };
           if (r.skipped) return { ok: false, code: 'no_group' };
           if (r.reason?.startsWith('TELEGRAM_BOT_TOKEN')) throw new NotConfigured();
@@ -386,7 +405,10 @@ router.post(
           if (r.errorCode === 403 || /kicked|not a member|bot was blocked/i.test(desc)) {
             return { ok: false, code: 'kicked' };
           }
-          if (r.errorCode === 400) return { ok: false, code: 'bad_request' };
+          if (r.errorCode === 400) {
+            const unusable = /chat not found|chat_id is empty|group chat was deactivated|peer_id_invalid/i.test(desc);
+            return { ok: false, code: unusable ? 'kicked' : 'bad_request' };
+          }
           return { ok: false, code: 'uncertain' };
         },
         () => cityFloor(cityKey),

@@ -326,6 +326,51 @@ describe('POST /city-post', () => {
     }
   });
 
+  it('applies the floor to a rate_limited key retry, leaving the row retryable', async () => {
+    mockSendToCityGroup.mockResolvedValueOnce({ ok: false, errorCode: 429, reason: 'x', retryAfter: 1 });
+    const body = cp();
+    expect((await post('/city-post', body)).body.code).toBe('rate_limited'); // records the attempt
+    const again = await post('/city-post', body); // within 5s gap
+    expect(again.body.code).toBe('rate_limited');
+    expect(again.body.replay).toBeUndefined();
+    expect(mockSendToCityGroup).toHaveBeenCalledTimes(1);
+    expect(store.get(body.idempotencyKey).status).toBe('failed');
+  });
+
+  it('a lookup throw before any Telegram request frees the key (503, retryable)', async () => {
+    mockSendToCityGroup.mockRejectedValueOnce(new Error('db down'));
+    const body = cp();
+    const res = await post('/city-post', body);
+    expect(res.status).toBe(503);
+    expect(store.has(body.idempotencyKey)).toBe(false);
+    expect((await post('/city-post', body)).body.ok).toBe(true);
+  });
+
+  it.each([
+    ['Bad Request: chat not found'],
+    ['Bad Request: group chat was deactivated'],
+  ])('maps a final 400 "%s" to kicked', async (reason) => {
+    mockSendToCityGroup.mockResolvedValue({ ok: false, errorCode: 400, reason });
+    expect((await post('/city-post', cp())).body.code).toBe('kicked');
+  });
+
+  it('only records the floor when a send was attempted', async () => {
+    mockSendToCityGroup.mockResolvedValueOnce({ ok: false, skipped: true, reason: 'no city TG group set' });
+    await post('/city-post', cp({ cityKey: 'nogroup' }));
+    // no_group did not consume the floor
+    expect((await post('/city-post', cp({ cityKey: 'nogroup' }))).body.ok).toBe(true);
+    // duplicate key replay does not consume it either
+    const body = cp({ cityKey: 'dup' });
+    await post('/city-post', body);
+    resetCityFloor();
+    await post('/city-post', body);
+    expect((await post('/city-post', cp({ cityKey: 'dup' }))).body.ok).toBe(true);
+    // a DB error on claim does not consume it
+    mockPrisma.pizzadaoServiceSend.create.mockRejectedValueOnce(new Error('db'));
+    expect((await post('/city-post', cp({ cityKey: 'dberr' }))).status).toBe(500);
+    expect((await post('/city-post', cp({ cityKey: 'dberr' }))).body.ok).toBe(true);
+  });
+
   it('400 on a bad city key or oversize text', async () => {
     expect((await post('/city-post', cp({ cityKey: '' }))).status).toBe(400);
     expect((await post('/city-post', cp({ cityKey: 'x'.repeat(81) }))).status).toBe(400);
