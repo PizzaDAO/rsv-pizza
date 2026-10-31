@@ -129,6 +129,9 @@ model Party {
   eventSeriesId String?      @map("event_series_id") @db.Uuid
   eventSeries   EventSeries? @relation(fields: [eventSeriesId], references: [id], onDelete: SetNull)
 
+  // basil-14648: AI / OPOP pizza orders placed through pizza-mcp for this party.
+  pizzaOrders PizzaOrder[]
+
   // Donation settings
   donationEnabled      Boolean  @default(false) @map("donation_enabled")
   donationGoal         Decimal? @map("donation_goal") @db.Decimal(10, 2)
@@ -2293,6 +2296,14 @@ model PayoutDocument {
   pizzaSizeLabel       String?  @map("pizza_size_label")
   pizzaSizeSource      String?  @map("pizza_size_source")
   pizzaSizeConfidence  Decimal? @map("pizza_size_confidence") @db.Decimal(3, 2)
+  // basil-14648: where this row came from. 'upload' (a host-uploaded file, every
+  // historical row) | 'ai_call' (draft written when a phone order is confirmed by
+  // the shop) | 'opop_native' (draft written when a native OPOP order is paid).
+  // Drafts carry no file: url is a pizza-order:// marker and ocrAmount stays NULL
+  // (the call total lives in ocrRaw) so they never add to a payout sum.
+  source       String      @default("upload") @map("source")
+  pizzaOrderId String?     @unique @map("pizza_order_id") @db.Uuid
+  pizzaOrder   PizzaOrder? @relation(fields: [pizzaOrderId], references: [id], onDelete: SetNull)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // napoletana-58210: thumbs-up voting on payout pizza photos surfaced in
@@ -2891,4 +2902,54 @@ model PizzadaoServiceSend {
 
   @@index([kind, target, createdAt], map: "pizzadao_service_sends_target_idx")
   @@map("pizzadao_service_sends")
+}
+
+// basil-14648: an order placed through pizza-mcp (OPOP) for a party. One row per
+// OPOP order id, kept current by the signed `order.updated` webhook (plus a poll on
+// page view). Holds NO card data, transcript or recording. See
+// openpizza/plans/rsv-pizza-ordering.md. Migration: 20261031_pizza_orders.
+model PizzaOrder {
+  id                  String    @id @default(uuid()) @db.Uuid
+  partyId             String    @map("party_id") @db.Uuid
+  party               Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  // The rsv.pizza User.id who placed it (the OPOP principal is "rsvpizza:<userId>").
+  userId              String    @map("user_id")
+  opopOrderId         String    @unique @map("opop_order_id")
+  tier                String // 'native' | 'listing'
+  shopId              String    @map("shop_id")
+  shopName            String    @map("shop_name")
+  status              String
+  paymentStatus       String?   @map("payment_status")
+  ceilingCents        Int?      @map("ceiling_cents")
+  confirmedTotalCents Int?      @map("confirmed_total_cents")
+  readyAt             DateTime? @map("ready_at") @db.Timestamptz
+  readyAtText         String?   @map("ready_at_text")
+  summary             String?
+  // Latest OPOP order view (no PII beyond what the order already holds) and the
+  // pending host action (approval URL), shown only to the placing host.
+  lastView            Json?     @map("last_view")
+  nextAction          Json?     @map("next_action")
+  // Out-of-order guard: timeline is append-only upstream, so a longer one is newer.
+  timelineLen         Int       @default(0) @map("timeline_len")
+  lastEventAt         DateTime? @map("last_event_at") @db.Timestamptz
+  // Set when the draft receipt was created (no FK: PayoutDocument.pizzaOrderId owns the link).
+  payoutDocumentId    String?   @map("payout_document_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  payoutDocuments PayoutDocument[]
+
+  @@index([partyId])
+  @@index([userId])
+  @@map("pizza_orders")
+}
+
+// basil-14648: Webhook-Id dedupe for pizza-mcp deliveries. Inserted in the same
+// transaction as the order upsert, so a failed handler leaves no id behind and
+// the retry is processed.
+model PizzaWebhookEvent {
+  id         String   @id // Webhook-Id (evt_...)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  @@map("pizza_webhook_events")
 }
