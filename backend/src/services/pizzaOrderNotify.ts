@@ -17,18 +17,35 @@ export function buildOrderNotice(row: Pick<PizzaOrder, 'shopName' | 'tier' | 'co
   if (row.tier === 'native') {
     return {
       subject: `Your pizza order at ${row.shopName} is paid`,
-      text: `Your pizza order at ${row.shopName}${total ? ` (${total})` : ''} is paid. A draft receipt is waiting on your payments page: ${paymentsUrl}`,
+      text: `Your pizza order at ${row.shopName}${total ? ` (${total})` : ''} is paid. A reminder line is on your Receipts list (it has no receipt image and is not counted). Upload the real receipt as usual: ${paymentsUrl}`,
     };
   }
   return {
     subject: `${row.shopName} confirmed your pizza order`,
     text:
       `${row.shopName} confirmed your order${total ? ` for ${total}` : ''}${row.readyAtText ? `, ready ${row.readyAtText}` : ''}. ` +
-      `Pay at pickup, then attach the receipt photo to the draft on your payments page: ${paymentsUrl}`,
+      `Pay at pickup, then upload the receipt photo as usual: ${paymentsUrl}. A reminder line with the confirmed total is on your Receipts list; it is not counted as a receipt and you can remove it there.`,
   };
 }
 
-export async function notifyHostOfOrder(row: PizzaOrder): Promise<void> {
+/** Wait for the notice at most this long: pizza-mcp gives the webhook 5 s in total. */
+export const NOTIFY_BUDGET_MS = 3000;
+
+export async function notifyHostOfOrder(row: PizzaOrder, budgetMs = NOTIFY_BUDGET_MS): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      sendNotices(row),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, budgetMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function sendNotices(row: PizzaOrder): Promise<void> {
   try {
     const [user, party] = await Promise.all([
       prisma.user.findUnique({ where: { id: row.userId }, select: { email: true } }),
@@ -44,6 +61,7 @@ export async function notifyHostOfOrder(row: PizzaOrder): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey && user?.email) {
       await fetch('https://api.resend.com/emails', {
+        signal: AbortSignal.timeout(NOTIFY_BUDGET_MS),
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

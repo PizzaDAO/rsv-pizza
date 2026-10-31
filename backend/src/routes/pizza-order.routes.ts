@@ -3,14 +3,16 @@ import crypto from 'node:crypto';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { loadPartyForOrdering, OrderingParty } from '../lib/pizzaOrdering.js';
+import { loadPartyForOrdering, remainingCapCents, OrderingParty } from '../lib/pizzaOrdering.js';
 import {
   recommendationsToLines,
   recommendationVersion,
   RecommendationError,
-  normalizeDietary,
+  MAX_PIZZAS_PER_ORDER,
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
+import { menuFacts, fitLine } from '../lib/menuFit.js';
+import { isTerminal, isBlocking, isRestartable, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -27,7 +29,7 @@ import { notifyHostOfOrder } from '../services/pizzaOrderNotify.js';
  * basil-14648: AI / OPOP ordering endpoints (plan §10). Mounted on /api/parties.
  *
  * Every route: requireAuth, then the caller must host or co-host the party AND the party must be
- * on the pilot allowlist (lib/pizzaOrdering.ts). Anything else is a 404. rsv.pizza only brokers:
+ * on the pilot allowlist (lib/pizzaOrdering.ts). Anything else is a 404. This server only brokers:
  * prices come from pizza-mcp (quote / the shop's spoken total), approval is the host's emailed
  * code on pizza-mcp's /confirm page, and no card data touches this server.
  */
@@ -36,19 +38,7 @@ const router = Router();
 const SHOP_ID_RE = /^pzl?_[A-Za-z0-9_.:\-]{1,190}$/;
 const OPOP_ID_RE = /^[A-Za-z0-9_\-]{1,100}$/;
 const E164_RE = /^\+[1-9]\d{6,14}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESOLVE_CONCURRENCY = 4;
-
-/** Statuses after which nothing more will happen, so a page view need not poll pizza-mcp. */
-export const TERMINAL_STATUSES = new Set([
-  'confirmed_by_shop',
-  'shop_requires_prepay',
-  'refused',
-  'unreachable',
-  'approval_timeout',
-  'canceled',
-  'completed',
-]);
 
 const actorFor = (req: AuthRequest, party: OrderingParty): OpopActor => ({
   userId: req.userId as string,
@@ -65,8 +55,10 @@ function opopIdParam(v: string): string {
   return v;
 }
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
 function publicOrder(row: any, forOwner: boolean) {
+  const view = (row.lastView ?? null) as any;
   return {
     id: row.id,
     opopOrderId: row.opopOrderId,
@@ -82,12 +74,14 @@ function publicOrder(row: any, forOwner: boolean) {
     readyAtText: row.readyAtText,
     summary: row.summary,
     payoutDocumentId: row.payoutDocumentId,
-    // call details incl. shop total, changes, and (when the API exposes it) deferred calls
-    call: (row.lastView as any)?.call ?? null,
-    timeline: (row.lastView as any)?.timeline ?? [],
+    // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`
+    call: view?.call ?? null,
+    timeline: view?.timeline ?? [],
     // the approval link belongs to the host who placed the order
     nextAction: forOwner ? row.nextAction : null,
     isMine: forOwner,
+    restartable: isRestartable(row),
+    cancelable: forOwner && CANCELABLE_STATUSES.has(row.status) && !isRestartable(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -99,10 +93,21 @@ function publicOrder(row: any, forOwner: boolean) {
 router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party, enabled } = await loadPartyForOrdering(req.params.partyId, req, { requireEnabled: false });
+    if (!enabled) return res.json({ enabled: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
+    let remaining: number | null = null;
+    let blockedReason: string | null = null;
+    try {
+      remaining = await remainingCapCents(party);
+    } catch (e) {
+      if (!(e instanceof AppError)) throw e;
+      blockedReason = e.code ?? 'BLOCKED';
+    }
     res.json({
-      enabled,
-      capCents: enabled ? party.capCents : null,
-      location: enabled ? { lat: party.latitude, lng: party.longitude, address: party.address } : null,
+      enabled: true,
+      capCents: party.capCents,
+      remainingCapCents: remaining,
+      blockedReason,
+      location: { lat: party.latitude, lng: party.longitude, address: party.address },
     });
   } catch (e) {
     next(e);
@@ -140,13 +145,20 @@ router.get('/:partyId/pizza/shops/:shopId/menu', requireAuth, async (req: AuthRe
 // ---------------------------------------------------------------------------
 // Cart: build from the party's recommendations, edit, quote
 // ---------------------------------------------------------------------------
+type Decision = 'omit_toppings' | 'drop_line';
+
 interface LineIssue {
   ref: string;
-  text: string;
-  kind: string;
-  ask_user: string | null;
-  candidates: string[];
+  /** What the host sees: the pizza, never an id. */
+  label: string;
+  kind: 'topping_unavailable' | 'unresolved';
+  ask_user: string;
+  unmatched: string[];
+  choices: Array<{ id: Decision; label: string }>;
 }
+
+const lineLabel = (s: OrderLineSpec) => s.label || `${s.quantity} x ${s.diameter ? `${s.diameter}" ` : ''}${s.style || 'pizza'}`.trim();
+const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -161,20 +173,40 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out;
 }
 
-/** Quote only a ready cart. `max_total_cents` carries the party's reimbursement cap. */
-async function quoteIfReady(actor: OpopActor, cart: OpopCart, party: OrderingParty): Promise<OpopQuote | null> {
+async function recordQuote(cartId: string, quoteId: string) {
+  await prisma.pizzaCart.update({ where: { opopCartId: cartId }, data: { quoteIds: { push: quoteId } } });
+}
+
+/** Quote only a ready cart. `max_total_cents` is what the party may still spend, not the whole cap. */
+async function quoteIfReady(actor: OpopActor, cart: OpopCart, remainingCents: number): Promise<OpopQuote | null> {
   if (!cart.ready_for_quote || cart.lines.length === 0) return null;
-  return getPizzaMcpClient().quote(actor, cart.id, party.capCents ? { max_total_cents: party.capCents } : {});
+  const q = await getPizzaMcpClient().quote(actor, cart.id, { max_total_cents: remainingCents });
+  await recordQuote(cart.id, q.quote_id);
+  return q;
+}
+
+/** The cart row binds an OPOP cart to the party, host and shop that built it. */
+async function ownedCartRow(cartId: string, party: OrderingParty, req: AuthRequest) {
+  const row = await prisma.pizzaCart.findUnique({ where: { opopCartId: cartId } });
+  if (!row || row.partyId !== party.id || row.userId !== req.userId) throw new AppError('Cart not found', 404, 'NOT_FOUND');
+  return row;
 }
 
 router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party } = await loadPartyForOrdering(req.params.partyId, req);
+    const remaining = await remainingCapCents(party);
     const body = isObj(req.body) ? req.body : {};
     const shopId = shopIdParam(String(body.shopId ?? ''));
     const pickupAt = typeof body.pickupAt === 'string' ? new Date(body.pickupAt) : null;
     if (!pickupAt || Number.isNaN(pickupAt.getTime()) || pickupAt.getTime() < Date.now() + 5 * 60_000) {
       throw new AppError('Pick a pickup time at least 5 minutes from now.', 400, 'PICKUP_TIME_REQUIRED');
+    }
+    const decisions: Record<string, Decision> = {};
+    if (isObj(body.decisions)) {
+      for (const [k, v] of Object.entries(body.decisions)) {
+        if (v === 'omit_toppings' || v === 'drop_line') decisions[k] = v;
+      }
     }
 
     let lines: OrderLineSpec[];
@@ -186,35 +218,68 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
     }
     const actor = actorFor(req, party);
     const client = getPizzaMcpClient();
+    const facts = menuFacts(await client.getMenu(actor, shopId));
 
-    // One resolve call per line (5-15 lines): the same resolver every agent uses, so halves,
-    // sizes and dietary text behave identically for every tier.
     const issues: LineIssue[] = [];
+    const notices: string[] = [];
+    const dropped: Array<{ ref: string; label: string }> = [];
+
+    // One resolve call per line (5-15 lines): the same resolver every agent uses.
     const resolved = await mapLimit(lines, RESOLVE_CONCURRENCY, async (spec) => {
+      const decision = decisions[spec.ref];
+      if (decision === 'drop_line') {
+        dropped.push({ ref: spec.ref, label: lineLabel(spec) });
+        return null;
+      }
+      const fit = fitLine(spec, facts, { omit: decision === 'omit_toppings' });
+      if (fit.unmatched.length && decision !== 'omit_toppings') {
+        issues.push({
+          ref: spec.ref,
+          label: lineLabel(spec),
+          kind: 'topping_unavailable',
+          ask_user: `This shop doesn't list ${list(fit.unmatched)}.`,
+          unmatched: fit.unmatched,
+          choices: [
+            { id: 'omit_toppings', label: `Leave off ${list(fit.unmatched)}` },
+            { id: 'drop_line', label: spec.quantity > 1 ? `Skip these ${spec.quantity} pizzas` : 'Skip this pizza' },
+          ],
+        });
+        return null;
+      }
+      if (fit.unmatched.length) notices.push(`${lineLabel(spec)}: leaving off ${list(fit.unmatched)}.`);
+      notices.push(...fit.notices);
       try {
-        const r = await client.resolve(actor, shopId, spec.text);
+        const r = await client.resolve(actor, shopId, fit.spec.text);
         if (!r.ready_to_add || r.lines.length !== 1) {
-          const amb = r.ambiguities[0];
           issues.push({
             ref: spec.ref,
-            text: spec.text,
-            kind: amb?.kind ?? (r.unmatched.length ? 'unmatched' : 'ambiguous'),
-            ask_user: amb?.ask_user ?? `Which item on this shop's menu matches "${spec.text}"?`,
-            candidates: amb?.candidates ?? [],
+            label: lineLabel(spec),
+            kind: 'unresolved',
+            ask_user: `We couldn't match "${lineLabel(spec)}" to this shop's menu.`,
+            unmatched: [],
+            choices: [{ id: 'drop_line', label: spec.quantity > 1 ? `Skip these ${spec.quantity} pizzas` : 'Skip this pizza' }],
           });
           return null;
         }
-        return { spec, line: r.lines[0].line, itemName: r.lines[0].item_name };
+        return { spec: fit.spec, line: r.lines[0].line };
       } catch (e) {
         // A 4xx on one line (unknown item, ...) is a question for the host; transport/auth errors abort.
         if (e instanceof AppError && e.statusCode >= 400 && e.statusCode < 500) {
-          issues.push({ ref: spec.ref, text: spec.text, kind: e.code ?? 'ERROR', ask_user: e.message, candidates: [] });
+          issues.push({
+            ref: spec.ref,
+            label: lineLabel(spec),
+            kind: 'unresolved',
+            ask_user: `We couldn't match "${lineLabel(spec)}" to this shop's menu.`,
+            unmatched: [],
+            choices: [{ id: 'drop_line', label: 'Skip this pizza' }],
+          });
           return null;
         }
         throw e;
       }
     });
 
+    const recVersion = recommendationVersion(lines);
     const ops: OpopCartRequest['ops'] = [];
     for (const r of resolved) {
       if (!r) continue;
@@ -231,21 +296,18 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
         client_line_ref: r.spec.ref,
       });
     }
-    if (ops.length === 0) {
-      return res.json({ cart: null, quote: null, issues, recommendationVersion: recommendationVersion(lines), capCents: party.capCents });
-    }
+    const common = { issues, notices, dropped, recommendationVersion: recVersion, capCents: party.capCents, remainingCapCents: remaining };
+    if (ops.length === 0) return res.json({ cart: null, quote: null, ...common });
     // pickup only in v1; scheduled_for is required for phone orders
     ops.push({ op: 'set_fulfillment', type: 'pickup', scheduled_for: pickupAt.toISOString() });
 
     const cart = await client.createCart(actor, { pizzeria_id: shopId, ops });
-    const quote = issues.length === 0 ? await quoteIfReady(actor, cart, party) : null;
-    res.json({
-      cart,
-      quote,
-      issues,
-      recommendationVersion: recommendationVersion(lines),
-      capCents: party.capCents,
+    await prisma.pizzaCart.create({
+      data: { partyId: party.id, userId: req.userId as string, opopCartId: cart.id, shopId, recommendationVersion: recVersion, quoteIds: [] },
     });
+    // No quote while a question is open: a partial order must be an explicit choice, never a surprise.
+    const quote = issues.length === 0 ? await quoteIfReady(actor, cart, remaining) : null;
+    res.json({ cart, quote, ...common });
   } catch (e) {
     next(e);
   }
@@ -254,7 +316,9 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
 router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party } = await loadPartyForOrdering(req.params.partyId, req);
+    const remaining = await remainingCapCents(party);
     const cartId = opopIdParam(req.params.cartId);
+    await ownedCartRow(cartId, party, req);
     const body = isObj(req.body) ? req.body : {};
     if (!Array.isArray(body.ops) || body.ops.length < 1 || body.ops.length > 30) {
       throw new AppError('ops must be a list of 1-30 edits', 400, 'VALIDATION_FAILED');
@@ -269,15 +333,35 @@ router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthReques
         throw new AppError('Pickup only', 400, 'DELIVERY_NOT_SUPPORTED');
       }
     }
-    const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : undefined;
     const actor = actorFor(req, party);
-    const cart = await getPizzaMcpClient().updateCart(
+    const client = getPizzaMcpClient();
+    // The 30-pizza phone-order limit applies to edits too: simulate them first.
+    const current = await client.getCart(actor, cartId);
+    const qty = new Map(current.lines.map((l) => [l.id, l.quantity]));
+    for (const op of body.ops as Array<Record<string, unknown>>) {
+      if (op.op === 'remove_line') qty.delete(String(op.line_id));
+      else if (op.op === 'update_line' && qty.has(String(op.line_id)) && op.quantity !== undefined) {
+        const n = Number(op.quantity);
+        if (!Number.isInteger(n) || n < 1 || n > 100) throw new AppError('Invalid quantity', 400, 'VALIDATION_FAILED');
+        qty.set(String(op.line_id), n);
+      }
+    }
+    const total = [...qty.values()].reduce((a, b) => a + b, 0);
+    if (total > MAX_PIZZAS_PER_ORDER) {
+      throw new AppError(
+        `${total} pizzas is too many for an automated order (max ${MAX_PIZZAS_PER_ORDER}). Call the shop yourself.`,
+        400,
+        'TOO_MANY_PIZZAS'
+      );
+    }
+    const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : undefined;
+    const cart = await client.updateCart(
       actor,
       cartId,
       { cart_id: cartId, expected_version: expected, ops: body.ops as OpopCartRequest['ops'] },
       expected
     );
-    res.json({ cart, quote: await quoteIfReady(actor, cart, party), capCents: party.capCents });
+    res.json({ cart, quote: await quoteIfReady(actor, cart, remaining), capCents: party.capCents, remainingCapCents: remaining });
   } catch (e) {
     next(e);
   }
@@ -293,111 +377,136 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     const quoteId = opopIdParam(String(body.quoteId ?? ''));
     const cartId = opopIdParam(String(body.cartId ?? ''));
     const shopId = shopIdParam(String(body.shopId ?? ''));
-    const recVersion = typeof body.recommendationVersion === 'string' ? body.recommendationVersion.slice(0, 4000) : '';
-    if (!recVersion) throw new AppError('recommendationVersion is required', 400, 'VALIDATION_FAILED');
-    const attempt = Number.isInteger(body.attempt) && (body.attempt as number) >= 0 && (body.attempt as number) < 10 ? (body.attempt as number) : 0;
 
     const c = isObj(body.contact) ? body.contact : {};
     const name = typeof c.name === 'string' ? c.name.trim().slice(0, 100) : '';
     const phone = typeof c.phone === 'string' ? c.phone.trim() : '';
-    const email = typeof c.email === 'string' && c.email.trim() ? c.email.trim() : req.userEmail;
+    // The approval code goes to this address: it is the signed-in host's own email, never a
+    // value the browser supplies.
+    const email = req.userEmail;
     if (!name) throw new AppError('Your name is required', 400, 'VALIDATION_FAILED');
     if (!E164_RE.test(phone)) throw new AppError('Phone must be in international format, e.g. +16175550123', 400, 'VALIDATION_FAILED');
-    if (email && !EMAIL_RE.test(email)) throw new AppError('Invalid email', 400, 'VALIDATION_FAILED');
 
     const pol = isObj(body.policy) ? body.policy : {};
-    const ceilingCents = Number(pol.ceilingCents);
     const substitution = pol.substitution === 'deals_ok' ? 'deals_ok' : 'exact';
     const minPizzaCount = pol.minPizzaCount === undefined ? undefined : Number(pol.minPizzaCount);
-    if (!Number.isInteger(ceilingCents) || ceilingCents <= 0) {
-      throw new AppError('A price ceiling is required', 400, 'VALIDATION_FAILED');
-    }
     if (minPizzaCount !== undefined && (!Number.isInteger(minPizzaCount) || minPizzaCount < 1 || minPizzaCount > 100)) {
       throw new AppError('minPizzaCount is invalid', 400, 'VALIDATION_FAILED');
     }
-    // The party's reimbursement cap is a hard stop, enforced here and again by pizza-mcp.
-    if (party.capCents !== null && ceilingCents > party.capCents) {
+
+    // The cart, its quote and its shop must belong together and to this host + party.
+    const cartRow = await ownedCartRow(cartId, party, req);
+    if (cartRow.shopId !== shopId) throw new AppError('Cart does not belong to this shop', 400, 'CART_MISMATCH');
+    if (!cartRow.quoteIds.includes(quoteId)) throw new AppError('That quote does not belong to this cart. Review the order again.', 400, 'QUOTE_MISMATCH');
+
+    // One live or confirmed order per party, whoever placed it, unless the host says "another".
+    const existing = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
+    const same = existing.find((o: any) => o.quoteId === quoteId && isBlocking(o));
+    if (same) return res.status(200).json({ order: publicOrder(same, same.userId === req.userId), next_action: same.nextAction ?? null, replayed: true });
+    const blockers = existing.filter((o: any) => isBlocking(o));
+    if (blockers.length && body.allowAnother !== true) {
       throw new AppError(
-        `That ceiling is over this party's reimbursement cap of $${(party.capCents / 100).toFixed(2)}. Lower it, or appeal your cap.`,
-        422,
-        'SPEND_LIMIT_EXCEEDED'
+        'This party already has an order in progress or confirmed. Cancel it, or confirm that you want a second order.',
+        409,
+        'ORDER_IN_PROGRESS',
+        { existingOrderId: blockers[0].opopOrderId, existingStatus: blockers[0].status }
       );
     }
 
+    const remaining = await remainingCapCents(party);
     const actor = actorFor(req, party);
     const client = getPizzaMcpClient();
-    // The cart must be this host's and for this shop; its version joins the idempotency key so an
-    // edited cart is a new order while a double-click replays.
     const cart = await client.getCart(actor, cartId);
-    if (cart.pizzeria_id !== shopId) throw new AppError('Cart does not belong to this shop', 400, 'VALIDATION_FAILED');
-    const shop = await client.getShop(actor, shopId);
+    if (cart.pizzeria_id !== cartRow.shopId) throw new AppError('Cart does not belong to this shop', 400, 'CART_MISMATCH');
+    const shop = await client.getShop(actor, cartRow.shopId);
     const tier = shop.tier === 'native' ? 'native' : 'listing';
     if (tier === 'listing' && shop.ordering?.channel !== 'ai_phone') {
       throw new AppError('We cannot place an automated call to this shop. Use the order script and call them yourself.', 409, 'CALLS_NOT_AVAILABLE_HERE');
     }
 
+    const ceilingCents = Number(pol.ceilingCents);
+    if (tier === 'listing') {
+      if (!Number.isInteger(ceilingCents) || ceilingCents <= 0) throw new AppError('A price ceiling is required', 400, 'VALIDATION_FAILED');
+      // The remaining budget is a hard stop, enforced here and again by pizza-mcp.
+      if (ceilingCents > remaining) {
+        throw new AppError(
+          `That ceiling is over what is left of this party's reimbursement budget ($${(remaining / 100).toFixed(2)}). Lower it, or appeal your cap.`,
+          422,
+          'SPEND_LIMIT_EXCEEDED'
+        );
+      }
+    }
+
+    const contact = { name, phone, ...(email ? { email } : {}) };
+    const client_ref = { party_id: party.id, rsvp_user_id: req.userId as string };
     const request: OpopPlaceOrderRequest =
       tier === 'listing'
         ? {
             quote_id: quoteId,
             payment_mode: 'pay_at_pickup',
-            contact: { name, phone, ...(email ? { email } : {}) },
+            contact,
             phone_order: {
               price_ceiling_cents: ceilingCents,
               substitution_policy: substitution,
               ...(minPizzaCount ? { min_pizza_count: minPizzaCount } : {}),
               transfer_to_host: pol.transferToHost === true,
             },
-            ...(party.capCents ? { max_total_cents: party.capCents } : {}),
-            client_ref: { party_id: party.id, rsvp_user_id: req.userId as string },
+            max_total_cents: remaining,
+            client_ref,
           }
-        : {
-            quote_id: quoteId,
-            payment_mode: 'checkout_link',
-            contact: { name, phone, ...(email ? { email } : {}) },
-            ...(party.capCents ? { max_total_cents: party.capCents } : {}),
-            client_ref: { party_id: party.id, rsvp_user_id: req.userId as string },
-          };
+        : { quote_id: quoteId, payment_mode: 'checkout_link', contact, max_total_cents: remaining, client_ref };
 
-    const key = orderIdempotencyKey(party.id, `${recVersion}#cart${cart.version}`, shopId, attempt);
+    // Key = sha256(party + what was ordered + shop), plus a server-derived attempt number (earlier
+    // rows for the same order) and the request itself: replaying the SAME request is idempotent, a
+    // rebuilt cart or a deliberate second order gets a fresh key. The client cannot choose it.
+    const recKey = sha(cartRow.recommendationVersion);
+    const attempt = existing.filter((o: any) => o.recKey === recKey && o.shopId === shopId).length;
+    const key = orderIdempotencyKey(party.id, `${cartRow.recommendationVersion}#${sha(JSON.stringify(request))}`, shopId, attempt);
     const placed = await client.placeOrder(actor, request, key);
     const o = placed.order;
 
-    // Create (or complete the row a fast webhook already made). Never regress its status.
+    // Trust the order, not the request: re-derive the shop's tier and name from where it really went.
+    const finalShop = o.pizzeria_id && o.pizzeria_id !== shop.id ? await client.getShop(actor, o.pizzeria_id) : shop;
+    const finalTier = finalShop.tier === 'native' ? 'native' : 'listing';
+    const na = placed.next_action ?? o.next_action ?? null;
     const row = await prisma.pizzaOrder.upsert({
       where: { opopOrderId: o.id },
       create: {
         partyId: party.id,
         userId: req.userId as string,
         opopOrderId: o.id,
-        tier,
-        shopId,
-        shopName: shop.name,
+        tier: finalTier,
+        shopId: o.pizzeria_id || finalShop.id,
+        shopName: finalShop.name,
         status: o.status,
         paymentStatus: o.payment_status ?? null,
-        ceilingCents: tier === 'listing' ? ceilingCents : null,
+        ceilingCents: finalTier === 'listing' ? ceilingCents : null,
+        recKey,
+        quoteId,
         summary: o.summary ?? null,
         lastView: o as any,
-        nextAction: (placed.next_action ?? o.next_action ?? null) as any,
+        nextAction: na as any,
         timelineLen: Array.isArray(o.timeline) ? o.timeline.length : 0,
         lastEventAt: new Date(),
       },
       update: {
-        tier,
-        shopId,
-        shopName: shop.name,
-        ceilingCents: tier === 'listing' ? ceilingCents : null,
-        ...((placed.next_action ?? o.next_action) ? { nextAction: (placed.next_action ?? o.next_action) as any } : {}),
+        tier: finalTier,
+        shopId: o.pizzeria_id || finalShop.id,
+        shopName: finalShop.name,
+        ceilingCents: finalTier === 'listing' ? ceilingCents : null,
+        recKey,
+        quoteId,
+        ...(na ? { nextAction: na as any } : {}),
       },
     });
-    res.status(201).json({ order: publicOrder(row, true), next_action: placed.next_action ?? o.next_action ?? null });
+    res.status(201).json({ order: publicOrder(row, true), next_action: na });
   } catch (e) {
     next(e);
   }
 });
 
 // ---------------------------------------------------------------------------
-// Status
+// Status, cancel
 // ---------------------------------------------------------------------------
 router.get('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -407,7 +516,7 @@ router.get('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res: 
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
-    res.json({ orders: rows.map((r) => publicOrder(r, r.userId === req.userId)) });
+    res.json({ orders: rows.map((r: any) => publicOrder(r, r.userId === req.userId)) });
   } catch (e) {
     next(e);
   }
@@ -424,20 +533,37 @@ router.get('/:partyId/pizza/orders/:orderId', requireAuth, async (req: AuthReque
     let stale = false;
     // Poll as a fallback to the webhook, only as the order's own principal (a co-host sees the
     // stored state; we never mint a token in someone else's name).
-    if (mine && !TERMINAL_STATUSES.has(row.status)) {
+    if (mine && !isTerminal(row.status)) {
       try {
         const live = await getPizzaMcpClient().getOrder(actorFor(req, party), orderId);
         const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, live, { clientRef: { party_id: party.id, rsvp_user_id: row!.userId } }));
         if (result.row) row = result.row;
-        if (result.draftCreated && result.row) {
-          void notifyHostOfOrder(result.row);
-        }
+        if (result.draftCreated && result.row) await notifyHostOfOrder(result.row);
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
         stale = true; // pizza-mcp is down: serve the last known state
       }
     }
     res.json({ order: publicOrder(row, mine), stale });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { party } = await loadPartyForOrdering(req.params.partyId, req);
+    const orderId = opopIdParam(req.params.orderId);
+    const row = await prisma.pizzaOrder.findFirst({ where: { opopOrderId: orderId, partyId: party.id } });
+    if (!row) throw new AppError('Order not found', 404, 'NOT_FOUND');
+    // pizza-mcp orders belong to the principal that placed them; only that host can cancel.
+    if (row.userId !== req.userId) throw new AppError('Only the host who placed this order can cancel it.', 403, 'NOT_ORDER_OWNER');
+    if (!CANCELABLE_STATUSES.has(row.status)) {
+      throw new AppError('This order can no longer be canceled here. Call the shop.', 409, 'CANCEL_NOT_ALLOWED');
+    }
+    const view = await getPizzaMcpClient().cancelOrder(actorFor(req, party), orderId);
+    const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, view, { clientRef: { party_id: party.id, rsvp_user_id: row.userId } }));
+    res.json({ order: publicOrder(result.row ?? row, true) });
   } catch (e) {
     next(e);
   }

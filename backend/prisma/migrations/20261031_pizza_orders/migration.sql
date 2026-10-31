@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS "pizza_orders" (
   "summary" TEXT,
   "last_view" JSONB,
   "next_action" JSONB,
+  "rec_key" TEXT,
+  "quote_id" TEXT,
   "timeline_len" INTEGER NOT NULL DEFAULT 0,
   "last_event_at" TIMESTAMPTZ,
   "payout_document_id" UUID,
@@ -36,6 +38,25 @@ CREATE INDEX IF NOT EXISTS "pizza_orders_user_id_idx" ON "pizza_orders"("user_id
 ALTER TABLE "pizza_orders" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "pizza_orders" FROM anon;
 REVOKE ALL ON "pizza_orders" FROM authenticated;
+
+CREATE TABLE IF NOT EXISTS "pizza_carts" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "party_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
+  "opop_cart_id" TEXT NOT NULL,
+  "shop_id" TEXT NOT NULL,
+  "recommendation_version" TEXT NOT NULL,
+  "quote_ids" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT "pizza_carts_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "pizza_carts_party_id_fkey"
+    FOREIGN KEY ("party_id") REFERENCES "parties"("id") ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "pizza_carts_opop_cart_id_key" ON "pizza_carts"("opop_cart_id");
+CREATE INDEX IF NOT EXISTS "pizza_carts_party_id_idx" ON "pizza_carts"("party_id");
+ALTER TABLE "pizza_carts" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON "pizza_carts" FROM anon;
+REVOKE ALL ON "pizza_carts" FROM authenticated;
 
 CREATE TABLE IF NOT EXISTS "pizza_webhook_events" (
   "id" TEXT NOT NULL,

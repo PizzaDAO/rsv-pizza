@@ -8,7 +8,7 @@
  *     so the UI can show `ask_user` / suggestions),
  *   - never forwards pizza-mcp 401/403 to the browser (the frontend treats a 401 as "log out").
  * `POST /orders` sends Idempotency-Key = sha256(partyId + recommendationVersion + shopId).
- * rsv.pizza never computes a binding price, never talks to Bland and never sees an OTP.
+ * RSV never computes a binding price, never talks to Bland and never sees an OTP.
  */
 import crypto from 'node:crypto';
 import { AppError } from '../middleware/error.js';
@@ -184,6 +184,10 @@ export class PizzaMcpClient {
       body,
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+  }
+
+  cancelOrder(actor: OpopActor, orderId: string, reason = 'customer_request') {
+    return this.request<OpopOrder>(actor, 'POST', `/orders/${encodeURIComponent(orderId)}/cancel`, { body: { reason } });
   }
 
   getOrder(actor: OpopActor, orderId: string) {

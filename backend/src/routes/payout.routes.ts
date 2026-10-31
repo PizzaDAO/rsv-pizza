@@ -43,6 +43,7 @@ import {
   assertRecipientIsPartyHost,
 } from '../services/payout-recipients.js';
 import { recomputeRefundTags } from '../services/refundTag.js';
+import { isUploadedReceipt } from '../lib/receiptSource.js';
 
 const router = Router();
 
@@ -132,7 +133,7 @@ export async function getPayoutSubmissionReadiness(partyId: string) {
                 AND p.payout_role = 'box_stack' AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_box,
       EXISTS (SELECT 1 FROM photos p, pa WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
                 AND p.payout_role = 'pizza'     AND (pa.date IS NULL OR p.created_at >= pa.date)) AS has_pizza,
-      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = ${partyId}::uuid AND pd.kind = 'receipt') AS has_receipt,
+      EXISTS (SELECT 1 FROM payout_documents pd WHERE pd.party_id = ${partyId}::uuid AND pd.kind = 'receipt' AND pd.source = 'upload') AS has_receipt,
       (SELECT COUNT(*)::int FROM photos p, pa
          WHERE p.party_id = ${partyId}::uuid AND p.deleted_at IS NULL
            AND (p.payout_role IS NULL OR p.payout_role NOT IN ('group','box_stack','pizza'))
@@ -1983,6 +1984,14 @@ router.get('/:partyId/payouts/receipts-library', async (req: AuthRequest, res: R
         uploadedByName: d.uploadedBy?.name ?? null,
         uploadedByEmail: d.uploadedByEmail ?? d.uploadedBy?.email ?? null,
         createdAt: d.createdAt.toISOString(),
+        // basil-14648: 'upload' for real receipts; 'ai_call' / 'opop_native' for the reminder line a
+        // pizza order leaves (no file, never counted). The shop total is in ocrRaw, ocrSummary is the text.
+        source: d.source ?? 'upload',
+        ocrSummary: d.source && d.source !== 'upload' ? d.ocrSummary ?? null : null,
+        draftTotalCents:
+          d.source && d.source !== 'upload' && typeof (d.ocrRaw as any)?.confirmed_total_cents === 'number'
+            ? (d.ocrRaw as any).confirmed_total_cents
+            : null,
       })),
     });
   } catch (error) {
@@ -2505,7 +2514,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       // pomodoro-92110: reuse the hoisted `removedSet` declared above (total-cap
       // check) instead of re-declaring it here.
       const survivingReceipts = existing.documents.filter(
-        d => d.kind === 'receipt' && !removedSet.has(d.id)
+        d => isUploadedReceipt(d) && !removedSet.has(d.id)
       );
       // culatello-92104: admin-flagged duplicates are excluded from the
       // recompute sum so the admin's intent (these two receipts are the
@@ -2552,7 +2561,7 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
       // If this is the first receipt OCR'd successfully, pull FX headline
       // fields from it. Otherwise leave existing headline FX in place.
       const hadAnyOcr = existing.documents.some(
-        d => d.kind === 'receipt' && !removedSet.has(d.id) && d.ocrAmount != null
+        d => isUploadedReceipt(d) && !removedSet.has(d.id) && d.ocrAmount != null
       );
       const fx = firstFxBox.value;
       if (!hadAnyOcr && fx) {
@@ -2897,10 +2906,10 @@ async function findActiveRollingPayout(
  */
 async function recomputeRollingFinalAmountUsd(
   partyId: string,
-  documents: Array<{ kind: string; isDuplicate?: boolean | null; ineligible?: boolean | null; ocrAmount: Decimal | null }>,
+  documents: Array<{ kind: string; source?: string | null; isDuplicate?: boolean | null; ineligible?: boolean | null; ocrAmount: Decimal | null }>,
 ): Promise<number> {
   const ocrSum = documents.reduce((sum, d) => {
-    if (d.kind !== 'receipt') return sum;
+    if (!isUploadedReceipt(d)) return sum;
     if (d.isDuplicate || d.ineligible) return sum;
     return sum + (d.ocrAmount != null ? Number(d.ocrAmount.toString()) : 0);
   }, 0);
@@ -3001,7 +3010,7 @@ router.get('/:partyId/reimbursement/me', async (req: AuthRequest, res: Response,
     // Running eligible total. Prefer the record's persisted finalAmountUsd when
     // it has one; else recompute live from its receipts so a brand-new (or
     // recently-edited) record reads correctly even before the next write.
-    const receipts = record ? record.documents.filter((d) => d.kind === 'receipt') : [];
+    const receipts = record ? record.documents.filter((d) => isUploadedReceipt(d)) : [];
     const eligibleTotalUsd = record
       ? await recomputeRollingFinalAmountUsd(partyId, record.documents)
       : 0;
@@ -3337,12 +3346,12 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
       // Recompute from the full set of receipts now on the record.
       const allDocs = await tx.payoutDocument.findMany({
         where: { payoutId: record.id },
-        select: { kind: true, isDuplicate: true, ineligible: true, ocrAmount: true },
+        select: { kind: true, source: true, isDuplicate: true, ineligible: true, ocrAmount: true },
       });
       const extractedSum = allDocs.reduce(
         (s, d) =>
           s +
-          (d.kind === 'receipt' && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
+          (isUploadedReceipt(d) && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
             ? Number(d.ocrAmount.toString())
             : 0),
         0,
@@ -3393,7 +3402,7 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
 
     res.status(201).json({
       reimbursement: serializePayout(updated),
-      receipts: updated.documents.filter((d) => d.kind === 'receipt').map(serializeDocument),
+      receipts: updated.documents.filter((d) => isUploadedReceipt(d)).map(serializeDocument),
       eligibleTotalUsd: Number(updated.finalAmountUsd.toString()),
       capWarning,
     });
@@ -3464,6 +3473,17 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
       throw new AppError('Authenticated user has no userId', 500, 'NO_USER_ID');
     }
 
+    // basil-14648: the reminder line a pizza order leaves is not on any reimbursement, so the host
+    // removes it here directly (never an uploaded receipt, never one attached to a request).
+    const draft = await prisma.payoutDocument.findFirst({
+      where: { id: docId, partyId, source: { not: 'upload' }, payoutId: null },
+      select: { id: true },
+    });
+    if (draft) {
+      await prisma.payoutDocument.deleteMany({ where: { id: draft.id, partyId, source: { not: 'upload' }, payoutId: null } });
+      return res.json({ removedDraft: true, id: draft.id });
+    }
+
     const record = await findActiveRollingPayout(partyId, req.userId, 'event');
     if (!record) {
       throw new AppError('No active reimbursement to edit', 404, 'NO_ACTIVE_REIMBURSEMENT');
@@ -3477,12 +3497,12 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
       await tx.payoutDocument.deleteMany({ where: { id: docId, payoutId: record.id } });
       const allDocs = await tx.payoutDocument.findMany({
         where: { payoutId: record.id },
-        select: { kind: true, isDuplicate: true, ineligible: true, ocrAmount: true },
+        select: { kind: true, source: true, isDuplicate: true, ineligible: true, ocrAmount: true },
       });
       const extractedSum = allDocs.reduce(
         (s, d) =>
           s +
-          (d.kind === 'receipt' && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
+          (isUploadedReceipt(d) && !d.isDuplicate && !d.ineligible && d.ocrAmount != null
             ? Number(d.ocrAmount.toString())
             : 0),
         0,
@@ -3510,7 +3530,7 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
 
     res.json({
       reimbursement: serializePayout(updated),
-      receipts: updated.documents.filter((d) => d.kind === 'receipt').map(serializeDocument),
+      receipts: updated.documents.filter((d) => isUploadedReceipt(d)).map(serializeDocument),
       eligibleTotalUsd: Number(updated.finalAmountUsd.toString()),
     });
   } catch (error) {
@@ -3708,6 +3728,7 @@ router.get('/:partyId/reimbursement/event', async (req: AuthRequest, res: Respon
       ) active ON TRUE
       WHERE pd.party_id = ${partyId}::uuid
         AND pd.kind = 'receipt'
+        AND pd.source = 'upload'
       GROUP BY pd.uploaded_by_user_id, u.email, pd.uploaded_by_email, u.name,
                active.status, active.submitted_for_review_at
       ORDER BY eligible_total_usd DESC

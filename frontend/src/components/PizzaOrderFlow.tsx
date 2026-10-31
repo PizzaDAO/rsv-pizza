@@ -6,7 +6,7 @@ import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
 import {
   buildPizzaCart, getPizzaOrderConfig, getPizzaOrders, placePizzaOrder,
-  CartResponse, PizzaOrderView, PizzaShop, isTerminalStatus,
+  CartResponse, CartDecision, PizzaOrderView, PizzaShop, isTerminalStatus,
 } from '../lib/pizzaOrder';
 import { generatePhoneOrderScript } from '../lib/ordering';
 
@@ -34,7 +34,11 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<PizzaOrderView | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const [decisions, setDecisions] = useState<Record<string, CartDecision>>({});
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
+  // set when the server says this party already has a live or confirmed order
+  const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string } | null>(null);
+  const [lastInput, setLastInput] = useState<Parameters<typeof placePizzaOrder>[1] | null>(null);
 
   useEffect(() => {
     if (!partyId) return;
@@ -45,10 +49,11 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         if (cancelled) return;
         setEnabled(cfg.enabled);
         if (!cfg.enabled) return;
+        setBlockedReason(cfg.blockedReason);
         // resume an order that is still in flight (page reload while the AI is calling)
         const { orders } = await getPizzaOrders(partyId).catch(() => ({ orders: [] as PizzaOrderView[] }));
         if (cancelled) return;
-        const live = orders.find((o) => o.isMine && !isTerminalStatus(o.status));
+        const live = orders.find((o) => o.isMine && !isTerminalStatus(o.status) && !o.restartable);
         if (live) {
           setOrder(live);
           setStep('status');
@@ -82,12 +87,14 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   );
 
   const onBuild = useCallback(
-    async (pickupAtIso: string) => {
+    async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}) => {
       if (!partyId || !shop) return;
       setBuilding(true);
       setError(null);
+      setInProgress(null);
       try {
-        setCartState(await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso));
+        setDecisions(nextDecisions);
+        setCartState(await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not build the order');
       } finally {
@@ -97,11 +104,35 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     [partyId, shop, recommendations]
   );
 
+  const viewExisting = useCallback(async () => {
+    if (!partyId) return;
+    setInProgress(null);
+    try {
+      const { orders } = await getPizzaOrders(partyId);
+      const o = orders.find((x) => !x.restartable && x.status !== 'canceled' && x.status !== 'refused' && x.status !== 'unreachable');
+      if (o) {
+        setOrder(o);
+        setStep('status');
+      }
+    } catch {
+      setError('Could not load the existing order.');
+    }
+  }, [partyId]);
+
+  const onDecide = useCallback(
+    (pickupAtIso: string, ref: string, choice: CartDecision) => onBuild(pickupAtIso, { ...decisions, [ref]: choice }),
+    [onBuild, decisions]
+  );
+
   const onApprove = useCallback(
-    async (input: { ceilingCents: number; substitution: 'exact' | 'deals_ok'; contact: { name: string; phone: string } }) => {
+    async (
+      input: { ceilingCents?: number; substitution: 'exact' | 'deals_ok'; contact: { name: string; phone: string } },
+      allowAnother = false
+    ) => {
       if (!partyId || !shop || !cartState?.cart || !cartState.quote) return;
       setPlacing(true);
       setError(null);
+      setInProgress(null);
       // Open the tab synchronously inside the click so popup blockers allow it, then point it at the approval page.
       const tab = window.open('', '_blank');
       try {
@@ -112,7 +143,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           recommendationVersion: cartState.recommendationVersion,
           contact: input.contact,
           policy: { ceilingCents: input.ceilingCents, substitution: input.substitution },
-          attempt,
+          ...(allowAnother ? { allowAnother: true } : {}),
         });
         const url = r.next_action?.type === 'open_url' ? r.next_action.url : null;
         if (tab && url) tab.location.href = url;
@@ -121,15 +152,23 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setStep('status');
       } catch (e) {
         tab?.close();
-        setError(e instanceof Error ? e.message : 'Could not place the order');
+        const err = e as Error & { code?: string; data?: { existingOrderId?: string; existingStatus?: string } };
+        if (err.code === 'ORDER_IN_PROGRESS') {
+          // never silently place a second order: the host chooses
+          setInProgress({ existingOrderId: err.data?.existingOrderId, existingStatus: err.data?.existingStatus });
+          setLastInput(input as never);
+        } else {
+          setError(err instanceof Error ? err.message : 'Could not place the order');
+        }
       } finally {
         setPlacing(false);
       }
     },
-    [partyId, shop, cartState, attempt]
+    [partyId, shop, cartState]
   );
 
-  if (!partyId || enabled === false) return <>{fallback}</>;
+  // until the backend says this party is in the pilot, show only the normal notice (no flash of the flow)
+  if (!partyId || enabled !== true) return <>{fallback}</>;
 
   return (
     <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
@@ -158,6 +197,30 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         />
       )}
 
+      {blockedReason && step !== 'status' && (
+        <p className="text-sm text-[#ffb347] mb-3">
+          {blockedReason === 'NO_REIMBURSEMENT_CAP'
+            ? 'AI ordering needs a reimbursement cap on this party. Ask your underboss to set one.'
+            : blockedReason === 'CAP_EXHAUSTED'
+              ? 'No reimbursement budget is left for another order.'
+              : 'AI ordering is not available for this party right now.'}
+        </p>
+      )}
+
+      {inProgress && (
+        <div className="p-3 mb-3 rounded-xl border border-[#ffb347]/40 bg-[#ffb347]/5 space-y-2">
+          <p className="text-sm text-theme-text">This party already has an order in progress or confirmed.</p>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary text-xs py-1 px-3" onClick={viewExisting}>
+              View it
+            </button>
+            <button type="button" className="btn-secondary text-xs py-1 px-3" disabled={placing || !lastInput} onClick={() => lastInput && onApprove(lastInput as never, true)}>
+              Place a second order anyway
+            </button>
+          </div>
+        </div>
+      )}
+
       {step === 'cart' && shop && (
         <CartReview
           shop={shop}
@@ -166,8 +229,9 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           error={error}
           defaultName={party?.hostName || ''}
           partyDate={party?.date ?? null}
-          onBuild={onBuild}
-          onApprove={onApprove}
+          onBuild={(iso) => onBuild(iso, decisions)}
+          onDecide={onDecide}
+          onApprove={(i) => onApprove(i)}
           placing={placing}
           onBack={() => setStep('shops')}
         />
@@ -180,8 +244,6 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           orderScript={orderScript}
           onUpdate={setOrder}
           onDone={() => {
-            // a new order after a failed one is a fresh idempotency key
-            if (order.status !== 'confirmed_by_shop') setAttempt((a) => a + 1);
             setOrder(null);
             setCartState(null);
             setStep('shops');

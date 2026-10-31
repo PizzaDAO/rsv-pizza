@@ -11,7 +11,7 @@ import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
 import { OrderCheckout } from './OrderCheckout';
 import { PizzaOrderFlow } from './PizzaOrderFlow';
-import { AI_ORDERING_ENABLED } from '../lib/pizzaOrder';
+import { usePizzaOrderingEnabled } from '../lib/pizzaOrder';
 import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
 
@@ -21,6 +21,8 @@ interface PizzeriaSelectionProps {
 
 export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
   const { party, guests, recommendations } = usePizza();
+  // flag AND backend allowlist: the build flag alone must not show the button to a host outside the pilot
+  const aiOrderingEnabled = usePizzaOrderingEnabled(party?.id);
 
   // AI order state
   const [orderPizzeria, setOrderPizzeria] = useState<Pizzeria | null>(null);
@@ -458,7 +460,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* AI Order button - hidden unless VITE_AI_ORDERING=1 (basil-14648); the backend party allowlist still decides */}
-                  {AI_ORDERING_ENABLED && pizzeria.phone && recommendations.length > 0 && (
+                  {aiOrderingEnabled && pizzeria.phone && recommendations.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setOrderPizzeria(pizzeria)}
@@ -817,7 +819,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* AI Order Checkout Modal */}
-      {orderPizzeria && !AI_ORDERING_ENABLED && (
+      {orderPizzeria && !aiOrderingEnabled && (
         <OrderCheckout
           pizzeria={orderPizzeria}
           orderingOption={aiOrderOption}
@@ -828,7 +830,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* basil-14648: the new ordering flow (pizza-mcp), pre-sorted to the shop the host clicked */}
-      {orderPizzeria && AI_ORDERING_ENABLED && createPortal(
+      {orderPizzeria && aiOrderingEnabled && createPortal(
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setOrderPizzeria(null); }}

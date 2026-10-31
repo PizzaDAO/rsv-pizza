@@ -25,20 +25,29 @@ export interface ApplyResult {
   draftCreated: boolean;
 }
 
-export function isDraftReceiptTrigger(o: Pick<OpopOrder, 'status' | 'payment_status' | 'tier'>): 'ai_call' | 'opop_native' | null {
-  if (o.tier !== 'native' && o.status === 'confirmed_by_shop') return 'ai_call';
-  if (o.tier === 'native' && o.payment_status === 'paid') return 'opop_native';
+/**
+ * `tier` is OUR stored value (the row), not the view's: pizza-mcp's order view carries no `tier`
+ * on every path, which made native orders look like phone orders.
+ */
+export function isDraftReceiptTrigger(
+  o: Pick<OpopOrder, 'status' | 'payment_status'>,
+  tier: string
+): 'ai_call' | 'opop_native' | null {
+  if (tier !== 'native' && o.status === 'confirmed_by_shop') return 'ai_call';
+  if (tier === 'native' && o.payment_status === 'paid') return 'opop_native';
   return null;
 }
 
-function confirmedTotalCents(o: OpopOrder): number | null {
-  if (o.tier === 'native') return o.totals?.total_cents ?? null;
+function confirmedTotalCents(o: OpopOrder, tier: string): number | null {
+  if (tier === 'native') return o.totals?.total_cents ?? null;
   const shop = o.call?.shop_total_cents;
   return typeof shop === 'number' ? shop : null;
 }
 
+// Only real ISO-8601 timestamps. `new Date("around 6")` happily returns June 2001.
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/;
 function parseDate(s: unknown): Date | null {
-  if (typeof s !== 'string') return null;
+  if (typeof s !== 'string' || !ISO_RE.test(s)) return null;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -63,18 +72,25 @@ export async function applyOrderUpdate(
     if (!partyId || !userId || !UUID_RE.test(partyId)) return { row: null, applied: false, draftCreated: false };
     const party = await db.party.findUnique({ where: { id: partyId }, select: { id: true } });
     if (!party) return { row: null, applied: false, draftCreated: false };
-    row = await db.pizzaOrder.create({
-      data: {
-        partyId,
-        userId,
-        opopOrderId: order.id,
-        tier: order.tier ?? 'listing',
-        shopId: order.pizzeria_id,
-        shopName: 'Pizzeria',
-        status: 'awaiting_approval',
-        timelineLen: 0,
-      },
+    // createMany + skipDuplicates (ON CONFLICT DO NOTHING): losing the race to the placing request
+    // must not abort this transaction the way a unique violation would.
+    await db.pizzaOrder.createMany({
+      data: [
+        {
+          partyId,
+          userId,
+          opopOrderId: order.id,
+          tier: order.pizzeria_id?.startsWith('pzl_') ? 'listing' : 'native', // listing ids are pzl_*; pizza-mcp's view carries no reliable tier
+          shopId: order.pizzeria_id,
+          shopName: 'Pizzeria',
+          status: 'awaiting_approval',
+          timelineLen: 0,
+        },
+      ],
+      skipDuplicates: true,
     });
+    row = await db.pizzaOrder.findUnique({ where: { opopOrderId: order.id } });
+    if (!row) return { row: null, applied: false, draftCreated: false };
   }
 
   const stale =
@@ -82,7 +98,7 @@ export async function applyOrderUpdate(
     (timelineLen === row.timelineLen && eventAt !== null && row.lastEventAt !== null && eventAt < row.lastEventAt);
   if (stale) return { row, applied: false, draftCreated: false };
 
-  const total = confirmedTotalCents(order);
+  const total = confirmedTotalCents(order, row.tier);
   row = await db.pizzaOrder.update({
     where: { id: row.id },
     data: {
@@ -100,7 +116,19 @@ export async function applyOrderUpdate(
   });
 
   let draftCreated = false;
-  const source = isDraftReceiptTrigger(order);
+  const source = isDraftReceiptTrigger(order, row.tier);
+  if (!source && row.payoutDocumentId) {
+    // Downgraded (needs_review) or canceled after the shop confirmed: the "confirmed" draft is no
+    // longer true. Remove it unless the host already attached it to a request.
+    await db.payoutDocument.deleteMany({ where: { pizzaOrderId: row.id, source: { not: 'upload' }, payoutId: null } });
+    row = await db.pizzaOrder.update({ where: { id: row.id }, data: { payoutDocumentId: null } });
+  } else if (source && row.payoutDocumentId) {
+    // Still confirmed: keep the draft's total and notes current (a re-quoted price, new substitutions).
+    await db.payoutDocument.updateMany({
+      where: { pizzaOrderId: row.id, source: { not: 'upload' } },
+      data: { ocrSummary: draftSummary(source, row.shopName, total), ocrRaw: draftRaw(source, row, order, total) as Prisma.InputJsonValue },
+    });
+  }
   if (source && !row.payoutDocumentId) {
     const hostUser = await db.user.findUnique({ where: { id: row.userId }, select: { email: true } });
     const made = await db.payoutDocument.createMany({
@@ -119,19 +147,8 @@ export async function applyOrderUpdate(
           // Stop the OCR backfill loop from fetching a URL that is not a file.
           ocrAttemptCount: 3,
           ocrAttemptedAt: new Date(),
-          ocrSummary: `${source === 'ai_call' ? 'AI phone order' : 'Online order'} at ${row.shopName}: ${
-            total != null ? `$${(total / 100).toFixed(2)}` : 'total pending'
-          }. Attach the real receipt to be reimbursed.`.slice(0, 300),
-          ocrRaw: {
-            source,
-            opop_order_id: row.opopOrderId,
-            shop_id: row.shopId,
-            shop_name: row.shopName,
-            confirmed_total_cents: total,
-            ready_at_text: order.call?.ready_at_text ?? null,
-            changes: order.call?.changes ?? [],
-            summary: order.summary ?? null,
-          } as Prisma.InputJsonValue,
+          ocrSummary: draftSummary(source, row.shopName, total),
+          ocrRaw: draftRaw(source, row, order, total) as Prisma.InputJsonValue,
           uploadedByUserId: hostUser ? row.userId : null,
           uploadedByEmail: hostUser?.email ?? null,
         },
@@ -145,4 +162,23 @@ export async function applyOrderUpdate(
     }
   }
   return { row, applied: true, draftCreated };
+}
+
+function draftSummary(source: 'ai_call' | 'opop_native', shopName: string, total: number | null): string {
+  return `${source === 'ai_call' ? 'AI phone order' : 'Online order'} at ${shopName}: ${
+    total != null ? `$${(total / 100).toFixed(2)}` : 'total pending'
+  }. Reminder only: upload your real receipt to be reimbursed.`.slice(0, 300);
+}
+
+function draftRaw(source: string, row: PizzaOrder, order: OpopOrder, total: number | null) {
+  return {
+    source,
+    opop_order_id: row.opopOrderId,
+    shop_id: row.shopId,
+    shop_name: row.shopName,
+    confirmed_total_cents: total,
+    ready_at_text: order.call?.ready_at_text ?? null,
+    changes: order.call?.changes ?? [],
+    summary: order.summary ?? null,
+  };
 }

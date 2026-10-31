@@ -22,14 +22,37 @@ describe('OrderStatus', () => {
     expect(screen.getByText(/\$187\.40/)).toBeTruthy();
   });
 
-  it('lists deferred calls when the API exposes them and renders fine without', () => {
-    const withDeferred = order({ call: { deferred_calls: [{ at: '2026-10-30T22:00:00Z', reason: 'shop closed' }] } });
+  it("shows pizza-mcp's call.deferred (until / reason / message) when present and renders fine without", () => {
+    const withDeferred = order({ status: 'calling', call: { deferred: { until: '2026-10-30T22:00:00Z', reason: 'outside_window', message: 'Shops are closed until 5pm.' } } });
     const { unmount } = render(<OrderStatus partyId="p" order={withDeferred} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.getByText(/Calls scheduled for later/)).toBeTruthy();
-    expect(screen.getByText(/shop closed/)).toBeTruthy();
+    expect(screen.getByText(/Shops are closed until 5pm\./)).toBeTruthy();
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
     unmount();
-    render(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.queryByText(/Calls scheduled for later/)).toBeNull();
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', call: { deferred: null } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/Next try:/)).toBeNull();
+  });
+
+  it('needs_review is terminal: no polling spinner, call-it-yourself script shown', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review' })} orderScript="read this out" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/read this out/)).toBeTruthy();
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('an expired approval offers Start over, not a dead link', () => {
+    const expired = order({ status: 'awaiting_approval', restartable: true, nextAction: { type: 'none' } });
+    render(<OrderStatus partyId="p" order={expired} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('The approval link expired')).toBeTruthy();
+    expect(screen.getByText('Start over')).toBeTruthy();
+    expect(screen.queryByText('Open the approval page')).toBeNull();
+  });
+
+  it('a live order the host placed can be canceled; a co-host cannot', () => {
+    const live = order({ status: 'calling', cancelable: true });
+    const { unmount } = render(<OrderStatus partyId="p" order={live} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Cancel this order')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={{ ...live, isMine: false }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Cancel this order')).toBeNull();
   });
 
   it('offers the approval link only to the placing host', () => {

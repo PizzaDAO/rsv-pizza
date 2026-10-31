@@ -11,6 +11,7 @@
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
+import { isBlocking } from './pizzaOrderStatus.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -95,7 +96,47 @@ export async function loadPartyForOrdering(
       longitude: row.longitude,
       customUrl: row.customUrl,
       inviteCode: row.inviteCode,
+      // null (or $0) means NO budget: ordering is refused, never treated as "no cap"
       capCents: capUsd != null && capUsd > 0 ? Math.round(capUsd * 100) : null,
     },
   };
+}
+
+/**
+ * What the host may still spend through an order: the party's reimbursement cap, minus eligible
+ * uploaded receipts, minus what open (or confirmed, not yet receipted) orders could cost. Refuses
+ * when there is no cap or nothing left. Conservative on purpose: a confirmed order whose receipt
+ * has been uploaded is counted twice until the order is removed.
+ */
+export async function remainingCapCents(party: OrderingParty): Promise<number> {
+  if (party.capCents === null) {
+    throw new AppError(
+      'This party has no reimbursement cap yet, so AI ordering is off. Ask your underboss to set one.',
+      422,
+      'NO_REIMBURSEMENT_CAP'
+    );
+  }
+  const [docs, orders] = await Promise.all([
+    prisma.payoutDocument.findMany({
+      where: { partyId: party.id, kind: 'receipt', source: 'upload', isDuplicate: false, ineligible: false },
+      select: { ocrAmount: true },
+    }),
+    prisma.pizzaOrder.findMany({ where: { partyId: party.id } }),
+  ]);
+  const receiptCents = docs.reduce((n, d) => n + (d.ocrAmount != null ? Math.round(Number(d.ocrAmount.toString()) * 100) : 0), 0);
+  const openCents = orders
+    .filter((o) => isBlocking(o))
+    .reduce((n, o) => {
+      const view = o.lastView as { totals?: { total_cents?: number } } | null;
+      return n + (o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0);
+    }, 0);
+  const remaining = party.capCents - receiptCents - openCents;
+  if (remaining <= 0) {
+    throw new AppError(
+      "There is no reimbursement budget left for another order (cap minus receipts and open orders).",
+      422,
+      'CAP_EXHAUSTED'
+    );
+  }
+  return remaining;
 }

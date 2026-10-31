@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink, Play } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, FileText, ExternalLink, Play, Phone, Trash2 } from 'lucide-react';
 import { fetchReceiptsLibrary } from '../../lib/api';
+import { removeOrderDraft, formatCents } from '../../lib/pizzaOrder';
 import type { ReceiptLibraryEntry } from '../../types';
 import { PayoutStatusPill } from '../payments-shared/PayoutStatusPill';
 import { ReceiptLightbox } from '../payments-shared';
@@ -40,19 +41,23 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
   // soppressata-92110: mirror the lightbox's current index so the read-only
   // DUPLICATE / INELIGIBLE banners paint the matching receipt.
   const [lightboxCurrentIndex, setLightboxCurrentIndex] = useState(0);
-  const lightboxCurrentReceipt = receipts[lightboxCurrentIndex] ?? null;
+  // basil-14648: pizza-order reminder lines have no file (their url is not fetchable), so they stay
+  // out of the lightbox and the carousel indexes only real receipts.
+  const viewable = useMemo(() => receipts.filter((r) => (r.source ?? 'upload') === 'upload'), [receipts]);
+  const lightboxCurrentReceipt = viewable[lightboxCurrentIndex] ?? null;
+  const [removing, setRemoving] = useState<string | null>(null);
 
   // Build the carousel list once per receipts array. Includes every entry —
   // non-image rows still get a fallback render inside the lightbox via the
   // HEIC pathway, and unknown formats degrade gracefully.
   const lightboxImages = useMemo(
     () =>
-      receipts.map((r) => ({
+      viewable.map((r) => ({
         url: r.url,
         fileName: r.fileName,
         mimeType: r.mimeType,
       })),
-    [receipts],
+    [viewable],
   );
 
   useEffect(() => {
@@ -122,7 +127,46 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
 
       {!loading && !error && receipts.length > 0 && (
         <ul className="divide-y divide-theme-stroke">
-          {receipts.map((r, idx) => {
+          {receipts.map((r) => {
+            if ((r.source ?? 'upload') !== 'upload') {
+              const total = formatCents(r.draftTotalCents ?? null);
+              return (
+                <li key={r.id} className="flex items-center gap-3 py-3">
+                  <div className="w-12 h-12 flex-shrink-0 rounded border border-theme-stroke bg-theme-surface-hover flex items-center justify-center">
+                    <Phone size={18} className="text-theme-text-secondary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-theme-text truncate">{r.fileName}</span>
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-theme-surface-hover text-theme-text-secondary">
+                        Reminder, not a receipt
+                      </span>
+                    </div>
+                    <div className="text-xs text-white/40 mt-0.5">
+                      {total ? <>Shop-confirmed total {total}. </> : null}
+                      {r.ocrSummary ?? 'Upload the real receipt to be reimbursed.'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={removing === r.id}
+                    onClick={() => {
+                      setRemoving(r.id);
+                      removeOrderDraft(partyId, r.id)
+                        .then(() => setReceipts((rows) => rows.filter((x) => x.id !== r.id)))
+                        .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not remove it'))
+                        .finally(() => setRemoving(null));
+                    }}
+                    className="text-sm text-theme-text-muted hover:text-[#ff393a] inline-flex items-center gap-1 flex-shrink-0"
+                    aria-label={`Remove reminder for ${r.fileName}`}
+                  >
+                    <Trash2 size={14} />
+                    Remove
+                  </button>
+                </li>
+              );
+            }
+            const idx = viewable.findIndex((v) => v.id === r.id);
             const isVideo = isVideoFile(r);
             const isPdf = !isVideo && isPdfFile(r);
             const isImage = !isVideo && !isPdf && (r.mimeType || '').startsWith('image/');

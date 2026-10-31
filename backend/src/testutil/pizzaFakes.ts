@@ -16,6 +16,7 @@ export function makeFakeDb() {
   const orders = new Map<string, any>(); // by id
   const docs: any[] = [];
   const events = new Set<string>();
+  const carts = new Map<string, any>();
   const parties = new Map<string, any>();
   const users = new Map<string, any>();
   let seq = 0;
@@ -43,6 +44,11 @@ export function makeFakeDb() {
       Object.assign(row, data, { updatedAt: new Date() });
       return row;
     },
+    createMany: async ({ data }: any) => {
+      let count = 0;
+      for (const d of data) if (!byOpop(d.opopOrderId)) { await pizzaOrder.create({ data: d }); count++; }
+      return { count };
+    },
     upsert: async ({ where, create, update }: any) => {
       const ex = byOpop(where.opopOrderId);
       return ex ? pizzaOrder.update({ where: { id: ex.id }, data: update }) : pizzaOrder.create({ data: create });
@@ -50,7 +56,26 @@ export function makeFakeDb() {
   };
   const db = {
     pizzaOrder,
+    pizzaCart: {
+      create: async ({ data }: any) => {
+        if (carts.has(data.opopCartId)) throw p2002();
+        const row = { id: `pc-${++seq}`, createdAt: new Date(), ...data };
+        carts.set(data.opopCartId, row);
+        return row;
+      },
+      findUnique: async ({ where }: any) => carts.get(where.opopCartId) ?? null,
+      update: async ({ where, data }: any) => {
+        const row = carts.get(where.opopCartId);
+        if (data.quoteIds?.push) row.quoteIds = [...row.quoteIds, data.quoteIds.push];
+        return row;
+      },
+    },
     pizzaWebhookEvent: {
+      createMany: async ({ data }: any) => {
+        let count = 0;
+        for (const d of data) if (!events.has(d.id)) { events.add(d.id); count++; }
+        return { count };
+      },
       create: async ({ data }: any) => {
         if (events.has(data.id)) throw p2002();
         events.add(data.id);
@@ -68,15 +93,35 @@ export function makeFakeDb() {
         return { count };
       },
       findUnique: async ({ where }: any) => docs.find((d) => d.pizzaOrderId === where.pizzaOrderId) ?? null,
+      findMany: async ({ where }: any) =>
+        docs.filter(
+          (d) =>
+            d.partyId === where.partyId &&
+            (where.source === undefined || d.source === where.source) &&
+            (where.isDuplicate === undefined || (d.isDuplicate ?? false) === where.isDuplicate) &&
+            (where.ineligible === undefined || (d.ineligible ?? false) === where.ineligible)
+        ),
+      deleteMany: async ({ where }: any) => {
+        const keep = docs.filter((d) => !(d.pizzaOrderId === where.pizzaOrderId && d.source !== 'upload' && (where.payoutId === undefined || (d.payoutId ?? null) === where.payoutId)));
+        const count = docs.length - keep.length;
+        docs.length = 0; docs.push(...keep);
+        return { count };
+      },
+      updateMany: async ({ where, data }: any) => {
+        let count = 0;
+        for (const d of docs) if (d.pizzaOrderId === where.pizzaOrderId && d.source !== 'upload') { Object.assign(d, data); count++; }
+        return { count };
+      },
     },
     party: { findUnique: async ({ where }: any) => parties.get(where.id) ?? null },
     user: { findUnique: async ({ where }: any) => users.get(where.id) ?? null },
     // rolls back on throw, like a real transaction
     $transaction: async (fn: any) => {
-      const snap = { events: new Set(events), orders: new Map([...orders].map(([k, v]) => [k, { ...v }])), docs: docs.map((d) => ({ ...d })) };
+      const snap = { carts: new Map([...carts].map(([k, v]) => [k, { ...v }])), events: new Set(events), orders: new Map([...orders].map(([k, v]) => [k, { ...v }])), docs: docs.map((d) => ({ ...d })) };
       try {
         return await fn(db);
       } catch (e) {
+        carts.clear(); snap.carts.forEach((v, k) => carts.set(k, v));
         events.clear(); snap.events.forEach((x) => events.add(x));
         orders.clear(); snap.orders.forEach((v, k) => orders.set(k, v));
         docs.length = 0; docs.push(...snap.docs);
@@ -84,7 +129,7 @@ export function makeFakeDb() {
       }
     },
   };
-  return { db, orders, docs, events, parties, users, byOpop };
+  return { db, orders, docs, events, carts, parties, users, byOpop };
 }
 
 export type FakeDb = ReturnType<typeof makeFakeDb>;
@@ -94,8 +139,8 @@ export function opopOrder(over: Record<string, any> = {}, timeline = 1) {
     id: 'ord_1',
     order_number: 'A-100',
     pizzeria_id: 'pzl_osm_n1',
-    status: 'calling',
-    payment_status: 'unpaid',
+    status: 'calling', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+    payment_status: 'unpaid', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
     summary: '10 pizzas',
     totals: { subtotal_cents: 0, discount_cents: 0, delivery_fee_cents: 0, service_fee_cents: 0, tax_cents: 0, tip_cents: 0, total_cents: 0 },
     promised_at: null,

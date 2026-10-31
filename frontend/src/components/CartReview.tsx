@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Loader2, Clock, DollarSign, User, Phone } from 'lucide-react';
 import { IconInput } from './IconInput';
 import { Checkbox } from './Checkbox';
-import { CartResponse, PizzaShop, formatCents, toE164, defaultPickupLocal } from '../lib/pizzaOrder';
+import { CartResponse, CartDecision, PizzaShop, formatCents, toE164, defaultPickupLocal } from '../lib/pizzaOrder';
 
 interface CartReviewProps {
   shop: PizzaShop;
@@ -13,13 +13,15 @@ interface CartReviewProps {
   defaultName: string;
   partyDate: string | null;
   onBuild: (pickupAtIso: string) => void;
-  onApprove: (input: { ceilingCents: number; substitution: 'exact' | 'deals_ok'; contact: { name: string; phone: string } }) => void;
+  /** The host answered a question about one pizza; rebuild with that decision. */
+  onDecide: (pickupAtIso: string, ref: string, choice: CartDecision) => void;
+  onApprove: (input: { ceilingCents?: number; substitution: 'exact' | 'deals_ok'; contact: { name: string; phone: string } }) => void;
   placing: boolean;
   onBack: () => void;
 }
 
 export const CartReview: React.FC<CartReviewProps> = ({
-  shop, cartState, building, error, defaultName, partyDate, onBuild, onApprove, placing, onBack,
+  shop, cartState, building, error, defaultName, partyDate, onBuild, onDecide, onApprove, placing, onBack,
 }) => {
   const [pickupLocal, setPickupLocal] = useState(() => defaultPickupLocal(partyDate));
   const [name, setName] = useState(defaultName);
@@ -30,11 +32,12 @@ export const CartReview: React.FC<CartReviewProps> = ({
   const quote = cartState?.quote ?? null;
   const isPhone = shop.tier !== 'native';
   const maxCeiling = useMemo(() => {
-    const caps = [quote?.price_ceiling_cents, cartState?.capCents].filter((c): c is number => typeof c === 'number');
+    const caps = [quote?.price_ceiling_cents, cartState?.remainingCapCents].filter((c): c is number => typeof c === 'number');
     return caps.length ? Math.min(...caps) : null;
   }, [quote, cartState]);
 
   const ceilingCents = ceilingText !== null ? Math.round(Number(ceilingText) * 100) : maxCeiling ?? 0;
+  // native orders have no ceiling to choose: the quote is binding
   const ceilingOk = !isPhone || (ceilingCents > 0 && (maxCeiling === null || ceilingCents <= maxCeiling));
   const e164 = toE164(phone);
   const pickupIso = (() => {
@@ -73,17 +76,42 @@ export const CartReview: React.FC<CartReviewProps> = ({
       {error && <p className="text-sm text-[#ff393a]">{error}</p>}
 
       {cartState?.issues.length ? (
-        <div className="p-3 rounded-xl border border-[#ffb347]/40 bg-[#ffb347]/5 space-y-2">
-          <p className="text-sm font-medium text-theme-text">This shop's menu needs your help</p>
+        <div className="p-3 rounded-xl border border-[#ffb347]/40 bg-[#ffb347]/5 space-y-3">
+          <p className="text-sm font-medium text-theme-text">A few pizzas need your call</p>
           {cartState.issues.map((i) => (
-            <p key={i.ref} className="text-xs text-theme-text-secondary">
-              &quot;{i.text}&quot;: {i.ask_user}
-              {i.candidates.length > 0 && ` (${i.candidates.join(', ')})`}
-            </p>
+            <div key={i.ref} className="space-y-1.5">
+              <p className="text-xs text-theme-text-secondary">
+                <span className="font-medium text-theme-text">{i.label}.</span> {i.ask_user}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {i.choices.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="btn-secondary text-xs py-1 px-3"
+                    disabled={building || !pickupIso}
+                    onClick={() => pickupIso && onDecide(pickupIso, i.ref, c.id)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
-          <p className="text-xs text-theme-text-muted">Try another pizzeria, or call this one yourself.</p>
+          <p className="text-xs text-theme-text-muted">Your other pizzas are kept. You can also pick another pizzeria, or call this one yourself.</p>
         </div>
       ) : null}
+
+      {cartState && !cartState.cart && cartState.issues.length === 0 && (
+        <p className="text-sm text-[#ffb347]">Nothing is left to order. Pick another pizzeria, or call this one yourself.</p>
+      )}
+
+      {cartState && (cartState.notices.length > 0 || cartState.dropped.length > 0) && (
+        <ul className="list-disc list-inside text-xs text-theme-text-secondary space-y-0.5">
+          {cartState.notices.map((n) => <li key={n}>{n}</li>)}
+          {cartState.dropped.map((d) => <li key={d.ref}>Skipping {d.label}.</li>)}
+        </ul>
+      )}
 
       {quote && (
         <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke space-y-2">
@@ -111,7 +139,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
           />
           <p className="text-xs text-theme-text-faint">
             {maxCeiling !== null
-              ? `Up to ${formatCents(maxCeiling)}${cartState?.capCents ? ` (your reimbursement cap is ${formatCents(cartState.capCents)})` : ''}. If the shop says more, we ask you first.`
+              ? `Up to ${formatCents(maxCeiling)}${cartState?.remainingCapCents != null ? ` (${formatCents(cartState.remainingCapCents)} of your reimbursement budget is left)` : ''}. If the shop says more, we ask you first.`
               : 'If the shop says more, we ask you first.'}
           </p>
           {!ceilingOk && <p className="text-xs text-[#ff393a]">Enter an amount up to {formatCents(maxCeiling)}.</p>}
@@ -134,7 +162,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
             type="button"
             className="btn-primary w-full text-sm py-2 flex items-center justify-center gap-2"
             disabled={!ready || placing}
-            onClick={() => e164 && onApprove({ ceilingCents, substitution: dealsOk ? 'deals_ok' : 'exact', contact: { name: name.trim(), phone: e164 } })}
+            onClick={() => e164 && onApprove({ ...(isPhone ? { ceilingCents } : {}), substitution: dealsOk ? 'deals_ok' : 'exact', contact: { name: name.trim(), phone: e164 } })}
           >
             {placing && <Loader2 size={14} className="animate-spin" />}
             {isPhone ? 'Approve and have the AI call' : 'Continue to payment'}

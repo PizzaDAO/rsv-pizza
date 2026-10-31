@@ -131,6 +131,7 @@ model Party {
 
   // basil-14648: AI / OPOP pizza orders placed through pizza-mcp for this party.
   pizzaOrders PizzaOrder[]
+  pizzaCarts  PizzaCart[]
 
   // Donation settings
   donationEnabled      Boolean  @default(false) @map("donation_enabled")
@@ -2930,6 +2931,9 @@ model PizzaOrder {
   lastView            Json?     @map("last_view")
   nextAction          Json?     @map("next_action")
   // Out-of-order guard: timeline is append-only upstream, so a longer one is newer.
+  // Idempotency bookkeeping: what the host ordered (hash of the recommendation lines) and which quote.
+  recKey              String?   @map("rec_key")
+  quoteId             String?   @map("quote_id")
   timelineLen         Int       @default(0) @map("timeline_len")
   lastEventAt         DateTime? @map("last_event_at") @db.Timestamptz
   // Set when the draft receipt was created (no FK: PayoutDocument.pizzaOrderId owns the link).
@@ -2952,4 +2956,21 @@ model PizzaWebhookEvent {
   receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
 
   @@map("pizza_webhook_events")
+}
+
+// basil-14648: binds an OPOP cart (and the quotes made from it) to the party, host and shop
+// that built it, so an order can only use a cart + quote + shop that belong together.
+model PizzaCart {
+  id                    String   @id @default(uuid()) @db.Uuid
+  partyId               String   @map("party_id") @db.Uuid
+  party                 Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  userId                String   @map("user_id")
+  opopCartId            String   @unique @map("opop_cart_id")
+  shopId                String   @map("shop_id")
+  recommendationVersion String   @map("recommendation_version")
+  quoteIds              String[] @default([]) @map("quote_ids")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("pizza_carts")
 }

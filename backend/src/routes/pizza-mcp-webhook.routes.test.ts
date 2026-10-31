@@ -139,6 +139,20 @@ describe('POST /api/pizza-mcp/webhook: replay and ordering', () => {
     expect(fake.byOpop('ord_1')?.status).toBe('calling');
   });
 
+  it('a signed body that is JSON null, an array or a scalar is acknowledged, not a 500', async () => {
+    for (const raw of ['null', '[]', '7', '"x"']) {
+      expect((await post(delivery(null, { raw }))).status, raw).toBe(200);
+    }
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('only ISO timestamps become ready_at (free text like "around 6" is not parsed as a date)', async () => {
+    await post(delivery(opopOrder({ status: 'calling', promised_at: 'around 6' }, 2)));
+    expect(fake.byOpop('ord_1')?.readyAt).toBeNull();
+    await post(delivery(opopOrder({ status: 'calling', promised_at: '2026-10-30T22:30:00.000Z' }, 3)));
+    expect(fake.byOpop('ord_1')?.readyAt?.toISOString()).toBe('2026-10-30T22:30:00.000Z');
+  });
+
   it('acknowledges unknown event types and orders it cannot attribute', async () => {
     const other = JSON.stringify({ id: 'e', type: 'order.something', order: opopOrder() });
     const d1 = delivery(null, { raw: other });
@@ -188,10 +202,46 @@ describe('POST /api/pizza-mcp/webhook: draft receipt and notification', () => {
   });
 
   it('native order creates the draft on payment_status paid, with source opop_native', async () => {
-    const native = opopOrder({ id: 'ord_n', tier: 'native', status: 'placed', payment_status: 'paid', totals: { subtotal_cents: 0, discount_cents: 0, delivery_fee_cents: 0, service_fee_cents: 0, tax_cents: 0, tip_cents: 0, total_cents: 9900 } }, 3);
+    const native = opopOrder({ id: 'ord_n', pizzeria_id: 'pz_abc', tier: undefined, status: 'placed', payment_status: 'paid', totals: { subtotal_cents: 0, discount_cents: 0, delivery_fee_cents: 0, service_fee_cents: 0, tax_cents: 0, tip_cents: 0, total_cents: 9900 } }, 3);
     await post(delivery(native));
+    // the view carries no `tier`: the row's tier (from the shop id) decides
     expect(fake.docs[0]).toMatchObject({ source: 'opop_native' });
     expect(fake.byOpop('ord_n')?.confirmedTotalCents).toBe(9900);
+  });
+
+  it('a view whose tier says "listing" cannot turn a native row into a phone order', async () => {
+    await post(delivery(opopOrder({ id: 'ord_n', pizzeria_id: 'pz_abc', status: 'held', payment_status: 'unpaid', tier: 'listing' }, 1)));
+    await post(delivery(opopOrder({ id: 'ord_n', pizzeria_id: 'pz_abc', status: 'confirmed_by_shop', payment_status: 'unpaid', tier: 'listing' }, 2)));
+    expect(fake.docs).toHaveLength(0);
+  });
+
+  it('a downgrade after confirmation (needs_review) or a later cancel removes the draft', async () => {
+    await post(delivery(confirmed({}, 3)));
+    expect(fake.docs).toHaveLength(1);
+    await post(delivery(opopOrder({ status: 'needs_review' }, 4)));
+    expect(fake.docs).toHaveLength(0);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'needs_review', payoutDocumentId: null });
+
+    // confirmed again, then canceled
+    await post(delivery(confirmed({}, 5)));
+    expect(fake.docs).toHaveLength(1);
+    await post(delivery(opopOrder({ status: 'canceled' }, 6)));
+    expect(fake.docs).toHaveLength(0);
+  });
+
+  it('a re-quoted total updates the draft instead of leaving the old number', async () => {
+    await post(delivery(confirmed({}, 3)));
+    await post(delivery(confirmed({ call: { attempts: 1, last_outcome: 'confirmed', shop_total_cents: 19900, ready_at_text: 'about 7', changes: [], transcript_available: true } }, 4)));
+    expect(fake.docs).toHaveLength(1);
+    expect(fake.docs[0].ocrRaw.confirmed_total_cents).toBe(19900);
+    expect(fake.docs[0].ocrSummary).toContain('$199.00');
+  });
+
+  it('a draft the host removed is not recreated by later updates', async () => {
+    await post(delivery(confirmed({}, 3)));
+    fake.docs.length = 0; // host removed it; payoutDocumentId stays set
+    await post(delivery(confirmed({ summary: 'again' }, 4)));
+    expect(fake.docs).toHaveLength(0);
   });
 
   it('a native order that is merely placed (unpaid) creates nothing', async () => {

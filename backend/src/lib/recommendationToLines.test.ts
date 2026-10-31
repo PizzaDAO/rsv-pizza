@@ -18,15 +18,16 @@ const base = {
 };
 
 describe('recommendationToLine', () => {
-  it('builds "<qty> <diameter>in <style> <toppings>"', () => {
+  it('builds "<n> <d>in pizza with X and Y" (the style is not sent to the resolver)', () => {
     const l = recommendationToLine(base);
-    expect(l.text).toBe('3 16in New York Pepperoni Mushroom');
+    expect(l.text).toBe('3 16in pizza with Pepperoni and Mushroom');
+    expect(l.style).toBe('New York');
     expect(l).toMatchObject({ ref: 'rec-1', quantity: 3, dietary_firm: [], label: null });
   });
 
   it('defaults quantity to 1 and empty toppings to cheese', () => {
     const l = recommendationToLine({ ...base, quantity: undefined, toppings: [] });
-    expect(l.text).toBe('1 16in New York cheese');
+    expect(l.text).toBe('1 16in cheese pizza');
     expect(l.quantity).toBe(1);
   });
 
@@ -38,11 +39,11 @@ describe('recommendationToLine', () => {
       leftHalf: { toppings: [{ name: 'Pepperoni' }] },
       rightHalf: { toppings: [{ name: 'Mushroom' }, { name: 'Onion' }] },
     });
-    expect(l.text).toBe('2 16in New York half Pepperoni half Mushroom Onion');
+    expect(l.text).toBe('2 16in pizza half Pepperoni half Mushroom and Onion');
   });
 
   it('falls back to the size name when there is no diameter', () => {
-    expect(recommendationToLine({ ...base, size: { name: 'Large' } }).text).toBe('3 Large New York Pepperoni Mushroom');
+    expect(recommendationToLine({ ...base, size: { name: 'Large' } }).text).toBe('3 Large pizza with Pepperoni and Mushroom');
   });
 
   it('keeps only known dietary needs, normalised, and merges both halves', () => {
@@ -65,6 +66,20 @@ describe('recommendationToLine', () => {
     });
     expect(l.text).not.toMatch(/[<>`{}\n]/);
     expect(l.label).toBe('Vegan script');
+  });
+
+  it('rejects a non-integer quantity instead of silently ordering 1', () => {
+    expect(() => recommendationToLine({ ...base, quantity: 2.5 })).toThrow(RecommendationError);
+    expect(() => recommendationToLine({ ...base, quantity: '3' as unknown as number })).toThrow(RecommendationError);
+  });
+
+  it('does not crash on a non-array dietaryRestrictions (was a 500)', () => {
+    const odd = { ...base, dietaryRestrictions: 5 as unknown as string[] };
+    expect(recommendationToLine(odd).dietary_firm).toEqual([]);
+    expect(recommendationToLine({ ...base, dietaryRestrictions: 'vegan' as unknown as string[] }).dietary_firm).toEqual([]);
+    expect(
+      recommendationToLine({ ...base, isHalfAndHalf: true, leftHalf: { toppings: [], dietaryRestrictions: 3 as unknown as string[] }, rightHalf: { toppings: [] } }).dietary_firm
+    ).toEqual([]);
   });
 
   it('rejects a missing id or an absurd quantity', () => {

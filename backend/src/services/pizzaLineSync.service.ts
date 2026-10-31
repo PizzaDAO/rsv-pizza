@@ -790,7 +790,7 @@ export async function syncPizzaLineItems(opts: {
     JOIN parties p ON p.id = d.party_id
     LEFT JOIN payouts po ON po.id = d.payout_id
     LEFT JOIN pizza_line_sync s ON s.document_id = d.id
-    WHERE d.kind = 'receipt'
+    WHERE d.kind = 'receipt' AND d.source = 'upload'
       AND ((d.ocr_line_items IS NOT NULL AND jsonb_typeof(d.ocr_line_items) = 'array') OR d.pizza_count IS NOT NULL)
       ${docFilter} ${changedFilter}`;
 

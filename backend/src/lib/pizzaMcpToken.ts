@@ -1,14 +1,14 @@
 /**
- * basil-14648: signing side of the rsv.pizza -> pizza-mcp trust (docs/CLIENTS.md in pizza-mcp).
+ * basil-14648: signing side of the RSV -> pizza-mcp trust (docs/CLIENTS.md in pizza-mcp).
  *
- * rsv.pizza mints a 60 second ES256 JWT per request and publishes the public key at
+ * RSV mints a 60 second ES256 JWT per request and publishes the public key at
  * GET /.well-known/jwks.json. The private key comes from env only (PIZZA_MCP_SIGNING_KEY,
  * a PKCS8 PEM; "\n" escapes are accepted). Nothing here writes a key to disk.
  *
  * Claims (must match pizza-mcp's trusted-issuer entry exactly):
- *   iss  = PIZZA_MCP_ISSUER (default https://api.rsv.pizza)
+ *   iss  = PIZZA_MCP_ISSUER (default https://the RSV API)
  *   aud  = PIZZA_MCP_AUDIENCE, default the canonical URL (PIZZA_MCP_URL)
- *   sub  = rsvpizza:<User.id>        azp = rsv.pizza
+ *   sub  = rsvpizza:<User.id>        azp = RSV
  *   scope = "pizza:browse orders:read orders:write"
  *   iat/exp 60 s apart, jti random. email only as the fallback address for the approval code.
  */
@@ -16,7 +16,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { brand } from '../config/brand.js';
 
-export const PIZZA_MCP_CLIENT_ID = 'rsv.pizza';
+export const PIZZA_MCP_CLIENT_ID = 'rsv.pizza'; // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
 export const PIZZA_MCP_SUB_PREFIX = 'rsvpizza:';
 export const PIZZA_MCP_SCOPE = 'pizza:browse orders:read orders:write';
 export const PIZZA_MCP_TOKEN_TTL_S = 60;

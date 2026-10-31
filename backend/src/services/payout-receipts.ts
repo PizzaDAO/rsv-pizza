@@ -8,6 +8,7 @@ export async function payoutHasReceipt(
   const hit = await db.payoutDocument.findFirst({
     where: {
       kind: 'receipt',
+      source: 'upload',
       OR: [
         { payoutId: p.id },
         ...(p.partyId && p.hostUserId ? [{ partyId: p.partyId, uploadedByUserId: p.hostUserId }] : []),

@@ -403,7 +403,7 @@ export async function recordPassError(documentId: string, which: 'llm' | 'vision
   }
 }
 
-const ELIGIBLE_SQL = Prisma.sql`d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false
+const ELIGIBLE_SQL = Prisma.sql`d.kind = 'receipt' AND d.source = 'upload' AND d.is_duplicate = false AND d.ineligible = false
   AND d.ocr_line_items IS NOT NULL AND jsonb_typeof(d.ocr_line_items) = 'array'`;
 
 export async function runLlmPass(opts: {

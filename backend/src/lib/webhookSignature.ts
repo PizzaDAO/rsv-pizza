@@ -1,5 +1,5 @@
 /**
- * Webhook signing, Standard-Webhooks style, shared by the sender (pizza-mcp) and the receiver (rsv.pizza
+ * Webhook signing, Standard-Webhooks style, shared by the sender (pizza-mcp) and the receiver (RSV
  * copies this file). No dependencies beyond node:crypto.
  *
  *   Webhook-Id:        evt_...                 stable across retries: dedupe on it

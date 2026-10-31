@@ -31,8 +31,17 @@ export interface RecommendationInput {
 export interface OrderLineSpec {
   /** The recommendation id; echoed back by OPOP as client_line_ref. */
   ref: string;
+  /** Resolver text built from the facts below (see lineText). Recomputed after a menu fit. */
   text: string;
   quantity: number;
+  diameter: number | null;
+  sizeName: string;
+  /** Whole-pizza toppings (empty for cheese or half-and-half). */
+  toppings: string[];
+  /** [left, right] topping names for a half-and-half. */
+  halves: [string[], string[]] | null;
+  /** The recommendation's style (New York, Detroit...). Kept for display only: generic menus have no style. */
+  style: string;
   dietary_firm: string[];
   label: string | null;
 }
@@ -49,7 +58,7 @@ function clean(s: unknown, max: number): string {
     .replace(/[\u0000-\u001f\u007f<>`{}]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, max);
+    .slice(0, max); // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
 }
 
 export function normalizeDietary(list: unknown): string[] {
@@ -75,46 +84,68 @@ export class RecommendationError extends Error {
   }
 }
 
+/**
+ * Resolver text: "<n> <d>in pizza with X and Y", "<n> <d>in cheese pizza" or
+ * "<n> <d>in pizza half X half Y". The style is NOT part of it: the resolver does not know
+ * "New York" or "Detroit" and rejects the whole line over it (7 of 39 realistic lines resolved
+ * before this change).
+ */
+export function lineText(l: Pick<OrderLineSpec, 'quantity' | 'diameter' | 'sizeName' | 'toppings' | 'halves'>): string {
+  const size = l.diameter ? `${l.diameter}in` : l.sizeName;
+  const head = [String(l.quantity), size].filter(Boolean).join(' ');
+  if (l.halves) {
+    const [left, right] = l.halves;
+    return clean(`${head} pizza half ${left.join(' and ') || 'cheese'} half ${right.join(' and ') || 'cheese'}`, 400);
+  }
+  if (l.toppings.length === 0) return clean(`${head} cheese pizza`, 400);
+  return clean(`${head} pizza with ${l.toppings.join(' and ')}`, 400);
+}
+
 /** One recommendation -> one line spec. Throws RecommendationError on unusable input. */
 export function recommendationToLine(rec: RecommendationInput): OrderLineSpec {
   const ref = clean(rec?.id, 100);
   if (!ref) throw new RecommendationError('Recommendation is missing an id', 'INVALID_RECOMMENDATION');
-  const quantity = Number.isInteger(rec.quantity) ? (rec.quantity as number) : 1;
-  if (quantity < 1 || quantity > 100) {
+  const rawQty = rec.quantity === undefined || rec.quantity === null ? 1 : rec.quantity;
+  if (typeof rawQty !== 'number' || !Number.isInteger(rawQty) || rawQty < 1 || rawQty > 100) {
     throw new RecommendationError(`Invalid quantity for ${ref}`, 'INVALID_RECOMMENDATION');
   }
+  const quantity = rawQty;
 
-  const parts: string[] = [String(quantity)];
-  const diameter = Number(rec.size?.diameter);
-  if (Number.isFinite(diameter) && diameter > 0) parts.push(`${Math.round(diameter)}in`);
-  else if (clean(rec.size?.name, 20)) parts.push(clean(rec.size?.name, 20));
-  const style = clean(rec.style?.name, 40);
-  if (style) parts.push(style);
+  const diameterRaw = Number(rec.size?.diameter);
+  const diameter = Number.isFinite(diameterRaw) && diameterRaw > 0 ? Math.round(diameterRaw) : null;
+  const sizeName = clean(rec.size?.name, 20);
 
   let dietary: string[];
+  let toppings: string[] = [];
+  let halves: [string[], string[]] | null = null;
+  const own = Array.isArray(rec.dietaryRestrictions) ? rec.dietaryRestrictions : [];
   if (rec.isHalfAndHalf && rec.leftHalf && rec.rightHalf) {
-    const left = toppingNames(rec.leftHalf.toppings);
-    const right = toppingNames(rec.rightHalf.toppings);
-    parts.push(`half ${left.join(' ') || 'cheese'} half ${right.join(' ') || 'cheese'}`);
+    halves = [toppingNames(rec.leftHalf.toppings), toppingNames(rec.rightHalf.toppings)];
     // either half's firm need makes the whole pie firm: the shop must not substitute either side
     dietary = normalizeDietary([
-      ...(rec.dietaryRestrictions ?? []),
-      ...(rec.leftHalf.dietaryRestrictions ?? []),
-      ...(rec.rightHalf.dietaryRestrictions ?? []),
+      ...own,
+      ...(Array.isArray(rec.leftHalf.dietaryRestrictions) ? rec.leftHalf.dietaryRestrictions : []),
+      ...(Array.isArray(rec.rightHalf.dietaryRestrictions) ? rec.rightHalf.dietaryRestrictions : []),
     ]);
   } else {
-    const t = toppingNames(rec.toppings);
-    parts.push(t.length ? t.join(' ') : 'cheese');
-    dietary = normalizeDietary(rec.dietaryRestrictions);
+    toppings = toppingNames(rec.toppings);
+    dietary = normalizeDietary(own);
   }
 
-  return {
+  const spec: OrderLineSpec = {
     ref,
-    text: clean(parts.join(' '), 400),
+    text: '',
     quantity,
+    diameter,
+    sizeName,
+    toppings,
+    halves,
+    style: clean(rec.style?.name, 40),
     dietary_firm: dietary,
     label: clean(rec.label, 80) || null,
   };
+  spec.text = lineText(spec);
+  return spec;
 }
 
 /** All recommendations -> line specs, enforcing the phone-order size cap. */
@@ -141,5 +172,5 @@ export function recommendationsToLines(recs: unknown): OrderLineSpec[] {
  * recommendations at the same shop replay, and a changed recommendation is a new order.
  */
 export function recommendationVersion(lines: OrderLineSpec[]): string {
-  return JSON.stringify(lines.map((l) => [l.ref, l.text, l.quantity, l.dietary_firm]));
+  return JSON.stringify(lines.map((l) => [l.ref, l.quantity, l.diameter, l.sizeName, l.toppings, l.halves, l.dietary_firm]));
 }
