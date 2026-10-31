@@ -571,6 +571,8 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     // farinata-58536: post-rotate url so the lightbox image re-renders rotated
     // immediately (backend repoints the doc url to a fresh storage object).
     url?: string;
+    // sfincione-40417: post-save pizza count/size from the admin chip.
+    pizza?: Record<string, unknown>;
   };
   const [receiptOverrides, setReceiptOverrides] = useState<Record<string, ReceiptOverride>>({});
   // Per-row save state.
@@ -720,6 +722,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
             // farinata-58536: layer the rotated url so the lightbox shows the
             // corrected orientation immediately.
             url: ov.url !== undefined ? ov.url : d.url,
+            ...(ov.pizza ?? {}),
           };
         }),
     [payout.documents, receiptOverrides],
@@ -1602,6 +1605,12 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
     return (
       <ReceiptEditor
         doc={r}
+        onPizzaSaved={(pizza) =>
+          setReceiptOverrides((m) => ({
+            ...m,
+            [r.id]: { ...(m[r.id] ?? { ocrAmount: r.ocrAmount, ocrCurrency: r.ocrCurrency }), pizza: pizza as Record<string, unknown> },
+          }))
+        }
         draft={draft}
         onDraftChange={(next) =>
           setReceiptDrafts((m) => ({ ...m, [r.id]: next }))
