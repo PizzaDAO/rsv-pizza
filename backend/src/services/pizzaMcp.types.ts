@@ -718,6 +718,15 @@ export interface components {
                     ready_at_text: string | null;
                     changes: string[];
                     transcript_available: boolean;
+                    /** @description Set while the order is `calling` but the shop has not been dialed yet (outside the calling window, a daily cap, or a retry after voicemail). null/absent when a call is live or none is owed. */
+                    deferred?: {
+                        /** @description ISO time the next dial is due. */
+                        until: string;
+                        /** @enum {string} */
+                        reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry";
+                        /** @description Plain words for the host, e.g. why the shop is not called yet. */
+                        message: string;
+                    } | null;
                 };
                 /** @description Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits). */
                 next_action?: {
@@ -779,6 +788,15 @@ export interface components {
                 ready_at_text: string | null;
                 changes: string[];
                 transcript_available: boolean;
+                /** @description Set while the order is `calling` but the shop has not been dialed yet (outside the calling window, a daily cap, or a retry after voicemail). null/absent when a call is live or none is owed. */
+                deferred?: {
+                    /** @description ISO time the next dial is due. */
+                    until: string;
+                    /** @enum {string} */
+                    reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry";
+                    /** @description Plain words for the host, e.g. why the shop is not called yet. */
+                    message: string;
+                } | null;
             };
             /** @description Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits). */
             next_action?: {

@@ -16,14 +16,14 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 /** Nothing live and nothing confirmed: a new order for the party needs no extra confirmation. */
 export const FREE_STATUSES: ReadonlySet<string> = new Set(['refused', 'unreachable', 'canceled', 'shop_requires_prepay']);
 
-/** Statuses a host can still cancel (nothing confirmed by a shop yet). */
-export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set([
-  'awaiting_approval',
-  'calling',
-  'awaiting_price_approval',
-  'approval_timeout',
-  'held',
-]);
+/**
+ * Statuses pizza-mcp lets a host cancel. `calling` and `awaiting_price_approval` are NOT here: it
+ * answers 409 there (a call is live), so offering a button only produced an error.
+ */
+export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set(['awaiting_approval', 'approval_timeout', 'held']);
+
+/** How long after `confirmed_by_shop` we keep polling: pizza-mcp can still downgrade it to `needs_review`. */
+export const SETTLE_WINDOW_MS = 20 * 60_000;
 
 export const isTerminal = (status: string) => TERMINAL_STATUSES.has(status);
 
@@ -37,7 +37,38 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
   return !na || na.type === 'none';
 }
 
-/** Does this row stop the party from placing another order without an explicit confirmation? */
-export function isBlocking(row: { status: string; nextAction?: unknown }): boolean {
+interface OrderRowLike {
+  status: string;
+  nextAction?: unknown;
+  ceilingCents?: number | null;
+  confirmedTotalCents?: number | null;
+  releasedAt?: Date | string | null;
+}
+
+/**
+ * A `needs_review` order only holds the party's budget (and blocks a new order) when the shop
+ * actually reached a confirmation or quoted a total inside what the host approved. IVR, voicemail
+ * and "the shop quoted more than the limit" mean nothing was ordered, so they hold nothing.
+ */
+export function needsReviewHolds(row: OrderRowLike): boolean {
+  if (row.status !== 'needs_review') return false;
+  if (row.confirmedTotalCents == null) return false;
+  return row.ceilingCents == null || row.confirmedTotalCents <= row.ceilingCents;
+}
+
+/**
+ * Does this row stop the party from placing another order, and hold budget? A host who said
+ * "nothing was ordered" (`releasedAt`) releases it.
+ */
+export function isBlocking(row: OrderRowLike): boolean {
+  if (row.releasedAt) return false;
+  if (row.status === 'needs_review') return needsReviewHolds(row);
   return !FREE_STATUSES.has(row.status) && !isRestartable(row);
+}
+
+/** Keep polling a freshly confirmed order for a while: the post-call check can still downgrade it. */
+export function isSettling(row: { status: string; lastEventAt?: Date | string | null }, now = Date.now()): boolean {
+  if (row.status !== 'confirmed_by_shop') return false;
+  const t = row.lastEventAt ? new Date(row.lastEventAt).getTime() : NaN;
+  return Number.isFinite(t) && now - t < SETTLE_WINDOW_MS;
 }

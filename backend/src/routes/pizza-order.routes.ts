@@ -12,7 +12,7 @@ import {
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
 import { menuFacts, fitLine } from '../lib/menuFit.js';
-import { isTerminal, isBlocking, isRestartable, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
+import { isTerminal, isBlocking, isRestartable, isSettling, needsReviewHolds, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -81,6 +81,12 @@ function publicOrder(row: any, forOwner: boolean) {
     nextAction: forOwner ? row.nextAction : null,
     isMine: forOwner,
     restartable: isRestartable(row),
+    // keep polling a fresh confirmation: the post-call check can still downgrade it
+    settling: isSettling(row),
+    // a needs_review that holds budget (it reached a confirmation / total) can be released by the host
+    releasable: !row.releasedAt && isTerminal(row.status) && row.status !== 'confirmed_by_shop' && row.status !== 'completed' && row.status !== 'canceled' && isBlocking(row),
+    released: !!row.releasedAt,
+    receiptCovered: !!row.receiptCoveredAt,
     cancelable: forOwner && CANCELABLE_STATUSES.has(row.status) && !isRestartable(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -533,7 +539,7 @@ router.get('/:partyId/pizza/orders/:orderId', requireAuth, async (req: AuthReque
     let stale = false;
     // Poll as a fallback to the webhook, only as the order's own principal (a co-host sees the
     // stored state; we never mint a token in someone else's name).
-    if (mine && !isTerminal(row.status)) {
+    if (mine && (!isTerminal(row.status) || isSettling(row))) {
       try {
         const live = await getPizzaMcpClient().getOrder(actorFor(req, party), orderId);
         const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, live, { clientRef: { party_id: party.id, rsvp_user_id: row!.userId } }));
@@ -564,6 +570,40 @@ router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: A
     const view = await getPizzaMcpClient().cancelOrder(actorFor(req, party), orderId);
     const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, view, { clientRef: { party_id: party.id, rsvp_user_id: row.userId } }));
     res.json({ order: publicOrder(result.row ?? row, true) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Tell us what really happened, so the budget is not held (or counted twice) for ever.
+ *  - nothing_ordered: the shop did not take the order (needs_review / refused / unreachable / ...):
+ *    releases the budget and unblocks a new order.
+ *  - receipt_uploaded: the real receipt for a confirmed order is uploaded: count it once.
+ * Any host or edit-enabled co-host of the party may do this (the budget is the party's).
+ */
+router.post('/:partyId/pizza/orders/:orderId/settle', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { party } = await loadPartyForOrdering(req.params.partyId, req);
+    const orderId = opopIdParam(req.params.orderId);
+    const body = isObj(req.body) ? req.body : {};
+    const row = await prisma.pizzaOrder.findFirst({ where: { opopOrderId: orderId, partyId: party.id } });
+    if (!row) throw new AppError('Order not found', 404, 'NOT_FOUND');
+    if (body.action === 'nothing_ordered') {
+      if (!isTerminal(row.status) || row.status === 'confirmed_by_shop' || row.status === 'completed') {
+        throw new AppError('Only an order that did not go through can be released. Cancel a live order; a confirmed one needs its receipt.', 409, 'SETTLE_NOT_ALLOWED');
+      }
+      const updated = await prisma.pizzaOrder.update({ where: { id: row.id }, data: { releasedAt: new Date() } });
+      return res.json({ order: publicOrder(updated, updated.userId === req.userId) });
+    }
+    if (body.action === 'receipt_uploaded') {
+      if (!['confirmed_by_shop', 'needs_review', 'completed'].includes(row.status)) {
+        throw new AppError('Only a confirmed order has a receipt to match.', 409, 'SETTLE_NOT_ALLOWED');
+      }
+      const updated = await prisma.pizzaOrder.update({ where: { id: row.id }, data: { receiptCoveredAt: new Date() } });
+      return res.json({ order: publicOrder(updated, updated.userId === req.userId) });
+    }
+    throw new AppError('action must be nothing_ordered or receipt_uploaded', 400, 'VALIDATION_FAILED');
   } catch (e) {
     next(e);
   }

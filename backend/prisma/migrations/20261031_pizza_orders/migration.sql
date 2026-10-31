@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS "pizza_orders" (
   "summary" TEXT,
   "last_view" JSONB,
   "next_action" JSONB,
+  "released_at" TIMESTAMPTZ,
+  "receipt_covered_at" TIMESTAMPTZ,
   "rec_key" TEXT,
   "quote_id" TEXT,
   "timeline_len" INTEGER NOT NULL DEFAULT 0,
@@ -32,6 +34,9 @@ CREATE TABLE IF NOT EXISTS "pizza_orders" (
   CONSTRAINT "pizza_orders_party_id_fkey"
     FOREIGN KEY ("party_id") REFERENCES "parties"("id") ON DELETE CASCADE
 );
+-- for databases that already applied the first version of this file
+ALTER TABLE "pizza_orders" ADD COLUMN IF NOT EXISTS "released_at" TIMESTAMPTZ;
+ALTER TABLE "pizza_orders" ADD COLUMN IF NOT EXISTS "receipt_covered_at" TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS "pizza_orders_opop_order_id_key" ON "pizza_orders"("opop_order_id");
 CREATE INDEX IF NOT EXISTS "pizza_orders_party_id_idx" ON "pizza_orders"("party_id");
 CREATE INDEX IF NOT EXISTS "pizza_orders_user_id_idx" ON "pizza_orders"("user_id");

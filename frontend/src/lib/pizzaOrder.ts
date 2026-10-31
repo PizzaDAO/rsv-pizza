@@ -95,6 +95,8 @@ export interface PizzaOrderView {
     shop_total_cents?: number | null;
     ready_at_text?: string | null;
     changes?: string[];
+    // Optional: a plain-words reason, when pizza-mcp provides one for needs_review / unreachable.
+    reason?: string | null;
     // Optional: set by pizza-mcp while the order is `calling` but the shop has not been dialed yet.
     deferred?: { until?: string | null; reason?: string | null; message?: string | null } | null;
   } | null;
@@ -103,6 +105,12 @@ export interface PizzaOrderView {
   /** Approval expired with nothing to open: the host can simply start over. */
   restartable?: boolean;
   cancelable?: boolean;
+  /** A fresh confirmation is still polled: the post-call check can downgrade it. */
+  settling?: boolean;
+  /** needs_review that holds budget: the host can say nothing was ordered. */
+  releasable?: boolean;
+  released?: boolean;
+  receiptCovered?: boolean;
 }
 
 // Mirrors pizza-mcp's TERMINAL (+ `completed` for native). approval_timeout is NOT terminal there.
@@ -200,6 +208,9 @@ export const cancelPizzaOrder = (partyId: string, orderId: string) =>
 export const removeOrderDraft = (partyId: string, docId: string) =>
   apiRequest<{ removedDraft: boolean }>(`/api/parties/${partyId}/reimbursement/receipts/${docId}`, { method: 'DELETE' });
 
+export const settlePizzaOrder = (partyId: string, orderId: string, action: 'nothing_ordered' | 'receipt_uploaded') =>
+  apiRequest<{ order: PizzaOrderView }>(`${base(partyId)}/orders/${orderId}/settle`, { method: 'POST', body: { action } });
+
 export const getPizzaOrders = (partyId: string) => apiRequest<{ orders: PizzaOrderView[] }>(`${base(partyId)}/orders`);
 export const getPizzaOrder = (partyId: string, orderId: string) =>
   apiRequest<{ order: PizzaOrderView; stale: boolean }>(`${base(partyId)}/orders/${orderId}`);
@@ -241,15 +252,21 @@ export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'conf
     case 'awaiting_price_approval':
       return { title: 'Shop quoted a higher price', detail: `${o.shopName} said ${total || 'more than your ceiling'}. They are holding the line while you approve.`, tone: 'action' };
     case 'confirmed_by_shop':
-      return { title: `${o.shopName} confirmed`, detail: `${total ? `Total ${total}. ` : ''}${o.readyAtText ? `Ready ${o.readyAtText}. ` : ''}Pay at pickup, then attach the receipt to the draft on your payments page.`, tone: 'success' };
+      return { title: `${o.shopName} confirmed`, detail: `${total ? `Total ${total}. ` : ''}${o.readyAtText ? `Ready ${o.readyAtText}. ` : ''}Pay at pickup, then upload the real receipt as usual (the reminder line in your Receipts list is not a receipt).`, tone: 'success' };
     case 'needs_review':
-      return { title: 'Please double-check this order', detail: `We think ${o.shopName} confirmed, but we could not verify everything. Call them to be sure.`, tone: 'warn' };
+      // Honest for both cases: the shop may have taken the order, or nothing may have been ordered at all
+      // (a phone menu, voicemail, or a price over your limit). Optional `reason` comes from pizza-mcp when it sends one.
+      return {
+        title: `We could not confirm the order at ${o.shopName}`,
+        detail: `${o.call?.reason ? `${o.call.reason} ` : ''}It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it. If nothing was ordered, release it below so it stops counting against your budget.`,
+        tone: 'warn',
+      };
     case 'shop_requires_prepay':
       return { title: 'The shop wants payment up front', detail: 'We never pay by phone. Call the shop yourself using the order below.', tone: 'warn' };
     case 'refused':
       return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them yourself using the order below.', tone: 'warn' };
     case 'unreachable':
-      return { title: 'We could not reach the shop', detail: 'No answer after retrying. Call them yourself using the order below.', tone: 'warn' };
+      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Nothing was ordered. Call them yourself using the order below.`, tone: 'warn' };
     case 'approval_timeout':
       return { title: 'Approval timed out', detail: 'The shop was told we would call back. Open the approval page to retry, or cancel the order.', tone: 'warn' };
     case 'canceled':

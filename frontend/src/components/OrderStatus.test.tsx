@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { OrderStatus } from './OrderStatus';
 import type { PizzaOrderView } from '../lib/pizzaOrder';
 
+const mocks = vi.hoisted(() => ({ settle: vi.fn(), get: vi.fn() }));
 vi.mock('../lib/pizzaOrder', async () => {
   const actual = await vi.importActual<typeof import('../lib/pizzaOrder')>('../lib/pizzaOrder');
-  return { ...actual, getPizzaOrder: vi.fn() };
+  return { ...actual, getPizzaOrder: mocks.get, settlePizzaOrder: mocks.settle };
 });
 
 const order = (over: Partial<PizzaOrderView> = {}): PizzaOrderView => ({
@@ -67,5 +69,49 @@ describe('OrderStatus', () => {
   it('shows the call-it-yourself script when the shop refused', () => {
     render(<OrderStatus partyId="p" order={order({ status: 'refused' })} orderScript="Hi, I'd like to place an order" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText(/place an order/)).toBeTruthy();
+  });
+
+  it('needs_review copy is honest both ways (not "we think the shop confirmed") and a holding one can be released', async () => {
+    mocks.settle.mockResolvedValue({ order: order({ status: 'needs_review', released: true }) });
+    const onUpdate = vi.fn();
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText(/could not confirm the order at Sal's/)).toBeTruthy();
+    expect(document.body.textContent).toMatch(/nothing was ordered, or that the shop did take it/);
+    expect(document.body.textContent).not.toMatch(/We think/);
+    await userEvent.click(screen.getByText('Nothing was ordered: release it'));
+    expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('unreachable says nothing was ordered, without claiming a retry that may not have happened', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'unreachable' })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/Nothing was ordered/);
+    expect(document.body.textContent).not.toMatch(/after retrying/);
+  });
+
+  it('shows an optional reason from pizza-mcp when present', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', call: { reason: 'The shop quoted $150.00, over your limit.' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/quoted \$150\.00, over your limit/)).toBeTruthy();
+  });
+
+  it('keeps polling a fresh confirmation (settling) and offers "I uploaded the receipt"', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockResolvedValue({ order: order({ status: 'needs_review' }), stale: false });
+    const onUpdate = vi.fn();
+    render(<OrderStatus partyId="p" order={order({ settling: true })} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalled();
+    expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
+    vi.useRealTimers();
+  });
+
+  it('an old confirmation is not polled', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    render(<OrderStatus partyId="p" order={order({ settling: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.get).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

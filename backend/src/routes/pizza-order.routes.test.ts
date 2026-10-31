@@ -616,3 +616,91 @@ describe('status and cancel', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/PRIVATE KEY|whsec_|Bearer /);
   });
 });
+
+describe('budget release, double counting, cancel button, settling (final review)', () => {
+  const mk = (over: Record<string, unknown>) =>
+    fake.db.pizzaOrder.create({
+      data: { partyId: PARTY_ID, userId: 'host1', opopOrderId: `ord_${Math.random().toString(36).slice(2, 8)}`, tier: 'listing', shopId: 'pzl_osm_n1', shopName: "Sal's", status: 'needs_review', ...over },
+    });
+  const cart = (who: any = host) =>
+    request(app()).post(`${base}/cart`).set(who).send({ shopId: 'pzl_osm_n1', recommendations: [rec], pickupAt: pickupAt() });
+
+  it('H2: a shop quote over the limit (needs_review, nothing ordered) does not hold the budget or block /cart', async () => {
+    setParty({ reimbursementCapUsd: 100 });
+    await mk({ ceilingCents: 10000, confirmedTotalCents: 15000 });
+    const res = await cart();
+    expect(res.status).toBe(200);
+    expect(res.body.remainingCapCents).toBe(10000);
+  });
+
+  it('H2: an IVR / voicemail needs_review (no total) holds nothing', async () => {
+    await mk({ ceilingCents: 5376, confirmedTotalCents: null });
+    const res = await cart();
+    expect(res.status).toBe(200);
+    expect(res.body.remainingCapCents).toBe(25000);
+  });
+
+  it('H2: a needs_review that reached a total inside the limit holds the budget and blocks, until the host releases it', async () => {
+    const o = await mk({ ceilingCents: 5000, confirmedTotalCents: 4000 });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 4000);
+    const c = await buildCart();
+    expect((await placeFrom(c)).body.error?.code).toBe('ORDER_IN_PROGRESS');
+
+    const rel = await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' });
+    expect(rel.status).toBe(200);
+    expect(rel.body.order).toMatchObject({ released: true });
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    const c2 = await buildCart();
+    expect((await placeFrom(c2)).status).toBe(201);
+  });
+
+  it('settle: any host may release; a confirmed order cannot be released (only receipt_uploaded); bad actions 400', async () => {
+    const o = await mk({ ceilingCents: 5000, confirmedTotalCents: 4000 });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(cohostEditor).send({ action: 'nothing_ordered' })).status).toBe(200);
+    const conf = await mk({ status: 'confirmed_by_shop', ceilingCents: 5000, confirmedTotalCents: 4000 });
+    const r = await request(app()).post(`${base}/orders/${conf.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' });
+    expect(r.status).toBe(409);
+    expect((await request(app()).post(`${base}/orders/${conf.opopOrderId}/settle`).set(host).send({ action: 'x' })).status).toBe(400);
+    const live = await mk({ status: 'calling' });
+    expect((await request(app()).post(`${base}/orders/${live.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
+    expect((await request(app()).post(`${base}/orders/${conf.opopOrderId}/settle`).set(stranger).send({ action: 'receipt_uploaded' })).status).toBe(404);
+  });
+
+  it('L3: a confirmed order plus its uploaded receipt counts once ($46.02 twice left $7.96 of $100)', async () => {
+    setParty({ reimbursementCapUsd: 100 });
+    await mk({ status: 'confirmed_by_shop', ceilingCents: 5376, confirmedTotalCents: 4602 });
+    fake.docs.push({ id: 'd1', partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: { toString: () => '46.02' }, isDuplicate: false, ineligible: false });
+    expect((await cart()).body.remainingCapCents).toBe(10000 - 4602);
+  });
+
+  it('L3: an unrelated receipt does not hide a confirmed order; the host can say a receipt covers it', async () => {
+    setParty({ reimbursementCapUsd: 100 });
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 5376, confirmedTotalCents: 4602 });
+    fake.docs.push({ id: 'd1', partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: { toString: () => '12.00' }, isDuplicate: false, ineligible: false });
+    expect((await cart()).body.remainingCapCents).toBe(10000 - 1200 - 4602);
+    await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' });
+    expect((await cart()).body.remainingCapCents).toBe(10000 - 1200);
+  });
+
+  it('L3: the cancel button shows only where pizza-mcp accepts a cancel', async () => {
+    for (const [status, want] of [['calling', false], ['awaiting_price_approval', false], ['awaiting_approval', true], ['approval_timeout', true]] as const) {
+      fake.orders.clear();
+      await mk({ status, nextAction: { type: 'open_url', url: 'https://x' } });
+      const list = await request(app()).get(`${base}/orders`).set(host);
+      expect(list.body.orders[0].cancelable, status).toBe(want);
+    }
+  });
+
+  it('L2: a fresh confirmation keeps being polled (it can still be downgraded); an old one stops', async () => {
+    const o = await mk({ status: 'confirmed_by_shop', lastEventAt: new Date() });
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].settling).toBe(true);
+    await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
+    expect(mcp.calls.filter((c) => c.path.startsWith('/orders/'))).toHaveLength(1);
+    mcp.calls.length = 0;
+    fake.byOpop(o.opopOrderId).status = 'confirmed_by_shop';
+    fake.byOpop(o.opopOrderId).lastEventAt = new Date(Date.now() - 3600_000);
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].settling).toBe(false);
+    await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
+    expect(mcp.calls).toHaveLength(0);
+  });
+});

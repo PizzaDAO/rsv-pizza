@@ -2932,6 +2932,10 @@ model PizzaOrder {
   nextAction          Json?     @map("next_action")
   // Out-of-order guard: timeline is append-only upstream, so a longer one is newer.
   // Idempotency bookkeeping: what the host ordered (hash of the recommendation lines) and which quote.
+  // Host said "nothing was ordered": releases the budget this order was holding.
+  releasedAt          DateTime? @map("released_at") @db.Timestamptz
+  // Host said the real receipt for this order is uploaded: count it once, not twice.
+  receiptCoveredAt    DateTime? @map("receipt_covered_at") @db.Timestamptz
   recKey              String?   @map("rec_key")
   quoteId             String?   @map("quote_id")
   timelineLen         Int       @default(0) @map("timeline_len")

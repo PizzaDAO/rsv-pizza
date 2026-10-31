@@ -105,8 +105,7 @@ export async function loadPartyForOrdering(
 /**
  * What the host may still spend through an order: the party's reimbursement cap, minus eligible
  * uploaded receipts, minus what open (or confirmed, not yet receipted) orders could cost. Refuses
- * when there is no cap or nothing left. Conservative on purpose: a confirmed order whose receipt
- * has been uploaded is counted twice until the order is removed.
+ * when there is no cap or nothing left. A confirmed order whose receipt is uploaded counts once (see budgetUsedCents).
  */
 export async function remainingCapCents(party: OrderingParty): Promise<number> {
   if (party.capCents === null) {
@@ -123,14 +122,11 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
     }),
     prisma.pizzaOrder.findMany({ where: { partyId: party.id } }),
   ]);
-  const receiptCents = docs.reduce((n, d) => n + (d.ocrAmount != null ? Math.round(Number(d.ocrAmount.toString()) * 100) : 0), 0);
-  const openCents = orders
-    .filter((o) => isBlocking(o))
-    .reduce((n, o) => {
-      const view = o.lastView as { totals?: { total_cents?: number } } | null;
-      return n + (o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0);
-    }, 0);
-  const remaining = party.capCents - receiptCents - openCents;
+  const receipts = docs
+    .map((d) => (d.ocrAmount != null ? Math.round(Number(d.ocrAmount.toString()) * 100) : 0))
+    .filter((c) => c > 0);
+  const used = budgetUsedCents(receipts, orders);
+  const remaining = party.capCents - used;
   if (remaining <= 0) {
     throw new AppError(
       "There is no reimbursement budget left for another order (cap minus receipts and open orders).",
@@ -139,4 +135,42 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
     );
   }
   return remaining;
+}
+
+interface BudgetOrder {
+  status: string;
+  ceilingCents?: number | null;
+  confirmedTotalCents?: number | null;
+  receiptCoveredAt?: Date | string | null;
+  releasedAt?: Date | string | null;
+  nextAction?: unknown;
+  lastView?: unknown;
+}
+
+const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']);
+
+/**
+ * Budget already spoken for: uploaded receipts + what open orders could still cost. A confirmed order
+ * whose real receipt is uploaded counts ONCE: either the host said so (`receiptCoveredAt`) or an
+ * uploaded receipt matches its total (within 5% or $1; each receipt covers one order).
+ * Orders that hold nothing (released, refused, IVR needs_review...) cost nothing.
+ */
+export function budgetUsedCents(receiptsCents: number[], orders: BudgetOrder[]): number {
+  const free = [...receiptsCents];
+  let open = 0;
+  for (const o of orders.filter((x) => isBlocking(x))) {
+    const view = o.lastView as { totals?: { total_cents?: number } } | null;
+    const amount = o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0;
+    if (CONFIRMED_STATUSES.has(o.status) && o.confirmedTotalCents != null) {
+      if (o.receiptCoveredAt) continue;
+      const tol = Math.max(100, Math.round(o.confirmedTotalCents * 0.05));
+      const i = free.findIndex((r) => Math.abs(r - o.confirmedTotalCents!) <= tol);
+      if (i >= 0) {
+        free.splice(i, 1);
+        continue;
+      }
+    }
+    open += amount;
+  }
+  return receiptsCents.reduce((a, b) => a + b, 0) + open;
 }

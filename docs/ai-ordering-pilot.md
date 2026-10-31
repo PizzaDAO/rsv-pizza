@@ -63,7 +63,7 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 2. **Key.** `bash backend/scripts/gen-pizza-mcp-key.sh`, store the output as `PIZZA_MCP_SIGNING_KEY` on the backend project.
 3. **Backend env** (table above), with `PIZZA_ORDERING_PARTY_IDS` = the single pilot party's UUID. Deploy the backend.
 4. **Check JWKS:** `curl https://api.rsv.pizza/.well-known/jwks.json` returns one EC P-256 key.
-5. **pizza-mcp env** (above), including `OUTBOUND_PROVIDER` and Bland settings on its side, and the shop allow-list for the
+5. **pizza-mcp env** (above), including its outbound-call (Bland) settings and the shop allow-list for the
    pilot (shops that agreed in advance). Check `GET <PIZZA_MCP_URL>/api/v1/pizzerias?near=...` answers.
 6. **Frontend:** set `VITE_AI_ORDERING=1` on the frontend project (preview first) and redeploy.
 7. **Smoke test as the party's host:** open the party's host page > pizza order card. You should see "AI Ordering - Pilot".
@@ -71,15 +71,28 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
    Status moves `awaiting_approval` -> `calling` -> `confirmed_by_shop`; the payments page shows a draft receipt row.
 8. **Turn off:** clear `PIZZA_ORDERING_PARTY_IDS` (instant, no deploy needed beyond the env change) or unset `VITE_AI_ORDERING`.
 
+## Testing before the real pilot
+
+- **Frontend previews share the prod backend.** A preview with `VITE_AI_ORDERING=1` talks to `api.rsv.pizza`, and pizza-mcp fetches
+  our JWKS from `https://api.rsv.pizza/.well-known/jwks.json` (and posts webhooks to `https://api.rsv.pizza/api/pizza-mcp/webhook`).
+  So **a test call needs this backend deployed to prod first** (migration first, then code), with the pilot party id allowlisted.
+  A preview alone cannot complete an order.
+
 ## Behaviour to know
 
 - **Budget:** a party with no reimbursement cap (null or $0) cannot order. The quote, the order's `max_total_cents` and the
   ceiling limit are the REMAINING budget: cap minus eligible uploaded receipts minus the ceilings (or confirmed totals) of
-  open orders. A confirmed order whose real receipt was uploaded counts twice until the order is removed (conservative).
+  open orders. A confirmed order and its matching uploaded receipt count once (see Release below).
 - **One order per party at a time.** While the party has a live, confirmed or `needs_review` order, a new order is refused
   with `ORDER_IN_PROGRESS` unless the host explicitly confirms "place a second order". Refused, unreachable, canceled,
   prepay-required and expired-approval orders are free. The idempotency key is derived on the server; the browser cannot choose it.
-- **Cancel:** the placing host can cancel an order that no shop has confirmed (`POST .../orders/:id/cancel`).
+- **Cancel:** the placing host can cancel an order that is waiting for approval (`POST .../orders/:id/cancel`); pizza-mcp refuses
+  a cancel once a call is live, so the button is not shown then.
+- **Release:** a `needs_review` order only holds budget (and blocks a new order) if the shop reached a confirmation or a total inside the
+  limit. Shop quotes over the limit, IVR and voicemail hold nothing. If it does hold, any host can press "Nothing was ordered" to release it
+  (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A confirmed order whose receipt is uploaded counts once: automatically when a
+  receipt matches its total (5% or $1), or when the host presses "I uploaded the receipt" (`action:'receipt_uploaded'`).
+- A confirmed order keeps being polled for 20 minutes: the post-call check can still downgrade it to `needs_review`.
 - **Menu fit:** sizes map to the shop's nearest offered size (shown to the host); toppings the shop does not list become a
   per-pizza choice (leave it off, or skip that pizza). Nothing is ordered until every question is answered.
 

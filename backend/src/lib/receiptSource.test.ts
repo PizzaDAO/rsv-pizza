@@ -67,7 +67,7 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
     walk(root);
     // Creates (and non-receipt-gate reads that cannot see a draft) are listed by file; anything new fails.
     const allowedUnfiltered: Record<string, number> = {
-      'routes/payout.routes.ts': 8, // 6 creates + the receipts library (shows drafts on purpose) + the host's own doc-id lookups
+      'routes/payout.routes.ts': 9, // 6 creates + the receipts library (shows drafts on purpose) + two by-id lookups of a doc the host names (receiptsChanged check, pizza-count patch): no gate or sum
       'routes/telegram-inbound.routes.ts': 1, // create
       'routes/admin-payout.routes.ts': 1, // admin doc-kind validation list
       'services/hostFastPass.service.ts': 2, // cross-party url/name reuse lookups (draft urls are unique per order)
@@ -79,8 +79,9 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
       const lines = fs.readFileSync(f, 'utf8').split('\n');
       lines.forEach((line, i) => {
         if (!/kind\s*(?:=|===|:)\s*'receipt'/.test(line) || /^\s*(\/\/|\*)/.test(line)) return;
-        const win = lines.slice(Math.max(0, i - 3), i + 5).join('\n');
-        if (/source/.test(win) || /isUploadedReceipt/.test(win)) return;
+        // the filter must be on the same line or the line right next to it, and must be the upload filter
+        const win = lines.slice(Math.max(0, i - 1), i + 2).join('\n');
+        if (/source\s*(:|=)\s*'upload'/.test(win) || /isUploadedReceipt/.test(win)) return;
         const rel = path.relative(root, f);
         counts[rel] = (counts[rel] ?? 0) + 1;
       });

@@ -3167,6 +3167,43 @@
                   },
                   "transcript_available": {
                     "type": "boolean"
+                  },
+                  "deferred": {
+                    "description": "Set while the order is `calling` but the shop has not been dialed yet (outside the calling window, a daily cap, or a retry after voicemail). null/absent when a call is live or none is owed.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "until": {
+                            "type": "string",
+                            "description": "ISO time the next dial is due."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "outside_call_window",
+                              "principal_daily_cap",
+                              "shop_daily_cap",
+                              "transient",
+                              "retry"
+                            ]
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Plain words for the host, e.g. why the shop is not called yet."
+                          }
+                        },
+                        "required": [
+                          "until",
+                          "reason",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -3432,6 +3469,43 @@
               },
               "transcript_available": {
                 "type": "boolean"
+              },
+              "deferred": {
+                "description": "Set while the order is `calling` but the shop has not been dialed yet (outside the calling window, a daily cap, or a retry after voicemail). null/absent when a call is live or none is owed.",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "until": {
+                        "type": "string",
+                        "description": "ISO time the next dial is due."
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "outside_call_window",
+                          "principal_daily_cap",
+                          "shop_daily_cap",
+                          "transient",
+                          "retry"
+                        ]
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Plain words for the host, e.g. why the shop is not called yet."
+                      }
+                    },
+                    "required": [
+                      "until",
+                      "reason",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [

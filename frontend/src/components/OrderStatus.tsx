@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import { getPizzaOrder, cancelPizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents } from '../lib/pizzaOrder';
+import { getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents } from '../lib/pizzaOrder';
 
 interface OrderStatusProps {
   partyId: string;
@@ -24,10 +24,19 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   const [copied, setCopied] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [settleError, setSettleError] = useState<string | null>(null);
+  const settle = async (action: 'nothing_ordered' | 'receipt_uploaded') => {
+    setSettleError(null);
+    try {
+      onUpdate((await settlePizzaOrder(partyId, order.opopOrderId, action)).order);
+    } catch (e) {
+      setSettleError(e instanceof Error ? e.message : 'Could not update the order');
+    }
+  };
 
   // The webhook updates the server row; this fallback poll keeps the page current.
   useEffect(() => {
-    if (isTerminalStatus(order.status) || order.restartable || !order.isMine) return;
+    if ((isTerminalStatus(order.status) && !order.settling) || order.restartable || !order.isMine) return;
     let stop = false;
     const tick = async () => {
       if (stop || document.hidden) return;
@@ -48,7 +57,7 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [partyId, order.opopOrderId, order.status, order.restartable, order.isMine, onUpdate]);
+  }, [partyId, order.opopOrderId, order.status, order.restartable, order.settling, order.isMine, onUpdate]);
 
   const info = statusInfo(order);
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
@@ -121,6 +130,18 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
           {cancelError && <p className="text-xs text-[#ff393a] mt-1">{cancelError}</p>}
         </div>
       )}
+
+      {order.releasable && (
+        <button type="button" className="btn-secondary w-full text-sm py-1.5" onClick={() => settle('nothing_ordered')}>
+          Nothing was ordered: release it
+        </button>
+      )}
+      {order.status === 'confirmed_by_shop' && !order.receiptCovered && (
+        <button type="button" className="text-xs text-theme-text-muted hover:text-theme-text underline" onClick={() => settle('receipt_uploaded')}>
+          I uploaded the receipt
+        </button>
+      )}
+      {settleError && <p className="text-xs text-[#ff393a]">{settleError}</p>}
 
       {FALLBACK.includes(order.status) && orderScript && (
         <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke space-y-2">
