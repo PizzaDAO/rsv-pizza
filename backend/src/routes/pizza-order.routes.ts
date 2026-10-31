@@ -12,7 +12,7 @@ import {
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
 import { menuFacts, fitLine } from '../lib/menuFit.js';
-import { isTerminal, isBlocking, isRestartable, isSettling, needsReviewHolds, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
+import { isTerminal, isBlocking, isRestartable, isSettling, outcomeOf, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -83,8 +83,10 @@ function publicOrder(row: any, forOwner: boolean) {
     restartable: isRestartable(row),
     // keep polling a fresh confirmation: the post-call check can still downgrade it
     settling: isSettling(row),
-    // a needs_review that holds budget (it reached a confirmation / total) can be released by the host
-    releasable: !row.releasedAt && isTerminal(row.status) && row.status !== 'confirmed_by_shop' && row.status !== 'completed' && row.status !== 'canceled' && isBlocking(row),
+    // what pizza-mcp says happened (null while in flight / confirmed / unknown): drives the host's copy and the budget
+    outcome: outcomeOf(row),
+    // an order that may exist (or needs_review that holds budget) and has ended: the host can say nothing was ordered
+    releasable: !row.releasedAt && isTerminal(row.status) && row.status !== 'confirmed_by_shop' && row.status !== 'completed' && isBlocking(row),
     released: !!row.releasedAt,
     receiptCovered: !!row.receiptCoveredAt,
     cancelable: forOwner && CANCELABLE_STATUSES.has(row.status) && !isRestartable(row),

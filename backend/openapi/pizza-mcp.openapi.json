@@ -3216,6 +3216,37 @@
                 ],
                 "additionalProperties": false
               },
+              "outcome": {
+                "description": "Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed.",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "nothing_ordered": {
+                        "type": "boolean",
+                        "description": "true = we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again."
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Plain English for the host, the same words as the email."
+                      }
+                    },
+                    "required": [
+                      "nothing_ordered",
+                      "reason",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "next_action": {
                 "description": "Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits).",
                 "type": "object",
@@ -3517,6 +3548,37 @@
               "transcript_available"
             ],
             "additionalProperties": false
+          },
+          "outcome": {
+            "description": "Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "nothing_ordered": {
+                    "type": "boolean",
+                    "description": "true = we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Plain English for the host, the same words as the email."
+                  }
+                },
+                "required": [
+                  "nothing_ordered",
+                  "reason",
+                  "message"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "next_action": {
             "description": "Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits).",

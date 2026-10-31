@@ -89,9 +89,25 @@ describe('OrderStatus', () => {
     expect(document.body.textContent).not.toMatch(/after retrying/);
   });
 
-  it('shows an optional reason from pizza-mcp when present', () => {
-    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', call: { reason: 'The shop quoted $150.00, over your limit.' } })} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.getByText(/quoted \$150\.00, over your limit/)).toBeTruthy();
+  it("shows pizza-mcp's outcome.message; nothing_ordered true says so and offers no release", () => {
+    const o = order({ status: 'unreachable', outcome: { nothing_ordered: true, reason: 'no_answer', message: 'Nobody picked up at Sal\'s.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+    expect(screen.getByText(/Nobody picked up/)).toBeTruthy();
+    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+  });
+
+  it('ambiguous_dial warns the host not to order again before checking with the shop', () => {
+    const o = order({ status: 'needs_review', releasable: true, outcome: { nothing_ordered: false, reason: 'ambiguous_dial', message: 'We may have reached the shop.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/Check with Sal's before ordering again/)).toBeTruthy();
+    expect(document.body.textContent).toMatch(/Do NOT order again until you have called Sal's/);
+    expect(screen.getByText('Nothing was ordered: release it')).toBeTruthy();
+  });
+
+  it('a missing or unknown outcome keeps the cautious copy', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', outcome: undefined })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/It may be that nothing was ordered, or that the shop did take it/);
   });
 
   it('keeps polling a fresh confirmation (settling) and offers "I uploaded the receipt"', async () => {

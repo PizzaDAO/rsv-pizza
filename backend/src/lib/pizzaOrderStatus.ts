@@ -37,7 +37,21 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
   return !na || na.type === 'none';
 }
 
+export interface OrderOutcome {
+  nothing_ordered: boolean;
+  reason: string;
+  message: string;
+}
+
+/** pizza-mcp's OrderView.outcome, as last stored in lastView. Missing / malformed = unknown (null). */
+export function outcomeOf(row: { lastView?: unknown }): OrderOutcome | null {
+  const o = (row.lastView as { outcome?: Partial<OrderOutcome> | null } | null | undefined)?.outcome;
+  if (!o || typeof o !== 'object' || typeof o.nothing_ordered !== 'boolean') return null;
+  return { nothing_ordered: o.nothing_ordered, reason: String(o.reason ?? ''), message: String(o.message ?? '') };
+}
+
 interface OrderRowLike {
+  lastView?: unknown;
   status: string;
   nextAction?: unknown;
   ceilingCents?: number | null;
@@ -46,9 +60,8 @@ interface OrderRowLike {
 }
 
 /**
- * A `needs_review` order only holds the party's budget (and blocks a new order) when the shop
- * actually reached a confirmation or quoted a total inside what the host approved. IVR, voicemail
- * and "the shop quoted more than the limit" mean nothing was ordered, so they hold nothing.
+ * Fallback when pizza-mcp sends no `outcome`: a `needs_review` order only holds the party's budget when the shop
+ * reached a confirmation or quoted a total inside what the host approved.
  */
 export function needsReviewHolds(row: OrderRowLike): boolean {
   if (row.status !== 'needs_review') return false;
@@ -62,6 +75,13 @@ export function needsReviewHolds(row: OrderRowLike): boolean {
  */
 export function isBlocking(row: OrderRowLike): boolean {
   if (row.releasedAt) return false;
+  const outcome = outcomeOf(row);
+  // pizza-mcp is sure nothing was placed: holds nothing, blocks nothing.
+  if (outcome?.nothing_ordered === true) return false;
+  // An order MAY exist (e.g. ambiguous_dial): hold the budget and block a second order until the host
+  // has checked with the shop and settled it, whatever the status.
+  if (outcome?.nothing_ordered === false && (row.status === 'needs_review' || FREE_STATUSES.has(row.status))) return true;
+  // No outcome (older pizza-mcp, or unknown): fall back to what we can see.
   if (row.status === 'needs_review') return needsReviewHolds(row);
   return !FREE_STATUSES.has(row.status) && !isRestartable(row);
 }

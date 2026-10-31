@@ -728,6 +728,15 @@ export interface components {
                         message: string;
                     } | null;
                 };
+                /** @description Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed. */
+                outcome?: {
+                    /** @description true = we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. */
+                    nothing_ordered: boolean;
+                    /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable. */
+                    reason: string;
+                    /** @description Plain English for the host, the same words as the email. */
+                    message: string;
+                } | null;
                 /** @description Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits). */
                 next_action?: {
                     /** @enum {string} */
@@ -798,6 +807,15 @@ export interface components {
                     message: string;
                 } | null;
             };
+            /** @description Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed. */
+            outcome?: {
+                /** @description true = we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. */
+                nothing_ordered: boolean;
+                /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable. */
+                reason: string;
+                /** @description Plain English for the host, the same words as the email. */
+                message: string;
+            } | null;
             /** @description Phone orders: what a human must do now, e.g. open the approval page (first approval, or a price above the limit while the call waits). */
             next_action?: {
                 /** @enum {string} */

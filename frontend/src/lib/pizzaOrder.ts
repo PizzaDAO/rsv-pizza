@@ -95,12 +95,16 @@ export interface PizzaOrderView {
     shop_total_cents?: number | null;
     ready_at_text?: string | null;
     changes?: string[];
-    // Optional: a plain-words reason, when pizza-mcp provides one for needs_review / unreachable.
-    reason?: string | null;
     // Optional: set by pizza-mcp while the order is `calling` but the shop has not been dialed yet.
     deferred?: { until?: string | null; reason?: string | null; message?: string | null } | null;
   } | null;
   nextAction: NextAction | null;
+  /**
+   * What pizza-mcp says happened when the order ended without a confirmation. null/absent while in flight,
+   * confirmed, or when pizza-mcp does not send it (older versions): the copy must then stay cautious.
+   * nothing_ordered true = sure nothing was placed; false = an order MAY exist, check with the shop.
+   */
+  outcome?: { nothing_ordered: boolean; reason: string; message: string } | null;
   isMine: boolean;
   /** Approval expired with nothing to open: the host can simply start over. */
   restartable?: boolean;
@@ -241,8 +245,21 @@ export interface StatusInfo {
   detail: string;
   tone: 'info' | 'action' | 'success' | 'warn' | 'error';
 }
-export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call'> & { restartable?: boolean }): StatusInfo {
+export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & { restartable?: boolean }): StatusInfo {
   const total = formatCents(o.confirmedTotalCents ?? o.call?.shop_total_cents ?? null);
+  // pizza-mcp's own words win once it has said what happened (never inferred from totals or transcripts).
+  const oc = o.outcome;
+  if (oc && ['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'].includes(o.status)) {
+    const check = `An order may exist at ${o.shopName}. Check with them before ordering again.`;
+    const ambiguous = oc.reason === 'ambiguous_dial';
+    return {
+      title: oc.nothing_ordered ? `Nothing was ordered at ${o.shopName}` : `Check with ${o.shopName} before ordering again`,
+      detail: [oc.message, ambiguous ? `Do NOT order again until you have called ${o.shopName} to find out whether they took it.` : oc.nothing_ordered ? '' : check]
+        .filter(Boolean)
+        .join(' '),
+      tone: oc.nothing_ordered ? (o.status === 'canceled' ? 'error' : 'warn') : 'warn',
+    };
+  }
   switch (o.status) {
     case 'awaiting_approval':
       if (o.restartable) return { title: 'The approval link expired', detail: 'Nothing was ordered. Start over to place it again.', tone: 'warn' };

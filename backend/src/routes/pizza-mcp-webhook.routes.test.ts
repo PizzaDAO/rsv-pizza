@@ -215,6 +215,14 @@ describe('POST /api/pizza-mcp/webhook: draft receipt and notification', () => {
     expect(fake.docs).toHaveLength(0);
   });
 
+  it('persists pizza-mcp\'s outcome from the webhook so budget and copy can use it', async () => {
+    const outcome = { nothing_ordered: false, reason: 'ambiguous_dial', message: 'We may have reached the shop.' };
+    await post(delivery(opopOrder({ status: 'needs_review', outcome }, 2)));
+    expect(fake.byOpop('ord_1').lastView.outcome).toEqual(outcome);
+    await post(delivery(opopOrder({ status: 'needs_review', outcome: null }, 3)));
+    expect(fake.byOpop('ord_1').lastView.outcome).toBeNull();
+  });
+
   it('a downgrade after confirmation (needs_review) or a later cancel removes the draft', async () => {
     await post(delivery(confirmed({}, 3)));
     expect(fake.docs).toHaveLength(1);

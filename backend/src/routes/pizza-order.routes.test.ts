@@ -703,4 +703,45 @@ describe('budget release, double counting, cancel button, settling (final review
     await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
     expect(mcp.calls).toHaveLength(0);
   });
+
+  const oc = (nothing_ordered: boolean, reason: string) => ({ nothing_ordered, reason, message: `msg ${reason}` });
+  const withOutcome = (o: ReturnType<typeof oc> | null) => ({ lastView: { outcome: o, call: {}, timeline: [] } });
+
+  it('outcome.nothing_ordered === true holds no budget and offers no release, even with a total inside the limit', async () => {
+    const o = await mk({ ceilingCents: 5000, confirmedTotalCents: 4000, ...withOutcome(oc(true, 'transcript_mismatch')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    const list = await request(app()).get(`${base}/orders`).set(host);
+    expect(list.body.orders[0]).toMatchObject({ releasable: false, outcome: { nothing_ordered: true, reason: 'transcript_mismatch' } });
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+    expect(o.opopOrderId).toBeTruthy();
+  });
+
+  it('outcome.nothing_ordered === false on needs_review holds the budget and blocks, even with no total; the host releases it after checking', async () => {
+    const o = await mk({ ceilingCents: 5376, confirmedTotalCents: null, ...withOutcome(oc(false, 'shop_answered_no_order')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 5376);
+    expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].releasable).toBe(true);
+    await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' });
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+  });
+
+  it('ambiguous_dial (an order may exist) keeps the one-order block even on an unreachable status, until settled', async () => {
+    const o = await mk({ status: 'unreachable', ceilingCents: 5000, ...withOutcome(oc(false, 'ambiguous_dial')) });
+    const res = await placeFrom(await buildCart());
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('ORDER_IN_PROGRESS');
+    const item = (await request(app()).get(`${base}/orders`).set(host)).body.orders[0];
+    expect(item).toMatchObject({ releasable: true, outcome: { reason: 'ambiguous_dial', nothing_ordered: false } });
+    await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' });
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+  });
+
+  it('a refused order with nothing_ordered true stays free; unknown or malformed outcome falls back to the old rules', async () => {
+    await mk({ status: 'refused', ceilingCents: 5000, ...withOutcome(oc(true, 'refused_ai')) });
+    await mk({ status: 'needs_review', ceilingCents: 5000, confirmedTotalCents: null, lastView: { outcome: { nothing_ordered: 'maybe' } } }); // malformed -> unknown -> IVR rule: holds nothing
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    await mk({ status: 'needs_review', ceilingCents: 5000, confirmedTotalCents: 4000, lastView: {} }); // unknown + total in limit: holds
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 4000);
+  });
 });
