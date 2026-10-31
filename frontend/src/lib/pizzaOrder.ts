@@ -275,7 +275,7 @@ export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'conf
       // (a phone menu, voicemail, or a price over your limit). Optional `reason` comes from pizza-mcp when it sends one.
       return {
         title: `We could not confirm the order at ${o.shopName}`,
-        detail: `${o.call?.reason ? `${o.call.reason} ` : ''}It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it. If nothing was ordered, release it below so it stops counting against your budget.`,
+        detail: `It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it. If nothing was ordered, release it below so it stops counting against your budget.`,
         tone: 'warn',
       };
     case 'shop_requires_prepay':
