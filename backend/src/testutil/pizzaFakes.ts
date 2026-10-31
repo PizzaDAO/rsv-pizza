@@ -139,8 +139,8 @@ export function opopOrder(over: Record<string, any> = {}, timeline = 1) {
     id: 'ord_1',
     order_number: 'A-100',
     pizzeria_id: 'pzl_osm_n1',
-    status: 'calling', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
-    payment_status: 'unpaid', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+    status: 'calling',
+    payment_status: 'unpaid',
     summary: '10 pizzas',
     totals: { subtotal_cents: 0, discount_cents: 0, delivery_fee_cents: 0, service_fee_cents: 0, tax_cents: 0, tip_cents: 0, total_cents: 0 },
     promised_at: null,
@@ -184,8 +184,8 @@ export function makeFakePizzaMcp(
     let claims: jwt.JwtPayload;
     try {
       const pub = crypto.createPublicKey({ key: publicJwks()!.keys[0] as any, format: 'jwk' });
-      claims = jwt.verify(token, pub, { algorithms: ['ES256'], issuer: 'https://api.rsv.pizza', audience: base }) as jwt.JwtPayload;
-      if (claims.azp !== 'rsv.pizza' || !String(claims.sub).startsWith('rsvpizza:') || claims.exp! - claims.iat! > 600) throw new Error('claims');
+      claims = jwt.verify(token, pub, { algorithms: ['ES256'], issuer: 'https://api.rsv.pizza', audience: base }) as jwt.JwtPayload; // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+      if (claims.azp !== 'rsv.pizza' || !String(claims.sub).startsWith('rsvpizza:') || claims.exp! - claims.iat! > 600) throw new Error('claims'); // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
     } catch {
       return new Response(JSON.stringify({ code: 'UNAUTHENTICATED', title: 'bad token', status: 401, retryable: false }), { status: 401 });
     }

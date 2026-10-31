@@ -58,7 +58,7 @@ function clean(s: unknown, max: number): string {
     .replace(/[\u0000-\u001f\u007f<>`{}]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, max); // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+    .slice(0, max);
 }
 
 export function normalizeDietary(list: unknown): string[] {
@@ -67,7 +67,7 @@ export function normalizeDietary(list: unknown): string[] {
   for (const raw of list) {
     if (typeof raw !== 'string') continue;
     const k = raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    // rsv.pizza spells it "gluten-free" / "Gluten Free"; anything unknown is dropped, never guessed.
+    // The app spells it "gluten-free" / "Gluten Free"; anything unknown is dropped, never guessed.
     if (DIETARY_ALLOWED.has(k)) out.add(k);
   }
   return Array.from(out).slice(0, 8);

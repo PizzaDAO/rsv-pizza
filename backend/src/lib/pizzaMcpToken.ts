@@ -16,7 +16,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { brand } from '../config/brand.js';
 
-export const PIZZA_MCP_CLIENT_ID = 'rsv.pizza'; // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+export const PIZZA_MCP_CLIENT_ID = 'rsv.pizza'; // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
 export const PIZZA_MCP_SUB_PREFIX = 'rsvpizza:';
 export const PIZZA_MCP_SCOPE = 'pizza:browse orders:read orders:write';
 export const PIZZA_MCP_TOKEN_TTL_S = 60;

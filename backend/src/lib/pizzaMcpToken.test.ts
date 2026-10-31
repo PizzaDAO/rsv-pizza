@@ -34,10 +34,10 @@ describe('pizza-mcp token claims (docs/CLIENTS.md)', () => {
 
     const c = jwt.decode(t) as jwt.JwtPayload;
     expect(c).toMatchObject({
-      iss: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+      iss: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
       aud: 'https://api.openpizza.xyz',
       sub: 'rsvpizza:u123',
-      azp: 'rsv.pizza', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract) // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
+      azp: 'rsv.pizza', // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
       scope: 'pizza:browse orders:read orders:write',
       iat: 1_800_000_000,
       exp: 1_800_000_060,
