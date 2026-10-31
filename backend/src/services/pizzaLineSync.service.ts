@@ -461,11 +461,16 @@ export function buildLumpSumWrite(
       const sub = it ? num((it as OcrItemLike).subtotal, 0) : 0;
       base += sub > 0 ? sub : w.qty * w.unitPriceList;
     }
-  } else {
-    if (!(c.receiptTotal && c.receiptTotal > 0) || !c.totalCurrency || !(c.totalFxRate && c.totalFxRate > 0)) return null;
-    base = c.receiptTotal;
-    currency = c.totalCurrency;
-    fxRate = c.totalFxRate;
+  }
+  const hasTotal = !!(c.receiptTotal && c.receiptTotal > 0) && !!c.totalCurrency && !!(c.totalFxRate && c.totalFxRate > 0);
+  // Pizza lines summing past the receipt total are misread: fall back to the total.
+  const linesOverTotal = mode === 'pizza_lines' && hasTotal && base * fxRate > c.receiptTotal! * c.totalFxRate! * 1.05;
+  if (mode === 'receipt_total' || linesOverTotal) {
+    if (!hasTotal) return null;
+    mode = 'receipt_total';
+    base = c.receiptTotal!;
+    currency = c.totalCurrency!;
+    fxRate = c.totalFxRate!;
   }
   if (!(base > 0)) return null;
 
