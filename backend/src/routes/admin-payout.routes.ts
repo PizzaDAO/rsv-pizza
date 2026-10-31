@@ -1756,7 +1756,7 @@ router.post(
           where: {
             paymentsClosedAt: null,
             payoutDocuments: {
-              some: { kind: 'receipt', isDuplicate: false, ineligible: false },
+              some: { kind: 'receipt', source: 'upload', isDuplicate: false, ineligible: false },
             },
           },
           select: { id: true, eventTags: true },
@@ -2120,7 +2120,7 @@ router.get(
       if (uniquePartyIds.length > 0) {
         const docRows = await prisma.payoutDocument.groupBy({
           by: ['partyId'],
-          where: { partyId: { in: uniquePartyIds }, kind: 'receipt' },
+          where: { partyId: { in: uniquePartyIds }, kind: 'receipt', source: 'upload' },
           _count: { id: true },
         });
         for (const r of docRows) {
@@ -2476,7 +2476,7 @@ router.get(
         const partyScope: any = { ...(where.party ?? {}) };
         const andParts: any[] = [
           { payouts: { none: {} } },
-          { payoutDocuments: { none: {} } },
+          { payoutDocuments: { none: { source: 'upload' } } },
         ];
         // Respect the unified search scope (salame-83472 / diavola-83147):
         // `where.OR` restricts to a partyId set; only the partyId arm applies
@@ -3081,7 +3081,7 @@ router.get(
           // ≥1 non-excluded receipt doc.
           {
             payoutDocuments: {
-              some: { kind: 'receipt', isDuplicate: false, ineligible: false },
+              some: { kind: 'receipt', source: 'upload', isDuplicate: false, ineligible: false },
             },
           },
         ];
@@ -3114,6 +3114,7 @@ router.get(
             where: {
               partyId: { in: pendingPartyIds },
               kind: 'receipt',
+              source: 'upload',
               isDuplicate: false,
               ineligible: false,
             },
@@ -6297,6 +6298,7 @@ router.post(
       const candidates = await prisma.payoutDocument.findMany({
         where: {
           kind: 'receipt',
+          source: 'upload',
           ocrLineItems: { equals: Prisma.DbNull },
           url: { not: '' },
           ocrAttemptCount: { lt: OCR_MAX_AUTO_ATTEMPTS },
@@ -6381,6 +6383,7 @@ router.post(
       const remaining = await prisma.payoutDocument.count({
         where: {
           kind: 'receipt',
+          source: 'upload',
           ocrLineItems: { equals: Prisma.DbNull },
           url: { not: '' },
           ocrAttemptCount: { lt: OCR_MAX_AUTO_ATTEMPTS },

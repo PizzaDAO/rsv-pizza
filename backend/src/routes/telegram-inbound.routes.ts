@@ -510,7 +510,7 @@ router.post(
         });
 
         const receiptCount = await prisma.payoutDocument.count({
-          where: { partyId: party.id, kind: 'receipt' },
+          where: { partyId: party.id, kind: 'receipt', source: 'upload' },
         });
 
         // suppli-58533: when no amount was read (e.g. a PDF whose OCR found no

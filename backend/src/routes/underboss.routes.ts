@@ -14,6 +14,7 @@ import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { loadHostQuestionSet } from '../lib/hostSurveyQuestions.js';
 import { runChecks, worstStatus, cityIdentity, RESERVED_SLUGS } from '../lib/gppVerification.js';
 import { GPP27_YEAR, GPP27_TAG } from '../helpers/gpp27.js';
+import { isUploadedReceipt } from '../lib/receiptSource.js';
 
 // Re-export the request type under the local name used throughout this file
 type UnderbossRequest = UnderbossAuthRequest;
@@ -73,7 +74,7 @@ function computeProgress(party: any, underbossEmails: string[] = []) {
       Array.isArray(party.payouts) &&
       party.payouts.some((p: any) =>
         Array.isArray(p.documents) &&
-        p.documents.some((d: any) => d.kind === 'receipt')),
+        p.documents.some((d: any) => isUploadedReceipt(d))),
     hasSubmittedPaymentInfo:
       Array.isArray(party.payouts) &&
       party.payouts.some((p: any) => p.payoutMethod != null),

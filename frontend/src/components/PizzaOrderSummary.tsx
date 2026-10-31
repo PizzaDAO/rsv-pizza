@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { usePizza } from '../contexts/PizzaContext';
 import { PizzeriaSearch } from './PizzeriaSearch';
 import { OrderCheckout } from './OrderCheckout';
+import { PizzaOrderFlow } from './PizzaOrderFlow';
+import { AI_ORDERING_ENABLED } from '../lib/pizzaOrder';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TableRow } from './TableRow';
 import { GuestPreferencesList } from './GuestPreferencesList';
@@ -363,6 +365,19 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
     ? `${totalPizzas} pizza${totalPizzas !== 1 ? 's' : ''} over ${waveCount} wave${waveCount !== 1 ? 's' : ''}`
     : '';
 
+  const comingSoon = (
+    <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
+      <div className="flex flex-col items-center justify-center py-6 text-center">
+        <Phone size={32} className="text-theme-text-faint mb-3" />
+        <h3 className="font-medium text-theme-text text-sm mb-1">AI Ordering</h3>
+        <span className="text-xs font-semibold text-[#ffb347] bg-[#ffb347]/10 px-3 py-1 rounded-full">Coming Soon</span>
+        <p className="text-xs text-theme-text-muted mt-2 max-w-xs">
+          Automated pizza ordering via AI phone calls is being upgraded. Stay tuned!
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="card p-6">
@@ -395,17 +410,9 @@ Can you accommodate these delivery times? Please confirm total and timing.`;
 
         {isExpanded && recommendations.length > 0 && (
           <>
-            {/* AI Ordering - Coming Soon */}
-            <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <Phone size={32} className="text-theme-text-faint mb-3" />
-                <h3 className="font-medium text-theme-text text-sm mb-1">AI Ordering</h3>
-                <span className="text-xs font-semibold text-[#ffb347] bg-[#ffb347]/10 px-3 py-1 rounded-full">Coming Soon</span>
-                <p className="text-xs text-theme-text-muted mt-2 max-w-xs">
-                  Automated pizza ordering via AI phone calls is being upgraded. Stay tuned!
-                </p>
-              </div>
-            </div>
+            {/* AI Ordering: the new pizza-mcp flow when VITE_AI_ORDERING=1 and this party is in the pilot
+                allowlist (basil-14648); otherwise the unchanged Coming Soon notice. */}
+            {AI_ORDERING_ENABLED ? <PizzaOrderFlow fallback={comingSoon} /> : comingSoon}
 
             {/* Original pizzeria selection - hidden while coming soon */}
             {false && <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">

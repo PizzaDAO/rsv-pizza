@@ -53,6 +53,7 @@ export async function computePartyReimbursementState(
     where: {
       partyId: { in: partyIds },
       kind: 'receipt',
+      source: 'upload',
       isDuplicate: false,
       ineligible: false,
     },
