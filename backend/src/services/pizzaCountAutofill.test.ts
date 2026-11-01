@@ -195,8 +195,9 @@ describe('USD-per-pizza guard', () => {
     // legacy local-currency ocr_amount with no rate: can't tell
     expect(receiptUsdTotal({ ocrAmount: 754000, ocrCurrency: 'NGN' })).toBeNull();
     expect(receiptUsdTotal({ ocrAmount: 754000, originalAmount: 754000, originalCurrency: 'NGN', exchangeRate: 0.00065 })).toBe(490.1);
-    // Nigerian receipt stamped USD (usd-passthrough) with a local-currency figure
-    expect(receiptUsdTotal({ ocrAmount: 754000, ocrCurrency: 'USD', originalCurrency: null })).toBeNull();
+    // admin-corrected ocr_amount (original_* stale) is used; the stale local figure is not
+    expect(receiptUsdTotal({ ocrAmount: 400, ocrCurrency: 'NGN', originalAmount: 754000, originalCurrency: 'NGN', exchangeRate: 0.00065 })).toBe(400);
+    expect(receiptUsdTotal({ ocrAmount: 754000, ocrCurrency: 'NGN', originalAmount: 754000, originalCurrency: 'NGN', exchangeRate: 0.00065 })).toBe(490.1);
     expect(receiptUsdTotal({ ocrAmount: 50 })).toBeNull();
     expect(receiptUsdTotal(null)).toBeNull();
   });

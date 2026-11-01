@@ -43,7 +43,7 @@ import {
   type OcrItemLike,
 } from './pizzaLineSync.service.js';
 import { loadDocRows, reallocateDocDiscounts, type DocRow } from './pizzaLineDocs.service.js';
-import { MAX_PIZZA_COUNT } from './pizzaCountAutofill.js';
+import { MAX_PIZZA_COUNT, isPlausiblePizzaCount, receiptUsdTotal } from './pizzaCountAutofill.js';
 
 const MAX_LINES_PER_DOC = 60;
 const SENT_CATEGORIES = new Set(['pizza', 'other', 'beverage', 'side']);
@@ -181,12 +181,18 @@ export function parseLumpSumResponse(content: string | null | undefined): LumpSu
  */
 export async function writeLumpSumToDoc(documentId: string, ls: LumpSumRead): Promise<boolean> {
   const c = Math.round(Math.min(0.7, ls.confidence) * 100) / 100;
-  const n = await prisma.$executeRaw(Prisma.sql`
+  // Same $/pizza guard as the OCR auto-fill: an implausible auto count is not stored.
+  const money = await prisma.payoutDocument.findUnique({
+    where: { id: documentId },
+    select: { ocrAmount: true, ocrCurrency: true, originalAmount: true, originalCurrency: true, exchangeRate: true },
+  });
+  const countOk = isPlausiblePizzaCount(ls.pizzaCount, receiptUsdTotal(money));
+  const n = countOk ? await prisma.$executeRaw(Prisma.sql`
     UPDATE payout_documents
     SET pizza_count = ${ls.pizzaCount}, pizza_count_source = 'llm', pizza_count_confidence = ${c}
     WHERE id = ${documentId}::uuid
       AND (pizza_count_source IS NULL
-           OR (pizza_count_source <> 'host' AND coalesce(pizza_count_confidence, 0) <= ${c}))`);
+           OR (pizza_count_source <> 'host' AND coalesce(pizza_count_confidence, 0) <= ${c}))`) : 0;
   if (ls.diameterCm !== null || ls.sizeLabel !== null) {
     const sc = ls.diameterCm !== null ? 0.6 : 0.45;
     await prisma.$executeRaw(Prisma.sql`

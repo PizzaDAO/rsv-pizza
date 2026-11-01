@@ -6,7 +6,11 @@
  * Usage (from backend/, needs DATABASE_URL):
  *   npx tsx --env-file=.env scripts/clear-implausible-pizza-counts.ts
  *       -> DRY RUN (default): lists affected docs, writes nothing
- *   npx tsx --env-file=.env scripts/clear-implausible-pizza-counts.ts --apply --backup <file.json>
+ *   npx tsx --env-file=.env scripts/clear-implausible-pizza-counts.ts --apply --backup <file.json> [--skip id,id]
+ *       --skip takes full or short (prefix) ids and leaves those docs out of --apply.
+ *       Rows tagged [verify] have a USD total worth checking by hand (USD-stamped
+ *       without a matching original_currency/original_amount, fx usd-passthrough, or
+ *       an admin-corrected ocr_amount).
  *       -> writes a JSON backup of the affected rows' pizza_* values, then clears them
  *
  * Scope: kind='receipt' docs with pizza_count set and pizza_count_source not 'host'
@@ -25,15 +29,16 @@ import { writeFileSync } from 'node:fs';
 
 process.env.NODE_ENV ??= 'production'; // keep Prisma from logging every query
 
-interface Args { apply: boolean; backup: string | null }
+interface Args { apply: boolean; backup: string | null; skip: string[] }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { apply: false, backup: null };
+  const a: Args = { apply: false, backup: null, skip: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--apply') a.apply = true;
     else if (k === '--dry-run') a.apply = false;
     else if (k === '--backup') a.backup = argv[++i] ?? null;
+    else if (k === '--skip') a.skip = (argv[++i] ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
     else throw new Error(`Unknown argument ${k}`);
   }
   if (a.apply && !a.backup) throw new Error('--apply requires --backup <file>');
@@ -45,7 +50,7 @@ const pad = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : s + ' '.r
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const { prisma } = await import('../src/config/database.js');
-  const { isPlausiblePizzaCount, receiptUsdTotal, usdPerPizza, MAX_USD_PER_PIZZA } =
+  const { isPlausiblePizzaCount, receiptUsdTotalDetailed, usdPerPizza, MAX_USD_PER_PIZZA } =
     await import('../src/services/pizzaCountAutofill.js');
 
   const BATCH = 200;
@@ -66,7 +71,7 @@ async function main() {
       orderBy: { id: 'asc' },
       take: BATCH,
       select: {
-        id: true, ocrAmount: true, ocrCurrency: true, originalAmount: true, originalCurrency: true, exchangeRate: true,
+        id: true, ocrRaw: true, ocrAmount: true, ocrCurrency: true, originalAmount: true, originalCurrency: true, exchangeRate: true,
         pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
         party: { select: { country: true, city: true } },
       },
@@ -75,12 +80,24 @@ async function main() {
     cursor = docs[docs.length - 1].id;
     for (const d of docs) {
       scanned += 1;
-      const total = receiptUsdTotal(d);
+      const { usd: total, corrected } = receiptUsdTotalDetailed(d);
       if (total === null) { unknownTotal += 1; continue; }
       if (isPlausiblePizzaCount(d.pizzaCount, total)) continue;
+      const effCur = String(d.originalCurrency ?? d.ocrCurrency ?? '').trim().toUpperCase();
+      const fxSource = d.ocrRaw && typeof d.ocrRaw === 'object' ? (d.ocrRaw as any).fx?.source : null;
+      const verifyReasons: string[] = [];
+      if (effCur === 'USD') {
+        if (String(d.originalCurrency ?? '').trim().toUpperCase() !== 'USD') verifyReasons.push('original_currency not USD');
+        if (d.originalAmount == null) verifyReasons.push('no original_amount');
+        if (fxSource === 'usd-passthrough') verifyReasons.push('fx usd-passthrough');
+      }
+      if (corrected) verifyReasons.push('admin-corrected ocr_amount used');
+      const skipped = args.skip.some((x) => d.id.toLowerCase().startsWith(x));
       const per = usdPerPizza(d.pizzaCount, total);
       affected.push({
         id: d.id,
+        verify: verifyReasons,
+        skipped,
         pizzaCount: d.pizzaCount,
         pizzaCountSource: d.pizzaCountSource,
         pizzaCountConfidence: d.pizzaCountConfidence == null ? null : Number(d.pizzaCountConfidence.toString()),
@@ -98,7 +115,7 @@ async function main() {
         `${pad(d.id.slice(0, 8), 9)}${pad(String(d.party?.country ?? '-'), 16)}${pad(String(d.party?.city ?? '-'), 22)}` +
         `count=${pad(String(d.pizzaCount), 5)} usd=${pad(total.toFixed(2), 11)} $/pizza=${per === null ? '-' : per.toFixed(2)}` +
         `  (${d.originalAmount ?? '-'} ${d.originalCurrency ?? d.ocrCurrency ?? '?'} @ ${d.exchangeRate ?? '-'})` +
-        (d.originalAmount == null ? '  [no original_amount: USD taken from ocr_amount, verify]' : ''),
+        (verifyReasons.length ? `  [verify] ${verifyReasons.join('; ')}` : '') + (skipped ? '  [SKIPPED]' : ''),
       );
     }
   }
@@ -107,11 +124,12 @@ async function main() {
   for (const r of rows) console.log('  ' + r);
 
   let cleared = 0;
-  if (args.apply && affected.length > 0) {
-    writeFileSync(args.backup!, JSON.stringify(affected, null, 2));
-    console.log(`\nbackup written: ${args.backup} (${affected.length} rows)`);
-    for (let i = 0; i < affected.length; i += BATCH) {
-      const ids = affected.slice(i, i + BATCH).map((a) => a.id as string);
+  const toClear = affected.filter((a) => !a.skipped);
+  if (args.apply && toClear.length > 0) {
+    writeFileSync(args.backup!, JSON.stringify(toClear, null, 2));
+    console.log(`\nbackup written: ${args.backup} (${toClear.length} rows)`);
+    for (let i = 0; i < toClear.length; i += BATCH) {
+      const ids = toClear.slice(i, i + BATCH).map((a) => a.id as string);
       // Re-assert the scope in the WHERE so a host edit made since the read is never overwritten.
       const res = await prisma.payoutDocument.updateMany({
         where: { id: { in: ids }, kind: 'receipt', OR: [{ pizzaCountSource: null }, { pizzaCountSource: { not: 'host' } }] },
@@ -123,7 +141,7 @@ async function main() {
 
   console.log(`\nauto-count receipts scanned: ${scanned}`);
   console.log(`USD total unknown (left alone): ${unknownTotal}`);
-  console.log(`implausible (> $${MAX_USD_PER_PIZZA}/pizza): ${affected.length}`);
+  console.log(`implausible (> $${MAX_USD_PER_PIZZA}/pizza): ${affected.length}  tagged [verify]: ${affected.filter((a) => a.verify.length).length}  skipped: ${affected.length - toClear.length}`);
   if (args.apply) console.log(`cleared: ${cleared}. Run POST /api/pizza-index/sync next (drops the lump-sum -1 lines; no OpenAI).`);
   await prisma.$disconnect();
 }

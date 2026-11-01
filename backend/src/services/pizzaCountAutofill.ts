@@ -248,9 +248,6 @@ export function derivePizzaAutofill(lineItems: unknown, ocrRaw: unknown, ocrConf
 // plausibility guard (USD per pizza)
 // ---------------------------------------------------------------------------
 
-/** A single receipt above this many USD is treated as a misread currency (total unknown). */
-export const MAX_PLAUSIBLE_RECEIPT_USD = 25000;
-
 /** The money columns of a payout_documents row (Decimals or numbers). */
 export interface ReceiptMoney {
   ocrAmount?: unknown;
@@ -267,26 +264,35 @@ export interface ReceiptMoney {
  * currency says USD. Otherwise: original_amount * exchange_rate.
  */
 export function receiptUsdTotal(m: ReceiptMoney | null | undefined): number | null {
-  const usd = receiptUsdTotalRaw(m);
-  // A "USD" total this large is a local-currency figure the OCR stamped as USD
-  // (prod: 754000 on a Nigerian receipt, fx usd-passthrough): can't tell.
-  return usd !== null && usd > MAX_PLAUSIBLE_RECEIPT_USD ? null : usd;
+  return receiptUsdTotalDetailed(m).usd;
 }
 
-function receiptUsdTotalRaw(m: ReceiptMoney | null | undefined): number | null {
-  if (!m) return null;
+/**
+ * Same as receiptUsdTotal, plus `corrected`: the non-USD row's ocr_amount
+ * matches neither original_amount * rate nor the local figure, i.e. an admin
+ * set ocrAmount + ocrCurrency by hand (original_* is left stale by that edit),
+ * so ocr_amount is used. Callers wanting a human check should flag these.
+ */
+export function receiptUsdTotalDetailed(m: ReceiptMoney | null | undefined): { usd: number | null; corrected: boolean } {
+  const none = { usd: null, corrected: false };
+  if (!m) return none;
   const cur = (m.originalCurrency ?? m.ocrCurrency ?? '').trim().toUpperCase();
   const ocrCur = (m.ocrCurrency ?? '').trim().toUpperCase();
-  if (cur && ocrCur && cur !== ocrCur) return null;
+  if (cur && ocrCur && cur !== ocrCur) return none;
   const orig = numOrNull(m.originalAmount);
   const rate = numOrNull(m.exchangeRate);
   const ocr = numOrNull(m.ocrAmount);
   if (cur === 'USD') {
     const usd = ocr ?? orig;
-    return usd !== null && usd >= 0 ? round2(usd) : null;
+    return usd !== null && usd >= 0 ? { usd: round2(usd), corrected: false } : none;
   }
-  if (orig !== null && orig >= 0 && rate !== null && rate > 0) return round2(orig * rate);
-  return null;
+  if (orig === null || orig < 0 || rate === null || !(rate > 0)) return none;
+  const product = orig * rate;
+  const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.02 * Math.abs(b), 0.01);
+  if (ocr !== null && ocr >= 0 && !near(ocr, product) && !near(ocr, orig)) {
+    return { usd: round2(ocr), corrected: true };
+  }
+  return { usd: round2(product), corrected: false };
 }
 
 /** USD per pizza, or null when the total or count is unknown. */
