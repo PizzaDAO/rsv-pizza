@@ -8316,8 +8316,6 @@ export interface PizzaStatusResponse {
   bundleLines: number;
   outlierLines: number;
   bySource: Record<string, number>;
-  partiesPendingPhoto?: number;
-  linesWithPhotoEstimate?: number;
 }
 
 export interface PizzaLinePatch {
@@ -8547,9 +8545,6 @@ export function runPizzaLlmPass(body: { limit?: number; dryRun?: boolean } = {})
 }
 export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; requireLlmPass?: boolean; includeLowConfidence?: boolean } = {}): Promise<PizzaPassResult> {
   return apiRequest(`${PIZZA_BASE}/vision-pass`, { method: 'POST', body, timeoutMs: 180_000 });
-}
-export function runPizzaPhotoPass(body: { limit?: number; dryRun?: boolean; partyIds?: string[] } = {}): Promise<PizzaPassResult> {
-  return apiRequest(`${PIZZA_BASE}/photo-pass`, { method: 'POST', body, timeoutMs: 240_000 });
 }
 export function fetchPublicPizzaIndex(year?: number): Promise<PublicPizzaIndex> {
   return apiRequest<PublicPizzaIndex>(`/api/pizza-index${year ? `?year=${year}` : ''}`, { requireAuth: false });
