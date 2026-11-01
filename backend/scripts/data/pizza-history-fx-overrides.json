@@ -1,4 +1,8 @@
 {
+  "AED:2022-05-22": {
+    "rate": 0.2722940776,
+    "source": "fixed USD peg"
+  },
   "AED:2023-05-24": {
     "rate": 0.2722940776,
     "source": "fixed USD peg"
@@ -166,6 +170,14 @@
   "NGN:2024-05-23": {
     "rate": 0.00069795239,
     "source": "fawazahmed0 currency-api 2024-05-23"
+  },
+  "NGN:2024-09-06": {
+    "rate": 0.000621986825,
+    "source": "fawazahmed0 currency-api 2024-09-06"
+  },
+  "NGN:2024-09-07": {
+    "rate": 0.000622930183,
+    "source": "fawazahmed0 currency-api 2024-09-07"
   },
   "NGN:2025-05-20": {
     "rate": 0.000622182222,
