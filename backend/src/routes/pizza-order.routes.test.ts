@@ -919,4 +919,67 @@ describe('budget release, double counting, cancel button, settling (final review
     await mk({ status: 'needs_review', ceilingCents: 5000, confirmedTotalCents: 4000, lastView: {} }); // unknown + total in limit: holds
     expect((await cart()).body.remainingCapCents).toBe(25000 - 4000);
   });
+
+  // pizza-mcp a0e10eb's reasons, plus one this code has never heard of: only nothing_ordered may decide.
+  it.each([
+    ['canceled', 'outcome_unclear'],
+    ['unreachable', 'outcome_unclear'],
+    ['needs_review', 'outcome_unclear'],
+    ['needs_review', 'possible_opt_out'],
+    ['canceled', 'price_approval_dropped'],
+    ['unreachable', 'a_reason_added_next_year'],
+    ['refused', 'a_reason_added_next_year'],
+  ])('%s with %s and nothing_ordered false blocks, holds and can be released by any host', async (status, reason) => {
+    const o = await mk({ status, ceilingCents: 5000, ...withOutcome(oc(false, reason)) });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 5000);
+    expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: true, released: false });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(cohostEditor).send({ action: 'nothing_ordered' })).body.order).toMatchObject({ released: true, blocking: false, releasable: false });
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+  });
+
+  it('an unknown reason with nothing_ordered true is free: the boolean decides, not a list', async () => {
+    await mk({ status: 'unreachable', ceilingCents: 5000, ...withOutcome(oc(true, 'a_reason_added_next_year')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000);
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: false, releasable: false });
+  });
+
+  it.each([true, false])('approval_timeout with nothing_ordered %s is never released: it holds, blocks and the settle is refused', async (no) => {
+    const o = await mk({ status: 'approval_timeout', ceilingCents: 5000, nextAction: { type: 'open_url', url: 'https://x' }, ...withOutcome(oc(no, no ? 'price_approval_timeout' : 'price_approval_dropped')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 5000);
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: false, cancelable: true });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
+  });
+
+  it('a confirmed order with a recorded opt-out stays confirmed, holding and not releasable', async () => {
+    await mk({ status: 'confirmed_by_shop', confirmedTotalCents: 4000, confirmedAt: new Date(0), lastView: { outcome: null, call: {}, timeline: [] } });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 4000);
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: false, outcome: null });
+  });
+
+  it('a stuck calling order (no deferred dial) stays live for its whole hour: it holds, and cannot be canceled or released here', async () => {
+    const o = await mk({ status: 'calling', ceilingCents: 5000, lastView: { outcome: null, call: { deferred: null }, timeline: [{ at: new Date(Date.now() - 59 * 60_000).toISOString(), status: 'calling' }] } });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 5000);
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: false, cancelable: false });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
+  });
+
+  it('a transient deferral with a not_dialed row in attempts is a cancelable live order, passed through as is', async () => {
+    await mk({ status: 'calling', ceilingCents: 5000, lastView: { outcome: null, call: { attempts: 2, last_outcome: 'not_dialed', deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'We hit a temporary problem.' } }, timeline: [] } });
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, cancelable: true, call: { deferred: { reason: 'transient' } } });
+  });
+
+  it('a canceled order that may exist takes the real receipt: counted once, still blocking until a host settles it', async () => {
+    const o = await mk({ status: 'canceled', ceilingCents: 5000, createdAt: new Date(Date.now() - 3600_000), ...withOutcome(oc(false, 'outcome_unclear')) });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' })).body.error.code).toBe('NO_RECEIPT_FOUND');
+    receipt('30.00');
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' })).body.order).toMatchObject({ receiptCovered: true, blocking: true });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 3000);
+  });
+
+  it('receipt_uploaded is still refused on an ended order pizza-mcp is sure about', async () => {
+    const o = await mk({ status: 'canceled', ...withOutcome(oc(true, 'canceled')) });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' })).status).toBe(409);
+  });
 });

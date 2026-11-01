@@ -63,7 +63,7 @@ describe('PizzaOrderFlow: resume after a reload', () => {
   it('reopens a releasable order, days later', async () => {
     mocks.orders.mockResolvedValue({ orders: [row({ status: 'needs_review', releasable: true })] });
     flow();
-    expect(await screen.findByText('Nothing was ordered: release it')).toBeTruthy();
+    expect(await screen.findByText('I checked: nothing was ordered, release it')).toBeTruthy();
   });
 
   it('reopens a confirmed order with no receipt yet', async () => {
@@ -75,7 +75,7 @@ describe('PizzaOrderFlow: resume after a reload', () => {
   it('reopens them for a co-host too', async () => {
     mocks.orders.mockResolvedValue({ orders: [row({ status: 'unreachable', releasable: true, isMine: false })] });
     flow();
-    expect(await screen.findByText('Nothing was ordered: release it')).toBeTruthy();
+    expect(await screen.findByText('I checked: nothing was ordered, release it')).toBeTruthy();
     expect(screen.getByText('Placed by another host of this party.')).toBeTruthy();
   });
 
@@ -118,6 +118,16 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     expect(await screen.findByText('Named confirmed')).toBeTruthy();
   });
 
+  it('ORDER_IN_PROGRESS on an ended order says it may exist, not that it is in progress', async () => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingOrderId: 'ord_named', existingStatus: 'canceled' } }));
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    await userEvent.click(await toCart());
+    await userEvent.click(screen.getByText('Approve'));
+    expect(await screen.findByText(/may exist at the shop/)).toBeTruthy();
+    expect(screen.queryByText(/in progress or confirmed/)).toBeNull();
+  });
+
   it('CAP_EXHAUSTED on building a cart leads to the held order, with no second-order offer', async () => {
     mocks.build.mockRejectedValue(capError());
     mocks.order.mockResolvedValue({ order: row({ opopOrderId: 'ord_held', status: 'needs_review', releasable: true }), stale: false });
@@ -126,7 +136,7 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     expect(screen.queryByText('Place a second order anyway')).toBeNull();
     await userEvent.click(screen.getByText('View it'));
     expect(mocks.order).toHaveBeenCalledWith('p1', 'ord_held');
-    expect(await screen.findByText('Nothing was ordered: release it')).toBeTruthy();
+    expect(await screen.findByText('I checked: nothing was ordered, release it')).toBeTruthy();
   });
 
   it('CAP_EXHAUSTED on placing leads to the held order as well', async () => {
@@ -157,7 +167,7 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
 
   it('after releasing the held order, leaving it refreshes the budget notice', async () => {
     mocks.config.mockResolvedValueOnce(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: 'ord_1' }));
-    mocks.orders.mockResolvedValue({ orders: [row({ status: 'needs_review', released: false, releasable: true, blocking: false })] });
+    mocks.orders.mockResolvedValue({ orders: [row({ status: 'needs_review', released: true, releasable: true, blocking: false })] });
     flow();
     await userEvent.click(await screen.findByText('Order from another pizzeria'));
     expect(await screen.findByText("Pick Sal's")).toBeTruthy();

@@ -63,7 +63,10 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
   const url = order.nextAction?.type === 'open_url' ? order.nextAction.url : null;
   const deferred = order.call?.deferred ?? null;
-  const finished = order.status === 'confirmed_by_shop' || order.status === 'completed';
+  const finished = order.status === 'confirmed_by_shop' || order.status === 'completed' || !!order.receiptCovered;
+  // "another pizzeria" says it is fine to order again: only when pizza-mcp is sure, or a host checked and released it
+  const safeToReorder = order.outcome?.nothing_ordered === true || !!order.released;
+  const showScript = FALLBACK.includes(order.status) || (order.status === 'canceled' && order.outcome?.nothing_ordered === false);
   // the backend would refuse another order: no link that leads to that refusal
   const showLeave = (!waiting || order.restartable) && (finished || !order.blocking);
   const Icon = info.tone === 'success' ? CheckCircle2 : info.tone === 'warn' || info.tone === 'error' ? AlertTriangle : waiting ? Loader2 : Clock;
@@ -87,12 +90,7 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
             {order.call.changes.map((c) => <li key={c}>{c}</li>)}
           </ul>
         )}
-        {deferred && (deferred.message || deferred.until) && (
-          <p className="mt-2 text-xs text-theme-text-secondary">
-            {deferred.message || `We will call ${order.shopName} later.`}
-            {fmtUntil(deferred.until) && <> Next try: {fmtUntil(deferred.until)}.</>}
-          </p>
-        )}
+        {fmtUntil(deferred?.until) && <p className="mt-2 text-xs text-theme-text-secondary">Next try: {fmtUntil(deferred?.until)}.</p>}
         {stale && <p className="text-xs text-theme-text-faint mt-2">Having trouble refreshing. Showing the last known status.</p>}
         {order.status === 'confirmed_by_shop' && (
           <p className="text-xs text-theme-text-faint mt-2">
@@ -116,7 +114,8 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
             className="btn-secondary w-full text-sm py-1.5"
             disabled={canceling}
             onClick={async () => {
-              if (!window.confirm(`Cancel the order at ${order.shopName}?`)) return;
+              const mayExist = order.outcome?.nothing_ordered === false;
+              if (!window.confirm(mayExist ? `Stop us calling ${order.shopName} back? This does not cancel anything they may already have: check with them.` : `Cancel the order at ${order.shopName}?`)) return;
               setCanceling(true);
               setCancelError(null);
               try {
@@ -143,19 +142,19 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
             settle('nothing_ordered');
           }}
         >
-          Nothing was ordered: release it
+          I checked: nothing was ordered, release it
         </button>
       )}
-      {order.status === 'confirmed_by_shop' && !order.receiptCovered && (
+      {(order.status === 'confirmed_by_shop' || order.releasable) && !order.receiptCovered && (
         <button type="button" className="text-xs text-theme-text-muted hover:text-theme-text underline" onClick={() => settle('receipt_uploaded')}>
           I uploaded the receipt
         </button>
       )}
       {settleError && <p className="text-xs text-[#ff393a]">{settleError}</p>}
 
-      {FALLBACK.includes(order.status) && orderScript && (
+      {showScript && orderScript && (
         <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke space-y-2">
-          <p className="text-xs uppercase tracking-wide text-theme-text-muted">Order to read out</p>
+          <p className="text-xs uppercase tracking-wide text-theme-text-muted">{safeToReorder ? 'Order to read out' : 'The order, to check with the shop'}</p>
           <pre className="text-xs text-theme-text whitespace-pre-wrap font-sans">{orderScript}</pre>
           <button
             type="button"
@@ -169,7 +168,7 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
 
       {showLeave && (
         <button type="button" onClick={onDone} className="text-xs text-theme-text-muted hover:text-theme-text">
-          {finished ? 'Done' : order.restartable ? 'Start over' : 'Order from another pizzeria'}
+          {finished ? 'Done' : order.restartable ? 'Start over' : safeToReorder ? 'Order from another pizzeria' : 'Back to pizzerias'}
         </button>
       )}
     </div>

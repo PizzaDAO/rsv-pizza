@@ -29,6 +29,29 @@ describe('isBlocking and outcome.nothing_ordered', () => {
     expect(isBlocking({ status, nextAction: { type: 'open_url' }, lastView: oc(true, 'not_dialed') })).toBe(true);
   });
 
+  it.each(['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay'])('a terminal %s with nothing_ordered false blocks and holds its ceiling, for any reason', (status) => {
+    for (const reason of ['outcome_unclear', 'price_approval_dropped', 'possible_opt_out', 'brand_new_reason']) {
+      const row = { status, ceilingCents: 5000, lastView: oc(false, reason) };
+      expect(isBlocking(row)).toBe(true);
+      expect(budgetUsedCents([], [row])).toBe(5000);
+    }
+  });
+
+  it('an approval_timeout blocks for either nothing_ordered', () => {
+    expect(isBlocking({ ...timeout, lastView: oc(false, 'price_approval_dropped') })).toBe(true);
+  });
+
+  it('confirmed never turns free, whatever an outcome says', () => {
+    expect(isBlocking(confirmed({ lastView: oc(true, 'no_answer') }))).toBe(true);
+  });
+
+  it('a later receipt offsets an ended order that may exist; one pizza-mcp is sure about never takes it', () => {
+    const canceled = { status: 'canceled', createdAt: ORDERED, ceilingCents: 5000, confirmedTotalCents: 4000, lastView: oc(false, 'outcome_unclear') };
+    expect(budgetUsedCents([later(4000)], [canceled])).toBe(4000);
+    expect(budgetUsedCents([later(4000)], [{ ...canceled, lastView: oc(true, 'canceled') }])).toBe(4000);
+    expect(budgetUsedCents([], [canceled])).toBe(4000);
+  });
+
   it('a release still frees a blocking order', () => {
     expect(isBlocking({ status: 'needs_review', releasedAt: ORDERED, lastView: oc(false, 'needs_review') })).toBe(false);
   });

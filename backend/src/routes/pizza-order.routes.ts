@@ -12,7 +12,7 @@ import {
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
 import { menuFacts, fitLine } from '../lib/menuFit.js';
-import { isTerminal, isBlocking, isCancelable, isRestartable, isSettling, outcomeOf } from '../lib/pizzaOrderStatus.js';
+import { isTerminal, isBlocking, isCancelable, isRestartable, isSettling, outcomeOf, mayExistAtShop } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -74,7 +74,8 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
     readyAtText: row.readyAtText,
     summary: row.summary,
     payoutDocumentId: row.payoutDocumentId,
-    // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`
+    // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`. `attempts` is not for
+    // display: it can count a row that was never dialed.
     call: view?.call ?? null,
     timeline: view?.timeline ?? [],
     // the approval link belongs to the host who placed the order
@@ -420,7 +421,7 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     const blockers = existing.filter((o: any) => isBlocking(o));
     if (blockers.length && body.allowAnother !== true) {
       throw new AppError(
-        'This party already has an order in progress or confirmed. Cancel it, or confirm that you want a second order.',
+        'This party already has an order in progress, confirmed, or that may exist at the shop. Settle it, or confirm that you want a second order.',
         409,
         'ORDER_IN_PROGRESS',
         { existingOrderId: blockers[0].opopOrderId, existingStatus: blockers[0].status }
@@ -590,7 +591,8 @@ router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: A
  * Tell us what really happened, so the budget is not held (or counted twice) for ever.
  *  - nothing_ordered: the shop did not take the order (needs_review / refused / unreachable / ...):
  *    releases the budget and unblocks a new order.
- *  - receipt_uploaded: the real receipt for a confirmed order is uploaded: count it once. Needs a
+ *  - receipt_uploaded: the real receipt for a confirmed order, or for one that ended but may exist
+ *    at the shop, is uploaded: count it once. Needs a
  *    receipt uploaded after the order; what it frees is limited by budgetBreakdown.
  * Any host or edit-enabled co-host of the party may do this (the budget is the party's).
  */
@@ -609,7 +611,8 @@ router.post('/:partyId/pizza/orders/:orderId/settle', requireAuth, async (req: A
       return res.json({ order: publicOrder(updated, updated.userId === req.userId) });
     }
     if (body.action === 'receipt_uploaded') {
-      if (!['confirmed_by_shop', 'needs_review', 'completed'].includes(row.status)) {
+      // A host who checked with the shop may find that an order that ended unclear was taken after all.
+      if (!['confirmed_by_shop', 'needs_review', 'completed'].includes(row.status) && !mayExistAtShop(row)) {
         throw new AppError('Only a confirmed order has a receipt to match.', 409, 'SETTLE_NOT_ALLOWED');
       }
       if (!(await partyReceipts(party.id)).some((r) => isLaterReceipt(r, row))) {

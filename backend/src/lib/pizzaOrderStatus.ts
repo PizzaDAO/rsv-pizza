@@ -13,7 +13,11 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
   'completed',
 ]);
 
-/** Nothing live and nothing confirmed: a new order for the party needs no extra confirmation. */
+/**
+ * Ended without a confirmation. With no `outcome` a new order needs no extra confirmation; with one, `nothing_ordered`
+ * decides (see isBlocking). pizza-mcp's reason codes are never read here: unknown reasons must work, so only the
+ * boolean counts.
+ */
 export const FREE_STATUSES: ReadonlySet<string> = new Set(['refused', 'unreachable', 'canceled', 'shop_requires_prepay']);
 
 /**
@@ -79,22 +83,27 @@ export function needsReviewHolds(row: OrderRowLike): boolean {
   return row.ceilingCents == null || row.confirmedTotalCents <= row.ceilingCents;
 }
 
+/** Ended, and pizza-mcp says an order may exist at the shop. `needs_review` is not here: it always takes a receipt. */
+export function mayExistAtShop(row: OrderRowLike): boolean {
+  return FREE_STATUSES.has(row.status) && outcomeOf(row)?.nothing_ordered === false;
+}
+
 /**
  * Does this row stop the party from placing another order, and hold budget? A host who said
  * "nothing was ordered" (`releasedAt`) releases it.
  */
 export function isBlocking(row: OrderRowLike): boolean {
   if (row.releasedAt) return false;
+  const ended = row.status === 'needs_review' || FREE_STATUSES.has(row.status);
+  // Only a final status can free anything. A live order still counts whatever its outcome says: on approval_timeout
+  // `nothing_ordered` may be either value, and approving sends the call back to the shop.
+  if (!ended) return !isRestartable(row);
   const outcome = outcomeOf(row);
-  // pizza-mcp is sure nothing was placed AND the order has ended: holds nothing, blocks nothing. A live
-  // order still can: approval_timeout says "nothing yet", but approving it sends the call back to the shop.
-  if (outcome?.nothing_ordered === true && isTerminal(row.status)) return false;
-  // An order MAY exist (e.g. ambiguous_dial): hold the budget and block a second order until the host
-  // has checked with the shop and settled it, whatever the status.
-  if (outcome?.nothing_ordered === false && (row.status === 'needs_review' || FREE_STATUSES.has(row.status))) return true;
-  // No outcome (older pizza-mcp, or unknown): fall back to what we can see.
-  if (row.status === 'needs_review') return needsReviewHolds(row);
-  return !FREE_STATUSES.has(row.status) && !isRestartable(row);
+  // An order may exist (ambiguous_dial, outcome_unclear, a reason added later...): hold the budget and block a second
+  // order until a host has checked with the shop, whatever the status.
+  if (outcome) return !outcome.nothing_ordered;
+  // No outcome (older pizza-mcp, or malformed): fall back to what we can see.
+  return row.status === 'needs_review' && needsReviewHolds(row);
 }
 
 /**

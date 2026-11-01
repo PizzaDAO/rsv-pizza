@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PizzaRecommendation } from '../types';
-import { shopBadge, toE164, statusInfo, defaultPickupLocal, isTerminalStatus, toRecommendationPayload, formatCents } from './pizzaOrder';
+import { shopBadge, toE164, statusInfo, defaultPickupLocal, isTerminalStatus, toRecommendationPayload, formatCents, orderToResume, PizzaOrderView } from './pizzaOrder';
 
 describe('shopBadge', () => {
   it('maps the ordering channel to the plan badges', () => {
@@ -38,7 +38,45 @@ describe('statusInfo', () => {
   const base = { shopName: "Sal's", confirmedTotalCents: null, readyAtText: null, call: null };
   it('a released order says so, whatever its status or outcome', () => {
     const s = statusInfo({ ...base, status: 'needs_review', released: true, outcome: { nothing_ordered: false, reason: 'needs_review', message: 'check' } });
-    expect(s.title).toBe("Released: nothing ordered at Sal's");
+    expect(s.title).toBe("A host released the order at Sal's");
+    expect(s.title).not.toMatch(/nothing ordered/i);
+    expect(s.detail).toMatch(/A host said/);
+  });
+  it.each(['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'])('%s never says nothing was ordered, or to order again, unless nothing_ordered is true', (status) => {
+    for (const outcome of [undefined, null, { nothing_ordered: false, reason: 'whatever_new', message: 'An order may exist.' }]) {
+      const s = statusInfo({ ...base, status, outcome });
+      expect(s.title).not.toMatch(/^nothing was ordered/i);
+      expect(`${s.title} ${s.detail}`).not.toMatch(/\border (it )?yourself\b|call (the shop|them) yourself|^nothing was ordered|\. nothing was ordered/i);
+    }
+  });
+  it('approval_timeout never reads as final, whichever way nothing_ordered points', () => {
+    const open = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: true, reason: 'price_approval_timeout', message: 'Nothing is ordered yet; approve to have us call back.' } });
+    expect(open.title).toBe('Approval timed out');
+    expect(open.detail).toMatch(/Nothing is ordered yet.*Open the approval page/);
+    const none = statusInfo({ ...base, status: 'approval_timeout' });
+    expect(none.detail).not.toMatch(/told we would call back/);
+  });
+  it('a calling order stays plain "calling" for ten minutes, then says it is waiting, up to the hour', () => {
+    const now = Date.parse('2026-11-01T12:00:00Z');
+    const at = (min: number) => ({ ...base, status: 'calling', timeline: [{ at: new Date(now - 90 * 60_000).toISOString(), status: 'awaiting_approval' }, { at: new Date(now - min * 60_000).toISOString(), status: 'calling' }] });
+    expect(statusInfo(at(9), now).title).toBe("Calling Sal's");
+    expect(statusInfo(at(9), now).detail).toMatch(/up to an hour/);
+    for (const min of [11, 59]) {
+      const s = statusInfo(at(min), now);
+      expect(s).toMatchObject({ title: "Still waiting on our call to Sal's", tone: 'info' });
+      expect(s.detail).toMatch(/do not order again/);
+    }
+  });
+  it('a bad or missing timeline falls back to the plain copy', () => {
+    expect(statusInfo({ ...base, status: 'calling', timeline: [{ at: 'soon', status: 'calling' }] }).title).toBe("Calling Sal's");
+    expect(statusInfo({ ...base, status: 'calling' }).title).toBe("Calling Sal's");
+  });
+  it('a deferred dial is never "Calling", however old, and a transient with no message still explains itself', () => {
+    const call = { deferred: { until: 'x', reason: 'transient', message: null } };
+    const s = statusInfo({ ...base, status: 'calling', call, timeline: [{ at: '2020-01-01T00:00:00Z', status: 'calling' }] });
+    expect(s.title).toBe("Our call to Sal's is delayed");
+    expect(s.detail).toMatch(/temporary problem/);
+    expect(statusInfo({ ...base, status: 'calling', call: { deferred: { reason: 'outside_call_window', message: 'Closed.' } } })).toMatchObject({ title: "Our call to Sal's is scheduled", detail: 'Closed.' });
   });
   it('a real outcome on unreachable still says nothing was ordered; no outcome does not', () => {
     expect(statusInfo({ ...base, status: 'unreachable', outcome: { nothing_ordered: true, reason: 'no_answer', message: 'm' } }).title).toBe("Nothing was ordered at Sal's");
@@ -48,6 +86,23 @@ describe('statusInfo', () => {
   it('knows terminal statuses', () => {
     expect(isTerminalStatus('confirmed_by_shop')).toBe(true);
     expect(isTerminalStatus('calling')).toBe(false);
+  });
+});
+
+describe('orderToResume', () => {
+  const row = (over: Partial<PizzaOrderView>) => ({ opopOrderId: 'o', status: 'canceled', isMine: false, ...over }) as PizzaOrderView;
+  it('reopens a canceled or unreachable order a host still has to settle, for any host', () => {
+    const c = row({ status: 'canceled', releasable: true });
+    const u = row({ status: 'unreachable', releasable: true });
+    expect(orderToResume([c])).toBe(c);
+    expect(orderToResume([u])).toBe(u);
+  });
+  it('keeps polling the host\'s stuck call and a transient deferral', () => {
+    const c = row({ status: 'calling', isMine: true });
+    expect(orderToResume([row({ status: 'unreachable', releasable: true }), c])).toBe(c);
+  });
+  it('does not reopen an order whose receipt is in, or one that is free', () => {
+    expect(orderToResume([row({ releasable: true, receiptCovered: true }), row({ status: 'unreachable' }), row({ released: true })])).toBeUndefined();
   });
 });
 

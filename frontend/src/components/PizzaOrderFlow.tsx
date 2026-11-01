@@ -6,7 +6,7 @@ import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
 import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, placePizzaOrder, orderToResume,
-  CartResponse, CartDecision, PizzaOrderView, PizzaShop,
+  isTerminalStatus, CartResponse, CartDecision, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
 import { generatePhoneOrderScript } from '../lib/ordering';
 
@@ -248,7 +248,9 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           <p className="text-sm text-theme-text">
             {inProgress.capExhausted
               ? 'An existing order is holding the rest of this party\'s budget. Open it to settle it.'
-              : 'This party already has an order in progress or confirmed.'}
+              : inProgress.existingStatus && isTerminalStatus(inProgress.existingStatus) && !['confirmed_by_shop', 'completed'].includes(inProgress.existingStatus)
+                ? 'An earlier order for this party may exist at the shop. Check with the shop before you order again.'
+                : 'This party already has an order in progress or confirmed.'}
           </p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary text-xs py-1 px-3" onClick={() => viewExisting(inProgress.existingOrderId)}>

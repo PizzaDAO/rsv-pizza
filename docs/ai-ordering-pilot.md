@@ -101,7 +101,8 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   - Blocks: anything live, including `approval_timeout` whatever its `outcome` says (approving it sends the call back to the
     shop), and every confirmed order, even with its receipt uploaded.
   - Blocks: an ended order (`needs_review`, `refused`, `unreachable`, `canceled`, `shop_requires_prepay`) when pizza-mcp's `outcome`
-    says `nothing_ordered: false`, meaning an order may exist.
+    says `nothing_ordered: false`, meaning an order may exist. Only that boolean counts: `outcome.reason` is never listed in code, so a new
+    reason needs no change here. On `approval_timeout` either value still blocks and holds: it is not a final status.
   - Free: an ended order with `nothing_ordered: true`, a released order, and an expired approval (`awaiting_approval` with nothing to open).
   - With no `outcome` from pizza-mcp: `needs_review` blocks only if the shop gave a total inside the ceiling. `refused`, `unreachable`,
     `canceled` and `shop_requires_prepay` are free.
@@ -112,11 +113,14 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 - **Release:** an ended order that blocks can be released by any host or edit-enabled co-host, after a confirmation prompt: "Nothing was
   ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
   so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
-- **Receipts:** only a receipt uploaded after the order can count for it. One that matches the confirmed total (5% or $1) does so
+- **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
+  host said so. `call.attempts` is never shown: it can count a row that was never dialed. A `calling` order can last up to 60 minutes
+  before pizza-mcp moves it to `needs_review`, so after 10 minutes the page says it is still waiting; `call.deferred` shows as delayed or scheduled, not calling.
+- **Receipts:** only a receipt uploaded after the order can count for it, and an order that ended but may exist at the shop can have one. One that matches the confirmed total (5% or $1) does so
   automatically. "I uploaded the receipt" (`action:'receipt_uploaded'`) is refused with `NO_RECEIPT_FOUND` until such a receipt exists, and it
   only pairs them: the receipt offsets the order up to its own amount, so the party's total stays at least the order's total. If the shop gave no
   total, the receipt replaces the ceiling hold. A receipt OCR has not read yet offsets nothing until it has an amount.
-- **Coming back later:** the flow reopens a releasable order, or a confirmed order with no receipt yet, for any host who can act on it.
+- **Coming back later:** the flow reopens a releasable or confirmed order with no receipt yet, for any host who can act on it.
 - A confirmed order keeps being polled for 20 minutes from when it entered `confirmed_by_shop`: the post-call check can still downgrade it to `needs_review`.
 - **Menu fit:** sizes map to the shop's nearest offered size (shown to the host); toppings the shop does not list become a
   per-pizza choice (leave it off, or skip that pizza). Nothing is ordered until every question is answered.

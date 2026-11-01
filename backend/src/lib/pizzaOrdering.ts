@@ -11,7 +11,7 @@
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
-import { isBlocking } from './pizzaOrderStatus.js';
+import { isBlocking, mayExistAtShop } from './pizzaOrderStatus.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -171,6 +171,8 @@ interface BudgetOrder {
 }
 
 const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']);
+/** An order that can have a real receipt, so that receipt must not be counted on top of its hold. */
+const hasReceiptToCount = (o: BudgetOrder) => CONFIRMED_STATUSES.has(o.status) || mayExistAtShop(o);
 
 /**
  * Budget already spoken for: uploaded receipts + what open orders could still cost. A confirmed order
@@ -179,7 +181,8 @@ const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'comple
  *  - When the host says so (`receiptCoveredAt`). The click is unverified, so it only pairs: later
  *    receipts offset the order up to their own amounts, and with none the order stays held in full.
  *    If the shop gave no total the hold is only the ceiling, so one later receipt replaces it.
- * Orders that hold nothing (released, refused, IVR needs_review...) cost nothing.
+ * Orders that hold nothing (released, nothing_ordered true, IVR needs_review...) cost nothing. An ended order that
+ * may exist at the shop (`canceled` or `unreachable` too) is held until a host releases it or its receipt offsets it.
  */
 export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[], orders: T[]): { usedCents: number; held: T[]; covered: T[] } {
   const free = receipts.filter((r) => r.cents > 0).map((r) => ({ ...r, left: r.cents }));
@@ -190,7 +193,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
   // Exact matches first, so a host's "this receipt covers it" cannot take another order's receipt.
   const unmatched = orders.filter(isBlocking).filter((o) => {
     const total = o.confirmedTotalCents;
-    if (!CONFIRMED_STATUSES.has(o.status) || total == null) return true;
+    if (!hasReceiptToCount(o) || total == null) return true;
     const tol = Math.max(100, Math.round(total * 0.05));
     const match = available(o).find((r) => r.left === r.cents && Math.abs(r.cents - total) <= tol);
     if (!match) return true;
@@ -203,7 +206,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
   for (const o of unmatched) {
     const view = o.lastView as { totals?: { total_cents?: number } } | null;
     let owed = o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0;
-    if (o.receiptCoveredAt && CONFIRMED_STATUSES.has(o.status)) {
+    if (o.receiptCoveredAt && hasReceiptToCount(o)) {
       if (o.confirmedTotalCents == null) {
         const receipt = available(o)[0];
         if (receipt) {

@@ -39,7 +39,7 @@ describe('OrderStatus', () => {
   it('needs_review is terminal: no polling spinner, call-it-yourself script shown', () => {
     render(<OrderStatus partyId="p" order={order({ status: 'needs_review' })} orderScript="read this out" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText(/read this out/)).toBeTruthy();
-    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+    expect(screen.getByText('Back to pizzerias')).toBeTruthy();
   });
 
   it('an expired approval offers Start over, not a dead link', () => {
@@ -81,7 +81,7 @@ describe('OrderStatus', () => {
     expect(document.body.textContent).toMatch(/nothing was ordered, or that the shop did take it/);
     expect(document.body.textContent).not.toMatch(/We think/);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await userEvent.click(screen.getByText('Nothing was ordered: release it'));
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Release the order at Sal's/));
     expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
     expect(onUpdate).toHaveBeenCalled();
@@ -91,7 +91,7 @@ describe('OrderStatus', () => {
     mocks.settle.mockClear();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
-    await userEvent.click(screen.getByText('Nothing was ordered: release it'));
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(mocks.settle).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe('OrderStatus', () => {
   it('needs_review only says "release it below" when the button is there', () => {
     const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: false })} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(document.body.textContent).not.toMatch(/release it below/);
-    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
     unmount();
     render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(document.body.textContent).toMatch(/release it below/);
@@ -114,8 +114,8 @@ describe('OrderStatus', () => {
 
   it('shows the released state, with no release button and the way to order again', () => {
     render(<OrderStatus partyId="p" order={order({ status: 'needs_review', released: true, releasable: false, blocking: false })} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.getByText("Released: nothing ordered at Sal's")).toBeTruthy();
-    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+    expect(screen.getByText("A host released the order at Sal's")).toBeTruthy();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
     expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
   });
 
@@ -124,8 +124,93 @@ describe('OrderStatus', () => {
     const { unmount } = render(<OrderStatus partyId="p" order={blocked} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(screen.queryByText('Order from another pizzeria')).toBeNull();
     unmount();
-    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false, outcome: { nothing_ordered: true, reason: 'refused_ai', message: 'm' } })} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('with no outcome the way out never suggests ordering again is safe', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false })} orderScript="read this" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Order from another pizzeria')).toBeNull();
+    expect(screen.getByText('Back to pizzerias')).toBeTruthy();
+    expect(screen.getByText('The order, to check with the shop')).toBeTruthy();
+    expect(screen.queryByText('Order to read out')).toBeNull();
+  });
+
+  const mayExist = { nothing_ordered: false, reason: 'outcome_unclear', message: 'An order may exist at the shop.' };
+
+  it.each(['canceled', 'unreachable', 'refused', 'needs_review', 'shop_requires_prepay'])('%s with nothing_ordered false: truthful copy, release, no way to reorder', async (status) => {
+    mocks.settle.mockClear();
+    mocks.settle.mockResolvedValue({ order: order({ status, released: true }) });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<OrderStatus partyId="p" order={order({ status, blocking: true, releasable: true, confirmedTotalCents: null, outcome: mayExist })} orderScript="read this" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    expect(screen.getByText(/An order may exist at the shop\./).textContent).toMatch(/Do NOT order again until you have called Sal's/);
+    expect(document.body.textContent).toMatch(/release it below/);
+    expect(document.body.textContent).not.toMatch(/Order to read out|Order from another pizzeria|Nothing was ordered at/);
+    expect(screen.getByText('The order, to check with the shop')).toBeTruthy();
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
+    expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
+  });
+
+  it('an unknown reason is read by nothing_ordered, both ways', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'unreachable', blocking: true, releasable: true, outcome: { ...mayExist, reason: 'a_reason_added_next_year' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'unreachable', blocking: false, outcome: { nothing_ordered: true, reason: 'a_reason_added_next_year', message: 'Fine.' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+  });
+
+  it('an ended order that may exist can take the receipt, and once covered it can be left and is not offered it again', () => {
+    const o = order({ status: 'canceled', blocking: true, releasable: true, outcome: mayExist });
+    const { unmount } = render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
+    expect(screen.queryByText('Done')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={{ ...o, receiptCovered: true }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('I uploaded the receipt')).toBeNull();
+    expect(screen.getByText('Done')).toBeTruthy();
+  });
+
+  it('price_approval_dropped stays open: approve or cancel, no release, and cancel says it does not undo anything at the shop', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const o = order({ status: 'approval_timeout', blocking: true, releasable: false, cancelable: true, nextAction: { type: 'open_url', url: 'https://x/confirm' }, outcome: { nothing_ordered: false, reason: 'price_approval_dropped', message: 'You can still approve.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    expect(screen.getByText('Open the approval page')).toBeTruthy();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
+    await userEvent.click(screen.getByText('Cancel this order'));
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/does not cancel anything they may already have/));
+  });
+
+  it('a transient deferral says so, still shows the next try and is not "Calling"', () => {
+    const o = order({ status: 'calling', cancelable: true, call: { deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'We hit a temporary problem and will try the call again shortly.' } } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Our call to Sal's is delayed")).toBeTruthy();
+    expect(screen.getByText(/temporary problem/)).toBeTruthy();
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
+    expect(screen.queryByText("Calling Sal's")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/nothing was ordered/i);
+  });
+
+  it('call.attempts is never shown, however large', () => {
+    const call = { attempts: 3, last_outcome: 'not_dialed', deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'Soon.' } } as PizzaOrderView['call'];
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', call })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).not.toMatch(/\b3\b|tried|attempt|times/i);
+  });
+
+  it('a call running for most of an hour reads as waiting: still spinning, still polled, no error tone', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    mocks.get.mockResolvedValue({ order: order({ status: 'calling' }), stale: false });
+    const o = order({ status: 'calling', timeline: [{ at: new Date(Date.now() - 55 * 60_000).toISOString(), status: 'calling' }] });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Still waiting on our call to Sal's").className).not.toContain('ffb347');
+    expect(document.querySelector('.animate-spin')).toBeTruthy();
+    expect(document.body.textContent).toMatch(/up to an hour/);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    mocks.get.mockReset();
+    vi.useRealTimers();
   });
 
   it('a blocking confirmed order still lets the host leave with Done', () => {
@@ -135,7 +220,7 @@ describe('OrderStatus', () => {
 
   it('a co-host can release and can say the receipt is in', () => {
     const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true, isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.getByText('Nothing was ordered: release it')).toBeTruthy();
+    expect(screen.getByText('I checked: nothing was ordered, release it')).toBeTruthy();
     unmount();
     render(<OrderStatus partyId="p" order={order({ isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
@@ -160,7 +245,7 @@ describe('OrderStatus', () => {
     render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
     expect(screen.getByText(/Nobody picked up/)).toBeTruthy();
-    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
   });
 
   it('ambiguous_dial warns the host not to order again before checking with the shop', () => {
@@ -168,7 +253,7 @@ describe('OrderStatus', () => {
     render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText(/Check with Sal's before ordering again/)).toBeTruthy();
     expect(document.body.textContent).toMatch(/Do NOT order again until you have called Sal's/);
-    expect(screen.getByText('Nothing was ordered: release it')).toBeTruthy();
+    expect(screen.getByText('I checked: nothing was ordered, release it')).toBeTruthy();
   });
 
   it('a missing or unknown outcome keeps the cautious copy', () => {

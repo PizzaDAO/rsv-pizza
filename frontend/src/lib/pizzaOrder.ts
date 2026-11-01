@@ -88,9 +88,8 @@ export interface PizzaOrderView {
   readyAtText: string | null;
   summary: string | null;
   payoutDocumentId: string | null;
-  // `deferred_calls` is optional: pizza-mcp may or may not expose it yet.
+  // `call.attempts` is deliberately not here: it can count a row that was never dialed, so it must not become "we tried N times".
   call: {
-    attempts?: number;
     last_outcome?: string | null;
     shop_total_cents?: number | null;
     ready_at_text?: string | null;
@@ -98,11 +97,14 @@ export interface PizzaOrderView {
     // Optional: set by pizza-mcp while the order is `calling` but the shop has not been dialed yet.
     deferred?: { until?: string | null; reason?: string | null; message?: string | null } | null;
   } | null;
+  /** Append-only status history from pizza-mcp. */
+  timeline?: Array<{ at: string; status: string }>;
   nextAction: NextAction | null;
   /**
    * What pizza-mcp says happened when the order ended without a confirmation. null/absent while in flight,
    * confirmed, or when pizza-mcp does not send it (older versions): the copy must then stay cautious.
    * nothing_ordered true = sure nothing was placed; false = an order MAY exist, check with the shop.
+   * Copy reads only that boolean and `message`, never a list of `reason`s: new reasons must work untouched.
    */
   outcome?: { nothing_ordered: boolean; reason: string; message: string } | null;
   isMine: boolean;
@@ -133,7 +135,7 @@ export const isTerminalStatus = (s: string) => TERMINAL_STATUSES.includes(s);
 export function orderToResume(orders: PizzaOrderView[]): PizzaOrderView | undefined {
   return (
     orders.find((o) => o.isMine && !isTerminalStatus(o.status) && !o.restartable) ??
-    orders.find((o) => o.releasable || (o.status === 'confirmed_by_shop' && !o.receiptCovered))
+    orders.find((o) => (o.releasable || o.status === 'confirmed_by_shop') && !o.receiptCovered)
   );
 }
 
@@ -256,17 +258,28 @@ export function toE164(raw: string): string | null {
   return null;
 }
 
+/** Past this, a `calling` order stops reading as "a few minutes". pizza-mcp can hold a stuck one for 60 minutes. */
+export const CALL_RUNNING_LONG_MS = 10 * 60_000;
+
+function callingSince(o: Pick<PizzaOrderView, 'timeline'>): number | null {
+  const entry = [...(o.timeline ?? [])].reverse().find((t) => t.status === 'calling');
+  const t = entry ? new Date(entry.at).getTime() : NaN;
+  return Number.isNaN(t) ? null : t;
+}
+
 export interface StatusInfo {
   title: string;
   detail: string;
   tone: 'info' | 'action' | 'success' | 'warn' | 'error';
 }
 export function statusInfo(
-  o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released'>
+  o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released' | 'timeline'>,
+  now = Date.now()
 ): StatusInfo {
   if (o.released) {
+    // the host's word, not ours: pizza-mcp may still say an order could exist
     return {
-      title: `Released: nothing ordered at ${o.shopName}`,
+      title: `A host released the order at ${o.shopName}`,
       detail: 'A host said nothing was ordered, so this no longer counts against your budget or blocks a new order.',
       tone: 'info',
     };
@@ -276,22 +289,46 @@ export function statusInfo(
   // Not for "nothing yet" on an approval_timeout: it is still open, and approving sends the call back.
   const oc = o.status === 'approval_timeout' && o.outcome?.nothing_ordered ? null : o.outcome;
   if (oc && ['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'].includes(o.status)) {
-    const check = `An order may exist at ${o.shopName}. Check with them before ordering again.`;
-    const ambiguous = oc.reason === 'ambiguous_dial';
+    if (oc.nothing_ordered) {
+      return { title: `Nothing was ordered at ${o.shopName}`, detail: oc.message, tone: o.status === 'canceled' ? 'error' : 'warn' };
+    }
     return {
-      title: oc.nothing_ordered ? `Nothing was ordered at ${o.shopName}` : `Check with ${o.shopName} before ordering again`,
-      detail: [oc.message, ambiguous ? `Do NOT order again until you have called ${o.shopName} to find out whether they took it.` : oc.nothing_ordered ? '' : check]
+      title: `Check with ${o.shopName} before ordering again`,
+      detail: [
+        oc.message,
+        `Do NOT order again until you have called ${o.shopName} to find out whether they took it.`,
+        o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
+      ]
         .filter(Boolean)
         .join(' '),
-      tone: oc.nothing_ordered ? (o.status === 'canceled' ? 'error' : 'warn') : 'warn',
+      tone: 'warn',
     };
   }
   switch (o.status) {
     case 'awaiting_approval':
       if (o.restartable) return { title: 'The approval link expired', detail: 'Nothing was ordered. Start over to place it again.', tone: 'warn' };
       return { title: 'Approve the order', detail: 'Enter the code we emailed you on the approval page. Nothing is ordered until you do.', tone: 'action' };
-    case 'calling':
-      return { title: `Calling ${o.shopName}`, detail: 'Our AI is placing your order by phone. This usually takes a few minutes.', tone: 'info' };
+    case 'calling': {
+      // Not dialed yet, so not "calling": no call is on the line, and that says nothing about earlier calls.
+      const deferred = o.call?.deferred;
+      if (deferred) {
+        const transient = deferred.reason === 'transient';
+        return {
+          title: transient ? `Our call to ${o.shopName} is delayed` : `Our call to ${o.shopName} is scheduled`,
+          detail: deferred.message || (transient ? 'A temporary problem on our side stopped the call before it was dialed. We will try again shortly.' : `We will call ${o.shopName} later.`),
+          tone: 'info',
+        };
+      }
+      const since = callingSince(o);
+      if (since !== null && now - since > CALL_RUNNING_LONG_MS) {
+        return {
+          title: `Still waiting on our call to ${o.shopName}`,
+          detail: 'We are waiting to hear how the call went. This can take up to an hour. Please do not order again in the meantime: the host who placed it gets an email when it ends.',
+          tone: 'info',
+        };
+      }
+      return { title: `Calling ${o.shopName}`, detail: 'Our AI is placing your order by phone. This usually takes a few minutes, and can take up to an hour.', tone: 'info' };
+    }
     case 'awaiting_price_approval':
       return { title: 'Shop quoted a higher price', detail: `${o.shopName} said ${total || 'more than your ceiling'}. They are holding the line while you approve.`, tone: 'action' };
     case 'confirmed_by_shop':
@@ -307,13 +344,14 @@ export function statusInfo(
         tone: 'warn',
       };
     case 'shop_requires_prepay':
-      return { title: 'The shop wants payment up front', detail: 'We never pay by phone. Call the shop yourself using the order below.', tone: 'warn' };
+      return { title: 'The shop wants payment up front', detail: 'We never pay by phone. Call the shop to check where the order stands. The order is below.', tone: 'warn' };
     case 'refused':
-      return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them yourself using the order below.', tone: 'warn' };
+      return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them to check where the order stands. The order is below.', tone: 'warn' };
     case 'unreachable':
-      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Call them to check, or order yourself using the order below.`, tone: 'warn' };
+      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Call them to check before you order again. The order is below.`, tone: 'warn' };
     case 'approval_timeout':
-      return { title: 'Approval timed out', detail: 'The shop was told we would call back. Open the approval page to retry, or cancel the order.', tone: 'warn' };
+      // `nothing_ordered: true` here is true only for now: the order stays open until it is approved or canceled
+      return { title: 'Approval timed out', detail: `${o.outcome?.message || 'We could not reach you in time.'} Open the approval page to retry, or cancel the order.`, tone: 'warn' };
     case 'canceled':
       return { title: 'Order canceled', detail: '', tone: 'error' };
     case 'held':
