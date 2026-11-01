@@ -99,6 +99,9 @@ export async function applyOrderUpdate(
   if (stale) return { row, applied: false, draftCreated: false };
 
   const total = confirmedTotalCents(order, row.tier);
+  const now = eventAt ?? new Date();
+  // When the row ENTERED confirmed_by_shop: later syncs of a confirmed order must not move it.
+  const confirmedAt = order.status !== 'confirmed_by_shop' ? null : row.status === 'confirmed_by_shop' ? row.confirmedAt ?? now : now;
   row = await db.pizzaOrder.update({
     where: { id: row.id },
     data: {
@@ -111,7 +114,8 @@ export async function applyOrderUpdate(
       lastView: order as unknown as Prisma.InputJsonValue,
       nextAction: (order.next_action ?? null) as unknown as Prisma.InputJsonValue,
       timelineLen,
-      lastEventAt: eventAt ?? new Date(),
+      lastEventAt: now,
+      confirmedAt,
     },
   });
 

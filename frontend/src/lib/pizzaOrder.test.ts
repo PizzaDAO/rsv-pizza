@@ -35,6 +35,16 @@ describe('statusInfo', () => {
   it('asks for action on a higher quote', () => {
     expect(statusInfo({ status: 'awaiting_price_approval', shopName: "Sal's", confirmedTotalCents: null, readyAtText: null, call: { shop_total_cents: 24000 } })).toMatchObject({ tone: 'action' });
   });
+  const base = { shopName: "Sal's", confirmedTotalCents: null, readyAtText: null, call: null };
+  it('a released order says so, whatever its status or outcome', () => {
+    const s = statusInfo({ ...base, status: 'needs_review', released: true, outcome: { nothing_ordered: false, reason: 'needs_review', message: 'check' } });
+    expect(s.title).toBe("Released: nothing ordered at Sal's");
+  });
+  it('a real outcome on unreachable still says nothing was ordered; no outcome does not', () => {
+    expect(statusInfo({ ...base, status: 'unreachable', outcome: { nothing_ordered: true, reason: 'no_answer', message: 'm' } }).title).toBe("Nothing was ordered at Sal's");
+    const none = statusInfo({ ...base, status: 'unreachable' });
+    expect(`${none.title} ${none.detail}`).not.toMatch(/nothing was ordered/i);
+  });
   it('knows terminal statuses', () => {
     expect(isTerminalStatus('confirmed_by_shop')).toBe(true);
     expect(isTerminalStatus('calling')).toBe(false);

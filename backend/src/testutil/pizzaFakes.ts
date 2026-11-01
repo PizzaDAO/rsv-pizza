@@ -33,7 +33,7 @@ export function makeFakeDb() {
       if (byOpop(data.opopOrderId)) throw p2002();
       const row = {
         id: `po-${++seq}`, paymentStatus: null, ceilingCents: null, confirmedTotalCents: null, readyAt: null,
-        readyAtText: null, summary: null, lastView: null, nextAction: null, timelineLen: 0, lastEventAt: null,
+        readyAtText: null, summary: null, lastView: null, nextAction: null, timelineLen: 0, lastEventAt: null, confirmedAt: null,
         payoutDocumentId: null, createdAt: new Date(), updatedAt: new Date(), ...data,
       };
       orders.set(row.id, row);

@@ -12,11 +12,23 @@ moment this code is live against a database without migration `20261031_pizza_or
 (payments, receipts, reimbursement, admin) fails with a missing-column error**, whether or not anyone uses AI ordering.
 Order of operations, no exceptions:
 
-1. Apply `backend/prisma/migrations/20261031_pizza_orders/migration.sql` to prod (additive; idempotent; safe to re-run).
+1. Apply `backend/prisma/migrations/20261031_pizza_orders/migration.sql` to prod (additive; idempotent; safe to re-run),
+   with `SET lock_timeout` first (see below).
 2. `npm --prefix backend run check:schema-drift` (and the `migrations-applied` CI check) must pass.
 3. Only then merge / deploy the backend. Frontend previews share the prod backend, so they are unaffected until step 3.
 
 The same note belongs in the PR description. (The raw SQL receipt gates also read `payout_documents.source`.)
+
+**Apply it with a lock timeout.** The `payout_documents` statements take strong locks on a table every payout screen reads.
+Without a timeout, one waiting `ALTER TABLE` queues every later query behind it. Set the timeout in the same session (a direct
+or session-mode connection, not transaction pooling), so a blocked statement fails instead of queueing:
+
+```bash
+psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET lock_timeout = '5s'" -f backend/prisma/migrations/20261031_pizza_orders/migration.sql
+```
+
+If it times out, run the same command again: every statement is idempotent. If this file was already applied, apply it
+again before deploying: `pizza_orders.confirmed_at` was added later and the code needs it.
 
 ## What it adds
 
@@ -58,8 +70,8 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 
 ## Pilot runbook (one party)
 
-1. **Migration first.** Apply `backend/prisma/migrations/20261031_pizza_orders/migration.sql` to prod BEFORE merging
-   (CLAUDE.md rule; it is additive, defaulted/nullable, RLS on). Then `npm --prefix backend run check:schema-drift`.
+1. **Migration first.** Apply `backend/prisma/migrations/20261031_pizza_orders/migration.sql` to prod BEFORE merging, with
+   `SET lock_timeout` as shown above (CLAUDE.md rule; it is additive, defaulted/nullable, RLS on). Then `npm --prefix backend run check:schema-drift`.
 2. **Key.** `bash backend/scripts/gen-pizza-mcp-key.sh`, store the output as `PIZZA_MCP_SIGNING_KEY` on the backend project.
 3. **Backend env** (table above), with `PIZZA_ORDERING_PARTY_IDS` = the single pilot party's UUID. Deploy the backend.
 4. **Check JWKS:** `curl https://api.rsv.pizza/.well-known/jwks.json` returns one EC P-256 key.
@@ -82,17 +94,30 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 
 - **Budget:** a party with no reimbursement cap (null or $0) cannot order. The quote, the order's `max_total_cents` and the
   ceiling limit are the REMAINING budget: cap minus eligible uploaded receipts minus the ceilings (or confirmed totals) of
-  open orders. A confirmed order and its matching uploaded receipt count once (see Release below).
-- **One order per party at a time.** While the party has a live, confirmed or `needs_review` order, a new order is refused
-  with `ORDER_IN_PROGRESS` unless the host explicitly confirms "place a second order". Refused, unreachable, canceled,
-  prepay-required and expired-approval orders are free. The idempotency key is derived on the server; the browser cannot choose it.
-- **Cancel:** the placing host can cancel an order that is waiting for approval (`POST .../orders/:id/cancel`); pizza-mcp refuses
-  a cancel once a call is live, so the button is not shown then.
-- **Release:** a `needs_review` order only holds budget (and blocks a new order) if the shop reached a confirmation or a total inside the
-  limit. Shop quotes over the limit, IVR and voicemail hold nothing. If it does hold, any host can press "Nothing was ordered" to release it
-  (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A confirmed order whose receipt is uploaded counts once: automatically when a
-  receipt matches its total (5% or $1), or when the host presses "I uploaded the receipt" (`action:'receipt_uploaded'`).
-- A confirmed order keeps being polled for 20 minutes: the post-call check can still downgrade it to `needs_review`.
+  open orders. A confirmed order and its real receipt count once (see Receipts below). If an order uses up the budget, the
+  `CAP_EXHAUSTED` error and `/config` name it, and the UI links to it.
+- **One order per party at a time.** An order that blocks also holds budget. A new order is then refused with
+  `ORDER_IN_PROGRESS` unless the host explicitly confirms "place a second order" (it must still fit the remaining budget):
+  - Blocks: anything live, including `approval_timeout` whatever its `outcome` says (approving it sends the call back to the
+    shop), and every confirmed order, even with its receipt uploaded.
+  - Blocks: an ended order (`needs_review`, `refused`, `unreachable`, `canceled`, `shop_requires_prepay`) when pizza-mcp's `outcome`
+    says `nothing_ordered: false`, meaning an order may exist.
+  - Free: an ended order with `nothing_ordered: true`, a released order, and an expired approval (`awaiting_approval` with nothing to open).
+  - With no `outcome` from pizza-mcp: `needs_review` blocks only if the shop gave a total inside the ceiling. `refused`, `unreachable`,
+    `canceled` and `shop_requires_prepay` are free.
+  The idempotency key is derived on the server; the browser cannot choose it.
+- **Cancel:** the placing host can cancel an order that is waiting for approval, and a `calling` order while its dial is deferred
+  (`call.deferred`: no call is on the line yet) (`POST .../orders/:id/cancel`). If the dial starts first, pizza-mcp answers 409 and the
+  host sees that error. Once a call is live the button is not shown.
+- **Release:** an ended order that blocks can be released by any host or edit-enabled co-host, after a confirmation prompt: "Nothing was
+  ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
+  so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
+- **Receipts:** only a receipt uploaded after the order can count for it. One that matches the confirmed total (5% or $1) does so
+  automatically. "I uploaded the receipt" (`action:'receipt_uploaded'`) is refused with `NO_RECEIPT_FOUND` until such a receipt exists, and it
+  only pairs them: the receipt offsets the order up to its own amount, so the party's total stays at least the order's total. If the shop gave no
+  total, the receipt replaces the ceiling hold. A receipt OCR has not read yet offsets nothing until it has an amount.
+- **Coming back later:** the flow reopens a releasable order, or a confirmed order with no receipt yet, for any host who can act on it.
+- A confirmed order keeps being polled for 20 minutes from when it entered `confirmed_by_shop`: the post-call check can still downgrade it to `needs_review`.
 - **Menu fit:** sizes map to the shop's nearest offered size (shown to the host); toppings the shop does not list become a
   per-pizza choice (leave it off, or skip that pizza). Nothing is ordered until every question is answered.
 

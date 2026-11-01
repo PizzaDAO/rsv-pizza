@@ -2940,6 +2940,8 @@ model PizzaOrder {
   quoteId             String?   @map("quote_id")
   timelineLen         Int       @default(0) @map("timeline_len")
   lastEventAt         DateTime? @map("last_event_at") @db.Timestamptz
+  // When the row entered confirmed_by_shop (null otherwise): the settling window counts from here.
+  confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz
   // Set when the draft receipt was created (no FK: PayoutDocument.pizzaOrderId owns the link).
   payoutDocumentId    String?   @map("payout_document_id") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz

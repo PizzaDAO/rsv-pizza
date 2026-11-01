@@ -47,6 +47,8 @@ import { isUploadedReceipt } from '../lib/receiptSource.js';
 
 const router = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * paccheri-58541: fire-and-forget refund-tag recompute after a host-side
  * receipt change (create / edit / delete). Always runs AFTER the mutation
@@ -3475,10 +3477,13 @@ router.delete('/:partyId/reimbursement/receipts/:docId', async (req: AuthRequest
 
     // basil-14648: the reminder line a pizza order leaves is not on any reimbursement, so the host
     // removes it here directly (never an uploaded receipt, never one attached to a request).
-    const draft = await prisma.payoutDocument.findFirst({
-      where: { id: docId, partyId, source: { not: 'upload' }, payoutId: null },
-      select: { id: true },
-    });
+    // A malformed id is no draft, and Prisma would throw on it: it falls through to the 404s below.
+    const draft = UUID_RE.test(docId)
+      ? await prisma.payoutDocument.findFirst({
+          where: { id: docId, partyId, source: { not: 'upload' }, payoutId: null },
+          select: { id: true },
+        })
+      : null;
     if (draft) {
       await prisma.payoutDocument.deleteMany({ where: { id: draft.id, partyId, source: { not: 'upload' }, payoutId: null } });
       return res.json({ removedDraft: true, id: draft.id });

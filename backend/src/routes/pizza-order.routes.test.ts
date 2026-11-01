@@ -666,42 +666,208 @@ describe('budget release, double counting, cancel button, settling (final review
     expect((await request(app()).post(`${base}/orders/${conf.opopOrderId}/settle`).set(stranger).send({ action: 'receipt_uploaded' })).status).toBe(404);
   });
 
-  it('L3: a confirmed order plus its uploaded receipt counts once ($46.02 twice left $7.96 of $100)', async () => {
+  const receipt = (usd: string, createdAt = new Date(Date.now() + 60_000), over: Record<string, unknown> = {}) =>
+    fake.docs.push({ id: `d${fake.docs.length}`, partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: usd ? { toString: () => usd } : null, isDuplicate: false, ineligible: false, createdAt, ...over });
+  const settleReceipt = (id: string, who: any = host) => request(app()).post(`${base}/orders/${id}/settle`).set(who).send({ action: 'receipt_uploaded' });
+
+  it('L3: a confirmed order plus its later uploaded receipt counts once ($46.02 twice left $7.96 of $100)', async () => {
     setParty({ reimbursementCapUsd: 100 });
     await mk({ status: 'confirmed_by_shop', ceilingCents: 5376, confirmedTotalCents: 4602 });
-    fake.docs.push({ id: 'd1', partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: { toString: () => '46.02' }, isDuplicate: false, ineligible: false });
+    receipt('46.02');
     expect((await cart()).body.remainingCapCents).toBe(10000 - 4602);
   });
 
-  it('L3: an unrelated receipt does not hide a confirmed order; the host can say a receipt covers it', async () => {
+  it('a receipt older than the order does not cover it, by matching or by the button', async () => {
     setParty({ reimbursementCapUsd: 100 });
     const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 5376, confirmedTotalCents: 4602 });
-    fake.docs.push({ id: 'd1', partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: { toString: () => '12.00' }, isDuplicate: false, ineligible: false });
+    receipt('46.02', new Date(Date.now() - 86400_000));
+    expect((await cart()).body.remainingCapCents).toBe(10000 - 4602 - 4602);
+    const r = await settleReceipt(o.opopOrderId);
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('NO_RECEIPT_FOUND');
+    expect(fake.byOpop(o.opopOrderId).receiptCoveredAt).toBeUndefined();
+  });
+
+  it('L3: an unrelated receipt does not hide a confirmed order; the button pairs them but frees only what the receipt is worth', async () => {
+    setParty({ reimbursementCapUsd: 100 });
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 5376, confirmedTotalCents: 4602 });
+    receipt('12.00');
     expect((await cart()).body.remainingCapCents).toBe(10000 - 1200 - 4602);
-    await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' });
-    expect((await cart()).body.remainingCapCents).toBe(10000 - 1200);
+    expect((await settleReceipt(o.opopOrderId)).status).toBe(200);
+    expect((await cart()).body.remainingCapCents).toBe(10000 - 4602); // not 10000 - 1200
+  });
+
+  it('receipt_uploaded with no receipt at all is refused and the hard ceiling stop holds', async () => {
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 20000, confirmedTotalCents: 20000 });
+    expect((await settleReceipt(o.opopOrderId)).body.error.code).toBe('NO_RECEIPT_FOUND');
+    const c = await buildCart();
+    expect(c.remainingCapCents).toBe(5000);
+    const res = await placeFrom(c, { allowAnother: true, policy: { ceilingCents: 20000, substitution: 'exact' } });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('SPEND_LIMIT_EXCEEDED');
+  });
+
+  it('a small receipt plus the button cannot lift the hard ceiling stop', async () => {
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 20000, confirmedTotalCents: 20000 });
+    receipt('1.00');
+    expect((await settleReceipt(o.opopOrderId)).status).toBe(200);
+    const c = await buildCart();
+    expect(c.remainingCapCents).toBe(5000);
+    const res = await placeFrom(c, { allowAnother: true, policy: { ceilingCents: 5001, substitution: 'exact' } });
+    expect(res.body.error.code).toBe('SPEND_LIMIT_EXCEEDED');
+  });
+
+  it('a duplicate or ineligible receipt does not satisfy the button; one OCR has not read does, and frees nothing until it has an amount', async () => {
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 20000, confirmedTotalCents: null });
+    receipt('150.00', undefined, { isDuplicate: true });
+    receipt('150.00', undefined, { ineligible: true });
+    expect((await settleReceipt(o.opopOrderId)).status).toBe(409);
+    receipt('');
+    expect((await settleReceipt(o.opopOrderId)).status).toBe(200);
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 20000);
+    fake.docs[fake.docs.length - 1].ocrAmount = { toString: () => '150.00' };
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 15000);
+  });
+
+  it('receipt_uploaded works when the shop gave no total: the receipt replaces the ceiling hold, a co-host may do it', async () => {
+    setParty({ reimbursementCapUsd: 400 });
+    const o = await mk({ status: 'confirmed_by_shop', ceilingCents: 20000, confirmedTotalCents: null });
+    receipt('150.00');
+    expect((await cart()).body.remainingCapCents).toBe(40000 - 15000 - 20000); // counted twice until it is settled
+    expect((await settleReceipt(o.opopOrderId, cohostEditor)).body.order.receiptCovered).toBe(true);
+    expect((await cart()).body.remainingCapCents).toBe(40000 - 15000);
+  });
+
+  it('the orders list marks a confirmed order covered once a receipt matched by itself', async () => {
+    await mk({ status: 'confirmed_by_shop', ceilingCents: 5000, confirmedTotalCents: 4000 });
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].receiptCovered).toBe(false);
+    receipt('40.00');
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].receiptCovered).toBe(true);
+  });
+
+  it('CAP_EXHAUSTED names the order holding the budget, on /cart, /orders and /config', async () => {
+    const o = await mk({ status: 'needs_review', ceilingCents: 25000, confirmedTotalCents: 25000 });
+    const res = await cart();
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatchObject({ code: 'CAP_EXHAUSTED', existingOrderId: o.opopOrderId, existingStatus: 'needs_review' });
+    const cfg = await request(app()).get(`${base}/config`).set(host);
+    expect(cfg.body).toMatchObject({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: o.opopOrderId });
+  });
+
+  it('CAP_EXHAUSTED from receipts alone names no order; a held order reaches a co-host too', async () => {
+    receipt('250.00');
+    const res = await cart();
+    expect(res.body.error.code).toBe('CAP_EXHAUSTED');
+    expect(res.body.error.existingOrderId).toBeUndefined();
+    expect((await request(app()).get(`${base}/config`).set(host)).body.heldOrderId).toBeNull();
+    fake.docs.length = 0;
+    const o = await mk({ status: 'confirmed_by_shop', userId: 'host1', confirmedTotalCents: 25000 });
+    expect((await cart(cohostEditor)).body.error.existingOrderId).toBe(o.opopOrderId);
+    const seen = await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(cohostEditor);
+    expect(seen.body.order).toMatchObject({ isMine: false, status: 'confirmed_by_shop', receiptCovered: false });
+  });
+
+  it('exposes blocking: what the backend would refuse a new order over', async () => {
+    await mk({ status: 'needs_review', ceilingCents: 5000, confirmedTotalCents: 4000 });
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].blocking).toBe(true);
+    fake.orders.clear();
+    await mk({ status: 'refused' });
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].blocking).toBe(false);
   });
 
   it('L3: the cancel button shows only where pizza-mcp accepts a cancel', async () => {
-    for (const [status, want] of [['calling', false], ['awaiting_price_approval', false], ['awaiting_approval', true], ['approval_timeout', true]] as const) {
+    const deferred = { call: { deferred: { until: '2026-11-02T17:00:00Z', reason: 'outside_call_window', message: 'later' } } };
+    const cases = [
+      ['calling', {}, false],
+      ['calling', { call: { deferred: null } }, false],
+      ['calling', deferred, true],
+      ['awaiting_price_approval', {}, false],
+      ['awaiting_price_approval', deferred, false],
+      ['awaiting_approval', {}, true],
+      ['approval_timeout', {}, true],
+    ] as const;
+    for (const [status, lastView, want] of cases) {
       fake.orders.clear();
-      await mk({ status, nextAction: { type: 'open_url', url: 'https://x' } });
+      await mk({ status, lastView, nextAction: { type: 'open_url', url: 'https://x' } });
       const list = await request(app()).get(`${base}/orders`).set(host);
-      expect(list.body.orders[0].cancelable, status).toBe(want);
+      expect(list.body.orders[0].cancelable, `${status} ${JSON.stringify(lastView)}`).toBe(want);
     }
   });
 
+  it('a deferred dial can be canceled; a live call is refused here without asking pizza-mcp', async () => {
+    const o = await mk({ status: 'calling', lastView: { call: { deferred: { until: 'x', reason: 'retry', message: 'm' } } } });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/cancel`).set(host).send({})).body.order.status).toBe('canceled');
+    expect(mcp.calls.filter((c) => c.path.endsWith('/cancel'))).toHaveLength(1);
+    mcp.calls.length = 0;
+    const live = await mk({ status: 'calling', lastView: { call: { deferred: null } } });
+    const res = await request(app()).post(`${base}/orders/${live.opopOrderId}/cancel`).set(host).send({});
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CANCEL_NOT_ALLOWED');
+    expect(mcp.calls).toHaveLength(0);
+  });
+
+  it("the dial starting first is pizza-mcp's 409: the host gets it and the order stays as it was", async () => {
+    mcp = pizzaMcp({ 'POST /orders/:id/cancel': () => ({ status: 409, json: { code: 'CANCEL_NOT_ALLOWED', title: 't', detail: 'The call is starting', status: 409, retryable: false } }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const o = await mk({ status: 'calling', lastView: { call: { deferred: { until: 'x', reason: 'retry', message: 'm' } } } });
+    const res = await request(app()).post(`${base}/orders/${o.opopOrderId}/cancel`).set(host).send({});
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({ code: 'CANCEL_NOT_ALLOWED', message: 'The call is starting' });
+    expect(fake.byOpop(o.opopOrderId).status).toBe('calling');
+  });
+
   it('L2: a fresh confirmation keeps being polled (it can still be downgraded); an old one stops', async () => {
-    const o = await mk({ status: 'confirmed_by_shop', lastEventAt: new Date() });
+    const o = await mk({ status: 'confirmed_by_shop', confirmedAt: new Date() });
     expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].settling).toBe(true);
     await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
     expect(mcp.calls.filter((c) => c.path.startsWith('/orders/'))).toHaveLength(1);
     mcp.calls.length = 0;
     fake.byOpop(o.opopOrderId).status = 'confirmed_by_shop';
-    fake.byOpop(o.opopOrderId).lastEventAt = new Date(Date.now() - 3600_000);
+    fake.byOpop(o.opopOrderId).confirmedAt = new Date(Date.now() - 3600_000);
     expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0].settling).toBe(false);
     await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
     expect(mcp.calls).toHaveLength(0);
+  });
+
+  it('real polls stop 20 minutes after entering confirmed_by_shop, though each poll moves lastEventAt', async () => {
+    const t0 = new Date('2026-11-01T18:00:00Z').getTime();
+    vi.useFakeTimers({ toFake: ['Date'], now: t0 });
+    try {
+      mcp = pizzaMcp({ 'GET /orders/:id': () => ({ json: opopOrder({ id: 'ord_poll', status: 'confirmed_by_shop' }, 3) }) });
+      setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+      const o = await mk({ opopOrderId: 'ord_poll', status: 'calling', timelineLen: 2, lastEventAt: new Date(t0) });
+      const poll = async () => {
+        mcp.calls.length = 0;
+        const res = await request(app()).get(`${base}/orders/${o.opopOrderId}`).set(host);
+        return { polled: mcp.calls.length, settling: res.body.order.settling };
+      };
+
+      expect(await poll()).toEqual({ polled: 1, settling: true }); // the poll that sees the confirmation
+      expect(fake.byOpop('ord_poll').confirmedAt.getTime()).toBe(t0);
+
+      for (let m = 5; m < 20; m += 5) {
+        vi.setSystemTime(t0 + m * 60_000);
+        expect(await poll(), `${m} minutes`).toEqual({ polled: 1, settling: true });
+        expect(fake.byOpop('ord_poll').lastEventAt.getTime()).toBe(t0 + m * 60_000);
+      }
+      expect(fake.byOpop('ord_poll').confirmedAt.getTime()).toBe(t0);
+
+      vi.setSystemTime(t0 + 20 * 60_000);
+      expect(await poll()).toEqual({ polled: 0, settling: false });
+      vi.setSystemTime(t0 + 25 * 60_000);
+      expect(await poll()).toEqual({ polled: 0, settling: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('confirmedAt clears on a downgrade and restarts if the order is confirmed again', async () => {
+    const { applyOrderUpdate } = await import('../services/pizzaOrderSync.js');
+    const o = await mk({ opopOrderId: 'ord_re', status: 'calling' });
+    await applyOrderUpdate(fake.db as any, opopOrder({ id: 'ord_re', status: 'confirmed_by_shop' }, 2) as any);
+    expect(fake.byOpop(o.opopOrderId).confirmedAt).toBeInstanceOf(Date);
+    await applyOrderUpdate(fake.db as any, opopOrder({ id: 'ord_re', status: 'needs_review' }, 3) as any);
+    expect(fake.byOpop(o.opopOrderId).confirmedAt).toBeNull();
   });
 
   const oc = (nothing_ordered: boolean, reason: string) => ({ nothing_ordered, reason, message: `msg ${reason}` });
@@ -735,6 +901,15 @@ describe('budget release, double counting, cancel button, settling (final review
     expect(item).toMatchObject({ releasable: true, outcome: { reason: 'ambiguous_dial', nothing_ordered: false } });
     await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' });
     expect((await placeFrom(await buildCart())).status).toBe(201);
+  });
+
+  it('approval_timeout with nothing_ordered true is still live: it holds budget, blocks and cannot be released', async () => {
+    const o = await mk({ status: 'approval_timeout', ceilingCents: 15000, confirmedTotalCents: 18000, nextAction: { type: 'open_url', url: 'https://x' }, ...withOutcome(oc(true, 'price_approval_timeout')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 18000);
+    expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
+    const item = (await request(app()).get(`${base}/orders`).set(host)).body.orders[0];
+    expect(item).toMatchObject({ releasable: false, cancelable: true, blocking: true });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
   });
 
   it('a refused order with nothing_ordered true stays free; unknown or malformed outcome falls back to the old rules', async () => {

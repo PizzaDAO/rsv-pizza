@@ -17,12 +17,12 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 export const FREE_STATUSES: ReadonlySet<string> = new Set(['refused', 'unreachable', 'canceled', 'shop_requires_prepay']);
 
 /**
- * Statuses pizza-mcp lets a host cancel. `calling` and `awaiting_price_approval` are NOT here: it
- * answers 409 there (a call is live), so offering a button only produced an error.
+ * Statuses pizza-mcp always lets a host cancel. `awaiting_price_approval` is NOT here: it answers 409
+ * there (the shop is on the line). `calling` depends on the dial, see isCancelable.
  */
 export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set(['awaiting_approval', 'approval_timeout', 'held']);
 
-/** How long after `confirmed_by_shop` we keep polling: pizza-mcp can still downgrade it to `needs_review`. */
+/** How long after entering `confirmed_by_shop` we keep polling: pizza-mcp can still downgrade it to `needs_review`. */
 export const SETTLE_WINDOW_MS = 20 * 60_000;
 
 export const isTerminal = (status: string) => TERMINAL_STATUSES.has(status);
@@ -35,6 +35,16 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
   if (row.status !== 'awaiting_approval') return false;
   const na = row.nextAction as { type?: string } | null | undefined;
   return !na || na.type === 'none';
+}
+
+/**
+ * Can the host call this order off? `calling` counts only while the dial is deferred (`call.deferred`):
+ * no call is on the line yet. If the dial starts first, pizza-mcp's 409 reaches the host as an error.
+ */
+export function isCancelable(row: { status: string; lastView?: unknown }): boolean {
+  if (CANCELABLE_STATUSES.has(row.status)) return true;
+  const deferred = (row.lastView as { call?: { deferred?: unknown } | null } | null | undefined)?.call?.deferred;
+  return row.status === 'calling' && !!deferred;
 }
 
 export interface OrderOutcome {
@@ -76,8 +86,9 @@ export function needsReviewHolds(row: OrderRowLike): boolean {
 export function isBlocking(row: OrderRowLike): boolean {
   if (row.releasedAt) return false;
   const outcome = outcomeOf(row);
-  // pizza-mcp is sure nothing was placed: holds nothing, blocks nothing.
-  if (outcome?.nothing_ordered === true) return false;
+  // pizza-mcp is sure nothing was placed AND the order has ended: holds nothing, blocks nothing. A live
+  // order still can: approval_timeout says "nothing yet", but approving it sends the call back to the shop.
+  if (outcome?.nothing_ordered === true && isTerminal(row.status)) return false;
   // An order MAY exist (e.g. ambiguous_dial): hold the budget and block a second order until the host
   // has checked with the shop and settled it, whatever the status.
   if (outcome?.nothing_ordered === false && (row.status === 'needs_review' || FREE_STATUSES.has(row.status))) return true;
@@ -86,9 +97,12 @@ export function isBlocking(row: OrderRowLike): boolean {
   return !FREE_STATUSES.has(row.status) && !isRestartable(row);
 }
 
-/** Keep polling a freshly confirmed order for a while: the post-call check can still downgrade it. */
-export function isSettling(row: { status: string; lastEventAt?: Date | string | null }, now = Date.now()): boolean {
+/**
+ * Keep polling a freshly confirmed order for a while: the post-call check can still downgrade it.
+ * Counted from `confirmedAt`, not `lastEventAt`: every poll moves `lastEventAt`, so it would never end.
+ */
+export function isSettling(row: { status: string; confirmedAt?: Date | string | null }, now = Date.now()): boolean {
   if (row.status !== 'confirmed_by_shop') return false;
-  const t = row.lastEventAt ? new Date(row.lastEventAt).getTime() : NaN;
+  const t = row.confirmedAt ? new Date(row.confirmedAt).getTime() : NaN;
   return Number.isFinite(t) && now - t < SETTLE_WINDOW_MS;
 }

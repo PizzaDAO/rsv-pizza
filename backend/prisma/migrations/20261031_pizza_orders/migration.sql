@@ -1,4 +1,4 @@
--- basil-14648: AI ordering through pizza-mcp (OPOP). Additive only: two new tables
+-- basil-14648: AI ordering through pizza-mcp (OPOP). Additive only: three new tables
 -- plus two columns on payout_documents (one defaulted, one nullable). Safe to apply
 -- before the code ships; nothing reads these until the feature is allowlisted.
 -- RLS enabled with no policies and anon/authenticated revoked (same convention as
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS "pizza_orders" (
   "quote_id" TEXT,
   "timeline_len" INTEGER NOT NULL DEFAULT 0,
   "last_event_at" TIMESTAMPTZ,
+  "confirmed_at" TIMESTAMPTZ,
   "payout_document_id" UUID,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS "pizza_orders" (
 -- for databases that already applied the first version of this file
 ALTER TABLE "pizza_orders" ADD COLUMN IF NOT EXISTS "released_at" TIMESTAMPTZ;
 ALTER TABLE "pizza_orders" ADD COLUMN IF NOT EXISTS "receipt_covered_at" TIMESTAMPTZ;
+ALTER TABLE "pizza_orders" ADD COLUMN IF NOT EXISTS "confirmed_at" TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS "pizza_orders_opop_order_id_key" ON "pizza_orders"("opop_order_id");
 CREATE INDEX IF NOT EXISTS "pizza_orders_party_id_idx" ON "pizza_orders"("party_id");
 CREATE INDEX IF NOT EXISTS "pizza_orders_user_id_idx" ON "pizza_orders"("user_id");

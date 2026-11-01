@@ -63,6 +63,9 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
   const url = order.nextAction?.type === 'open_url' ? order.nextAction.url : null;
   const deferred = order.call?.deferred ?? null;
+  const finished = order.status === 'confirmed_by_shop' || order.status === 'completed';
+  // the backend would refuse another order: no link that leads to that refusal
+  const showLeave = (!waiting || order.restartable) && (finished || !order.blocking);
   const Icon = info.tone === 'success' ? CheckCircle2 : info.tone === 'warn' || info.tone === 'error' ? AlertTriangle : waiting ? Loader2 : Clock;
   const color = info.tone === 'success' ? 'text-[#4ade80]' : info.tone === 'warn' || info.tone === 'error' ? 'text-[#ffb347]' : 'text-theme-text';
 
@@ -132,7 +135,14 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
       )}
 
       {order.releasable && (
-        <button type="button" className="btn-secondary w-full text-sm py-1.5" onClick={() => settle('nothing_ordered')}>
+        <button
+          type="button"
+          className="btn-secondary w-full text-sm py-1.5"
+          onClick={() => {
+            if (!window.confirm(`Release the order at ${order.shopName}? Only do this if you checked and nothing was ordered.`)) return;
+            settle('nothing_ordered');
+          }}
+        >
           Nothing was ordered: release it
         </button>
       )}
@@ -157,9 +167,9 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
         </div>
       )}
 
-      {(!waiting || order.restartable) && (
+      {showLeave && (
         <button type="button" onClick={onDone} className="text-xs text-theme-text-muted hover:text-theme-text">
-          {order.status === 'confirmed_by_shop' ? 'Done' : order.restartable ? 'Start over' : 'Order from another pizzeria'}
+          {finished ? 'Done' : order.restartable ? 'Start over' : 'Order from another pizzeria'}
         </button>
       )}
     </div>

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
-import { loadPartyForOrdering, remainingCapCents, OrderingParty } from '../lib/pizzaOrdering.js';
+import { loadPartyForOrdering, remainingCapCents, partyReceipts, isLaterReceipt, budgetBreakdown, OrderingParty } from '../lib/pizzaOrdering.js';
 import {
   recommendationsToLines,
   recommendationVersion,
@@ -12,7 +12,7 @@ import {
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
 import { menuFacts, fitLine } from '../lib/menuFit.js';
-import { isTerminal, isBlocking, isRestartable, isSettling, outcomeOf, CANCELABLE_STATUSES } from '../lib/pizzaOrderStatus.js';
+import { isTerminal, isBlocking, isCancelable, isRestartable, isSettling, outcomeOf } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -57,7 +57,7 @@ function opopIdParam(v: string): string {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
-function publicOrder(row: any, forOwner: boolean) {
+function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boolean } = {}) {
   const view = (row.lastView ?? null) as any;
   return {
     id: row.id,
@@ -88,8 +88,10 @@ function publicOrder(row: any, forOwner: boolean) {
     // an order that may exist (or needs_review that holds budget) and has ended: the host can say nothing was ordered
     releasable: !row.releasedAt && isTerminal(row.status) && row.status !== 'confirmed_by_shop' && row.status !== 'completed' && isBlocking(row),
     released: !!row.releasedAt,
-    receiptCovered: !!row.receiptCoveredAt,
-    cancelable: forOwner && CANCELABLE_STATUSES.has(row.status) && !isRestartable(row),
+    // the backend would refuse a new order without "place a second order anyway"
+    blocking: isBlocking(row),
+    receiptCovered: !!row.receiptCoveredAt || opts.receiptMatched === true,
+    cancelable: forOwner && isCancelable(row) && !isRestartable(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -104,17 +106,21 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
     if (!enabled) return res.json({ enabled: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
     let remaining: number | null = null;
     let blockedReason: string | null = null;
+    let heldOrderId: string | null = null;
     try {
       remaining = await remainingCapCents(party);
     } catch (e) {
       if (!(e instanceof AppError)) throw e;
       blockedReason = e.code ?? 'BLOCKED';
+      heldOrderId = typeof e.data?.existingOrderId === 'string' ? e.data.existingOrderId : null;
     }
     res.json({
       enabled: true,
       capCents: party.capCents,
       remainingCapCents: remaining,
       blockedReason,
+      // the order to open when it is an order that uses up the budget
+      heldOrderId,
       location: { lat: party.latitude, lng: party.longitude, address: party.address },
     });
   } catch (e) {
@@ -496,6 +502,7 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
         nextAction: na as any,
         timelineLen: Array.isArray(o.timeline) ? o.timeline.length : 0,
         lastEventAt: new Date(),
+        confirmedAt: o.status === 'confirmed_by_shop' ? new Date() : null,
       },
       update: {
         tier: finalTier,
@@ -524,7 +531,9 @@ router.get('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res: 
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
-    res.json({ orders: rows.map((r: any) => publicOrder(r, r.userId === req.userId)) });
+    // a receipt that matched by itself: the host has nothing left to do on that order
+    const { covered } = budgetBreakdown(await partyReceipts(party.id), rows);
+    res.json({ orders: rows.map((r: any) => publicOrder(r, r.userId === req.userId, { receiptMatched: covered.includes(r) })) });
   } catch (e) {
     next(e);
   }
@@ -566,7 +575,7 @@ router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: A
     if (!row) throw new AppError('Order not found', 404, 'NOT_FOUND');
     // pizza-mcp orders belong to the principal that placed them; only that host can cancel.
     if (row.userId !== req.userId) throw new AppError('Only the host who placed this order can cancel it.', 403, 'NOT_ORDER_OWNER');
-    if (!CANCELABLE_STATUSES.has(row.status)) {
+    if (!isCancelable(row)) {
       throw new AppError('This order can no longer be canceled here. Call the shop.', 409, 'CANCEL_NOT_ALLOWED');
     }
     const view = await getPizzaMcpClient().cancelOrder(actorFor(req, party), orderId);
@@ -581,7 +590,8 @@ router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: A
  * Tell us what really happened, so the budget is not held (or counted twice) for ever.
  *  - nothing_ordered: the shop did not take the order (needs_review / refused / unreachable / ...):
  *    releases the budget and unblocks a new order.
- *  - receipt_uploaded: the real receipt for a confirmed order is uploaded: count it once.
+ *  - receipt_uploaded: the real receipt for a confirmed order is uploaded: count it once. Needs a
+ *    receipt uploaded after the order; what it frees is limited by budgetBreakdown.
  * Any host or edit-enabled co-host of the party may do this (the budget is the party's).
  */
 router.post('/:partyId/pizza/orders/:orderId/settle', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -601,6 +611,9 @@ router.post('/:partyId/pizza/orders/:orderId/settle', requireAuth, async (req: A
     if (body.action === 'receipt_uploaded') {
       if (!['confirmed_by_shop', 'needs_review', 'completed'].includes(row.status)) {
         throw new AppError('Only a confirmed order has a receipt to match.', 409, 'SETTLE_NOT_ALLOWED');
+      }
+      if (!(await partyReceipts(party.id)).some((r) => isLaterReceipt(r, row))) {
+        throw new AppError('We could not find a receipt uploaded after this order. Upload the real receipt first.', 409, 'NO_RECEIPT_FOUND');
       }
       const updated = await prisma.pizzaOrder.update({ where: { id: row.id }, data: { receiptCoveredAt: new Date() } });
       return res.json({ order: publicOrder(updated, updated.userId === req.userId) });

@@ -102,10 +102,35 @@ export async function loadPartyForOrdering(
   };
 }
 
+/** A real uploaded receipt, as the budget sees it. `cents` is 0 until OCR has read an amount. */
+export interface BudgetReceipt {
+  cents: number;
+  createdAt: Date | string;
+}
+
+/** Eligible receipts for the party. Reminder lines (`source` != 'upload') are never receipts. */
+export async function partyReceipts(partyId: string): Promise<BudgetReceipt[]> {
+  const docs = await prisma.payoutDocument.findMany({
+    where: { partyId, kind: 'receipt', source: 'upload', isDuplicate: false, ineligible: false },
+    select: { ocrAmount: true, createdAt: true },
+  });
+  return docs.map((d) => ({
+    cents: d.ocrAmount != null ? Math.round(Number(d.ocrAmount.toString()) * 100) : 0,
+    createdAt: d.createdAt,
+  }));
+}
+
+/** Only a receipt uploaded after the order can be that order's receipt. Unknown dates never match. */
+export function isLaterReceipt(receipt: Pick<BudgetReceipt, 'createdAt'>, order: { createdAt?: Date | string | null }): boolean {
+  if (!order.createdAt) return false;
+  return new Date(receipt.createdAt).getTime() > new Date(order.createdAt).getTime();
+}
+
 /**
  * What the host may still spend through an order: the party's reimbursement cap, minus eligible
  * uploaded receipts, minus what open (or confirmed, not yet receipted) orders could cost. Refuses
- * when there is no cap or nothing left. A confirmed order whose receipt is uploaded counts once (see budgetUsedCents).
+ * when there is no cap or nothing left, naming the order that holds the budget if there is one.
+ * A confirmed order and its real receipt count once (see budgetBreakdown).
  */
 export async function remainingCapCents(party: OrderingParty): Promise<number> {
   if (party.capCents === null) {
@@ -115,29 +140,26 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
       'NO_REIMBURSEMENT_CAP'
     );
   }
-  const [docs, orders] = await Promise.all([
-    prisma.payoutDocument.findMany({
-      where: { partyId: party.id, kind: 'receipt', source: 'upload', isDuplicate: false, ineligible: false },
-      select: { ocrAmount: true },
-    }),
-    prisma.pizzaOrder.findMany({ where: { partyId: party.id } }),
+  const [receipts, orders] = await Promise.all([
+    partyReceipts(party.id),
+    prisma.pizzaOrder.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' } }),
   ]);
-  const receipts = docs
-    .map((d) => (d.ocrAmount != null ? Math.round(Number(d.ocrAmount.toString()) * 100) : 0))
-    .filter((c) => c > 0);
-  const used = budgetUsedCents(receipts, orders);
-  const remaining = party.capCents - used;
+  const { usedCents, held } = budgetBreakdown(receipts, orders);
+  const remaining = party.capCents - usedCents;
   if (remaining <= 0) {
+    const holder = held[0];
     throw new AppError(
-      "There is no reimbursement budget left for another order (cap minus receipts and open orders).",
+      'There is no reimbursement budget left for another order (cap minus receipts and open orders).',
       422,
-      'CAP_EXHAUSTED'
+      'CAP_EXHAUSTED',
+      holder ? { existingOrderId: holder.opopOrderId, existingStatus: holder.status } : undefined
     );
   }
   return remaining;
 }
 
 interface BudgetOrder {
+  opopOrderId?: string;
   status: string;
   ceilingCents?: number | null;
   confirmedTotalCents?: number | null;
@@ -145,32 +167,64 @@ interface BudgetOrder {
   releasedAt?: Date | string | null;
   nextAction?: unknown;
   lastView?: unknown;
+  createdAt?: Date | string | null;
 }
 
 const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']);
 
 /**
  * Budget already spoken for: uploaded receipts + what open orders could still cost. A confirmed order
- * whose real receipt is uploaded counts ONCE: either the host said so (`receiptCoveredAt`) or an
- * uploaded receipt matches its total (within 5% or $1; each receipt covers one order).
+ * counts once with its real receipt, and only a receipt uploaded after the order can be that receipt:
+ *  - Automatically, when one matches its total (within 5% or $1; each receipt covers one order).
+ *  - When the host says so (`receiptCoveredAt`). The click is unverified, so it only pairs: later
+ *    receipts offset the order up to their own amounts, and with none the order stays held in full.
+ *    If the shop gave no total the hold is only the ceiling, so one later receipt replaces it.
  * Orders that hold nothing (released, refused, IVR needs_review...) cost nothing.
  */
-export function budgetUsedCents(receiptsCents: number[], orders: BudgetOrder[]): number {
-  const free = [...receiptsCents];
+export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[], orders: T[]): { usedCents: number; held: T[]; covered: T[] } {
+  const free = receipts.filter((r) => r.cents > 0).map((r) => ({ ...r, left: r.cents }));
+  const available = (o: T) => free.filter((r) => r.left > 0 && isLaterReceipt(r, o));
+  const held: T[] = [];
+  const covered: T[] = [];
+
+  // Exact matches first, so a host's "this receipt covers it" cannot take another order's receipt.
+  const unmatched = orders.filter(isBlocking).filter((o) => {
+    const total = o.confirmedTotalCents;
+    if (!CONFIRMED_STATUSES.has(o.status) || total == null) return true;
+    const tol = Math.max(100, Math.round(total * 0.05));
+    const match = available(o).find((r) => r.left === r.cents && Math.abs(r.cents - total) <= tol);
+    if (!match) return true;
+    match.left = 0;
+    covered.push(o);
+    return false;
+  });
+
   let open = 0;
-  for (const o of orders.filter((x) => isBlocking(x))) {
+  for (const o of unmatched) {
     const view = o.lastView as { totals?: { total_cents?: number } } | null;
-    const amount = o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0;
-    if (CONFIRMED_STATUSES.has(o.status) && o.confirmedTotalCents != null) {
-      if (o.receiptCoveredAt) continue;
-      const tol = Math.max(100, Math.round(o.confirmedTotalCents * 0.05));
-      const i = free.findIndex((r) => Math.abs(r - o.confirmedTotalCents!) <= tol);
-      if (i >= 0) {
-        free.splice(i, 1);
-        continue;
+    let owed = o.confirmedTotalCents ?? o.ceilingCents ?? view?.totals?.total_cents ?? 0;
+    if (o.receiptCoveredAt && CONFIRMED_STATUSES.has(o.status)) {
+      if (o.confirmedTotalCents == null) {
+        const receipt = available(o)[0];
+        if (receipt) {
+          receipt.left = 0;
+          owed = 0;
+        }
+      } else {
+        for (const r of available(o)) {
+          const taken = Math.min(r.left, owed);
+          r.left -= taken;
+          owed -= taken;
+        }
       }
     }
-    open += amount;
+    if (owed > 0) held.push(o);
+    else covered.push(o);
+    open += owed;
   }
-  return receiptsCents.reduce((a, b) => a + b, 0) + open;
+  return { usedCents: receipts.reduce((a, r) => a + Math.max(r.cents, 0), 0) + open, held, covered };
+}
+
+export function budgetUsedCents(receipts: BudgetReceipt[], orders: BudgetOrder[]): number {
+  return budgetBreakdown(receipts, orders).usedCents;
 }

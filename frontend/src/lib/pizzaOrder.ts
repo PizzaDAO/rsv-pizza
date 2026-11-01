@@ -111,9 +111,12 @@ export interface PizzaOrderView {
   cancelable?: boolean;
   /** A fresh confirmation is still polled: the post-call check can downgrade it. */
   settling?: boolean;
-  /** needs_review that holds budget: the host can say nothing was ordered. */
+  /** An ended order that holds budget or may exist: a host can say nothing was ordered. */
   releasable?: boolean;
+  /** A host said nothing was ordered: it holds nothing and blocks nothing. */
   released?: boolean;
+  /** The backend refuses a new order while this one stands, unless the host confirms a second. */
+  blocking?: boolean;
   receiptCovered?: boolean;
 }
 
@@ -123,6 +126,17 @@ export const TERMINAL_STATUSES = [
 ];
 export const isTerminalStatus = (s: string) => TERMINAL_STATUSES.includes(s);
 
+/**
+ * The order to reopen on load: the host's own live order, else one a host still has to settle
+ * (release it, or say the receipt is in). Those can wait days, and any host who can edit may settle them.
+ */
+export function orderToResume(orders: PizzaOrderView[]): PizzaOrderView | undefined {
+  return (
+    orders.find((o) => o.isMine && !isTerminalStatus(o.status) && !o.restartable) ??
+    orders.find((o) => o.releasable || (o.status === 'confirmed_by_shop' && !o.receiptCovered))
+  );
+}
+
 const base = (partyId: string) => `/api/parties/${partyId}/pizza`;
 
 export interface PizzaOrderConfig {
@@ -131,6 +145,8 @@ export interface PizzaOrderConfig {
   remainingCapCents: number | null;
   /** e.g. NO_REIMBURSEMENT_CAP / CAP_EXHAUSTED: ordering is on for the party but blocked right now. */
   blockedReason: string | null;
+  /** With CAP_EXHAUSTED: the order holding the budget, when one is. */
+  heldOrderId?: string | null;
   location: { lat: number | null; lng: number | null; address: string | null } | null;
 }
 export const getPizzaOrderConfig = (partyId: string) => apiRequest<PizzaOrderConfig>(`${base(partyId)}/config`);
@@ -245,10 +261,20 @@ export interface StatusInfo {
   detail: string;
   tone: 'info' | 'action' | 'success' | 'warn' | 'error';
 }
-export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & { restartable?: boolean }): StatusInfo {
+export function statusInfo(
+  o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released'>
+): StatusInfo {
+  if (o.released) {
+    return {
+      title: `Released: nothing ordered at ${o.shopName}`,
+      detail: 'A host said nothing was ordered, so this no longer counts against your budget or blocks a new order.',
+      tone: 'info',
+    };
+  }
   const total = formatCents(o.confirmedTotalCents ?? o.call?.shop_total_cents ?? null);
   // pizza-mcp's own words win once it has said what happened (never inferred from totals or transcripts).
-  const oc = o.outcome;
+  // Not for "nothing yet" on an approval_timeout: it is still open, and approving sends the call back.
+  const oc = o.status === 'approval_timeout' && o.outcome?.nothing_ordered ? null : o.outcome;
   if (oc && ['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'].includes(o.status)) {
     const check = `An order may exist at ${o.shopName}. Check with them before ordering again.`;
     const ambiguous = oc.reason === 'ambiguous_dial';
@@ -275,7 +301,9 @@ export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'conf
       // (a phone menu, voicemail, or a price over your limit). Optional `reason` comes from pizza-mcp when it sends one.
       return {
         title: `We could not confirm the order at ${o.shopName}`,
-        detail: `It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it. If nothing was ordered, release it below so it stops counting against your budget.`,
+        detail: `It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it.${
+          o.releasable ? ' If nothing was ordered, release it below so it stops counting against your budget.' : ''
+        }`,
         tone: 'warn',
       };
     case 'shop_requires_prepay':
@@ -283,7 +311,7 @@ export function statusInfo(o: Pick<PizzaOrderView, 'status' | 'shopName' | 'conf
     case 'refused':
       return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them yourself using the order below.', tone: 'warn' };
     case 'unreachable':
-      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Nothing was ordered. Call them yourself using the order below.`, tone: 'warn' };
+      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Call them to check, or order yourself using the order below.`, tone: 'warn' };
     case 'approval_timeout':
       return { title: 'Approval timed out', detail: 'The shop was told we would call back. Open the approval page to retry, or cancel the order.', tone: 'warn' };
     case 'canceled':

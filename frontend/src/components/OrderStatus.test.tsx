@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderStatus } from './OrderStatus';
@@ -16,6 +16,8 @@ const order = (over: Partial<PizzaOrderView> = {}): PizzaOrderView => ({
   payoutDocumentId: 'd1', call: null, nextAction: null, isMine: true, ...over,
 });
 const noop = () => undefined;
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('OrderStatus', () => {
   it('shows the confirmed total and ready time', () => {
@@ -78,15 +80,79 @@ describe('OrderStatus', () => {
     expect(screen.getByText(/could not confirm the order at Sal's/)).toBeTruthy();
     expect(document.body.textContent).toMatch(/nothing was ordered, or that the shop did take it/);
     expect(document.body.textContent).not.toMatch(/We think/);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await userEvent.click(screen.getByText('Nothing was ordered: release it'));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Release the order at Sal's/));
     expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
     expect(onUpdate).toHaveBeenCalled();
   });
 
-  it('unreachable says nothing was ordered, without claiming a retry that may not have happened', () => {
+  it('Release asks first, like Cancel: declining settles nothing', async () => {
+    mocks.settle.mockClear();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    await userEvent.click(screen.getByText('Nothing was ordered: release it'));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(mocks.settle).not.toHaveBeenCalled();
+  });
+
+  it('needs_review only says "release it below" when the button is there', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).not.toMatch(/release it below/);
+    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/release it below/);
+  });
+
+  it('with no outcome, unreachable does not claim nothing was ordered, or a retry that may not have happened', () => {
     render(<OrderStatus partyId="p" order={order({ status: 'unreachable' })} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(document.body.textContent).toMatch(/Nothing was ordered/);
+    expect(document.body.textContent).toMatch(/We could not complete the call/);
+    expect(document.body.textContent).not.toMatch(/nothing was ordered/i);
     expect(document.body.textContent).not.toMatch(/after retrying/);
+  });
+
+  it('shows the released state, with no release button and the way to order again', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', released: true, releasable: false, blocking: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Released: nothing ordered at Sal's")).toBeTruthy();
+    expect(screen.queryByText('Nothing was ordered: release it')).toBeNull();
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('hides "Order from another pizzeria" where the backend would block it', () => {
+    const blocked = order({ status: 'unreachable', blocking: true, releasable: true, outcome: { nothing_ordered: false, reason: 'ambiguous_dial', message: 'm' } });
+    const { unmount } = render(<OrderStatus partyId="p" order={blocked} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Order from another pizzeria')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('a blocking confirmed order still lets the host leave with Done', () => {
+    render(<OrderStatus partyId="p" order={order({ blocking: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Done')).toBeTruthy();
+  });
+
+  it('a co-host can release and can say the receipt is in', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true, isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Nothing was ordered: release it')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
+  });
+
+  it("a refused 'I uploaded the receipt' shows why", async () => {
+    mocks.settle.mockRejectedValueOnce(new Error('Upload the real receipt first.'));
+    render(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={noop} onDone={noop} />);
+    await userEvent.click(screen.getByText('I uploaded the receipt'));
+    expect(await screen.findByText('Upload the real receipt first.')).toBeTruthy();
+  });
+
+  it('an approval_timeout saying "nothing yet" stays open: approval copy, not "Nothing was ordered"', () => {
+    const o = order({ status: 'approval_timeout', outcome: { nothing_ordered: true, reason: 'price_approval_timeout', message: 'Nothing is ordered yet.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Approval timed out')).toBeTruthy();
+    expect(screen.queryByText("Nothing was ordered at Sal's")).toBeNull();
   });
 
   it("shows pizza-mcp's outcome.message; nothing_ordered true says so and offers no release", () => {

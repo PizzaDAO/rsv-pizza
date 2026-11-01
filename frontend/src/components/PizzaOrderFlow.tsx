@@ -5,12 +5,14 @@ import { ShopPicker } from './ShopPicker';
 import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
 import {
-  buildPizzaCart, getPizzaOrderConfig, getPizzaOrders, placePizzaOrder,
-  CartResponse, CartDecision, PizzaOrderView, PizzaShop, isTerminalStatus,
+  buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, placePizzaOrder, orderToResume,
+  CartResponse, CartDecision, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
 import { generatePhoneOrderScript } from '../lib/ordering';
 
 type Step = 'loading' | 'shops' | 'cart' | 'status';
+
+type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingStatus?: string } };
 
 interface PizzaOrderFlowProps {
   /** Shown while loading fails or when this party is not in the pilot. */
@@ -36,8 +38,9 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   const [order, setOrder] = useState<PizzaOrderView | null>(null);
   const [decisions, setDecisions] = useState<Record<string, CartDecision>>({});
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
-  // set when the server says this party already has a live or confirmed order
-  const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string } | null>(null);
+  const [heldOrderId, setHeldOrderId] = useState<string | null>(null);
+  // set when the server names an existing order: a live or confirmed one, or (capExhausted) one that holds the budget
+  const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string; capExhausted?: boolean } | null>(null);
   const [lastInput, setLastInput] = useState<Parameters<typeof placePizzaOrder>[1] | null>(null);
 
   useEffect(() => {
@@ -50,12 +53,13 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setEnabled(cfg.enabled);
         if (!cfg.enabled) return;
         setBlockedReason(cfg.blockedReason);
-        // resume an order that is still in flight (page reload while the AI is calling)
+        setHeldOrderId(cfg.heldOrderId ?? null);
+        // resume an order in flight (page reload while the AI is calling) or one a host still has to settle
         const { orders } = await getPizzaOrders(partyId).catch(() => ({ orders: [] as PizzaOrderView[] }));
         if (cancelled) return;
-        const live = orders.find((o) => o.isMine && !isTerminalStatus(o.status) && !o.restartable);
-        if (live) {
-          setOrder(live);
+        const resume = orderToResume(orders);
+        if (resume) {
+          setOrder(resume);
           setStep('status');
         } else {
           setStep('shops');
@@ -86,6 +90,13 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     [recommendations, party?.hostName]
   );
 
+  /** A budget used up by an order is not a dead end: send the host to that order. */
+  const showHeldOrder = useCallback((err: ApiError) => {
+    if (err.code !== 'CAP_EXHAUSTED' || !err.data?.existingOrderId) return false;
+    setInProgress({ ...err.data, capExhausted: true });
+    return true;
+  }, []);
+
   const onBuild = useCallback(
     async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}) => {
       if (!partyId || !shop) return;
@@ -96,28 +107,29 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setDecisions(nextDecisions);
         setCartState(await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions));
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not build the order');
+        if (!showHeldOrder(e as ApiError)) setError(e instanceof Error ? e.message : 'Could not build the order');
       } finally {
         setBuilding(false);
       }
     },
-    [partyId, shop, recommendations]
+    [partyId, shop, recommendations, showHeldOrder]
   );
 
-  const viewExisting = useCallback(async () => {
-    if (!partyId) return;
-    setInProgress(null);
-    try {
-      const { orders } = await getPizzaOrders(partyId);
-      const o = orders.find((x) => !x.restartable && x.status !== 'canceled' && x.status !== 'refused' && x.status !== 'unreachable');
-      if (o) {
-        setOrder(o);
+  const viewExisting = useCallback(
+    async (orderId: string | null | undefined) => {
+      if (!partyId) return;
+      setInProgress(null);
+      setError(null);
+      try {
+        if (!orderId) throw new Error('no order id');
+        setOrder((await getPizzaOrder(partyId, orderId)).order);
         setStep('status');
+      } catch {
+        setError('Could not load the existing order.');
       }
-    } catch {
-      setError('Could not load the existing order.');
-    }
-  }, [partyId]);
+    },
+    [partyId]
+  );
 
   const onDecide = useCallback(
     (pickupAtIso: string, ref: string, choice: CartDecision) => onBuild(pickupAtIso, { ...decisions, [ref]: choice }),
@@ -152,8 +164,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setStep('status');
       } catch (e) {
         tab?.close();
-        const err = e as Error & { code?: string; data?: { existingOrderId?: string; existingStatus?: string } };
-        if (err.code === 'ORDER_IN_PROGRESS') {
+        const err = e as ApiError;
+        if (showHeldOrder(err)) {
+          // nothing else to do here: a second order could not fit either
+        } else if (err.code === 'ORDER_IN_PROGRESS') {
           // never silently place a second order: the host chooses
           setInProgress({ existingOrderId: err.data?.existingOrderId, existingStatus: err.data?.existingStatus });
           setLastInput(input as never);
@@ -164,8 +178,23 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setPlacing(false);
       }
     },
-    [partyId, shop, cartState]
+    [partyId, shop, cartState, showHeldOrder]
   );
+
+  // Leaving an order may have changed the budget (a release, a receipt): refresh the notice.
+  const onDone = useCallback(() => {
+    setOrder(null);
+    setCartState(null);
+    setError(null);
+    setStep('shops');
+    if (!partyId) return;
+    getPizzaOrderConfig(partyId)
+      .then((cfg) => {
+        setBlockedReason(cfg.blockedReason);
+        setHeldOrderId(cfg.heldOrderId ?? null);
+      })
+      .catch(() => undefined);
+  }, [partyId]);
 
   // until the backend says this party is in the pilot, show only the normal notice (no flash of the flow)
   if (!partyId || enabled !== true) return <>{fallback}</>;
@@ -204,19 +233,32 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
             : blockedReason === 'CAP_EXHAUSTED'
               ? 'No reimbursement budget is left for another order.'
               : 'AI ordering is not available for this party right now.'}
+          {blockedReason === 'CAP_EXHAUSTED' && heldOrderId && !inProgress && (
+            <button type="button" className="ml-2 underline" onClick={() => viewExisting(heldOrderId)}>
+              View the order holding it
+            </button>
+          )}
         </p>
       )}
 
+      {error && step !== 'cart' && <p className="text-sm text-[#ff393a] mb-3">{error}</p>}
+
       {inProgress && (
         <div className="p-3 mb-3 rounded-xl border border-[#ffb347]/40 bg-[#ffb347]/5 space-y-2">
-          <p className="text-sm text-theme-text">This party already has an order in progress or confirmed.</p>
+          <p className="text-sm text-theme-text">
+            {inProgress.capExhausted
+              ? 'An existing order is holding the rest of this party\'s budget. Open it to settle it.'
+              : 'This party already has an order in progress or confirmed.'}
+          </p>
           <div className="flex gap-2">
-            <button type="button" className="btn-secondary text-xs py-1 px-3" onClick={viewExisting}>
+            <button type="button" className="btn-secondary text-xs py-1 px-3" onClick={() => viewExisting(inProgress.existingOrderId)}>
               View it
             </button>
-            <button type="button" className="btn-secondary text-xs py-1 px-3" disabled={placing || !lastInput} onClick={() => lastInput && onApprove(lastInput as never, true)}>
-              Place a second order anyway
-            </button>
+            {!inProgress.capExhausted && (
+              <button type="button" className="btn-secondary text-xs py-1 px-3" disabled={placing || !lastInput} onClick={() => lastInput && onApprove(lastInput as never, true)}>
+                Place a second order anyway
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -243,11 +285,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           order={order}
           orderScript={orderScript}
           onUpdate={setOrder}
-          onDone={() => {
-            setOrder(null);
-            setCartState(null);
-            setStep('shops');
-          }}
+          onDone={onDone}
         />
       )}
     </div>
