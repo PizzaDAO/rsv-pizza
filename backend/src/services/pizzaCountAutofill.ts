@@ -39,6 +39,8 @@ export interface PizzaFields {
 }
 
 export const MAX_PIZZA_COUNT = 5000;
+/** A receipt implying more than this per pizza is a lump-sum catering line, not a pizza count. */
+export const MAX_USD_PER_PIZZA = 100;
 const MIN_SIZE_CM = 15;
 const MAX_SIZE_CM = 80;
 
@@ -243,6 +245,72 @@ export function derivePizzaAutofill(lineItems: unknown, ocrRaw: unknown, ocrConf
 }
 
 // ---------------------------------------------------------------------------
+// plausibility guard (USD per pizza)
+// ---------------------------------------------------------------------------
+
+/** A single receipt above this many USD is treated as a misread currency (total unknown). */
+export const MAX_PLAUSIBLE_RECEIPT_USD = 25000;
+
+/** The money columns of a payout_documents row (Decimals or numbers). */
+export interface ReceiptMoney {
+  ocrAmount?: unknown;
+  ocrCurrency?: string | null;
+  originalAmount?: unknown;
+  originalCurrency?: string | null;
+  exchangeRate?: unknown;
+}
+
+/**
+ * The receipt total in USD, or null when it can't be told. ocr_amount is
+ * documented as USD-converted but legacy rows hold the local-currency figure
+ * (a Nigerian receipt shows 754000), so it is only trusted as USD when the
+ * currency says USD. Otherwise: original_amount * exchange_rate.
+ */
+export function receiptUsdTotal(m: ReceiptMoney | null | undefined): number | null {
+  const usd = receiptUsdTotalRaw(m);
+  // A "USD" total this large is a local-currency figure the OCR stamped as USD
+  // (prod: 754000 on a Nigerian receipt, fx usd-passthrough): can't tell.
+  return usd !== null && usd > MAX_PLAUSIBLE_RECEIPT_USD ? null : usd;
+}
+
+function receiptUsdTotalRaw(m: ReceiptMoney | null | undefined): number | null {
+  if (!m) return null;
+  const cur = (m.originalCurrency ?? m.ocrCurrency ?? '').trim().toUpperCase();
+  const ocrCur = (m.ocrCurrency ?? '').trim().toUpperCase();
+  if (cur && ocrCur && cur !== ocrCur) return null;
+  const orig = numOrNull(m.originalAmount);
+  const rate = numOrNull(m.exchangeRate);
+  const ocr = numOrNull(m.ocrAmount);
+  if (cur === 'USD') {
+    const usd = ocr ?? orig;
+    return usd !== null && usd >= 0 ? round2(usd) : null;
+  }
+  if (orig !== null && orig >= 0 && rate !== null && rate > 0) return round2(orig * rate);
+  return null;
+}
+
+/** USD per pizza, or null when the total or count is unknown. */
+export function usdPerPizza(count: number | null | undefined, usdTotal: number | null | undefined): number | null {
+  if (count == null || !(count > 0) || usdTotal == null || !Number.isFinite(usdTotal)) return null;
+  return usdTotal / count;
+}
+
+/**
+ * Is `count` plausible for a receipt of `usdTotal` USD? Total / count must be
+ * <= MAX_USD_PER_PIZZA. Unknown USD total (null) keeps today's behaviour: true.
+ */
+export function isPlausiblePizzaCount(count: number, usdTotal: number | null | undefined): boolean {
+  const per = usdPerPizza(count, usdTotal);
+  return per === null || per <= MAX_USD_PER_PIZZA;
+}
+
+/** Drop an implausible AUTO count (size handling unchanged). Pure. */
+export function guardAutofillCount(auto: PizzaAutofill, usdTotal: number | null | undefined): PizzaAutofill {
+  if (auto.count === null || isPlausiblePizzaCount(auto.count, usdTotal)) return auto;
+  return { ...auto, count: null, countConfidence: null, countSource: null };
+}
+
+// ---------------------------------------------------------------------------
 // merge (host stickiness + confidence precedence)
 // ---------------------------------------------------------------------------
 
@@ -297,11 +365,17 @@ export function mergeAutofill(existing: PizzaFields, auto: PizzaAutofill): Parti
 
 /**
  * Create-time columns for a brand-new receipt doc (nothing to preserve).
+ * `usdTotal` (see receiptUsdTotal) drops an implausible auto count; null = unknown.
  * NEVER throws: a failure here must not fail an upload.
  */
-export function pizzaAutofillColumns(lineItems: unknown, ocrRaw: unknown, ocrConfidence: number | null = null): Partial<PizzaFields> {
+export function pizzaAutofillColumns(
+  lineItems: unknown,
+  ocrRaw: unknown,
+  ocrConfidence: number | null = null,
+  usdTotal: number | null = null,
+): Partial<PizzaFields> {
   try {
-    return mergeAutofill(emptyPizzaFields(), derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence));
+    return mergeAutofill(emptyPizzaFields(), guardAutofillCount(derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence), usdTotal));
   } catch (err) {
     console.error('[pizzaCountAutofill] derive failed (ignored):', err instanceof Error ? err.message : err);
     return {};
@@ -317,9 +391,13 @@ export function pizzaAutofillPatch(
   lineItems: unknown,
   ocrRaw: unknown,
   ocrConfidence: number | null = null,
+  usdTotal: number | null = null,
 ): Partial<PizzaFields> {
   try {
-    return mergeAutofill(pizzaFieldsFromDoc(existingDoc), derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence));
+    return mergeAutofill(
+      pizzaFieldsFromDoc(existingDoc),
+      guardAutofillCount(derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence), usdTotal),
+    );
   } catch (err) {
     console.error('[pizzaCountAutofill] derive failed (ignored):', err instanceof Error ? err.message : err);
     return {};

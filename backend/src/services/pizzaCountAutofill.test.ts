@@ -7,6 +7,11 @@ import {
   emptyAutofill,
   parsePizzaCountPatch,
   pizzaAutofillColumns,
+  pizzaAutofillPatch,
+  guardAutofillCount,
+  isPlausiblePizzaCount,
+  receiptUsdTotal,
+  MAX_USD_PER_PIZZA,
 } from './pizzaCountAutofill.js';
 
 const pz = (name: string, qty: number, unitPrice: number, size?: object) => ({
@@ -177,5 +182,51 @@ describe('parsePizzaCountPatch', () => {
   it('empty body is a no-op and non-objects fail', () => {
     expect(parsePizzaCountPatch({})).toEqual({ ok: true, data: {}, changed: false });
     expect(parsePizzaCountPatch(null).ok).toBe(false);
+  });
+});
+
+describe('USD-per-pizza guard', () => {
+  const giro = [{ name: 'Giro Pizza', qty: 1, unitPrice: 520, subtotal: 520, category: 'pizza' }];
+  const eur = { originalAmount: 520, originalCurrency: 'EUR', exchangeRate: 1.16, ocrAmount: 603.2, ocrCurrency: 'EUR' };
+
+  it('receiptUsdTotal converts, trusts ocr_amount only for USD, else unknown', () => {
+    expect(receiptUsdTotal(eur)).toBe(603.2);
+    expect(receiptUsdTotal({ originalAmount: 625, originalCurrency: 'USD', exchangeRate: 1, ocrAmount: 625, ocrCurrency: 'USD' })).toBe(625);
+    // legacy local-currency ocr_amount with no rate: can't tell
+    expect(receiptUsdTotal({ ocrAmount: 754000, ocrCurrency: 'NGN' })).toBeNull();
+    expect(receiptUsdTotal({ ocrAmount: 754000, originalAmount: 754000, originalCurrency: 'NGN', exchangeRate: 0.00065 })).toBe(490.1);
+    // Nigerian receipt stamped USD (usd-passthrough) with a local-currency figure
+    expect(receiptUsdTotal({ ocrAmount: 754000, ocrCurrency: 'USD', originalCurrency: null })).toBeNull();
+    expect(receiptUsdTotal({ ocrAmount: 50 })).toBeNull();
+    expect(receiptUsdTotal(null)).toBeNull();
+  });
+  it('isPlausiblePizzaCount: <= $100/pizza, unknown total keeps', () => {
+    expect(MAX_USD_PER_PIZZA).toBe(100);
+    expect(isPlausiblePizzaCount(1, 603.2)).toBe(false);
+    expect(isPlausiblePizzaCount(35, 625)).toBe(true);
+    expect(isPlausiblePizzaCount(1, 100)).toBe(true);
+    expect(isPlausiblePizzaCount(1, null)).toBe(true);
+    expect(isPlausiblePizzaCount(1, undefined)).toBe(true);
+  });
+  it('drops a lump-sum count of 1 on a 520 EUR receipt (size handling unchanged)', () => {
+    expect(pizzaAutofillColumns(giro, null, null)).toMatchObject({ pizzaCount: 1, pizzaCountSource: 'ocr' });
+    expect(pizzaAutofillColumns(giro, null, null, receiptUsdTotal(eur))).toEqual({});
+    const sized = [{ ...giro[0], name: 'Giro Pizza 30cm' }];
+    const cols = pizzaAutofillColumns(sized, null, null, receiptUsdTotal(eur));
+    expect(cols.pizzaCount).toBeUndefined();
+    expect(cols.pizzaCountSource).toBeUndefined();
+    expect(cols.pizzaSizeCm).toBe(30);
+  });
+  it('keeps 35 pizzas on a 625 USD receipt and keeps when the total is unknown', () => {
+    const lines = [pz('Pizza', 35, 17.86)];
+    expect(pizzaAutofillColumns(lines, null, null, 625).pizzaCount).toBe(35);
+    expect(pizzaAutofillColumns(giro, null, null, null).pizzaCount).toBe(1);
+  });
+  it('never touches a host value', () => {
+    const host = { ...emptyPizzaFields(), pizzaCount: 1, pizzaCountSource: 'host' as const };
+    const guarded = guardAutofillCount(derivePizzaAutofill(giro, null), 603.2);
+    expect(guarded.count).toBeNull();
+    expect(mergeAutofill(host, guarded)).toEqual({});
+    expect(pizzaAutofillPatch(host, giro, null, null, 603.2)).toEqual({});
   });
 });
