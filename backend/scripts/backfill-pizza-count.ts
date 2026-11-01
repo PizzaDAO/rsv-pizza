@@ -35,7 +35,7 @@ const band = (c: number | null) => (c === null ? 'n/a' : c >= 0.7 ? '>=0.70' : c
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const { prisma } = await import('../src/config/database.js');
-  const { derivePizzaAutofill, mergeAutofill, pizzaFieldsFromDoc } = await import('../src/services/pizzaCountAutofill.js');
+  const { derivePizzaAutofill, mergeAutofill, pizzaFieldsFromDoc, guardAutofillCount, receiptUsdTotal } = await import('../src/services/pizzaCountAutofill.js');
 
   const BATCH = 200;
   let cursor: string | null = null;
@@ -54,7 +54,8 @@ async function main() {
       orderBy: { id: 'asc' },
       take: BATCH,
       select: {
-        id: true, ocrLineItems: true, ocrRaw: true, ocrConfidence: true, ocrSummary: true,
+        id: true, ocrAmount: true, ocrCurrency: true, originalAmount: true, originalCurrency: true, exchangeRate: true,
+        ocrLineItems: true, ocrRaw: true, ocrConfidence: true, ocrSummary: true,
         pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
         pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
       },
@@ -65,7 +66,8 @@ async function main() {
     for (const d of docs) {
       scanned += 1;
       const conf = d.ocrConfidence == null ? null : Number(d.ocrConfidence.toString());
-      const auto = derivePizzaAutofill(d.ocrLineItems, d.ocrRaw, conf);
+      // Implausible counts ($/pizza over the cap) are dropped, same as at upload.
+      const auto = guardAutofillCount(derivePizzaAutofill(d.ocrLineItems, d.ocrRaw, conf), receiptUsdTotal(d));
       const patch = mergeAutofill(pizzaFieldsFromDoc(d), auto);
       if (Object.keys(patch).length === 0) continue;
       if (patch.pizzaCount != null) {

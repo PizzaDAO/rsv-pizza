@@ -44,7 +44,7 @@ import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 import { rasterizePdfFirstPage } from '../services/pdfRasterize.js';
-import { pizzaAutofillColumns } from '../services/pizzaCountAutofill.js';
+import { pizzaAutofillColumns, receiptUsdTotal } from '../services/pizzaCountAutofill.js';
 import { resolveWalletInput, looksLikeEnsName } from '../services/ens.service.js';
 import { saveHostPayoutWallet } from '../services/payout-snapshot.js';
 
@@ -503,7 +503,10 @@ router.post(
             ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
             ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
             // sfincione-40417 (pizza count): auto-fill (never throws).
-            ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
+            ...pizzaAutofillColumns(
+              ocr.lineItems, ocr.raw, ocr.confidence,
+              receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+            ),
             uploadedByEmail: hostEmail,
             sortOrder,
           },
