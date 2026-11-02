@@ -92,7 +92,7 @@ export interface SendToCityGroupResult {
  *
  * @param cityKey  Already-normalized city key (caller should pass `lower(trim(city))`).
  * @param text     Message body.
- * @param parseMode 'Auto' (default) | 'HTML' | 'Markdown' | 'None'.
+ * @param parseMode 'None' (default, plain) | 'Auto' | 'HTML' | 'Markdown'.
  * @param replyMarkup Optional Telegram reply_markup (e.g. an inline_keyboard);
  *   bocconcini-58533 uses this to attach URL + copy_text connect buttons.
  */
@@ -133,7 +133,7 @@ export async function sendToCityGroup(
     }
   }
 
-  const fmt = formatForTelegram(text, parseMode);
+  const fmt = formatForTelegram(text, parseMode ?? 'None');
 
   const send = async (sendChatId: string) => {
     const { json } = await postTelegramMessage(

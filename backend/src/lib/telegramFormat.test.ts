@@ -6,6 +6,7 @@ import {
   postTelegramMessage,
   formatAnnouncement,
 } from './telegramFormat.js';
+import { sendServiceDm } from '../services/telegramSend.js';
 import { BENNY_SIGNATURE } from './bennySignature.js';
 
 describe('toTelegramHtml', () => {
@@ -25,7 +26,7 @@ describe('toTelegramHtml', () => {
     expect(toTelegramHtml('*one')).toBe('*one');
   });
   it('converts _italic_ and __italic__ but not snake_case', () => {
-    expect(toTelegramHtml('_hi_ __there__')).toBe('<i>hi</i> <i>there</i>');
+    expect(toTelegramHtml('_hi_ __There Now__')).toBe('<i>hi</i> <i>There Now</i>');
     expect(toTelegramHtml('use snake_case_name here')).toBe('use snake_case_name here');
     expect(toTelegramHtml('a_b and c_d')).toBe('a_b and c_d');
   });
@@ -113,5 +114,57 @@ describe('formatAnnouncement', () => {
   });
   it('works without a subject', () => {
     expect(formatAnnouncement('', '**hi**').text).toBe(`<b>hi</b>\n\n${BENNY_SIGNATURE}`);
+  });
+});
+
+describe('edge cases', () => {
+  it('keeps ** and punctuation outside bare URLs', () => {
+    expect(toTelegramHtml('**https://x.com/a_b**')).toBe('<b>https://x.com/a_b</b>');
+    expect(toTelegramHtml('See https://x.com/a, then https://y.com/b.')).toBe('See https://x.com/a, then https://y.com/b.');
+    expect(toTelegramHtml('(see https://x.com/a)')).toBe('(see https://x.com/a)');
+    expect(toTelegramHtml('_https://x.com/a_')).toBe('<i>https://x.com/a</i>');
+    expect(toTelegramHtml('*https://x.com/a*')).toBe('<b>https://x.com/a</b>');
+  });
+  it('supports parentheses inside link URLs', () => {
+    expect(toTelegramHtml('[Pizza](https://en.wikipedia.org/wiki/Pizza_(food)) ok')).toBe(
+      '<a href="https://en.wikipedia.org/wiki/Pizza_(food)">Pizza</a> ok',
+    );
+  });
+  it('leaves snake_case and dunder identifiers alone', () => {
+    expect(toTelegramHtml('def __init__ and my_var_name')).toBe('def __init__ and my_var_name');
+    expect(toTelegramHtml('__Big News__')).toBe('<i>Big News</i>');
+  });
+  it('strips NUL so user text cannot collide with placeholders', () => {
+    expect(toTelegramHtml('x\u00000\u0000 https://a.com')).toBe('x0 https://a.com');
+  });
+});
+
+describe('sendServiceDm', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const reply = (body: any, status = 200) => ({ status, json: async () => body });
+  it('is plain by default', async () => {
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+    const f = vi.fn().mockResolvedValue(reply({ ok: true, result: { message_id: 1 } }));
+    vi.stubGlobal('fetch', f);
+    await sendServiceDm('1', '**hi**');
+    const body = JSON.parse(f.mock.calls[0][1].body);
+    expect(body.parse_mode).toBeUndefined();
+    expect(body.text).toContain('**hi**');
+  });
+  it("format 'auto' sends HTML and falls back to plain on a parse error", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(reply({ ok: false, error_code: 400, description: "Bad Request: can't parse entities" }, 400))
+      .mockResolvedValueOnce(reply({ ok: true, result: { message_id: 2 } }));
+    vi.stubGlobal('fetch', f);
+    const r = await sendServiceDm('1', '**hi**', undefined, { format: 'auto' });
+    expect(r.ok).toBe(true);
+    const first = JSON.parse(f.mock.calls[0][1].body);
+    const second = JSON.parse(f.mock.calls[1][1].body);
+    expect(first.parse_mode).toBe('HTML');
+    expect(first.text).toContain('<b>hi</b>');
+    expect(second.parse_mode).toBeUndefined();
+    expect(second.text).toContain('**hi**');
   });
 });

@@ -2239,7 +2239,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
         try {
           const { json: tgJson } = await postTelegramMessage(
             `https://api.telegram.org/bot${botToken}/sendMessage`,
-            { chat_id: party.hostTelegramChatId.toString(), disable_web_page_preview: true },
+            { chat_id: party.hostTelegramChatId.toString() },
             formatAnnouncement(subject, body),
           );
           telegramSent = !!tgJson.ok;

@@ -18,7 +18,7 @@
  *   POST /dm       { telegramUserId, text, buttons?, format?: 'auto', idempotencyKey }
  *                  -> { ok:true, messageId, replay? } | { ok:false, code, retryAfter? }
  *   POST /probe    { telegramUserId } -> { ok, reachable, code? }
- *   POST /city-post { cityKey, text, idempotencyKey }
+ *   POST /city-post { cityKey, text, format?: 'auto', idempotencyKey }
  *                  -> { ok:true, messageId?, migratedTo?, replay? } | { ok:false, code, retryAfter? }
  *   POST /host-match { emailHashes: string[1..100] }  (sha256 hex of lower(trim(email)))
  *                  -> { ok:true, matches:[{ emailHash, telegramUserId, handleHint }] }
@@ -402,7 +402,7 @@ router.post(
         async () => {
           let r;
           try {
-            r = await sendToCityGroup(cityKey, text);
+            r = await sendToCityGroup(cityKey, text, req.body?.format === 'auto' ? 'Auto' : 'None');
           } catch {
             // sendToCityGroup catches its own send errors, so a throw is a
             // group lookup failure that happened before any request to Telegram.

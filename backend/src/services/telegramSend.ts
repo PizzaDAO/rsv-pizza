@@ -17,8 +17,8 @@ import { formatForTelegram, postTelegramMessage, toTelegramHtml, isParseEntities
 export async function sendTelegramMessage(
   chatId: string,
   text: string,
-  // Telegram parse mode: 'Auto' (default; **bold** etc. -> HTML), 'HTML',
-  // 'Markdown' or 'None'. A parse-entities 400 is retried once as plain text.
+  // Telegram parse mode: default plain ('None'); 'Auto' converts **bold** etc.
+  // to HTML; 'HTML' / 'Markdown' pass through. A parse-entities 400 is retried once as plain text.
   parseMode?: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -29,7 +29,7 @@ export async function sendTelegramMessage(
     const { status, json } = await postTelegramMessage(
       `https://api.telegram.org/bot${token}/sendMessage`,
       { chat_id: chatId, disable_web_page_preview: true },
-      formatForTelegram(text, parseMode),
+      formatForTelegram(text, parseMode ?? 'None'),
     );
     if (!json?.ok) {
       const detail = typeof json?.description === 'string' ? json.description.slice(0, 200) : '';

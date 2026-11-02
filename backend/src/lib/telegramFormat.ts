@@ -23,21 +23,37 @@ export function toTelegramHtml(text: string): string {
     return `\u0000${stash.length - 1}\u0000`;
   };
 
-  let s = escapeTelegramHtml(text ?? '');
+  // NUL is our placeholder delimiter; drop it from user text so it can't collide.
+  let s = escapeTelegramHtml((text ?? '').replace(/\u0000/g, ''));
 
   // [text](url): http/https only. s is already escaped, so only quotes remain.
-  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, label: string, url: string) =>
+  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g, (_m, label: string, url: string) =>
     hold(`<a href="${url.replace(/"/g, '&quot;')}">${label}</a>`),
   );
   // Bare URLs are protected so `_` and `*` inside them are never touched.
-  s = s.replace(/https?:\/\/[^\s<]+/g, (url) => hold(url));
+  s = s.replace(/https?:\/\/[^\s<]+/g, (raw) => {
+    let url = raw;
+    // Trailing markers/punctuation belong to the sentence, not the URL.
+    for (;;) {
+      const last = url[url.length - 1];
+      const unbalancedParen =
+        last === ')' && (url.match(/\)/g) || []).length > (url.match(/\(/g) || []).length;
+      const entityEnd = last === ';' && /&[a-z]+;$/i.test(url);
+      if (unbalancedParen || (/[*_.,:;!?'"]/.test(last) && !entityEnd)) url = url.slice(0, -1);
+      else break;
+    }
+    return hold(url) + raw.slice(url.length);
+  });
 
   // Bold: **x** first, then single *x*.
   s = s.replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '<b>$1</b>');
   s = s.replace(/(?<![*\w])\*(?=[^\s*])([^*\n]*?[^\s*])\*(?![*\w])/g, '<b>$1</b>');
 
   // Italic: __x__ first, then word-bounded _x_ (snake_case is left alone).
-  s = s.replace(/(?<![\w_])__(?=\S)([^\n]*?\S)__(?![\w_])/g, '<i>$1</i>');
+  // Dunder identifiers like __init__ (single lowercase token) stay literal.
+  s = s.replace(/(?<![\w_])__(?=\S)([^\n]*?\S)__(?![\w_])/g, (m, inner: string) =>
+    /^[a-z0-9_]+$/.test(inner) ? m : `<i>${inner}</i>`,
+  );
   s = s.replace(/(?<![\w_])_(?=[^\s_])([^_\n]*?[^\s_])_(?![\w_])/g, '<i>$1</i>');
 
   return s.replace(/\u0000(\d+)\u0000/g, (_m, i: string) => stash[Number(i)]);
