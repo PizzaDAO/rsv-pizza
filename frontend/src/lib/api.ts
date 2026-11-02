@@ -4242,7 +4242,7 @@ export async function fetchHostAudience(): Promise<HostAudienceRow[]> {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto',
   // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
   appTab: string | null = null
 ): Promise<BroadcastResponse> {
@@ -4256,7 +4256,7 @@ export async function sendTelegramBroadcast(
 export async function sendTelegramTest(
   chatId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
     method: 'POST',
@@ -4275,7 +4275,7 @@ export interface BroadcastHost {
 export async function sendHostTelegramBroadcast(
   hosts: BroadcastHost[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto',
   // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
   appTab: string | null = null,
   // guanciale-58491: client-minted UUID double-send guard (null = none).
@@ -4291,7 +4291,7 @@ export async function sendHostTelegramBroadcast(
 export async function sendHostTelegramTest(
   partyId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
     method: 'POST',

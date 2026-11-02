@@ -18,6 +18,7 @@
  */
 import { prisma } from '../config/database.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { escapeTelegramHtml } from '../lib/telegramFormat.js';
 
 const BOT_API = 'https://api.telegram.org';
 
@@ -56,14 +57,14 @@ export async function notifyHostOfPaymentExecution(
     let text: string;
     if (outcome === 'paid') {
       const txLine = details?.txHash
-        ? `\nTx: https://basescan.org/tx/${details.txHash}`
+        ? `\nTx: https://basescan.org/tx/${escapeTelegramHtml(String(details.txHash))}`
         : '';
-      text = `🍕 *Pizza payment sent!*\n$${amount} USDC to your wallet for *${cityName}*.${txLine}`;
+      text = `🍕 <b>Pizza payment sent!</b>\n$${amount} USDC to your wallet for <b>${escapeTelegramHtml(cityName)}</b>.${txLine}`;
     } else {
       const errSuffix = details?.error
-        ? `: ${details.error.slice(0, 200)}`
+        ? `: ${escapeTelegramHtml(details.error.slice(0, 200))}`
         : '';
-      text = `⚠️ Your $${amount} payment for *${cityName}* couldn't go through${errSuffix}. Admin will retry shortly.`;
+      text = `⚠️ Your $${amount} payment for <b>${escapeTelegramHtml(cityName)}</b> couldn't go through${errSuffix}. Admin will retry shortly.`;
     }
 
     await fetch(`${BOT_API}/bot${token}/sendMessage`, {
@@ -72,7 +73,7 @@ export async function notifyHostOfPaymentExecution(
       body: JSON.stringify({
         chat_id: chatId.toString(),
         text: withBennySignature(text),
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         disable_web_page_preview: true,
       }),
     }).catch((err) => {

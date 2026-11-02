@@ -12,42 +12,30 @@
  * failure exactly as before.
  */
 import { withBennySignature } from '../lib/bennySignature.js';
+import { formatForTelegram, postTelegramMessage, toTelegramHtml, isParseEntitiesError } from '../lib/telegramFormat.js';
 
 export async function sendTelegramMessage(
   chatId: string,
   text: string,
-  // suppli-58533: optional Telegram parse_mode ('HTML' | 'Markdown'). Default
-  // stays plain text so existing callers are unaffected; only the per-type
-  // reminder copy (which embeds an inline <a> "DM them to me" link) opts in.
+  // Telegram parse mode: 'Auto' (default; **bold** etc. -> HTML), 'HTML',
+  // 'Markdown' or 'None'. A parse-entities 400 is retried once as plain text.
   parseMode?: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     return { ok: false, reason: 'TELEGRAM_BOT_TOKEN not configured' };
   }
-  const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
   try {
-    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: withBennySignature(text),
-        disable_web_page_preview: true,
-        ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-      }),
-    });
-    if (!resp.ok) {
-      let detail = '';
-      try {
-        const body = await resp.text();
-        detail = body.slice(0, 200);
-      } catch {
-        // ignore — surface just the status
-      }
+    const { status, json } = await postTelegramMessage(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      { chat_id: chatId, disable_web_page_preview: true },
+      formatForTelegram(text, parseMode),
+    );
+    if (!json?.ok) {
+      const detail = typeof json?.description === 'string' ? json.description.slice(0, 200) : '';
       return {
         ok: false,
-        reason: `Telegram API returned ${resp.status}${detail ? `: ${detail}` : ''}`,
+        reason: `Telegram API returned ${json?.error_code ?? status}${detail ? `: ${detail}` : ''}`,
       };
     }
     return { ok: true };
@@ -113,18 +101,27 @@ async function callBotApi(method: string, payload: Record<string, unknown>): Pro
   }
 }
 
-/** Plain-text private message with optional URL buttons; signed like every Benny message. */
-export function sendServiceDm(
+/** Private message (plain unless `format: 'auto'`) with optional URL buttons; signed like every Benny message. */
+export async function sendServiceDm(
   chatId: string,
   text: string,
   buttons?: { text: string; url: string }[][],
+  opts: { format?: 'auto' } = {},
 ): Promise<TelegramApiResult> {
-  return callBotApi('sendMessage', {
-    chat_id: chatId,
-    text: withBennySignature(text),
-    disable_web_page_preview: true,
-    ...(buttons && buttons.length > 0 && { reply_markup: { inline_keyboard: buttons } }),
+  const reply_markup = buttons && buttons.length > 0 ? { reply_markup: { inline_keyboard: buttons } } : {};
+  const base = { chat_id: chatId, disable_web_page_preview: true, ...reply_markup };
+  if (opts.format !== 'auto') {
+    return callBotApi('sendMessage', { ...base, text: withBennySignature(text) });
+  }
+  const html = await callBotApi('sendMessage', {
+    ...base,
+    text: withBennySignature(toTelegramHtml(text)),
+    parse_mode: 'HTML',
   });
+  if (!html.ok && isParseEntitiesError({ error_code: html.errorCode, description: html.description })) {
+    return callBotApi('sendMessage', { ...base, text: withBennySignature(text) });
+  }
+  return html;
 }
 
 /** `typing` chat action: succeeds only if the user has started the bot. */

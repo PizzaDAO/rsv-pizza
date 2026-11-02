@@ -15,7 +15,7 @@
  *   /city-groups needs only the key. Identifiers go in bodies, never URLs.
  *
  *   GET  /city-groups -> { ok, groups:[{ cityKey, title, country, region, chatUrl, hasChat }] }
- *   POST /dm       { telegramUserId, text, buttons?, idempotencyKey }
+ *   POST /dm       { telegramUserId, text, buttons?, format?: 'auto', idempotencyKey }
  *                  -> { ok:true, messageId, replay? } | { ok:false, code, retryAfter? }
  *   POST /probe    { telegramUserId } -> { ok, reachable, code? }
  *   POST /city-post { cityKey, text, idempotencyKey }
@@ -322,7 +322,7 @@ router.post('/dm', dmFlag, async (req: Request, res: Response, next: NextFunctio
     const key = parseKey(req.body?.idempotencyKey);
     const buttons = parseButtons(req.body?.buttons);
     const out = await sendOnce<DmCode>('dm', userId, key, async () => {
-      const r = await sendServiceDm(userId, text, buttons);
+      const r = await sendServiceDm(userId, text, buttons, { format: req.body?.format === 'auto' ? 'auto' : undefined });
       if (r.ok) return { ok: true, messageId: r.messageId };
       if (r.notConfigured) throw new NotConfigured();
       return { ok: false, ...classifyDmFailure(r) };
