@@ -35,8 +35,8 @@ describe('toTelegramHtml', () => {
     expect(toTelegramHtml('_x_ https://x.com/_a_')).toBe('<i>x</i> https://x.com/_a_');
   });
   it('converts links and escapes attributes', () => {
-    expect(toTelegramHtml('[RSVP](https://rsv.pizza/a_b?x=1&y="2")')).toBe(
-      '<a href="https://rsv.pizza/a_b?x=1&amp;y=&quot;2&quot;">RSVP</a>',
+    expect(toTelegramHtml('[RSVP](https://example.com/a_b?x=1&y="2")')).toBe(
+      '<a href="https://example.com/a_b?x=1&amp;y=&quot;2&quot;">RSVP</a>',
     );
   });
   it('rejects non-http links', () => {
