@@ -388,6 +388,7 @@
     "messagePlaceholder": "Type your message here...",
     "messageLabel": "Message",
     "formatPlain": "Plain Text",
+    "formatAuto": "Auto (bold with **text**)",
     "formatHtml": "HTML",
     "formatMarkdown": "Markdown",
     "sent": "Sent",

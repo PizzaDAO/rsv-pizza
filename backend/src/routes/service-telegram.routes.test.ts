@@ -278,7 +278,7 @@ describe('POST /city-post', () => {
     mockSendToCityGroup.mockResolvedValue({ ok: true, migratedTo: '-200', messageId: 9 });
     const res = await post('/city-post', cp());
     expect(res.body).toEqual({ ok: true, messageId: 9, migratedTo: '-200' });
-    expect(mockSendToCityGroup).toHaveBeenCalledWith('test city', 'hi');
+    expect(mockSendToCityGroup).toHaveBeenCalledWith('test city', 'hi', 'None');
   });
 
   it('maps skipped to no_group', async () => {

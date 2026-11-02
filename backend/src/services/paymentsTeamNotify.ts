@@ -20,6 +20,7 @@
  */
 import { prisma } from '../config/database.js';
 import { withBennySignature } from '../lib/bennySignature.js';
+import { escapeTelegramHtml } from '../lib/telegramFormat.js';
 import { brand } from '../config/brand.js';
 
 type NotifyKind = 'approved' | 'flag_ready';
@@ -52,7 +53,7 @@ export async function notifyPaymentsTeam(opts: {
 
     const baseUrl = process.env.FRONTEND_BASE_URL || 'https://rsv.pizza';
     const reviewUrl = `${baseUrl}/payments`;
-    const text = `${verbWithIcon}\n*${cityName}* — $${amount} USDC to ${recipient}\n${reviewUrl}`;
+    const text = `${escapeTelegramHtml(verbWithIcon)}\n<b>${escapeTelegramHtml(cityName)}</b> — $${amount} USDC to ${escapeTelegramHtml(recipient)}\n${escapeTelegramHtml(reviewUrl)}`;
 
     // Telegram — single shared chat id (group or DM). Skip if either env var
     // is missing.
@@ -65,7 +66,7 @@ export async function notifyPaymentsTeam(opts: {
         body: JSON.stringify({
           chat_id: tgChat,
           text: withBennySignature(text),
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           disable_web_page_preview: true,
         }),
       }).catch((e: any) => {
