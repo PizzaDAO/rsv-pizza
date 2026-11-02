@@ -75,6 +75,16 @@ export function formatForTelegram(text: string, parseMode?: string): TelegramFor
   return { text: plain, parse_mode: parseMode, plain };
 }
 
+/** Announcement: bold escaped subject, then the body converted via toTelegramHtml. */
+export function formatAnnouncement(subject: string | undefined | null, body: string): TelegramFormatted {
+  const html = subject ? `<b>${escapeTelegramHtml(subject)}</b>\n\n${toTelegramHtml(body)}` : toTelegramHtml(body);
+  return {
+    text: withBennySignature(html),
+    parse_mode: 'HTML',
+    plain: withBennySignature(subject ? `${subject}\n\n${body}` : body),
+  };
+}
+
 /**
  * POST sendMessage once; if Telegram rejects the entities, retry once as plain
  * text. `extra` holds chat_id and other fields (not text / parse_mode).

@@ -4,6 +4,7 @@ import {
   isParseEntitiesError,
   formatForTelegram,
   postTelegramMessage,
+  formatAnnouncement,
 } from './telegramFormat.js';
 import { BENNY_SIGNATURE } from './bennySignature.js';
 
@@ -100,5 +101,17 @@ describe('postTelegramMessage', () => {
     vi.stubGlobal('fetch', fetch2);
     await postTelegramMessage('https://t.invalid/x', { chat_id: '1' }, formatForTelegram('hi', 'None'));
     expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('formatAnnouncement', () => {
+  it('bolds the escaped subject and converts the body', () => {
+    const f = formatAnnouncement('Doors <open>', 'Come **early** & enjoy');
+    expect(f.parse_mode).toBe('HTML');
+    expect(f.text).toBe(`<b>Doors &lt;open&gt;</b>\n\nCome <b>early</b> &amp; enjoy\n\n${BENNY_SIGNATURE}`);
+    expect(f.plain).toBe(`Doors <open>\n\nCome **early** & enjoy\n\n${BENNY_SIGNATURE}`);
+  });
+  it('works without a subject', () => {
+    expect(formatAnnouncement('', '**hi**').text).toBe(`<b>hi</b>\n\n${BENNY_SIGNATURE}`);
   });
 });

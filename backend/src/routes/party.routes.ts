@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin, isAdmin, isUnderboss, isPaymentAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { withBennySignature } from '../lib/bennySignature.js';
-import { escapeTelegramHtml } from '../lib/telegramFormat.js';
+import { formatAnnouncement, postTelegramMessage } from '../lib/telegramFormat.js';
 import { sendApprovalEmail, sendPromotionEmail } from './rsvp.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { canUserEditParty, canUserAccessTab, VALID_TAB_IDS } from '../helpers/partyAccess.js';
@@ -2237,18 +2237,11 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (botToken) {
         try {
-          const message = subject ? `<b>${escapeTelegramHtml(subject)}</b>\n\n${escapeTelegramHtml(body)}` : escapeTelegramHtml(body);
-          const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: party.hostTelegramChatId.toString(),
-              text: withBennySignature(message),
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-            }),
-          });
-          const tgJson = await tgRes.json();
+          const { json: tgJson } = await postTelegramMessage(
+            `https://api.telegram.org/bot${botToken}/sendMessage`,
+            { chat_id: party.hostTelegramChatId.toString(), disable_web_page_preview: true },
+            formatAnnouncement(subject, body),
+          );
           telegramSent = !!tgJson.ok;
         } catch (err) {
           console.error('[Day-of announce] Telegram send failed:', err);
