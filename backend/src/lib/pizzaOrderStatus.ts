@@ -45,6 +45,14 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
   return !na || na.type === 'none';
 }
 
+/** pizza-mcp `call.deferred` on a `calling` order: a dial is owed but nothing is on the line. */
+export function deferredOf(row: { status: string; lastView?: unknown }): { reason: string; message: string; until: string | null } | null {
+  if (row.status !== 'calling') return null;
+  const d = (row.lastView as { call?: { deferred?: { reason?: unknown; message?: unknown; until?: unknown } | null } | null } | null | undefined)?.call?.deferred;
+  if (!d || typeof d !== 'object') return null;
+  return { reason: String(d.reason ?? ''), message: String(d.message ?? ''), until: typeof d.until === 'string' ? d.until : null };
+}
+
 /**
  * pizza-mcp 662d51c: the shop agreed on the call and the call is being checked (its post-call judge) before the order
  * can be `confirmed_by_shop`. The order stays `calling` with `call.checking = { message }` until it becomes
@@ -54,6 +62,10 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
  */
 export function checkingOf(row: { status: string; lastView?: unknown }): { message: string } | null {
   if (row.status !== 'calling') return null;
+  // pizza-mcp 41b81d7: after a price approval the order can be `calling` with BOTH `call.checking` (the earlier call's
+  // stage is confirmed) and `call.deferred` (`call_check_pending`: the callback waits for that check). Deferred wins:
+  // the order is waiting to be called, and pizza-mcp lets the host cancel it then.
+  if (deferredOf(row)) return null;
   const c = (row.lastView as { call?: { checking?: { message?: unknown } | null } | null } | null | undefined)?.call?.checking;
   if (!c || typeof c !== 'object') return null;
   return { message: typeof c.message === 'string' && c.message.trim() ? c.message : 'The call ended and the result is being checked.' };
@@ -62,13 +74,14 @@ export function checkingOf(row: { status: string; lastView?: unknown }): { messa
 /**
  * Can the host call this order off? `calling` counts only while the dial is deferred (`call.deferred`):
  * no call is on the line yet. If the dial starts first, pizza-mcp's 409 reaches the host as an error.
- * Never while the finished call is being checked (`call.checking`): pizza-mcp refuses that cancel.
+ * Never while the finished call is being checked (`call.checking`) with no dial owed: pizza-mcp refuses that cancel.
+ * A deferral wins over a check: pizza-mcp's cancelOrder allows a `calling` order whose dial is pending (retry_at set),
+ * including `call_check_pending`, where the earlier call's check is still running.
  */
 export function isCancelable(row: { status: string; lastView?: unknown }): boolean {
   if (CANCELABLE_STATUSES.has(row.status)) return true;
-  if (checkingOf(row)) return false;
-  const deferred = (row.lastView as { call?: { deferred?: unknown } | null } | null | undefined)?.call?.deferred;
-  return row.status === 'calling' && !!deferred;
+  if (deferredOf(row)) return true;
+  return false;
 }
 
 export interface OrderOutcome {

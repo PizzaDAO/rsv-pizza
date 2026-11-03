@@ -723,7 +723,7 @@ export interface components {
                         /** @description ISO time the next dial is due. */
                         until: string;
                         /** @enum {string} */
-                        reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry";
+                        reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry" | "call_check_pending";
                         /** @description Plain words for the host, e.g. why the shop is not called yet. */
                         message: string;
                     } | null;
@@ -807,7 +807,7 @@ export interface components {
                     /** @description ISO time the next dial is due. */
                     until: string;
                     /** @enum {string} */
-                    reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry";
+                    reason: "outside_call_window" | "principal_daily_cap" | "shop_daily_cap" | "transient" | "retry" | "call_check_pending";
                     /** @description Plain words for the host, e.g. why the shop is not called yet. */
                     message: string;
                 } | null;

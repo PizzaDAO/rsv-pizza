@@ -208,6 +208,19 @@ describe('OrderStatus', () => {
     expect(document.body.textContent).not.toMatch(/nothing was ordered/i);
   });
 
+  it('pizza-mcp 41b81d7: call_check_pending (deferred + checking) reads as waiting to call back, offers cancel, shows the next try', async () => {
+    const msg = 'An earlier call to the shop is still being checked; we will call as soon as that check is done.';
+    const o = order({ status: 'calling', cancelable: true, confirmedTotalCents: null, payoutDocumentId: null, call: { deferred: { until: '2026-11-01T12:05:00Z', reason: 'call_check_pending', message: msg }, checking: { message: 'The call ended and the result is being checked.' } } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Waiting to call Sal's back")).toBeTruthy();
+    expect(document.body.textContent).toContain(msg);
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
+    expect(screen.queryByText("Calling Sal's")).toBeNull();
+    expect(screen.queryByText("Checking the call with Sal's")).toBeNull();
+    expect(screen.getByText('Cancel this order')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Sal's confirmed|Receipts list|Pay at pickup/);
+  });
+
   it('call.attempts is never shown, however large', () => {
     const call = { attempts: 3, last_outcome: 'not_dialed', deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'Soon.' } } as PizzaOrderView['call'];
     render(<OrderStatus partyId="p" order={order({ status: 'calling', call })} orderScript="" onUpdate={noop} onDone={noop} />);

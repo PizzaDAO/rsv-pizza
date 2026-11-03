@@ -108,14 +108,14 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
         </a>
       )}
 
-      {order.isMine && order.cancelable && !order.call?.checking && (
+      {order.isMine && order.cancelable && (!order.call?.checking || !!order.call?.deferred) && (
         <div>
           <button
             type="button"
             className="btn-secondary w-full text-sm py-1.5"
             disabled={canceling}
             onClick={async () => {
-              const mayExist = order.outcome?.nothing_ordered === false;
+              const mayExist = order.outcome?.nothing_ordered === false || !!order.call?.checking;
               if (!window.confirm(mayExist ? `Stop us calling ${order.shopName} back? This does not cancel anything they may already have: check with them.` : `Cancel the order at ${order.shopName}?`)) return;
               setCanceling(true);
               setCancelError(null);

@@ -313,6 +313,21 @@ export function statusInfo(
         tone: 'warn',
       };
     }
+    // pizza-mcp 41b81d7: a card number may have been read out on the call. The call is not checked automatically; a person
+    // reads it. An order may exist. Never repeat or ask for card details here.
+    if (oc.reason === 'card_spoken') {
+      return {
+        title: `Check with ${o.shopName} before ordering again`,
+        detail: [
+          oc.message,
+          `A person on our team will read the call, but you don't need to wait for that: call ${o.shopName} to find out whether they took the order and whether they kept a card number from the call.`,
+          o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        tone: 'warn',
+      };
+    }
     return {
       title: `Check with ${o.shopName} before ordering again`,
       detail: [
@@ -337,7 +352,9 @@ export function statusInfo(
     case 'calling': {
       // pizza-mcp 662d51c: the shop agreed on the call, and the call is being checked before the order can be
       // confirmed. Not a confirmation: it becomes confirmed or "could not confirm", and nothing is redialed meanwhile.
-      const checking = o.call?.checking;
+      // pizza-mcp 41b81d7: a deferral beats a check. After a price approval the order can carry both `call.checking`
+      // and `call.deferred` (`call_check_pending`); it is waiting to be called, which is what the host needs to know.
+      const checking = o.call?.deferred ? null : o.call?.checking;
       if (checking) {
         return {
           title: `Checking the call with ${o.shopName}`,
@@ -347,6 +364,13 @@ export function statusInfo(
       }
       // Not dialed yet, so not "calling": no call is on the line, and that says nothing about earlier calls.
       const deferred = o.call?.deferred;
+      if (deferred && deferred.reason === 'call_check_pending') {
+        return {
+          title: `Waiting to call ${o.shopName} back`,
+          detail: `${deferred.message || 'An earlier call to the shop is still being checked; we will call as soon as that check is done.'} Nothing is on the line right now. If the check takes longer than about 30 minutes we stop and tell you. You can cancel this order meanwhile; that does not undo anything ${o.shopName} may already have, so check with them. Please do not order again in the meantime.`,
+          tone: 'info',
+        };
+      }
       if (deferred) {
         const transient = deferred.reason === 'transient';
         return {

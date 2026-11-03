@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../config/database.js', () => ({ prisma: {} }));
 
 import { budgetBreakdown, budgetUsedCents, isLaterReceipt } from './pizzaOrdering.js';
-import { isBlocking, isCancelable, isSettling, checkingOf, SETTLE_WINDOW_MS } from './pizzaOrderStatus.js';
+import { isBlocking, isCancelable, isSettling, checkingOf, deferredOf, SETTLE_WINDOW_MS } from './pizzaOrderStatus.js';
 
 const ORDERED = new Date('2026-11-01T12:00:00Z');
 const before = new Date('2026-11-01T11:00:00Z');
@@ -140,8 +140,15 @@ describe('isCancelable', () => {
     expect(isCancelable({ status: 'calling', lastView: { call: {} } })).toBe(false);
     expect(isCancelable({ status: 'calling' })).toBe(false);
     expect(isCancelable({ status: 'confirmed_by_shop', lastView: { call: { deferred: { until: 'x' } } } })).toBe(false);
-    // pizza-mcp 662d51c: never while the finished call is being checked
-    expect(isCancelable({ status: 'calling', lastView: { call: { deferred: { until: 'x' }, checking: { message: 'm' } } } })).toBe(false);
+    // pizza-mcp 662d51c: never while the finished call is being checked and no dial is owed
+    expect(isCancelable({ status: 'calling', lastView: { call: { checking: { message: 'm' } } } })).toBe(false);
+    // pizza-mcp 41b81d7: a deferral (call_check_pending) beats the check: cancelOrder allows a pending dial, and
+    // checking does not hide it
+    const both = { status: 'calling', lastView: { call: { deferred: { until: 'x', reason: 'call_check_pending', message: 'm' }, checking: { message: 'c' } } } };
+    expect(isCancelable(both)).toBe(true);
+    expect(checkingOf(both)).toBeNull();
+    expect(deferredOf(both)).toEqual({ reason: 'call_check_pending', message: 'm', until: 'x' });
+    expect(deferredOf({ status: 'unreachable', lastView: both.lastView })).toBeNull();
     expect(checkingOf({ status: 'calling', lastView: { call: { checking: { message: 'm' } } } })).toEqual({ message: 'm' });
     expect(checkingOf({ status: 'calling', lastView: { call: { checking: {} } } })).toEqual({ message: 'The call ended and the result is being checked.' });
     expect(checkingOf({ status: 'confirmed_by_shop', lastView: { call: { checking: { message: 'm' } } } })).toBeNull();

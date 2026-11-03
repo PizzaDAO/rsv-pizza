@@ -3185,7 +3185,8 @@
                               "principal_daily_cap",
                               "shop_daily_cap",
                               "transient",
-                              "retry"
+                              "retry",
+                              "call_check_pending"
                             ]
                           },
                           "message": {
@@ -3539,7 +3540,8 @@
                           "principal_daily_cap",
                           "shop_daily_cap",
                           "transient",
-                          "retry"
+                          "retry",
+                          "call_check_pending"
                         ]
                       },
                       "message": {

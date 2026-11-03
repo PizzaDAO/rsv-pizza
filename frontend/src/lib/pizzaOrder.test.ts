@@ -74,6 +74,30 @@ describe('statusInfo', () => {
     expect(`${s.title} ${s.detail}`).not.toMatch(/\bNOT\b|error|failed|problem|went wrong/);
     expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'judge_unavailable', message } }).detail).not.toMatch(/release/);
   });
+  it.each(['needs_review', 'unreachable', 'canceled'])('pizza-mcp 41b81d7: card_spoken on %s says a card may have been read out, an order may exist, and to check with the shop', (status) => {
+    const message = 'A card number may have been read out on the call, so we did not check the call automatically and a person will read it. An order may exist at the shop: please check with it before ordering again.';
+    const s = statusInfo({ ...base, status, releasable: true, outcome: { nothing_ordered: false, reason: 'card_spoken', message } });
+    expect(s.title).toBe("Check with Sal's before ordering again");
+    expect(s.tone).toBe('warn');
+    expect(s.detail.startsWith(message)).toBe(true);
+    expect(s.detail).toMatch(/call Sal's to find out whether they took the order/);
+    expect(s.detail).toMatch(/card number/);
+    expect(s.detail).toMatch(/release it below/);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/confirmed|\d{4}/i);
+    expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'card_spoken', message } }).detail).not.toMatch(/release/);
+  });
+  it('pizza-mcp 41b81d7: a call_check_pending deferral reads as waiting to call back, never Calling, Checking or confirmed, even with call.checking set', () => {
+    const msg = 'An earlier call to the shop is still being checked; we will call as soon as that check is done.';
+    const call = { deferred: { until: '2026-11-01T12:05:00Z', reason: 'call_check_pending', message: msg }, checking: { message: 'The call ended and the result is being checked.' } };
+    const long = [{ at: new Date(Date.now() - 50 * 60_000).toISOString(), status: 'calling' }];
+    const s = statusInfo({ ...base, status: 'calling', call, timeline: long });
+    expect(s.title).toBe("Waiting to call Sal's back");
+    expect(s.detail.startsWith(msg)).toBe(true);
+    expect(s.detail).toMatch(/30 minutes/);
+    expect(s.detail).toMatch(/cancel/);
+    expect(s.tone).toBe('info');
+    expect(`${s.title} ${s.detail}`).not.toMatch(/Calling Sal|Checking the call|confirmed|Pay at pickup|receipt/i);
+  });
   it('an order waiting on approval says what to do if the approval page refuses the call', () => {
     expect(statusInfo({ ...base, status: 'awaiting_approval' }).detail).toMatch(/cancel this order and pick another pizzeria/);
   });

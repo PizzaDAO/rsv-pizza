@@ -928,6 +928,7 @@ describe('budget release, double counting, cancel button, settling (final review
     ['needs_review', 'outcome_unclear'],
     ['needs_review', 'possible_opt_out'],
     ['needs_review', 'judge_unavailable'],
+    ['needs_review', 'card_spoken'],
     ['canceled', 'price_approval_dropped'],
     ['unreachable', 'a_reason_added_next_year'],
     ['refused', 'a_reason_added_next_year'],
