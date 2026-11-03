@@ -23,7 +23,8 @@ export function buildOrderNotice(row: Pick<PizzaOrder, 'shopName' | 'tier' | 'co
   return {
     subject: `${row.shopName} confirmed your pizza order`,
     text:
-      `${row.shopName} confirmed your order${total ? ` for ${total}` : ''}${row.readyAtText ? `, ready ${row.readyAtText}` : ''}. ` +
+      // pizza-mcp 662d51c confirms a phone order only when its recorded total includes tax
+      `${row.shopName} confirmed your order${total ? ` for ${total} with tax` : ''}${row.readyAtText ? `, ready ${row.readyAtText}` : ''}. ` +
       `Pay at pickup, then upload the receipt photo as usual: ${paymentsUrl}. A reminder line with the confirmed total is on your Receipts list; it is not counted as a receipt and you can remove it there.`,
   };
 }

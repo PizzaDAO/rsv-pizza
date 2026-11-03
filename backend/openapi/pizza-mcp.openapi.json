@@ -3017,7 +3017,7 @@
               },
               "status": {
                 "type": "string",
-                "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled."
+                "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set."
               },
               "payment_status": {
                 "type": "string"
@@ -3204,6 +3204,27 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "checking": {
+                    "description": "Set while the order is still `calling` because the shop agreed on the call and the call is being checked (a post-call review of the transcript) before the order can be `confirmed_by_shop`. It then becomes `confirmed_by_shop` or `needs_review`; nothing is redialed meanwhile. null/absent otherwise.",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string",
+                            "description": "Plain words for the host: \"The call ended and the result is being checked.\""
+                          }
+                        },
+                        "required": [
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -3228,7 +3249,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered."
+                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review. A client must treat a reason it does not know by nothing_ordered."
                       },
                       "message": {
                         "type": "string",
@@ -3350,7 +3371,7 @@
           },
           "status": {
             "type": "string",
-            "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled."
+            "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set."
           },
           "payment_status": {
             "type": "string"
@@ -3537,6 +3558,27 @@
                     "type": "null"
                   }
                 ]
+              },
+              "checking": {
+                "description": "Set while the order is still `calling` because the shop agreed on the call and the call is being checked (a post-call review of the transcript) before the order can be `confirmed_by_shop`. It then becomes `confirmed_by_shop` or `needs_review`; nothing is redialed meanwhile. null/absent otherwise.",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "description": "Plain words for the host: \"The call ended and the result is being checked.\""
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -3561,7 +3603,7 @@
                   },
                   "reason": {
                     "type": "string",
-                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered."
+                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review. A client must treat a reason it does not know by nothing_ordered."
                   },
                   "message": {
                     "type": "string",

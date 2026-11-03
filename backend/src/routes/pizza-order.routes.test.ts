@@ -1049,3 +1049,78 @@ describe('pizza-mcp 9ad5364', () => {
     expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
   });
 });
+
+describe('pizza-mcp 662d51c: checking before confirmed_by_shop, pending_operator_review', () => {
+  const MSG = 'The call ended and the result is being checked.';
+  const serve = (json: any) => {
+    mcp = pizzaMcp({ 'GET /orders/:id': () => ({ json }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  };
+
+  it('calling + call.checking is not confirmed: no draft, no notice, no confirmed total, not cancelable, still polled; then it resolves', async () => {
+    const id = (await placeFrom(await buildCart())).body.order.opopOrderId;
+    const call = { attempts: 1, last_outcome: 'confirmed', shop_total_cents: 18000, ready_at_text: '6:30', changes: [], transcript_available: false };
+    serve(opopOrder({ id, status: 'calling', call: { ...call, deferred: null, checking: { message: MSG } } }, 3));
+    const g = (await request(app()).get(`${base}/orders/${id}`).set(host)).body.order;
+    expect(g).toMatchObject({ status: 'calling', checking: { message: MSG }, call: { checking: { message: MSG } }, cancelable: false, settling: false, payoutDocumentId: null, confirmedTotalCents: null, blocking: true, releasable: false });
+    expect(fake.docs).toHaveLength(0);
+    expect(m.notify).not.toHaveBeenCalled();
+    expect(fake.byOpop(id)).toMatchObject({ confirmedAt: null, confirmedTotalCents: null });
+    // the ceiling stays held while it is checked
+    expect((await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents).toBe(25000 - 21000);
+    const x = await request(app()).post(`${base}/orders/${id}/cancel`).set(host).send({});
+    expect(x.status).toBe(409);
+    expect(x.body.error.code).toBe('CANCEL_NOT_ALLOWED');
+    // still polled: the judge confirms it
+    serve(opopOrder({ id, status: 'confirmed_by_shop', call: { ...call, checking: null } }, 4));
+    const c = (await request(app()).get(`${base}/orders/${id}`).set(host)).body.order;
+    expect(c).toMatchObject({ status: 'confirmed_by_shop', checking: null, confirmedTotalCents: 18000 });
+    expect(fake.docs).toHaveLength(1);
+    expect(m.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('checking that ends in needs_review / no_call_record never made a draft or a notice', async () => {
+    const id = (await placeFrom(await buildCart())).body.order.opopOrderId;
+    serve(opopOrder({ id, status: 'calling', call: { attempts: 1, shop_total_cents: 18000, checking: { message: MSG } } }, 3));
+    await request(app()).get(`${base}/orders/${id}`).set(host);
+    serve(opopOrder({ id, status: 'needs_review', outcome: { nothing_ordered: false, reason: 'no_call_record', message: 'We could not get the call record.' }, call: { attempts: 1, shop_total_cents: 18000 } }, 4));
+    const g = (await request(app()).get(`${base}/orders/${id}`).set(host)).body.order;
+    expect(g).toMatchObject({ status: 'needs_review', checking: null, blocking: true, releasable: true, outcome: { reason: 'no_call_record', nothing_ordered: false } });
+    expect(fake.docs).toHaveLength(0);
+    expect(m.notify).not.toHaveBeenCalled();
+  });
+
+  it('place_order 422 CALLS_NOT_AVAILABLE_HERE (pending_operator_review): its own copy, never "may have asked not to be called"', async () => {
+    mcp = pizzaMcp({
+      'POST /orders': () => ({
+        status: 422,
+        json: {
+          code: 'CALLS_NOT_AVAILABLE_HERE', title: 'Phone orders are not available for this shop', status: 422, retryable: false,
+          detail: 'An earlier call to this shop could not be checked automatically, so calls to it are paused until someone has reviewed it.',
+          details: { reasons: ['pending_operator_review'] },
+        },
+      }),
+    });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const res = await placeFrom(await buildCart());
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatchObject({ code: 'CALLS_NOT_AVAILABLE_HERE', shopId: 'pzl_osm_n1', reason: 'pending_operator_review' });
+    expect(res.body.error.message).toBe(
+      "We can't call Sal's for you right now. An earlier call to Sal's could not be checked automatically, so we are not calling it until someone on our team has reviewed that call. This is not because of anything Sal's said. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
+    );
+    expect(res.body.error.message).not.toMatch(/asked not to|opt/i);
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('an outcome pending_operator_review (nothing_ordered true) holds and blocks nothing', async () => {
+    await fake.db.pizzaOrder.create({
+      data: {
+        partyId: PARTY_ID, userId: 'host1', opopOrderId: 'ord_por', tier: 'listing', shopId: 'pzl_osm_n1', shopName: "Sal's", status: 'unreachable', ceilingCents: 5000,
+        lastView: { outcome: { nothing_ordered: true, reason: 'pending_operator_review', message: 'We did not call the shop.' }, call: { attempts: 0 }, timeline: [] },
+      },
+    });
+    const item = (await request(app()).get(`${base}/orders`).set(host)).body.orders[0];
+    expect(item).toMatchObject({ blocking: false, releasable: false, outcome: { nothing_ordered: true, reason: 'pending_operator_review' } });
+    expect((await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents).toBe(25000);
+  });
+});

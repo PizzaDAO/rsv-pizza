@@ -50,5 +50,7 @@ describe('notifyHostOfOrder (awaited, bounded)', () => {
     const n = buildOrderNotice(row, 'https://x/pay');
     expect(n.text).not.toMatch(/attach the receipt photo to the draft/);
     expect(n.text).toMatch(/not counted as a receipt/);
+    // pizza-mcp 662d51c confirms a phone order only with a total that includes tax
+    expect(n.text).toMatch(/^Sal's confirmed your order for \$187\.40 with tax, ready about 6:30\./);
   });
 });

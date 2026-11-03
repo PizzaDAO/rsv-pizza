@@ -96,6 +96,8 @@ export interface PizzaOrderView {
     changes?: string[];
     // Optional: set by pizza-mcp while the order is `calling` but the shop has not been dialed yet.
     deferred?: { until?: string | null; reason?: string | null; message?: string | null } | null;
+    // pizza-mcp 662d51c: still `calling`, the shop agreed and the finished call is being checked. NOT confirmed.
+    checking?: { message: string } | null;
   } | null;
   /** Append-only status history from pizza-mcp. */
   timeline?: Array<{ at: string; status: string }>;
@@ -114,6 +116,8 @@ export interface PizzaOrderView {
   cancelable?: boolean;
   /** A fresh confirmation is still polled: the post-call check can downgrade it. */
   settling?: boolean;
+  /** pizza-mcp 662d51c: `calling`, the call is being checked (same as `call.checking`). Not confirmed. */
+  checking?: { message: string } | null;
   /** An ended order that holds budget or may exist: a host can say nothing was ordered. */
   releasable?: boolean;
   /** A host said nothing was ordered: it holds nothing and blocks nothing. */
@@ -331,6 +335,16 @@ export function statusInfo(
         tone: 'action',
       };
     case 'calling': {
+      // pizza-mcp 662d51c: the shop agreed on the call, and the call is being checked before the order can be
+      // confirmed. Not a confirmation: it becomes confirmed or "could not confirm", and nothing is redialed meanwhile.
+      const checking = o.call?.checking;
+      if (checking) {
+        return {
+          title: `Checking the call with ${o.shopName}`,
+          detail: `${checking.message || 'The call ended and the result is being checked.'} The order is not confirmed until this check is done. It usually takes a few seconds, and at most about an hour. Please do not order again in the meantime.`,
+          tone: 'info',
+        };
+      }
       // Not dialed yet, so not "calling": no call is on the line, and that says nothing about earlier calls.
       const deferred = o.call?.deferred;
       if (deferred) {
@@ -354,7 +368,8 @@ export function statusInfo(
     case 'awaiting_price_approval':
       return { title: 'Shop quoted a higher price', detail: `${o.shopName} said ${total || 'more than your ceiling'}. They are holding the line while you approve.`, tone: 'action' };
     case 'confirmed_by_shop':
-      return { title: `${o.shopName} confirmed`, detail: `${total ? `Total ${total}. ` : ''}${o.readyAtText ? `Ready ${o.readyAtText}. ` : ''}Pay at pickup, then upload the real receipt as usual (the reminder line in your Receipts list is not a receipt).`, tone: 'success' };
+      // pizza-mcp 662d51c confirms only a recorded total that includes tax
+      return { title: `${o.shopName} confirmed`, detail: `${total ? `Total ${total} with tax. ` : ''}${o.readyAtText ? `Ready ${o.readyAtText}. ` : ''}Pay at pickup, then upload the real receipt as usual (the reminder line in your Receipts list is not a receipt).`, tone: 'success' };
     case 'needs_review':
       // Honest for both cases: the shop may have taken the order, or nothing may have been ordered at all
       // (a phone menu, voicemail, or a price over your limit). Optional `reason` comes from pizza-mcp when it sends one.

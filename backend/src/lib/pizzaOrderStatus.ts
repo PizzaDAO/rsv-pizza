@@ -26,7 +26,11 @@ export const FREE_STATUSES: ReadonlySet<string> = new Set(['refused', 'unreachab
  */
 export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set(['awaiting_approval', 'approval_timeout', 'held']);
 
-/** How long after entering `confirmed_by_shop` we keep polling: pizza-mcp can still downgrade it to `needs_review`. */
+/**
+ * How long after entering `confirmed_by_shop` we keep polling. Since pizza-mcp 662d51c the judge rules BEFORE
+ * `confirmed_by_shop` (the order waits in `calling` + `call.checking`), so a downgrade is no longer expected; the
+ * window is kept as a cheap safety net.
+ */
 export const SETTLE_WINDOW_MS = 20 * 60_000;
 
 export const isTerminal = (status: string) => TERMINAL_STATUSES.has(status);
@@ -42,11 +46,27 @@ export function isRestartable(row: { status: string; nextAction?: unknown }): bo
 }
 
 /**
+ * pizza-mcp 662d51c: the shop agreed on the call and the call is being checked (its post-call judge) before the order
+ * can be `confirmed_by_shop`. The order stays `calling` with `call.checking = { message }` until it becomes
+ * `confirmed_by_shop` or `needs_review` (`no_call_record` within about an hour if the call record never arrives).
+ * `calling` is never "confirmed": nothing that says so (draft receipt, host notice) happens before `confirmed_by_shop`.
+ * No webhook is sent when `checking` first appears: polling picks it up. Returns pizza-mcp's message, or null.
+ */
+export function checkingOf(row: { status: string; lastView?: unknown }): { message: string } | null {
+  if (row.status !== 'calling') return null;
+  const c = (row.lastView as { call?: { checking?: { message?: unknown } | null } | null } | null | undefined)?.call?.checking;
+  if (!c || typeof c !== 'object') return null;
+  return { message: typeof c.message === 'string' && c.message.trim() ? c.message : 'The call ended and the result is being checked.' };
+}
+
+/**
  * Can the host call this order off? `calling` counts only while the dial is deferred (`call.deferred`):
  * no call is on the line yet. If the dial starts first, pizza-mcp's 409 reaches the host as an error.
+ * Never while the finished call is being checked (`call.checking`): pizza-mcp refuses that cancel.
  */
 export function isCancelable(row: { status: string; lastView?: unknown }): boolean {
   if (CANCELABLE_STATUSES.has(row.status)) return true;
+  if (checkingOf(row)) return false;
   const deferred = (row.lastView as { call?: { deferred?: unknown } | null } | null | undefined)?.call?.deferred;
   return row.status === 'calling' && !!deferred;
 }

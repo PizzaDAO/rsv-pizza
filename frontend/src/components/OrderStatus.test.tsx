@@ -289,6 +289,32 @@ describe('OrderStatus', () => {
     vi.useRealTimers();
   });
 
+  it('pizza-mcp 662d51c: a call being checked is not confirmed: shows the message, no cancel, no receipt copy, keeps polling, then resolves', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    const msg = 'The call ended and the result is being checked.';
+    const checking = order({ status: 'calling', confirmedTotalCents: null, payoutDocumentId: null, cancelable: true, call: { checking: { message: msg } } });
+    mocks.get.mockResolvedValueOnce({ order: checking, stale: false }).mockResolvedValueOnce({ order: order(), stale: false });
+    const onUpdate = vi.fn();
+    const { rerender } = render(<OrderStatus partyId="p" order={checking} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Checking the call with Sal's")).toBeTruthy();
+    expect(document.body.textContent).toContain(msg);
+    expect(document.body.textContent).toMatch(/not confirmed until this check is done/);
+    expect(document.body.textContent).not.toMatch(/Sal's confirmed|Receipts list|Pay at pickup|uploaded the receipt/);
+    // even if a stale flag said cancelable, the button is not offered while checking
+    expect(screen.queryByText('Cancel this order')).toBeNull();
+    expect(screen.queryByText(/Order from another pizzeria|Back to pizzerias|Done/)).toBeNull();
+    expect(document.querySelector('.animate-spin')).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(10_500);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'confirmed_by_shop' }));
+    rerender(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Sal's confirmed")).toBeTruthy();
+    mocks.get.mockReset();
+    vi.useRealTimers();
+  });
+
   it('an old confirmation is not polled', async () => {
     vi.useFakeTimers();
     mocks.get.mockReset();

@@ -34,7 +34,8 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
     }
   };
 
-  // The webhook updates the server row; this fallback poll keeps the page current.
+  // The webhook updates the server row; this fallback poll keeps the page current. A `calling` order whose call is
+  // being checked (pizza-mcp 662d51c `call.checking`) is not final: no webhook announces the check, so keep polling.
   useEffect(() => {
     if ((isTerminalStatus(order.status) && !order.settling) || order.restartable || !order.isMine) return;
     let stop = false;
@@ -107,7 +108,7 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
         </a>
       )}
 
-      {order.isMine && order.cancelable && (
+      {order.isMine && order.cancelable && !order.call?.checking && (
         <div>
           <button
             type="button"

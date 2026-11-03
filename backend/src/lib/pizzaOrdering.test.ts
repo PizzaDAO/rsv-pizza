@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../config/database.js', () => ({ prisma: {} }));
 
 import { budgetBreakdown, budgetUsedCents, isLaterReceipt } from './pizzaOrdering.js';
-import { isBlocking, isCancelable, isSettling, SETTLE_WINDOW_MS } from './pizzaOrderStatus.js';
+import { isBlocking, isCancelable, isSettling, checkingOf, SETTLE_WINDOW_MS } from './pizzaOrderStatus.js';
 
 const ORDERED = new Date('2026-11-01T12:00:00Z');
 const before = new Date('2026-11-01T11:00:00Z');
@@ -140,6 +140,12 @@ describe('isCancelable', () => {
     expect(isCancelable({ status: 'calling', lastView: { call: {} } })).toBe(false);
     expect(isCancelable({ status: 'calling' })).toBe(false);
     expect(isCancelable({ status: 'confirmed_by_shop', lastView: { call: { deferred: { until: 'x' } } } })).toBe(false);
+    // pizza-mcp 662d51c: never while the finished call is being checked
+    expect(isCancelable({ status: 'calling', lastView: { call: { deferred: { until: 'x' }, checking: { message: 'm' } } } })).toBe(false);
+    expect(checkingOf({ status: 'calling', lastView: { call: { checking: { message: 'm' } } } })).toEqual({ message: 'm' });
+    expect(checkingOf({ status: 'calling', lastView: { call: { checking: {} } } })).toEqual({ message: 'The call ended and the result is being checked.' });
+    expect(checkingOf({ status: 'confirmed_by_shop', lastView: { call: { checking: { message: 'm' } } } })).toBeNull();
+    expect(checkingOf({ status: 'calling', lastView: { call: { checking: null } } })).toBeNull();
   });
 });
 

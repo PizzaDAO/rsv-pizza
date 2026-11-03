@@ -80,7 +80,8 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 6. **Frontend:** set `VITE_AI_ORDERING=1` on the frontend project (preview first) and redeploy.
 7. **Smoke test as the party's host:** open the party's host page > pizza order card. You should see "AI Ordering - Pilot".
    Pick a pilot shop, build the order, set a ceiling, approve: a new tab opens pizza-mcp's `/confirm` page, enter the emailed code.
-   Status moves `awaiting_approval` -> `calling` -> `confirmed_by_shop`; the payments page shows a draft receipt row.
+   Status moves `awaiting_approval` -> `calling` -> (`calling`, "The call ended and the result is being checked.") ->
+   `confirmed_by_shop`; only then does the payments page show a draft receipt row.
 8. **Turn off:** clear `PIZZA_ORDERING_PARTY_IDS` (instant, no deploy needed beyond the env change) or unset `VITE_AI_ORDERING`.
 
 ## Testing before the real pilot
@@ -107,9 +108,16 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   - With no `outcome` from pizza-mcp: `needs_review` blocks only if the shop gave a total inside the ceiling. `refused`, `unreachable`,
     `canceled` and `shop_requires_prepay` are free.
   The idempotency key is derived on the server; the browser cannot choose it.
+- **Checking (pizza-mcp 662d51c):** nothing is `confirmed_by_shop` before pizza-mcp's call judge has read the call. When the shop agrees,
+  the order stays `calling` with `call.checking = { message }` (the API view also carries it as `checking`) until the judge moves it to
+  `confirmed_by_shop` or `needs_review`. No webhook is sent when checking starts, so the page's poll (which runs for every non-final
+  status, `calling` included) shows the message: "Checking the call with <shop>", not confirmed. No draft receipt, no "confirmed" email or
+  Telegram notice, no confirmed total and no `confirmedAt` before `confirmed_by_shop`; the ceiling stays held. Nothing is redialed meanwhile.
+  It normally takes seconds; if the call record never arrives the order goes to `needs_review` / `no_call_record` within about an hour.
+  A confirmed phone total includes tax (pizza-mcp's gates refuse one that does not), and the copy says "with tax".
 - **Cancel:** the placing host can cancel an order that is waiting for approval, and a `calling` order while its dial is deferred
   (`call.deferred`: no call is on the line yet) (`POST .../orders/:id/cancel`). If the dial starts first, pizza-mcp answers 409 and the
-  host sees that error. Once a call is live the button is not shown.
+  host sees that error. Once a call is live, or while the finished call is being checked, the button is not shown and the route answers 409.
 - **Release:** an ended order that blocks can be released by any host or edit-enabled co-host, after a confirmation prompt: "Nothing was
   ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
   so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
@@ -123,7 +131,8 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   only pairs them: the receipt offsets the order up to its own amount, so the party's total stays at least the order's total. If the shop gave no
   total, the receipt replaces the ceiling hold. A receipt OCR has not read yet offsets nothing until it has an amount.
 - **Coming back later:** the flow reopens a releasable or confirmed order with no receipt yet, for any host who can act on it.
-- A confirmed order keeps being polled for 20 minutes from when it entered `confirmed_by_shop`: the post-call check can still downgrade it to `needs_review`.
+- A confirmed order keeps being polled for 20 minutes from when it entered `confirmed_by_shop`. Since 662d51c the judge rules before that
+  status, so a downgrade is no longer expected; the window is a cheap safety net.
 - **Menu fit:** sizes map to the shop's nearest offered size (shown to the host); toppings the shop does not list become a
   per-pizza choice (leave it off, or skip that pizza). Nothing is ordered until every question is answered.
 
@@ -142,8 +151,11 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   change found by pizza-mcp's sweep comes as a plain status `order.updated` (no `change`), and a body never changes under one `Webhook-Id`.
 - **Shop can't be called:** pizza-mcp answers `place_order` with 422 `CALLS_NOT_AVAILABLE_HERE` when it won't phone the shop (for example
   `details.reasons: ["possible_opt_out"]`: the shop may have asked not to be called, and calls to the number are paused until an operator
-  checks it). Nothing is created; the host is told so, sent back to the shop list with that shop marked "call it yourself", and can order
+  checks it). `["pending_operator_review"]` is different: an earlier call to the shop could not be checked automatically and waits for a
+  person; nothing suggests an opt-out, so the host gets its own words ("...could not be checked automatically... This is not because of
+  anything <shop> said.") and the error carries `reason`. Nothing is created; the host is told so, sent back to the shop list with that shop marked "call it yourself", and can order
   elsewhere with no override. The same refusal can come on pizza-mcp's approval page; the order then stays waiting for approval, and the
   status copy tells the host to cancel it and pick another pizzeria (canceling frees it). An order never dialed because its number was
-  quarantined ends `unreachable` with `nothing_ordered: true` (`not_dialed`) and holds nothing.
+  quarantined ends `unreachable` with `nothing_ordered: true` (`not_dialed`, or `pending_operator_review` when the hold is an unread
+  call) and holds nothing.
 - Co-hosts see an order but not its approval link; only the host who placed it is polled / notified.

@@ -12,6 +12,9 @@
  *   response is applied (it is a live read) but does not move it: stamping it with this server's
  *   clock could make a later outcome event look older than it is and drop it for good on an order
  *   that is no longer polled.
+ * - Checking (pizza-mcp 662d51c): after the shop agrees the order stays `calling` with `call.checking` until the call
+ *   judge moves it to `confirmed_by_shop` or `needs_review`. That is not a confirmation: no draft, no notice, no
+ *   confirmedAt, and a total seen while `calling` is not recorded as the confirmed total.
  * - Draft receipt: on `confirmed_by_shop` (phone tier) or `payment_status = paid` (native) a
  *   draft PayoutDocument is created, once (unique pizza_order_id), carrying NO file and NO
  *   ocrAmount. The shop's total lives in ocrRaw so the reimbursement flow can show and cross-check
@@ -48,6 +51,8 @@ export function isDraftReceiptTrigger(
 
 function confirmedTotalCents(o: OpopOrder, tier: string): number | null {
   if (tier === 'native') return o.totals?.total_cents ?? null;
+  // still `calling` (the call is being checked): a total the judge has not passed is not a confirmed total
+  if (o.status === 'calling') return null;
   const shop = o.call?.shop_total_cents;
   return typeof shop === 'number' ? shop : null;
 }

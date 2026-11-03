@@ -12,7 +12,7 @@ import {
   OrderLineSpec,
 } from '../lib/recommendationToLines.js';
 import { menuFacts, fitLine } from '../lib/menuFit.js';
-import { isTerminal, isBlocking, isCancelable, isRestartable, isSettling, outcomeOf, mayExistAtShop } from '../lib/pizzaOrderStatus.js';
+import { isTerminal, isBlocking, isCancelable, isRestartable, isSettling, outcomeOf, mayExistAtShop, checkingOf } from '../lib/pizzaOrderStatus.js';
 import {
   getPizzaMcpClient,
   orderIdempotencyKey,
@@ -84,6 +84,8 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
     restartable: isRestartable(row),
     // keep polling a fresh confirmation: the post-call check can still downgrade it
     settling: isSettling(row),
+    // pizza-mcp 662d51c: `calling`, the shop agreed and the call is being checked. NOT confirmed: keep polling.
+    checking: checkingOf(row),
     // what pizza-mcp says happened (null while in flight / confirmed / unknown): drives the host's copy and the budget
     outcome: outcomeOf(row),
     // an order that may exist (or needs_review that holds budget) and has ended: the host can say nothing was ordered
@@ -484,11 +486,20 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
       // pizza-mcp refused to call this shop (an opt-out, a number it has paused until an operator checks it, a
       // changed number...). Nothing was created there, so nothing blocks here: say so, and send the host on.
       if (e instanceof AppError && e.code === 'CALLS_NOT_AVAILABLE_HERE') {
+        const reasons = ((e.data as { opop?: { details?: { reasons?: unknown } } } | undefined)?.opop?.details?.reasons ?? []) as unknown[];
+        const reason = typeof reasons[0] === 'string' ? reasons[0] : null;
+        // pizza-mcp 662d51c: `pending_operator_review` is NOT a possible opt-out. An earlier call to this shop could not
+        // be checked automatically and waits for a person; nothing suggests the shop asked not to be called. Own words,
+        // so the host is not told the shop may have said not to call.
+        const why =
+          reason === 'pending_operator_review'
+            ? `An earlier call to ${shop.name} could not be checked automatically, so we are not calling it until someone on our team has reviewed that call. This is not because of anything ${shop.name} said.`
+            : e.message.trim().replace(/([^.!?])$/, '$1.');
         throw new AppError(
-          `We can't call ${shop.name} for you right now. ${e.message.trim().replace(/([^.!?])$/, '$1.')} Nothing was ordered. Pick another pizzeria, or call ${shop.name} yourself.`,
+          `We can't call ${shop.name} for you right now. ${why} Nothing was ordered. Pick another pizzeria, or call ${shop.name} yourself.`,
           e.statusCode,
           'CALLS_NOT_AVAILABLE_HERE',
-          { ...(e.data ?? {}), shopId: shop.id }
+          { ...(e.data ?? {}), shopId: shop.id, reason }
         );
       }
       throw e;

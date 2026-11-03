@@ -153,3 +153,30 @@ describe('toRecommendationPayload', () => {
   });
   it('formats cents', () => expect(formatCents(1050)).toBe('$10.50'));
 });
+
+describe('pizza-mcp 662d51c', () => {
+  const base = { shopName: "Sal's", confirmedTotalCents: null, readyAtText: null, call: null };
+
+  it('pizza-mcp 662d51c: calling + call.checking is "being checked", never confirmed, and beats the long-call copy', () => {
+    const msg = 'The call ended and the result is being checked.';
+    const long = [{ at: new Date(Date.now() - 50 * 60_000).toISOString(), status: 'calling' }];
+    const s = statusInfo({ ...base, status: 'calling', call: { checking: { message: msg } }, timeline: long });
+    expect(s.title).toBe("Checking the call with Sal's");
+    expect(s.detail.startsWith(msg)).toBe(true);
+    expect(s.detail).toMatch(/not confirmed until this check is done/);
+    expect(s.tone).toBe('info');
+    expect(`${s.title} ${s.detail}`).not.toMatch(/confirmed\b(?! until)|Pay at pickup|receipt/i);
+    expect(statusInfo({ ...base, status: 'calling', call: { checking: null } }).title).toBe("Calling Sal's");
+  });
+
+  it('pizza-mcp 662d51c: outcome pending_operator_review (nothing_ordered true) reads as nothing ordered, with its message', () => {
+    const message = 'We did not call the shop: an earlier call to it could not be checked automatically, so calls to it are paused until someone has reviewed that call. Nothing was ordered.';
+    const s = statusInfo({ ...base, status: 'unreachable', outcome: { nothing_ordered: true, reason: 'pending_operator_review', message } });
+    expect(s).toEqual({ title: "Nothing was ordered at Sal's", detail: message, tone: 'warn' });
+    expect(s.detail).not.toMatch(/asked not to|opt/i);
+  });
+
+  it('a confirmed phone total says it includes tax (pizza-mcp 662d51c confirms only a total with tax)', () => {
+    expect(statusInfo({ ...base, status: 'confirmed_by_shop', confirmedTotalCents: 3765 }).detail).toMatch(/^Total \$37\.65 with tax\./);
+  });
+});
