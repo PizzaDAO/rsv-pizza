@@ -247,9 +247,9 @@ describe('index: live-receipt lump sums (origin event)', () => {
     expect(pub.countries).toHaveLength(1);
     expect(pub.countries[0].estimated).toBe(true);
   });
-  it('dropped once the country has confirmed rows', () => {
+  it('dropped once the same event has confirmed rows', () => {
     const lump = row({ partyId: 'a', usdPerCm2: 0.05, isLumpSum: true, sizeConfidence: 0.5 });
-    const ok = row({ partyId: 'b', usdPerCm2: 0.01 });
+    const ok = row({ partyId: 'a', usdPerCm2: 0.01 });
     const pub = buildPublicIndexFromRows([lump, ok], 2026);
     expect(pub.countries[0].estimated).toBe(false);
     expect(pub.countries[0].usdPerCm2).toBeCloseTo(0.01);

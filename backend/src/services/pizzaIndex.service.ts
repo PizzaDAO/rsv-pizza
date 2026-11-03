@@ -520,6 +520,8 @@ export interface PublicCountryEntry {
   ladderLocal: SizeLadder;
   /** true when no size in this country is confirmed yet and the figure uses estimated sizes. */
   estimated: boolean;
+  /** Events in the figure that use estimated sizes (0 = all confirmed; nParties = all estimated). */
+  nEstimatedParties: number;
 }
 
 /** One point on a country's price trend: that year's published 30 cm price (nominal USD). */
@@ -547,21 +549,31 @@ export interface PublicPizzaIndex {
 export const ESTIMATE_SANE_USD_PER_CM2 = { min: 0.002, max: 0.2 } as const;
 
 /**
- * Rows behind the public figures (Snax 2026-10-28: show every country we have).
- * A country with any confirmed size (verified or >= 0.8) uses only those rows.
- * A country with none falls back to estimated sizes (any confidence), minus
- * unverified outliers and anything outside the sanity band, and is flagged.
+ * Rows behind the public figures (Snax 2026-10-28: show every country we have;
+ * 2026-11-03: "we have a lot more data than we're showing" -> per event).
+ * An event with any confirmed size (verified or >= 0.8) uses only those rows.
+ * An event with none falls back to estimated sizes (any confidence), minus
+ * unverified outliers and anything outside the sanity band.
+ * estimatedCountries: no confirmed event at all; estimatedEvents: per country,
+ * how many of its events are on estimated sizes.
  */
-export function selectPublicRows(rows: IndexRow[]): { rows: IndexRow[]; estimatedCountries: Set<string> } {
+export function selectPublicRows(rows: IndexRow[]): {
+  rows: IndexRow[]; estimatedCountries: Set<string>; estimatedEvents: Map<string, number>;
+} {
   const confirmed = selectRows(rows, { verifiedOnly: false, includeBundles: false });
+  const key = (r: IndexRow) => `${r.country}|${r.eventKey}`;
+  const confirmedEvents = new Set(confirmed.filter((r) => r.country).map(key));
   const confirmedCountries = new Set(confirmed.map((r) => r.country).filter((c): c is string => !!c));
   const estimated = rows.filter((r) =>
-    r.country && !confirmedCountries.has(r.country) &&
+    r.country && !confirmedEvents.has(key(r)) &&
     r.areaCm2 > 0 && r.usdPerCm2 > 0 && !r.isBundle && !r.outlierFlag &&
     r.usdPerCm2 >= ESTIMATE_SANE_USD_PER_CM2.min && r.usdPerCm2 <= ESTIMATE_SANE_USD_PER_CM2.max);
+  const estEvents = new Map<string, Set<string>>();
+  for (const r of estimated) (estEvents.get(r.country!) ?? estEvents.set(r.country!, new Set()).get(r.country!)!).add(r.eventKey);
   return {
     rows: [...confirmed, ...estimated],
-    estimatedCountries: new Set(estimated.map((r) => r.country!)),
+    estimatedCountries: new Set(estimated.map((r) => r.country!).filter((c) => !confirmedCountries.has(c))),
+    estimatedEvents: new Map([...estEvents].map(([c, s]) => [c, s.size])),
   };
 }
 
@@ -572,7 +584,7 @@ export function selectPublicRows(rows: IndexRow[]): { rows: IndexRow[]; estimate
  */
 export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = PUBLIC_INDEX_YEAR): PublicPizzaIndex {
   const allRows = allRowsIn.filter((r) => r.eventYear === year);
-  const { rows, estimatedCountries } = selectPublicRows(allRows);
+  const { rows, estimatedCountries, estimatedEvents } = selectPublicRows(allRows);
   const countries = aggregate(rows, { level: 'country', includeBundles: false, publishedOnly: true, preselected: true })
     .filter((g) => g.usdPerCm2.median !== null && g.country)
     .map<PublicCountryEntry>((g) => ({
@@ -588,6 +600,7 @@ export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = P
       localPerCm2: g.localPerCm2,
       ladderLocal: g.ladderLocal,
       estimated: estimatedCountries.has(g.country!),
+      nEstimatedParties: Math.min(estimatedEvents.get(g.country!) ?? 0, g.nParties),
     }))
     .sort((a, b) => a.usdPerCm2 - b.usdPerCm2);
   // Global figure only over published countries so unpublished data never leaks in.
@@ -599,7 +612,7 @@ export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = P
     trends: {},
     generatedAt: new Date().toISOString(),
     minParties: MIN_PARTIES.country,
-    basis: 'median of per-event medians; menu (list) prices; confirmed sizes where a country has any, otherwise estimated sizes (flagged); bundles excluded',
+    basis: 'median of per-event medians; menu (list) prices; confirmed sizes where an event has any, otherwise estimated sizes (counted per country); bundles excluded',
     global: { nParties: g.nParties, nCountries: countries.length, usdPerCm2: g.usdPerCm2.median, ladderUsd: g.ladderUsd },
     countries,
   };
