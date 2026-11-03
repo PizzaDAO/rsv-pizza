@@ -141,6 +141,12 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   have"). All are `false`, so rsv holds and blocks as before and shows pizza-mcp's message. There are fewer late-check emails from pizza-mcp (none for
   "could not tell", none when stale, none after a timeout email that already carried the finding); rsv sends none of its own. The judge reads raw
   transcripts; rsv still stores and shows none.
+- **pizza-mcp 5320d6a:** no API or schema change (spec and generated types byte-identical). When the AI ends a call on the shop's refusal (`cant_fulfill`,
+  `over_limit`, `shop_closed`, `wrong_number`, `refused_ai`, `asked_not_to_call`, `requires_prepay`, `host_declined`, `transfer_to_host`) the status event now has
+  `nothing_ordered: false` and "not finished checking" wording. Once the call is checked, an `order.updated` with `change: "outcome"` flips it to `true` (the new
+  message says nothing was ordered); if the check cannot confirm it, it stays `false` with a "could not confirm" message. rsv switches only on `nothing_ordered`:
+  held and blocking while `false`, released when `true`, and it shows the latest message. `shop_answered_no_order`, `no_answer` and `unreachable` can now be
+  `outcome_unclear` / `false`. The host email for these reasons is delayed and sent once, by pizza-mcp; rsv sends none.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
   host said so. The one reason the copy names is `judge_unavailable` (pizza-mcp faf6855: its call judge could not read the call): it
   adds that the call is waiting for a person at pizza-mcp to read it and that the host need not wait for that, since the check does not

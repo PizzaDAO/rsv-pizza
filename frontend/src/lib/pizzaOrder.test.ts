@@ -115,6 +115,37 @@ describe('statusInfo', () => {
       expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|safe to order again/i);
     }
   });
+  it('pizza-mcp 5320d6a: AI-ended reasons are false ("not finished checking" / "could not confirm") until the gate: may exist, never "order elsewhere"', () => {
+    const cases: Array<[string, string, string]> = [
+      ['needs_review', 'cant_fulfill', "The shop said it can't make this order."],
+      ['needs_review', 'over_limit', "The shop's total was above the most you can approve."],
+      ['unreachable', 'shop_closed', 'The shop said it is closed.'],
+      ['unreachable', 'wrong_number', 'The call seemed to reach the wrong number.'],
+      ['refused', 'refused_ai', 'The shop said it does not take orders from an AI caller.'],
+      ['refused', 'asked_not_to_call', 'The shop asked not to be called again, and we will not call it again.'],
+      ['shop_requires_prepay', 'requires_prepay', 'The shop wants payment up front, and we never give card details by phone.'],
+      ['canceled', 'host_declined', 'You declined the new total, and we told the shop.'],
+      ['needs_review', 'transfer_to_host', 'The call was passed to a person at the shop.'],
+    ];
+    for (const [status, reason, said] of cases) {
+      for (const tail of [
+        'We have not finished checking the call to confirm that nothing was ordered, so an order may exist at the shop: please check with it before ordering again.',
+        'But our check of the call could not confirm that nothing was ordered, so an order may exist at the shop: please check with it before ordering again.',
+      ]) {
+        const message = `${said} ${tail}`;
+        const s = statusInfo({ ...base, status: status as PizzaOrderView['status'], releasable: true, outcome: { nothing_ordered: false, reason, message } });
+        expect(s.title).toBe("Check with Sal's before ordering again");
+        expect(s.detail.startsWith(message)).toBe(true);
+        expect(s.detail).toMatch(/Do NOT order again/);
+        expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|safe to order again|order elsewhere|another pizzeria/i);
+      }
+      // after the gate closes the call: the new message replaces the old one and the host is told nothing was ordered
+      const closed = `${said.replace(/\.$/, '')}, so nothing was ordered.`;
+      const t = statusInfo({ ...base, status: status as PizzaOrderView['status'], outcome: { nothing_ordered: true, reason, message: closed } });
+      expect(t.title).toBe("Nothing was ordered at Sal's");
+      expect(t.detail).toBe(closed);
+    }
+  });
   it('pizza-mcp e62620e: price_approval_timeout is nothing_ordered false: approval_timeout offers the callback and cancel, and never says nothing is ordered', () => {
     const message = 'The shop asked about a higher total and we could not reach you in time. We told the shop we would call back, but it heard the order and may have started it: approve to have us call back, or check with the shop.';
     const s = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: false, reason: 'price_approval_timeout', message } });

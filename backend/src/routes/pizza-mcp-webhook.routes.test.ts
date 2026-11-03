@@ -388,3 +388,30 @@ describe('POST /api/pizza-mcp/webhook: pizza-mcp 4cbebfe', () => {
     expect(fake.byOpop('ord_1').lastView.outcome.message).toBe(LATE);
   });
 });
+
+describe('POST /api/pizza-mcp/webhook: pizza-mcp 5320d6a', () => {
+  const aiEnd = (status: string, nothing_ordered: boolean, message: string) =>
+    opopOrder({ status, outcome: { nothing_ordered, reason: 'cant_fulfill', message } }, 6);
+  const PENDING = "The shop said it can't make this order. We have not finished checking the call to confirm that nothing was ordered, so an order may exist at the shop: please check with it before ordering again.";
+  const CLOSED = "The shop said it can't make this order, so nothing was ordered.";
+  const UNCONFIRMED = "The shop said it can't make this order. But our check of the call could not confirm that nothing was ordered, so an order may exist at the shop: please check with it before ordering again.";
+
+  it('an AI-ended call arrives held (false), then an outcome event flips it to true: rsv switches only on nothing_ordered, releases the hold and shows the new message', async () => {
+    await post(delivery(aiEnd('needs_review', false, PENDING), { createdAt: '2026-11-01T18:00:00.000Z', extra: { previous_status: 'calling' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    expect(fake.byOpop('ord_1').lastView.outcome.message).toBe(PENDING);
+    const res = await post(delivery(aiEnd('needs_review', true, CLOSED), { createdAt: '2026-11-01T18:01:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(res.status).toBe(200);
+    expect(fake.byOpop('ord_1').lastView.outcome).toEqual({ nothing_ordered: true, reason: 'cant_fulfill', message: CLOSED });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'needs_review', timelineLen: 6, payoutDocumentId: null, confirmedAt: null });
+    expect(fake.docs).toHaveLength(0);
+  });
+
+  it('a gate that disagrees keeps it false with only a new message: still held, latest message shown', async () => {
+    await post(delivery(aiEnd('unreachable', false, PENDING), { createdAt: '2026-11-01T18:00:00.000Z', extra: { previous_status: 'calling' } }));
+    await post(delivery(aiEnd('unreachable', false, UNCONFIRMED), { createdAt: '2026-11-01T18:01:00.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } }));
+    expect(fake.byOpop('ord_1').lastView.outcome).toEqual({ nothing_ordered: false, reason: 'cant_fulfill', message: UNCONFIRMED });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+  });
+});
