@@ -102,6 +102,19 @@ describe('statusInfo', () => {
     expect(s.detail).not.toContain(early);
     expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|safe to order again/i);
   });
+  it('pizza-mcp 4353198: call_check_timeout messages for an unended call or a check that could not tell stay held, with no "nothing ordered"', () => {
+    const at = (message: string) => statusInfo({ ...base, status: 'needs_review', releasable: true, outcome: { nothing_ordered: false, reason: 'call_check_timeout', message } });
+    for (const message of [
+      'We did not call the shop again because we could not confirm in time that the earlier call had ended. Our automatic check of that call did finish, but could not tell whether the shop took your order, so an order may exist: please check with it before ordering again.',
+      'We did not call the shop again because we could not confirm in time that the earlier call had ended. Our automatic check found no order in the part of the call we have, but the call may have gone on after it, so an order may exist: please check with the shop before ordering again.',
+      'We did not call the shop again because our automatic check of the earlier call did not finish in time. The check has since finished and found no order in the part of the call we have, but we could not confirm that the call had ended, so it may have gone on: please check with the shop before ordering again.',
+    ]) {
+      const s = at(message);
+      expect(s.title).toBe("Check with Sal's before ordering again");
+      expect(s.detail.startsWith(message)).toBe(true);
+      expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|safe to order again/i);
+    }
+  });
   it('pizza-mcp e62620e: price_approval_timeout is nothing_ordered false: approval_timeout offers the callback and cancel, and never says nothing is ordered', () => {
     const message = 'The shop asked about a higher total and we could not reach you in time. We told the shop we would call back, but it heard the order and may have started it: approve to have us call back, or check with the shop.';
     const s = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: false, reason: 'price_approval_timeout', message } });

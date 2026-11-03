@@ -135,6 +135,12 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   line shows it; blocking, the hold, the draft and the notices are unchanged. A same-reason re-deferral no longer sends `calling` -> `calling`
   (rsv handles both). rsv does not match on the `TIER_UNAVAILABLE` detail text, only on the code. pizza-mcp's own host emails ("Your order with X is
   likely real", "Nothing was ordered from X") come from pizza-mcp; rsv sends nothing for `needs_review`, so nothing contradicts them.
+- **pizza-mcp 4353198:** no API or schema change (spec and generated types byte-identical). Behaviour only: `outcome.nothing_ordered` is `false` in more cases
+  (a judge `not_placed` on a call where the tools recorded a line, total or price question, and any call whose end the provider never confirmed), and
+  `call_check_timeout` has more message variants ("could not confirm in time that the earlier call had ended", "found no order in the part of the call we
+  have"). All are `false`, so rsv holds and blocks as before and shows pizza-mcp's message. There are fewer late-check emails from pizza-mcp (none for
+  "could not tell", none when stale, none after a timeout email that already carried the finding); rsv sends none of its own. The judge reads raw
+  transcripts; rsv still stores and shows none.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
   host said so. The one reason the copy names is `judge_unavailable` (pizza-mcp faf6855: its call judge could not read the call): it
   adds that the call is waiting for a person at pizza-mcp to read it and that the host need not wait for that, since the check does not
