@@ -104,7 +104,8 @@ export interface PizzaOrderView {
    * What pizza-mcp says happened when the order ended without a confirmation. null/absent while in flight,
    * confirmed, or when pizza-mcp does not send it (older versions): the copy must then stay cautious.
    * nothing_ordered true = sure nothing was placed; false = an order MAY exist, check with the shop.
-   * Copy reads only that boolean and `message`, never a list of `reason`s: new reasons must work untouched.
+   * Copy reads only that boolean and `message`, never a list of `reason`s: new reasons must work untouched. The one
+   * exception adds words, never safety: `judge_unavailable` also says the call is waiting for a person to read it.
    */
   outcome?: { nothing_ordered: boolean; reason: string; message: string } | null;
   isMine: boolean;
@@ -291,6 +292,22 @@ export function statusInfo(
   if (oc && ['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'].includes(o.status)) {
     if (oc.nothing_ordered) {
       return { title: `Nothing was ordered at ${o.shopName}`, detail: oc.message, tone: o.status === 'canceled' ? 'error' : 'warn' };
+    }
+    // pizza-mcp faf6855: its call judge could not read this call. Not a fault at the shop: the call is waiting for a
+    // person at pizza-mcp to read it (its operator is emailed every time). That check does not report back here, so the
+    // host is told not to wait for it. Still nothing_ordered false, so it blocks and holds like any other.
+    if (oc.reason === 'judge_unavailable') {
+      return {
+        title: `Check with ${o.shopName} before ordering again`,
+        detail: [
+          oc.message,
+          `The call is waiting for a person on our team to read it, but you don't need to wait for that: call ${o.shopName} to find out whether they took the order.`,
+          o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        tone: 'warn',
+      };
     }
     return {
       title: `Check with ${o.shopName} before ordering again`,

@@ -732,7 +732,7 @@ export interface components {
                 outcome?: {
                     /** @description true = as of now we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. Only final when the order's status is final: on approval_timeout the host can still approve and a callback may place the order, so true there must not be read as releasing a hold or a budget. Treat any status that is not final as still open. */
                     nothing_ordered: boolean;
-                    /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out. A client must treat a reason it does not know by nothing_ordered. */
+                    /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered. */
                     reason: string;
                     /** @description Plain English for the host, the same words as the email. */
                     message: string;
@@ -811,7 +811,7 @@ export interface components {
             outcome?: {
                 /** @description true = as of now we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. Only final when the order's status is final: on approval_timeout the host can still approve and a callback may place the order, so true there must not be read as releasing a hold or a budget. Treat any status that is not final as still open. */
                 nothing_ordered: boolean;
-                /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out. A client must treat a reason it does not know by nothing_ordered. */
+                /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered. */
                 reason: string;
                 /** @description Plain English for the host, the same words as the email. */
                 message: string;

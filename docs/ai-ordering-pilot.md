@@ -114,7 +114,9 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
   so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
-  host said so. `call.attempts` is never shown (since pizza-mcp 9ad5364 it no longer counts `not_dialed` rows, but the outcome is what the host reads). A `calling` order can last up to 60 minutes
+  host said so. The one reason the copy names is `judge_unavailable` (pizza-mcp faf6855: its call judge could not read the call): it
+  adds that the call is waiting for a person at pizza-mcp to read it and that the host need not wait for that, since the check does not
+  report back. It blocks and holds like any `nothing_ordered: false`. `call.attempts` is never shown (since pizza-mcp 9ad5364 it no longer counts `not_dialed` rows, but the outcome is what the host reads). A `calling` order can last up to 60 minutes
   before pizza-mcp moves it to `needs_review`, so after 10 minutes the page says it is still waiting; `call.deferred` shows as delayed or scheduled, not calling.
 - **Receipts:** only a receipt uploaded after the order can count for it, and an order that ended but may exist at the shop can have one. One that matches the confirmed total (5% or $1) does so
   automatically. "I uploaded the receipt" (`action:'receipt_uploaded'`) is refused with `NO_RECEIPT_FOUND` until such a receipt exists, and it
@@ -136,7 +138,8 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   pizza-mcp (9ad5364 on) also sends `order.updated` with `change: "outcome"` when only `order.outcome` changed (same status, same timeline,
   `previous_status` equal to the status), for example a late call record on an order that already ended. Every event is applied whole, on
   final statuses too, so blocking and the budget hold follow the latest `outcome`. Equal-timeline events are ordered by the webhook's
-  `created_at` only: a poll or a cancel response is applied but never stamps the row with this server's clock.
+  `created_at` only: a poll or a cancel response is applied but never stamps the row with this server's clock. Since faf6855 a status
+  change found by pizza-mcp's sweep comes as a plain status `order.updated` (no `change`), and a body never changes under one `Webhook-Id`.
 - **Shop can't be called:** pizza-mcp answers `place_order` with 422 `CALLS_NOT_AVAILABLE_HERE` when it won't phone the shop (for example
   `details.reasons: ["possible_opt_out"]`: the shop may have asked not to be called, and calls to the number are paused until an operator
   checks it). Nothing is created; the host is told so, sent back to the shop list with that shop marked "call it yourself", and can order

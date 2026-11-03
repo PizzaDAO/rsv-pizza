@@ -61,6 +61,19 @@ describe('statusInfo', () => {
     expect(s.detail.startsWith(message)).toBe(true);
     expect(s.detail).toMatch(/release it below/);
   });
+  it.each(['needs_review', 'unreachable', 'refused', 'canceled'])('pizza-mcp faf6855: judge_unavailable on %s says an order may exist and a check is pending, without alarm', (status) => {
+    const message = 'The shop seems to have answered, but we could not check the call recording automatically. An order may exist at the shop: please check with it before ordering again.';
+    const s = statusInfo({ ...base, status, releasable: true, outcome: { nothing_ordered: false, reason: 'judge_unavailable', message } });
+    expect(s.title).toBe("Check with Sal's before ordering again");
+    expect(s.tone).toBe('warn');
+    expect(s.detail.startsWith(message)).toBe(true);
+    expect(s.detail).toMatch(/waiting for a person on our team to read it/);
+    expect(s.detail).toMatch(/call Sal's to find out whether they took the order/);
+    expect(s.detail).toMatch(/release it below/);
+    expect(s.detail).not.toMatch(/nothing was ordered\./i);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/\bNOT\b|error|failed|problem|went wrong/);
+    expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'judge_unavailable', message } }).detail).not.toMatch(/release/);
+  });
   it('an order waiting on approval says what to do if the approval page refuses the call', () => {
     expect(statusInfo({ ...base, status: 'awaiting_approval' }).detail).toMatch(/cancel this order and pick another pizzeria/);
   });

@@ -3228,7 +3228,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out. A client must treat a reason it does not know by nothing_ordered."
+                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered."
                       },
                       "message": {
                         "type": "string",
@@ -3561,7 +3561,7 @@
                   },
                   "reason": {
                     "type": "string",
-                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out. A client must treat a reason it does not know by nothing_ordered."
+                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable. A client must treat a reason it does not know by nothing_ordered."
                   },
                   "message": {
                     "type": "string",
