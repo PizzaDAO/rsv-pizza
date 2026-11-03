@@ -10,6 +10,8 @@ vi.mock('../services/pizzaOrderNotify.js', () => ({ notifyHostOfOrder: m.notify 
 import router from './pizza-mcp-webhook.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { signWebhook } from '../lib/webhookSignature.js';
+import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
+import { isBlocking } from '../lib/pizzaOrderStatus.js';
 
 const SECRET = 'whsec_test_secret_0123456789abcdef0123456789';
 const app = () => {
@@ -21,7 +23,7 @@ const app = () => {
 };
 
 let n = 0;
-function delivery(order: any, opts: { id?: string; secret?: string; ts?: number; createdAt?: string; raw?: string; clientRef?: any } = {}) {
+function delivery(order: any, opts: { id?: string; secret?: string; ts?: number; createdAt?: string; raw?: string; clientRef?: any; extra?: Record<string, unknown> } = {}) {
   const id = opts.id ?? `evt_${++n}`;
   const ts = opts.ts ?? Math.floor(Date.now() / 1000);
   const raw =
@@ -32,6 +34,7 @@ function delivery(order: any, opts: { id?: string; secret?: string; ts?: number;
       created_at: opts.createdAt ?? new Date().toISOString(),
       client_ref: opts.clientRef ?? { party_id: PARTY_ID, rsvp_user_id: 'u1' },
       order,
+      ...(opts.extra ?? {}),
     });
   return { id, ts, raw, sig: signWebhook(opts.secret ?? SECRET, id, ts, raw) };
 }
@@ -255,5 +258,50 @@ describe('POST /api/pizza-mcp/webhook: draft receipt and notification', () => {
   it('a native order that is merely placed (unpaid) creates nothing', async () => {
     await post(delivery(opopOrder({ id: 'ord_n', tier: 'native', status: 'held', payment_status: 'unpaid' }, 2)));
     expect(fake.docs).toHaveLength(0);
+  });
+});
+
+describe('POST /api/pizza-mcp/webhook: outcome-only events (pizza-mcp 9ad5364)', () => {
+  const ended = (nothing_ordered: boolean, reason: string, status = 'unreachable') =>
+    opopOrder({ status, outcome: { nothing_ordered, reason, message: `msg ${reason}` } }, 3);
+
+  it('change "outcome" on a final status (same status, same timeline, new Webhook-Id) flips blocking both ways', async () => {
+    await post(delivery(ended(true, 'no_answer'), { createdAt: '2026-11-01T18:00:00.000Z' }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+    const late = delivery(ended(false, 'outcome_unclear'), { createdAt: '2026-11-01T18:03:00.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } });
+    expect((await post(late)).status).toBe(200);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'unreachable', timelineLen: 3 });
+    expect(fake.byOpop('ord_1').lastView.outcome).toMatchObject({ nothing_ordered: false, reason: 'outcome_unclear' });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    // and back: a later outcome event that says nothing was ordered frees it again
+    await post(delivery(ended(true, 'not_dialed'), { createdAt: '2026-11-01T18:04:00.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+  });
+
+  it('an outcome event delivered before the older status event is not undone by it', async () => {
+    const statusEvt = delivery(ended(true, 'no_answer'), { createdAt: '2026-11-01T18:00:00.000Z' });
+    const outcomeEvt = delivery(ended(false, 'outcome_unclear'), { createdAt: '2026-11-01T18:03:00.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } });
+    await post(outcomeEvt);
+    await post(statusEvt); // a retry of the status change, arriving late
+    expect(fake.byOpop('ord_1').lastView.outcome.nothing_ordered).toBe(false);
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+  });
+
+  it('a poll on this server\'s clock does not make a later outcome event look stale (no mixed clocks)', async () => {
+    await post(delivery(ended(true, 'no_answer'), { createdAt: '2026-11-01T18:00:00.000Z' }));
+    // the page polls (no eventAt): this server's clock is ahead of pizza-mcp's
+    await applyOrderUpdate(fake.db as any, ended(true, 'no_answer') as any);
+    expect(fake.byOpop('ord_1').lastEventAt.toISOString()).toBe('2026-11-01T18:00:00.000Z');
+    await post(delivery(ended(false, 'outcome_unclear'), { createdAt: '2026-11-01T18:00:30.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+  });
+
+  it('confirmed_by_shop -> needs_review with nothing_ordered false removes the draft and blocks', async () => {
+    await post(delivery(opopOrder({ status: 'confirmed_by_shop', call: { attempts: 1, last_outcome: 'confirmed', shop_total_cents: 18740, ready_at_text: '6:30', changes: [], transcript_available: true } }, 3)));
+    expect(fake.docs).toHaveLength(1);
+    await post(delivery(opopOrder({ status: 'needs_review', outcome: { nothing_ordered: false, reason: 'transcript_mismatch', message: 'm' } }, 4), { extra: { previous_status: 'confirmed_by_shop' } }));
+    expect(fake.docs).toHaveLength(0);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'needs_review', payoutDocumentId: null });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
   });
 });

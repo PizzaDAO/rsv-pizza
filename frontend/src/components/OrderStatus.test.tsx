@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { OrderStatus } from './OrderStatus';
 import type { PizzaOrderView } from '../lib/pizzaOrder';
 
-const mocks = vi.hoisted(() => ({ settle: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ settle: vi.fn(), get: vi.fn(), cancel: vi.fn() }));
 vi.mock('../lib/pizzaOrder', async () => {
   const actual = await vi.importActual<typeof import('../lib/pizzaOrder')>('../lib/pizzaOrder');
-  return { ...actual, getPizzaOrder: mocks.get, settlePizzaOrder: mocks.settle };
+  return { ...actual, getPizzaOrder: mocks.get, settlePizzaOrder: mocks.settle, cancelPizzaOrder: mocks.cancel };
 });
 
 const order = (over: Partial<PizzaOrderView> = {}): PizzaOrderView => ({
@@ -40,6 +40,22 @@ describe('OrderStatus', () => {
     render(<OrderStatus partyId="p" order={order({ status: 'needs_review' })} orderScript="read this out" onUpdate={noop} onDone={noop} />);
     expect(screen.getByText(/read this out/)).toBeTruthy();
     expect(screen.getByText('Back to pizzerias')).toBeTruthy();
+  });
+
+  it('an approval the shop cannot take (pizza-mcp 422 on its page) has a way out: the copy says so, and cancel leads to another pizzeria', async () => {
+    const pending = order({ status: 'awaiting_approval', cancelable: true, nextAction: { type: 'open_url', url: 'https://mcp.example/confirm/c1' } as never, payoutDocumentId: null });
+    const canceled = order({ status: 'canceled', blocking: false, outcome: { nothing_ordered: true, reason: 'canceled', message: 'You canceled before we called. Nothing was ordered.' }, payoutDocumentId: null });
+    const onUpdate = vi.fn();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mocks.get.mockResolvedValue({ order: pending, stale: false });
+    mocks.cancel.mockResolvedValue({ order: canceled });
+    const { rerender } = render(<OrderStatus partyId="p" order={pending} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText(/If that page says the shop can't be called right now, cancel this order and pick another pizzeria\./)).toBeTruthy();
+    await userEvent.click(screen.getByText('Cancel this order'));
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledWith(canceled));
+    rerender(<OrderStatus partyId="p" order={canceled} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
   });
 
   it('an expired approval offers Start over, not a dead link', () => {

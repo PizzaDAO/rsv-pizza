@@ -42,6 +42,8 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // set when the server names an existing order: a live or confirmed one, or (capExhausted) one that holds the budget
   const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string; capExhausted?: boolean } | null>(null);
   const [lastInput, setLastInput] = useState<Parameters<typeof placePizzaOrder>[1] | null>(null);
+  // shops pizza-mcp refused to call this session (e.g. paused while an operator checks a possible opt-out)
+  const [uncallable, setUncallable] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     if (!partyId) return;
@@ -167,6 +169,12 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         const err = e as ApiError;
         if (showHeldOrder(err)) {
           // nothing else to do here: a second order could not fit either
+        } else if (err.code === 'CALLS_NOT_AVAILABLE_HERE') {
+          // nothing was ordered and nothing is pending: back to the list, this shop marked call-it-yourself
+          setUncallable((prev) => new Set(prev).add(shop.id));
+          setCartState(null);
+          setStep('shops');
+          setError(err.message || `We can't call ${shop.name} right now. Nothing was ordered. Pick another pizzeria.`);
         } else if (err.code === 'ORDER_IN_PROGRESS') {
           // never silently place a second order: the host chooses
           setInProgress({ existingOrderId: err.data?.existingOrderId, existingStatus: err.data?.existingStatus });
@@ -217,6 +225,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         <ShopPicker
           partyId={partyId}
           preferName={preferName}
+          uncallable={uncallable}
           onSelect={(s) => {
             setShop(s);
             setCartState(null);

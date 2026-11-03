@@ -6,6 +6,8 @@ interface ShopPickerProps {
   partyId: string;
   onSelect: (shop: PizzaShop) => void;
   preferName?: string;
+  /** Shops the ordering service refused to call this session: shown as call-it-yourself. */
+  uncallable?: ReadonlySet<string>;
 }
 
 const toneClass: Record<'green' | 'purple' | 'gray', string> = {
@@ -17,7 +19,7 @@ const toneClass: Record<'green' | 'purple' | 'gray', string> = {
 const addressLine = (a: Record<string, unknown>) =>
   [a.line1, a.city, a.region].filter((x) => typeof x === 'string' && x).join(', ');
 
-export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName }) => {
+export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable }) => {
   const [shops, setShops] = useState<PizzaShop[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attribution, setAttribution] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
   return (
     <div className="space-y-2">
       {shops.map((shop) => {
-        const badge = shopBadge(shop);
+        const badge = uncallable?.has(shop.id) ? { label: "We can't call it right now: call it yourself", tone: 'gray' as const, orderable: false } : shopBadge(shop);
         const Icon = badge.tone === 'green' ? Zap : badge.tone === 'purple' ? Bot : Phone;
         return (
           <div key={shop.id} className="p-3 bg-theme-surface rounded-xl border border-theme-stroke">

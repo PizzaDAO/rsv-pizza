@@ -829,7 +829,7 @@ describe('budget release, double counting, cancel button, settling (final review
     expect(mcp.calls).toHaveLength(0);
   });
 
-  it('real polls stop 20 minutes after entering confirmed_by_shop, though each poll moves lastEventAt', async () => {
+  it('real polls stop 20 minutes after entering confirmed_by_shop, and no poll moves lastEventAt', async () => {
     const t0 = new Date('2026-11-01T18:00:00Z').getTime();
     vi.useFakeTimers({ toFake: ['Date'], now: t0 });
     try {
@@ -848,7 +848,8 @@ describe('budget release, double counting, cancel button, settling (final review
       for (let m = 5; m < 20; m += 5) {
         vi.setSystemTime(t0 + m * 60_000);
         expect(await poll(), `${m} minutes`).toEqual({ polled: 1, settling: true });
-        expect(fake.byOpop('ord_poll').lastEventAt.getTime()).toBe(t0 + m * 60_000);
+        // a poll is applied but never stamps lastEventAt with this server's clock (only webhook created_at does)
+        expect(fake.byOpop('ord_poll').lastEventAt.getTime()).toBe(t0);
       }
       expect(fake.byOpop('ord_poll').confirmedAt.getTime()).toBe(t0);
 
@@ -981,5 +982,69 @@ describe('budget release, double counting, cancel button, settling (final review
   it('receipt_uploaded is still refused on an ended order pizza-mcp is sure about', async () => {
     const o = await mk({ status: 'canceled', ...withOutcome(oc(true, 'canceled')) });
     expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'receipt_uploaded' })).status).toBe(409);
+  });
+});
+
+describe('pizza-mcp 9ad5364', () => {
+  const optOut422 = () => ({
+    status: 422,
+    json: {
+      code: 'CALLS_NOT_AVAILABLE_HERE',
+      title: 'Phone orders are not available for this shop',
+      status: 422,
+      detail: 'The shop may have asked not to be called, so calls to it are paused until someone has checked.',
+      details: { reasons: ['possible_opt_out'] },
+      retryable: false,
+    },
+  });
+
+  it('place_order 422 CALLS_NOT_AVAILABLE_HERE (possible_opt_out): truthful copy with a way forward, no row, nothing blocks another shop', async () => {
+    mcp = pizzaMcp({ 'POST /orders': (c: any) => (c.body.quote_id.includes('cart_1') ? optOut422() : { status: 201, json: { order: opopOrder({ id: 'ord_ok', pizzeria_id: 'pzl_osm_n2', status: 'awaiting_approval' }), next_action: null } }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const res = await placeFrom(await buildCart());
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatchObject({ code: 'CALLS_NOT_AVAILABLE_HERE', shopId: 'pzl_osm_n1' });
+    expect(res.body.error.message).toBe(
+      "We can't call Sal's for you right now. The shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
+    );
+    expect(res.body.error.opop.details.reasons).toEqual(['possible_opt_out']);
+    expect(fake.orders.size).toBe(0);
+    const cfg = await request(app()).get(`${base}/config`).set(host);
+    expect(cfg.body).toMatchObject({ remainingCapCents: 25000, blockedReason: null });
+    // another pizzeria, no "allowAnother" needed
+    const other = await placeFrom(await buildCart({}, host, 'pzl_osm_n2'));
+    expect(other.status).toBe(201);
+  });
+
+  it('an order whose number was quarantined before the dial (unreachable, not_dialed, nothing_ordered true) holds and blocks nothing', async () => {
+    await fake.db.pizzaOrder.create({
+      data: {
+        partyId: PARTY_ID, userId: 'host1', opopOrderId: 'ord_nd', tier: 'listing', shopId: 'pzl_osm_n1', shopName: "Sal's", status: 'unreachable', ceilingCents: 5000,
+        lastView: { outcome: { nothing_ordered: true, reason: 'not_dialed', message: 'We did not call the shop: phone ordering is not available for it right now.' }, call: { attempts: 0, last_outcome: 'not_dialed' }, timeline: [] },
+      },
+    });
+    const item = (await request(app()).get(`${base}/orders`).set(host)).body.orders[0];
+    expect(item).toMatchObject({ blocking: false, releasable: false, outcome: { nothing_ordered: true, reason: 'not_dialed' } });
+    expect((await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents).toBe(25000);
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+  });
+
+  it('confirmed_by_shop downgraded to needs_review (nothing_ordered false) on the settling poll: draft removed, holds the ceiling, blocks, releasable', async () => {
+    const c = await buildCart();
+    const placed = await placeFrom(c);
+    const id = placed.body.order.opopOrderId;
+    const confirmed = opopOrder({ id, status: 'confirmed_by_shop', call: { attempts: 1, last_outcome: 'confirmed', shop_total_cents: 18000, ready_at_text: '6:30', changes: [], transcript_available: true } }, 3);
+    mcp = pizzaMcp({ 'GET /orders/:id': () => ({ json: confirmed }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    expect((await request(app()).get(`${base}/orders/${id}`).set(host)).body.order).toMatchObject({ status: 'confirmed_by_shop', settling: true });
+    expect(fake.docs).toHaveLength(1);
+    const review = opopOrder({ id, status: 'needs_review', outcome: { nothing_ordered: false, reason: 'transcript_mismatch', message: 'The shop may have taken it.' }, call: confirmed.call }, 4);
+    mcp = pizzaMcp({ 'GET /orders/:id': () => ({ json: review }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const g = (await request(app()).get(`${base}/orders/${id}`).set(host)).body.order;
+    expect(g).toMatchObject({ status: 'needs_review', blocking: true, releasable: true, payoutDocumentId: null, outcome: { nothing_ordered: false } });
+    expect(fake.docs).toHaveLength(0);
+    expect((await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents).toBe(25000 - 18000);
+    expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
   });
 });

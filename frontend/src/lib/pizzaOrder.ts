@@ -307,7 +307,12 @@ export function statusInfo(
   switch (o.status) {
     case 'awaiting_approval':
       if (o.restartable) return { title: 'The approval link expired', detail: 'Nothing was ordered. Start over to place it again.', tone: 'warn' };
-      return { title: 'Approve the order', detail: 'Enter the code we emailed you on the approval page. Nothing is ordered until you do.', tone: 'action' };
+      return {
+        title: 'Approve the order',
+        detail:
+          "Enter the code we emailed you on the approval page. Nothing is ordered until you do. If that page says the shop can't be called right now, cancel this order and pick another pizzeria.",
+        tone: 'action',
+      };
     case 'calling': {
       // Not dialed yet, so not "calling": no call is on the line, and that says nothing about earlier calls.
       const deferred = o.call?.deferred;

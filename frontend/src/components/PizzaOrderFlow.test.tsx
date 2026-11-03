@@ -21,7 +21,12 @@ vi.mock('../contexts/PizzaContext', () => ({
 }));
 const shop = { id: 'pzl_1', name: "Sal's", tier: 'listing' } as PizzaShop;
 vi.mock('./ShopPicker', () => ({
-  ShopPicker: ({ onSelect }: { onSelect: (s: PizzaShop) => void }) => <button onClick={() => onSelect(shop)}>Pick Sal's</button>,
+  ShopPicker: ({ onSelect, uncallable }: { onSelect: (s: PizzaShop) => void; uncallable?: ReadonlySet<string> }) => (
+    <div>
+      <button onClick={() => onSelect(shop)}>Pick Sal's</button>
+      {uncallable?.has(shop.id) && <span>Sal's marked call-it-yourself</span>}
+    </div>
+  ),
 }));
 vi.mock('./CartReview', () => ({
   CartReview: ({ onBuild, onApprove, error }: { onBuild: (iso: string) => void; onApprove: (i: unknown) => void; error: string | null }) => (
@@ -173,6 +178,23 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     expect(await screen.findByText("Pick Sal's")).toBeTruthy();
     expect(mocks.config).toHaveBeenCalledTimes(2);
     await vi.waitFor(() => expect(screen.queryByText(/No reimbursement budget is left/)).toBeNull());
+  });
+
+  it('CALLS_NOT_AVAILABLE_HERE (possible opt-out) on placing: back to the shop list with the reason, shop marked, nothing pending', async () => {
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    const msg = "We can't call Sal's for you right now. The shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself.";
+    mocks.place.mockRejectedValue(Object.assign(new Error(msg), { code: 'CALLS_NOT_AVAILABLE_HERE', data: { opop: { details: { reasons: ['possible_opt_out'] } }, shopId: 'pzl_1' } }));
+    const close = vi.fn();
+    vi.spyOn(window, 'open').mockReturnValue({ close, location: {} } as unknown as Window);
+    await userEvent.click(await toCart());
+    await userEvent.click(screen.getByText('Approve'));
+    expect(await screen.findByText(msg)).toBeTruthy();
+    expect(screen.getByText("Pick Sal's")).toBeTruthy();
+    expect(screen.getByText("Sal's marked call-it-yourself")).toBeTruthy();
+    expect(close).toHaveBeenCalled();
+    // no stuck state: no second-order prompt, no order view
+    expect(screen.queryByText('Place a second order anyway')).toBeNull();
+    expect(screen.queryByText('Build')).toBeNull();
   });
 
   it('a failed lookup says so wherever the host is', async () => {

@@ -4,6 +4,14 @@
  *
  * - Out of order: pizza-mcp's order.timeline is append-only, so a view with a SHORTER timeline
  *   than the stored one is older and is ignored; on equal length the later event time wins.
+ * - Outcome-only events: pizza-mcp also sends `order.updated` with `change: "outcome"` when the
+ *   computed `order.outcome` changes and the status does not (a late call record on an order that is
+ *   already final). Same timeline length, later `created_at`, so it is applied like any newer event:
+ *   blocking and the budget hold follow `outcome` on every event.
+ * - `lastEventAt` is only ever a webhook's `created_at` (pizza-mcp's clock). A poll or a cancel
+ *   response is applied (it is a live read) but does not move it: stamping it with this server's
+ *   clock could make a later outcome event look older than it is and drop it for good on an order
+ *   that is no longer polled.
  * - Draft receipt: on `confirmed_by_shop` (phone tier) or `payment_status = paid` (native) a
  *   draft PayoutDocument is created, once (unique pizza_order_id), carrying NO file and NO
  *   ocrAmount. The shop's total lives in ocrRaw so the reimbursement flow can show and cross-check
@@ -114,7 +122,7 @@ export async function applyOrderUpdate(
       lastView: order as unknown as Prisma.InputJsonValue,
       nextAction: (order.next_action ?? null) as unknown as Prisma.InputJsonValue,
       timelineLen,
-      lastEventAt: now,
+      lastEventAt: eventAt ?? row.lastEventAt,
       confirmedAt,
     },
   });

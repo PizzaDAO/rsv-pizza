@@ -16,7 +16,8 @@ import type { OpopOrder } from '../services/pizzaMcp.client.js';
  *    than 5 minutes off -> 401 (lib/webhookSignature.ts is pizza-mcp's own verifier, copied).
  *  - Dedupes on Webhook-Id in the same transaction as the upsert: a handler that fails leaves no
  *    id behind, so pizza-mcp's retry is processed; a replay answers 200 and changes nothing.
- *  - Out-of-order events are ignored by services/pizzaOrderSync.ts.
+ *  - Out-of-order events are ignored by services/pizzaOrderSync.ts. An outcome-only event (`change: "outcome"`,
+ *    same status, same timeline, new Webhook-Id) is newer by created_at and is applied, on final statuses too.
  *  - Unknown event types and orders we cannot attribute are acknowledged (2xx) so they are not retried.
  */
 const router = Router();
@@ -44,6 +45,10 @@ router.post(
       let payload: {
         type?: string;
         created_at?: string;
+        // `"outcome"` when only order.outcome changed (previous_status equals order.status). Not branched on:
+        // every event, whatever its `change`, is applied whole, so blocking and the budget follow order.outcome.
+        change?: string;
+        previous_status?: string;
         client_ref?: { party_id?: unknown; rsvp_user_id?: unknown } | null;
         order?: OpopOrder;
       } | null;

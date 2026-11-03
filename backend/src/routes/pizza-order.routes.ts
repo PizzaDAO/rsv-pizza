@@ -74,8 +74,8 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
     readyAtText: row.readyAtText,
     summary: row.summary,
     payoutDocumentId: row.payoutDocumentId,
-    // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`. `attempts` is not for
-    // display: it can count a row that was never dialed.
+    // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`. `attempts` counts dialed
+    // calls only (pizza-mcp 9ad5364 leaves out `not_dialed` rows) but is still not shown: the outcome says what happened.
     call: view?.call ?? null,
     timeline: view?.timeline ?? [],
     // the approval link belongs to the host who placed the order
@@ -477,7 +477,22 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     const recKey = sha(cartRow.recommendationVersion);
     const attempt = existing.filter((o: any) => o.recKey === recKey && o.shopId === shopId).length;
     const key = orderIdempotencyKey(party.id, `${cartRow.recommendationVersion}#${sha(JSON.stringify(request))}`, shopId, attempt);
-    const placed = await client.placeOrder(actor, request, key);
+    let placed: Awaited<ReturnType<typeof client.placeOrder>>;
+    try {
+      placed = await client.placeOrder(actor, request, key);
+    } catch (e) {
+      // pizza-mcp refused to call this shop (an opt-out, a number it has paused until an operator checks it, a
+      // changed number...). Nothing was created there, so nothing blocks here: say so, and send the host on.
+      if (e instanceof AppError && e.code === 'CALLS_NOT_AVAILABLE_HERE') {
+        throw new AppError(
+          `We can't call ${shop.name} for you right now. ${e.message.trim().replace(/([^.!?])$/, '$1.')} Nothing was ordered. Pick another pizzeria, or call ${shop.name} yourself.`,
+          e.statusCode,
+          'CALLS_NOT_AVAILABLE_HERE',
+          { ...(e.data ?? {}), shopId: shop.id }
+        );
+      }
+      throw e;
+    }
     const o = placed.order;
 
     // Trust the order, not the request: re-derive the shop's tier and name from where it really went.
@@ -502,7 +517,8 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
         lastView: o as any,
         nextAction: na as any,
         timelineLen: Array.isArray(o.timeline) ? o.timeline.length : 0,
-        lastEventAt: new Date(),
+        // only a webhook's created_at goes here (see pizzaOrderSync): the first event always applies
+        lastEventAt: null,
         confirmedAt: o.status === 'confirmed_by_shop' ? new Date() : null,
       },
       update: {

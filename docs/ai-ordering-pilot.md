@@ -114,7 +114,7 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
   so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
-  host said so. `call.attempts` is never shown: it can count a row that was never dialed. A `calling` order can last up to 60 minutes
+  host said so. `call.attempts` is never shown (since pizza-mcp 9ad5364 it no longer counts `not_dialed` rows, but the outcome is what the host reads). A `calling` order can last up to 60 minutes
   before pizza-mcp moves it to `needs_review`, so after 10 minutes the page says it is still waiting; `call.deferred` shows as delayed or scheduled, not calling.
 - **Receipts:** only a receipt uploaded after the order can count for it, and an order that ended but may exist at the shop can have one. One that matches the confirmed total (5% or $1) does so
   automatically. "I uploaded the receipt" (`action:'receipt_uploaded'`) is refused with `NO_RECEIPT_FOUND` until such a receipt exists, and it
@@ -133,4 +133,14 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   `source = 'upload'`, enforced by `backend/src/lib/receiptSource.test.ts`. The host uploads the real receipt as usual and can
   remove the reminder line. A later downgrade (`needs_review`) or cancel removes it; a changed total updates it.
 - Webhook: raw-body HMAC (5 minute window), dedupe on `Webhook-Id` inside the upsert transaction, stale (shorter timeline) events ignored.
+  pizza-mcp (9ad5364 on) also sends `order.updated` with `change: "outcome"` when only `order.outcome` changed (same status, same timeline,
+  `previous_status` equal to the status), for example a late call record on an order that already ended. Every event is applied whole, on
+  final statuses too, so blocking and the budget hold follow the latest `outcome`. Equal-timeline events are ordered by the webhook's
+  `created_at` only: a poll or a cancel response is applied but never stamps the row with this server's clock.
+- **Shop can't be called:** pizza-mcp answers `place_order` with 422 `CALLS_NOT_AVAILABLE_HERE` when it won't phone the shop (for example
+  `details.reasons: ["possible_opt_out"]`: the shop may have asked not to be called, and calls to the number are paused until an operator
+  checks it). Nothing is created; the host is told so, sent back to the shop list with that shop marked "call it yourself", and can order
+  elsewhere with no override. The same refusal can come on pizza-mcp's approval page; the order then stays waiting for approval, and the
+  status copy tells the host to cancel it and pick another pizzeria (canceling frees it). An order never dialed because its number was
+  quarantined ends `unreachable` with `nothing_ordered: true` (`not_dialed`) and holds nothing.
 - Co-hosts see an order but not its approval link; only the host who placed it is polled / notified.

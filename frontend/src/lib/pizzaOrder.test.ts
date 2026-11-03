@@ -49,6 +49,21 @@ describe('statusInfo', () => {
       expect(`${s.title} ${s.detail}`).not.toMatch(/\border (it )?yourself\b|call (the shop|them) yourself|^nothing was ordered|\. nothing was ordered/i);
     }
   });
+  it('pizza-mcp 9ad5364: a quarantined number never dialed (not_dialed, nothing_ordered true) reads as nothing ordered', () => {
+    const s = statusInfo({ ...base, status: 'unreachable', outcome: { nothing_ordered: true, reason: 'not_dialed', message: 'We did not call the shop: phone ordering is not available for it right now.' } });
+    expect(s.title).toBe("Nothing was ordered at Sal's");
+    expect(s.detail).toBe('We did not call the shop: phone ordering is not available for it right now.');
+  });
+  it('pizza-mcp 9ad5364: possible_opt_out on needs_review shows its message and says to check before ordering again', () => {
+    const message = "The shop may have said not to call, but we can't tell for sure, so we are not calling it until someone has checked. We don't know whether an order exists at the shop: please check with it before ordering again.";
+    const s = statusInfo({ ...base, status: 'needs_review', releasable: true, outcome: { nothing_ordered: false, reason: 'possible_opt_out', message } });
+    expect(s.title).toBe("Check with Sal's before ordering again");
+    expect(s.detail.startsWith(message)).toBe(true);
+    expect(s.detail).toMatch(/release it below/);
+  });
+  it('an order waiting on approval says what to do if the approval page refuses the call', () => {
+    expect(statusInfo({ ...base, status: 'awaiting_approval' }).detail).toMatch(/cancel this order and pick another pizzeria/);
+  });
   it('approval_timeout never reads as final, whichever way nothing_ordered points', () => {
     const open = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: true, reason: 'price_approval_timeout', message: 'Nothing is ordered yet; approve to have us call back.' } });
     expect(open.title).toBe('Approval timed out');
