@@ -55,6 +55,9 @@ import funnelRoutes from './routes/funnel.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
+import pizzaOrderRoutes from './routes/pizza-order.routes.js'; // basil-14648: AI ordering through pizza-mcp (OPOP), allowlisted parties only
+import pizzaMcpWebhookRoutes from './routes/pizza-mcp-webhook.routes.js'; // basil-14648: signed order.updated webhook (raw body)
+import jwksRoutes from './routes/jwks.routes.js'; // basil-14648: public JWKS for the tokens we mint for pizza-mcp
 import telegramRoutes from './routes/telegram.routes.js';
 import telegramLinkCallbackRoutes from './routes/telegram-link-callback.routes.js'; // provola-58505: moltobene host-link callback
 import telegramInboundRoutes from './routes/telegram-inbound.routes.js'; // suppli-58533: moltobene host DM submissions
@@ -137,6 +140,11 @@ app.use(cors({
 // bounce-rate-heuristic.
 app.use('/api/webhooks/resend', resendWebhookRouter);
 
+// basil-14648: pizza-mcp webhook ALSO needs the raw bytes (HMAC over the exact body), so it
+// mounts before express.json() too. JWKS is public and static.
+app.use('/api/pizza-mcp', pizzaMcpWebhookRoutes);
+app.use('/.well-known', jwksRoutes);
+
 // Logo-cleanup upload accepts base64-encoded images up to ~5 MB raw
 // (~6.7 MB base64). Must be registered BEFORE the global express.json()
 // below, or the global 100 KB default fires first.
@@ -203,6 +211,7 @@ app.use('/api/heic', heicRoutes); // taleggio-71042: public server-side HEIC->JP
 app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', pizzaOrderRoutes); // basil-14648: AI ordering (host/co-host + pilot allowlist on every route)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)

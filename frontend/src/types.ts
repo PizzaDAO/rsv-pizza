@@ -1850,6 +1850,11 @@ export type PayoutStatus = 'pending' | 'approved' | 'queued' | 'rejected' | 'pai
  */
 export interface ReceiptLibraryEntry {
   id: string;
+  /** basil-14648: 'upload' for real receipts; 'ai_call' / 'opop_native' for the reminder line a pizza order leaves. */
+  source?: 'upload' | 'ai_call' | 'opop_native';
+  /** Reminder lines only: the text and the shop's confirmed total. */
+  ocrSummary?: string | null;
+  draftTotalCents?: number | null;
   /** agnolotti-58291: null when the parent payout has been hard-deleted. */
   payoutId: string | null;
   /** agnolotti-58291: null when the parent payout has been hard-deleted. */

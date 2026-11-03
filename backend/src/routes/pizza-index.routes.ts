@@ -494,7 +494,7 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
              count(*) FILTER (WHERE s.document_id IS NOT NULL AND s.llm_pass_at IS NULL)::int AS pending_llm
       FROM payout_documents d JOIN parties p ON p.id = d.party_id
       LEFT JOIN pizza_line_sync s ON s.document_id = d.id
-      WHERE d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false
+      WHERE d.kind = 'receipt' AND d.source = 'upload' AND d.is_duplicate = false AND d.ineligible = false
         AND d.ocr_line_items IS NOT NULL AND jsonb_typeof(d.ocr_line_items) = 'array' ${sc}`);
     const [lines] = await prisma.$queryRaw<Array<Record<string, number>>>(Prisma.sql`
       SELECT count(*)::int AS lines,
@@ -598,7 +598,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const offset = intQ(q.offset, 0, 0, 100000);
     await refreshOutliers();
 
-    const eligible = Prisma.sql`((d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false)
+    const eligible = Prisma.sql`((d.kind = 'receipt' AND d.source = 'upload' AND d.is_duplicate = false AND d.ineligible = false)
       OR (h.id IS NOT NULL AND h.kind <> 'not_pizza'))`;
     const cond: Prisma.Sql[] = [eligible];
     if (bool(q.excluded)) cond.push(Prisma.sql`li.excluded = true`);
@@ -1218,7 +1218,7 @@ async function fetchBundles(scope: IndexScope, f: IndexFilters): Promise<PizzaBu
     FROM pizza_line_items li
     JOIN payout_documents d ON d.id = li.document_id
     JOIN parties p ON p.id = li.party_id
-    WHERE li.is_bundle = true AND li.excluded = false AND d.kind = 'receipt'
+    WHERE li.is_bundle = true AND li.excluded = false AND d.kind = 'receipt' AND d.source = 'upload'
       AND d.is_duplicate = false AND d.ineligible = false AND li.unit_price_usd > 0
       ${cond.length ? Prisma.join(cond, ' ') : Prisma.empty} ${scope.full ? Prisma.empty : scopeSql(scope, 'p')}
     ORDER BY li.unit_price_usd * li.qty DESC
