@@ -191,7 +191,10 @@ describe('OrderStatus', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const o = order({ status: 'approval_timeout', blocking: true, releasable: false, cancelable: true, nextAction: { type: 'open_url', url: 'https://x/confirm' }, outcome: { nothing_ordered: false, reason: 'price_approval_dropped', message: 'You can still approve.' } });
     render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
-    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    // pizza-mcp e62620e: an open approval_timeout keeps its own title; the body still says an order may exist
+    expect(screen.getByText('Approval timed out')).toBeTruthy();
+    expect(document.body.textContent).toMatch(/You can still approve\./);
+    expect(document.body.textContent).not.toMatch(/Nothing was ordered|nothing is ordered/i);
     expect(screen.getByText('Open the approval page')).toBeTruthy();
     expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
     await userEvent.click(screen.getByText('Cancel this order'));

@@ -305,3 +305,58 @@ describe('POST /api/pizza-mcp/webhook: outcome-only events (pizza-mcp 9ad5364)',
     expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
   });
 });
+
+describe('POST /api/pizza-mcp/webhook: pizza-mcp e62620e', () => {
+  const deferred = (until: string) =>
+    opopOrder({ status: 'calling', call: { attempts: 1, last_outcome: 'approval_timeout', deferred: { until, reason: 'call_check_pending', message: 'An earlier call to the shop is still being checked; we will call as soon as that check is done.' } } }, 5);
+
+  it('repeated calling -> calling events under call_check_pending (each 2-minute re-deferral) send no notice, make no draft, and change nothing but the view', async () => {
+    for (let i = 0; i < 8; i++) {
+      const res = await post(delivery(deferred(`2026-11-01T18:${String(2 + i * 2).padStart(2, '0')}:00.000Z`), { createdAt: `2026-11-01T18:${String(i * 2).padStart(2, '0')}:30.000Z`, extra: { previous_status: 'calling' } }));
+      expect(res.status).toBe(200);
+    }
+    expect(m.notify).not.toHaveBeenCalled();
+    expect(fake.docs).toHaveLength(0);
+    expect(fake.orders.size).toBe(1);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'calling', payoutDocumentId: null, confirmedAt: null, confirmedTotalCents: null, timelineLen: 5 });
+    expect(fake.byOpop('ord_1').lastView.call.deferred.until).toBe('2026-11-01T18:16:00.000Z');
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+  });
+
+  it('the very same re-deferral event redelivered (same Webhook-Id) is a no-op, and an older one arriving late does not undo a newer one', async () => {
+    const newer = delivery(deferred('2026-11-01T18:10:00.000Z'), { createdAt: '2026-11-01T18:08:30.000Z' });
+    await post(newer);
+    const writes = fake.byOpop('ord_1').updatedAt;
+    await post(newer);
+    expect(m.notify).not.toHaveBeenCalled();
+    await post(delivery(deferred('2026-11-01T18:04:00.000Z'), { createdAt: '2026-11-01T18:02:30.000Z' }));
+    expect(fake.byOpop('ord_1').lastView.call.deferred.until).toBe('2026-11-01T18:10:00.000Z');
+    expect(fake.byOpop('ord_1').updatedAt).toEqual(writes);
+  });
+
+  it('call_check_timeout (needs_review, nothing_ordered false) blocks without a notice, and a late outcome event changes it both ways, still with no notice or draft', async () => {
+    const timeout = (no: boolean, status = 'needs_review') =>
+      opopOrder({ status, outcome: { nothing_ordered: no, reason: 'call_check_timeout', message: `msg ${no}` } }, 6);
+    await post(delivery(timeout(false), { createdAt: '2026-11-01T18:00:00.000Z', extra: { previous_status: 'calling' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    // the late verdict says every call shows no order
+    await post(delivery(timeout(true), { createdAt: '2026-11-01T18:20:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+    // and a confirmed verdict makes it an order that exists: outcome_unclear, held again, status stays needs_review
+    await post(delivery(opopOrder({ status: 'needs_review', outcome: { nothing_ordered: false, reason: 'outcome_unclear', message: 'm' } }, 6), { createdAt: '2026-11-01T18:21:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'needs_review', payoutDocumentId: null, confirmedAt: null });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    expect(m.notify).not.toHaveBeenCalled();
+    expect(fake.docs).toHaveLength(0);
+  });
+
+  it('a canceled order after an approval timeout (outcome_unclear, nothing_ordered false) stays blocking; a later outcome event can free it', async () => {
+    await post(delivery(opopOrder({ status: 'approval_timeout', outcome: { nothing_ordered: false, reason: 'price_approval_timeout', message: 'm' } }, 4), { createdAt: '2026-11-01T18:00:00.000Z' }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    await post(delivery(opopOrder({ status: 'canceled', outcome: { nothing_ordered: false, reason: 'outcome_unclear', message: 'm' } }, 5), { createdAt: '2026-11-01T18:05:00.000Z', extra: { previous_status: 'approval_timeout' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    await post(delivery(opopOrder({ status: 'canceled', outcome: { nothing_ordered: true, reason: 'canceled', message: 'm' } }, 5), { createdAt: '2026-11-01T18:30:00.000Z', extra: { change: 'outcome', previous_status: 'canceled' } }));
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+    expect(m.notify).not.toHaveBeenCalled();
+  });
+});

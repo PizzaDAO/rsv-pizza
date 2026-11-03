@@ -121,6 +121,14 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
 - **Release:** an ended order that blocks can be released by any host or edit-enabled co-host, after a confirmation prompt: "Nothing was
   ordered" (`POST .../orders/:id/settle {action:'nothing_ordered'}`). A released order holds no budget and blocks nothing. It is the host's word,
   so it is offered only after they have checked with the shop. Confirmed orders cannot be released.
+- **pizza-mcp e62620e:** `call_check_timeout` (an earlier call's check never finished, so the callback was never made) ends
+  `needs_review` with `nothing_ordered: false`, until every call shows no order. `pending_operator_review` now means only a
+  judge-unavailable quarantine. A `price_approval_timeout` is `nothing_ordered: false` unless a verdict shows no order, so it reads "Approval
+  timed out ... check with the shop" and never says nothing is ordered. A `canceled` order after an approval timeout is `outcome_unclear`
+  / `false`: held, blocking, releasable. `outcome` can change after the status is final (`change: "outcome"`), including a late verdict after
+  `call_check_timeout`. Callbacks can wait longer under `call_check_pending` and each re-deferral may send `order.updated` calling to
+  calling: applied cheaply, and only a first `confirmed_by_shop` ever sends an email or Telegram message. A spoken card no longer changes
+  an outcome (`card_spoken` is gone); stored transcripts keep prices and only phones and other long numbers are removed. rsv stores no transcript.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
   host said so. The one reason the copy names is `judge_unavailable` (pizza-mcp faf6855: its call judge could not read the call): it
   adds that the call is waiting for a person at pizza-mcp to read it and that the host need not wait for that, since the check does not

@@ -313,18 +313,13 @@ export function statusInfo(
         tone: 'warn',
       };
     }
-    // pizza-mcp 41b81d7: a card number may have been read out on the call. The call is not checked automatically; a person
-    // reads it. An order may exist. Never repeat or ask for card details here.
-    if (oc.reason === 'card_spoken') {
+    // pizza-mcp e62620e: an approval timeout is NOT evidence that nothing was ordered (the shop heard the order and the AI
+    // said it would call back), so its outcome is `nothing_ordered: false` unless a verdict shows no order. The order is
+    // still open: approving sends the call back, canceling only stops the callback. Never says nothing was ordered.
+    if (o.status === 'approval_timeout') {
       return {
-        title: `Check with ${o.shopName} before ordering again`,
-        detail: [
-          oc.message,
-          `A person on our team will read the call, but you don't need to wait for that: call ${o.shopName} to find out whether they took the order and whether they kept a card number from the call.`,
-          o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
-        ]
-          .filter(Boolean)
-          .join(' '),
+        title: 'Approval timed out',
+        detail: `${oc.message} Open the approval page to have us call ${o.shopName} back, or cancel to stop the callback; canceling does not undo anything the shop may already have. Please do not order again in the meantime.`,
         tone: 'warn',
       };
     }

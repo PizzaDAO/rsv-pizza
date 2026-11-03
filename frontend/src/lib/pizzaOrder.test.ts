@@ -74,17 +74,51 @@ describe('statusInfo', () => {
     expect(`${s.title} ${s.detail}`).not.toMatch(/\bNOT\b|error|failed|problem|went wrong/);
     expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'judge_unavailable', message } }).detail).not.toMatch(/release/);
   });
-  it.each(['needs_review', 'unreachable', 'canceled'])('pizza-mcp 41b81d7: card_spoken on %s says a card may have been read out, an order may exist, and to check with the shop', (status) => {
-    const message = 'A card number may have been read out on the call, so we did not check the call automatically and a person will read it. An order may exist at the shop: please check with it before ordering again.';
-    const s = statusInfo({ ...base, status, releasable: true, outcome: { nothing_ordered: false, reason: 'card_spoken', message } });
+  it.each(['needs_review', 'unreachable'])('pizza-mcp e62620e: call_check_timeout (nothing_ordered false) on %s says an order may exist and to check with the shop, never that nothing was ordered', (status) => {
+    const message = 'We did not call the shop again: our automatic check of the earlier call did not finish in time. The shop may have heard your order on that call, so an order may exist: please check with it before ordering again.';
+    const s = statusInfo({ ...base, status, releasable: true, outcome: { nothing_ordered: false, reason: 'call_check_timeout', message } });
     expect(s.title).toBe("Check with Sal's before ordering again");
     expect(s.tone).toBe('warn');
     expect(s.detail.startsWith(message)).toBe(true);
-    expect(s.detail).toMatch(/call Sal's to find out whether they took the order/);
-    expect(s.detail).toMatch(/card number/);
+    expect(s.detail).toMatch(/Do NOT order again until you have called Sal's/);
     expect(s.detail).toMatch(/release it below/);
-    expect(`${s.title} ${s.detail}`).not.toMatch(/confirmed|\d{4}/i);
-    expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'card_spoken', message } }).detail).not.toMatch(/release/);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|confirmed|paused until someone/i);
+    expect(statusInfo({ ...base, status, releasable: false, outcome: { nothing_ordered: false, reason: 'call_check_timeout', message } }).detail).not.toMatch(/release/);
+  });
+  it('pizza-mcp e62620e: call_check_timeout with nothing_ordered true (every call shows no order) reads as nothing ordered, with its own message', () => {
+    const message = 'We did not call the shop again: our automatic check of the earlier call did not finish in time. Nothing was ordered on that call.';
+    const s = statusInfo({ ...base, status: 'needs_review', outcome: { nothing_ordered: true, reason: 'call_check_timeout', message } });
+    expect(s.title).toBe("Nothing was ordered at Sal's");
+    expect(s.detail).toBe(message);
+  });
+  it('pizza-mcp e62620e: price_approval_timeout is nothing_ordered false: approval_timeout offers the callback and cancel, and never says nothing is ordered', () => {
+    const message = 'The shop asked about a higher total and we could not reach you in time. We told the shop we would call back, but it heard the order and may have started it: approve to have us call back, or check with the shop.';
+    const s = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: false, reason: 'price_approval_timeout', message } });
+    expect(s.title).toBe('Approval timed out');
+    expect(s.tone).toBe('warn');
+    expect(s.detail.startsWith(message)).toBe(true);
+    expect(s.detail).toMatch(/Open the approval page to have us call Sal's back, or cancel to stop the callback/);
+    expect(s.detail).toMatch(/does not undo anything the shop may already have/);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/nothing (was|is) ordered|release it/i);
+  });
+  it('pizza-mcp e62620e: canceled after an approval timeout (outcome_unclear, nothing_ordered false) says check with the shop and offers release, never nothing ordered', () => {
+    const message = 'An order may exist at the shop.';
+    const s = statusInfo({ ...base, status: 'canceled', releasable: true, outcome: { nothing_ordered: false, reason: 'outcome_unclear', message } });
+    expect(s.title).toBe("Check with Sal's before ordering again");
+    expect(s.detail.startsWith(message)).toBe(true);
+    expect(s.detail).toMatch(/release it below/);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at/i);
+  });
+  it('a host is never told an order may exist and that nothing was ordered together: every outcome x status', () => {
+    const statuses = ['needs_review', 'unreachable', 'canceled', 'refused', 'shop_requires_prepay', 'approval_timeout'];
+    const reasons = ['call_check_timeout', 'price_approval_timeout', 'outcome_unclear', 'judge_unavailable', 'pending_operator_review', 'a_new_reason'];
+    for (const status of statuses) for (const reason of reasons) for (const no of [true, false]) {
+      const message = no ? 'Nothing was ordered.' : 'An order may exist at the shop: check with it.';
+      const s = statusInfo({ ...base, status, releasable: !no, outcome: { nothing_ordered: no, reason, message } });
+      const text = `${s.title} ${s.detail}`;
+      if (no) expect(text).not.toMatch(/may exist|check with|before ordering again/i);
+      else expect(text).not.toMatch(/nothing was ordered at|nothing is ordered yet|^Nothing was ordered/i);
+    }
   });
   it('pizza-mcp 41b81d7: a call_check_pending deferral reads as waiting to call back, never Calling, Checking or confirmed, even with call.checking set', () => {
     const msg = 'An earlier call to the shop is still being checked; we will call as soon as that check is done.';

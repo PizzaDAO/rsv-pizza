@@ -928,7 +928,9 @@ describe('budget release, double counting, cancel button, settling (final review
     ['needs_review', 'outcome_unclear'],
     ['needs_review', 'possible_opt_out'],
     ['needs_review', 'judge_unavailable'],
-    ['needs_review', 'card_spoken'],
+    ['needs_review', 'call_check_timeout'],
+    ['unreachable', 'call_check_timeout'],
+    ['canceled', 'price_approval_timeout'],
     ['canceled', 'price_approval_dropped'],
     ['unreachable', 'a_reason_added_next_year'],
     ['refused', 'a_reason_added_next_year'],
@@ -948,10 +950,18 @@ describe('budget release, double counting, cancel button, settling (final review
     expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: false, releasable: false });
   });
 
-  it.each([true, false])('approval_timeout with nothing_ordered %s is never released: it holds, blocks and the settle is refused', async (no) => {
+  it.each([true, false])('approval_timeout with nothing_ordered %s (price_approval_timeout or dropped) is never released: it holds, blocks and the settle is refused', async (no) => {
     const o = await mk({ status: 'approval_timeout', ceilingCents: 5000, nextAction: { type: 'open_url', url: 'https://x' }, ...withOutcome(oc(no, no ? 'price_approval_timeout' : 'price_approval_dropped')) });
     expect((await cart()).body.remainingCapCents).toBe(25000 - 5000);
     expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: false, cancelable: true });
+    expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
+  });
+
+  it('pizza-mcp e62620e: price_approval_timeout with nothing_ordered false (the default now) is live: holds, blocks, cancelable, never released, and canceling it keeps it held and releasable', async () => {
+    const o = await mk({ status: 'approval_timeout', ceilingCents: 5000, nextAction: { type: 'open_url', url: 'https://x' }, ...withOutcome(oc(false, 'price_approval_timeout')) });
+    expect((await cart()).body.remainingCapCents).toBe(25000 - 5000);
+    expect((await placeFrom(await buildCart())).body.error?.code).toBe('ORDER_IN_PROGRESS');
+    expect((await request(app()).get(`${base}/orders`).set(host)).body.orders[0]).toMatchObject({ blocking: true, releasable: false, cancelable: true, outcome: { nothing_ordered: false } });
     expect((await request(app()).post(`${base}/orders/${o.opopOrderId}/settle`).set(host).send({ action: 'nothing_ordered' })).status).toBe(409);
   });
 
