@@ -517,6 +517,7 @@ describe('send-only guarantee', () => {
     const files = [
       path.join(dir, 'service-telegram.routes.ts'),
       path.join(dir, '..', 'services', 'telegramSend.ts'),
+      path.join(dir, '..', 'services', 'pizzadaoFollowupInbound.ts'),
     ];
     for (const f of files) {
       expect(fs.readFileSync(f, 'utf8')).not.toMatch(/setWebhook|deleteWebhook|getUpdates|setMyCommands|setdomain/i);
