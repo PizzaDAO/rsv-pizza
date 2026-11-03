@@ -54,6 +54,14 @@ describe('host-inbound: forwarding unmatched DMs as follow-up replies', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith('555', 'Got it');
   });
+  it('no party, photo: never forwarded; the connect-code hint is still sent', async () => {
+    resolveCtx.mockResolvedValue(null);
+    forward.mockResolvedValue({ claimed: true, ack: '' });
+    const res = await post({ chatId: 555, kind: 'photo', fileId: 'f1' });
+    expect(forward).not.toHaveBeenCalled();
+    expect(res.body).toMatchObject({ reason: 'no-party' });
+    expect(send).toHaveBeenCalledWith('555', expect.stringContaining('not sure which event'));
+  });
   it('a claimed reply with an empty ack sends nothing', async () => {
     resolveCtx.mockResolvedValue(null);
     forward.mockResolvedValue({ claimed: true, ack: '' });

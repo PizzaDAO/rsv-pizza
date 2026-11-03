@@ -181,12 +181,11 @@ router.post(
       const ctx = await resolveSubmitterContext(BigInt(chatIdStr));
 
       if (!ctx) {
-        // Not a host or contributor: may be a reply to a PizzaDAO follow-up from the same bot.
+        // Not a host or contributor: text may be a reply to a PizzaDAO follow-up from the same bot.
+        // Photos/PDFs are never forwarded, so a first-time sender still gets the connect-code hint.
         if (
-          await forwardedAsFollowUpReply(
-            chatIdStr,
-            kind === 'text' ? { kind: 'text', text: typeof text === 'string' ? text : '', messageId } : { kind: 'photo' },
-          )
+          kind === 'text' &&
+          (await forwardedAsFollowUpReply(chatIdStr, { kind: 'text', text: typeof text === 'string' ? text : '', messageId }))
         ) {
           return res.status(200).json({ ok: true, action: 'ignored', reason: 'followup-reply' });
         }
