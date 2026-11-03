@@ -40,6 +40,7 @@ import {
   type HostInboundParty,
 } from '../services/hostInboundResolve.js';
 import { sendTelegramMessage } from '../services/telegramSend.js';
+import { tryForwardFollowUpReply } from '../services/pizzadaoFollowupInbound.js';
 import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
@@ -49,6 +50,21 @@ import { resolveWalletInput, looksLikeEnsName } from '../services/ens.service.js
 import { saveHostPayoutWallet } from '../services/payout-snapshot.js';
 
 const router = Router();
+
+/**
+ * Last resort for a DM nothing here matched: offer it to PizzaDAO as a possible reply to one of its
+ * follow-ups (same shared bot). True when PizzaDAO saved it (and the ack, if any, was sent), so the
+ * caller must NOT also send its own reply. Off by default; never throws.
+ */
+async function forwardedAsFollowUpReply(
+  chatIdStr: string,
+  msg: Parameters<typeof tryForwardFollowUpReply>[1],
+): Promise<boolean> {
+  const fwd = await tryForwardFollowUpReply(chatIdStr, msg);
+  if (!fwd) return false;
+  if (fwd.ack) await sendTelegramMessage(chatIdStr, fwd.ack);
+  return true;
+}
 
 // suppli-58533: minimum OCR confidence for a host-DM image to be treated as a
 // receipt (rather than an event photo). Combined with amount>0 AND a merchant
@@ -131,8 +147,10 @@ router.post(
         return res.status(401).json({ ok: false, action: 'ignored', reason: 'unauthorized' });
       }
 
-      const { chatId, kind, fileId, imageBase64, text, mimeType } = (req.body || {}) as {
+      const { chatId, kind, fileId, imageBase64, text, mimeType, messageId } = (req.body || {}) as {
         chatId?: number | string;
+        // Optional: the Telegram message id, when the forwarding bot sends it (idempotency for replies).
+        messageId?: number | string;
         kind?: string;
         fileId?: string;
         fileUniqueId?: string;
@@ -163,6 +181,15 @@ router.post(
       const ctx = await resolveSubmitterContext(BigInt(chatIdStr));
 
       if (!ctx) {
+        // Not a host or contributor: may be a reply to a PizzaDAO follow-up from the same bot.
+        if (
+          await forwardedAsFollowUpReply(
+            chatIdStr,
+            kind === 'text' ? { kind: 'text', text: typeof text === 'string' ? text : '', messageId } : { kind: 'photo' },
+          )
+        ) {
+          return res.status(200).json({ ok: true, action: 'ignored', reason: 'followup-reply' });
+        }
         // chatId not linked to any party → tell the user how to connect so
         // they aren't left on moltobene's "📥 processing…" ack forever.
         await sendTelegramMessage(
@@ -182,6 +209,10 @@ router.post(
       if (kind === 'text') {
         // suppli-58533: attendance is HOST-ONLY. Contributors are photo-only.
         if (!isHost) {
+          // A contributor's text can only be rejected here, so offer it to PizzaDAO first.
+          if (await forwardedAsFollowUpReply(chatIdStr, { kind: 'text', text: typeof text === 'string' ? text : '', messageId })) {
+            return res.status(200).json({ ok: true, action: 'ignored', partyName: party.name, reason: 'followup-reply' });
+          }
           await sendTelegramMessage(
             chatIdStr,
             `Only the event host can submit receipts or attendance for ${party.name}. ` +
@@ -271,8 +302,11 @@ router.post(
         }
 
         // ---------------------------------------------------------------
-        // Anything else → the existing pointer reply.
+        // Anything else → offer it to PizzaDAO as a follow-up reply, else the existing pointer reply.
         // ---------------------------------------------------------------
+        if (await forwardedAsFollowUpReply(chatIdStr, { kind: 'text', text: trimmed, messageId })) {
+          return res.status(200).json({ ok: true, action: 'ignored', partyName: party.name, reason: 'followup-reply' });
+        }
         await sendTelegramMessage(
           chatIdStr,
           `I can add a receipt photo, an event photo, a headcount number, or your payout wallet for ${party.name}. ` +
