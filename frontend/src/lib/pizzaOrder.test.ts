@@ -91,6 +91,17 @@ describe('statusInfo', () => {
     expect(s.title).toBe("Nothing was ordered at Sal's");
     expect(s.detail).toBe(message);
   });
+  it('pizza-mcp 4cbebfe: a late check that confirms the order changes only the message (same reason, nothing_ordered false); the host sees the latest message and still no "nothing ordered"', () => {
+    const early = 'We did not call the shop again because our automatic check of the earlier call did not finish in time. The shop may have heard your order on that call, so an order may exist: please check with it before ordering again.';
+    const late = 'We did not call the shop again because our automatic check of the earlier call did not finish in time. The check has since finished: the shop most likely took your order on that call. Please check with the shop, and pick the order up.';
+    const at = (message: string) => statusInfo({ ...base, status: 'needs_review', releasable: true, outcome: { nothing_ordered: false, reason: 'call_check_timeout', message } });
+    expect(at(early).detail.startsWith(early)).toBe(true);
+    const s = at(late);
+    expect(s.title).toBe(at(early).title);
+    expect(s.detail.startsWith(late)).toBe(true);
+    expect(s.detail).not.toContain(early);
+    expect(`${s.title} ${s.detail}`).not.toMatch(/nothing was ordered at|safe to order again/i);
+  });
   it('pizza-mcp e62620e: price_approval_timeout is nothing_ordered false: approval_timeout offers the callback and cancel, and never says nothing is ordered', () => {
     const message = 'The shop asked about a higher total and we could not reach you in time. We told the shop we would call back, but it heard the order and may have started it: approve to have us call back, or check with the shop.';
     const s = statusInfo({ ...base, status: 'approval_timeout', outcome: { nothing_ordered: false, reason: 'price_approval_timeout', message } });

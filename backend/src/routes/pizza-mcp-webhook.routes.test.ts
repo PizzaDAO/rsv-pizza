@@ -360,3 +360,31 @@ describe('POST /api/pizza-mcp/webhook: pizza-mcp e62620e', () => {
     expect(m.notify).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /api/pizza-mcp/webhook: pizza-mcp 4cbebfe', () => {
+  const timeout = (message: string, nothing_ordered = false) =>
+    opopOrder({ status: 'needs_review', outcome: { nothing_ordered, reason: 'call_check_timeout', message } }, 6);
+  const EARLY = 'an order may exist: please check with it before ordering again.';
+  const LATE = 'The check has since finished: the shop most likely took your order on that call. Please check with the shop, and pick the order up.';
+
+  it('an outcome event where only outcome.message changed (same reason, same nothing_ordered) is stored; the latest message wins; no notice, draft or unblocking', async () => {
+    await post(delivery(timeout(EARLY), { createdAt: '2026-11-01T18:00:00.000Z', extra: { previous_status: 'calling' } }));
+    expect(fake.byOpop('ord_1').lastView.outcome.message).toBe(EARLY);
+    const res = await post(delivery(timeout(LATE), { createdAt: '2026-11-01T18:25:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(res.status).toBe(200);
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'needs_review', timelineLen: 6, payoutDocumentId: null, confirmedAt: null });
+    expect(fake.byOpop('ord_1').lastView.outcome).toEqual({ nothing_ordered: false, reason: 'call_check_timeout', message: LATE });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    expect(m.notify).not.toHaveBeenCalled();
+    expect(fake.docs).toHaveLength(0);
+    expect(fake.orders.size).toBe(1);
+  });
+
+  it('the message-only event stamped at the same instant as the timeout is still applied (not stale); an older message arriving late does not replace the newer one', async () => {
+    await post(delivery(timeout(EARLY), { createdAt: '2026-11-01T18:00:00.000Z' }));
+    await post(delivery(timeout(LATE), { createdAt: '2026-11-01T18:00:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(fake.byOpop('ord_1').lastView.outcome.message).toBe(LATE);
+    await post(delivery(timeout('older message'), { createdAt: '2026-11-01T17:59:00.000Z', extra: { change: 'outcome', previous_status: 'needs_review' } }));
+    expect(fake.byOpop('ord_1').lastView.outcome.message).toBe(LATE);
+  });
+});

@@ -129,6 +129,12 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   `call_check_timeout`. Callbacks can wait longer under `call_check_pending` and each re-deferral may send `order.updated` calling to
   calling: applied cheaply, and only a first `confirmed_by_shop` ever sends an email or Telegram message. A spoken card no longer changes
   an outcome (`card_spoken` is gone); stored transcripts keep prices and only phones and other long numbers are removed. rsv stores no transcript.
+- **pizza-mcp 4cbebfe:** no schema or reason-code changes (spec and generated types are byte-identical). An `order.updated` with `change: "outcome"`
+  can now carry only a new `outcome.message` (same reason, same `nothing_ordered`), e.g. `call_check_timeout` once the late check has finished
+  ("the shop most likely took your order", or "could not tell"). rsv applies every event whole, so it stores the latest message and the status
+  line shows it; blocking, the hold, the draft and the notices are unchanged. A same-reason re-deferral no longer sends `calling` -> `calling`
+  (rsv handles both). rsv does not match on the `TIER_UNAVAILABLE` detail text, only on the code. pizza-mcp's own host emails ("Your order with X is
+  likely real", "Nothing was ordered from X") come from pizza-mcp; rsv sends nothing for `needs_review`, so nothing contradicts them.
 - **Copy:** nothing may say "nothing was ordered", or suggest ordering again is safe, unless `nothing_ordered` is true. A released order says a
   host said so. The one reason the copy names is `judge_unavailable` (pizza-mcp faf6855: its call judge could not read the call): it
   adds that the call is waiting for a person at pizza-mcp to read it and that the host need not wait for that, since the check does not
