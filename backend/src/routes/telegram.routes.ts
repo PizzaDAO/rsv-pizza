@@ -8,6 +8,7 @@ import {
   cityKeyFromPartyName,
   buildScopedWhereClause,
   UnderbossScope,
+  buildCityDisplayNameMap,
 } from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
 import { formatForTelegram, postTelegramMessage } from '../lib/telegramFormat.js';
@@ -236,6 +237,12 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
     const results: Array<{ chatId: string; city: string; success: boolean; error?: string; linkResolved?: boolean }> = [];
 
+    // {city} must render the proper display name, not the lowercase cityKey.
+    const usesCityToken = /\{city\}/.test(message);
+    const cityNames = usesCityToken
+      ? await buildCityDisplayNameMap(groups.map((g: any) => String(g?.city || '')))
+      : new Map<string, string>();
+
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
       const { chatId, city, country } = group;
@@ -257,7 +264,7 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
       // Replace template variables
       let personalizedMessage = message;
-      personalizedMessage = personalizedMessage.replace(/\{city\}/g, city || '');
+      personalizedMessage = personalizedMessage.replace(/\{city\}/g, cityNames.get((city || '').toLowerCase().trim()) || city || '');
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
       // Substitute (and strip-if-unresolved) the per-recipient link tokens.
       personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
@@ -928,10 +935,12 @@ router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAu
       orderBy: { cityKey: 'asc' },
     });
 
+    const displayNames = await buildCityDisplayNameMap(rows.map((r) => r.cityKey));
     res.json({
       groups: rows.map((r) => ({
         id: r.id,
         cityKey: r.cityKey,
+        cityName: displayNames.get(r.cityKey) ?? r.cityKey,
         chatId: r.chatId !== null ? r.chatId.toString() : null,
         chatUrl: r.chatUrl,
         title: r.title,
