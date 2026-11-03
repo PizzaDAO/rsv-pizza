@@ -704,6 +704,8 @@ export async function sendTgAttendanceReminder(
 export interface CityTelegramGroupRow {
   id: string;
   cityKey: string;
+  /** Proper display name (capitalised); cityKey stays lowercase. */
+  cityName?: string;
   chatId: string | null;
   chatUrl: string | null;
   title: string | null;

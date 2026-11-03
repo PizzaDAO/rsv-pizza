@@ -208,7 +208,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
           .filter((r) => r.chatId && r.cityKey)
           .map((r) => ({
             country: r.country || '',
-            city: r.cityKey,
+            city: r.cityName || r.cityKey,
             underboss: r.underboss || '',
             region: r.region || '',
             chatUrl: r.chatUrl || '',
