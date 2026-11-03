@@ -211,12 +211,13 @@ describe('publicPartiesByCountry', () => {
   it('only returns parties behind published countries, using the public row rules', () => {
     const rows = [
       row({ partyId: 'A', usdPerCm2: 0.02 }),
-      row({ partyId: 'B', usdPerCm2: 0.02, sizeConfidence: 0.5 }), // low confidence: not public
+      row({ partyId: 'B', usdPerCm2: 0.02, sizeConfidence: 0.5 }), // estimated event: still public
+      row({ partyId: 'D', usdPerCm2: 0.02, sizeConfidence: 0.5, outlierFlag: true }), // unverified outlier: not public
       row({ partyId: 'C', usdPerCm2: 0.02, country: 'Peru' }),
     ];
     const m = publicPartiesByCountry(rows, new Set(['India']));
     expect([...m.keys()]).toEqual(['India']);
-    expect(m.get('India')).toEqual(['A']);
+    expect(m.get('India')).toEqual(['A', 'B']);
   });
 });
 
@@ -238,10 +239,11 @@ describe('public index', () => {
     expect(pub.countries[0].countryCode).toBe('IN');
   });
 
-  it('falls back to estimated sizes only for countries with no confirmed size', () => {
+  it('falls back to estimated sizes per event', () => {
     const rows = [
       row({ partyId: 'A', usdPerCm2: 0.02 }),
-      row({ partyId: 'B', usdPerCm2: 0.09, sizeConfidence: 0.5 }), // India has a confirmed size: estimate ignored
+      row({ partyId: 'A', usdPerCm2: 0.15, sizeConfidence: 0.5 }), // event A is confirmed: its estimate is ignored
+      row({ partyId: 'B', usdPerCm2: 0.04, sizeConfidence: 0.5 }), // event B has no confirmed size: estimate counts
       row({ partyId: 'C', usdPerCm2: 0.03, country: 'Chile', region: 'south-america', sizeConfidence: 0.55 }),
       row({ partyId: 'D', usdPerCm2: 0.9, country: 'Chile', region: 'south-america', sizeConfidence: 0.55 }), // misread: outside band
       row({ partyId: 'E', usdPerCm2: 0.03, country: 'Togo', region: 'west-africa', sizeConfidence: 0.5, outlierFlag: true }),
@@ -250,9 +252,12 @@ describe('public index', () => {
     const india = pub.countries.find((c) => c.country === 'India')!;
     const chile = pub.countries.find((c) => c.country === 'Chile')!;
     expect(india.estimated).toBe(false);
-    expect(india.usdPerCm2).toBeCloseTo(0.02, 6);
+    expect(india.nParties).toBe(2);
+    expect(india.nEstimatedParties).toBe(1);
+    expect(india.usdPerCm2).toBeCloseTo(0.03, 6); // median of A 0.02 and B 0.04
     expect(chile.estimated).toBe(true);
     expect(chile.nParties).toBe(1);
+    expect(chile.nEstimatedParties).toBe(1);
     expect(chile.usdPerCm2).toBeCloseTo(0.03, 6);
     expect(pub.countries.find((c) => c.country === 'Togo')).toBeUndefined(); // only an unverified outlier
   });
@@ -285,12 +290,15 @@ describe('history: selectRows lump sums', () => {
     expect(pub.countries).toHaveLength(1);
     expect(pub.countries[0].estimated).toBe(true);
   });
-  it('a country-year with confirmed lines drops its lump sums', () => {
+  it('an event with confirmed lines drops its lump sums; other events keep theirs', () => {
     const lump = hist('Delhi', 2022, 0.05, { isLumpSum: true, sizeConfidence: 0.5 });
-    const ok = hist('Mumbai', 2022, 0.01);
+    const ok = hist('Delhi', 2022, 0.01);
     const pub = buildPublicIndexFromRows([lump, ok], 2022);
     expect(pub.countries[0].estimated).toBe(false);
     expect(pub.countries[0].usdPerCm2).toBeCloseTo(0.01);
+    const other = buildPublicIndexFromRows([lump, hist('Mumbai', 2022, 0.01)], 2022);
+    expect(other.countries[0].nParties).toBe(2);
+    expect(other.countries[0].nEstimatedParties).toBe(1);
   });
 });
 

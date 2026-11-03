@@ -8456,6 +8456,8 @@ export interface PublicPizzaCountry {
   ladderLocal: PizzaSizeLadder;
   /** No confirmed pizza size yet; the figure uses estimated sizes. Optional until the backend ships it. */
   estimated?: boolean;
+  /** Events in the figure on estimated sizes. Optional until the backend ships it. */
+  nEstimatedParties?: number;
 }
 
 export interface PublicPizzaTrendPoint {

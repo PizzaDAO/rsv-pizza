@@ -219,6 +219,14 @@ export function PizzaIndexPage() {
                               estimated
                             </span>
                           )}
+                          {!c.estimated && !!c.nEstimatedParties && (
+                            <span
+                              className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-500/80"
+                              title={`${c.nEstimatedParties} of ${c.nParties} events use estimated sizes`}
+                            >
+                              {c.nEstimatedParties}/{c.nParties} estimated
+                            </span>
+                          )}
                         </td>
                         <td className={td}>{fmtPerCm2(c.usdPerCm2)}</td>
                         <td className={td}>{fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}</td>
@@ -257,9 +265,9 @@ export function PizzaIndexPage() {
             <li>Each pizza's price is divided by its area in cm², then scaled to standard 25, 30, 35 and 40 cm sizes so countries are comparable.</li>
             <li>Each event counts once: we take the median per event, then the median across events.</li>
             <li>A country appears once at least one event has an itemized pizza price. Countries with fewer than {EARLY_BELOW} events are marked <i>early</i>: one pizzeria can swing their number.</li>
-            <li>Where a country has pizzas whose size was confirmed (by a reviewer, or printed on the receipt), only those are used. Otherwise sizes are estimated from the menu item, price and local norms, and the country is marked <i>estimated</i>; those figures can be off by 20-30% until a size is confirmed.</li>
-            <li>Prices that look like misreads (for example a whole bill read as one pizza) are left out of estimated countries.</li>
-            <li>Bundles and all-you-can-eat deals are excluded. Receipts that only show a total for N pizzas (stated on the receipt or entered by the host) are averaged per pizza (so drinks, tax and delivery can inflate them) and the country is marked <i>estimated</i>; they are dropped once a country has confirmed sizes for that year.</li>
+            <li>Where an event has pizzas whose size was confirmed (by a reviewer, printed on the receipt, or stated on the pizzeria's menu), only those are used. Otherwise its sizes are estimated from the menu item, price and local norms; a country with no confirmed size is marked <i>estimated</i>, and one with some shows how many of its events are estimated. Estimated sizes can be off by 20-30%.</li>
+            <li>Prices that look like misreads (for example a whole bill read as one pizza) are left out of estimated events.</li>
+            <li>Bundles and all-you-can-eat deals are excluded. Receipts that only show a total for N pizzas (stated on the receipt or entered by the host) are averaged per pizza (so drinks, tax and delivery can inflate them) and count as estimated; they are dropped once that event has confirmed sizes.</li>
             <li>Tax treatment varies by country (many include VAT, US prices are usually pre-tax), so US prices may look slightly low.</li>
           </ul>
           {data && <p className="text-xs text-theme-text-faint">Updated {new Date(data.generatedAt).toLocaleDateString()}.</p>}
