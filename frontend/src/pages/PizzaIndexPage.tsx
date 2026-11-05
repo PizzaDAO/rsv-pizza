@@ -192,7 +192,7 @@ function CountryEvents({ country, year }: { country: string; year: number }) {
   }, [country, year]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setReceipts({}); return; }
     let cancelled = false;
     fetchPizzaCountryReceipts(country, year)
       .then((r) => { if (!cancelled) setReceipts(r.receipts); })

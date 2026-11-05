@@ -743,9 +743,10 @@ export async function getPublicCountryEvents(country: string, year?: number): Pr
       name: rs[0].partyName,
       city: rs[0].city,
       merchants: [...new Set(rs.map((r) => r.merchant?.trim()).filter((m): m is string => !!m))],
-      usd30: median(rs.map((r) => r.usdPerCm2))! * AREA_30CM,
+      // same per-event figure as summarize(): pizza-weighted median
+      usd30: (weightedMedian(rs.map((r) => [r.usdPerCm2, r.qty])) ?? median(rs.map((r) => r.usdPerCm2))!) * AREA_30CM,
       confirmed: rs.every((r) => confirmedIds.has(r.lineId)),
-      nPizzas: rs.reduce((a, r) => a + r.qty, 0),
+      nPizzas: Math.round(rs.reduce((a, r) => a + r.qty, 0) * 100) / 100,
       lines: rs.map((r) => ({
         name: r.rawName, qty: r.qty, price: r.unitPriceList, currency: r.currency, shape: r.shape,
         diameterCm: r.diameterCm, sizeLabel: r.sizeLabel, confirmed: confirmedIds.has(r.lineId),
