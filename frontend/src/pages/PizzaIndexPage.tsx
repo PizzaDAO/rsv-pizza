@@ -5,11 +5,17 @@ import { ChevronDown, ChevronRight, Loader2, Pizza } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';
 import {
+  fetchPizzaCountryReceipts,
+  fetchPublicPizzaCountryEvents,
   fetchPublicPizzaCountryPhotos,
   fetchPublicPizzaIndex,
+  type PizzaEventReceipt,
   type PublicPizzaCountryPhoto,
+  type PublicPizzaEvent,
+  type PublicPizzaEventLine,
   type PublicPizzaIndex,
 } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { LADDER_SIZES, fmtLocalPerCm2, fmtPerCm2, fmtUsd } from '../lib/pizzaIndexUtils';
 import { flagEmoji } from '../lib/iso4217';
 import { PizzaIndexMap } from '../components/PizzaIndexMap';
@@ -63,6 +69,143 @@ function CountryPhotos({ country, year }: { country: string; year: number }) {
           />
         </a>
       ))}
+    </div>
+  );
+}
+
+function fmtLocalPrice(v: number | null, currency: string | null): string {
+  if (v === null || !Number.isFinite(v)) return '-';
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD', maximumFractionDigits: v >= 100 ? 0 : 2 }).format(v);
+  } catch {
+    return `${v.toLocaleString()} ${currency ?? ''}`.trim();
+  }
+}
+
+function fmtSize(l: PublicPizzaEventLine): string {
+  if (l.shape === 'round' && l.diameterCm) return `${Math.round(l.diameterCm)} cm (≈${Math.round(l.diameterCm / 2.54)}″)`;
+  if (l.shape === 'slice') return 'slice';
+  return l.sizeLabel || l.shape || '-';
+}
+
+const SizeChip = ({ confirmed }: { confirmed: boolean }) => (
+  <span
+    className={`text-[10px] px-1.5 py-0.5 rounded ${confirmed ? 'bg-green-500/15 text-green-500' : 'bg-yellow-500/15 text-yellow-500'}`}
+    title={confirmed ? 'Size confirmed (reviewer, printed on the receipt, or the pizzeria menu)' : 'Size estimated from the menu item, price and local norms'}
+  >
+    {confirmed ? 'confirmed' : 'estimated'}
+  </span>
+);
+
+/** One event in a country's drill-down: its itemized pizzas, photos and (admins only) receipts. */
+function EventRow({ event, receipts }: { event: PublicPizzaEvent; receipts?: PizzaEventReceipt[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border border-theme-stroke rounded-lg">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5"
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span className="flex-1 min-w-0">
+          <span className="font-medium text-theme-text">{event.name || event.city || 'Event'}</span>
+          {event.merchants.length > 0 && <span className="text-theme-text-muted"> · {event.merchants.join(', ')}</span>}
+        </span>
+        <span className="text-theme-text-muted whitespace-nowrap">{event.nPizzas} pizzas</span>
+        <span className="font-medium text-theme-text whitespace-nowrap w-16 text-right">{fmtUsd(event.usd30)}</span>
+        <SizeChip confirmed={event.confirmed} />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-theme-text-faint text-left">
+                  <th className="py-1 pr-2 font-normal">Pizza</th>
+                  <th className="py-1 pr-2 font-normal text-right">Qty</th>
+                  <th className="py-1 pr-2 font-normal text-right">Price</th>
+                  <th className="py-1 pr-2 font-normal">Size</th>
+                  <th className="py-1 font-normal text-right">30 cm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {event.lines.map((l, i) => (
+                  <tr key={i} className="border-t border-theme-stroke text-theme-text-muted">
+                    <td className="py-1 pr-2 text-theme-text">
+                      {l.name || 'Pizza'}
+                      {l.lumpSum && <span className="ml-1 text-theme-text-faint" title="Receipt shows only a total for these pizzas">(total ÷ count)</span>}
+                    </td>
+                    <td className="py-1 pr-2 text-right">{l.qty}</td>
+                    <td className="py-1 pr-2 text-right whitespace-nowrap">{fmtLocalPrice(l.price, l.currency)}</td>
+                    <td className="py-1 pr-2 whitespace-nowrap">{fmtSize(l)} <SizeChip confirmed={l.confirmed} /></td>
+                    <td className="py-1 text-right">{fmtUsd(l.usd30)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {event.photos.length > 0 && (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+              {event.photos.map((p) => (
+                <a key={p.url} href={p.url} target="_blank" rel="noreferrer" className="block">
+                  <img
+                    src={p.thumbnailUrl || p.url}
+                    alt={`Pizza from ${event.name || 'a Global Pizza Party event'}`}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover rounded-lg border border-theme-stroke hover:opacity-90"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+          {receipts && receipts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-theme-text-faint">Receipts (admin only):</span>
+              {receipts.map((r, i) => (
+                <a key={r.url} href={r.url} target="_blank" rel="noreferrer" className="underline text-theme-text-muted hover:text-theme-text">
+                  {r.mimeType === 'application/pdf' ? 'PDF' : 'Receipt'} {receipts.length > 1 ? i + 1 : ''}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The events behind a country's figure. Receipt links load only for admins (403 for everyone else). */
+function CountryEvents({ country, year }: { country: string; year: number }) {
+  const { user } = useAuth();
+  const [events, setEvents] = useState<PublicPizzaEvent[] | null>(null);
+  const [receipts, setReceipts] = useState<Record<string, PizzaEventReceipt[]>>({});
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicPizzaCountryEvents(country, year)
+      .then((r) => { if (!cancelled) setEvents(r.events); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [country, year]);
+
+  useEffect(() => {
+    if (!user) { setReceipts({}); return; }
+    let cancelled = false;
+    fetchPizzaCountryReceipts(country, year)
+      .then((r) => { if (!cancelled) setReceipts(r.receipts); })
+      .catch(() => { /* not an admin: no receipt links */ });
+    return () => { cancelled = true; };
+  }, [country, year, user]);
+
+  if (failed) return <div className="text-xs text-theme-text-muted">Couldn't load events.</div>;
+  if (!events) return <div className="py-4 flex justify-center"><Loader2 size={18} className="animate-spin text-theme-text-muted" /></div>;
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-theme-text-faint">{events.length} {events.length === 1 ? 'event' : 'events'}, cheapest first. Price is each event's median for a 30 cm pizza.</div>
+      {events.map((e) => <EventRow key={e.id} event={e} receipts={receipts[e.id]} />)}
     </div>
   );
 }
@@ -242,6 +385,8 @@ export function PizzaIndexPage() {
                             <div className="space-y-4">
                               <PizzaTrendChart points={data.trends?.[c.country]} selectedYear={data.year} />
                               {!isArchive && <CountryPhotos country={c.country} year={data.year} />}
+                              <CountryEvents country={c.country} year={data.year} />
+
                             </div>
                           </td>
                         </tr>

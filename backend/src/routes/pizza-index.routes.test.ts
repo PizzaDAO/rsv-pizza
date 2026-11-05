@@ -310,4 +310,24 @@ describe('public endpoint: years + trends', () => {
     expect((await request(app()).get('/api/pizza-index/photos?country=India&year=2024')).status).toBe(404);
     expect((await request(app()).get('/api/pizza-index/photos?country=India&year=abc')).status).toBe(400);
   });
+  it('events: itemized lines per event, no receipt urls; 404 for unpublished', async () => {
+    h.viewRows = [{ ...vrow(2026, 'delhi', 0.012), document_url: 'https://x/secret-receipt.jpg' }];
+    const r = await request(app()).get('/api/pizza-index/events?country=India&year=2026');
+    expect(r.status).toBe(200);
+    expect(r.body.events).toHaveLength(1);
+    const e = r.body.events[0];
+    expect(e.usd30).toBeCloseTo(0.012 * 706.86, 1);
+    expect(e.confirmed).toBe(true);
+    expect(e.lines[0]).toMatchObject({ name: 'Pizza', qty: 1, price: 100, currency: 'INR', diameterCm: 30, confirmed: true });
+    expect(JSON.stringify(r.body)).not.toContain('secret-receipt');
+    expect((await request(app()).get('/api/pizza-index/events?country=Peru&year=2026')).status).toBe(404);
+  });
+  it('public-receipts: full admins only', async () => {
+    h.viewRows = [{ ...vrow(2026, 'delhi', 0.012), document_url: 'https://x/secret-receipt.jpg', document_mime_type: 'image/jpeg' }];
+    expect((await request(app()).get('/api/admin/pizza-index/public-receipts?country=India')).status).toBe(401);
+    expect((await request(app()).get('/api/admin/pizza-index/public-receipts?country=India').set('x-test-email', 'ub@x.com')).status).toBe(403);
+    const r = await request(app()).get('/api/admin/pizza-index/public-receipts?country=India').set('x-test-email', 'admin@x.com');
+    expect(r.status).toBe(200);
+    expect(r.body.receipts['hist:2026:delhi|India']).toEqual([{ url: 'https://x/secret-receipt.jpg', mimeType: 'image/jpeg' }]);
+  });
 });
