@@ -8561,6 +8561,40 @@ export interface PublicPizzaCountryPhoto {
 export function fetchPublicPizzaCountryPhotos(country: string, year?: number): Promise<{ country: string; photos: PublicPizzaCountryPhoto[] }> {
   return apiRequest(`/api/pizza-index/photos?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
 }
+export interface PublicPizzaEventLine {
+  name: string | null;
+  qty: number;
+  price: number | null;
+  currency: string | null;
+  shape: string | null;
+  diameterCm: number | null;
+  sizeLabel: string | null;
+  confirmed: boolean;
+  lumpSum: boolean;
+  usd30: number;
+}
+export interface PublicPizzaEvent {
+  id: string;
+  name: string | null;
+  city: string | null;
+  merchants: string[];
+  usd30: number;
+  confirmed: boolean;
+  nPizzas: number;
+  lines: PublicPizzaEventLine[];
+  photos: PublicPizzaCountryPhoto[];
+}
+export function fetchPublicPizzaCountryEvents(country: string, year?: number): Promise<{ country: string; events: PublicPizzaEvent[] }> {
+  return apiRequest(`/api/pizza-index/events?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
+}
+export interface PizzaEventReceipt {
+  url: string;
+  mimeType: string | null;
+}
+/** Admin-only: receipt files per event id for the public drill-down. */
+export function fetchPizzaCountryReceipts(country: string, year?: number): Promise<{ country: string; receipts: Record<string, PizzaEventReceipt[]> }> {
+  return apiRequest(`${PIZZA_BASE}/public-receipts?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`);
+}
 
 // ---------------------------------------------------------------------------
 // Host fast pass: track record, review assist, budget pre-approval.

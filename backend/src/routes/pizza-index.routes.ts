@@ -50,6 +50,8 @@ import {
   fetchIndexRows,
   flagOutliers,
   getPublicCountryPhotos,
+  getPublicCountryEvents,
+  getPublicCountryReceipts,
   getPublicPizzaIndex,
   invalidatePizzaIndexCache,
   refreshOutliers,
@@ -1272,6 +1274,23 @@ router.get('/index/lines', ...reviewerChain, async (req: PizzaRequest, res: Resp
   }
 });
 
+// GET /api/admin/pizza-index/public-receipts?country=India[&year=2025]
+//   -> { country, receipts: { [eventId]: [{ url, mimeType }] } } for the public page's drill-down.
+//   Full admins only (Snax 2026-11-05: receipt images are admin-only; they carry personal info).
+router.get('/public-receipts', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    const country = typeof req.query.country === 'string' ? req.query.country.trim().slice(0, 80) : '';
+    if (!country) throw new AppError('country is required', 400, 'COUNTRY_REQUIRED');
+    const year = parsePublicYear(req.query.year);
+    const receipts = await getPublicCountryReceipts(country, year);
+    if (!receipts) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ country, receipts });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
 
 // ===========================================================================
@@ -1279,7 +1298,9 @@ export default router;
 //   Aggregates only: country level, one year at a time (?year=, default latest; 2021-2025 come
 //   from the archive), verified or
 //   high-confidence sizes, bundles excluded. No party names, merchants, or
-//   receipt images. Cached 1h (in-process + Cache-Control).
+//   receipt images here; /events gives the itemized per-event drill-down and
+//   receipt images stay admin-only (/api/admin/pizza-index/public-receipts).
+//   Cached 1h (in-process + Cache-Control).
 //   Response: PublicPizzaIndex (see services/pizzaIndex.service.ts)
 // ===========================================================================
 export const publicPizzaIndexRouter = Router();
@@ -1316,6 +1337,22 @@ publicPizzaIndexRouter.get('/photos', async (req, res: Response, next: NextFunct
     if (!photos) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
     res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
     res.json({ country, photos });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/pizza-index/events?country=India[&year=2025]  -> { country, events: PublicEvent[] }
+// The events behind a published country's figure: itemized lines and pizza photos, no receipt images.
+publicPizzaIndexRouter.get('/events', async (req, res: Response, next: NextFunction) => {
+  try {
+    const country = typeof req.query.country === 'string' ? req.query.country.trim().slice(0, 80) : '';
+    if (!country) throw new AppError('country is required', 400, 'COUNTRY_REQUIRED');
+    const year = parsePublicYear(req.query.year);
+    const events = await getPublicCountryEvents(country, year);
+    if (!events) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600');
+    res.json({ country, events });
   } catch (err) {
     next(err);
   }

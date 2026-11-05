@@ -667,6 +667,8 @@ interface PublicCache {
   latest: number;
   byYear: Map<number, PublicPizzaIndex>;
   partiesByYear: Map<number, Map<string, string[]>>;
+  /** All view rows per published year (server-side only), for the per-event drill-down. */
+  rowsByYear: Map<number, IndexRow[]>;
 }
 let publicCache: PublicCache | null = null;
 
@@ -675,12 +677,136 @@ async function loadPublic(): Promise<PublicCache> {
   const rows = await fetchIndexRows(undefined, {});
   const { years, latest, byYear } = buildPublicByYear(rows);
   const partiesByYear = new Map<number, Map<string, string[]>>();
+  const rowsByYear = new Map<number, IndexRow[]>();
   for (const [y, idx] of byYear) {
-    partiesByYear.set(y, publicPartiesByCountry(
-      rows.filter((r) => r.eventYear === y), new Set(idx.countries.map((c) => c.country))));
+    const yearRows = rows.filter((r) => r.eventYear === y);
+    rowsByYear.set(y, yearRows);
+    partiesByYear.set(y, publicPartiesByCountry(yearRows, new Set(idx.countries.map((c) => c.country))));
   }
-  publicCache = { at: Date.now(), years, latest, byYear, partiesByYear };
+  publicCache = { at: Date.now(), years, latest, byYear, partiesByYear, rowsByYear };
   return publicCache;
+}
+
+const AREA_30CM = Math.PI * 15 * 15;
+
+export interface PublicEventLine {
+  name: string | null;
+  qty: number;
+  /** Menu (list) unit price in the receipt currency. */
+  price: number | null;
+  currency: string | null;
+  shape: string | null;
+  diameterCm: number | null;
+  sizeLabel: string | null;
+  /** Size confirmed (reviewer, printed on the receipt, or the pizzeria's menu) vs estimated. */
+  confirmed: boolean;
+  /** Receipt shows only a total for N pizzas; price is that total / N. */
+  lumpSum: boolean;
+  usd30: number;
+}
+
+export interface PublicEvent {
+  /** Opaque event key (party id, or the archive city-year key). */
+  id: string;
+  name: string | null;
+  city: string | null;
+  merchants: string[];
+  /** This event's median price of a 30 cm pizza, USD. */
+  usd30: number;
+  /** Every line in this event has a confirmed size. */
+  confirmed: boolean;
+  nPizzas: number;
+  lines: PublicEventLine[];
+  photos: PublicCountryPhoto[];
+}
+
+/**
+ * The events behind a published country's figure (Snax 2026-11-05: "users should
+ * be able to drill down and see the actual receipts and pizza photos"). Same rows
+ * as the public figure (selectPublicRows). Itemized data only: receipt images
+ * stay admin-only (getPublicCountryReceipts). null = country not published.
+ */
+export async function getPublicCountryEvents(country: string, year?: number): Promise<PublicEvent[] | null> {
+  const c = await loadPublic();
+  const y = year ?? c.latest;
+  if (!c.byYear.get(y)?.countries.some((e) => e.country === country)) return null;
+  return cached(`public-events:${y}:${country}`, PUBLIC_TTL_MS, async () => {
+    const subset = (c.rowsByYear.get(y) ?? []).filter((r) => r.country === country);
+    const { rows } = selectPublicRows(subset);
+    const confirmedIds = new Set(selectRows(subset, { verifiedOnly: false, includeBundles: false }).map((r) => r.lineId));
+    const byEvent = new Map<string, IndexRow[]>();
+    for (const r of rows) (byEvent.get(r.eventKey) ?? byEvent.set(r.eventKey, []).get(r.eventKey)!).push(r);
+    const partyIds = [...new Set(rows.map((r) => r.partyId).filter((p): p is string => !!p))];
+    const photos = await publicPhotosByParty(partyIds);
+    const events = [...byEvent].map<PublicEvent>(([id, rs]) => ({
+      id,
+      name: rs[0].partyName,
+      city: rs[0].city,
+      merchants: [...new Set(rs.map((r) => r.merchant?.trim()).filter((m): m is string => !!m))],
+      usd30: median(rs.map((r) => r.usdPerCm2))! * AREA_30CM,
+      confirmed: rs.every((r) => confirmedIds.has(r.lineId)),
+      nPizzas: rs.reduce((a, r) => a + r.qty, 0),
+      lines: rs.map((r) => ({
+        name: r.rawName, qty: r.qty, price: r.unitPriceList, currency: r.currency, shape: r.shape,
+        diameterCm: r.diameterCm, sizeLabel: r.sizeLabel, confirmed: confirmedIds.has(r.lineId),
+        lumpSum: r.isLumpSum, usd30: r.usdPerCm2 * AREA_30CM,
+      })),
+      photos: (rs[0].partyId && photos.get(rs[0].partyId)) || [],
+    }));
+    return events.sort((a, b) => a.usd30 - b.usd30);
+  });
+}
+
+export const PUBLIC_PHOTOS_PER_EVENT = 4;
+
+/** Public pizza photos per party (same visibility rules and ordering as getPublicCountryPhotos). */
+async function publicPhotosByParty(ids: string[]): Promise<Map<string, PublicCountryPhoto[]>> {
+  const out = new Map<string, PublicCountryPhoto[]>();
+  if (!ids.length) return out;
+  const rows = await prisma.$queryRaw<Array<{ party_id: string; url: string; thumbnail_url: string | null; city: string | null }>>(Prisma.sql`
+    SELECT party_id, url, thumbnail_url, city FROM (
+      SELECT ph.party_id, ph.url, ph.thumbnail_url, pa.city,
+        row_number() OVER (
+          PARTITION BY ph.party_id
+          ORDER BY CASE ph.payout_role WHEN 'pizza' THEN 0 WHEN 'box_stack' THEN 1 WHEN 'group' THEN 3 ELSE 2 END,
+                   (coalesce(ph.caption, '') ILIKE '%pizza%' OR 'pizza' = ANY(ph.tags)) DESC,
+                   ph.starred DESC, ph.vote_count DESC, ph.created_at
+        ) AS rn
+      FROM photos ph JOIN parties pa ON pa.id = ph.party_id
+      WHERE ph.party_id = ANY(${ids}::uuid[])
+        AND ph.status = 'approved' AND ph.deleted_at IS NULL
+        AND ph.mime_type IN ('image/jpeg', 'image/png', 'image/webp')
+        AND pa.underboss_status = 'approved' AND pa.photos_public = true AND pa.photos_enabled = true
+    ) x
+    WHERE rn <= ${PUBLIC_PHOTOS_PER_EVENT}
+    ORDER BY party_id, rn`);
+  for (const r of rows) {
+    (out.get(r.party_id) ?? out.set(r.party_id, []).get(r.party_id)!).push({ url: r.url, thumbnailUrl: r.thumbnail_url, city: r.city });
+  }
+  return out;
+}
+
+export interface PublicEventReceipt {
+  url: string;
+  mimeType: string | null;
+}
+
+/**
+ * Receipt files behind each event of a published country (admin-only: receipts
+ * carry names, phone numbers and card digits). Keyed by PublicEvent.id.
+ */
+export async function getPublicCountryReceipts(country: string, year?: number): Promise<Record<string, PublicEventReceipt[]> | null> {
+  const c = await loadPublic();
+  const y = year ?? c.latest;
+  if (!c.byYear.get(y)?.countries.some((e) => e.country === country)) return null;
+  const { rows } = selectPublicRows((c.rowsByYear.get(y) ?? []).filter((r) => r.country === country));
+  const out: Record<string, PublicEventReceipt[]> = {};
+  for (const r of rows) {
+    if (!r.documentUrl) continue;
+    const list = (out[r.eventKey] ??= []);
+    if (!list.some((d) => d.url === r.documentUrl)) list.push({ url: r.documentUrl, mimeType: r.documentMimeType });
+  }
+  return out;
 }
 
 /** The public index for `year` (default: latest year with data). Unknown years yield an empty index. */
