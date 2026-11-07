@@ -330,11 +330,18 @@ export function aggregate(allRows: IndexRow[], opts: IndexOptions): IndexGroup[]
 export const OUTLIER_BAND = { min: 0.002, max: 0.2 } as const;
 export const OUTLIER_MAD_THRESHOLD = 3.5;
 const MIN_COUNTRY_SAMPLE = 5;
+/**
+ * Floor for the log-scale MAD (~10% in price). Many lines share one price (one
+ * receipt, or one country norm size), so the raw MAD collapses toward 0 and a
+ * pizza 6% dearer than the rest got flagged.
+ */
+export const OUTLIER_MAD_FLOOR = 0.1;
 
 /**
  * Flag lines whose log(usd_per_cm2) is more than 3.5 modified-z (MAD-based,
- * 0.6745 * |x - median| / MAD) from their country median, or outside the
- * global sanity band. Countries with < 5 lines only get the band check.
+ * 0.6745 * |x - median| / MAD, MAD floored at OUTLIER_MAD_FLOOR) from their
+ * country median, or outside the global sanity band. Countries with < 5 lines
+ * only get the band check.
  * Buckets are country + event year, so a 2021 ARS price is never compared to 2026.
  */
 export function computeOutlierIds(
@@ -357,8 +364,7 @@ export function computeOutlierIds(
   for (const list of byCountry.values()) {
     if (list.length < MIN_COUNTRY_SAMPLE) continue;
     const med = median(list.map((l) => l.x))!;
-    const mad = median(list.map((l) => Math.abs(l.x - med)))!;
-    if (!(mad > 0)) continue;
+    const mad = Math.max(median(list.map((l) => Math.abs(l.x - med)))!, OUTLIER_MAD_FLOOR);
     for (const l of list) {
       if ((0.6745 * Math.abs(l.x - med)) / mad > OUTLIER_MAD_THRESHOLD) flagged.add(l.id);
     }
