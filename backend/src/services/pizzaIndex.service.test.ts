@@ -201,6 +201,14 @@ describe('computeOutlierIds', () => {
     rows.push({ id: 'bad', country: 'US', usdPerCm2: 0.15 });
     expect([...computeOutlierIds(rows)]).toEqual(['bad']);
   });
+  it('floors the MAD so a near-identical cluster does not flag small differences', () => {
+    // Uganda 2026: three events at the same norm price, one 6% dearer, one 37% cheaper.
+    const rows = [0.01313, 0.01313, 0.01314, 0.01388, 0.00828].map((v, i) => ({ id: `n${i}`, country: 'UG', usdPerCm2: v }));
+    expect(computeOutlierIds(rows).size).toBe(0);
+    // ...while a real outlier in the same cluster is still flagged.
+    rows.push({ id: 'bad', country: 'UG', usdPerCm2: 0.05 });
+    expect([...computeOutlierIds(rows)]).toEqual(['bad']);
+  });
   it('does not apply MAD flagging to tiny samples', () => {
     const rows = [0.02, 0.021, 0.15].map((v, i) => ({ id: `n${i}`, country: 'US', usdPerCm2: v }));
     expect(computeOutlierIds(rows).size).toBe(0);
