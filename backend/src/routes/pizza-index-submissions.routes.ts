@@ -20,18 +20,20 @@ import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import {
   HONEYPOT_FIELD,
+  cleanupOrphanedUploads,
   createUploadUrl,
   finalizeSubmission,
   submissionsEnabled,
 } from '../services/pizzaSubmission.service.js';
 
 const router = Router();
+export const pizzaSubmissionCronRouter = Router();
 
 // Upload URLs are the cheap step, so cap them per IP too (finalize enforces the real 3/hr, 10/day).
 const uploadUrlLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 12,
-  message: { error: 'Too many uploads from your connection. Please try again later.' },
+  message: { error: { message: 'Too many uploads, try again later.', code: 'RATE_LIMITED' } },
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -49,7 +51,7 @@ async function requireOpen(_req: AuthRequest, _res: Response, next: NextFunction
 router.post('/upload-url', uploadUrlLimiter, requireOpen, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const out = await createUploadUrl(req.userId ?? null, body.mimeType, body.fileSize);
+    const out = await createUploadUrl(req.userId ?? null, body.mimeType, body.fileSize, req.ip);
     res.set('Cache-Control', 'no-store');
     res.json(out);
   } catch (err) {
@@ -73,6 +75,32 @@ router.post('/', requireOpen, optionalAuth, async (req: AuthRequest, res: Respon
       ip: req.ip,
     });
     res.status(201).json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Daily cleanup of orphaned uploads (CRON_SECRET gate, same as the other /api/cron routes).
+// Vercel crons call with GET; POST is accepted for manual runs.
+async function runCleanup(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || (req.headers.authorization || '') !== `Bearer ${cronSecret}`) {
+      throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+    res.json(await cleanupOrphanedUploads());
+  } catch (err) {
+    next(err);
+  }
+}
+pizzaSubmissionCronRouter.get('/cleanup-pizza-submissions', runCleanup);
+pizzaSubmissionCronRouter.post('/cleanup-pizza-submissions', runCleanup);
+
+// GET /status -> { open }: lets the public page hide the Submit button while the kill switch is off.
+router.get('/status', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ open: await submissionsEnabled() });
   } catch (err) {
     next(err);
   }

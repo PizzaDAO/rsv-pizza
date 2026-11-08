@@ -8603,6 +8603,10 @@ export function fetchPublicPizzaCountryEvents(country: string, year?: number): P
 export function requestPizzaSubmissionUpload(mimeType: string, fileSize: number): Promise<{ path: string; token: string }> {
   return apiRequest('/api/pizza-index/submissions/upload-url', { method: 'POST', body: { mimeType, fileSize }, requireAuth: false });
 }
+/** Is the public form open? (kill switch app_config pizza_index.submissions_enabled) */
+export function fetchPizzaSubmissionsOpen(): Promise<{ open: boolean }> {
+  return apiRequest('/api/pizza-index/submissions/status', { requireAuth: false });
+}
 export interface PizzaSubmissionInput {
   path: string;
   receiptDate: string;

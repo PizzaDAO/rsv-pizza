@@ -92,7 +92,7 @@ import { publicTaxFormRequestRouter, adminTaxFormRequestRouter } from './routes/
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
-import pizzaSubmissionRoutes from './routes/pizza-index-submissions.routes.js';
+import pizzaSubmissionRoutes, { pizzaSubmissionCronRouter } from './routes/pizza-index-submissions.routes.js';
 import pizzaIndexRoutes, { publicPizzaIndexRouter } from './routes/pizza-index.routes.js'; // sfincione-40417: Pizza Price Index (admin/UB review + public aggregates)
 import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
@@ -256,6 +256,7 @@ app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-c
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/host-survey', hostSurveyPublicRouter); // panzerotti-58527: public token-based host survey (no auth)
+app.use('/api/cron', pizzaSubmissionCronRouter); // sfincione-40417: orphaned submission upload cleanup (CRON_SECRET)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/bizdev', bizdevRoutes); // soppressata-72251: per-partner BizDev industry report (auth-gated per-route)

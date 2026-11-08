@@ -148,7 +148,7 @@ function SubmissionCard({ sub, onDone }: { sub: PizzaSubmissionDto; onDone: () =
 
   const isPdf = current.mimeType === 'application/pdf';
   const isHeic = current.mimeType === 'image/heic';
-  const imageUrl = isPdf ? current.previewUrl : isHeic ? null : current.receiptUrl;
+  const imageUrl = isPdf || isHeic ? current.previewUrl : current.receiptUrl;
 
   return (
     <div className="rounded-xl border border-theme-stroke bg-white/5">
@@ -175,7 +175,7 @@ function SubmissionCard({ sub, onDone }: { sub: PizzaSubmissionDto; onDone: () =
               </a>
             ) : (
               <div className="rounded-lg border border-theme-stroke bg-black/20 p-6 text-center text-xs text-theme-text-muted">
-                {isPdf ? 'PDF: press "Read receipt" to render a preview, or open the file.' : 'No inline preview for this file type.'}
+                {isPdf || isHeic ? `${isPdf ? 'PDF' : 'HEIC'}: press "Read receipt" to render a preview, or open the file.` : 'No inline preview for this file type.'}
               </div>
             )}
             {current.receiptUrl && (

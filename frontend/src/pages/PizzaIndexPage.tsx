@@ -6,6 +6,7 @@ import { Layout } from '../components/Layout';
 import { BRAND } from '../config/brand';
 import {
   fetchPizzaCountryReceipts,
+  fetchPizzaSubmissionsOpen,
   fetchPublicPizzaCountryEvents,
   fetchPublicPizzaCountryPhotos,
   fetchPublicPizzaIndex,
@@ -225,6 +226,12 @@ export function PizzaIndexPage() {
   const [error, setError] = useState<string | null>(null);
   const [openCountry, setOpenCountry] = useState<string | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [submissionsOpen, setSubmissionsOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPizzaSubmissionsOpen().then((r) => { if (!cancelled) setSubmissionsOpen(!!r.open); }).catch(() => { /* hidden on error */ });
+    return () => { cancelled = true; };
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const yearParam = /^\d{4}$/.test(searchParams.get('year') ?? '') ? Number(searchParams.get('year')) : undefined;
 
@@ -275,13 +282,15 @@ export function PizzaIndexPage() {
           <p className="text-theme-text-muted max-w-2xl">
             Real menu prices from pizzerias that fed Global Pizza Party {year} events, plus receipts sent in by pizza fans, normalised by size so a 25 cm pie in Lagos can be compared with a 16-inch pie in Brooklyn.
           </p>
-          <button
-            type="button"
-            onClick={() => setSubmitOpen(true)}
-            className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium"
-          >
-            <Send size={14} />Submit a receipt
-          </button>
+          {submissionsOpen && (
+            <button
+              type="button"
+              onClick={() => setSubmitOpen(true)}
+              className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium"
+            >
+              <Send size={14} />Submit a receipt
+            </button>
+          )}
         </header>
 
         {data && data.years.length > 1 && (
@@ -307,11 +316,13 @@ export function PizzaIndexPage() {
           <div className="rounded-2xl border border-theme-stroke bg-white/5 p-8 text-center space-y-2">
             <div className="text-lg font-semibold text-theme-text">The index is still being cooked.</div>
             <p className="text-sm text-theme-text-muted">
-              We publish a country once one of its events has an itemized pizza price. Check back soon, or send us a receipt.
+              We publish a country once one of its events has an itemized pizza price. Check back soon{submissionsOpen ? ', or send us a receipt' : ''}.
             </p>
-            <button type="button" onClick={() => setSubmitOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium">
-              <Send size={14} />Submit a receipt
-            </button>
+            {submissionsOpen && (
+              <button type="button" onClick={() => setSubmitOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium">
+                <Send size={14} />Submit a receipt
+              </button>
+            )}
           </div>
         )}
 

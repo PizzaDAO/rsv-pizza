@@ -1360,6 +1360,12 @@ router.get('/public-receipts', ...fullChain, async (req: PizzaRequest, res: Resp
 //   POST /submissions/:id/approve   body: draft { kind, currency, total, pizzaCount, lines[], merchant?, city?, country?, receiptDate?, fxRate? }
 //   POST /submissions/:id/reject    body: { reason? }
 // ===========================================================================
+router.param('id', (req, _res, next, id) => {
+  // only the /submissions/:id routes use a uuid id here; others keep their own validation
+  if (req.path.startsWith('/submissions/') && !UUID_RE.test(id)) return next(new AppError('Submission not found', 404, 'NOT_FOUND'));
+  next();
+});
+
 router.get('/submissions/counts', ...fullChain, async (_req: PizzaRequest, res: Response, next: NextFunction) => {
   try {
     res.set('Cache-Control', 'private, no-store');

@@ -352,16 +352,20 @@ describe('community submissions (admin)', () => {
   const paths: Array<['get' | 'post', string]> = [
     ['get', '/api/admin/pizza-index/submissions'],
     ['get', '/api/admin/pizza-index/submissions/counts'],
-    ['get', '/api/admin/pizza-index/submissions/abc'],
-    ['post', '/api/admin/pizza-index/submissions/abc/extract'],
-    ['post', '/api/admin/pizza-index/submissions/abc/approve'],
-    ['post', '/api/admin/pizza-index/submissions/abc/reject'],
+    ['get', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/extract'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/approve'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/reject'],
   ];
   it('requires login and full admin: underbosses get 403', async () => {
     for (const [m, path] of paths) {
       expect((await request(app())[m](path)).status, path).toBe(401);
       expect((await request(app())[m](path).set('x-test-email', 'ub@x.com')).status, path).toBe(403);
     }
+  });
+  it('404s (not 500) on a malformed submission id', async () => {
+    const r = await request(app()).get('/api/admin/pizza-index/submissions/not-a-uuid').set('x-test-email', 'admin@x.com');
+    expect(r.status).toBe(404);
   });
   it('validates the status filter for full admins', async () => {
     const bad = await request(app()).get('/api/admin/pizza-index/submissions?status=nope').set('x-test-email', 'admin@x.com');

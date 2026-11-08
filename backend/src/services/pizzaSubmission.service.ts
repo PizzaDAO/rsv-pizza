@@ -90,9 +90,22 @@ export const submissionsEnabled = () => getConfigFlag(FLAG_ENABLED, false);
 // Pure helpers (unit tested)
 // ---------------------------------------------------------------------------
 
+/** IPv4 as-is; IPv6 reduced to its /64 prefix (a single device/home can rotate the rest at will). */
+export function normalizeIp(ip: string | undefined): string {
+  if (!ip) return 'unknown';
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped) return mapped[1];
+  if (!ip.includes(':')) return ip;
+  const [head, tail = ''] = ip.split('%')[0].split('::');
+  const a = head ? head.split(':') : [];
+  const b = ip.includes('::') && tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b] : a;
+  return groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
 export function hashIp(ip: string | undefined): string {
   const secret = process.env.PIZZA_SUBMISSION_IP_SECRET || process.env.JWT_SECRET || 'pizza-submissions';
-  return crypto.createHash('sha256').update(`${ip ?? 'unknown'}|${secret}`).digest('hex');
+  return crypto.createHash('sha256').update(`${normalizeIp(ip)}|${secret}`).digest('hex');
 }
 
 /** Detect the real type from the first bytes. Returns an ALLOWED_MIME key or null. */
@@ -116,6 +129,7 @@ export function isValidStoragePath(path: unknown, userId: string | null): path i
   if (typeof path !== 'string' || path.length > 200) return false;
   const m = PATH_RE.exec(path);
   if (!m) return false;
+  if (m[1] === 'final') return false; // reserved for moved, server-owned objects
   return m[1] === (userId ?? 'anon');
 }
 
@@ -162,10 +176,14 @@ export function validateReceiptDate(date: unknown, now: Date = new Date()): stri
   return date;
 }
 
-export function canonicalLocation(countryIn: unknown): { country: string; countryCode: string | null; region: string | null } {
+export function canonicalLocation(countryIn: unknown, codeIn?: unknown): { country: string; countryCode: string | null; region: string | null } {
   const raw = clean(countryIn, 80);
-  const country = canonicalizeCountryName(raw);
-  if (!raw || !country) throw new AppError('Please pick a city so we know the country', 400, 'BAD_COUNTRY');
+  let country = canonicalizeCountryName(raw);
+  if (!country && typeof codeIn === 'string' && /^[A-Za-z]{2}$/.test(codeIn.trim())) {
+    // Fall back to the 2-letter code Google gave us -> English name.
+    try { country = canonicalizeCountryName(new Intl.DisplayNames(['en'], { type: 'region' }).of(codeIn.trim().toUpperCase()) ?? null); } catch { country = null; }
+  }
+  if (!country) throw new AppError('Please pick a city so we know the country', 400, 'BAD_COUNTRY');
   const code = getCountryCode(country);
   return { country, countryCode: code, region: (code ? countryCodeToRegion(code) : null) ?? countryNameToRegion(country) };
 }
@@ -176,7 +194,7 @@ export function validateSubmissionFields(body: Record<string, unknown>, userId: 
   const receiptDate = validateReceiptDate(body.receiptDate, now);
   const merchant = clean(body.merchant, 120);
   if (!merchant) throw new AppError('Pizzeria name is required', 400, 'MERCHANT_REQUIRED');
-  const loc = canonicalLocation(body.country);
+  const loc = canonicalLocation(body.country, body.countryCode);
   const sizeNoteRaw = typeof body.sizeNote === 'string' ? body.sizeNote : '';
   if (sizeNoteRaw.length > 200) throw new AppError('Size note is too long (200 characters max)', 400, 'SIZE_NOTE_TOO_LONG');
   let email: string | null = null;
@@ -216,12 +234,13 @@ export async function assertIpWithinLimits(ipHash: string, now: Date = new Date(
   if (day >= LIMITS.perDay) throw new AppError('Too many receipts from your connection today. Please try again tomorrow.', 429, 'RATE_LIMITED');
 }
 
-export async function createUploadUrl(userId: string | null, mimeType: unknown, fileSize: unknown): Promise<{ path: string; token: string }> {
+export async function createUploadUrl(userId: string | null, mimeType: unknown, fileSize: unknown, ip?: string): Promise<{ path: string; token: string }> {
   if (typeof mimeType !== 'string' || !ALLOWED_MIME[mimeType]) {
     throw new AppError('Please upload a JPEG, PNG, WebP, HEIC or PDF', 400, 'BAD_FILE_TYPE');
   }
   if (typeof fileSize !== 'number' || !Number.isFinite(fileSize) || fileSize <= 0) throw new AppError('Missing file size', 400, 'BAD_FILE_SIZE');
   if (fileSize > MAX_FILE_BYTES) throw new AppError('That file is too big (10 MB max)', 413, 'FILE_TOO_BIG');
+  await assertIpWithinLimits(hashIp(ip));
   await assertQueueHasRoom();
   const path = makeStoragePath(userId, mimeType);
   const { data, error } = await bucket().createSignedUploadUrl(path);
@@ -258,11 +277,20 @@ export async function finalizeSubmission(input: FinalizeInput): Promise<{ id: st
     throw new AppError('That file does not look like a JPEG, PNG, WebP, HEIC or PDF', 400, 'BAD_FILE_TYPE');
   }
   const sha = crypto.createHash('sha256').update(buf).digest('hex');
-  const existing = await prisma.pizzaSubmission.findUnique({ where: { fileSha256: sha }, select: { id: true } });
+  const existing = await prisma.pizzaSubmission.findUnique({ where: { fileSha256: sha }, select: { id: true, storagePath: true } });
   if (existing) {
+    // Same object as a live submission (an idempotent retry): never delete it.
+    if (existing.storagePath === f.path) return { id: existing.id, status: 'pending' };
     await discard();
     throw new AppError('This receipt was already submitted. Thank you!', 409, 'ALREADY_SUBMITTED');
   }
+
+  // Move to a server-owned path with an explicit content type, so the client's upload token
+  // (which can overwrite the temp path until it expires) can no longer touch the stored file.
+  const finalPath = `final/${crypto.randomUUID()}.${ALLOWED_MIME[mime]}`;
+  const up = await bucket().upload(finalPath, buf, { contentType: mime, upsert: false });
+  if (up.error) throw new AppError('Could not store your file. Please try again.', 502, 'STORE_FAILED');
+  const dropFinal = async () => { await bucket().remove([finalPath]).catch(() => undefined); };
 
   // Soft duplicate flag (never blocks): same pizzeria within a day of the same date.
   const merchantKey = normalizeMerchantKey(f.merchant);
@@ -288,7 +316,7 @@ export async function finalizeSubmission(input: FinalizeInput): Promise<{ id: st
         submitterUserId: input.userId,
         submitterEmail: f.email ?? input.userEmail,
         notify: !!f.email,
-        storagePath: f.path,
+        storagePath: finalPath,
         mimeType: mime,
         fileSize: buf.length,
         fileSha256: sha,
@@ -307,9 +335,14 @@ export async function finalizeSubmission(input: FinalizeInput): Promise<{ id: st
       },
       select: { id: true },
     });
+    await discard(); // temp upload no longer needed
     return { id: row.id, status: 'pending' };
   } catch (err) {
+    await dropFinal();
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // A concurrent retry of the same upload may already have stored it: report that one.
+      const again = await prisma.pizzaSubmission.findUnique({ where: { storagePath: f.path }, select: { id: true } });
+      if (again) return { id: again.id, status: 'pending' };
       await discard();
       throw new AppError('This receipt was already submitted. Thank you!', 409, 'ALREADY_SUBMITTED');
     }
@@ -448,20 +481,32 @@ export function ocrToDraft(ocr: OcrResult): SubmissionDraft {
   };
 }
 
+/** HEIC -> PNG (pure-JS libheif; sharp's prebuilt binary cannot decode HEIC). */
+export async function heicToPng(buf: Buffer): Promise<Buffer> {
+  const convert = (await import('heic-convert')).default;
+  return Buffer.from(await convert({ buffer: buf, format: 'PNG' }));
+}
+
 /** OCR on admin open only (spam costs nothing until a human looks). */
 export async function extractSubmission(id: string): Promise<{ submission: SubmissionDto; draft: SubmissionDraft | null }> {
   const sub = await prisma.pizzaSubmission.findUnique({ where: { id } });
   if (!sub) throw new AppError('Submission not found', 404, 'NOT_FOUND');
   let imagePath = sub.storagePath;
   let ocrImagePath = sub.ocrImagePath;
-  if (sub.mimeType === 'application/pdf') {
+  if (sub.mimeType === 'application/pdf' || sub.mimeType === 'image/heic') {
     if (!ocrImagePath) {
       const { data, error } = await bucket().download(sub.storagePath);
       if (error || !data) throw new AppError('Could not read the stored file', 502, 'FILE_MISSING');
-      const { pngBuffer } = await rasterizePdfFirstPage(Buffer.from(await data.arrayBuffer()));
+      const raw = Buffer.from(await data.arrayBuffer());
+      let pngBuffer: Buffer;
+      try {
+        pngBuffer = sub.mimeType === 'image/heic' ? await heicToPng(raw) : (await rasterizePdfFirstPage(raw)).pngBuffer;
+      } catch {
+        throw new AppError('Could not render this file for reading', 422, 'RENDER_FAILED');
+      }
       ocrImagePath = `${sub.storagePath}.thumb.png`;
       const up = await bucket().upload(ocrImagePath, pngBuffer, { contentType: 'image/png', upsert: true });
-      if (up.error) throw new AppError('Could not render the PDF', 502, 'PDF_RENDER_FAILED');
+      if (up.error) throw new AppError('Could not store the preview', 502, 'PREVIEW_FAILED');
     }
     imagePath = ocrImagePath;
   }
@@ -650,5 +695,42 @@ export async function rejectSubmission(id: string, actorEmail: string, reason: u
     }),
   ]);
   invalidatePizzaIndexCache();
+  await refreshOutliers(0).catch(() => undefined);
   return getSubmission(id);
+}
+
+// ---------------------------------------------------------------------------
+// Orphan cleanup (daily cron): temp uploads that never became a submission
+// ---------------------------------------------------------------------------
+
+const ORPHAN_AGE_MS = 24 * 3600_000;
+const CLEANUP_MAX_DELETES = 1000;
+
+/**
+ * Delete bucket objects older than 24h that have no pizza_submissions row. Uploads land in
+ * `anon/` or `{userId}/` and are moved to `final/` on success, so anything left there is an
+ * abandoned upload. `final/` itself is never touched.
+ */
+export async function cleanupOrphanedUploads(now: Date = new Date()): Promise<{ scanned: number; deleted: number }> {
+  const store = bucket();
+  const cutoff = now.getTime() - ORPHAN_AGE_MS;
+  const { data: top } = await store.list('', { limit: 1000 });
+  const folders = (top ?? []).filter((e) => !e.id && e.name && e.name !== 'final').map((e) => e.name);
+  let scanned = 0;
+  const doomed: string[] = [];
+  for (const folder of folders) {
+    const { data: files } = await store.list(folder, { limit: 1000 });
+    const old = (files ?? [])
+      .filter((f) => f.id && f.created_at && new Date(f.created_at).getTime() < cutoff)
+      .map((f) => `${folder}/${f.name}`);
+    scanned += (files ?? []).length;
+    if (!old.length) continue;
+    const live = await prisma.pizzaSubmission.findMany({ where: { storagePath: { in: old } }, select: { storagePath: true } });
+    const keep = new Set(live.map((r) => r.storagePath));
+    for (const path of old) if (!keep.has(path)) doomed.push(path);
+    if (doomed.length >= CLEANUP_MAX_DELETES) break;
+  }
+  const batch = doomed.slice(0, CLEANUP_MAX_DELETES);
+  if (batch.length) await store.remove(batch);
+  return { scanned, deleted: batch.length };
 }

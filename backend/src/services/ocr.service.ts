@@ -237,10 +237,15 @@ Reminder: wrap the result as { "receipts": [ ... ] }. Always return valid JSON.`
  * Fetch an image from a public URL and convert to a base64 data URL.
  * Suitable for passing as `image_url.url` to OpenAI vision endpoints.
  */
+/** Host + path only: signed URLs carry a token in the query string that must never be logged. */
+function urlForLog(u: string): string {
+  try { const p = new URL(u); return `${p.host}${p.pathname}`; } catch { return '[url]'; }
+}
+
 export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
   const response = await fetch(imageUrl, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
-    throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${imageUrl}`);
+    throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${urlForLog(imageUrl)}`);
   }
   const arrayBuf = await response.arrayBuffer();
   const originalContentType = response.headers.get('content-type') || 'image/jpeg';
@@ -269,7 +274,7 @@ export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string>
   } catch (err) {
     // sharp couldn't decode (HEIC/HDR/corrupt) — send the original untouched.
     console.warn(
-      `[ocr] sharp preprocess failed for ${imageUrl}; falling back to original bytes (${originalContentType}):`,
+      `[ocr] sharp preprocess failed for ${urlForLog(imageUrl)}; falling back to original bytes (${originalContentType}):`,
       err instanceof Error ? err.message : err,
     );
     return `data:${originalContentType};base64,${originalBuf.toString('base64')}`;
@@ -741,7 +746,7 @@ export async function analyzeReceiptMulti(
       // Escalation failed (network/auth/parse) — keep the cheap result rather
       // than failing the whole image.
       console.warn(
-        `[ocr] escalation to ${models.ocr} failed for ${imageUrl}; keeping cheap (${models.ocrCheap}) result:`,
+        `[ocr] escalation to ${models.ocr} failed for ${urlForLog(imageUrl)}; keeping cheap (${models.ocrCheap}) result:`,
         err instanceof Error ? err.message : err,
       );
       return firstPass;

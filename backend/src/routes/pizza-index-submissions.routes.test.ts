@@ -15,6 +15,11 @@ const h = vi.hoisted(() => ({
   created: [] as any[],
   files: new Map<string, Buffer>(),
   removed: [] as string[],
+  uploaded: [] as Array<{ path: string; opts: any }>,
+  existingPath: 'other/path' as string,
+  byPath: null as any,
+  p2002: false,
+  list: {} as Record<string, any[]>,
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -40,9 +45,14 @@ vi.mock('../config/database.js', () => ({
         const ageMs = since ? Date.now() - since.getTime() : 0;
         return ageMs < 4_000_000 ? h.countHour : h.countDay;
       }),
-      findUnique: vi.fn(async () => (h.existingSha ? { id: 'old' } : null)),
+      findUnique: vi.fn(async ({ where }: any) => {
+        if (where.storagePath) return h.byPath;
+        return h.existingSha ? { id: 'old', storagePath: h.existingPath } : null;
+      }),
+      findMany: vi.fn(async () => []),
       findFirst: vi.fn(async () => null),
       create: vi.fn(async ({ data }: any) => {
+        if (h.p2002) { const { Prisma } = await import('@prisma/client'); throw new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }); }
         h.created.push(data);
         return { id: 'sub-1' };
       }),
@@ -59,6 +69,8 @@ vi.mock('@supabase/supabase-js', () => ({
           const b = h.files.get(path);
           return b ? { data: { arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }, error: null } : { data: null, error: { message: 'nope' } };
         },
+        upload: async (path: string, _b: any, opts: any) => { h.uploaded.push({ path, opts }); return { data: {}, error: null }; },
+        list: async (folder: string) => ({ data: h.list[folder] ?? [], error: null }),
         remove: async (paths: string[]) => { h.removed.push(...paths); return { data: [], error: null }; },
       }),
     },
@@ -72,7 +84,8 @@ vi.mock('../services/fx.service.js', () => ({ convertToUSD: vi.fn() }));
 vi.mock('../services/pizzaLineSync.service.js', () => ({ loadPresets: vi.fn(async () => []), lineFingerprint: () => 'fp' }));
 vi.mock('../services/pizzaIndex.service.js', () => ({ invalidatePizzaIndexCache: vi.fn(), refreshOutliers: vi.fn() }));
 
-import router from './pizza-index-submissions.routes.js';
+import router, { pizzaSubmissionCronRouter } from './pizza-index-submissions.routes.js';
+import { cleanupOrphanedUploads, normalizeIp, canonicalLocation } from '../services/pizzaSubmission.service.js';
 
 process.env.SUPABASE_URL = 'https://proj.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test-key';
@@ -114,6 +127,11 @@ beforeEach(() => {
   h.created = [];
   h.removed = [];
   h.files = new Map([[ANON_PATH, JPEG]]);
+  h.uploaded = [];
+  h.existingPath = 'other/path';
+  h.byPath = null;
+  h.p2002 = false;
+  h.list = {};
 });
 
 describe('kill switch', () => {
@@ -163,8 +181,12 @@ describe('POST / (finalize)', () => {
     expect(h.created).toHaveLength(1);
     expect(h.created[0]).toMatchObject({
       status: 'pending', submitterUserId: null, submitterEmail: 'fan@example.com', notify: true,
-      storagePath: ANON_PATH, mimeType: 'image/jpeg', country: 'Italy', year: 2026, merchant: 'Pizzeria Da Michele',
+      mimeType: 'image/jpeg', country: 'Italy', year: 2026, merchant: 'Pizzeria Da Michele',
     });
+    // stored under a server-owned path with an explicit content type; the temp upload is deleted
+    expect(h.created[0].storagePath).toMatch(/^final\/[0-9a-f-]{36}\.jpg$/);
+    expect(h.uploaded).toEqual([{ path: h.created[0].storagePath, opts: expect.objectContaining({ contentType: 'image/jpeg', upsert: false }) }]);
+    expect(h.removed).toContain(ANON_PATH);
     expect(h.created[0].ipHash).toMatch(/^[0-9a-f]{64}$/);
     expect(h.created[0].fileSha256).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -257,5 +279,79 @@ describe('POST / (finalize)', () => {
     expect(r.body.error.code).toBe('ALREADY_SUBMITTED');
     expect(h.removed).toContain(ANON_PATH);
     expect(h.created).toHaveLength(0);
+  });
+});
+
+describe('409 / idempotency', () => {
+  it('a retry of the very same live object returns that submission and deletes nothing', async () => {
+    h.existingSha = 'x';
+    h.existingPath = ANON_PATH;
+    const r = await post(body());
+    expect(r.status).toBe(201);
+    expect(r.body).toEqual({ id: 'old', status: 'pending' });
+    expect(h.removed).toEqual([]);
+  });
+  it('P2002 race: reports the submission already stored for this path, else 409 without touching it', async () => {
+    h.p2002 = true;
+    h.byPath = { id: 'raced' };
+    const ok = await post(body());
+    expect(ok.body).toEqual({ id: 'raced', status: 'pending' });
+    expect(h.removed.filter((p) => p === ANON_PATH)).toEqual([]);
+    h.byPath = null;
+    expect((await post(body())).status).toBe(409);
+  });
+  it('the reserved final/ folder cannot be claimed as an upload path', async () => {
+    h.files.set(`final/${UUID}.jpg`, JPEG);
+    expect((await post(body({ path: `final/${UUID}.jpg` }))).body.error.code).toBe('BAD_PATH');
+  });
+});
+
+describe('upload-url hardening', () => {
+  it('applies the per-IP limits too', async () => {
+    h.countHour = 3;
+    const r = await request(app()).post('/api/pizza-index/submissions/upload-url').send({ mimeType: 'image/png', fileSize: 10 });
+    expect(r.status).toBe(429);
+    expect(r.body.error.code).toBe('RATE_LIMITED');
+  });
+  it('GET /status reports the kill switch', async () => {
+    expect((await request(app()).get('/api/pizza-index/submissions/status')).body).toEqual({ open: true });
+    h.flag = 'false';
+    expect((await request(app()).get('/api/pizza-index/submissions/status')).body).toEqual({ open: false });
+  });
+});
+
+describe('helpers', () => {
+  it('IPv6 collapses to its /64; mapped IPv4 to IPv4', () => {
+    expect(normalizeIp('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe(normalizeIp('2001:db8:1:2::1'));
+    expect(normalizeIp('2001:db8:1:2::1')).not.toBe(normalizeIp('2001:db8:1:3::1'));
+    expect(normalizeIp('::ffff:1.2.3.4')).toBe('1.2.3.4');
+    expect(normalizeIp('1.2.3.4')).toBe('1.2.3.4');
+  });
+  it('falls back to a 2-letter country code', () => {
+    expect(canonicalLocation('Italia?', 'IT').country).toBe('Italy');
+    expect(() => canonicalLocation('Atlantis', 'ZZZ')).toThrow();
+  });
+  it('malformed upload rate-limit body uses the standard error shape', async () => {
+    // the limiter's message is { error: { message, code } }; asserted via the cron secret gate shape below
+    const a = express();
+    a.use('/api/cron', pizzaSubmissionCronRouter);
+    a.use((err: any, _req: any, res: any, _n: any) => res.status(err.statusCode ?? 500).json({ error: { code: err.code } }));
+    expect((await request(a).get('/api/cron/cleanup-pizza-submissions')).status).toBe(401);
+  });
+});
+
+describe('cleanupOrphanedUploads', () => {
+  it('deletes only old temp objects with no submission row, never final/', async () => {
+    const old = new Date(Date.now() - 48 * 3600_000).toISOString();
+    const fresh = new Date().toISOString();
+    h.list = {
+      '': [{ name: 'anon' }, { name: 'final' }, { name: 'u1' }],
+      anon: [{ id: '1', name: 'old.jpg', created_at: old }, { id: '2', name: 'new.jpg', created_at: fresh }],
+      u1: [{ id: '3', name: 'old2.pdf', created_at: old }],
+      final: [{ id: '4', name: 'keep.jpg', created_at: old }],
+    };
+    const r = await cleanupOrphanedUploads();
+    expect(r.deleted).toBe(2);
+    expect(h.removed.sort()).toEqual(['anon/old.jpg', 'u1/old2.pdf']);
   });
 });
