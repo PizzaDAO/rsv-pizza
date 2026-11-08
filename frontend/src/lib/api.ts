@@ -8447,6 +8447,8 @@ export interface PublicPizzaCountry {
   countryCode: string | null;
   continent: string | null;
   nParties: number;
+  /** Receipts behind the figure. Optional until the backend ships it. */
+  nReceipts?: number;
   nLines: number;
   nPizzas: number;
   usdPerCm2: number;

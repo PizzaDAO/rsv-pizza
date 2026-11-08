@@ -72,6 +72,8 @@ export interface IndexRow {
   fxSource: string | null;
   /** Lump-sum line (archive receipt, or a live receipt's pizza count; one synthetic line per receipt): estimated tier only. */
   isLumpSum: boolean;
+  /** One receipt: payout document id, or `h:{history_receipt_id}` for archive lines. Falls back to lineId when absent. */
+  receiptKey?: string;
 }
 
 export type SizeLadder = Record<'25' | '30' | '35' | '40', number | null>;
@@ -84,6 +86,8 @@ export interface Quantiles {
 
 export interface GroupSummary {
   nParties: number;
+  /** Distinct receipts behind the rows. */
+  nReceipts: number;
   nLines: number;
   /** Sum of qty. */
   nPizzas: number;
@@ -251,6 +255,7 @@ export function summarize(rows: IndexRow[]): GroupSummary {
   const nVerified = rows.filter((r) => r.isVerified).length;
   return {
     nParties: byParty.size,
+    nReceipts: new Set(rows.map((r) => r.receiptKey ?? r.lineId)).size,
     nLines: rows.length,
     nPizzas: Math.round(rows.reduce((a, r) => a + r.qty, 0) * 100) / 100,
     nVerifiedLines: nVerified,
@@ -406,6 +411,7 @@ interface ViewRow {
   outlier_flag: boolean; is_bundle: boolean;
   usd_per_cm2: number; local_per_cm2: number; net_usd_per_cm2: number | null;
   event_key: string; origin: string; fx_source: string | null; is_lump_sum: boolean;
+  receipt_key: string | null;
 }
 
 function mapViewRow(v: ViewRow): IndexRow {
@@ -424,6 +430,7 @@ function mapViewRow(v: ViewRow): IndexRow {
     usdPerCm2: v.usd_per_cm2, localPerCm2: v.local_per_cm2, netUsdPerCm2: v.net_usd_per_cm2,
     eventKey: v.event_key, origin: v.origin === 'history' ? 'history' : 'event',
     fxSource: v.fx_source, isLumpSum: !!v.is_lump_sum,
+    receiptKey: v.receipt_key ?? undefined,
   };
 }
 
@@ -446,7 +453,9 @@ export async function fetchIndexRows(scope?: IndexScope, f: IndexFilters = {}): 
   // Underbosses never see archive rows (no scope mapping): the history branch fills region/city.
   const scopeCond = scope && !scope.full ? Prisma.sql`AND v.origin = 'event' ${scopeSql(scope, 'v')}` : Prisma.empty;
   const rows = await prisma.$queryRaw<ViewRow[]>(Prisma.sql`
-    SELECT v.* FROM pizza_price_index_lines v
+    SELECT v.*, coalesce(v.document_id::text, 'h:' || li.history_receipt_id::text) AS receipt_key
+    FROM pizza_price_index_lines v
+    LEFT JOIN pizza_line_items li ON li.id = v.line_id
     WHERE true ${cond.length ? Prisma.join(cond, ' ') : Prisma.empty} ${scopeCond}`);
   let mapped = rows.map(mapViewRow);
   if (f.continent) mapped = mapped.filter((r) => regionToContinent(r.region) === f.continent);
@@ -516,6 +525,7 @@ export interface PublicCountryEntry {
   countryCode: string | null;
   continent: string | null;
   nParties: number;
+  nReceipts: number;
   nLines: number;
   nPizzas: number;
   usdPerCm2: number;
@@ -598,6 +608,7 @@ export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = P
       countryCode: getCountryCode(g.country),
       continent: g.continent,
       nParties: g.nParties,
+      nReceipts: g.nReceipts,
       nLines: g.nLines,
       nPizzas: g.nPizzas,
       usdPerCm2: g.usdPerCm2.median!,
