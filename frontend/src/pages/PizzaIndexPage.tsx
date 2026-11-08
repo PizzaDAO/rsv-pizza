@@ -358,14 +358,15 @@ export function PizzaIndexPage() {
                 {isArchive ? 'Tap a country to see how its price changed over the years.' : 'Tap a country to see its price trend and pizzas from its events.'}
               </p>
               <div className="overflow-x-auto rounded-xl border border-theme-stroke">
-                <table className="w-full">
+                {/* Fixed layout on phones so a long country name or the drill-down can't widen the table past the screen. */}
+                <table className="w-full max-md:table-fixed">
                   <thead className="bg-white/5">
                     <tr>
-                      <th className={th}>#</th>
+                      <th className={`${th} max-md:w-10`}>#</th>
                       <th className={th}>Country</th>
-                      <th className={th}>USD / cm²</th>
+                      <th className={`${th} max-md:w-[88px]`}>USD / cm²</th>
                       <th className={`${th} hidden md:table-cell`}>Local / cm²</th>
-                      {LADDER_SIZES.map((s) => <th key={s} className={`${th} ${s === '30' ? '' : 'hidden md:table-cell'}`}>{s} cm</th>)}
+                      {LADDER_SIZES.map((s) => <th key={s} className={`${th} ${s === '30' ? 'max-md:w-[72px]' : 'hidden md:table-cell'}`}>{s} cm</th>)}
                       <th className={`${th} hidden md:table-cell`}>Events</th>
                     </tr>
                   </thead>
@@ -378,7 +379,7 @@ export function PizzaIndexPage() {
                         aria-expanded={openCountry === c.country}
                       >
                         <td className={`${td} text-theme-text-muted`}>{i + 1}</td>
-                        <td className={`${td} font-medium text-theme-text`}>
+                        <td className={`${td} font-medium text-theme-text max-md:whitespace-normal`}>
                           <button
                             type="button"
                             className="inline-flex items-center gap-1"
@@ -419,7 +420,7 @@ export function PizzaIndexPage() {
                       </tr>
                       {openCountry === c.country && (
                         <tr className="bg-black/10">
-                          <td colSpan={5 + LADDER_SIZES.length} className="px-3 py-3 max-md:max-w-0 max-md:w-full">
+                          <td colSpan={5 + LADDER_SIZES.length} className="px-3 py-3">
                             <div className="space-y-4 min-w-0">
                               <p className="md:hidden text-xs text-theme-text-secondary">
                                 {LADDER_SIZES.filter((s) => s !== '30').map((s) => `${s} cm ${fmtUsd(c.ladderUsd[s])}`).join(' · ')}
