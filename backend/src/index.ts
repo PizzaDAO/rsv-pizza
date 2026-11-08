@@ -92,6 +92,7 @@ import { publicTaxFormRequestRouter, adminTaxFormRequestRouter } from './routes/
 import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-58472: admin/underboss-only suggestions list
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
+import pizzaSubmissionRoutes, { pizzaSubmissionCronRouter } from './routes/pizza-index-submissions.routes.js';
 import pizzaIndexRoutes, { publicPizzaIndexRouter } from './routes/pizza-index.routes.js'; // sfincione-40417: Pizza Price Index (admin/UB review + public aggregates)
 import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
@@ -244,6 +245,7 @@ app.use('/api/gpp27', gpp27Routes); // soppressata-50927: GPP27 (2027) admin/UB-
 app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated create flow, cap, agreement, publish gates
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
+app.use('/api/pizza-index/submissions', pizzaSubmissionRoutes); // sfincione-40417: public receipt submissions (anonymous allowed); before the aggregates router
 app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public aggregates only (n>=3 parties, GPP 2026), cached 1h
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config
@@ -254,6 +256,7 @@ app.use('/api', reminderRoutes); // margherita-58471: T-4h reminder cron + one-c
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/host-survey', hostSurveyPublicRouter); // panzerotti-58527: public token-based host survey (no auth)
+app.use('/api/cron', pizzaSubmissionCronRouter); // sfincione-40417: orphaned submission upload cleanup (CRON_SECRET)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/bizdev', bizdevRoutes); // soppressata-72251: per-partner BizDev industry report (auth-gated per-route)

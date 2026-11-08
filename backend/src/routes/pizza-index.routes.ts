@@ -63,6 +63,14 @@ import {
   type IndexScope,
   type SizeLadder,
 } from '../services/pizzaIndex.service.js';
+import {
+  approveSubmission,
+  extractSubmission,
+  getSubmission,
+  listSubmissions,
+  rejectSubmission,
+  submissionCounts,
+} from '../services/pizzaSubmission.service.js';
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -132,6 +140,8 @@ export interface PizzaLineDto {
   documentId: string | null;
   partyId: string | null;
   historyReceiptId: string | null;
+  /** Set for lines of an approved community submission. */
+  submissionId: string | null;
   lineIndex: number;
   rawName: string;
   merchant: string | null;
@@ -194,6 +204,7 @@ export function toLineDto(r: DbLine): PizzaLineDto {
     documentId: r.documentId,
     partyId: r.partyId,
     historyReceiptId: r.historyReceiptId,
+    submissionId: r.submissionId,
     lineIndex: r.lineIndex,
     rawName: r.rawName,
     merchant: r.merchant,
@@ -557,13 +568,13 @@ router.get('/status', ...reviewerChain, async (req: PizzaRequest, res: Response,
 //          outlier=true, excluded=true (show excluded lines instead of hiding them),
 //          bundles=include|exclude|only (default include), partyId, documentId, minConfidence,
 //          photoEstimate=true (only lines with a photo-pass suggestion),
-//          origin=event|history|all (default event = GPP 2026 work; archive receipts are admin-only),
+//          origin=event|history|submission|all (default event = GPP 2026 work; archive + community submissions are admin-only),
 //          year=YYYY (event year, or the archive receipt year),
 //          limit (receipts, 1-100, default 20), offset
 // ===========================================================================
 export interface PizzaQueueReceipt {
-  /** 'history' = archive receipt (url is the Drive link, no preview, no photos). */
-  origin: 'event' | 'history';
+  /** 'history' = archive receipt (url is the Drive link, no preview, no photos); 'submission' = approved community receipt (no url: view it in Submissions). */
+  origin: 'event' | 'history' | 'submission';
   /** Event year (party date) or archive receipt year. */
   year: number | null;
   document: {
@@ -601,14 +612,15 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     await refreshOutliers();
 
     const eligible = Prisma.sql`((d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false)
-      OR (h.id IS NOT NULL AND h.kind <> 'not_pizza'))`;
+      OR (h.id IS NOT NULL AND h.kind <> 'not_pizza')
+      OR (s.id IS NOT NULL AND s.status = 'approved' AND s.kind IS NOT NULL AND s.kind <> 'not_pizza'))`;
     const cond: Prisma.Sql[] = [eligible];
     if (bool(q.excluded)) cond.push(Prisma.sql`li.excluded = true`);
     else cond.push(Prisma.sql`li.excluded = false`);
     if (status === 'unverified') cond.push(Prisma.sql`li.verified_at IS NULL`);
     else if (status === 'verified') cond.push(Prisma.sql`li.verified_at IS NOT NULL`);
     const country = str(q.country);
-    if (country) cond.push(Prisma.sql`coalesce(p.country, h.country) = ${country}`);
+    if (country) cond.push(Prisma.sql`coalesce(p.country, h.country, s.country) = ${country}`);
     const merchant = str(q.merchant);
     if (merchant) cond.push(Prisma.sql`li.merchant_key ILIKE ${'%' + (normalizeMerchantKey(merchant) ?? merchant) + '%'}`);
     const source = str(q.source);
@@ -626,21 +638,25 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const minConf = Number(q.minConfidence);
     if (Number.isFinite(minConf)) cond.push(Prisma.sql`coalesce(li.size_confidence, 0) >= ${minConf}`);
     const origin = str(q.origin) ?? 'event';
-    if (!['event', 'history', 'all'].includes(origin)) throw new AppError('origin must be event, history or all', 400, 'BAD_REQUEST');
-    if (origin === 'event') cond.push(Prisma.sql`li.history_receipt_id IS NULL`);
+    if (!['event', 'history', 'submission', 'all'].includes(origin)) throw new AppError('origin must be event, history, submission or all', 400, 'BAD_REQUEST');
+    // Each origin is keyed on its OWN column: 'event' used to mean history_receipt_id IS NULL, which
+    // would pull submission lines (no document, no history receipt) into the GPP work queue.
+    if (origin === 'event') cond.push(Prisma.sql`li.document_id IS NOT NULL`);
     if (origin === 'history') cond.push(Prisma.sql`li.history_receipt_id IS NOT NULL`);
+    if (origin === 'submission') cond.push(Prisma.sql`li.submission_id IS NOT NULL`);
     const yearQ = Number(q.year);
     if (Number.isFinite(yearQ) && yearQ > 2000) {
-      cond.push(Prisma.sql`coalesce(h.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
+      cond.push(Prisma.sql`coalesce(h.year, s.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
     }
-    // Archive receipts have no party, so there is no scope mapping: admins only.
-    const histGuard = actor.full ? Prisma.empty : Prisma.sql`AND li.history_receipt_id IS NULL`;
+    // Archive and community receipts have no party, so there is no scope mapping: admins only.
+    const histGuard = actor.full ? Prisma.empty : Prisma.sql`AND li.document_id IS NOT NULL`;
     // Progress honours the origin + year filters (but not the other review filters).
     const progressCond: Prisma.Sql[] = [];
-    if (origin === 'event') progressCond.push(Prisma.sql`li.history_receipt_id IS NULL`);
+    if (origin === 'event') progressCond.push(Prisma.sql`li.document_id IS NOT NULL`);
     if (origin === 'history') progressCond.push(Prisma.sql`li.history_receipt_id IS NOT NULL`);
+    if (origin === 'submission') progressCond.push(Prisma.sql`li.submission_id IS NOT NULL`);
     if (Number.isFinite(yearQ) && yearQ > 2000) {
-      progressCond.push(Prisma.sql`coalesce(h.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
+      progressCond.push(Prisma.sql`coalesce(h.year, s.year, EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${Math.trunc(yearQ)}`);
     }
     const progressWhere = progressCond.length ? Prisma.sql`AND ${Prisma.join(progressCond, ' AND ')}` : Prisma.empty;
     const sc = scopeSql(actor.scope, 'p');
@@ -648,8 +664,9 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
     const from = Prisma.sql`FROM pizza_line_items li
       LEFT JOIN payout_documents d ON d.id = li.document_id
       LEFT JOIN parties p ON p.id = li.party_id
-      LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id`;
-    const groupKey = Prisma.sql`coalesce(li.document_id, li.history_receipt_id)`;
+      LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id
+      LEFT JOIN pizza_submissions s ON s.id = li.submission_id`;
+    const groupKey = Prisma.sql`coalesce(li.document_id, li.history_receipt_id, li.submission_id)`;
 
     const [{ total }] = await prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
       SELECT count(DISTINCT ${groupKey})::int AS total ${from} ${where}`);
@@ -676,13 +693,14 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
       LEFT JOIN payout_documents d ON d.id = li.document_id
       LEFT JOIN parties p ON p.id = li.party_id
       LEFT JOIN pizza_history_receipts h ON h.id = li.history_receipt_id
+      LEFT JOIN pizza_submissions s ON s.id = li.submission_id
       WHERE ${eligible} AND li.excluded = false ${progressWhere} ${histGuard} ${sc}`);
 
     const receipts: PizzaQueueReceipt[] = [];
     if (docIds.length) {
-      const [lines, docs, syncs, histories] = await Promise.all([
+      const [lines, docs, syncs, histories, subs] = await Promise.all([
         prisma.pizzaLineItem.findMany({
-          where: { OR: [{ documentId: { in: docIds } }, { historyReceiptId: { in: docIds } }] },
+          where: { OR: [{ documentId: { in: docIds } }, { historyReceiptId: { in: docIds } }, { submissionId: { in: docIds } }] },
           orderBy: [{ lineIndex: 'asc' }],
         }),
         prisma.payoutDocument.findMany({
@@ -694,8 +712,14 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
         }),
         prisma.pizzaLineSync.findMany({ where: { documentId: { in: docIds } }, select: { documentId: true, discounts: true } }),
         prisma.pizzaHistoryReceipt.findMany({ where: { id: { in: docIds } } }),
+        // Never select storagePath/email here: the queue carries no receipt file.
+        prisma.pizzaSubmission.findMany({
+          where: { id: { in: docIds } },
+          select: { id: true, year: true, receiptDate: true, country: true, city: true, region: true, merchant: true, currency: true },
+        }),
       ]);
       const histById = new Map(histories.map((h) => [h.id, h]));
+      const subById = new Map(subs.map((x) => [x.id, x]));
       const partyIds = [...new Set(docs.map((d) => d.party.id))];
       const [photoByParty, galleryByParty] = await Promise.all([
         payoutPizzaPhotos(partyIds, MAX_PHOTOS_PER_PARTY),
@@ -703,7 +727,7 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
       ]);
       const linesByDoc = new Map<string, PizzaLineDto[]>();
       for (const l of lines) {
-        const key = l.documentId ?? l.historyReceiptId;
+        const key = l.documentId ?? l.historyReceiptId ?? l.submissionId;
         if (!key) continue;
         const a = linesByDoc.get(key) ?? [];
         a.push(toLineDto(l));
@@ -725,6 +749,27 @@ router.get('/queue', ...reviewerChain, async (req: PizzaRequest, res: Response, 
             },
             merchant: h.merchant ?? ls.find((l) => l.merchant)?.merchant ?? null,
             currency: h.currency ?? ls[0]?.currency ?? null,
+            receiptDiscounts: [],
+            lines: ls,
+            pizzaPhotoUrls: [],
+            galleryPhotoUrls: [],
+          });
+          continue;
+        }
+        const sub = subById.get(id);
+        if (sub) {
+          const ls = linesByDoc.get(id) ?? [];
+          receipts.push({
+            origin: 'submission',
+            year: sub.year,
+            // No file URL on purpose: admins open the receipt (signed URL) in the Submissions tab.
+            document: { id: sub.id, url: '', mimeType: null, fileName: null, sourceReceiptIndex: null, sourceReceiptCount: null },
+            party: {
+              id: null, name: sub.merchant, city: sub.city, country: sub.country, region: sub.region,
+              date: sub.receiptDate.toISOString(),
+            },
+            merchant: sub.merchant,
+            currency: sub.currency ?? ls[0]?.currency ?? null,
             receiptDiscounts: [],
             lines: ls,
             pizzaPhotoUrls: [],
@@ -966,8 +1011,21 @@ router.post('/lines/:id/apply-to-merchant', ...reviewerChain, async (req: PizzaR
         AND li.verified_at IS NULL AND li.excluded = false AND li.is_bundle = false
         AND (li.size_source IS NULL OR li.size_source IN ('preset', 'llm', 'web'))
         AND coalesce(li.size_label, 'default') = ${label}`));
+    // Community submissions have no party/scope either: full admins only.
+    const updatedSubmissions = !actor.full ? 0 : Number(await prisma.$executeRaw(Prisma.sql`
+      UPDATE pizza_line_items li SET
+        shape = ${dims.shape}, diameter_cm = ${dims.diameterCm}, length_cm = ${dims.lengthCm},
+        width_cm = ${dims.widthCm}, slice_fraction = ${dims.sliceFraction}, area_cm2 = ${dims.areaCm2},
+        size_label = ${label}, size_source = 'preset', size_confidence = ${CONFIDENCE.merchant},
+        preset_id = ${preset.id}::uuid, updated_by = ${actor.email}, updated_at = now()
+      WHERE li.submission_id IS NOT NULL
+        AND li.merchant_key = ${line.merchantKey}
+        AND li.id <> ${line.id}::uuid
+        AND li.verified_at IS NULL AND li.excluded = false AND li.is_bundle = false
+        AND (li.size_source IS NULL OR li.size_source IN ('preset', 'llm', 'web'))
+        AND coalesce(li.size_label, 'default') = ${label}`));
     invalidatePizzaIndexCache();
-    res.json({ preset: toPresetDto(preset, !actor.full), updatedLines: Number(updated) + updatedHistory });
+    res.json({ preset: toPresetDto(preset, !actor.full), updatedLines: Number(updated) + updatedHistory + updatedSubmissions });
   } catch (err) {
     next(err);
   }
@@ -1286,6 +1344,79 @@ router.get('/public-receipts', ...fullChain, async (req: PizzaRequest, res: Resp
     if (!receipts) throw new AppError('Country not on the public index', 404, 'NOT_PUBLISHED');
     res.set('Cache-Control', 'private, no-store');
     res.json({ country, receipts });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===========================================================================
+// Community receipt submissions (sfincione-40417). Full admins only: submissions have no party,
+// so they follow the same rule as archive lines. Receipt files are reachable only through
+// short-lived signed URLs minted per request (Cache-Control: private, no-store).
+//   GET  /submissions?status=pending|approved|rejected|all&limit=&offset=
+//   GET  /submissions/counts
+//   GET  /submissions/:id
+//   POST /submissions/:id/extract   OCR the receipt (admin-open only; costs money)
+//   POST /submissions/:id/approve   body: draft { kind, currency, total, pizzaCount, lines[], merchant?, city?, country?, receiptDate?, fxRate? }
+//   POST /submissions/:id/reject    body: { reason? }
+// ===========================================================================
+router.param('id', (req, _res, next, id) => {
+  // only the /submissions/:id routes use a uuid id here; others keep their own validation
+  if (req.path.startsWith('/submissions/') && !UUID_RE.test(id)) return next(new AppError('Submission not found', 404, 'NOT_FOUND'));
+  next();
+});
+
+router.get('/submissions/counts', ...fullChain, async (_req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json(await submissionCounts());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/submissions', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    const status = str(req.query.status) ?? 'pending';
+    if (!['pending', 'approved', 'rejected', 'all'].includes(status)) throw new AppError('status must be pending, approved, rejected or all', 400, 'BAD_REQUEST');
+    res.set('Cache-Control', 'private, no-store');
+    res.json(await listSubmissions(status, intQ(req.query.limit, 20, 1, 50), intQ(req.query.offset, 0, 0, 100000)));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/submissions/:id', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ submission: await getSubmission(req.params.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/submissions/:id/extract', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json(await extractSubmission(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/submissions/:id/approve', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json(await approveSubmission(req.params.id, req.actor!.email, req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/submissions/:id/reject', ...fullChain, async (req: PizzaRequest, res: Response, next: NextFunction) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ submission: await rejectSubmission(req.params.id, req.actor!.email, (req.body ?? {}).reason) });
   } catch (err) {
     next(err);
   }

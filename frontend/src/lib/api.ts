@@ -8184,6 +8184,8 @@ export interface PizzaLineDto {
   documentId: string | null;
   partyId: string | null;
   historyReceiptId: string | null;
+  /** Set for lines of an approved community submission. */
+  submissionId: string | null;
   lineIndex: number;
   rawName: string;
   merchant: string | null;
@@ -8256,8 +8258,8 @@ export interface PizzaPresetDto {
 }
 
 export interface PizzaQueueReceipt {
-  /** 'history' = archive receipt (url is the Drive link; no preview, no photos). */
-  origin: 'event' | 'history';
+  /** 'history' = archive receipt (url is the Drive link; no preview, no photos); 'submission' = community receipt (no url). */
+  origin: 'event' | 'history' | 'submission';
   /** Event year, or the archive receipt year. */
   year: number | null;
   document: {
@@ -8299,7 +8301,7 @@ export interface PizzaQueueParams {
   partyId?: string;
   documentId?: string;
   /** Archive (2021-2025) receipts vs GPP event receipts. Archive is admin-only. */
-  origin?: 'event' | 'history' | 'all';
+  origin?: 'event' | 'history' | 'submission' | 'all';
   year?: number;
   limit?: number;
   offset?: number;
@@ -8460,6 +8462,8 @@ export interface PublicPizzaCountry {
   estimated?: boolean;
   /** Events in the figure on estimated sizes. Optional until the backend ships it. */
   nEstimatedParties?: number;
+  /** Events in the figure that come from community-submitted receipts. */
+  nCommunityParties?: number;
 }
 
 export interface PublicPizzaTrendPoint {
@@ -8583,12 +8587,125 @@ export interface PublicPizzaEvent {
   usd30: number;
   confirmed: boolean;
   nPizzas: number;
+  /** Built only from receipts sent in by the community. */
+  community?: boolean;
   lines: PublicPizzaEventLine[];
   photos: PublicPizzaCountryPhoto[];
 }
 export function fetchPublicPizzaCountryEvents(country: string, year?: number): Promise<{ country: string; events: PublicPizzaEvent[] }> {
   return apiRequest(`/api/pizza-index/events?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
 }
+// ---------------------------------------------------------------------------
+// Community receipt submissions (public form + admin review)
+// Mirrors backend/src/routes/pizza-index-submissions.routes.ts + services/pizzaSubmission.service.ts
+// ---------------------------------------------------------------------------
+
+export function requestPizzaSubmissionUpload(mimeType: string, fileSize: number): Promise<{ path: string; token: string }> {
+  return apiRequest('/api/pizza-index/submissions/upload-url', { method: 'POST', body: { mimeType, fileSize }, requireAuth: false });
+}
+/** Is the public form open? (kill switch app_config pizza_index.submissions_enabled) */
+export function fetchPizzaSubmissionsOpen(): Promise<{ open: boolean }> {
+  return apiRequest('/api/pizza-index/submissions/status', { requireAuth: false });
+}
+export interface PizzaSubmissionInput {
+  path: string;
+  receiptDate: string;
+  merchant: string;
+  city: string;
+  country: string;
+  countryCode?: string;
+  sizeNote?: string;
+  email?: string;
+  /** Honeypot: must stay empty. */
+  website?: string;
+}
+export function createPizzaSubmission(body: PizzaSubmissionInput): Promise<{ id: string; status: 'pending' }> {
+  return apiRequest('/api/pizza-index/submissions', { method: 'POST', body, requireAuth: false });
+}
+
+export interface PizzaSubmissionOcr {
+  amount: number;
+  currency: string | null;
+  confidence: number;
+  merchant?: string | null;
+  receiptDate?: string | null;
+}
+export interface PizzaSubmissionDto {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  submitterEmail: string | null;
+  submittedByUser: boolean;
+  notify: boolean;
+  /** Short-lived signed URLs (admin only). */
+  receiptUrl: string | null;
+  previewUrl: string | null;
+  mimeType: string;
+  receiptDate: string;
+  year: number;
+  country: string;
+  city: string | null;
+  merchant: string;
+  sizeNote: string | null;
+  kind: 'itemized' | 'lump_sum' | 'not_pizza' | null;
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  fxRate: number | null;
+  fxSource: string | null;
+  ocr: PizzaSubmissionOcr | null;
+  ocrAt: string | null;
+  duplicateOfId: string | null;
+  duplicateReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  rejectReason: string | null;
+}
+export interface PizzaSubmissionDraftLine {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  sizeLabel: string | null;
+  diameterCm: number | null;
+}
+export interface PizzaSubmissionDraft {
+  kind: 'itemized' | 'lump_sum' | 'not_pizza';
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  merchant: string | null;
+  receiptDate: string | null;
+  lines: PizzaSubmissionDraftLine[];
+}
+export interface PizzaSubmissionApproveBody {
+  kind: 'itemized' | 'lump_sum' | 'not_pizza';
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  merchant?: string | null;
+  city?: string | null;
+  country?: string | null;
+  receiptDate?: string | null;
+  /** USD per 1 unit of currency; only needed when no automatic rate exists. */
+  fxRate?: number | null;
+  lines: PizzaSubmissionDraftLine[];
+}
+export function fetchPizzaSubmissions(params: { status?: 'pending' | 'approved' | 'rejected' | 'all'; limit?: number; offset?: number } = {}): Promise<{ total: number; submissions: PizzaSubmissionDto[] }> {
+  return apiRequest(`${PIZZA_BASE}/submissions${pizzaQs(params)}`);
+}
+export function fetchPizzaSubmissionCounts(): Promise<{ pending: number; approved: number; rejected: number }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/counts`);
+}
+export function extractPizzaSubmission(id: string): Promise<{ submission: PizzaSubmissionDto; draft: PizzaSubmissionDraft | null }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/extract`, { method: 'POST', body: {}, timeoutMs: 120_000 });
+}
+export function approvePizzaSubmission(id: string, body: PizzaSubmissionApproveBody): Promise<{ submission: PizzaSubmissionDto; linesWritten: number; warnings: string[] }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/approve`, { method: 'POST', body, timeoutMs: 60_000 });
+}
+export function rejectPizzaSubmission(id: string, reason?: string): Promise<{ submission: PizzaSubmissionDto }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/reject`, { method: 'POST', body: { reason } });
+}
+
 export interface PizzaEventReceipt {
   url: string;
   mimeType: string | null;
