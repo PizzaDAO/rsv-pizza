@@ -3,12 +3,12 @@ import MapLibreMap, { type MapLibreMarker } from '../lib/maps/MapLibreMap';
 import { countryCentroid } from '../lib/countryCentroids';
 import { flagEmoji } from '../lib/iso4217';
 import { fmtPerCm2, fmtUsd } from '../lib/pizzaIndexUtils';
-import type { PublicCountryEntry } from '../lib/api';
+import type { PublicPizzaCountry } from '../lib/api';
 
 /**
  * sfincione-40417: country markers for the public Pizza Price Index.
  * Colour = USD/cm^2 (green cheap -> red pricey, relative to the published set),
- * size = number of events. Countries without a known centroid are skipped.
+ * size = number of receipts. Countries without a known centroid are skipped.
  */
 
 const escapeHtml = (s: string) =>
@@ -19,19 +19,20 @@ function colorFor(t: number): string {
   return `hsl(${Math.round(140 * (1 - t))}, 75%, 48%)`;
 }
 
-export function PizzaIndexMap({ countries }: { countries: PublicCountryEntry[] }) {
+export function PizzaIndexMap({ countries }: { countries: PublicPizzaCountry[] }) {
   const markers = useMemo<MapLibreMarker[]>(() => {
     const prices = countries.map((c) => c.usdPerCm2).filter((v) => Number.isFinite(v));
     if (prices.length === 0) return [];
     const min = Math.min(...prices);
     const max = Math.max(...prices);
-    const maxN = Math.max(...countries.map((c) => c.nParties), 1);
+    const nOf = (c: PublicPizzaCountry) => c.nReceipts ?? c.nParties;
+    const maxN = Math.max(...countries.map(nOf), 1);
     const out: MapLibreMarker[] = [];
     for (const c of countries) {
       const pos = countryCentroid(c.countryCode);
       if (!pos) continue;
       const t = max > min ? (c.usdPerCm2 - min) / (max - min) : 0.5;
-      const size = Math.round(16 + 22 * Math.sqrt(c.nParties / maxN));
+      const size = Math.round(16 + 22 * Math.sqrt(nOf(c) / maxN));
       const el = document.createElement('div');
       el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${colorFor(t)};border:2px solid rgba(255,255,255,0.9);box-shadow:0 1px 4px rgba(0,0,0,0.5);opacity:0.92;cursor:pointer;`;
       el.title = `${c.country}: ${fmtPerCm2(c.usdPerCm2)}/cm²`;
@@ -43,7 +44,7 @@ export function PizzaIndexMap({ countries }: { countries: PublicCountryEntry[] }
         element: el,
         anchor: 'center',
         title: c.country,
-        popupHTML: `<div style="color:#111;font-size:13px;line-height:1.4"><div style="font-weight:600">${flag}${escapeHtml(c.country)}</div><div>${escapeHtml(fmtPerCm2(c.usdPerCm2))} per cm²</div><div>30 cm pizza: ${escapeHtml(fmtUsd(c.ladderUsd['30']))}</div><div>${c.nParties} events</div></div>`,
+        popupHTML: `<div style="color:#111;font-size:13px;line-height:1.4"><div style="font-weight:600">${flag}${escapeHtml(c.country)}</div><div>${escapeHtml(fmtPerCm2(c.usdPerCm2))} per cm²</div><div>30 cm pizza: ${escapeHtml(fmtUsd(c.ladderUsd['30']))}</div><div>${nOf(c)} ${nOf(c) === 1 ? 'receipt' : 'receipts'}</div></div>`,
       });
     }
     return out;
@@ -72,7 +73,7 @@ export function PizzaIndexMap({ countries }: { countries: PublicCountryEntry[] }
           <span className="inline-block h-2 w-24 rounded-full" style={{ background: `linear-gradient(to right, ${colorFor(0)}, ${colorFor(0.5)}, ${colorFor(1)})` }} />
           pricier
         </span>
-        <span>Bigger dot = more events. Tap a dot for details.</span>
+        <span>Bigger dot = more receipts. Tap a dot for details.</span>
       </div>
     </section>
   );
