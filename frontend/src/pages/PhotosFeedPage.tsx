@@ -384,7 +384,7 @@ export function PhotosFeedPage() {
 
         {/* Sticky filter bar */}
         <div
-          className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 border-b border-theme-stroke flex flex-wrap items-center gap-2"
+          className="sticky top-0 z-30 -mx-4 px-4 py-3 mb-4 border-b border-theme-stroke flex flex-nowrap md:flex-wrap items-center gap-2 overflow-x-auto md:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
           style={{ background: 'rgba(255,255,255,0.95)' }}
         >
           {/* cannoli-58292: event-year selector (single-select). */}
@@ -569,7 +569,7 @@ function FilterDropdownShell({
         <>
           <div className="fixed inset-0 z-40" onClick={onToggle} />
           <div
-            className={`absolute top-full left-0 mt-2 z-50 rounded-xl py-2 min-w-[260px] max-h-[60vh] overflow-y-auto border ${panelClassName}`}
+            className={`absolute max-md:fixed max-md:top-auto max-md:left-4 max-md:right-4 max-md:min-w-0 top-full left-0 mt-2 z-50 rounded-xl py-2 min-w-[260px] max-h-[60vh] overflow-y-auto border ${panelClassName}`}
             style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.1)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
           >
             {children}
@@ -953,7 +953,7 @@ function FeedTile({
         </span>
       </div>
       {(displayCity || photo.party.name) && (
-        <div className="px-2 py-1.5 text-xs text-theme-text-muted flex items-center gap-1.5">
+        <div className="px-2 py-1.5 text-xs text-theme-text-secondary flex items-center gap-1.5">
           {countryNameToAlpha2(displayCountry)
             ? <CircleFlag country={displayCountry} size={14} />
             : <MapPin size={11} />}

@@ -326,7 +326,7 @@ function HostPageContent() {
             with backend ASSISTANT_ENABLED_SLUGS). */}
         {canEdit && isEventAssistantEnabled(party) && <EventAssistant />}
 
-        <div className="host-tabs border-b border-theme-stroke mb-6 flex gap-8 overflow-x-auto">
+        <div className="host-tabs border-b border-theme-stroke mb-6 flex gap-5 md:gap-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -334,13 +334,13 @@ function HostPageContent() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 data-testid={`host-tab-${tab.id}`}
-                className={`flex items-center gap-2 px-1 pb-3 font-medium text-sm transition-all whitespace-nowrap relative ${activeTab === tab.id
+                className={`flex items-center gap-2 px-1 pb-3 min-h-[44px] md:min-h-0 shrink-0 font-medium text-sm transition-all whitespace-nowrap relative ${activeTab === tab.id
                     ? 'text-theme-text'
                     : 'text-theme-text-muted hover:text-theme-text-secondary'
                   }`}
               >
                 <Icon size={18} />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.label}</span>
                 {activeTab === tab.id && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-text" />
                 )}

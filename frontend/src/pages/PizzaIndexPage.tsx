@@ -227,6 +227,15 @@ export function PizzaIndexPage() {
   const [openCountry, setOpenCountry] = useState<string | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submissionsOpen, setSubmissionsOpen] = useState(false);
+  // Phones show 4 table columns; the drill-down must span exactly those or the
+  // fixed table layout gives hidden columns the Country column's width.
+  const [isDesktop, setIsDesktop] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 768px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     fetchPizzaSubmissionsOpen().then((r) => { if (!cancelled) setSubmissionsOpen(!!r.open); }).catch(() => { /* hidden on error */ });
@@ -265,6 +274,8 @@ export function PizzaIndexPage() {
 
   const countries = data?.countries ?? [];
   const hasData = countries.length > 0 && data?.global.usdPerCm2 != null;
+  // Mention community receipts only while submissions are open or this year's data includes some.
+  const showCommunityCopy = submissionsOpen || countries.some((c) => (c.nCommunityParties ?? 0) > 0);
   const th = 'px-3 py-2 text-left text-xs font-medium text-theme-text-muted whitespace-nowrap';
   const td = 'px-3 py-2 text-sm whitespace-nowrap';
 
@@ -280,7 +291,7 @@ export function PizzaIndexPage() {
           <div className="flex items-center gap-2 text-red-500"><Pizza size={22} /><span className="text-sm font-semibold uppercase tracking-wide">Pizza Price Index</span></div>
           <h1 className="text-3xl sm:text-4xl font-bold text-theme-text">What does a pizza cost around the world?</h1>
           <p className="text-theme-text-muted max-w-2xl">
-            Real menu prices from pizzerias that fed Global Pizza Party {year} events, plus receipts sent in by pizza fans, normalised by size so a 25 cm pie in Lagos can be compared with a 16-inch pie in Brooklyn.
+            Real menu prices from pizzerias that fed Global Pizza Party {year} events{showCommunityCopy ? ', plus receipts sent in by pizza fans,' : ','} normalised by size so a 25 cm pie in Lagos can be compared with a 16-inch pie in Brooklyn.
           </p>
           {submissionsOpen && (
             <button
@@ -342,7 +353,7 @@ export function PizzaIndexPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-theme-text-faint">
+              <p className="text-xs text-theme-text-muted">
                 Median across {data.global.nCountries} countries and {data.global.nParties} events. Prices in USD at each event's exchange rate{isArchive ? ' on the receipt date' : ''}.
               </p>
             </section>
@@ -352,19 +363,20 @@ export function PizzaIndexPage() {
             {/* Leaderboard */}
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-theme-text">Cheapest to priciest</h2>
-              <p className="text-xs text-theme-text-faint">
+              <p className="text-xs text-theme-text-muted">
                 {isArchive ? 'Tap a country to see how its price changed over the years.' : 'Tap a country to see its price trend and pizzas from its events.'}
               </p>
               <div className="overflow-x-auto rounded-xl border border-theme-stroke">
-                <table className="w-full">
+                {/* Fixed layout on phones so a long country name or the drill-down can't widen the table past the screen. */}
+                <table className="w-full max-md:table-fixed">
                   <thead className="bg-white/5">
                     <tr>
-                      <th className={th}>#</th>
+                      <th className={`${th} max-md:w-10`}>#</th>
                       <th className={th}>Country</th>
-                      <th className={th}>USD / cm²</th>
-                      <th className={th}>Local / cm²</th>
-                      {LADDER_SIZES.map((s) => <th key={s} className={th}>{s} cm</th>)}
-                      <th className={th}>Events</th>
+                      <th className={`${th} max-md:w-[88px]`}>USD / cm²</th>
+                      <th className={`${th} hidden md:table-cell`}>Local / cm²</th>
+                      {LADDER_SIZES.map((s) => <th key={s} className={`${th} ${s === '30' ? 'max-md:w-[72px]' : 'hidden md:table-cell'}`}>{s} cm</th>)}
+                      <th className={`${th} hidden md:table-cell`}>Events</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -376,7 +388,7 @@ export function PizzaIndexPage() {
                         aria-expanded={openCountry === c.country}
                       >
                         <td className={`${td} text-theme-text-muted`}>{i + 1}</td>
-                        <td className={`${td} font-medium text-theme-text`}>
+                        <td className={`${td} font-medium text-theme-text max-md:whitespace-normal`}>
                           <button
                             type="button"
                             className="inline-flex items-center gap-1"
@@ -403,9 +415,9 @@ export function PizzaIndexPage() {
                           )}
                         </td>
                         <td className={td}>{fmtPerCm2(c.usdPerCm2)}</td>
-                        <td className={td}>{fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}</td>
-                        {LADDER_SIZES.map((s) => <td key={s} className={td}>{fmtUsd(c.ladderUsd[s])}</td>)}
-                        <td className={`${td} text-theme-text-muted`}>
+                        <td className={`${td} hidden md:table-cell`}>{fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}</td>
+                        {LADDER_SIZES.map((s) => <td key={s} className={`${td} ${s === '30' ? '' : 'hidden md:table-cell'}`}>{fmtUsd(c.ladderUsd[s])}</td>)}
+                        <td className={`${td} hidden md:table-cell text-theme-text-muted`}>
                           {c.nParties}
                           {!!c.nCommunityParties && (
                             <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400" title="Events from receipts sent in by pizza fans">
@@ -417,8 +429,14 @@ export function PizzaIndexPage() {
                       </tr>
                       {openCountry === c.country && (
                         <tr className="bg-black/10">
-                          <td colSpan={5 + LADDER_SIZES.length} className="px-3 py-3">
-                            <div className="space-y-4">
+                          <td colSpan={isDesktop ? 5 + LADDER_SIZES.length : 4} className="px-3 py-3">
+                            <div className="space-y-4 min-w-0">
+                              <p className="md:hidden text-xs text-theme-text-secondary">
+                                {LADDER_SIZES.filter((s) => s !== '30').map((s) => `${s} cm ${fmtUsd(c.ladderUsd[s])}`).join(' · ')}
+                                {` · ${c.nParties} ${c.nParties === 1 ? 'event' : 'events'}`}
+                                {!!c.nCommunityParties && ` (incl. ${c.nCommunityParties} community)`}
+                                {` · local ${fmtLocalPerCm2(c.localPerCm2, c.localCurrency)}/cm²`}
+                              </p>
                               <PizzaTrendChart points={data.trends?.[c.country]} selectedYear={data.year} />
                               {!isArchive && <CountryPhotos country={c.country} year={data.year} />}
                               <CountryEvents country={c.country} year={data.year} />
