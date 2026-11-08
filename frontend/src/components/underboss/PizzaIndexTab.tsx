@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Check, ChevronLeft, ChevronRight, ExternalLink, Loader2, Package, Search, Store, Globe, X } from 'lucide-react';
+import { Archive, Check, ChevronLeft, ChevronRight, ExternalLink, Loader2, Package, Search, Store, Globe, Users, X } from 'lucide-react';
 import {
   fetchPizzaQueue,
+  fetchPizzaSubmissionCounts,
   type PizzaLineDto,
   type PizzaQueueParams,
   type PizzaQueueResponse,
@@ -13,6 +14,7 @@ import { PizzaSizeEditor } from './PizzaSizeEditor';
 import { PizzaIndexView } from './PizzaIndexView';
 import { PizzaPresetsView } from './PizzaPresetsView';
 import { PizzaOpsView } from './PizzaOpsView';
+import { PizzaSubmissionsView } from './PizzaSubmissionsView';
 
 /**
  * sfincione-40417: Underboss dashboard "Pizza Index" tab. Visible to admins,
@@ -20,7 +22,7 @@ import { PizzaOpsView } from './PizzaOpsView';
  * underbosses to their own regions/cities. Ops is full-admin only.
  */
 
-type SubView = 'review' | 'index' | 'presets' | 'ops';
+type SubView = 'review' | 'index' | 'presets' | 'submissions' | 'ops';
 const PAGE_SIZE = 20;
 
 interface Filters {
@@ -32,7 +34,7 @@ interface Filters {
   photoEstimate: boolean;
   excluded: boolean;
   bundles: NonNullable<PizzaQueueParams['bundles']>;
-  /** GPP events vs the 2021-2025 archive (archive is admin-only). */
+  /** GPP events vs the 2021-2025 archive vs approved community receipts (archive + community are admin-only). */
   origin: NonNullable<PizzaQueueParams['origin']>;
   year: string;
 }
@@ -126,7 +128,7 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
   );
 
   const onLineUpdated = useCallback((line: PizzaLineDto) => {
-    const receiptId = line.documentId ?? line.historyReceiptId;
+    const receiptId = line.documentId ?? line.historyReceiptId ?? line.submissionId;
     setReceipts((rs) => rs.map((r) => (r.document.id === receiptId
       ? { ...r, lines: r.lines.map((l) => (l.id === line.id ? line : l)) }
       : r)));
@@ -235,6 +237,7 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
             <option value="event">GPP events</option>
             <option value="all">All receipts</option>
             <option value="history">Archive (2021-2025)</option>
+            <option value="submission">Community submissions</option>
           </select>
         )}
         <select value={filters.year} onChange={(e) => set({ year: e.target.value })} aria-label="Year" className="text-sm">
@@ -281,6 +284,11 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
                           <Archive size={10} />{r.year} archive
                         </span>
                       )}
+                      {r.origin === 'submission' && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 align-middle">
+                          <Users size={10} />community
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-theme-text-muted truncate">
                       {r.party.name}{r.party.city ? ` · ${r.party.city}` : ''}{r.party.country ? `, ${r.party.country}` : ''}
@@ -314,17 +322,23 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      {/* Archive receipts have no image to preview: show the editor with a Drive link instead. */}
-      {lightboxOpen && current?.origin === 'history' && (
+      {/* Archive and community receipts have no image to preview here (community files are only reachable via signed URLs in Submissions): show the editor alone. */}
+      {lightboxOpen && current && current.origin !== 'event' && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
         >
           <div className="card relative w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between gap-3 px-4 pt-3">
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-300">
-                <Archive size={12} />{current.year} archive
-              </span>
+              {current.origin === 'submission' ? (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">
+                  <Users size={12} />Community receipt
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-300">
+                  <Archive size={12} />{current.year} archive
+                </span>
+              )}
               <div className="flex items-center gap-3">
                 {current.document.url && (
                   <a href={current.document.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline">
@@ -347,7 +361,7 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <ReceiptLightbox
-        isOpen={lightboxOpen && current?.origin !== 'history'}
+        isOpen={lightboxOpen && current?.origin === 'event'}
         images={images}
         initialIndex={startIndex}
         onClose={closeLightbox}
@@ -372,11 +386,17 @@ function ReviewView({ isAdmin }: { isAdmin: boolean }) {
 
 export function PizzaIndexTab({ isAdmin }: { isAdmin: boolean }) {
   const [view, setView] = useState<SubView>('review');
+  const [pendingSubs, setPendingSubs] = useState<number | null>(null);
+  const refreshPending = useCallback(() => {
+    if (!isAdmin) return;
+    fetchPizzaSubmissionCounts().then((c) => setPendingSubs(c.pending)).catch(() => setPendingSubs(null));
+  }, [isAdmin]);
+  useEffect(() => { refreshPending(); }, [refreshPending]);
   const tabs: Array<{ id: SubView; label: string }> = [
     { id: 'review', label: 'Review' },
     { id: 'index', label: 'Index' },
     { id: 'presets', label: 'Presets' },
-    ...(isAdmin ? [{ id: 'ops' as SubView, label: 'Ops' }] : []),
+    ...(isAdmin ? [{ id: 'submissions' as SubView, label: 'Submissions' }, { id: 'ops' as SubView, label: 'Ops' }] : []),
   ];
   return (
     <div className="space-y-4">
@@ -389,12 +409,16 @@ export function PizzaIndexTab({ isAdmin }: { isAdmin: boolean }) {
             className={`px-4 py-1.5 text-sm rounded-md ${view === t.id ? 'bg-red-500 text-white' : 'text-theme-text-muted hover:text-theme-text'}`}
           >
             {t.label}
+            {t.id === 'submissions' && !!pendingSubs && (
+              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-white/20">{pendingSubs}</span>
+            )}
           </button>
         ))}
       </div>
       {view === 'review' && <ReviewView isAdmin={isAdmin} />}
       {view === 'index' && <PizzaIndexView />}
       {view === 'presets' && <PizzaPresetsView isAdmin={isAdmin} />}
+      {view === 'submissions' && isAdmin && <PizzaSubmissionsView onChanged={refreshPending} />}
       {view === 'ops' && isAdmin && <PizzaOpsView />}
     </div>
   );

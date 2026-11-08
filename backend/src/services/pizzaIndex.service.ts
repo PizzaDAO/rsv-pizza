@@ -65,10 +65,12 @@ export interface IndexRow {
   netUsdPerCm2: number | null;
   /**
    * What counts as one "event" for MIN_PARTIES: party_id for DB events;
-   * `hist:{year}:{city}|{country}` for archive receipts (one city-year = one event).
+   * `hist:{year}:{city}|{country}` for archive receipts (one city-year = one event);
+   * `sub:{year}:{merchant_key}|{city}|{country}` for submissions (one pizzeria-city-year = one event).
    */
   eventKey: string;
-  origin: 'event' | 'history';
+  /** 'submission' = receipt sent in via the public form and approved by an admin (community). */
+  origin: 'event' | 'history' | 'submission';
   fxSource: string | null;
   /** Lump-sum line (archive receipt, or a live receipt's pizza count; one synthetic line per receipt): estimated tier only. */
   isLumpSum: boolean;
@@ -396,7 +398,7 @@ export interface IndexFilters {
   year?: number | null;
 }
 
-interface ViewRow {
+export interface ViewRow {
   line_id: string; document_id: string | null; party_id: string | null; party_name: string;
   country: string | null; city: string | null; region: string | null;
   event_year: number | null; event_series_slug: string | null;
@@ -414,7 +416,9 @@ interface ViewRow {
   receipt_key: string | null;
 }
 
-function mapViewRow(v: ViewRow): IndexRow {
+export function mapViewRow(v: ViewRow): IndexRow {
+  // Defence in depth: the view already NULLs these for submissions; a receipt file path must never travel.
+  if (v.origin === 'submission') v = { ...v, document_url: null, document_mime_type: null };
   return {
     lineId: v.line_id, documentId: v.document_id, partyId: v.party_id, partyName: v.party_name,
     country: v.country, city: v.city, region: v.region, eventYear: v.event_year,
@@ -428,7 +432,8 @@ function mapViewRow(v: ViewRow): IndexRow {
     sizeConfidence: v.size_confidence, verifiedAt: v.verified_at, verifiedBy: v.verified_by,
     isVerified: v.is_verified, outlierFlag: v.outlier_flag, isBundle: v.is_bundle,
     usdPerCm2: v.usd_per_cm2, localPerCm2: v.local_per_cm2, netUsdPerCm2: v.net_usd_per_cm2,
-    eventKey: v.event_key, origin: v.origin === 'history' ? 'history' : 'event',
+    eventKey: v.event_key,
+    origin: v.origin === 'history' ? 'history' : v.origin === 'submission' ? 'submission' : 'event',
     fxSource: v.fx_source, isLumpSum: !!v.is_lump_sum,
     receiptKey: v.receipt_key ?? undefined,
   };
@@ -453,7 +458,7 @@ export async function fetchIndexRows(scope?: IndexScope, f: IndexFilters = {}): 
   // Underbosses never see archive rows (no scope mapping): the history branch fills region/city.
   const scopeCond = scope && !scope.full ? Prisma.sql`AND v.origin = 'event' ${scopeSql(scope, 'v')}` : Prisma.empty;
   const rows = await prisma.$queryRaw<ViewRow[]>(Prisma.sql`
-    SELECT v.*, coalesce(v.document_id::text, 'h:' || li.history_receipt_id::text) AS receipt_key
+    SELECT v.*, coalesce(v.document_id::text, 'h:' || li.history_receipt_id::text, 's:' || li.submission_id::text) AS receipt_key
     FROM pizza_price_index_lines v
     LEFT JOIN pizza_line_items li ON li.id = v.line_id
     WHERE true ${cond.length ? Prisma.join(cond, ' ') : Prisma.empty} ${scopeCond}`);
@@ -538,6 +543,8 @@ export interface PublicCountryEntry {
   estimated: boolean;
   /** Events in the figure that use estimated sizes (0 = all confirmed; nParties = all estimated). */
   nEstimatedParties: number;
+  /** Events in the figure that come from community (submitted) receipts. Additive. */
+  nCommunityParties: number;
 }
 
 /** One point on a country's price trend: that year's published 30 cm price (nominal USD). */
@@ -601,6 +608,11 @@ export function selectPublicRows(rows: IndexRow[]): {
 export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = PUBLIC_INDEX_YEAR): PublicPizzaIndex {
   const allRows = allRowsIn.filter((r) => r.eventYear === year);
   const { rows, estimatedCountries, estimatedEvents } = selectPublicRows(allRows);
+  const communityEvents = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (r.origin !== 'submission' || !r.country) continue;
+    (communityEvents.get(r.country) ?? communityEvents.set(r.country, new Set()).get(r.country)!).add(r.eventKey);
+  }
   const countries = aggregate(rows, { level: 'country', includeBundles: false, publishedOnly: true, preselected: true })
     .filter((g) => g.usdPerCm2.median !== null && g.country)
     .map<PublicCountryEntry>((g) => ({
@@ -618,6 +630,7 @@ export function buildPublicIndexFromRows(allRowsIn: IndexRow[], year: number = P
       ladderLocal: g.ladderLocal,
       estimated: estimatedCountries.has(g.country!),
       nEstimatedParties: Math.min(estimatedEvents.get(g.country!) ?? 0, g.nParties),
+      nCommunityParties: Math.min(communityEvents.get(g.country!)?.size ?? 0, g.nParties),
     }))
     .sort((a, b) => a.usdPerCm2 - b.usdPerCm2);
   // Global figure only over published countries so unpublished data never leaks in.
@@ -689,9 +702,23 @@ interface PublicCache {
 }
 let publicCache: PublicCache | null = null;
 
+/** true unless app_config `pizza_index.submissions_public` is 'false'/'0' (a read failure counts as included). */
+async function communityIncluded(): Promise<boolean> {
+  try {
+    const row = await prisma.appConfig.findUnique({ where: { key: 'pizza_index.submissions_public' } });
+    const v = row?.value.trim().toLowerCase();
+    return !(v === 'false' || v === '0');
+  } catch {
+    return true;
+  }
+}
+
 async function loadPublic(): Promise<PublicCache> {
   if (publicCache && Date.now() - publicCache.at < PUBLIC_TTL_MS) return publicCache;
-  const rows = await fetchIndexRows(undefined, {});
+  let rows = await fetchIndexRows(undefined, {});
+  // Switch (app_config pizza_index.submissions_public = 'false') to pull community receipts out
+  // of every public figure without a deploy. Default: included.
+  if (!(await communityIncluded())) rows = rows.filter((r) => r.origin !== 'submission');
   const { years, latest, byYear } = buildPublicByYear(rows);
   const partiesByYear = new Map<number, Map<string, string[]>>();
   const rowsByYear = new Map<number, IndexRow[]>();
@@ -733,6 +760,8 @@ export interface PublicEvent {
   /** Every line in this event has a confirmed size. */
   confirmed: boolean;
   nPizzas: number;
+  /** Every line comes from a receipt submitted by the community (not a GPP payout or the archive). Additive. */
+  community: boolean;
   lines: PublicEventLine[];
   photos: PublicCountryPhoto[];
 }
@@ -764,6 +793,7 @@ export async function getPublicCountryEvents(country: string, year?: number): Pr
       usd30: (weightedMedian(rs.map((r) => [r.usdPerCm2, r.qty])) ?? median(rs.map((r) => r.usdPerCm2))!) * AREA_30CM,
       confirmed: rs.every((r) => confirmedIds.has(r.lineId)),
       nPizzas: Math.round(rs.reduce((a, r) => a + r.qty, 0) * 100) / 100,
+      community: rs.every((r) => r.origin === 'submission'),
       lines: rs.map((r) => ({
         name: r.rawName, qty: r.qty, price: r.unitPriceList, currency: r.currency, shape: r.shape,
         diameterCm: r.diameterCm, sizeLabel: r.sizeLabel, confirmed: confirmedIds.has(r.lineId),
