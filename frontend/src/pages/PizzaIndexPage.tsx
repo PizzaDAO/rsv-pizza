@@ -227,6 +227,15 @@ export function PizzaIndexPage() {
   const [openCountry, setOpenCountry] = useState<string | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submissionsOpen, setSubmissionsOpen] = useState(false);
+  // Phones show 4 table columns; the drill-down must span exactly those or the
+  // fixed table layout gives hidden columns the Country column's width.
+  const [isDesktop, setIsDesktop] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 768px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     fetchPizzaSubmissionsOpen().then((r) => { if (!cancelled) setSubmissionsOpen(!!r.open); }).catch(() => { /* hidden on error */ });
@@ -420,7 +429,7 @@ export function PizzaIndexPage() {
                       </tr>
                       {openCountry === c.country && (
                         <tr className="bg-black/10">
-                          <td colSpan={5 + LADDER_SIZES.length} className="px-3 py-3">
+                          <td colSpan={isDesktop ? 5 + LADDER_SIZES.length : 4} className="px-3 py-3">
                             <div className="space-y-4 min-w-0">
                               <p className="md:hidden text-xs text-theme-text-secondary">
                                 {LADDER_SIZES.filter((s) => s !== '30').map((s) => `${s} cm ${fmtUsd(c.ladderUsd[s])}`).join(' · ')}
