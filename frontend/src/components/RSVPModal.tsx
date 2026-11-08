@@ -189,7 +189,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           <button
             type="button"
             onClick={() => { form.setEthereumAddress(''); form.setWalletValidation('idle'); }}
-            className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
+            className="px-3 py-2.5 min-h-[40px] rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
           >
             <X size={14} />
             <span className="hidden sm:inline">{tCommon('buttons.clear')}</span>
@@ -200,7 +200,7 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
               <button
                 type="button"
                 onClick={show}
-                className="px-3 py-2.5 rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
+                className="px-3 py-2.5 min-h-[40px] rounded-xl bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-theme-text-secondary hover:text-theme-text text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0"
               >
                 <Wallet size={14} />
                 <span className="hidden sm:inline">{tCommon('buttons.connect')}</span>

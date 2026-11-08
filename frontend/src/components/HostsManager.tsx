@@ -696,7 +696,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               )}
             </div>
             {/* Bottom row: controls */}
-            <div className="flex items-center gap-3 mt-2 pl-9">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 pl-9 [&>button]:min-h-[40px] md:[&>button]:min-h-0">
               <Checkbox
                 checked={coHost.showOnEvent !== false}
                 onChange={() => toggleCoHostShowOnEvent(coHost.id)}
@@ -714,7 +714,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
               <button
                 type="button"
                 onClick={() => startEditingHost(coHost)}
-                className="text-white/50 hover:text-white text-sm font-medium"
+                className="text-white/50 hover:text-white text-sm font-medium px-1"
               >
                 Edit
               </button>
@@ -726,7 +726,7 @@ export const HostsManager: React.FC<HostsManagerProps> = ({
                   type="button"
                   onClick={openTransferModal}
                   disabled={loadingPrimaryOwner}
-                  className="text-white/50 hover:text-[#ff393a] text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                  className="text-white/50 hover:text-[#ff393a] text-xs font-medium flex items-center gap-1 disabled:opacity-50 whitespace-nowrap"
                   title="Admin only — reassign event ownership to another registered user"
                 >
                   <ArrowRightLeft size={12} />

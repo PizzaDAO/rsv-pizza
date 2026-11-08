@@ -876,9 +876,9 @@ export function EventPage() {
           </div>
         )}
         <div className="card overflow-hidden">
-          <div className="grid md:grid-cols-[400px,1fr] gap-0 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-[400px,1fr] gap-0 md:gap-8">
             {/* Left Column - Image and Host Info (Desktop only) */}
-            <div className="hidden md:flex flex-col">
+            <div className="hidden md:flex flex-col min-w-0">
               {/* Square Image */}
               {event.eventImageUrl ? (
                 <div className="relative aspect-square bg-black/30">
@@ -984,7 +984,7 @@ export function EventPage() {
             </div>
 
             {/* Right Column - Event Details */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               {/* Mobile-only sections */}
               <div className="md:hidden">
                 {/* Square Image - Mobile */}
