@@ -1017,7 +1017,7 @@ describe('pizza-mcp 9ad5364', () => {
     expect(res.status).toBe(422);
     expect(res.body.error).toMatchObject({ code: 'CALLS_NOT_AVAILABLE_HERE', shopId: 'pzl_osm_n1' });
     expect(res.body.error.message).toBe(
-      "We can't call Sal's for you right now. The shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
+      "We can't call Sal's right now: the shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
     );
     expect(res.body.error.opop.details.reasons).toEqual(['possible_opt_out']);
     expect(fake.orders.size).toBe(0);
@@ -1117,7 +1117,7 @@ describe('pizza-mcp 662d51c: checking before confirmed_by_shop, pending_operator
     expect(res.status).toBe(422);
     expect(res.body.error).toMatchObject({ code: 'CALLS_NOT_AVAILABLE_HERE', shopId: 'pzl_osm_n1', reason: 'pending_operator_review' });
     expect(res.body.error.message).toBe(
-      "We can't call Sal's for you right now. An earlier call to Sal's could not be checked automatically, so we are not calling it until someone on our team has reviewed that call. This is not because of anything Sal's said. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
+      "We can't call Sal's right now: an earlier call to it couldn't be checked automatically and is waiting for our team. It's not because of anything the shop said. Nothing was ordered. Pick another pizzeria, or call Sal's yourself."
     );
     expect(res.body.error.message).not.toMatch(/asked not to|opt/i);
     expect(fake.orders.size).toBe(0);

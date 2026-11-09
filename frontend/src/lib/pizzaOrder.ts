@@ -274,13 +274,38 @@ function callingSince(o: Pick<PizzaOrderView, 'timeline'>): number | null {
 
 export interface StatusInfo {
   title: string;
+  /** One "why" line (pizza-mcp's own words where it sent any). */
   detail: string;
   tone: 'info' | 'action' | 'success' | 'warn' | 'error';
+  /** What the host does next, in order (rendered as a numbered list). */
+  steps?: string[];
+  /** A short "please don't order again" line, shown after the steps. */
+  caution?: string;
+  /** The copy tells the host to phone the shop: show a Call button when we know the number. */
+  callShop?: boolean;
 }
-export function statusInfo(
-  o: Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> & Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released' | 'timeline'>,
-  now = Date.now()
-): StatusInfo {
+
+type StatusInput = Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> &
+  Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released' | 'timeline' | 'isMine' | 'nextAction' | 'ceilingCents'>;
+
+/** The approval deadline in the view, if any: for a price approval, the link's expiry (pizza-mcp sets it). */
+export function approvalDeadline(o: Pick<Partial<PizzaOrderView>, 'nextAction'>): string | null {
+  const iso = o.nextAction?.type === 'open_url' ? o.nextAction.expires_at ?? null : null;
+  return iso && !Number.isNaN(Date.parse(iso)) ? iso : null;
+}
+
+const CHECK_CAUTION = "Please don't order again until you've checked with them.";
+
+/** The "check with the shop" steps: call, what to do either way. */
+function checkSteps(shop: string, releasable: boolean | undefined): string[] {
+  return [
+    `Call ${shop} and ask whether they have your pickup order.`,
+    'If they do: pick it up and pay as usual, then upload the receipt.',
+    releasable ? "If they don't: release it below so it stops counting against your budget." : "If they don't: you can order again.",
+  ];
+}
+
+export function statusInfo(o: StatusInput, now = Date.now(), opts: { timeZone?: string | null } = {}): StatusInfo {
   if (o.released) {
     // the host's word, not ours: pizza-mcp may still say an order could exist
     return {
@@ -289,13 +314,15 @@ export function statusInfo(
       tone: 'info',
     };
   }
+  const mine = o.isMine !== false;
+  const hasLink = o.nextAction?.type === 'open_url' && !!o.nextAction.url;
   const total = formatCents(o.confirmedTotalCents ?? o.call?.shop_total_cents ?? null);
   // pizza-mcp's own words win once it has said what happened (never inferred from totals or transcripts).
   // Not for "nothing yet" on an approval_timeout: it is still open, and approving sends the call back.
   const oc = o.status === 'approval_timeout' && o.outcome?.nothing_ordered ? null : o.outcome;
   if (oc && ['needs_review', 'refused', 'unreachable', 'canceled', 'shop_requires_prepay', 'approval_timeout'].includes(o.status)) {
     if (oc.nothing_ordered) {
-      return { title: `Nothing was ordered at ${o.shopName}`, detail: oc.message, tone: o.status === 'canceled' ? 'error' : 'warn' };
+      return { title: `Nothing was ordered at ${o.shopName}`, detail: oc.message, tone: o.status === 'canceled' ? 'info' : 'warn' };
     }
     // pizza-mcp faf6855: its call judge could not read this call. Not a fault at the shop: the call is waiting for a
     // person at pizza-mcp to read it (its operator is emailed every time). That check does not report back here, so the
@@ -303,13 +330,10 @@ export function statusInfo(
     if (oc.reason === 'judge_unavailable') {
       return {
         title: `Check with ${o.shopName} before ordering again`,
-        detail: [
-          oc.message,
-          `The call is waiting for a person on our team to read it, but you don't need to wait for that: call ${o.shopName} to find out whether they took the order.`,
-          o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
-        ]
-          .filter(Boolean)
-          .join(' '),
+        detail: `${oc.message} The call is waiting for a person on our team to read it, but you don't need to wait for that.`,
+        steps: checkSteps(o.shopName, o.releasable),
+        caution: CHECK_CAUTION,
+        callShop: true,
         tone: 'warn',
       };
     }
@@ -319,29 +343,42 @@ export function statusInfo(
     if (o.status === 'approval_timeout') {
       return {
         title: 'Approval timed out',
-        detail: `${oc.message} Open the approval page to have us call ${o.shopName} back, or cancel to stop the callback; canceling does not undo anything the shop may already have. Please do not order again in the meantime.`,
+        detail: oc.message,
+        steps: [
+          hasLink
+            ? `Open the approval page to have us call ${o.shopName} back.`
+            : mine
+              ? `Approve from the email we sent you to have us call ${o.shopName} back.`
+              : `The host who placed it can approve from their email to have us call ${o.shopName} back.`,
+          `Or cancel to stop the callback. Canceling doesn't undo anything ${o.shopName} may already have, so check with them.`,
+        ],
+        caution: "Please don't order again in the meantime.",
+        callShop: true,
         tone: 'warn',
       };
     }
     return {
       title: `Check with ${o.shopName} before ordering again`,
-      detail: [
-        oc.message,
-        `Do NOT order again until you have called ${o.shopName} to find out whether they took it.`,
-        o.releasable ? 'If they say nothing was ordered, release it below so it stops counting against your budget.' : '',
-      ]
-        .filter(Boolean)
-        .join(' '),
+      detail: oc.message,
+      steps: checkSteps(o.shopName, o.releasable),
+      caution: CHECK_CAUTION,
+      callShop: true,
       tone: 'warn',
     };
   }
   switch (o.status) {
     case 'awaiting_approval':
       if (o.restartable) return { title: 'The approval link expired', detail: 'Nothing was ordered. Start over to place it again.', tone: 'warn' };
+      if (!mine) {
+        return {
+          title: `Waiting for approval of the call to ${o.shopName}`,
+          detail: `The host who placed this order gets a 6-digit code by email and approves the call. We don't call ${o.shopName} until they do.`,
+          tone: 'info',
+        };
+      }
       return {
-        title: 'Approve the order',
-        detail:
-          "Enter the code we emailed you on the approval page. Nothing is ordered until you do. If that page says the shop can't be called right now, cancel this order and pick another pizzeria.",
+        title: `Approve the call to ${o.shopName}`,
+        detail: `When the approval page opens we email you a 6-digit code from Open Pizza; enter it there within 10 minutes. We don't call ${o.shopName} until you do. If that page says the shop can't be called right now, cancel this order and pick another pizzeria.`,
         tone: 'action',
       };
     case 'calling': {
@@ -384,8 +421,20 @@ export function statusInfo(
       }
       return { title: `Calling ${o.shopName}`, detail: 'Our AI is placing your order by phone. This usually takes a few minutes, and can take up to an hour.', tone: 'info' };
     }
-    case 'awaiting_price_approval':
-      return { title: 'Shop quoted a higher price', detail: `${o.shopName} said ${total || 'more than your ceiling'}. They are holding the line while you approve.`, tone: 'action' };
+    case 'awaiting_price_approval': {
+      // pizza-mcp sends one email with the price, the deadline and a one-tap approve link.
+      const limit = formatCents(o.ceilingCents ?? null);
+      const quoted = `${o.shopName} quoted ${total || 'more than your limit'}${limit && total ? ` (over your ${limit})` : ''}.`;
+      const deadline = approvalDeadline(o);
+      const by = deadline ? ` before ${formatWhen(deadline, opts.timeZone)}` : '';
+      return {
+        title: `${o.shopName} quoted a higher price`,
+        detail: mine
+          ? `${quoted} Approve or decline from the email we sent you${by}.${deadline ? '' : ` ${o.shopName} is holding the line, so please answer quickly.`}`
+          : `${quoted} The host who placed it can approve or decline from their email${by}.`,
+        tone: 'action',
+      };
+    }
     case 'confirmed_by_shop':
       // pizza-mcp 662d51c confirms only a recorded total that includes tax
       return { title: `${o.shopName} confirmed`, detail: `${total ? `Total ${total} with tax. ` : ''}${o.readyAtText ? `Ready ${o.readyAtText}. ` : ''}Pay at pickup, then upload the real receipt as usual (the reminder line in your Receipts list is not a receipt).`, tone: 'success' };
@@ -394,38 +443,107 @@ export function statusInfo(
       // (a phone menu, voicemail, or a price over your limit). Optional `reason` comes from pizza-mcp when it sends one.
       return {
         title: `We could not confirm the order at ${o.shopName}`,
-        detail: `It may be that nothing was ordered, or that the shop did take it. Call ${o.shopName} to check before you rely on it.${
-          o.releasable ? ' If nothing was ordered, release it below so it stops counting against your budget.' : ''
-        }`,
+        detail: 'It may be that nothing was ordered, or that the shop did take it.',
+        steps: checkSteps(o.shopName, o.releasable),
+        caution: CHECK_CAUTION,
+        callShop: true,
         tone: 'warn',
       };
     case 'shop_requires_prepay':
-      return { title: 'The shop wants payment up front', detail: 'We never pay by phone. Call the shop to check where the order stands. The order is below.', tone: 'warn' };
+      return { title: 'The shop wants payment up front', detail: 'We never pay by phone. Call the shop to check where the order stands. The order is below.', callShop: true, tone: 'warn' };
     case 'refused':
-      return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them to check where the order stands. The order is below.', tone: 'warn' };
+      return { title: 'The shop declined the call', detail: 'They do not take orders from our assistant. Call them to check where the order stands. The order is below.', callShop: true, tone: 'warn' };
     case 'unreachable':
-      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Call them to check before you order again. The order is below.`, tone: 'warn' };
+      return { title: 'We could not complete the call', detail: `We did not get a person at ${o.shopName} to take the order (no answer, voicemail or a phone menu). Call them to check before you order again. The order is below.`, callShop: true, tone: 'warn' };
     case 'approval_timeout':
       // `nothing_ordered: true` here is true only for now: the order stays open until it is approved or canceled
-      return { title: 'Approval timed out', detail: `${o.outcome?.message || 'We could not reach you in time.'} Open the approval page to retry, or cancel the order.`, tone: 'warn' };
+      return {
+        title: 'Approval timed out',
+        detail: `${o.outcome?.message || 'We could not reach you in time.'} ${
+          hasLink ? 'Open the approval page to retry, or cancel the order.' : mine ? 'Approve from the email we sent you to retry, or cancel the order.' : 'The host who placed it can approve from their email, or cancel the order.'
+        }`,
+        tone: 'warn',
+      };
     case 'canceled':
-      return { title: 'Order canceled', detail: '', tone: 'error' };
+      return { title: 'Order canceled', detail: `This order is canceled. If we had already called ${o.shopName}, check with them before ordering again.`, callShop: true, tone: 'info' };
     case 'held':
       return { title: 'Pay to place the order', detail: 'Open the payment page. The kitchen only gets it after you pay.', tone: 'action' };
     default:
-      return { title: o.status.replace(/_/g, ' '), detail: o.readyAtText ? `Ready ${o.readyAtText}` : '', tone: 'info' };
+      return { title: `Update on your order at ${o.shopName}`, detail: o.readyAtText ? `Ready ${o.readyAtText}.` : "We'll show more here as soon as we hear from the shop.", tone: 'info' };
   }
 }
 
-/** Default pickup: 45 minutes before the party if that is at least 2 hours away, else in 2 hours. Local `datetime-local` string. */
-export function defaultPickupLocal(partyDateIso: string | null, now = new Date()): string {
-  const twoHours = new Date(now.getTime() + 2 * 3600_000);
+// ---- time zones: pickup and every time shown use the PARTY's zone, not the browser's --------------------
+
+/** A usable IANA zone, or undefined (= the browser's) when missing or unknown to this browser. */
+export function safeTimeZone(tz: string | null | undefined): string | undefined {
+  if (!tz) return undefined;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return tz;
+  } catch {
+    return undefined;
+  }
+}
+
+function zonedParts(ms: number, tz: string | undefined) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(ms));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return { y: get('year'), mo: get('month'), d: get('day'), h: get('hour') % 24, mi: get('minute'), s: get('second') };
+}
+
+/** "YYYY-MM-DDTHH:MM" for an instant, as the wall clock reads in `tz`. */
+export function toZonedLocal(ms: number, timeZone?: string | null): string {
+  const p = zonedParts(ms, safeTimeZone(timeZone));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`;
+}
+
+/** A `datetime-local` value read as wall-clock time in `tz` -> ISO instant (DST-safe). null if unparsable. */
+export function zonedLocalToIso(local: string, timeZone?: string | null): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local);
+  if (!m) return null;
+  const tz = safeTimeZone(timeZone);
+  const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  if (Number.isNaN(wall)) return null;
+  const offset = (ms: number) => {
+    const p = zonedParts(ms, tz);
+    return Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000;
+  };
+  let t = wall - offset(wall);
+  t = wall - offset(t);
+  return new Date(t).toISOString();
+}
+
+/** "Sat 5:15 PM EST" in the party's zone. No seconds. */
+export function formatWhen(iso: string | null | undefined, timeZone?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { timeZone: safeTimeZone(timeZone), weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(d);
+}
+
+/** "+16175550101" -> "(617) 555-0101"; other numbers are shown as given. */
+export function formatPhone(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(raw.replace(/[^\d+]/g, ''));
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : raw;
+}
+
+/**
+ * Default pickup: 45 minutes before the party if that is at least 2 hours away, else in 2 hours, rounded up to 5
+ * minutes. A `datetime-local` string on the wall clock of `timeZone` (the party's; the browser's when absent).
+ */
+export function defaultPickupLocal(partyDateIso: string | null, now = new Date(), timeZone?: string | null): string {
+  const twoHours = now.getTime() + 2 * 3600_000;
   let t = twoHours;
   if (partyDateIso) {
-    const p = new Date(new Date(partyDateIso).getTime() - 45 * 60_000);
-    if (!Number.isNaN(p.getTime()) && p.getTime() >= twoHours.getTime()) t = p;
+    const p = new Date(partyDateIso).getTime() - 45 * 60_000;
+    if (!Number.isNaN(p) && p >= twoHours) t = p;
   }
-  t.setMinutes(Math.ceil(t.getMinutes() / 5) * 5, 0, 0);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  const step = 5 * 60_000;
+  t = Math.ceil(t / step) * step;
+  return toZonedLocal(t, timeZone);
 }

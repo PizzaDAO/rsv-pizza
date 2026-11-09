@@ -491,12 +491,14 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
         // pizza-mcp 662d51c: `pending_operator_review` is NOT a possible opt-out. An earlier call to this shop could not
         // be checked automatically and waits for a person; nothing suggests the shop asked not to be called. Own words,
         // so the host is not told the shop may have said not to call.
-        const why =
+        // UX audit P1-18: one short why, the shop named twice at most (the host already knows which shop).
+        const raw =
           reason === 'pending_operator_review'
-            ? `An earlier call to ${shop.name} could not be checked automatically, so we are not calling it until someone on our team has reviewed that call. This is not because of anything ${shop.name} said.`
-            : e.message.trim().replace(/([^.!?])$/, '$1.');
+            ? "an earlier call to it couldn't be checked automatically and is waiting for our team. It's not because of anything the shop said"
+            : e.message.trim().replace(/[.!?]+$/, '');
+        const why = /^[A-Z][a-z]/.test(raw) ? raw[0].toLowerCase() + raw.slice(1) : raw;
         throw new AppError(
-          `We can't call ${shop.name} for you right now. ${why} Nothing was ordered. Pick another pizzeria, or call ${shop.name} yourself.`,
+          `We can't call ${shop.name} right now: ${why}. Nothing was ordered. Pick another pizzeria, or call ${shop.name} yourself.`,
           e.statusCode,
           'CALLS_NOT_AVAILABLE_HERE',
           { ...(e.data ?? {}), shopId: shop.id, reason }

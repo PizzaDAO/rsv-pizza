@@ -1,53 +1,84 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Bot, Loader2, Phone, RotateCw } from 'lucide-react';
 import { usePizza } from '../contexts/PizzaContext';
 import { ShopPicker } from './ShopPicker';
 import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
+import { InlineConfirm } from './InlineConfirm';
 import {
-  buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, placePizzaOrder, orderToResume,
-  isTerminalStatus, CartResponse, CartDecision, PizzaOrderView, PizzaShop,
+  buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
+  isTerminalStatus, formatPhone, CartResponse, CartDecision, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
-import { generatePhoneOrderScript } from '../lib/ordering';
+import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
 
 type Step = 'loading' | 'shops' | 'cart' | 'status';
 
 type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingStatus?: string } };
 
 interface PizzaOrderFlowProps {
-  /** Shown while loading fails or when this party is not in the pilot. */
+  /** Shown when this party is not in the pilot (and, unless `gated`, while that is being checked). */
   fallback: React.ReactNode;
   /** Sort a shop whose name contains this to the top (set when the host clicked Order on a pizzeria). */
   preferName?: string;
+  /**
+   * The parent already knows this party is in the pilot (usePizzaOrderingEnabled): show a spinner while loading
+   * and a retry on a load error instead of the fallback ("not available" was wrong while it loaded).
+   */
+  gated?: boolean;
 }
+
+/** An order that is still live at pizza-mcp: a second one now would race it. */
+const LIVE = ['awaiting_approval', 'calling', 'awaiting_price_approval'];
 
 /**
  * basil-14648: shop picker -> cart review -> approve (on pizza-mcp's page) -> status.
  * Mounted only behind VITE_AI_ORDERING=1; the backend party allowlist decides per party.
  */
-export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, preferName }) => {
+export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, preferName, gated }) => {
+  const { t } = useTranslation('host');
   const { party, recommendations } = usePizza();
   const partyId = party?.id;
   const [step, setStep] = useState<Step>('loading');
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [hasLocation, setHasLocation] = useState(true);
   const [shop, setShop] = useState<PizzaShop | null>(null);
   const [cartState, setCartState] = useState<CartResponse | null>(null);
   const [building, setBuilding] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const [order, setOrder] = useState<PizzaOrderView | null>(null);
   const [decisions, setDecisions] = useState<Record<string, CartDecision>>({});
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [heldOrderId, setHeldOrderId] = useState<string | null>(null);
   // set when the server names an existing order: a live or confirmed one, or (capExhausted) one that holds the budget
-  const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string; capExhausted?: boolean } | null>(null);
+  const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingStatus?: string; capExhausted?: boolean; existingShop?: string } | null>(null);
+  const [confirmSecond, setConfirmSecond] = useState(false);
   const [lastInput, setLastInput] = useState<Parameters<typeof placePizzaOrder>[1] | null>(null);
   // shops pizza-mcp refused to call this session (e.g. paused while an operator checks a possible opt-out)
   const [uncallable, setUncallable] = useState<ReadonlySet<string>>(() => new Set());
+  const [uncallableNotice, setUncallableNotice] = useState<{ message: string; shopName: string; phone: string | null } | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  // shop phones from the listing (pizza-mcp's order view has none): for the Call button on the status card
+  const [phones, setPhones] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const firstStep = useRef(true);
+
+  const rememberPhones = useCallback((shops: PizzaShop[]) => {
+    setPhones((prev) => {
+      const next = new Map(prev);
+      for (const s of shops) if (s.phone) next.set(s.id, s.phone);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!partyId) return;
     let cancelled = false;
+    setLoadFailed(false);
     (async () => {
       try {
         const cfg = await getPizzaOrderConfig(partyId);
@@ -56,6 +87,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         if (!cfg.enabled) return;
         setBlockedReason(cfg.blockedReason);
         setHeldOrderId(cfg.heldOrderId ?? null);
+        setHasLocation(!cfg.location || cfg.location.lat != null || !!cfg.location.address);
         // resume an order in flight (page reload while the AI is calling) or one a host still has to settle
         const { orders } = await getPizzaOrders(partyId).catch(() => ({ orders: [] as PizzaOrderView[] }));
         if (cancelled) return;
@@ -67,30 +99,51 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setStep('shops');
         }
       } catch {
-        if (!cancelled) setEnabled(false);
+        if (cancelled) return;
+        setEnabled(false);
+        setLoadFailed(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [partyId]);
+  }, [partyId, loadAttempt]);
 
-  const orderScript = useMemo(
+  // A resumed order has no shop from this session: look its phone up in the listing once.
+  useEffect(() => {
+    if (!partyId || step !== 'status' || !order || phones.has(order.shopId)) return;
+    let cancelled = false;
+    getPizzaShops(partyId)
+      .then((r) => !cancelled && rememberPhones(r.pizzerias))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [partyId, step, order, phones, rememberPhones]);
+
+  // Move focus to the step's heading when the step changes (not on first render), so screen readers follow.
+  useEffect(() => {
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    headingRef.current?.focus();
+  }, [step]);
+
+  const scriptItems = useMemo(
     () =>
-      generatePhoneOrderScript(
-        recommendations.map((r) => ({
-          name: r.label || r.style.name,
-          description: '',
-          quantity: r.quantity ?? 1,
-          size: r.size.name,
-          toppings: r.toppings.map((t) => t.name),
-          dietaryNotes: r.dietaryRestrictions,
-        })),
-        party?.hostName || '',
-        'pickup'
-      ),
-    [recommendations, party?.hostName]
+      recommendations.map((r) => ({
+        name: r.label || r.style.name,
+        description: '',
+        quantity: r.quantity ?? 1,
+        size: r.size.name,
+        toppings: r.toppings.map((tp) => tp.name),
+        dietaryNotes: r.dietaryRestrictions,
+      })),
+    [recommendations]
   );
+  const orderScript = useMemo(() => generatePhoneOrderScript(scriptItems, party?.hostName || '', 'pickup'), [scriptItems, party?.hostName]);
+  const checkScript = useMemo(() => generateCheckOrderScript(scriptItems, party?.hostName || ''), [scriptItems, party?.hostName]);
 
   /** A budget used up by an order is not a dead end: send the host to that order. */
   const showHeldOrder = useCallback((err: ApiError) => {
@@ -104,17 +157,18 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       if (!partyId || !shop) return;
       setBuilding(true);
       setError(null);
+      setPlaceError(null);
       setInProgress(null);
       try {
         setDecisions(nextDecisions);
         setCartState(await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions));
       } catch (e) {
-        if (!showHeldOrder(e as ApiError)) setError(e instanceof Error ? e.message : 'Could not build the order');
+        if (!showHeldOrder(e as ApiError)) setError(e instanceof Error ? e.message : t('aiOrder.flow.buildError'));
       } finally {
         setBuilding(false);
       }
     },
-    [partyId, shop, recommendations, showHeldOrder]
+    [partyId, shop, recommendations, showHeldOrder, t]
   );
 
   const viewExisting = useCallback(
@@ -127,10 +181,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setOrder((await getPizzaOrder(partyId, orderId)).order);
         setStep('status');
       } catch {
-        setError('Could not load the existing order.');
+        setError(t('aiOrder.flow.existingLoadError'));
       }
     },
-    [partyId]
+    [partyId, t]
   );
 
   const onDecide = useCallback(
@@ -145,10 +199,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     ) => {
       if (!partyId || !shop || !cartState?.cart || !cartState.quote) return;
       setPlacing(true);
-      setError(null);
+      setPlaceError(null);
       setInProgress(null);
-      // Open the tab synchronously inside the click so popup blockers allow it, then point it at the approval page.
-      const tab = window.open('', '_blank');
+      setConfirmSecond(false);
+      setPopupBlocked(false);
       try {
         const r = await placePizzaOrder(partyId, {
           quoteId: cartState.quote.quote_id,
@@ -159,34 +213,49 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           policy: { ceilingCents: input.ceilingCents, substitution: input.substitution },
           ...(allowAnother ? { allowAnother: true } : {}),
         });
+        // Open the approval page only once the order exists (no blank tab on an error). A blocked popup is fine:
+        // the status card has an "Open the approval page" button, and we say so.
         const url = r.next_action?.type === 'open_url' ? r.next_action.url : null;
-        if (tab && url) tab.location.href = url;
-        else tab?.close();
+        if (url) {
+          const tab = window.open(url, '_blank');
+          if (tab) tab.opener = null;
+          else setPopupBlocked(true);
+        }
         setOrder(r.order);
         setStep('status');
       } catch (e) {
-        tab?.close();
         const err = e as ApiError;
         if (showHeldOrder(err)) {
           // nothing else to do here: a second order could not fit either
         } else if (err.code === 'CALLS_NOT_AVAILABLE_HERE') {
           // nothing was ordered and nothing is pending: back to the list, this shop marked call-it-yourself
           setUncallable((prev) => new Set(prev).add(shop.id));
+          setUncallableNotice({ message: err.message || t('aiOrder.flow.cantCall', { shop: shop.name }), shopName: shop.name, phone: shop.phone });
           setCartState(null);
           setStep('shops');
-          setError(err.message || `We can't call ${shop.name} right now. Nothing was ordered. Pick another pizzeria.`);
         } else if (err.code === 'ORDER_IN_PROGRESS') {
           // never silently place a second order: the host chooses
-          setInProgress({ existingOrderId: err.data?.existingOrderId, existingStatus: err.data?.existingStatus });
+          const existing = { existingOrderId: err.data?.existingOrderId, existingStatus: err.data?.existingStatus };
+          setInProgress(existing);
           setLastInput(input as never);
+          if (existing.existingOrderId) {
+            const existingId = existing.existingOrderId;
+            Promise.resolve()
+              .then(() => getPizzaOrder(partyId, existingId))
+              .then((x) => {
+                const o = x?.order;
+                if (o) setInProgress((p) => (p && p.existingOrderId === existingId ? { ...p, existingShop: o.shopName, existingStatus: o.status } : p));
+              })
+              .catch(() => undefined);
+          }
         } else {
-          setError(err instanceof Error ? err.message : 'Could not place the order');
+          setPlaceError(err instanceof Error ? err.message : t('aiOrder.flow.placeError'));
         }
       } finally {
         setPlacing(false);
       }
     },
-    [partyId, shop, cartState, showHeldOrder]
+    [partyId, shop, cartState, showHeldOrder, t]
   );
 
   // Leaving an order may have changed the budget (a release, a receipt): refresh the notice.
@@ -194,6 +263,8 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     setOrder(null);
     setCartState(null);
     setError(null);
+    setPlaceError(null);
+    setPopupBlocked(false);
     setStep('shops');
     if (!partyId) return;
     getPizzaOrderConfig(partyId)
@@ -204,74 +275,128 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       .catch(() => undefined);
   }, [partyId]);
 
+  if (!partyId) return <>{fallback}</>;
+  if (gated && enabled === null && !loadFailed) {
+    return (
+      <div role="status" className="ai-order flex items-center gap-2 text-sm text-theme-text-secondary p-4">
+        <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {t('aiOrder.flow.loading')}
+      </div>
+    );
+  }
+  if (gated && loadFailed) {
+    return (
+      <div role="alert" className="ai-order space-y-2 p-4">
+        <p className="text-sm text-theme-text">{t('aiOrder.flow.loadFailed')}</p>
+        <button type="button" className="btn-secondary text-sm min-h-[44px] py-2 px-4 inline-flex items-center gap-2" onClick={() => setLoadAttempt((n) => n + 1)}>
+          <RotateCw size={14} aria-hidden="true" /> {t('aiOrder.tryAgain')}
+        </button>
+      </div>
+    );
+  }
   // until the backend says this party is in the pilot, show only the normal notice (no flash of the flow)
-  if (!partyId || enabled !== true) return <>{fallback}</>;
+  if (enabled !== true) return <>{fallback}</>;
+
+  const blockedCopy =
+    blockedReason === 'NO_REIMBURSEMENT_CAP'
+      ? t('aiOrder.flow.blockedNoCap')
+      : blockedReason === 'CAP_EXHAUSTED'
+        ? heldOrderId ? t('aiOrder.flow.blockedHeld') : t('aiOrder.flow.blockedNoBudget')
+        : blockedReason ? t('aiOrder.flow.blockedOther') : null;
+  const existingLive = !!inProgress?.existingStatus && LIVE.includes(inProgress.existingStatus);
+  const stepHeading =
+    step === 'shops' ? t('aiOrder.flow.headingShops') : step === 'cart' && shop ? t('aiOrder.flow.headingCart', { shop: shop.name }) : step === 'status' ? t('aiOrder.flow.headingStatus') : t('aiOrder.flow.loading');
+
+  const inProgressPanel = inProgress && (
+    <div role="alert" className="p-3 rounded-xl border border-theme-stroke border-l-4 border-l-[color:var(--ai-warn)] bg-theme-surface space-y-2">
+      <p className="text-sm text-theme-text">
+        {inProgress.capExhausted
+          ? t('aiOrder.flow.heldBudget')
+          : inProgress.existingStatus && isTerminalStatus(inProgress.existingStatus) && !['confirmed_by_shop', 'completed'].includes(inProgress.existingStatus)
+            ? t('aiOrder.flow.earlierMayExist')
+            : t('aiOrder.flow.alreadyHasOrder')}
+      </p>
+      <button type="button" className="btn-primary w-full text-sm min-h-[44px] py-2" onClick={() => viewExisting(inProgress.existingOrderId)}>
+        {t('aiOrder.flow.viewIt')}
+      </button>
+      {!inProgress.capExhausted && !existingLive && shop && (
+        confirmSecond ? (
+          <InlineConfirm
+            message={t('aiOrder.flow.confirmSecond', { shop: shop.name, existing: inProgress.existingShop || t('aiOrder.flow.firstShop') })}
+            confirmLabel={t('aiOrder.flow.confirmSecondYes')}
+            cancelLabel={t('aiOrder.flow.confirmSecondNo')}
+            busy={placing}
+            onCancel={() => setConfirmSecond(false)}
+            onConfirm={() => lastInput && onApprove(lastInput as never, true)}
+          />
+        ) : (
+          <button type="button" className="min-h-[44px] w-full text-sm text-theme-text-secondary underline hover:text-theme-text" disabled={placing || !lastInput} onClick={() => setConfirmSecond(true)}>
+            {t('aiOrder.flow.placeSecond')}
+          </button>
+        )
+      )}
+    </div>
+  );
 
   return (
-    <div className="mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
-      <div className="flex items-center gap-2 mb-3">
-        <Bot size={18} className="text-[#a78bfa]" />
-        <h3 className="font-medium text-theme-text text-sm">AI Ordering</h3>
-        <span className="text-[10px] font-semibold text-[#a78bfa] bg-[#8b5cf6]/10 px-2 py-0.5 rounded-full">Pilot</span>
+    <div className="ai-order mt-4 mb-4 p-4 bg-theme-surface border border-theme-stroke rounded-xl">
+      <div className="flex items-center gap-2 mb-1">
+        <Bot size={18} className="text-[color:var(--ai-accent)]" aria-hidden="true" />
+        <h3 className="font-semibold text-theme-text text-sm">{t('aiOrder.flow.title')}</h3>
+        <span className="text-xs font-semibold text-[color:var(--ai-accent)] border border-current px-2 py-0.5 rounded-full">{t('aiOrder.flow.pilot')}</span>
       </div>
+      <p className="text-xs text-theme-text-secondary mb-3">{t('aiOrder.flow.pilotExplain')}</p>
+      <h4 ref={headingRef} tabIndex={-1} className="sr-only">{stepHeading}</h4>
 
       {step === 'loading' && (
-        <div className="flex items-center gap-2 text-sm text-theme-text-muted py-4">
-          <Loader2 size={16} className="animate-spin" /> Loading...
+        <div role="status" className="flex items-center gap-2 text-sm text-theme-text-secondary py-4">
+          <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {t('aiOrder.flow.loading')}
         </div>
       )}
+
+      {blockedCopy && step !== 'status' && (
+        <div role="status" className="p-3 mb-3 rounded-xl border border-theme-stroke border-l-4 border-l-[color:var(--ai-warn)] bg-theme-surface space-y-2">
+          <p className="text-sm text-theme-text">{blockedCopy}</p>
+          {blockedReason === 'CAP_EXHAUSTED' && heldOrderId && !inProgress && (
+            <button type="button" className="btn-secondary w-full text-sm min-h-[44px] py-2" onClick={() => viewExisting(heldOrderId)}>
+              {t('aiOrder.flow.openHeld')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {uncallableNotice && step === 'shops' && (
+        <div role="status" className="p-3 mb-3 rounded-xl border border-theme-stroke bg-theme-surface space-y-2">
+          <p className="text-sm text-theme-text">{uncallableNotice.message}</p>
+          {uncallableNotice.phone && (
+            <a href={`tel:${uncallableNotice.phone}`} className="btn-secondary w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2">
+              <Phone size={14} aria-hidden="true" /> {t('aiOrder.cart.callShop', { shop: uncallableNotice.shopName, phone: formatPhone(uncallableNotice.phone) })}
+            </a>
+          )}
+        </div>
+      )}
+
+      {error && step !== 'cart' && <p role="alert" className="text-sm text-[color:var(--ai-error)] mb-3">{error}</p>}
+
+      {/* next to Approve once there is a quote (where the host just tapped), else at the top */}
+      {!(step === 'cart' && cartState?.quote) && inProgressPanel && <div className="mb-3">{inProgressPanel}</div>}
 
       {step === 'shops' && (
         <ShopPicker
           partyId={partyId}
           preferName={preferName}
           uncallable={uncallable}
+          orderDisabled={!!blockedReason}
+          hasLocation={hasLocation}
+          onLoaded={rememberPhones}
           onSelect={(s) => {
             setShop(s);
             setCartState(null);
             setError(null);
+            setPlaceError(null);
+            setUncallableNotice(null);
             setStep('cart');
           }}
         />
-      )}
-
-      {blockedReason && step !== 'status' && (
-        <p className="text-sm text-[#ffb347] mb-3">
-          {blockedReason === 'NO_REIMBURSEMENT_CAP'
-            ? 'AI ordering needs a reimbursement cap on this party. Ask your underboss to set one.'
-            : blockedReason === 'CAP_EXHAUSTED'
-              ? 'No reimbursement budget is left for another order.'
-              : 'AI ordering is not available for this party right now.'}
-          {blockedReason === 'CAP_EXHAUSTED' && heldOrderId && !inProgress && (
-            <button type="button" className="ml-2 underline" onClick={() => viewExisting(heldOrderId)}>
-              View the order holding it
-            </button>
-          )}
-        </p>
-      )}
-
-      {error && step !== 'cart' && <p className="text-sm text-[#ff393a] mb-3">{error}</p>}
-
-      {inProgress && (
-        <div className="p-3 mb-3 rounded-xl border border-[#ffb347]/40 bg-[#ffb347]/5 space-y-2">
-          <p className="text-sm text-theme-text">
-            {inProgress.capExhausted
-              ? 'An existing order is holding the rest of this party\'s budget. Open it to settle it.'
-              : inProgress.existingStatus && isTerminalStatus(inProgress.existingStatus) && !['confirmed_by_shop', 'completed'].includes(inProgress.existingStatus)
-                ? 'An earlier order for this party may exist at the shop. Check with the shop before you order again.'
-                : 'This party already has an order in progress or confirmed.'}
-          </p>
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary text-xs py-1 px-3" onClick={() => viewExisting(inProgress.existingOrderId)}>
-              View it
-            </button>
-            {!inProgress.capExhausted && (
-              <button type="button" className="btn-secondary text-xs py-1 px-3" disabled={placing || !lastInput} onClick={() => lastInput && onApprove(lastInput as never, true)}>
-                Place a second order anyway
-              </button>
-            )}
-          </div>
-        </div>
       )}
 
       {step === 'cart' && shop && (
@@ -280,8 +405,12 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           cartState={cartState}
           building={building}
           error={error}
+          approveError={placeError}
+          approveNotice={cartState?.quote ? inProgressPanel || null : null}
           defaultName={party?.hostName || ''}
           partyDate={party?.date ?? null}
+          timeZone={party?.timezone ?? null}
+          city={party?.city ?? null}
           onBuild={(iso) => onBuild(iso, decisions)}
           onDecide={onDecide}
           onApprove={(i) => onApprove(i)}
@@ -291,13 +420,19 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       )}
 
       {step === 'status' && order && (
-        <OrderStatus
-          partyId={partyId}
-          order={order}
-          orderScript={orderScript}
-          onUpdate={setOrder}
-          onDone={onDone}
-        />
+        <>
+          {popupBlocked && <p role="status" className="text-sm text-theme-text mb-3">{t('aiOrder.flow.popupBlocked')}</p>}
+          <OrderStatus
+            partyId={partyId}
+            order={order}
+            orderScript={orderScript}
+            checkScript={checkScript}
+            shopPhone={phones.get(order.shopId) ?? (shop?.id === order.shopId ? shop.phone : null)}
+            timeZone={party?.timezone ?? null}
+            onUpdate={setOrder}
+            onDone={onDone}
+          />
+        </>
       )}
     </div>
   );

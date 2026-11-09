@@ -201,6 +201,19 @@ export function generatePhoneOrderScript(
   return lines.join('\n');
 }
 
+/**
+ * basil-14648: for when an order MAY already exist at the shop (our AI called it in). Reading the place-order script
+ * then would order the pizzas twice, so this one asks about the earlier order and lists only the pizzas.
+ */
+export function generateCheckOrderScript(items: OrderItem[], customerName: string): string {
+  const who = customerName.trim() ? ` for ${customerName.trim()}` : '';
+  const lines = [`Hi, I'm checking on a pickup order${who} that an automated assistant called in earlier. Do you have it? It was:`];
+  items.forEach((item) => {
+    lines.push(`- ${item.quantity}x ${item.size} ${item.name}${item.toppings.length > 0 ? ` with ${item.toppings.join(', ')}` : ''}`);
+  });
+  return lines.join('\n');
+}
+
 // Call status response from ai-call-status edge function
 export interface CallStatus {
   status: 'queued' | 'in-progress' | 'completed' | 'failed' | 'unknown';

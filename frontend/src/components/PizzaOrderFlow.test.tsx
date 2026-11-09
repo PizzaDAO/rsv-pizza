@@ -1,3 +1,4 @@
+import '../i18n';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -29,11 +30,13 @@ vi.mock('./ShopPicker', () => ({
   ),
 }));
 vi.mock('./CartReview', () => ({
-  CartReview: ({ onBuild, onApprove, error }: { onBuild: (iso: string) => void; onApprove: (i: unknown) => void; error: string | null }) => (
+  CartReview: ({ onBuild, onApprove, error, approveError, approveNotice }: { onBuild: (iso: string) => void; onApprove: (i: unknown) => void; error: string | null; approveError?: string | null; approveNotice?: React.ReactNode }) => (
     <div>
       <button onClick={() => onBuild('2026-11-01T18:00:00Z')}>Build</button>
       <button onClick={() => onApprove({ substitution: 'exact', contact: { name: 'S', phone: '+16175550123' } })}>Approve</button>
       {error && <p>{error}</p>}
+      {approveError && <p data-testid="approve-error">{approveError}</p>}
+      {approveNotice}
     </div>
   ),
 }));
@@ -118,7 +121,7 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     await userEvent.click(await toCart());
     await userEvent.click(screen.getByText('Approve'));
     expect(await screen.findByText('Place a second order anyway')).toBeTruthy();
-    await userEvent.click(screen.getByText('View it'));
+    await userEvent.click(screen.getByText('View that order'));
     expect(mocks.order).toHaveBeenCalledWith('p1', 'ord_named');
     expect(await screen.findByText('Named confirmed')).toBeTruthy();
   });
@@ -139,7 +142,7 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     await userEvent.click(await toCart());
     expect(await screen.findByText(/holding the rest of this party's budget/)).toBeTruthy();
     expect(screen.queryByText('Place a second order anyway')).toBeNull();
-    await userEvent.click(screen.getByText('View it'));
+    await userEvent.click(screen.getByText('View that order'));
     expect(mocks.order).toHaveBeenCalledWith('p1', 'ord_held');
     expect(await screen.findByText('I checked: nothing was ordered, release it')).toBeTruthy();
   });
@@ -150,14 +153,14 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     vi.spyOn(window, 'open').mockReturnValue(null);
     await userEvent.click(await toCart());
     await userEvent.click(screen.getByText('Approve'));
-    expect(await screen.findByText('View it')).toBeTruthy();
+    expect(await screen.findByText('View that order')).toBeTruthy();
   });
 
   it('CAP_EXHAUSTED with no order behind it stays a plain error', async () => {
     mocks.build.mockRejectedValue(Object.assign(new Error('No budget left'), { code: 'CAP_EXHAUSTED' }));
     await userEvent.click(await toCart());
     expect(await screen.findByText('No budget left')).toBeTruthy();
-    expect(screen.queryByText('View it')).toBeNull();
+    expect(screen.queryByText('View that order')).toBeNull();
   });
 
   it('a budget already spent on load links to the held order, even one the list would not reopen', async () => {
@@ -165,7 +168,7 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     mocks.orders.mockResolvedValue({ orders: [row({ status: 'calling', isMine: false, opopOrderId: 'ord_held' })] });
     mocks.order.mockResolvedValue({ order: row({ status: 'calling', isMine: false, shopName: 'Held' }), stale: false });
     flow();
-    await userEvent.click(await screen.findByText('View the order holding it'));
+    await userEvent.click(await screen.findByText('Open that order'));
     expect(mocks.order).toHaveBeenCalledWith('p1', 'ord_held');
     expect(await screen.findByText('Calling Held')).toBeTruthy();
   });
@@ -177,21 +180,22 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     await userEvent.click(await screen.findByText('Order from another pizzeria'));
     expect(await screen.findByText("Pick Sal's")).toBeTruthy();
     expect(mocks.config).toHaveBeenCalledTimes(2);
-    await vi.waitFor(() => expect(screen.queryByText(/No reimbursement budget is left/)).toBeNull());
+    await vi.waitFor(() => expect(screen.queryByText(/reimbursement budget is used up/)).toBeNull());
   });
 
   it('CALLS_NOT_AVAILABLE_HERE (possible opt-out) on placing: back to the shop list with the reason, shop marked, nothing pending', async () => {
     mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
-    const msg = "We can't call Sal's for you right now. The shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself.";
+    const msg = "We can't call Sal's right now: the shop may have asked not to be called, so calls to it are paused until someone has checked. Nothing was ordered. Pick another pizzeria, or call Sal's yourself.";
     mocks.place.mockRejectedValue(Object.assign(new Error(msg), { code: 'CALLS_NOT_AVAILABLE_HERE', data: { opop: { details: { reasons: ['possible_opt_out'] } }, shopId: 'pzl_1' } }));
-    const close = vi.fn();
-    vi.spyOn(window, 'open').mockReturnValue({ close, location: {} } as unknown as Window);
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
     await userEvent.click(await toCart());
     await userEvent.click(screen.getByText('Approve'));
-    expect(await screen.findByText(msg)).toBeTruthy();
+    // UX audit P1-18: a neutral notice above the list (a status, not a red error)
+    expect((await screen.findByText(msg)).closest('[role=status]')).toBeTruthy();
     expect(screen.getByText("Pick Sal's")).toBeTruthy();
     expect(screen.getByText("Sal's marked call-it-yourself")).toBeTruthy();
-    expect(close).toHaveBeenCalled();
+    // UX audit P1-3: no tab is opened (and none flashes) when placing fails
+    expect(open).not.toHaveBeenCalled();
     // no stuck state: no second-order prompt, no order view
     expect(screen.queryByText('Place a second order anyway')).toBeNull();
     expect(screen.queryByText('Build')).toBeNull();
@@ -201,7 +205,77 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: 'ord_held' }));
     mocks.order.mockRejectedValue(new Error('down'));
     flow();
-    await userEvent.click(await screen.findByText('View the order holding it'));
-    expect(await screen.findByText('Could not load the existing order.')).toBeTruthy();
+    await userEvent.click(await screen.findByText('Open that order'));
+    expect(await screen.findByText("Couldn't load the existing order.")).toBeTruthy();
+  });
+});
+
+describe('PizzaOrderFlow: UX audit (basil-14648)', () => {
+  const toApprove = async () => {
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    flow();
+    await userEvent.click(await screen.findByText("Pick Sal's"));
+    await userEvent.click(await screen.findByText('Build'));
+  };
+
+  it('P1-3: the approval tab opens only after the order exists; a blocked popup is explained', async () => {
+    const placed = row({ status: 'awaiting_approval', nextAction: { type: 'open_url', url: 'https://mcp.example/confirm/c1' } });
+    mocks.place.mockResolvedValue({ order: placed, next_action: placed.nextAction });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    await toApprove();
+    expect(open).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByText('Approve'));
+    expect(open).toHaveBeenCalledWith('https://mcp.example/confirm/c1', '_blank');
+    expect(await screen.findByText(/Your browser blocked the new tab/)).toBeTruthy();
+    expect(screen.getByText('Open the approval page').closest('a')?.getAttribute('href')).toBe('https://mcp.example/confirm/c1');
+  });
+
+  it('P1-3: a place error is shown next to Approve, as an alert', async () => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('That ceiling is over the budget.'), { code: 'SPEND_LIMIT_EXCEEDED' }));
+    await toApprove();
+    await userEvent.click(screen.getByText('Approve'));
+    expect((await screen.findByTestId('approve-error')).textContent).toBe('That ceiling is over the budget.');
+  });
+
+  it('P1-4: "View that order" is the main action; a second order needs a confirm that names both shops', async () => {
+    mocks.place.mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingOrderId: 'ord_0', existingStatus: 'needs_review' } }));
+    mocks.order.mockResolvedValue({ order: row({ opopOrderId: 'ord_0', status: 'needs_review', shopName: 'Luigi' }), stale: false });
+    await toApprove();
+    await userEvent.click(screen.getByText('Approve'));
+    expect((await screen.findByText('View that order')).className).toMatch(/btn-primary/);
+    await userEvent.click(screen.getByText('Place a second order anyway'));
+    expect(mocks.place).toHaveBeenCalledTimes(1);
+    expect((await screen.findByRole('alertdialog')).textContent).toMatch(/Place a second order at Sal's\? If Luigi already has your first order, you'll get \(and pay for\) both\./);
+    mocks.place.mockResolvedValue({ order: row({ status: 'awaiting_approval' }), next_action: null });
+    await userEvent.click(screen.getByText('Yes, place a second order'));
+    expect(mocks.place).toHaveBeenCalledTimes(2);
+    expect(mocks.place.mock.calls[1][1]).toMatchObject({ allowAnother: true });
+  });
+
+  it('P1-4: no second order while the first is still being approved or called', async () => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingOrderId: 'ord_0', existingStatus: 'calling' } }));
+    mocks.order.mockResolvedValue({ order: row({ opopOrderId: 'ord_0', status: 'calling' }), stale: false });
+    await toApprove();
+    await userEvent.click(screen.getByText('Approve'));
+    expect(await screen.findByText('View that order')).toBeTruthy();
+    expect(screen.queryByText('Place a second order anyway')).toBeNull();
+  });
+
+  it('P1-5: inside the pre-gated modal, loading shows a spinner and a load error offers a retry (never "not available")', async () => {
+    let fail = true;
+    mocks.config.mockImplementation(() => (fail ? Promise.reject(new Error('502')) : Promise.resolve(cfg())));
+    render(<PizzaOrderFlow gated fallback={<p>fallback</p>} />);
+    expect(screen.getByText('Loading ordering…')).toBeTruthy();
+    expect(await screen.findByText("Couldn't load ordering.")).toBeTruthy();
+    expect(screen.queryByText('fallback')).toBeNull();
+    fail = false;
+    await userEvent.click(screen.getByText('Try again'));
+    expect(await screen.findByText("Pick Sal's")).toBeTruthy();
+  });
+
+  it('P1-6: a blocked party sees why above the list', async () => {
+    mocks.config.mockResolvedValue(cfg({ blockedReason: 'NO_REIMBURSEMENT_CAP' }));
+    flow();
+    expect(await screen.findByText("You can't order here yet: this party has no reimbursement cap. Ask your underboss to set one.")).toBeTruthy();
   });
 });

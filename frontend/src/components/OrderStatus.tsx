@@ -1,37 +1,71 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import { getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents } from '../lib/pizzaOrder';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, BellRing, Phone, Info } from 'lucide-react';
+import {
+  getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents,
+  formatWhen, formatPhone, approvalDeadline,
+} from '../lib/pizzaOrder';
+import { InlineConfirm } from './InlineConfirm';
 
 interface OrderStatusProps {
   partyId: string;
   order: PizzaOrderView;
-  /** Plain-text order for the "call them yourself" fallback. */
+  /** Plain-text order for the "call them yourself" fallback, when ordering again is safe. */
   orderScript: string;
+  /** What to say when an order MAY exist: asks about the earlier order instead of placing a new one. */
+  checkScript?: string;
+  /** The shop's phone (E.164) from the listing, for the Call button. */
+  shopPhone?: string | null;
+  /** The party's time zone: every time on this card is shown in it. */
+  timeZone?: string | null;
   onUpdate: (o: PizzaOrderView) => void;
   onDone: () => void;
 }
 
 const POLL_MS = 10_000;
 const FALLBACK = ['shop_requires_prepay', 'refused', 'unreachable', 'needs_review'];
-const fmtUntil = (iso?: string | null) => {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
+
+/** "2:41 left" until the deadline, ticking every second. */
+const Countdown: React.FC<{ deadline: string }> = ({ deadline }) => {
+  const { t } = useTranslation('host');
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const left = Math.max(0, Date.parse(deadline) - now);
+  const mm = Math.floor(left / 60_000);
+  const ss = Math.floor((left % 60_000) / 1000);
+  return (
+    <p className="mt-2 text-sm font-semibold text-[color:var(--ai-warn)] tabular-nums" aria-live="off">
+      <Clock size={14} className="inline mr-1 -mt-0.5" />
+      {left > 0 ? t('aiOrder.status.timeLeft', { time: `${mm}:${String(ss).padStart(2, '0')}` }) : t('aiOrder.status.timeUp')}
+    </p>
+  );
 };
 
-export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderScript, onUpdate, onDone }) => {
+type Pending = 'cancel' | 'release' | null;
+
+export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderScript, checkScript, shopPhone, timeZone, onUpdate, onDone }) => {
+  const { t } = useTranslation('host');
   const [stale, setStale] = useState(false);
   const [copied, setCopied] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [settleError, setSettleError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const settle = async (action: 'nothing_ordered' | 'receipt_uploaded') => {
     setSettleError(null);
     try {
       onUpdate((await settlePizzaOrder(partyId, order.opopOrderId, action)).order);
     } catch (e) {
-      setSettleError(e instanceof Error ? e.message : 'Could not update the order');
+      setSettleError(e instanceof Error ? e.message : t('aiOrder.status.couldNotUpdate'));
     }
+  };
+  const closeConfirm = () => {
+    setPending(null);
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
   // The webhook updates the server row; this fallback poll keeps the page current. A `calling` order whose call is
@@ -60,116 +94,169 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
     };
   }, [partyId, order.opopOrderId, order.status, order.restartable, order.settling, order.isMine, onUpdate]);
 
-  const info = statusInfo(order);
+  const info = statusInfo(order, Date.now(), { timeZone });
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
   const url = order.nextAction?.type === 'open_url' ? order.nextAction.url : null;
   const deferred = order.call?.deferred ?? null;
+  const nextTry = formatWhen(deferred?.until, timeZone);
   const finished = order.status === 'confirmed_by_shop' || order.status === 'completed' || !!order.receiptCovered;
   // "another pizzeria" says it is fine to order again: only when pizza-mcp is sure, or a host checked and released it
   const safeToReorder = order.outcome?.nothing_ordered === true || !!order.released;
   const showScript = FALLBACK.includes(order.status) || (order.status === 'canceled' && order.outcome?.nothing_ordered === false);
+  const script = safeToReorder ? orderScript : checkScript || orderScript;
   // the backend would refuse another order: no link that leads to that refusal
   const showLeave = (!waiting || order.restartable) && (finished || !order.blocking);
-  const Icon = info.tone === 'success' ? CheckCircle2 : info.tone === 'warn' || info.tone === 'error' ? AlertTriangle : waiting ? Loader2 : Clock;
-  const color = info.tone === 'success' ? 'text-[#4ade80]' : info.tone === 'warn' || info.tone === 'error' ? 'text-[#ffb347]' : 'text-theme-text';
+  const callable = !!shopPhone && !!info.callShop && !safeToReorder;
+  const deadline = order.status === 'awaiting_price_approval' ? approvalDeadline(order) : null;
+  const beforeApproval = order.status === 'awaiting_approval';
+  const Icon =
+    info.tone === 'success' ? CheckCircle2
+      : info.tone === 'warn' || info.tone === 'error' ? AlertTriangle
+        : info.tone === 'action' ? BellRing
+          : waiting ? Loader2
+            : order.status === 'canceled' ? Info : Clock;
+  const color =
+    info.tone === 'success' ? 'text-[color:var(--ai-success)]'
+      : info.tone === 'warn' || info.tone === 'error' ? 'text-[color:var(--ai-warn)]'
+        : 'text-theme-text';
+  const rowBtn = 'btn-secondary w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2';
 
   return (
     <div className="space-y-3">
-      <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke">
+      <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke" role="status" aria-live="polite" aria-atomic="true">
         <div className="flex items-start gap-2">
-          <Icon size={18} className={`${color} flex-shrink-0 mt-0.5 ${waiting && info.tone === 'info' ? 'animate-spin' : ''}`} />
+          <Icon size={18} aria-hidden="true" className={`${color} flex-shrink-0 mt-0.5 ${waiting && info.tone === 'info' ? 'animate-spin' : ''}`} />
           <div className="min-w-0">
-            <p className={`text-sm font-medium ${color}`}>{info.title}</p>
-            {info.detail && <p className="text-xs text-theme-text-secondary mt-0.5">{info.detail}</p>}
+            <p className={`text-sm font-semibold ${color}`}>{info.title}</p>
+            {info.detail && <p className="text-sm text-theme-text-secondary mt-1">{info.detail}</p>}
           </div>
         </div>
+        {info.steps && info.steps.length > 0 && (
+          <ol className="mt-2 ml-7 list-decimal list-outside space-y-1 text-sm text-theme-text">
+            {info.steps.map((s) => <li key={s}>{s}</li>)}
+          </ol>
+        )}
+        {info.caution && <p className="mt-2 ml-7 text-sm font-medium text-theme-text">{info.caution}</p>}
+        {deadline && <Countdown deadline={deadline} />}
         {order.ceilingCents != null && order.tier === 'listing' && (
-          <p className="text-xs text-theme-text-faint mt-2">You approved up to {formatCents(order.ceilingCents)}.</p>
+          <p className="text-xs text-theme-text-secondary mt-2">
+            {beforeApproval ? t('aiOrder.status.limitBeforeApproval', { amount: formatCents(order.ceilingCents) }) : t('aiOrder.status.limitApproved', { amount: formatCents(order.ceilingCents) })}
+          </p>
         )}
         {order.call?.changes && order.call.changes.length > 0 && (
           <ul className="mt-2 list-disc list-inside text-xs text-theme-text-secondary">
             {order.call.changes.map((c) => <li key={c}>{c}</li>)}
           </ul>
         )}
-        {fmtUntil(deferred?.until) && <p className="mt-2 text-xs text-theme-text-secondary">Next try: {fmtUntil(deferred?.until)}.</p>}
-        {stale && <p className="text-xs text-theme-text-faint mt-2">Having trouble refreshing. Showing the last known status.</p>}
-        {order.status === 'confirmed_by_shop' && (
-          <p className="text-xs text-theme-text-faint mt-2">
-            A reminder line with this total is on your Receipts list. It is not counted as a receipt: upload the real one.
-          </p>
-        )}
-        {!order.isMine && <p className="text-xs text-theme-text-faint mt-2">Placed by another host of this party.</p>}
+        {nextTry && <p className="mt-2 text-xs text-theme-text-secondary">{t('aiOrder.status.nextTry', { time: nextTry })}</p>}
+        {stale && <p className="text-xs text-theme-text-secondary mt-2">{t('aiOrder.status.stale')}</p>}
+        {!order.isMine && <p className="text-xs text-theme-text-secondary mt-2">{t('aiOrder.status.otherHost')}</p>}
       </div>
 
+      {callable && (
+        <a href={`tel:${shopPhone}`} className={`${url ? 'btn-secondary' : 'btn-primary'} w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2`}>
+          <Phone size={14} aria-hidden="true" />
+          {t('aiOrder.status.callShop', { shop: order.shopName, phone: formatPhone(shopPhone) })}
+        </a>
+      )}
+
       {url && order.isMine && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="btn-primary w-full text-sm py-2 flex items-center justify-center gap-2">
-          <ExternalLink size={14} />
-          {order.status === 'awaiting_price_approval' ? 'Review the higher price' : order.status === 'held' ? 'Pay now' : 'Open the approval page'}
+        <a href={url} target="_blank" rel="noopener noreferrer" className="btn-primary w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2">
+          <ExternalLink size={14} aria-hidden="true" />
+          {order.status === 'awaiting_price_approval' ? t('aiOrder.status.reviewPrice') : order.status === 'held' ? t('aiOrder.status.payNow') : t('aiOrder.status.openApproval')}
         </a>
       )}
 
       {order.isMine && order.cancelable && (!order.call?.checking || !!order.call?.deferred) && (
         <div>
-          <button
-            type="button"
-            className="btn-secondary w-full text-sm py-1.5"
-            disabled={canceling}
-            onClick={async () => {
-              const mayExist = order.outcome?.nothing_ordered === false || !!order.call?.checking;
-              if (!window.confirm(mayExist ? `Stop us calling ${order.shopName} back? This does not cancel anything they may already have: check with them.` : `Cancel the order at ${order.shopName}?`)) return;
-              setCanceling(true);
-              setCancelError(null);
-              try {
-                onUpdate((await cancelPizzaOrder(partyId, order.opopOrderId)).order);
-              } catch (e) {
-                setCancelError(e instanceof Error ? e.message : 'Could not cancel');
-              } finally {
-                setCanceling(false);
+          {pending === 'cancel' ? (
+            <InlineConfirm
+              message={
+                order.outcome?.nothing_ordered === false || !!order.call?.checking
+                  ? t('aiOrder.status.confirmStopCallback', { shop: order.shopName })
+                  : t('aiOrder.status.confirmCancel', { shop: order.shopName })
               }
-            }}
-          >
-            {canceling ? 'Canceling...' : 'Cancel this order'}
-          </button>
-          {cancelError && <p className="text-xs text-[#ff393a] mt-1">{cancelError}</p>}
+              confirmLabel={t('aiOrder.status.confirmCancelYes')}
+              cancelLabel={t('aiOrder.status.keepOrder')}
+              busy={canceling}
+              onCancel={closeConfirm}
+              onConfirm={async () => {
+                setCanceling(true);
+                setCancelError(null);
+                try {
+                  onUpdate((await cancelPizzaOrder(partyId, order.opopOrderId)).order);
+                  setPending(null);
+                } catch (e) {
+                  setCancelError(e instanceof Error ? e.message : t('aiOrder.status.couldNotCancel'));
+                } finally {
+                  setCanceling(false);
+                }
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className={rowBtn}
+              disabled={canceling}
+              onClick={(e) => {
+                triggerRef.current = e.currentTarget;
+                setPending('cancel');
+              }}
+            >
+              {canceling ? t('aiOrder.status.canceling') : t('aiOrder.status.cancelOrder')}
+            </button>
+          )}
+          {cancelError && <p role="alert" className="text-sm text-[color:var(--ai-error)] mt-1">{cancelError}</p>}
         </div>
       )}
 
-      {order.releasable && (
-        <button
-          type="button"
-          className="btn-secondary w-full text-sm py-1.5"
-          onClick={() => {
-            if (!window.confirm(`Release the order at ${order.shopName}? Only do this if you checked and nothing was ordered.`)) return;
+      {order.releasable && (pending === 'release' ? (
+        <InlineConfirm
+          message={t('aiOrder.status.confirmRelease', { shop: order.shopName })}
+          confirmLabel={t('aiOrder.status.confirmReleaseYes')}
+          cancelLabel={t('aiOrder.status.notYet')}
+          onCancel={closeConfirm}
+          onConfirm={() => {
+            setPending(null);
             settle('nothing_ordered');
           }}
+        />
+      ) : (
+        <button
+          type="button"
+          className={rowBtn}
+          onClick={(e) => {
+            triggerRef.current = e.currentTarget;
+            setPending('release');
+          }}
         >
-          I checked: nothing was ordered, release it
+          {t('aiOrder.status.release')}
         </button>
-      )}
+      ))}
       {(order.status === 'confirmed_by_shop' || order.releasable) && !order.receiptCovered && (
-        <button type="button" className="text-xs text-theme-text-muted hover:text-theme-text underline" onClick={() => settle('receipt_uploaded')}>
-          I uploaded the receipt
+        <button type="button" className={rowBtn} onClick={() => settle('receipt_uploaded')}>
+          {order.status === 'confirmed_by_shop' ? t('aiOrder.status.receiptUploaded') : t('aiOrder.status.pickedUpReceiptUploaded')}
         </button>
       )}
-      {settleError && <p className="text-xs text-[#ff393a]">{settleError}</p>}
+      {settleError && <p role="alert" className="text-sm text-[color:var(--ai-error)]">{settleError}</p>}
 
-      {showScript && orderScript && (
+      {showScript && script && (
         <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke space-y-2">
-          <p className="text-xs uppercase tracking-wide text-theme-text-muted">{safeToReorder ? 'Order to read out' : 'The order, to check with the shop'}</p>
-          <pre className="text-xs text-theme-text whitespace-pre-wrap font-sans">{orderScript}</pre>
+          <p className="text-sm font-medium text-theme-text">{safeToReorder ? t('aiOrder.status.scriptReorder') : t('aiOrder.status.scriptCheck')}</p>
+          <pre className="text-sm text-theme-text whitespace-pre-wrap font-sans">{script}</pre>
           <button
             type="button"
-            className="btn-secondary text-xs py-1 px-3"
-            onClick={() => navigator.clipboard?.writeText(orderScript).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }).catch(() => undefined)}
+            className="btn-secondary text-sm min-h-[44px] py-2 px-4"
+            onClick={() => navigator.clipboard?.writeText(script).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }).catch(() => undefined)}
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('aiOrder.status.copied') : t('aiOrder.status.copy')}
           </button>
         </div>
       )}
 
       {showLeave && (
-        <button type="button" onClick={onDone} className="text-xs text-theme-text-muted hover:text-theme-text">
-          {finished ? 'Done' : order.restartable ? 'Start over' : safeToReorder ? 'Order from another pizzeria' : 'Back to pizzerias'}
+        <button type="button" onClick={onDone} className={rowBtn}>
+          {finished ? t('aiOrder.status.done') : order.restartable ? t('aiOrder.status.startOver') : safeToReorder ? t('aiOrder.status.orderElsewhere') : t('aiOrder.status.backToShops')}
         </button>
       )}
     </div>

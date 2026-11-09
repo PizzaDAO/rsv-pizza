@@ -1,3 +1,4 @@
+import '../i18n';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -59,5 +60,48 @@ describe('CartReview', () => {
   it('says when nothing is left to order', () => {
     render(<CartReview {...props({ cartState: { ...base, cart: null, quote: null } })} />);
     expect(screen.getByText(/Nothing is left to order/)).toBeTruthy();
+  });
+
+  it('P0-1: says the code comes by email from Open Pizza, with the 10-minute window', () => {
+    render(<CartReview {...props()} />);
+    expect(screen.getByText("Next: a new tab opens. We'll email you a 6-digit code from Open Pizza; enter it there within 10 minutes. We don't call Sal's until you do.")).toBeTruthy();
+  });
+
+  it('P1-10: the inputs are labelled text fields, and a disabled Approve says what is missing', async () => {
+    render(<CartReview {...props()} />);
+    expect((screen.getByLabelText('Most you\'ll pay (USD)') as HTMLInputElement).type).toBe('text');
+    expect((screen.getByLabelText('Pickup name') as HTMLInputElement).type).toBe('text');
+    expect((screen.getByLabelText('Your mobile number') as HTMLInputElement).type).toBe('tel');
+    expect((screen.getByText('Approve and have the AI call') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Add your mobile number to continue.')).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Your mobile number'), '6175550123');
+    expect(screen.queryByText('Add your mobile number to continue.')).toBeNull();
+    expect((screen.getByText('Approve and have the AI call') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('P1-9: the pickup time is on the party clock and labelled with its zone', async () => {
+    const onBuild = vi.fn();
+    render(<CartReview {...props({ cartState: null, onBuild, timeZone: 'Europe/Lisbon', city: 'Lisbon', partyDate: '2099-11-14T20:00:00Z' })} />);
+    expect(screen.getByText(/Pickup at Sal's · Lisbon time \(Europe\/Lisbon\)/)).toBeTruthy();
+    expect((screen.getByLabelText('Pickup time') as HTMLInputElement).value).toBe('2099-11-14T19:15');
+    await userEvent.click(screen.getByText('Build order from recommendations'));
+    expect(onBuild).toHaveBeenCalledWith('2099-11-14T19:15:00.000Z');
+  });
+
+  it('P1-11/P2-15: lists the cart lines (not the raw read-back) and drops the confidence jargon', () => {
+    const cartState = { ...base, cart: { ...base.cart!, lines: [{ id: 'l1', item_name: 'Pepperoni', size_name: 'Large', quantity: 4, summary: '4x Large (16") Pepperoni' }] }, quote: { ...base.quote!, read_back: 'For pickup around 2026-11-14T22:15:00.000Z. ESTIMATE only' } };
+    render(<CartReview {...props({ cartState })} />);
+    expect(screen.getByText('4x Large (16") Pepperoni').tagName).toBe('LI');
+    expect(document.body.textContent).not.toMatch(/ESTIMATE|T22:15|confidence/);
+  });
+
+  it('P1-3: an approve error sits next to the button as an alert', () => {
+    render(<CartReview {...props({ approveError: 'That ceiling is over the budget.' })} />);
+    expect(screen.getByRole('alert').textContent).toBe('That ceiling is over the budget.');
+  });
+
+  it('P1-8: offers to call the shop when nothing is left to order', () => {
+    render(<CartReview {...props({ shop: { ...shop('listing'), phone: '+16175550101' }, cartState: { ...base, cart: null, quote: null } })} />);
+    expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
   });
 });

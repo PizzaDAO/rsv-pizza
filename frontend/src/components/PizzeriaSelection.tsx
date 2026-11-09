@@ -11,6 +11,7 @@ import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
 import { OrderCheckout } from './OrderCheckout';
 import { PizzaOrderFlow } from './PizzaOrderFlow';
+import { AiOrderDialog } from './AiOrderDialog';
 import { usePizzaOrderingEnabled } from '../lib/pizzaOrder';
 import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
@@ -830,21 +831,10 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* basil-14648: the new ordering flow (pizza-mcp), pre-sorted to the shop the host clicked */}
-      {orderPizzeria && aiOrderingEnabled && createPortal(
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setOrderPizzeria(null); }}
-        >
-          <div className="bg-theme-header border border-theme-stroke rounded-2xl shadow-xl p-4 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-end">
-              <button type="button" onClick={() => setOrderPizzeria(null)} className="text-theme-text-muted hover:text-theme-text p-1">
-                <X size={18} />
-              </button>
-            </div>
-            <PizzaOrderFlow preferName={orderPizzeria.name} fallback={<p className="text-sm text-theme-text-muted p-4">AI ordering is not available for this party yet.</p>} />
-          </div>
-        </div>,
-        document.body
+      {orderPizzeria && aiOrderingEnabled && (
+        <AiOrderDialog onClose={() => setOrderPizzeria(null)}>
+          <PizzaOrderFlow gated preferName={orderPizzeria.name} fallback={<p className="text-sm text-theme-text-muted p-4">AI ordering is not available for this party yet.</p>} />
+        </AiOrderDialog>
       )}
 
       {/* AI Call Complete Modal */}
