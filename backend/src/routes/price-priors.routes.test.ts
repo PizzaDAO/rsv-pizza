@@ -159,49 +159,40 @@ describe.skipIf(!MCP)('pizza-mcp verifies rsv\'s priors document (real code from
     expect(existsSync(join(MCP!, 'node_modules', '.bin', 'tsx'))).toBe(true);
   });
 
-  it('verifySignedDocument accepts it, parsePriorsDocument + validateBatch pass, and the types never cross', async () => {
+  it('accepts the document, passes its own row checks, never crosses token types, and rejects a wrong aud or a tampered body', async () => {
     const res = await request(app()).get('/api/pizza-index/priors.jws').buffer(true).parse((r, cb) => {
       let s = '';
       r.on('data', (c: Buffer) => (s += c));
       r.on('end', () => cb(null, s));
     });
     const jws = res.body as string;
-    const accessToken = mintPizzaMcpToken({ userId: 'u1' });
-    const out = runPizzaMcp({
-      jws,
-      accessToken,
-      jwks: publicJwks(),
-      issuer: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP issuer, fixed by the trust contract)
-      audiences: ['https://api.openpizza.xyz', 'https://api.openpizza.xyz/api/mcp'],
-      nowMs: Date.now(),
-    });
-    expect(out.verified).toBe(true);
-    expect(out.parsed).toMatchObject({ ok: true });
-    expect(out.parsed.rows).toHaveLength(3);
-    expect(out.valid).toMatchObject({ ok: true });
-    expect(out.bytes).toBeLessThanOrEqual(out.maxBytes);
-    expect(out.docAsToken).toBeNull(); // a priors document is never an access token
-    expect(out.tokenAsDoc).toBeNull(); // an access token is never a priors document
-    expect(out.tokenAsToken).toBe(true); // and rsv's access tokens still pass the stricter verify()
-  });
-
-  it('pizza-mcp rejects it for the wrong audience or a tampered body', async () => {
-    const res = await request(app()).get('/api/pizza-index/priors.jws').buffer(true).parse((r, cb) => {
-      let s = '';
-      r.on('data', (c: Buffer) => (s += c));
-      r.on('end', () => cb(null, s));
-    });
-    const jws = res.body as string;
-    const base = {
-      jwks: publicJwks(),
-      issuer: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP issuer, fixed by the trust contract)
-      nowMs: Date.now(),
-    };
-    expect(runPizzaMcp({ ...base, jws, audiences: ['https://other.example'] }).verified).toBe(false);
     const [hh, p, s] = jws.split('.');
     const claims = decode(p);
     claims.rows[0].p50_cents += 100;
     const tampered = `${hh}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${s}`;
-    expect(runPizzaMcp({ ...base, jws: tampered, audiences: ['https://api.openpizza.xyz'] }).verified).toBe(false);
+    const base = {
+      jwks: publicJwks(),
+      issuer: 'https://api.rsv.pizza', // brand-check-ignore-line (OPOP issuer, fixed by the trust contract)
+      audiences: ['https://api.openpizza.xyz', 'https://api.openpizza.xyz/api/mcp'],
+      nowMs: Date.now(),
+    };
+    // ONE pizza-mcp process for every case
+    const [good, wrongAud, bad] = runPizzaMcp({
+      cases: [
+        { ...base, jws, accessToken: mintPizzaMcpToken({ userId: 'u1' }) },
+        { ...base, jws, audiences: ['https://other.example'] },
+        { ...base, jws: tampered },
+      ],
+    });
+    expect(good.verified).toBe(true);
+    expect(good.parsed).toMatchObject({ ok: true });
+    expect(good.parsed.rows).toHaveLength(3);
+    expect(good.valid).toMatchObject({ ok: true });
+    expect(good.bytes).toBeLessThanOrEqual(good.maxBytes);
+    expect(good.docAsToken).toBeNull(); // a priors document is never an access token
+    expect(good.tokenAsDoc).toBeNull(); // an access token is never a priors document
+    expect(good.tokenAsToken).toBe(true); // and rsv's access tokens still pass the stricter verify()
+    expect(wrongAud.verified).toBe(false);
+    expect(bad.verified).toBe(false);
   });
 });

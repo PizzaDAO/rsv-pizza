@@ -67,6 +67,38 @@ export const MIN_MERCHANTS = 2;
 export const P50_BOUNDS = { min: 100, max: 10_000 } as const;
 export const P80_MAX = 15_000;
 export const MAX_ROWS = 2000;
+/** pizza-mcp PRIORS_MAX_BYTES is 256 KB for the whole compact JWS. We aim well under it. */
+export const PRIORS_MAX_JWS_BYTES = 256 * 1024;
+export const PRIORS_TARGET_JWS_BYTES = 200 * 1024;
+/** Header + the non-row claims + the ES256 signature, generously (base64url-encoded). */
+const JWS_FIXED_OVERHEAD = 1024;
+
+/**
+ * Upper estimate of the compact JWS size for these rows: base64url of the JSON is 4/3 of its bytes, plus
+ * the header, the other claims and the signature. Pure, so the cap can be tested without a key.
+ */
+export function estimatedJwsBytes(rows: PriorRow[]): number {
+  return Math.ceil((Buffer.byteLength(JSON.stringify(rows)) * 4) / 3) + JWS_FIXED_OVERHEAD;
+}
+
+/**
+ * Keep the document under `maxBytes` (and MAX_ROWS) by dropping the weakest rows first: lowest n, then the
+ * finest key (city before state before country). Returns the kept rows in their original order.
+ */
+export function capRowsBySize(rows: PriorRow[], maxBytes = PRIORS_TARGET_JWS_BYTES): PriorRow[] {
+  if (rows.length <= MAX_ROWS && estimatedJwsBytes(rows) <= maxBytes) return rows;
+  const best = [...rows].sort((a, b) => b.n - a.n || rank(a.region) - rank(b.region));
+  // the largest prefix of `best` that fits (size grows with the prefix, so binary search)
+  let lo = 0;
+  let hi = Math.min(best.length, MAX_ROWS);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (estimatedJwsBytes(best.slice(0, mid)) <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  const keep = new Set(best.slice(0, lo));
+  return rows.filter((r) => keep.has(r));
+}
 
 /** pizza-mcp estimate.ts sizeBucket, from centimetres. */
 export function sizeBucketFromCm(diameterCm: number): SizeBucket {
@@ -198,10 +230,8 @@ export function buildPriceDocument(allRows: IndexRow[], opts: BuildOptions = {})
     a.size_bucket.localeCompare(b.size_bucket) ||
     a.topping_count - b.topping_count ||
     a.currency.localeCompare(b.currency));
-  // Coarse keys first if we ever exceed the cap (country rows are the most useful).
-  const capped = out.length > MAX_ROWS
-    ? [...out].sort((a, b) => rank(a.region) - rank(b.region)).slice(0, MAX_ROWS)
-    : out;
+  // Stay under pizza-mcp's 256 KB JWS cap with margin: drop the lowest-n rows first.
+  const capped = capRowsBySize(out);
   return { v: 1, generated_at: now.toISOString(), rows: capped };
 }
 

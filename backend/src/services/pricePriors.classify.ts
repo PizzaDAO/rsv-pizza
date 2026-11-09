@@ -35,8 +35,16 @@ const FILLER = new Set([
   'serves', 'serve', 'promo', 'combo', 'only',
 ]);
 
-/** Multi-cheese pies are priced like specialties. */
-const MULTI_CHEESE = /\b(\d+|two|three|four|five|tre|quattro|cuatro|quatro|quatre|tres|trois)\s*-?\s*(cheese|cheeses|formaggi|formaggio|quesos|queijos|fromages)\b/;
+/**
+ * Multi-cheese pies are priced like specialties: 3-5 as a bare number ("3 Cheese"), the words two to five (en/it/es/
+ * pt/fr), "multi", or a hyphenated 2-5 ("2-cheese", "4-cheese"). A bare "2 Cheese" is ambiguous (two cheese pizzas on
+ * an OCR line), so it stays plain. Size numbers never match: "14 Cheese", "18 Cheese" and "12\" cheese" are plain
+ * (a number of 6+ or one glued to other digits is not a cheese count).
+ */
+const CHEESE_WORD = '(?:cheese|cheeses|formaggi|formaggio|queso|quesos|queijo|queijos|fromage|fromages)';
+const MULTI_CHEESE = new RegExp(
+  `(?:(?<![0-9./])[345]\\s*-?\\s*|(?<![0-9./])[2-5]-\\s*|\\b(?:two|three|four|five|tre|quattro|dos|tres|cuatro|quatro|cinco|deux|trois|quatre|cinq|multi)\\s*-?\\s*)${CHEESE_WORD}\\b`,
+);
 
 function fold(s: string): string {
   return s

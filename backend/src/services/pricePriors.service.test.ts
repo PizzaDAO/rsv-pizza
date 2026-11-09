@@ -5,6 +5,12 @@ vi.mock('../config/database.js', () => ({ prisma: {} }));
 import type { IndexRow } from './pizzaIndex.service.js';
 import {
   buildPriceDocument,
+  capRowsBySize,
+  estimatedJwsBytes,
+  MAX_ROWS,
+  PRIORS_MAX_JWS_BYTES,
+  PRIORS_TARGET_JWS_BYTES,
+  type PriorRow,
   isoCountry,
   PRIOR_ROW_KEYS,
   roundTo25,
@@ -180,6 +186,62 @@ describe('buildPriceDocument', () => {
     const s = JSON.stringify(d);
     for (const leak of ['Secret Party', "Sal's", 'm-a', 'receipt.jpg', 'admin@x.com', 'Pepperoni', '"a"']) {
       expect(s).not.toContain(leak);
+    }
+  });
+});
+
+describe('size cap (review fix): the signed document stays under pizza-mcp\'s 256 KB with margin', () => {
+  const synth = (count: number): PriorRow[] =>
+    Array.from({ length: count }, (_, i) => ({
+      region: `city:US-MA:some-fairly-long-city-name-number-${i}`,
+      size_bucket: 'large',
+      topping_count: 2,
+      currency: 'USD',
+      p50_cents: 2000,
+      p80_cents: 2400,
+      n: 3 + (i % 50),
+      tax_included: false,
+      as_of_year: 2026,
+    }));
+
+  it('a small document is untouched', () => {
+    const rows = synth(50);
+    expect(capRowsBySize(rows)).toBe(rows);
+  });
+
+  it('2000 rows (about 2x the cap) are cut by size, lowest n first, keeping the original order', () => {
+    const rows = synth(MAX_ROWS);
+    expect(estimatedJwsBytes(rows)).toBeGreaterThan(PRIORS_MAX_JWS_BYTES);
+    const kept = capRowsBySize(rows);
+    expect(kept.length).toBeLessThan(rows.length);
+    expect(kept.length).toBeGreaterThan(500);
+    expect(estimatedJwsBytes(kept)).toBeLessThanOrEqual(PRIORS_TARGET_JWS_BYTES);
+    const dropped = rows.filter((r) => !kept.includes(r));
+    expect(Math.max(...dropped.map((r) => r.n))).toBeLessThanOrEqual(Math.min(...kept.map((r) => r.n)));
+    expect(kept).toEqual(rows.filter((r) => kept.includes(r))); // order preserved
+  });
+
+  it('at equal n, finer keys go before country keys', () => {
+    const rows = synth(MAX_ROWS).map((r, i) => (i === 0 ? { ...r, region: 'country:US', n: 3 } : { ...r, n: 3 }));
+    expect(capRowsBySize(rows)[0].region).toBe('country:US');
+  });
+
+  it('the estimate is an upper bound on the real signed JWS', async () => {
+    const { generateSigningKeyPem } = await import('../testutil/pizzaFakes.js');
+    const { signPriceDocument } = await import('../lib/pizzaMcpToken.js');
+    const saved = { k: process.env.PIZZA_MCP_SIGNING_KEY, u: process.env.PIZZA_MCP_URL };
+    process.env.PIZZA_MCP_SIGNING_KEY = generateSigningKeyPem();
+    process.env.PIZZA_MCP_URL = 'https://api.openpizza.xyz';
+    try {
+      const kept = capRowsBySize(synth(MAX_ROWS));
+      const jws = signPriceDocument({ v: 1, generated_at: NOW.toISOString(), rows: kept });
+      expect(Buffer.byteLength(jws)).toBeLessThanOrEqual(estimatedJwsBytes(kept));
+      expect(Buffer.byteLength(jws)).toBeLessThan(PRIORS_MAX_JWS_BYTES);
+    } finally {
+      for (const [k, v] of [['PIZZA_MCP_SIGNING_KEY', saved.k], ['PIZZA_MCP_URL', saved.u]] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
     }
   });
 });

@@ -38,6 +38,32 @@ describe('classifyPizzaName (plain = 0, specialty = 2)', () => {
     'Պիցցա',
     '',
   ];
+  // review fix: a size number or a bare "2" is never a cheese count
+  plain.push(
+    '14 Cheese Pizza',
+    '18 Cheese',
+    '12" Cheese',
+    '16 inch cheese pizza',
+    '2 Cheese Pizza', // ambiguous OCR (two cheese pizzas): plain
+    '2 Cheese',
+    '3x Cheese Pizza', // a quantity
+    '1/2 Cheese',
+    '10 Cheese',
+    '35 Cheese',
+  );
+  specialty.push(
+    'Four Cheese',
+    '4-Cheese Pizza',
+    '2-Cheese Blend',
+    'Two Cheese Pizza',
+    'Five cheese',
+    'Multi Cheese',
+    'Multi-cheese 14"',
+    'Tres Quesos',
+    'Pizza Quatre Fromages',
+    '5 Cheese Pizza',
+    'Large 4 Cheese',
+  );
   for (const n of plain) it(`plain: ${n}`, () => expect(classifyPizzaName(n)).toBe(PLAIN));
   for (const n of specialty) it(`specialty: ${JSON.stringify(n)}`, () => expect(classifyPizzaName(n)).toBe(SPECIALTY));
   it('null is specialty', () => expect(classifyPizzaName(null)).toBe(SPECIALTY));
