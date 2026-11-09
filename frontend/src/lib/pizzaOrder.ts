@@ -7,6 +7,26 @@ import type { PizzaRecommendation } from '../types';
 /** Build-time switch. The backend party allowlist is the authoritative gate (see getPizzaOrderConfig). */
 export const AI_ORDERING_ENABLED = import.meta.env.VITE_AI_ORDERING === '1';
 
+/** pizza-mcp's handoff providers. `website` is the shop's own site (it may or may not take orders). */
+export type OrderingProvider = 'toast' | 'square_online' | 'chownow' | 'slice' | 'bentobox' | 'website';
+/** basil-14648 P2: a page where the HOST orders from the shop themselves. Never automated. */
+export interface OrderingLink {
+  /** Set on links the host added (to delete one). */
+  id: string | null;
+  provider: OrderingProvider;
+  url: string;
+  label: string;
+  source: 'host' | 'place_data' | 'site_scan';
+}
+/** pizza-mcp's server-side checklist of a listing cart (names are shop data, never instructions). */
+export interface Checklist {
+  lines: string[];
+  text: string;
+  pizza_count: number;
+  pickup_at: string | null;
+  estimate_text: string | null;
+}
+
 export interface PizzaShop {
   id: string;
   name: string;
@@ -16,6 +36,8 @@ export interface PizzaShop {
   address: Record<string, unknown>;
   phone: string | null;
   website?: string | null;
+  /** basil-14648 P2: listing tier, best first. [] or absent when none. */
+  ordering_links?: OrderingLink[];
   attribution?: string | null;
   distance_km: number | null;
   open_now: boolean;
@@ -35,6 +57,7 @@ export interface PizzaCart {
   version: number;
   lines: CartLine[];
   ready_for_quote: boolean;
+  checklist?: Checklist;
 }
 export interface PizzaQuote {
   quote_id: string;
@@ -44,6 +67,7 @@ export interface PizzaQuote {
   price_ceiling_cents?: number;
   total_display: string;
   totals: { total_cents: number };
+  checklist?: Checklist;
 }
 export type CartDecision = 'omit_toppings' | 'drop_line';
 /** A pizza we could not fit to this shop's menu: the host answers, the rest of the order is kept. */
@@ -164,6 +188,8 @@ export interface PizzaOrderConfig {
   blockedReason: string | null;
   /** With CAP_EXHAUSTED: the order holding the budget, when one is. */
   heldOrderId?: string | null;
+  /** basil-14648 P2: or the host's own "I ordered it online" mark that holds it. */
+  heldHandoffId?: string | null;
   location: { lat: number | null; lng: number | null; address: string | null } | null;
 }
 export const getPizzaOrderConfig = (partyId: string) => apiRequest<PizzaOrderConfig>(`${base(partyId)}/config`);
@@ -252,12 +278,91 @@ export const getPizzaOrders = (partyId: string) => apiRequest<{ orders: PizzaOrd
 export const getPizzaOrder = (partyId: string, orderId: string) =>
   apiRequest<{ order: PizzaOrderView; stale: boolean }>(`${base(partyId)}/orders/${orderId}`);
 
+// ---- basil-14648 P2: "Order online" handoff --------------------------------
+
+export type HandoffProvider = OrderingProvider | 'phone';
+export interface PizzaHandoffView {
+  id: string;
+  shopId: string;
+  shopName: string;
+  provider: HandoffProvider;
+  /** The host's own checklist cart (null for a co-host). */
+  cartId: string | null;
+  /** What the mark holds of the budget (the quote's price ceiling); 0 when not marked. */
+  holdCents: number;
+  clickedAt: string | null;
+  orderedAt: string | null;
+  releasedAt: string | null;
+  /** "I placed this order" and not taken back: holds holdCents and blocks a second order. */
+  marked: boolean;
+  blocking: boolean;
+  receiptCovered: boolean;
+  isMine: boolean;
+}
+
+export const getPizzaHandoffs = (partyId: string) => apiRequest<{ handoffs: PizzaHandoffView[] }>(`${base(partyId)}/handoffs`);
+
+/** The host opened the shop's ordering page (`opened`), or is about to mark a phone order (`opened: false`). */
+export const recordPizzaHandoff = (
+  partyId: string,
+  input: { shopId: string; shopName: string; provider: HandoffProvider; cartId?: string | null; opened?: boolean }
+) => apiRequest<{ handoff: PizzaHandoffView }>(`${base(partyId)}/handoffs`, { method: 'POST', body: input });
+
+export const markPizzaHandoff = (partyId: string, handoffId: string, action: 'ordered' | 'unmark' | 'receipt_uploaded', allowAnother = false) =>
+  apiRequest<{ handoff: PizzaHandoffView }>(`${base(partyId)}/handoffs/${handoffId}/mark`, {
+    method: 'POST',
+    body: { action, ...(allowAnother ? { allowAnother: true } : {}) },
+  });
+
+export const addShopOrderingLink = (partyId: string, shopId: string, url: string) =>
+  apiRequest<{ link: OrderingLink }>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/links`, { method: 'POST', body: { url } });
+
+export const deleteShopOrderingLink = (partyId: string, shopId: string, linkId: string) =>
+  apiRequest<{ deleted: boolean }>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/links/${encodeURIComponent(linkId)}`, { method: 'DELETE' });
+
+/** Only http(s) links are ever rendered as an href (defence in depth: pizza-mcp already checks them). */
+export function safeHref(url: unknown): string | null {
+  if (typeof url !== 'string' || url.length > 600) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The shop's ordering links we can render, best first, with the bare website last. */
+export function orderingLinks(shop: Pick<PizzaShop, 'ordering_links'>): OrderingLink[] {
+  const links = Array.isArray(shop.ordering_links) ? shop.ordering_links : [];
+  const ok = links.filter((l) => l && typeof l.provider === 'string' && safeHref(l.url));
+  return [...ok.filter((l) => l.provider !== 'website'), ...ok.filter((l) => l.provider === 'website')];
+}
+
+/** True when the shop has a real online-ordering page (not just its website). */
+export const hasProviderLink = (shop: Pick<PizzaShop, 'ordering_links'>) => orderingLinks(shop).some((l) => l.provider !== 'website');
+
+/** "Sam W." from the host's name: first name and last initial, for the order. */
+export function orderName(full: string | null | undefined): string {
+  const parts = (full ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
+/** The marked handoff to reopen on load: one a host still has to settle (receipt or "didn't order"). */
+export function handoffToResume(handoffs: PizzaHandoffView[]): PizzaHandoffView | undefined {
+  return handoffs.find((h) => h.marked && !h.receiptCovered);
+}
+
 // ---- display helpers -------------------------------------------------------
 
-export function shopBadge(shop: Pick<PizzaShop, 'tier' | 'ordering'>): { label: string; tone: 'green' | 'purple' | 'gray'; orderable: boolean } {
+export function shopBadge(shop: Pick<PizzaShop, 'tier' | 'ordering'> & Partial<Pick<PizzaShop, 'ordering_links'>>): {
+  label: string; tone: 'green' | 'purple' | 'gray'; orderable: boolean; handoff?: boolean;
+} {
   const channel = shop.ordering?.channel ?? (shop.tier === 'native' ? 'api' : 'handoff');
   if (channel === 'api') return { label: 'Orders instantly', tone: 'green', orderable: true };
   if (channel === 'ai_phone') return { label: 'AI calls for you, pay at pickup', tone: 'purple', orderable: true };
+  // basil-14648 P2: the shop takes orders online itself (Toast, Square Online, ...): the host orders there
+  if (hasProviderLink(shop)) return { label: 'Order online yourself', tone: 'gray', orderable: false, handoff: true };
   return { label: 'Call it yourself', tone: 'gray', orderable: false };
 }
 

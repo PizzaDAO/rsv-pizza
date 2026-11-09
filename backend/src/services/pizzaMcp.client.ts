@@ -27,6 +27,11 @@ export type OpopPlaceOrderRequest = S['PlaceOrderRequest'];
 export type OpopPlaceOrderResult = S['PlaceOrderResult'];
 export type OpopOrder = S['Order'];
 export type OpopProblem = S['Problem'];
+export type OpopOrderingLink = S['OrderingLink'];
+export type OpopChecklist = S['Checklist'];
+/** pizza-mcp's handoff providers (ORDERING_PROVIDERS). */
+export const OPOP_ORDERING_PROVIDERS = ['toast', 'square_online', 'chownow', 'slice', 'bentobox', 'website'] as const;
+export type OpopOrderingProvider = (typeof OPOP_ORDERING_PROVIDERS)[number];
 
 /**
  * What rsv reads of pizza-mcp's approval-page view (`GET /confirmations/{id}`, a public endpoint). It is not in the
@@ -114,13 +119,15 @@ export class PizzaMcpClient {
   /** `actor: null` sends no token: only for pizza-mcp's public (human page) endpoints. */
   private async request<T>(
     actor: OpopActor | null,
-    method: 'GET' | 'POST' | 'PATCH',
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,
     opts: {
       query?: Record<string, string | number | boolean | undefined>;
       body?: unknown;
       headers?: Record<string, string>;
       timeoutMs?: number;
+      /** The endpoint answers 204 No Content: resolve with null instead of "unexpected response". */
+      noContent?: boolean;
     } = {}
   ): Promise<T> {
     if (!this.baseUrl) throw new AppError('Ordering is not configured', 503, 'PIZZA_MCP_NOT_CONFIGURED');
@@ -163,6 +170,7 @@ export class PizzaMcpClient {
       }
     }
     if (!res.ok) throw problemToAppError(res.status, json);
+    if (opts.noContent && (res.status === 204 || json === null)) return null as T;
     if (json === null) throw new AppError('Unexpected response from the ordering service', 502, 'PIZZA_MCP_BAD_RESPONSE');
     return json as T;
   }
@@ -219,6 +227,22 @@ export class PizzaMcpClient {
 
   getOrder(actor: OpopActor, orderId: string) {
     return this.request<OpopOrder>(actor, 'GET', `/orders/${encodeURIComponent(orderId)}`);
+  }
+
+  /** basil-14648 P2: the host adds the shop's own ordering page. Private to that host on pizza-mcp (422 LINK_NOT_RECOGNIZED). */
+  addOrderingLink(actor: OpopActor, shopId: string, url: string) {
+    return this.request<OpopOrderingLink>(actor, 'POST', `/pizzerias/${encodeURIComponent(shopId)}/ordering-links`, { body: { url } });
+  }
+
+  deleteOrderingLink(actor: OpopActor, shopId: string, linkId: string) {
+    return this.request<null>(actor, 'DELETE', `/pizzerias/${encodeURIComponent(shopId)}/ordering-links/${encodeURIComponent(linkId)}`, {
+      noContent: true,
+    });
+  }
+
+  /** Aggregate funnel counter on pizza-mcp (204). Needs a cart this host owns; stores no principal, cart or party. */
+  recordHandoff(actor: OpopActor, cartId: string, body: { provider: OpopOrderingProvider; event: 'opened' | 'marked_ordered' | 'unmarked' }) {
+    return this.request<null>(actor, 'POST', `/carts/${encodeURIComponent(cartId)}/handoff`, { body, noContent: true, timeoutMs: 5000 });
   }
 
   /**

@@ -140,11 +140,12 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
       'NO_REIMBURSEMENT_CAP'
     );
   }
-  const [receipts, orders] = await Promise.all([
+  const [receipts, orders, handoffs] = await Promise.all([
     partyReceipts(party.id),
     prisma.pizzaOrder.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' } }),
+    partyHandoffOrders(party.id),
   ]);
-  const { usedCents, held } = budgetBreakdown(receipts, orders);
+  const { usedCents, held } = budgetBreakdown(receipts, [...orders, ...handoffs]);
   const remaining = party.capCents - usedCents;
   if (remaining <= 0) {
     const holder = held[0];
@@ -152,14 +153,64 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
       'There is no reimbursement budget left for another order (cap minus receipts and open orders).',
       422,
       'CAP_EXHAUSTED',
-      holder ? { existingOrderId: holder.opopOrderId, existingStatus: holder.status } : undefined
+      holder ? holderData(holder) : undefined
     );
   }
   return remaining;
 }
 
-interface BudgetOrder {
+/** What the UI needs to open the order (or the marked handoff) that holds the budget or blocks a new order. */
+export function holderData(o: BudgetOrder): { existingOrderId?: string; existingHandoffId?: string; existingStatus: string } {
+  return o.handoffId
+    ? { existingHandoffId: o.handoffId, existingStatus: o.status }
+    : { existingOrderId: o.opopOrderId, existingStatus: o.status };
+}
+
+// ---------------------------------------------------------------------------
+// basil-14648 P2: "Order online" handoffs (pizza_handoffs). The host's own "I ordered it" mark behaves like a
+// CONFIRMED order with no shop total: it blocks a second order (unless the host confirms one), holds its
+// hold_cents, and one later uploaded receipt replaces the hold once the host says it is uploaded.
+// A click alone (no mark) holds and blocks nothing. Released ("I didn't order after all") frees it.
+// ---------------------------------------------------------------------------
+
+/** Status a marked handoff takes in the budget: in CONFIRMED_STATUSES, never terminal, so it blocks until released. */
+export const HOST_ORDERED = 'host_ordered';
+
+export interface HandoffRowLike {
+  id: string;
+  holdCents: number;
+  orderedAt: Date | string | null;
+  releasedAt: Date | string | null;
+  receiptCoveredAt: Date | string | null;
+}
+
+/** A marked, unreleased handoff as a budget order; null for a click, an unmark or a release. */
+export function handoffAsBudgetOrder(h: HandoffRowLike): (BudgetOrder & { handoffId: string }) | null {
+  if (!h.orderedAt || h.releasedAt) return null;
+  return {
+    handoffId: h.id,
+    status: HOST_ORDERED,
+    ceilingCents: Math.max(0, h.holdCents | 0),
+    confirmedTotalCents: null,
+    receiptCoveredAt: h.receiptCoveredAt,
+    releasedAt: null,
+    createdAt: h.orderedAt,
+  };
+}
+
+/** The party's marked, unreleased handoffs, as budget orders. */
+export async function partyHandoffOrders(partyId: string): Promise<Array<BudgetOrder & { handoffId: string }>> {
+  const rows = await prisma.pizzaHandoff.findMany({
+    where: { partyId, orderedAt: { not: null }, releasedAt: null },
+    orderBy: { orderedAt: 'desc' },
+  });
+  return rows.map(handoffAsBudgetOrder).filter((o): o is BudgetOrder & { handoffId: string } => o !== null);
+}
+
+export interface BudgetOrder {
   opopOrderId?: string;
+  /** Set on a marked "Order online" handoff (pizza_handoffs.id); such a row has no OPOP order. */
+  handoffId?: string;
   status: string;
   ceilingCents?: number | null;
   confirmedTotalCents?: number | null;
@@ -170,7 +221,8 @@ interface BudgetOrder {
   createdAt?: Date | string | null;
 }
 
-const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']);
+// `host_ordered` = a marked handoff (basil-14648 P2): the host ordered on the shop's own site, so it can have a receipt.
+const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'host_ordered']);
 /** An order that can have a real receipt, so that receipt must not be counted on top of its hold. */
 const hasReceiptToCount = (o: BudgetOrder) => CONFIRMED_STATUSES.has(o.status) || mayExistAtShop(o);
 

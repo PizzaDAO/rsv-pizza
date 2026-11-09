@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw } from 'lucide-react';
-import { getPizzaShops, shopBadge, formatPhone, PizzaShop } from '../lib/pizzaOrder';
+import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw, ListChecks, ShoppingBag } from 'lucide-react';
+import { getPizzaShops, shopBadge, formatPhone, orderingLinks, safeHref, OrderingLink, PizzaShop } from '../lib/pizzaOrder';
 
 interface ShopPickerProps {
   partyId: string;
@@ -15,6 +15,10 @@ interface ShopPickerProps {
   hasLocation?: boolean;
   /** The loaded list, so the flow knows each shop's phone. */
   onLoaded?: (shops: PizzaShop[]) => void;
+  /** basil-14648 P2: build a checklist to order from this shop yourself (online or by phone). */
+  onChecklist?: (shop: PizzaShop) => void;
+  /** basil-14648 P2: the host opened one of the shop's ordering pages (recorded; never blocks the new tab). */
+  onOpenLink?: (shop: PizzaShop, link: OrderingLink) => void;
 }
 
 const toneClass: Record<'green' | 'purple' | 'gray', string> = {
@@ -26,7 +30,7 @@ const toneClass: Record<'green' | 'purple' | 'gray', string> = {
 const addressLine = (a: Record<string, unknown>) =>
   [a.line1, a.city, a.region].filter((x) => typeof x === 'string' && x).join(', ');
 
-export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded }) => {
+export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded, onChecklist, onOpenLink }) => {
   const { t } = useTranslation('host');
   const [shops, setShops] = useState<PizzaShop[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +87,34 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
     <ul className="space-y-2" aria-label={t('aiOrder.shops.listLabel')}>
       {shops.map((shop) => {
         const badge = uncallable?.has(shop.id) ? { label: t('aiOrder.shops.badgeUncallable'), tone: 'gray' as const, orderable: false } : shopBadge(shop);
-        const Icon = badge.tone === 'green' ? Zap : badge.tone === 'purple' ? Bot : Phone;
+        const links = orderingLinks(shop);
+        const providerLinks = links.filter((l) => l.provider !== 'website');
+        const site = safeHref(links.find((l) => l.provider === 'website')?.url ?? shop.website ?? null);
+        const linkButtons = providerLinks.map((l) => (
+          <a
+            key={l.url}
+            href={safeHref(l.url)!}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => onOpenLink?.(shop, l)}
+            className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5"
+            aria-label={`${t('aiOrder.handoff.orderAtFor', { provider: t(`aiOrder.handoff.providers.${l.provider}`), shop: shop.name })} ${t('aiOrder.handoff.newTab')}`}
+          >
+            <ShoppingBag size={14} aria-hidden="true" /> {t('aiOrder.handoff.orderAt', { provider: t(`aiOrder.handoff.providers.${l.provider}`) })}
+          </a>
+        ));
+        const checklistButton = shop.tier !== 'native' && onChecklist && (
+          <button
+            type="button"
+            onClick={() => onChecklist(shop)}
+            disabled={orderDisabled}
+            className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5"
+            aria-label={t('aiOrder.handoff.buildChecklistFor', { shop: shop.name })}
+          >
+            <ListChecks size={14} aria-hidden="true" /> {t('aiOrder.handoff.buildChecklist')}
+          </button>
+        );
+        const Icon = badge.tone === 'green' ? Zap : badge.tone === 'purple' ? Bot : 'handoff' in badge && badge.handoff ? ShoppingBag : Phone;
         const addr = addressLine(shop.address);
         return (
           <li key={shop.id} className="p-3 bg-theme-surface rounded-xl border border-theme-stroke">
@@ -99,33 +130,48 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${toneClass[badge.tone]}`}>
-                    <Icon size={12} aria-hidden="true" /> {badge.label}
+                    <Icon size={12} aria-hidden="true" /> {'handoff' in badge && badge.handoff ? t('aiOrder.shops.badgeOnline') : badge.label}
                   </span>
                   {shop.open_now && <span className="text-xs font-medium text-[color:var(--ai-success)]">{t('aiOrder.shops.openNow')}</span>}
                 </div>
               </div>
               {badge.orderable ? (
-                <button
-                  type="button"
-                  onClick={() => onSelect(shop)}
-                  disabled={orderDisabled}
-                  className="btn-primary text-sm min-h-[44px] py-2 px-5 flex-shrink-0 w-full sm:w-auto"
-                  aria-label={t('aiOrder.shops.orderFrom', { shop: shop.name })}
-                >
-                  {t('aiOrder.shops.order')}
-                </button>
+                <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(shop)}
+                    disabled={orderDisabled}
+                    className="btn-primary text-sm min-h-[44px] py-2 px-5 w-full sm:w-auto"
+                    aria-label={t('aiOrder.shops.orderFrom', { shop: shop.name })}
+                  >
+                    {t('aiOrder.shops.order')}
+                  </button>
+                  {/* basil-14648 P2: the shop's own online ordering, as an alternative to the AI call */}
+                  {linkButtons}
+                </div>
               ) : (
                 <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
+                  {linkButtons}
                   {shop.phone && (
                     <a href={`tel:${shop.phone}`} className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                       <Phone size={14} aria-hidden="true" /> {formatPhone(shop.phone)}
                     </a>
                   )}
-                  {shop.website && (
-                    <a href={shop.website} target="_blank" rel="noopener noreferrer" className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  {providerLinks.length === 0 && site && (
+                    <a
+                      href={site}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        const w = links.find((l) => l.provider === 'website');
+                        if (w) onOpenLink?.(shop, w);
+                      }}
+                      className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+                    >
                       <ExternalLink size={14} aria-hidden="true" /> {t('aiOrder.shops.website')}
                     </a>
                   )}
+                  {checklistButton}
                 </div>
               )}
             </div>

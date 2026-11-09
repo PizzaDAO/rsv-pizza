@@ -130,8 +130,9 @@ model Party {
   eventSeries   EventSeries? @relation(fields: [eventSeriesId], references: [id], onDelete: SetNull)
 
   // basil-14648: AI / OPOP pizza orders placed through pizza-mcp for this party.
-  pizzaOrders PizzaOrder[]
-  pizzaCarts  PizzaCart[]
+  pizzaOrders   PizzaOrder[]
+  pizzaCarts    PizzaCart[]
+  pizzaHandoffs PizzaHandoff[]
 
   // Donation settings
   donationEnabled      Boolean  @default(false) @map("donation_enabled")
@@ -3029,4 +3030,32 @@ model PizzaCart {
 
   @@index([partyId])
   @@map("pizza_carts")
+}
+
+// basil-14648 P2: the host's own "Order online" click and "I ordered it" mark (migration 20261109_pizza_handoffs).
+// Not a pizza_orders row: the OPOP sync must never poll it. A mark (orderedAt, no releasedAt) holds holdCents and
+// blocks a second order, like a confirmed order with no shop total. No amount or detail of the external order.
+model PizzaHandoff {
+  id               String    @id @default(uuid()) @db.Uuid
+  partyId          String    @map("party_id") @db.Uuid
+  party            Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  // The rsv.pizza User.id who clicked / marked.
+  userId           String    @map("user_id")
+  shopId           String    @map("shop_id")
+  shopName         String    @map("shop_name")
+  // toast | square_online | chownow | slice | bentobox | website | phone
+  provider         String
+  opopCartId       String?   @map("opop_cart_id")
+  quoteId          String?   @map("quote_id")
+  // OUR number: the quote's price ceiling for the checklist's cart (<= what was left of the budget)
+  holdCents        Int       @default(0) @map("hold_cents")
+  clickedAt        DateTime? @map("clicked_at") @db.Timestamptz
+  orderedAt        DateTime? @map("ordered_at") @db.Timestamptz
+  releasedAt       DateTime? @map("released_at") @db.Timestamptz
+  receiptCoveredAt DateTime? @map("receipt_covered_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([partyId])
+  @@map("pizza_handoffs")
 }

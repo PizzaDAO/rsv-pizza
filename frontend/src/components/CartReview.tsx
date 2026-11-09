@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Clock, DollarSign, User, Phone, ArrowLeft } from 'lucide-react';
+import { Loader2, Clock, DollarSign, User, Phone, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { IconInput } from './IconInput';
 import {
   CartResponse, CartDecision, PizzaShop, formatCents, toE164, defaultPickupLocal, zonedLocalToIso, safeTimeZone, formatWhen, formatPhone,
+  hasProviderLink,
 } from '../lib/pizzaOrder';
 
 interface CartReviewProps {
@@ -29,6 +30,14 @@ interface CartReviewProps {
   onApprove: (input: { ceilingCents?: number; substitution: 'exact' | 'deals_ok'; contact: { name: string; phone: string } }) => void;
   placing: boolean;
   onBack: () => void;
+  /**
+   * basil-14648 P2: 'handoff' = the host orders from the shop themselves (online or by phone) with the checklist:
+   * no AI call, so no price limit, contact or Approve. `handoffSlot` (the HandoffPanel) renders in their place.
+   */
+  mode?: 'ai' | 'handoff';
+  handoffSlot?: React.ReactNode;
+  /** Offered on a callable listing shop that also takes orders online. */
+  onSwitchToHandoff?: () => void;
 }
 
 const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; children: React.ReactNode }> = ({ id, label, help, children }) => (
@@ -41,7 +50,9 @@ const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; child
 
 export const CartReview: React.FC<CartReviewProps> = ({
   shop, cartState, building, error, approveError, approveNotice, defaultName, partyDate, timeZone, city, onBuild, onDecide, onApprove, placing, onBack,
+  mode = 'ai', handoffSlot, onSwitchToHandoff,
 }) => {
+  const handoff = mode === 'handoff';
   const { t } = useTranslation('host');
   const tz = safeTimeZone(timeZone);
   const [pickupLocal, setPickupLocal] = useState(() => defaultPickupLocal(partyDate, new Date(), tz));
@@ -187,7 +198,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
         </div>
       )}
 
-      {quote && isPhone && (
+      {quote && isPhone && !handoff && (
         <div className="space-y-2">
           <Field
             id={ids.ceiling}
@@ -228,7 +239,9 @@ export const CartReview: React.FC<CartReviewProps> = ({
         </div>
       )}
 
-      {quote && (
+      {handoff && handoffSlot}
+
+      {quote && !handoff && (
         <div className="space-y-3">
           <Field id={ids.name} label={t('aiOrder.cart.nameLabel')} help={t('aiOrder.cart.nameHelp')}>
             <IconInput id={ids.name} icon={User} type="text" autoComplete="name" aria-describedby={`${ids.name}-help`} value={name} onChange={(e) => setName((e as React.ChangeEvent<HTMLInputElement>).target.value)} placeholder={t('aiOrder.cart.namePlaceholder')} />
@@ -253,6 +266,15 @@ export const CartReview: React.FC<CartReviewProps> = ({
           <p className="text-sm text-theme-text-secondary">
             {isPhone ? t('aiOrder.cart.nextPhone', { shop: shop.name }) : t('aiOrder.cart.nextNative')}
           </p>
+        </div>
+      )}
+
+      {!handoff && isPhone && onSwitchToHandoff && hasProviderLink(shop) && (
+        <div className="pt-2 border-t border-theme-stroke space-y-2">
+          <p className="text-sm text-theme-text-secondary">{t('aiOrder.handoff.orIntro')}</p>
+          <button type="button" className="btn-secondary w-full text-sm min-h-[44px] py-2 inline-flex items-center justify-center gap-2" onClick={onSwitchToHandoff}>
+            <ShoppingBag size={14} aria-hidden="true" /> {t('aiOrder.handoff.switch')}
+          </button>
         </div>
       )}
     </div>

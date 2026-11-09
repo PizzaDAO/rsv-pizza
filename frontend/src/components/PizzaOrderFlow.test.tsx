@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { PizzaOrderFlow } from './PizzaOrderFlow';
 import type { PizzaOrderView, PizzaShop } from '../lib/pizzaOrder';
 
-const mocks = vi.hoisted(() => ({ config: vi.fn(), orders: vi.fn(), order: vi.fn(), build: vi.fn(), place: vi.fn() }));
+const mocks = vi.hoisted(() => ({ config: vi.fn(), orders: vi.fn(), order: vi.fn(), build: vi.fn(), place: vi.fn(), handoffs: vi.fn() }));
 vi.mock('../lib/pizzaOrder', async () => {
   const actual = await vi.importActual<typeof import('../lib/pizzaOrder')>('../lib/pizzaOrder');
   return {
@@ -15,6 +15,7 @@ vi.mock('../lib/pizzaOrder', async () => {
     getPizzaOrder: mocks.order,
     buildPizzaCart: mocks.build,
     placePizzaOrder: mocks.place,
+    getPizzaHandoffs: mocks.handoffs,
   };
 });
 vi.mock('../contexts/PizzaContext', () => ({
@@ -55,6 +56,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.config.mockResolvedValue(cfg());
   mocks.orders.mockResolvedValue({ orders: [] });
+  mocks.handoffs.mockResolvedValue({ handoffs: [] });
 });
 
 describe('PizzaOrderFlow: stays inert', () => {
@@ -277,5 +279,50 @@ describe('PizzaOrderFlow: UX audit (basil-14648)', () => {
     mocks.config.mockResolvedValue(cfg({ blockedReason: 'NO_REIMBURSEMENT_CAP' }));
     flow();
     expect(await screen.findByText("You can't order here yet: this party has no reimbursement cap. Ask your underboss to set one.")).toBeTruthy();
+  });
+});
+
+describe('PizzaOrderFlow: "Order online" handoff (basil-14648 P2)', () => {
+  const mark = {
+    id: 'h1', shopId: 'pzl_9', shopName: 'Regina', provider: 'toast', cartId: null, holdCents: 18000, clickedAt: null,
+    orderedAt: '2026-11-09T12:00:00Z', releasedAt: null, marked: true, blocking: true, receiptCovered: false, isMine: true,
+  };
+
+  it('resumes a marked online order with no receipt yet, in its own words', async () => {
+    mocks.handoffs.mockResolvedValue({ handoffs: [mark] });
+    flow();
+    expect(await screen.findByText('You said you ordered online at Toast')).toBeTruthy();
+    expect(screen.getByText(/\$180\.00 of your reimbursement budget is held/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'I uploaded the receipt' })).toBeTruthy();
+  });
+
+  it('an AI order in progress is resumed first; a covered mark is not resumed', async () => {
+    mocks.handoffs.mockResolvedValue({ handoffs: [{ ...mark, receiptCovered: true }] });
+    flow();
+    expect(await screen.findByText("Pick Sal's")).toBeTruthy();
+    expect(screen.queryByText(/You said you ordered/)).toBeNull();
+  });
+
+  it('ORDER_IN_PROGRESS naming a handoff: View it opens that mark, not an OPOP order', async () => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingHandoffId: 'h1', existingStatus: 'host_ordered' } }));
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    flow();
+    await userEvent.click(await screen.findByText("Pick Sal's"));
+    await userEvent.click(screen.getByText('Build'));
+    await userEvent.click(screen.getByText('Approve'));
+    mocks.handoffs.mockResolvedValue({ handoffs: [mark] });
+    await userEvent.click(await screen.findByText('View that order'));
+    expect(mocks.order).not.toHaveBeenCalled();
+    expect(await screen.findByText('You said you ordered online at Toast')).toBeTruthy();
+  });
+
+  it('a budget held by a mark says so and opens it', async () => {
+    mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: 'h1' }));
+    flow();
+    expect(await screen.findByText('Your reimbursement budget is held by an order you said you placed online.')).toBeTruthy();
+    mocks.handoffs.mockResolvedValue({ handoffs: [mark] });
+    await userEvent.click(screen.getByRole('button', { name: 'Open that order' }));
+    expect(await screen.findByText('You said you ordered online at Toast')).toBeTruthy();
   });
 });

@@ -9,6 +9,10 @@ interface CheckboxProps {
   disabled?: boolean;
   labelClassName?: string;
   children?: React.ReactNode;
+  /** Extra classes on the button (e.g. a 44px tap target). */
+  className?: string;
+  /** Expose it to assistive tech as a real checkbox (role + aria-checked). Opt-in so existing queries keep working. */
+  checkboxRole?: boolean;
 }
 
 export const Checkbox: React.FC<CheckboxProps> = ({
@@ -18,18 +22,21 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   size = 18,
   disabled = false,
   labelClassName = 'text-sm text-theme-text',
-  children
+  children,
+  className = '',
+  checkboxRole = false,
 }) => {
   return (
     <button
       type="button"
       onClick={disabled ? undefined : onChange}
-      className={`flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      {...(checkboxRole ? { role: 'checkbox', 'aria-checked': checked, 'aria-disabled': disabled || undefined } : {})}
+      className={`flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     >
       {checked ? (
-        <CheckSquare2 size={size} className="text-[#ff393a] flex-shrink-0" />
+        <CheckSquare2 size={size} className="text-[#ff393a] flex-shrink-0" aria-hidden={checkboxRole || undefined} />
       ) : (
-        <SquareIcon size={size} className="text-theme-text-secondary flex-shrink-0" />
+        <SquareIcon size={size} className="text-theme-text-secondary flex-shrink-0" aria-hidden={checkboxRole || undefined} />
       )}
       <span className={labelClassName}>{label}</span>
       {children}
