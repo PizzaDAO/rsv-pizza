@@ -54,7 +54,7 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
     expect(sql).toMatch(/payout_documents pd WHERE[^)]*pd\.kind = 'receipt' AND pd\.source = 'upload'\) AS has_receipt/);
   });
 
-  it('regression guard: every query-side kind=receipt in backend/src also filters source (creates are allow-listed)', () => {
+  it('regression guard: every query-side kind=receipt in backend/src and backend/scripts also filters source (creates are allow-listed)', () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
     const files: string[] = [];
     const walk = (d: string) => {
@@ -65,6 +65,9 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
       }
     };
     walk(root);
+    // Ops scripts read payout_documents too (pizza-count backfills, clean-ups): same rule.
+    const scriptsRoot = path.resolve(root, '..', 'scripts');
+    if (fs.existsSync(scriptsRoot)) walk(scriptsRoot);
     // Creates (and non-receipt-gate reads that cannot see a draft) are listed by file; anything new fails.
     const allowedUnfiltered: Record<string, number> = {
       'routes/payout.routes.ts': 9, // 6 creates + the receipts library (shows drafts on purpose) + two by-id lookups of a doc the host names (receiptsChanged check, pizza-count patch): no gate or sum
