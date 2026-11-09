@@ -4,7 +4,8 @@ import { prisma } from '../config/database.js';
 import { verifyWebhook } from '../lib/webhookSignature.js';
 import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
 import { notifyHostOfOrder } from '../services/pizzaOrderNotify.js';
-import type { OpopOrder } from '../services/pizzaMcp.client.js';
+import { getPizzaMcpClient, type OpopOrder } from '../services/pizzaMcp.client.js';
+import { withApprovalHold } from '../services/pizzaApproval.js';
 
 /**
  * basil-14648: POST /api/pizza-mcp/webhook — pizza-mcp -> RSV `order.updated`.
@@ -70,6 +71,9 @@ router.post(
         return res.sendStatus(200);
       }
       const eventAt = payload.created_at ? new Date(payload.created_at) : null;
+      // pizza-mcp 64fb2ac: a price approval's real hold deadline is only on the approval page's view. Read it before
+      // the transaction (bounded to 3 s, and a failure just leaves it out), so co-hosts see the countdown too.
+      const view = await withApprovalHold(getPizzaMcpClient(), order);
 
       // One transaction: the Webhook-Id marker and the order update commit together or not at all.
       // createMany + skipDuplicates (not a thrown P2002) tells us "already processed" without
@@ -78,7 +82,7 @@ router.post(
       const result = await prisma.$transaction(async (tx) => {
         const marker = await tx.pizzaWebhookEvent.createMany({ data: [{ id: verdict.id }], skipDuplicates: true });
         if (marker.count === 0) return null;
-        return applyOrderUpdate(tx, order, {
+        return applyOrderUpdate(tx, view, {
           eventAt: eventAt && !Number.isNaN(eventAt.getTime()) ? eventAt : null,
           clientRef: payload.client_ref ?? null,
         });

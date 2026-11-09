@@ -95,6 +95,13 @@ describe('CartReview', () => {
     expect(document.body.textContent).not.toMatch(/ESTIMATE|T22:15|confidence/);
   });
 
+  it('pizza-mcp 64fb2ac: with no cart lines to list, the new plain read-back is shown as sent', () => {
+    const readBack = "4x Large (16\") Pepperoni. For pickup around 5:15 PM. Estimate only: about $180.00 (likely $150.00 to $210.00); the shop's own price on the call is final. We'll accept up to $210.00; if the shop says more, we'll ask you first (never over your $250.00 limit). You pay at pickup.";
+    const cartState = { ...base, cart: { ...base.cart!, lines: [] }, quote: { ...base.quote!, read_back: readBack } };
+    render(<CartReview {...props({ cartState })} />);
+    expect(screen.getByText(readBack)).toBeTruthy();
+  });
+
   it('P1-3: an approve error sits next to the button as an alert', () => {
     render(<CartReview {...props({ approveError: 'That ceiling is over the budget.' })} />);
     expect(screen.getByRole('alert').textContent).toBe('That ceiling is over the budget.');

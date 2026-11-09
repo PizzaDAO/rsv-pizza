@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, BellRing, Phone, Info } from 'lucide-react';
 import {
   getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents,
-  formatWhen, formatPhone, approvalDeadline,
+  formatWhen, approvalDeadline, callNumber,
 } from '../lib/pizzaOrder';
 import { InlineConfirm } from './InlineConfirm';
 
@@ -14,7 +14,7 @@ interface OrderStatusProps {
   orderScript: string;
   /** What to say when an order MAY exist: asks about the earlier order instead of placing a new one. */
   checkScript?: string;
-  /** The shop's phone (E.164) from the listing, for the Call button. */
+  /** The shop's phone (E.164) from the listing: the Call button's fallback when the order view has no `shop.phone`. */
   shopPhone?: string | null;
   /** The party's time zone: every time on this card is shown in it. */
   timeZone?: string | null;
@@ -96,7 +96,8 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
 
   const info = statusInfo(order, Date.now(), { timeZone });
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
-  const url = order.nextAction?.type === 'open_url' ? order.nextAction.url : null;
+  // `live: false` (pizza-mcp's approval view): approving can no longer do anything, so no link to a dead page
+  const url = order.nextAction?.type === 'open_url' && order.nextAction.live !== false ? order.nextAction.url : null;
   const deferred = order.call?.deferred ?? null;
   const nextTry = formatWhen(deferred?.until, timeZone);
   const finished = order.status === 'confirmed_by_shop' || order.status === 'completed' || !!order.receiptCovered;
@@ -106,8 +107,9 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   const script = safeToReorder ? orderScript : checkScript || orderScript;
   // the backend would refuse another order: no link that leads to that refusal
   const showLeave = (!waiting || order.restartable) && (finished || !order.blocking);
-  const callable = !!shopPhone && !!info.callShop && !safeToReorder;
-  const deadline = order.status === 'awaiting_price_approval' ? approvalDeadline(order) : null;
+  const call = callNumber(order, shopPhone);
+  const callable = !!call && !!info.callShop && !safeToReorder;
+  const deadline = approvalDeadline(order);
   const beforeApproval = order.status === 'awaiting_approval';
   const Icon =
     info.tone === 'success' ? CheckCircle2
@@ -153,10 +155,10 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
         {!order.isMine && <p className="text-xs text-theme-text-secondary mt-2">{t('aiOrder.status.otherHost')}</p>}
       </div>
 
-      {callable && (
-        <a href={`tel:${shopPhone}`} className={`${url ? 'btn-secondary' : 'btn-primary'} w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2`}>
+      {callable && call && (
+        <a href={`tel:${call.tel}`} className={`${url ? 'btn-secondary' : 'btn-primary'} w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2`}>
           <Phone size={14} aria-hidden="true" />
-          {t('aiOrder.status.callShop', { shop: order.shopName, phone: formatPhone(shopPhone) })}
+          {t('aiOrder.status.callShop', { shop: order.shopName, phone: call.display })}
         </a>
       )}
 

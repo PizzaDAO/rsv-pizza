@@ -415,3 +415,32 @@ describe('POST /api/pizza-mcp/webhook: pizza-mcp 5320d6a', () => {
     expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
   });
 });
+
+describe('pizza-mcp 64fb2ac: a price approval webhook carries the real hold', () => {
+  it('reads hold_until from the approval view before the transaction and stores it on the next action', async () => {
+    const { PizzaMcpClient, setPizzaMcpClientForTests } = await import('../services/pizzaMcp.client.js');
+    const hold = new Date(Date.now() + 180_000).toISOString();
+    const seen: string[] = [];
+    setPizzaMcpClientForTests(
+      new PizzaMcpClient({
+        baseUrl: 'https://api.openpizza.xyz',
+        fetchImpl: (async (u: any, init: any) => {
+          seen.push(`${init.method} ${new URL(String(u)).pathname} auth=${init.headers.Authorization ? 'yes' : 'no'}`);
+          return new Response(JSON.stringify({ id: 'lconf_p1', kind: 'price_increase', status: 'pending', hold_until: hold, live: true }), { status: 200 });
+        }) as typeof fetch,
+      })
+    );
+    try {
+      const na = { type: 'open_url', url: 'https://api.openpizza.xyz/confirm/lconf_p1', expires_at: new Date(Date.now() + 900_000).toISOString(), message: 'm' };
+      const res = await post(delivery(opopOrder({ status: 'awaiting_price_approval', next_action: na }, 3)));
+      expect(res.status).toBe(200);
+      expect(seen).toEqual(['GET /api/v1/confirmations/lconf_p1 auth=no']);
+      expect(fake.byOpop('ord_1').nextAction).toMatchObject({ url: na.url, hold_until: hold, live: true });
+      // any other status: no extra call
+      await post(delivery(opopOrder({ status: 'calling' }, 4)));
+      expect(seen).toHaveLength(1);
+    } finally {
+      setPizzaMcpClientForTests(null);
+    }
+  });
+});

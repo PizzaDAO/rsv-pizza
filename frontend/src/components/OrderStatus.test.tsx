@@ -366,12 +366,35 @@ describe('OrderStatus', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Nope.');
   });
 
-  it('UX audit P0-2: a price approval shows the quote, the limit and a countdown to the deadline in the view', () => {
-    const at = new Date(Date.now() + 150_000).toISOString();
-    const o = order({ status: 'awaiting_price_approval', confirmedTotalCents: null, call: { shop_total_cents: 23450 }, nextAction: { type: 'open_url', url: 'https://x/confirm', expires_at: at } });
-    render(<OrderStatus partyId="p" order={o} orderScript="" timeZone="America/New_York" onUpdate={noop} onDone={noop} />);
-    expect(document.body.textContent).toMatch(/Sal's quoted \$234\.50 \(over your \$210\.00\)\. Approve or decline from the email we sent you before /);
-    expect(screen.getByText(/^2:[0-9]{2} left to answer$|^2:30 left to answer$/)).toBeTruthy();
+  it('UX audit P0-2 / pizza-mcp 64fb2ac: a price approval counts down to the shop\'s hold (holdUntil), not the link expiry', () => {
+    const hold = new Date(Date.now() + 150_000).toISOString();
+    const linkExpiry = new Date(Date.now() + 15 * 60_000).toISOString();
+    const o = order({ status: 'awaiting_price_approval', confirmedTotalCents: null, call: { shop_total_cents: 23450 }, holdUntil: hold, nextAction: { type: 'open_url', url: 'https://x/confirm', expires_at: linkExpiry } });
+    const { unmount } = render(<OrderStatus partyId="p" order={o} orderScript="" timeZone="America/New_York" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/Sal's quoted \$234\.50 \(over your \$210\.00\)\. Approve or decline from the email we sent you\. Sal's is holding the line until /);
+    expect(screen.getByText(/^2:[0-9]{2} left to answer$/)).toBeTruthy();
+    unmount();
+    // only the link's expiry: no countdown (it would say 14 minutes while the shop hangs up after 3)
+    render(<OrderStatus partyId="p" order={{ ...o, holdUntil: null }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/left to answer/)).toBeNull();
+    expect(document.body.textContent).toMatch(/holding the line, so please answer quickly/);
+  });
+
+  it('pizza-mcp 64fb2ac: the Call button uses the order view\'s shop number, and the listing only as a fallback', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'refused', shop: { name: "Sal's", phone: '+16175550101', phoneDisplay: '(617) 555-0101' } })} orderScript="x" shopPhone="+19995550000" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', shop: null })} orderScript="x" shopPhone="+16175550199" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Call Sal's · (617) 555-0199").closest('a')?.getAttribute('href')).toBe('tel:+16175550199');
+  });
+
+  it('pizza-mcp 64fb2ac: no approval link once pizza-mcp says approving can do nothing (live: false)', () => {
+    const na = { type: 'open_url' as const, url: 'https://x/confirm/lconf_1', expires_at: new Date(Date.now() + 600_000).toISOString() };
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'awaiting_price_approval', nextAction: { ...na, live: true } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Review the higher price')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'awaiting_price_approval', nextAction: { ...na, live: false } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Review the higher price')).toBeNull();
   });
 
   it('UX audit P2-1/P2-6: the limit reads as a limit before approval, and the next try has the zone and no seconds', () => {

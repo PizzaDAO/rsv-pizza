@@ -73,7 +73,10 @@ export interface NextAction {
   type: 'open_url' | 'none';
   url?: string | null;
   message?: string;
+  /** When the approval LINK expires. Not the shop's hold: see PizzaOrderView.holdUntil. */
   expires_at?: string | null;
+  /** pizza-mcp 64fb2ac, read from the approval page's view by our backend: false once approving can do nothing. */
+  live?: boolean;
 }
 export interface PizzaOrderView {
   id: string;
@@ -102,6 +105,13 @@ export interface PizzaOrderView {
   /** Append-only status history from pizza-mcp. */
   timeline?: Array<{ at: string; status: string }>;
   nextAction: NextAction | null;
+  /**
+   * pizza-mcp 64fb2ac: while a price approval waits, when the shop stops holding the line (3 minutes after the
+   * shop's quote), from the approval page's `hold_until`. null when unknown: then there is no countdown.
+   */
+  holdUntil?: string | null;
+  /** pizza-mcp 64fb2ac OrderView.shop: the name and number the order was placed with (E.164 or null). */
+  shop?: { name: string | null; phone: string | null; phoneDisplay: string | null } | null;
   /**
    * What pizza-mcp says happened when the order ended without a confirmation. null/absent while in flight,
    * confirmed, or when pizza-mcp does not send it (older versions): the copy must then stay cautious.
@@ -286,12 +296,23 @@ export interface StatusInfo {
 }
 
 type StatusInput = Pick<PizzaOrderView, 'status' | 'shopName' | 'confirmedTotalCents' | 'readyAtText' | 'call' | 'outcome'> &
-  Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released' | 'timeline' | 'isMine' | 'nextAction' | 'ceilingCents'>;
+  Pick<Partial<PizzaOrderView>, 'restartable' | 'releasable' | 'released' | 'timeline' | 'isMine' | 'nextAction' | 'ceilingCents' | 'holdUntil'>;
 
-/** The approval deadline in the view, if any: for a price approval, the link's expiry (pizza-mcp sets it). */
-export function approvalDeadline(o: Pick<Partial<PizzaOrderView>, 'nextAction'>): string | null {
-  const iso = o.nextAction?.type === 'open_url' ? o.nextAction.expires_at ?? null : null;
+/**
+ * The price approval's deadline: when the shop stops holding the line (pizza-mcp's `hold_until`, 3 minutes). Never
+ * `next_action.expires_at`: that is when the link expires, long after the shop has hung up. null when unknown.
+ */
+export function approvalDeadline(o: Pick<Partial<PizzaOrderView>, 'status' | 'holdUntil'>): string | null {
+  if (o.status !== 'awaiting_price_approval') return null;
+  const iso = o.holdUntil ?? null;
   return iso && !Number.isNaN(Date.parse(iso)) ? iso : null;
+}
+
+/** The number for a Call button: the one pizza-mcp placed the order with, else the listing's. */
+export function callNumber(o: Pick<Partial<PizzaOrderView>, 'shop'>, listingPhone?: string | null): { tel: string; display: string } | null {
+  const tel = o.shop?.phone || listingPhone || null;
+  if (!tel) return null;
+  return { tel, display: (o.shop?.phone && o.shop.phoneDisplay) || formatPhone(tel) };
 }
 
 const CHECK_CAUTION = "Please don't order again until you've checked with them.";
@@ -425,13 +446,17 @@ export function statusInfo(o: StatusInput, now = Date.now(), opts: { timeZone?: 
       // pizza-mcp sends one email with the price, the deadline and a one-tap approve link.
       const limit = formatCents(o.ceilingCents ?? null);
       const quoted = `${o.shopName} quoted ${total || 'more than your limit'}${limit && total ? ` (over your ${limit})` : ''}.`;
+      // pizza-mcp 64fb2ac: the deadline is the shop's real hold (hold_until). After it, approving still works: we
+      // call the shop back at that price. So the hold is "answer before then", never "the offer is gone".
       const deadline = approvalDeadline(o);
-      const by = deadline ? ` before ${formatWhen(deadline, opts.timeZone)}` : '';
+      const hold = deadline
+        ? `${o.shopName} is holding the line until ${formatWhen(deadline, opts.timeZone)}.`
+        : `${o.shopName} is holding the line, so please answer quickly.`;
       return {
         title: `${o.shopName} quoted a higher price`,
         detail: mine
-          ? `${quoted} Approve or decline from the email we sent you${by}.${deadline ? '' : ` ${o.shopName} is holding the line, so please answer quickly.`}`
-          : `${quoted} The host who placed it can approve or decline from their email${by}.`,
+          ? `${quoted} Approve or decline from the email we sent you. ${hold}`
+          : `${quoted} The host who placed it can approve or decline from their email. ${hold}`,
         tone: 'action',
       };
     }

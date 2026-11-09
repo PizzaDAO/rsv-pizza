@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { PizzaRecommendation } from '../types';
 import {
   shopBadge, toE164, statusInfo, defaultPickupLocal, isTerminalStatus, toRecommendationPayload, formatCents, orderToResume, PizzaOrderView, StatusInfo,
-  zonedLocalToIso, toZonedLocal, formatWhen, formatPhone, approvalDeadline,
+  zonedLocalToIso, toZonedLocal, formatWhen, formatPhone, approvalDeadline, callNumber,
 } from './pizzaOrder';
 
 /** Everything the host reads on the card: title, why line, steps and the caution line. */
@@ -329,19 +329,34 @@ describe('UX audit copy (basil-14648)', () => {
     expect(co.title).toBe("Waiting for approval of the call to Sal's");
     expect(full(co)).not.toMatch(/enter it|we email you/i);
   });
-  it('P0-2: a price approval names the quote, the limit and (when the view has one) the deadline', () => {
-    const at = '2026-11-14T22:12:00Z';
+  it('P0-2 / pizza-mcp 64fb2ac: a price approval names the quote, the limit and the shop\'s real hold (hold_until), never the link expiry', () => {
+    const hold = '2026-11-14T22:03:00Z';
+    const linkExpiry = '2026-11-14T22:12:00Z';
+    const nextAction = { type: 'open_url' as const, url: 'https://x', expires_at: linkExpiry };
     const s = statusInfo(
-      { ...base, status: 'awaiting_price_approval', ceilingCents: 21000, call: { shop_total_cents: 23450 }, nextAction: { type: 'open_url', url: 'https://x', expires_at: at } },
+      { ...base, status: 'awaiting_price_approval', ceilingCents: 21000, call: { shop_total_cents: 23450 }, nextAction, holdUntil: hold },
       Date.now(),
       { timeZone: 'America/New_York' }
     );
     expect(s.title).toBe("Sal's quoted a higher price");
-    expect(s.detail).toBe("Sal's quoted $234.50 (over your $210.00). Approve or decline from the email we sent you before Sat, 5:12 PM EST.");
-    expect(approvalDeadline({ nextAction: { type: 'open_url', url: 'https://x', expires_at: at } })).toBe(at);
-    const plain = statusInfo({ ...base, status: 'awaiting_price_approval', ceilingCents: 21000, call: { shop_total_cents: 23450 } });
-    expect(plain.detail).toBe("Sal's quoted $234.50 (over your $210.00). Approve or decline from the email we sent you. Sal's is holding the line, so please answer quickly.");
-    expect(approvalDeadline({ nextAction: null })).toBeNull();
+    expect(s.detail).toBe("Sal's quoted $234.50 (over your $210.00). Approve or decline from the email we sent you. Sal's is holding the line until Sat, 5:03 PM EST.");
+    expect(approvalDeadline({ status: 'awaiting_price_approval', holdUntil: hold })).toBe(hold);
+    // the link's expiry alone is NOT a deadline: no "until", no countdown
+    const linkOnly = statusInfo({ ...base, status: 'awaiting_price_approval', ceilingCents: 21000, call: { shop_total_cents: 23450 }, nextAction });
+    expect(linkOnly.detail).toBe("Sal's quoted $234.50 (over your $210.00). Approve or decline from the email we sent you. Sal's is holding the line, so please answer quickly.");
+    expect(approvalDeadline({ status: 'awaiting_price_approval', holdUntil: null })).toBeNull();
+    expect(approvalDeadline({ status: 'awaiting_price_approval', holdUntil: 'soon' })).toBeNull();
+    expect(approvalDeadline({ status: 'calling', holdUntil: hold })).toBeNull();
+    const co = statusInfo({ ...base, status: 'awaiting_price_approval', isMine: false, ceilingCents: 21000, call: { shop_total_cents: 23450 }, holdUntil: hold }, Date.now(), { timeZone: 'America/New_York' });
+    expect(co.detail).toBe("Sal's quoted $234.50 (over your $210.00). The host who placed it can approve or decline from their email. Sal's is holding the line until Sat, 5:03 PM EST.");
+  });
+
+  it('pizza-mcp 64fb2ac: the Call number is the order view\'s shop.phone, falling back to the listing', () => {
+    expect(callNumber({ shop: { name: 'S', phone: '+16175550101', phoneDisplay: '(617) 555-0101' } }, '+19999999999')).toEqual({ tel: '+16175550101', display: '(617) 555-0101' });
+    expect(callNumber({ shop: { name: 'S', phone: '+16175550101', phoneDisplay: null } })).toEqual({ tel: '+16175550101', display: '(617) 555-0101' });
+    expect(callNumber({ shop: { name: 'S', phone: null, phoneDisplay: null } }, '+16175550199')).toEqual({ tel: '+16175550199', display: '(617) 555-0199' });
+    expect(callNumber({ shop: null }, '+16175550199')).toEqual({ tel: '+16175550199', display: '(617) 555-0199' });
+    expect(callNumber({}, null)).toBeNull();
   });
   it('P2-4/P2-5: canceled is not an error and says what to check; an unknown status is not shown raw', () => {
     const c = statusInfo({ ...base, status: 'canceled' });

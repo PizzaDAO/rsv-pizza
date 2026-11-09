@@ -24,6 +24,7 @@ import {
 } from '../services/pizzaMcp.client.js';
 import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
 import { notifyHostOfOrder } from '../services/pizzaOrderNotify.js';
+import { withApprovalHold, holdUntilOf } from '../services/pizzaApproval.js';
 
 /**
  * basil-14648: AI / OPOP ordering endpoints (plan §10). Mounted on /api/parties.
@@ -55,6 +56,15 @@ function opopIdParam(v: string): string {
   return v;
 }
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const strOrNull = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+
+/** OrderView.shop, only well-formed parts: a tel: link must only ever get an E.164 number. */
+function shopOf(view: any): { name: string | null; phone: string | null; phoneDisplay: string | null } | null {
+  const s = isObj(view?.shop) ? view.shop : null;
+  if (!s) return null;
+  const phone = typeof s.phone === 'string' && E164_RE.test(s.phone) ? s.phone : null;
+  return { name: strOrNull(s.name), phone, phoneDisplay: phone ? strOrNull(s.phone_display) : null };
+}
 const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
 function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boolean } = {}) {
@@ -80,6 +90,11 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
     timeline: view?.timeline ?? [],
     // the approval link belongs to the host who placed the order
     nextAction: forOwner ? row.nextAction : null,
+    // pizza-mcp 64fb2ac: the shop's real hold on a price approval (3 minutes), from the approval page's view. Not
+    // `next_action.expires_at` (the link's expiry). Not secret: a co-host sees how long the shop waits too.
+    holdUntil: holdUntilOf(row),
+    // pizza-mcp 64fb2ac OrderView.shop: the name and number the order was placed with, for the Call button
+    shop: shopOf(view),
     isMine: forOwner,
     restartable: isRestartable(row),
     // keep polling a fresh confirmation: the post-call check can still downgrade it
@@ -172,6 +187,16 @@ interface LineIssue {
   ask_user: string;
   unmatched: string[];
   choices: Array<{ id: Decision; label: string }>;
+}
+
+/** The party's name as pizza-mcp's `phone_order.party_name` takes it: one line, at most 80 characters. */
+export function partyLabel(name: string | null | undefined): string | null {
+  const one = (name ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!one) return null;
+  // pizza-mcp counts UTF-16 units (zod max 80): cut there, never inside a surrogate pair
+  let cut = one.slice(0, 80);
+  if (/[\ud800-\udbff]$/.test(cut)) cut = cut.slice(0, -1);
+  return cut.trim() || null;
 }
 
 const lineLabel = (s: OrderLineSpec) => s.label || `${s.quantity} x ${s.diameter ? `${s.diameter}" ` : ''}${s.style || 'pizza'}`.trim();
@@ -455,6 +480,7 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     }
 
     const contact = { name, phone, ...(email ? { email } : {}) };
+    const partyName = partyLabel(party.name);
     const client_ref = { party_id: party.id, rsvp_user_id: req.userId as string };
     const request: OpopPlaceOrderRequest =
       tier === 'listing'
@@ -467,6 +493,9 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
               substitution_policy: substitution,
               ...(minPizzaCount ? { min_pizza_count: minPizzaCount } : {}),
               transfer_to_host: pol.transferToHost === true,
+              // pizza-mcp 64fb2ac: names the order in the host's emails (subjects too) and on the approval page, never
+              // read to the shop. The party's own name, at most 80 characters.
+              ...(partyName ? { party_name: partyName } : {}),
             },
             max_total_cents: remaining,
             client_ref,
@@ -582,7 +611,9 @@ router.get('/:partyId/pizza/orders/:orderId', requireAuth, async (req: AuthReque
     // stored state; we never mint a token in someone else's name).
     if (mine && (!isTerminal(row.status) || isSettling(row))) {
       try {
-        const live = await getPizzaMcpClient().getOrder(actorFor(req, party), orderId);
+        const client = getPizzaMcpClient();
+        // the real hold deadline is read before the transaction: no network call inside it
+        const live = await withApprovalHold(client, await client.getOrder(actorFor(req, party), orderId));
         const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, live, { clientRef: { party_id: party.id, rsvp_user_id: row!.userId } }));
         if (result.row) row = result.row;
         if (result.draftCreated && result.row) await notifyHostOfOrder(result.row);

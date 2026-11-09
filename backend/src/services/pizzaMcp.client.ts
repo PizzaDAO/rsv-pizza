@@ -28,6 +28,25 @@ export type OpopPlaceOrderResult = S['PlaceOrderResult'];
 export type OpopOrder = S['Order'];
 export type OpopProblem = S['Problem'];
 
+/**
+ * What rsv reads of pizza-mcp's approval-page view (`GET /confirmations/{id}`, a public endpoint). It is not in the
+ * spec (the response there is untyped), so this is the subset rsv relies on, from pizza-mcp 64fb2ac
+ * `ConfirmationView` (services/listing-approval.ts). Every field is optional here: an older pizza-mcp omits them.
+ */
+export interface OpopConfirmation {
+  id: string;
+  kind?: 'place' | 'price_increase';
+  status?: string;
+  expires_at?: string;
+  /** A price approval while the shop holds the line: when the hold ends (ISO). null otherwise. */
+  hold_until?: string | null;
+  /** Whether approving can still do anything (pending, unexpired, and the order still waiting on it). */
+  live?: boolean;
+  ended_by?: 'host' | 'too_many_codes' | 'client' | null;
+  client_name?: string | null;
+  party_name?: string | null;
+}
+
 /** Who is acting. The token is minted from this on every request. */
 export interface OpopActor {
   userId: string;
@@ -92,18 +111,26 @@ export class PizzaMcpClient {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
+  /** `actor: null` sends no token: only for pizza-mcp's public (human page) endpoints. */
   private async request<T>(
-    actor: OpopActor,
+    actor: OpopActor | null,
     method: 'GET' | 'POST' | 'PATCH',
     path: string,
-    opts: { query?: Record<string, string | number | boolean | undefined>; body?: unknown; headers?: Record<string, string> } = {}
+    opts: {
+      query?: Record<string, string | number | boolean | undefined>;
+      body?: unknown;
+      headers?: Record<string, string>;
+      timeoutMs?: number;
+    } = {}
   ): Promise<T> {
     if (!this.baseUrl) throw new AppError('Ordering is not configured', 503, 'PIZZA_MCP_NOT_CONFIGURED');
-    let token: string;
-    try {
-      token = mintPizzaMcpToken(actor);
-    } catch {
-      throw new AppError('Ordering is not configured', 503, 'PIZZA_MCP_NOT_CONFIGURED');
+    let token: string | null = null;
+    if (actor) {
+      try {
+        token = mintPizzaMcpToken(actor);
+      } catch {
+        throw new AppError('Ordering is not configured', 503, 'PIZZA_MCP_NOT_CONFIGURED');
+      }
     }
     const url = new URL(`${this.baseUrl}${API_PREFIX}${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {})) {
@@ -114,14 +141,14 @@ export class PizzaMcpClient {
       res = await this.fetchImpl(url.toString(), {
         method,
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: 'application/json',
           ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           ...opts.headers,
         },
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         redirect: 'error',
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? this.timeoutMs),
       });
     } catch {
       throw new AppError('The ordering service is unreachable. Try again in a minute.', 502, 'PIZZA_MCP_UNAVAILABLE');
@@ -192,6 +219,15 @@ export class PizzaMcpClient {
 
   getOrder(actor: OpopActor, orderId: string) {
     return this.request<OpopOrder>(actor, 'GET', `/orders/${encodeURIComponent(orderId)}`);
+  }
+
+  /**
+   * The approval page's view of one confirmation. Public on pizza-mcp (the page reads it with no login), so no token
+   * is minted: this also works from the webhook, where no host is acting. Short timeout: callers treat a failure as
+   * "no extra detail", never as an error.
+   */
+  getConfirmation(confirmationId: string, timeoutMs = 3000) {
+    return this.request<OpopConfirmation>(null, 'GET', `/confirmations/${encodeURIComponent(confirmationId)}`, { timeoutMs });
   }
 }
 

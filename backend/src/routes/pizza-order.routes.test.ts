@@ -28,6 +28,7 @@ vi.mock('../services/pizzaOrderNotify.js', () => ({ notifyHostOfOrder: m.notify 
 import router from './pizza-order.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { PizzaMcpClient, setPizzaMcpClientForTests, orderIdempotencyKey } from '../services/pizzaMcp.client.js';
+import { partyLabel } from './pizza-order.routes.js';
 
 const host = { 'x-user-id': 'host1', 'x-user-email': 'host@x.com' };
 const stranger = { 'x-user-id': 'bad1', 'x-user-email': 'bad@x.com' };
@@ -1133,5 +1134,90 @@ describe('pizza-mcp 662d51c: checking before confirmed_by_shop, pending_operator
     const item = (await request(app()).get(`${base}/orders`).set(host)).body.orders[0];
     expect(item).toMatchObject({ blocking: false, releasable: false, outcome: { nothing_ordered: true, reason: 'pending_operator_review' } });
     expect((await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents).toBe(25000);
+  });
+});
+
+describe('pizza-mcp 64fb2ac: party_name, OrderView.shop, the real price-approval hold', () => {
+  const poll = (id: string) => request(app()).get(`${base}/orders/${id}`).set(host);
+  const useMcp = (over: Record<string, any>) => {
+    mcp = pizzaMcp(over);
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  };
+
+  it('sends the party name as phone_order.party_name (one line, at most 80 UTF-16 units), and none for a blank name', async () => {
+    await placeFrom(await buildCart());
+    expect(mcp.calls.find((x) => x.method === 'POST' && x.path === '/orders')!.body.phone_order).toEqual({
+      price_ceiling_cents: 21000, substitution_policy: 'exact', transfer_to_host: false, party_name: 'Pizza Party',
+    });
+    expect(partyLabel('  Sam\'s\n\tbirthday   party ')).toBe("Sam's birthday party");
+    expect(partyLabel('x'.repeat(200))).toHaveLength(80);
+    // an emoji is two UTF-16 units: the cut never leaves half of one
+    const e = partyLabel('a' + '🍕'.repeat(60))!;
+    expect(e.length).toBeLessThanOrEqual(80);
+    expect(/[\ud800-\udbff]$/.test(e)).toBe(false);
+    expect(partyLabel('   ')).toBeNull();
+    expect(partyLabel(null)).toBeNull();
+    setParty({ name: '   ' });
+    useMcp({});
+    fake.orders.clear();
+    expect((await placeFrom(await buildCart())).status).toBe(201);
+    expect(mcp.calls.find((x) => x.method === 'POST' && x.path === '/orders')!.body.phone_order.party_name).toBeUndefined();
+  });
+
+  it('OrderView.shop reaches the order as shop {name, phone, phoneDisplay}; a phone that is not E.164 is dropped', async () => {
+    const placed = await placeFrom(await buildCart());
+    const id = placed.body.order.opopOrderId;
+    useMcp({ 'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'calling', shop: { name: "Sal's Pizza", phone: '+16175550101', phone_display: '(617) 555-0101' } }, 3) }) });
+    expect((await poll(id)).body.order.shop).toEqual({ name: "Sal's Pizza", phone: '+16175550101', phoneDisplay: '(617) 555-0101' });
+    useMcp({ 'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'calling', shop: { name: "Sal's", phone: 'javascript:alert(1)', phone_display: 'x' } }, 4) }) });
+    expect((await poll(id)).body.order.shop).toEqual({ name: "Sal's", phone: null, phoneDisplay: null });
+    useMcp({ 'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'calling' }, 5) }) });
+    expect((await poll(id)).body.order.shop).toBeNull();
+  });
+
+  it('a price approval reads hold_until from the approval page view (no token sent) and never uses next_action.expires_at', async () => {
+    const placed = await placeFrom(await buildCart());
+    const id = placed.body.order.opopOrderId;
+    const linkExpiry = new Date(Date.now() + 15 * 60_000).toISOString();
+    const hold = new Date(Date.now() + 3 * 60_000).toISOString();
+    const na = { type: 'open_url', url: 'https://api.openpizza.xyz/confirm/lconf_abc123', expires_at: linkExpiry, message: 'approve' };
+    useMcp({
+      'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'awaiting_price_approval', next_action: na, call: { shop_total_cents: 23450 } }, 4) }),
+      'GET /confirmations/:id': (c: any) => ({ json: { id: c.path.split('/').pop(), kind: 'price_increase', status: 'pending', expires_at: linkExpiry, hold_until: hold, live: true } }),
+    });
+    const o = (await poll(id)).body.order;
+    expect(o.holdUntil).toBe(hold);
+    expect(o.holdUntil).not.toBe(linkExpiry);
+    expect(o.nextAction).toMatchObject({ url: na.url, expires_at: linkExpiry, hold_until: hold, live: true });
+    const conf = mcp.calls.find((x) => x.path === '/confirmations/lconf_abc123')!;
+    expect(conf.method).toBe('GET');
+    expect(conf.headers.authorization).toBeUndefined();
+    // a co-host sees the hold too (no link)
+    const co = (await request(app()).get(`${base}/orders`).set(cohostEditor)).body.orders[0];
+    expect(co).toMatchObject({ holdUntil: hold, nextAction: null });
+  });
+
+  it('no hold without a price approval, and a failing or odd approval view leaves it out without failing the poll', async () => {
+    const placed = await placeFrom(await buildCart());
+    const id = placed.body.order.opopOrderId;
+    const na = { type: 'open_url', url: 'https://api.openpizza.xyz/confirm/lconf_abc123', expires_at: new Date(Date.now() + 600_000).toISOString(), message: 'approve' };
+    useMcp({ 'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'awaiting_approval', next_action: na }, 2) }) });
+    expect((await poll(id)).body.order.holdUntil).toBeNull();
+    expect(mcp.calls.some((x) => x.path.startsWith('/confirmations/'))).toBe(false);
+    for (const [k, answer] of [
+      [3, { status: 500, json: { code: 'INTERNAL', title: 'boom', status: 500 } }],
+      [4, { json: { id: 'lconf_other', kind: 'price_increase', hold_until: new Date().toISOString() } }],
+      [5, { json: { id: 'lconf_abc123', kind: 'place', hold_until: new Date().toISOString() } }],
+      [6, { json: { id: 'lconf_abc123', kind: 'price_increase', hold_until: 'soon' } }],
+    ] as const) {
+      useMcp({
+        'GET /orders/:id': () => ({ json: opopOrder({ id, status: 'awaiting_price_approval', next_action: na }, k) }),
+        'GET /confirmations/:id': () => answer,
+      });
+      const res = await poll(id);
+      expect(res.status).toBe(200);
+      expect(res.body.order.status).toBe('awaiting_price_approval');
+      expect(res.body.order.holdUntil).toBeNull();
+    }
   });
 });

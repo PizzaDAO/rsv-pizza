@@ -62,7 +62,8 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   const [uncallable, setUncallable] = useState<ReadonlySet<string>>(() => new Set());
   const [uncallableNotice, setUncallableNotice] = useState<{ message: string; shopName: string; phone: string | null } | null>(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
-  // shop phones from the listing (pizza-mcp's order view has none): for the Call button on the status card
+  // shop phones from the listing: the Call button's fallback when the order view has no `shop.phone` (pizza-mcp
+  // before 64fb2ac, or a row stored before it)
   const [phones, setPhones] = useState<ReadonlyMap<string, string>>(() => new Map());
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstStep = useRef(true);
@@ -109,9 +110,11 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     };
   }, [partyId, loadAttempt]);
 
-  // A resumed order has no shop from this session: look its phone up in the listing once.
+  // A resumed order has no shop from this session: look its phone up in the listing once, unless pizza-mcp's order
+  // view already names the number the order was placed with.
+  const viewPhone = order?.shop?.phone ?? null;
   useEffect(() => {
-    if (!partyId || step !== 'status' || !order || phones.has(order.shopId)) return;
+    if (!partyId || step !== 'status' || !order || viewPhone || phones.has(order.shopId)) return;
     let cancelled = false;
     getPizzaShops(partyId)
       .then((r) => !cancelled && rememberPhones(r.pizzerias))
@@ -119,7 +122,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     return () => {
       cancelled = true;
     };
-  }, [partyId, step, order, phones, rememberPhones]);
+  }, [partyId, step, order, viewPhone, phones, rememberPhones]);
 
   // Move focus to the step's heading when the step changes (not on first render), so screen readers follow.
   useEffect(() => {

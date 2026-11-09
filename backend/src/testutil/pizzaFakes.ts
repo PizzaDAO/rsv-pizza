@@ -182,7 +182,10 @@ export function makeFakePizzaMcp(
     for (const [k, v] of Object.entries(init.headers ?? {})) headers[k.toLowerCase()] = String(v);
     const token = (headers.authorization ?? '').replace(/^Bearer /, '');
     let claims: jwt.JwtPayload;
-    try {
+    // pizza-mcp's human-page endpoints are public: GET /confirmations/{id} needs (and gets) no token
+    const isPublic = (init.method ?? 'GET') === 'GET' && /^\/api\/v1\/confirmations\/[^/]+$/.test(url.pathname) && !headers.authorization;
+    if (isPublic) claims = {};
+    else try {
       const pub = crypto.createPublicKey({ key: publicJwks()!.keys[0] as any, format: 'jwk' });
       claims = jwt.verify(token, pub, { algorithms: ['ES256'], issuer: 'https://api.rsv.pizza', audience: base }) as jwt.JwtPayload; // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
       if (claims.azp !== 'rsv.pizza' || !String(claims.sub).startsWith('rsvpizza:') || claims.exp! - claims.iat! > 600) throw new Error('claims'); // brand-check-ignore-line (OPOP client id / issuer, fixed by the trust contract)
