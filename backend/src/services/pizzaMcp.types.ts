@@ -323,7 +323,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** (Human page) confirmation summary */
+        /**
+         * (Human page) confirmation summary
+         * @description Public: the approval page reads it with no login. Phone-order confirmations (lconf_*) carry every field (shop, party, hold_until, live, ended_by...); native ones only id, status, summary, total_cents, expires_at and requested_by.
+         */
         get: operations["getConfirmation"];
         put?: never;
         /** (Human page) approve/decline. Approving needs the 6-digit code sent to the customer, or, for a price approval, the secret link_token from the customer's price email (never returned by any API), so an agent cannot self-approve. */
@@ -1074,6 +1077,70 @@ export interface components {
             };
         } & {
             [key: string]: unknown;
+        };
+        Confirmation: {
+            id: string;
+            /** @enum {string} */
+            kind?: "place" | "price_increase";
+            /** @enum {string} */
+            status: "pending" | "approved" | "declined" | "expired";
+            summary: string;
+            total_cents: number;
+            /** @description When the approval (and a price email's link) stops working. */
+            expires_at: string;
+            /** @description The client id that placed the order. */
+            requested_by: string;
+            /** @description The client as a host reads it ("RSVP"); null: "your AI assistant". Never the raw client id. */
+            client_name?: string | null;
+            /** @description The order's `phone_order.party_name`, as shown to the host. */
+            party_name?: string | null;
+            /** @description The shop being called; its number as people write it. */
+            shop?: {
+                name: string | null;
+                phone: string | null;
+            } | null;
+            pickup?: {
+                time_text: string | null;
+                name: string;
+                callback: string | null;
+            } | null;
+            /** @description A price approval while the shop holds the line: when the hold ends (ISO; 3 minutes after the shop's quote). null otherwise. Not `expires_at`: approving after the hold still has the shop called back. */
+            hold_until?: string | null;
+            code?: {
+                sent: boolean;
+                sent_to: string | null;
+                tries_left: number;
+            };
+            /** @description Who closed a declined approval: host (page or email link), too_many_codes, client (the app canceled the order). null when not declined or not recorded. */
+            ended_by?: ("host" | "too_many_codes" | "client") | null;
+            /** @description Whether approving can still do anything (pending, unexpired, and the order still waiting on it). */
+            live?: boolean;
+            link_demo?: boolean;
+            order?: ({
+                id: string;
+                status: string;
+                shop_total_cents: number | null;
+                ready_at_text?: string | null;
+                checking?: {
+                    message: string;
+                } | null;
+                outcome?: {
+                    nothing_ordered: boolean;
+                    reason: string;
+                    message: string;
+                } | null;
+                deferred?: {
+                    until: string;
+                    message: string;
+                } | null;
+                hold_until?: string | null;
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            detail?: {
+                approved_ceiling_cents: number;
+                shop_total_cents: number | null;
+            } | null;
         };
         CancelRequest: {
             /** @default customer_request */
@@ -2283,7 +2350,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Confirmation"];
+                };
             };
             /** @description Error 404 (RFC 9457 problem+json, LLM-recoverable: see code, ask_user, suggestions) */
             404: {

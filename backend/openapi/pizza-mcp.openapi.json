@@ -1633,6 +1633,7 @@
         ],
         "operationId": "getConfirmation",
         "summary": "(Human page) confirmation summary",
+        "description": "Public: the approval page reads it with no login. Phone-order confirmations (lconf_*) carry every field (shop, party, hold_until, live, ended_by...); native ones only id, status, summary, total_cents, expires_at and requested_by.",
         "parameters": [
           {
             "name": "id",
@@ -1646,7 +1647,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Confirmation"
+            "description": "Confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Confirmation"
+                }
+              }
+            }
           },
           "404": {
             "description": "Error 404 (RFC 9457 problem+json, LLM-recoverable: see code, ask_user, suggestions)",
@@ -4896,6 +4904,338 @@
           "tracking_url"
         ],
         "additionalProperties": {}
+      },
+      "Confirmation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "place",
+              "price_increase"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "declined",
+              "expired"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "total_cents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "When the approval (and a price email's link) stops working."
+          },
+          "requested_by": {
+            "type": "string",
+            "description": "The client id that placed the order."
+          },
+          "client_name": {
+            "description": "The client as a host reads it (\"RSVP\"); null: \"your AI assistant\". Never the raw client id.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "party_name": {
+            "description": "The order's `phone_order.party_name`, as shown to the host.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shop": {
+            "description": "The shop being called; its number as people write it.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "phone"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "time_text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "callback": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "time_text",
+                  "name",
+                  "callback"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hold_until": {
+            "description": "A price approval while the shop holds the line: when the hold ends (ISO; 3 minutes after the shop's quote). null otherwise. Not `expires_at`: approving after the hold still has the shop called back.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "object",
+            "properties": {
+              "sent": {
+                "type": "boolean"
+              },
+              "sent_to": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tries_left": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "sent",
+              "sent_to",
+              "tries_left"
+            ],
+            "additionalProperties": false
+          },
+          "ended_by": {
+            "description": "Who closed a declined approval: host (page or email link), too_many_codes, client (the app canceled the order). null when not declined or not recorded.",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "too_many_codes",
+                  "client"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "live": {
+            "description": "Whether approving can still do anything (pending, unexpired, and the order still waiting on it).",
+            "type": "boolean"
+          },
+          "link_demo": {
+            "type": "boolean"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "shop_total_cents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "ready_at_text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checking": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "nothing_ordered": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nothing_ordered",
+                          "reason",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deferred": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "until": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "until",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "hold_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "status",
+                  "shop_total_cents"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "approved_ceiling_cents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "shop_total_cents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "approved_ceiling_cents",
+                  "shop_total_cents"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "summary",
+          "total_cents",
+          "expires_at",
+          "requested_by"
+        ],
+        "additionalProperties": false
       },
       "CancelRequest": {
         "type": "object",
