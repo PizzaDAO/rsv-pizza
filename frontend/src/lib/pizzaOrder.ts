@@ -190,6 +190,8 @@ export interface PizzaOrderConfig {
   heldOrderId?: string | null;
   /** basil-14648 P2: or the host's own "I ordered it online" mark that holds it. */
   heldHandoffId?: string | null;
+  /** How that mark was placed and whether the viewer placed it (for honest copy). */
+  heldHandoff?: { id: string; shopName: string; provider: HandoffProvider; isMine: boolean } | null;
   location: { lat: number | null; lng: number | null; address: string | null } | null;
 }
 export const getPizzaOrderConfig = (partyId: string) => apiRequest<PizzaOrderConfig>(`${base(partyId)}/config`);
@@ -280,7 +282,8 @@ export const getPizzaOrder = (partyId: string, orderId: string) =>
 
 // ---- basil-14648 P2: "Order online" handoff --------------------------------
 
-export type HandoffProvider = OrderingProvider | 'phone';
+/** How the host says they ordered: on one of the shop's pages, by phone, or in person. */
+export type HandoffProvider = OrderingProvider | 'phone' | 'in_person';
 export interface PizzaHandoffView {
   id: string;
   shopId: string;
@@ -290,6 +293,14 @@ export interface PizzaHandoffView {
   cartId: string | null;
   /** What the mark holds of the budget (the quote's price ceiling); 0 when not marked. */
   holdCents: number;
+  /** pizza-mcp's estimate for the checklist's cart, when there was one. */
+  estimateCents?: number | null;
+  /** Marked, but holding less than the estimate: what was left of the budget did not cover it. */
+  overBudget?: boolean;
+  /** Taken back by the host who marked it ("I didn't order after all"). */
+  releasedByOwner?: boolean;
+  /** Taken back (or released) by the viewer. */
+  releasedByMe?: boolean;
   clickedAt: string | null;
   orderedAt: string | null;
   releasedAt: string | null;
@@ -308,8 +319,14 @@ export const recordPizzaHandoff = (
   input: { shopId: string; shopName: string; provider: HandoffProvider; cartId?: string | null; opened?: boolean }
 ) => apiRequest<{ handoff: PizzaHandoffView }>(`${base(partyId)}/handoffs`, { method: 'POST', body: input });
 
-export const markPizzaHandoff = (partyId: string, handoffId: string, action: 'ordered' | 'unmark' | 'receipt_uploaded', allowAnother = false) =>
-  apiRequest<{ handoff: PizzaHandoffView }>(`${base(partyId)}/handoffs/${handoffId}/mark`, {
+/** `unmark`: the host who marked it. `release`: a co-host who checked that nothing was ordered. */
+export const markPizzaHandoff = (
+  partyId: string,
+  handoffId: string,
+  action: 'ordered' | 'unmark' | 'release' | 'receipt_uploaded',
+  allowAnother = false
+) =>
+  apiRequest<{ handoff: PizzaHandoffView; budget?: { capCents: number | null; leftCents: number; noCap: boolean } }>(`${base(partyId)}/handoffs/${handoffId}/mark`, {
     method: 'POST',
     body: { action, ...(allowAnother ? { allowAnother: true } : {}) },
   });

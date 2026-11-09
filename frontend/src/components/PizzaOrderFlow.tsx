@@ -10,14 +10,14 @@ import { HandoffPanel } from './HandoffPanel';
 import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
   getPizzaHandoffs, recordPizzaHandoff, handoffToResume,
-  isTerminalStatus, formatPhone, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderView, PizzaShop,
+  isTerminalStatus, formatPhone, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
 import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
 
 // basil-14648 P2: 'handoff' = a resumed "I ordered it online" mark (the host settles it there)
 type Step = 'loading' | 'shops' | 'cart' | 'status' | 'handoff';
 
-type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingHandoffId?: string; existingStatus?: string } };
+type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingHandoffId?: string; existingStatus?: string; existingShopName?: string } };
 
 interface PizzaOrderFlowProps {
   /** Shown when this party is not in the pilot (and, unless `gated`, while that is being checked). */
@@ -58,6 +58,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [heldOrderId, setHeldOrderId] = useState<string | null>(null);
   const [heldHandoffId, setHeldHandoffId] = useState<string | null>(null);
+  const [heldHandoff, setHeldHandoff] = useState<PizzaOrderConfig['heldHandoff']>(null);
   // basil-14648 P2: the cart step for "order it yourself" (checklist + the shop's own ordering page), and its row
   const [mode, setMode] = useState<'ai' | 'handoff'>('ai');
   const [handoff, setHandoff] = useState<PizzaHandoffView | null>(null);
@@ -96,6 +97,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setBlockedReason(cfg.blockedReason);
         setHeldOrderId(cfg.heldOrderId ?? null);
         setHeldHandoffId(cfg.heldHandoffId ?? null);
+        setHeldHandoff(cfg.heldHandoff ?? null);
         setHasLocation(!cfg.location || cfg.location.lat != null || !!cfg.location.address);
         // resume an order in flight (page reload while the AI is calling) or one a host still has to settle
         const [{ orders }, { handoffs }] = await Promise.all([
@@ -272,7 +274,13 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setStep('shops');
         } else if (err.code === 'ORDER_IN_PROGRESS') {
           // never silently place a second order: the host chooses
-          const existing = { existingOrderId: err.data?.existingOrderId, existingHandoffId: err.data?.existingHandoffId, existingStatus: err.data?.existingStatus };
+          // the server names the existing order's shop (an AI order or a handoff mark), for the second-order confirm
+          const existing = {
+            existingOrderId: err.data?.existingOrderId,
+            existingHandoffId: err.data?.existingHandoffId,
+            existingStatus: err.data?.existingStatus,
+            existingShop: err.data?.existingShopName,
+          };
           setInProgress(existing);
           setLastInput(input as never);
           if (existing.existingOrderId) {
@@ -311,6 +319,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setBlockedReason(cfg.blockedReason);
         setHeldOrderId(cfg.heldOrderId ?? null);
         setHeldHandoffId(cfg.heldHandoffId ?? null);
+        setHeldHandoff(cfg.heldHandoff ?? null);
       })
       .catch(() => undefined);
   }, [partyId]);
@@ -325,6 +334,8 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setBlockedReason(cfg.blockedReason);
           setHeldOrderId(cfg.heldOrderId ?? null);
           setHeldHandoffId(cfg.heldHandoffId ?? null);
+          setHeldHandoff(cfg.heldHandoff ?? null);
+        setHeldHandoff(cfg.heldHandoff ?? null);
         })
         .catch(() => undefined);
     },
@@ -352,11 +363,22 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // until the backend says this party is in the pilot, show only the normal notice (no flash of the flow)
   if (enabled !== true) return <>{fallback}</>;
 
+  // basil-14648 P2: say how the holding mark was placed, and by whom, in plain words
+  function heldHandoffCopy(): string {
+    const h = heldHandoff;
+    if (!h) return t('aiOrder.flow.blockedHeldHandoffOther', { shop: t('aiOrder.flow.firstShop') });
+    if (!h.isMine) return t('aiOrder.flow.blockedHeldHandoffOther', { shop: h.shopName });
+    if (h.provider === 'phone') return t('aiOrder.flow.blockedHeldHandoffPhone', { shop: h.shopName });
+    if (h.provider === 'in_person') return t('aiOrder.flow.blockedHeldHandoffInPerson', { shop: h.shopName });
+    if (h.provider === 'website') return t('aiOrder.flow.blockedHeldHandoffWebsite', { shop: h.shopName });
+    return t('aiOrder.flow.blockedHeldHandoffOnline', { provider: t(`aiOrder.handoff.providers.${h.provider}`) });
+  }
+
   const blockedCopy =
     blockedReason === 'NO_REIMBURSEMENT_CAP'
       ? t('aiOrder.flow.blockedNoCap')
       : blockedReason === 'CAP_EXHAUSTED'
-        ? heldOrderId ? t('aiOrder.flow.blockedHeld') : heldHandoffId ? t('aiOrder.flow.blockedHeldHandoff') : t('aiOrder.flow.blockedNoBudget')
+        ? heldOrderId ? t('aiOrder.flow.blockedHeld') : heldHandoffId ? heldHandoffCopy() : t('aiOrder.flow.blockedNoBudget')
         : blockedReason ? t('aiOrder.flow.blockedOther') : null;
   const existingLive = !!inProgress?.existingStatus && LIVE.includes(inProgress.existingStatus);
   const stepHeading =
@@ -509,6 +531,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
               shop={shop}
               cartId={cartState?.cart?.id ?? null}
               checklist={cartState?.quote?.checklist ?? cartState?.cart?.checklist ?? null}
+              fallbackLines={(cartState?.cart?.lines ?? []).map((l) => l.summary || `${l.quantity} x ${[l.size_name, l.item_name].filter(Boolean).join(' ')}`)}
               hostName={party?.hostName || ''}
               // a mark stays with the shop whatever cart is shown; a plain click only with its own cart
               handoff={handoff && handoff.shopId === shop.id && (handoff.marked || (handoff.cartId ?? null) === (cartState?.cart?.id ?? null)) ? handoff : null}

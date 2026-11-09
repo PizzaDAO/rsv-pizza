@@ -5,7 +5,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import {
   loadPartyForOrdering, remainingCapCents, partyReceipts, isLaterReceipt, budgetBreakdown, OrderingParty,
-  partyHandoffOrders, handoffAsBudgetOrder, holderData,
+  partyHandoffOrders, handoffAsBudgetOrder, holderData, budgetLeft,
 } from '../lib/pizzaOrdering.js';
 import {
   recommendationsToLines,
@@ -139,6 +139,12 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
       heldOrderId = typeof e.data?.existingOrderId === 'string' ? e.data.existingOrderId : null;
       heldHandoffId = typeof e.data?.existingHandoffId === 'string' ? e.data.existingHandoffId : null;
     }
+    // basil-14648 P2: how the holding mark was placed and by whom, for honest copy
+    let heldHandoff: { id: string; shopName: string; provider: string; isMine: boolean } | null = null;
+    if (heldHandoffId) {
+      const h = await prisma.pizzaHandoff.findFirst({ where: { id: heldHandoffId, partyId: party.id } });
+      if (h) heldHandoff = { id: h.id, shopName: h.shopName, provider: h.provider, isMine: h.userId === req.userId };
+    }
     res.json({
       enabled: true,
       capCents: party.capCents,
@@ -148,6 +154,7 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
       heldOrderId,
       // basil-14648 P2: or the host's own "I ordered it" mark (an "Order online" handoff) that holds it
       heldHandoffId,
+      heldHandoff,
       location: { lat: party.latitude, lng: party.longitude, address: party.address },
     });
   } catch (e) {
@@ -699,13 +706,14 @@ router.post('/:partyId/pizza/orders/:orderId/settle', requireAuth, async (req: A
 
 // ---------------------------------------------------------------------------
 // basil-14648 P2: "Order online" handoff (plans/rsv-p2-order-online-handoff.md). The host orders on the shop's own
-// site (Toast, Square Online, ...) or by phone with the checklist. We record the click and the host's own
-// "I ordered it" mark in pizza_handoffs (never pizza_orders: the OPOP sync must not poll it) and forward
+// site (Toast, Square Online, ...), by phone or in person, with the checklist. We record the click and the host's
+// own "I ordered it" mark in pizza_handoffs (never pizza_orders: the OPOP sync must not poll it) and forward
 // aggregate counts to pizza-mcp. No amount, order number or screenshot of the external order is stored.
 // ---------------------------------------------------------------------------
-const HANDOFF_PROVIDERS: ReadonlySet<string> = new Set([...OPOP_ORDERING_PROVIDERS, 'phone']);
+const HANDOFF_PROVIDERS: ReadonlySet<string> = new Set([...OPOP_ORDERING_PROVIDERS, 'phone', 'in_person']);
 const isOpopProvider = (p: string): p is OpopOrderingProvider => (OPOP_ORDERING_PROVIDERS as readonly string[]).includes(p);
-const MAX_HANDOFFS_PER_PARTY = 100;
+/** Open (unreleased) rows per party: released ones do not count. */
+const MAX_OPEN_HANDOFFS_PER_PARTY = 100;
 
 /** A display name from the browser: one line, at most 120 characters (React escapes it; never used in a query). */
 function shopNameParam(v: unknown): string {
@@ -714,8 +722,9 @@ function shopNameParam(v: unknown): string {
   return one;
 }
 
-function publicHandoff(h: any, forOwner: boolean, opts: { receiptMatched?: boolean } = {}) {
+function publicHandoff(h: any, viewerId: string | undefined, opts: { receiptMatched?: boolean } = {}) {
   const marked = !!h.orderedAt && !h.releasedAt;
+  const forOwner = h.userId === viewerId;
   return {
     id: h.id,
     shopId: h.shopId,
@@ -723,9 +732,16 @@ function publicHandoff(h: any, forOwner: boolean, opts: { receiptMatched?: boole
     provider: h.provider,
     cartId: forOwner ? h.opopCartId : null,
     holdCents: marked ? h.holdCents : 0,
+    // pizza-mcp's estimate for the checklist's cart (null when there was none)
+    estimateCents: h.estimateCents ?? null,
+    // the mark holds less than the order's estimate: what was left of the budget did not cover it
+    overBudget: marked && h.estimateCents != null && h.holdCents < h.estimateCents,
     clickedAt: h.clickedAt,
     orderedAt: h.orderedAt,
     releasedAt: h.releasedAt,
+    // who took it back: the host who marked it ("I didn't order after all") or a co-host who checked
+    releasedByOwner: !!h.releasedAt && h.releasedBy === h.userId,
+    releasedByMe: !!h.releasedAt && !!viewerId && h.releasedBy === viewerId,
     // the host's own mark: holds hold_cents and blocks a second order until released
     marked,
     blocking: marked,
@@ -751,23 +767,57 @@ async function handoffRow(handoffId: string, party: OrderingParty) {
   return row;
 }
 
+type CartQuote =
+  | { ok: true; quoteId: string; ceilingCents: number | null; estimateCents: number | null }
+  | { ok: false; overBudget: true; estimateCents: number | null }
+  | { ok: false; overBudget: false };
+
+/**
+ * Quote the checklist's cart with what is left of the budget (no cap when nothing is left: the estimate is still
+ * pizza-mcp's). Never throws a pizza-mcp 4xx/5xx: a failed quote (pickup time passed, cart expired, service down)
+ * is `{ok:false}` and the caller falls back to the row's last known numbers.
+ */
+async function quoteCart(actor: OpopActor, cartId: string, leftCents: number): Promise<CartQuote> {
+  try {
+    const q = await getPizzaMcpClient().quote(actor, cartId, leftCents > 0 ? { max_total_cents: leftCents } : {});
+    await recordQuote(cartId, q.quote_id);
+    const estimate = q.estimate?.expected_cents ?? q.totals?.total_cents ?? null;
+    return { ok: true, quoteId: q.quote_id, ceilingCents: q.price_ceiling_cents ?? null, estimateCents: estimate ?? q.price_ceiling_cents ?? null };
+  } catch (e) {
+    if (!(e instanceof AppError)) throw e;
+    if (e.code === 'SPEND_LIMIT_EXCEEDED') {
+      const d = (e.data as { opop?: { details?: { expected_cents?: unknown } } } | undefined)?.opop?.details;
+      return { ok: false, overBudget: true, estimateCents: typeof d?.expected_cents === 'number' ? d.expected_cents : null };
+    }
+    return { ok: false, overBudget: false };
+  }
+}
+
 router.get('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party } = await loadPartyForOrdering(req.params.partyId, req);
-    const rows = await prisma.pizzaHandoff.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' }, take: 20 });
+    // the latest 20, plus every mark still standing (the one that holds the budget is never cut off)
+    const [recent, standing] = await Promise.all([
+      prisma.pizzaHandoff.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      prisma.pizzaHandoff.findMany({ where: { partyId: party.id, orderedAt: { not: null }, releasedAt: null }, orderBy: { createdAt: 'desc' } }),
+    ]);
+    const byId = new Map([...standing, ...recent].map((r) => [r.id, r]));
+    const rows = [...byId.values()].sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
     const orders = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
-    const marks = rows.map((r) => handoffAsBudgetOrder(r)).filter((o): o is NonNullable<typeof o> => o !== null);
+    const marks = standing.map((r) => handoffAsBudgetOrder(r)).filter((o): o is NonNullable<typeof o> => o !== null);
     const { covered } = budgetBreakdown(await partyReceipts(party.id), [...orders, ...marks]);
     const coveredIds = new Set(covered.map((o: any) => o.handoffId).filter(Boolean));
-    res.json({ handoffs: rows.map((r) => publicHandoff(r, r.userId === req.userId, { receiptMatched: coveredIds.has(r.id) })) });
+    res.json({ handoffs: rows.map((r) => publicHandoff(r, req.userId, { receiptMatched: coveredIds.has(r.id) })) });
   } catch (e) {
     next(e);
   }
 });
 
 /**
- * The host opened the shop's ordering page (`opened`, default true), or is about to mark an order placed by phone
- * (`opened: false`). Reuses the host's open row for the same shop and cart. Holds and blocks nothing.
+ * The host opened the shop's ordering page (`opened`, default true), or is about to mark an order placed some
+ * other way (`opened: false`, provider = what the host said: an online provider, `phone` or `in_person`).
+ * Reuses the host's open row for the same shop and cart. Holds and blocks nothing. With a cart, the row keeps
+ * pizza-mcp's estimate for it, the fallback hold if the mark later cannot re-quote.
  */
 router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -778,6 +828,7 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
     const provider = String(body.provider ?? '');
     if (!HANDOFF_PROVIDERS.has(provider)) throw new AppError('Unknown provider', 400, 'VALIDATION_FAILED');
     const opened = body.opened !== false;
+    if (opened && !isOpopProvider(provider)) throw new AppError('Only an ordering page can be opened', 400, 'VALIDATION_FAILED');
     let cartId: string | null = null;
     if (body.cartId !== undefined && body.cartId !== null && body.cartId !== '') {
       cartId = opopIdParam(String(body.cartId));
@@ -791,35 +842,50 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
     });
     let row;
     if (open) {
-      // a marked row keeps its provider: the host already said where they ordered
+      // a marked row keeps its provider: the host already said how they ordered. A click sets the provider.
       row = await prisma.pizzaHandoff.update({
         where: { id: open.id },
         data: { ...(opened ? { clickedAt: new Date() } : {}), ...(open.orderedAt ? {} : { provider, shopName }) },
       });
     } else {
-      if ((await prisma.pizzaHandoff.count({ where: { partyId: party.id } })) >= MAX_HANDOFFS_PER_PARTY) {
-        throw new AppError('Too many online-order records for this party.', 429, 'TOO_MANY_HANDOFFS');
+      if ((await prisma.pizzaHandoff.count({ where: { partyId: party.id, releasedAt: null } })) >= MAX_OPEN_HANDOFFS_PER_PARTY) {
+        throw new AppError('Too many open online-order records for this party.', 429, 'TOO_MANY_HANDOFFS');
       }
       row = await prisma.pizzaHandoff.create({
         data: { partyId: party.id, userId, shopId, shopName, provider, opopCartId: cartId, clickedAt: opened ? new Date() : null },
       });
     }
-    if (opened) forwardHandoff(actorFor(req, party), row, 'opened');
-    res.status(open ? 200 : 201).json({ handoff: publicHandoff(row, true) });
+    const actor = actorFor(req, party);
+    if (cartId && row.estimateCents == null && !row.orderedAt) {
+      const q = await quoteCart(actor, cartId, Math.max(0, (await budgetLeft(party)).leftCents));
+      if (q.ok || q.overBudget) {
+        row = await prisma.pizzaHandoff.update({
+          where: { id: row.id },
+          data: q.ok
+            ? { quoteId: q.quoteId, quoteCeilingCents: q.ceilingCents, estimateCents: q.estimateCents }
+            : { estimateCents: q.estimateCents },
+        });
+      }
+    }
+    if (opened) forwardHandoff(actor, row, 'opened');
+    res.status(open ? 200 : 201).json({ handoff: publicHandoff(row, req.userId) });
   } catch (e) {
     next(e);
   }
 });
 
 /**
- * What the host says about a handoff:
- *  - ordered: "I placed this order". Blocks a second order (409 ORDER_IN_PROGRESS unless `allowAnother`) and holds
- *    the quote's price ceiling for the checklist's cart, re-quoted here with what is left of the budget (so the hold
- *    always fits it; never a number from the browser). With no cart it holds 0 and still blocks. Only the host who
- *    built the checklist can mark it (the cart is theirs on pizza-mcp).
- *  - unmark: "I didn't order after all": frees it at once (the mark itself was only the host's word).
- *  - receipt_uploaded: one receipt uploaded AFTER the mark replaces the hold (NO_RECEIPT_FOUND otherwise).
- * unmark and receipt_uploaded: any host or edit-enabled co-host (the budget is the party's).
+ * What a host says about a handoff:
+ *  - ordered: "I placed this order". A fact, so it is ALWAYS recorded once the host confirms (a second order needs
+ *    `allowAnother`: 409 ORDER_IN_PROGRESS otherwise). It blocks a second order and holds the quote's price
+ *    ceiling, re-quoted here with what is left of the budget, so the hold never comes from the browser. When the
+ *    re-quote fails (pickup time passed, cart expired) it holds the cart's last known estimate. The hold is clamped
+ *    to what is left, which may be 0 (no budget left, no cap, or the estimate over it): then `overBudget` says so.
+ *    With no cart it holds 0 and still blocks. Only the host who built the checklist can mark it.
+ *  - unmark: "I didn't order after all". Only the host who marked it; frees it at once.
+ *  - release: a co-host who checked that nothing was ordered frees it; recorded as theirs (released_by).
+ *  - receipt_uploaded: one receipt uploaded AFTER the mark replaces the hold (any host). A receipt uploaded before
+ *    the mark is never matched to it (it may be another order's): 409 RECEIPT_BEFORE_MARK explains.
  */
 router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -831,7 +897,7 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
 
     if (body.action === 'ordered') {
       if (!mine) throw new AppError('Only the host who built this checklist can mark it ordered.', 403, 'NOT_HANDOFF_OWNER');
-      if (marked) return res.json({ handoff: publicHandoff(row, mine), replayed: true });
+      if (marked) return res.json({ handoff: publicHandoff(row, req.userId), replayed: true });
       const orders = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
       const blockers = [
         ...orders.filter((o: any) => isBlocking(o)),
@@ -839,61 +905,78 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
       ];
       if (blockers.length && body.allowAnother !== true) {
         throw new AppError(
-          'This party already has an order in progress, confirmed, or that may exist at the shop. Settle it, or confirm that this is a second order.',
+          'This party already has an order in progress, confirmed, or that may exist at the shop. Confirm that this is a second order.',
           409,
           'ORDER_IN_PROGRESS',
           holderData(blockers[0])
         );
       }
-      const remaining = await remainingCapCents(party);
+      const budget = await budgetLeft(party);
+      const left = Math.max(0, budget.leftCents);
       let holdCents = 0;
+      let estimateCents: number | null = row.estimateCents;
+      let quoteCeilingCents: number | null = row.quoteCeilingCents;
       let quoteId: string | null = row.quoteId;
       if (row.opopCartId) {
         await ownedCartRow(row.opopCartId, party, req);
-        try {
-          const q = await getPizzaMcpClient().quote(actorFor(req, party), row.opopCartId, { max_total_cents: remaining });
-          await recordQuote(row.opopCartId, q.quote_id);
-          quoteId = q.quote_id;
-          holdCents = q.price_ceiling_cents ?? q.estimate?.expected_cents ?? q.totals?.total_cents ?? remaining;
-        } catch (e) {
-          if (!(e instanceof AppError)) throw e;
-          if (e.code === 'SPEND_LIMIT_EXCEEDED') {
-            throw new AppError(
-              `What's left of this party's reimbursement budget ($${(remaining / 100).toFixed(2)}) doesn't cover this order's estimate.`,
-              422,
-              'CAP_EXHAUSTED'
-            );
-          }
-          // pizza-mcp could not re-quote (pickup time passed, cart gone, service down): hold what is left, the
-          // most this order could be reimbursed for. The receipt replaces it.
-          holdCents = remaining;
+        const q = await quoteCart(actorFor(req, party), row.opopCartId, left);
+        if (q.ok) {
+          quoteId = q.quoteId;
+          quoteCeilingCents = q.ceilingCents;
+          estimateCents = q.estimateCents;
+          holdCents = q.ceilingCents ?? q.estimateCents ?? 0;
+        } else if (q.overBudget) {
+          // the low estimate is over what is left: hold all of it (the mark still counts as the party's order)
+          estimateCents = q.estimateCents ?? estimateCents;
+          holdCents = left;
+        } else {
+          // no fresh quote: the cart's last known estimate (not the whole budget)
+          holdCents = estimateCents ?? quoteCeilingCents ?? 0;
         }
       }
-      holdCents = Math.max(0, Math.min(Math.round(holdCents), remaining));
+      holdCents = Math.max(0, Math.min(Math.round(holdCents), left));
       const updated = await prisma.pizzaHandoff.update({
         where: { id: row.id },
-        data: { orderedAt: new Date(), releasedAt: null, receiptCoveredAt: null, holdCents, quoteId },
+        data: { orderedAt: new Date(), releasedAt: null, releasedBy: null, receiptCoveredAt: null, holdCents, estimateCents, quoteCeilingCents, quoteId },
       });
       forwardHandoff(actorFor(req, party), updated, 'marked_ordered');
-      return res.json({ handoff: publicHandoff(updated, mine) });
+      return res.json({
+        handoff: publicHandoff(updated, req.userId),
+        // the party's budget in USD cents (reimbursement caps are in USD); noCap = no reimbursement cap set
+        budget: { capCents: budget.capCents, leftCents: left, noCap: budget.capCents === null },
+      });
     }
 
-    if (body.action === 'unmark') {
-      if (!marked) throw new AppError('This online order is not marked as placed.', 409, 'HANDOFF_NOT_MARKED');
-      const updated = await prisma.pizzaHandoff.update({ where: { id: row.id }, data: { releasedAt: new Date() } });
+    if (body.action === 'unmark' || body.action === 'release') {
+      if (!marked) throw new AppError('This order is not marked as placed.', 409, 'HANDOFF_NOT_MARKED');
+      if (body.action === 'unmark' && !mine) {
+        throw new AppError('Only the host who marked this order can take it back. If you checked with the shop, release it instead.', 403, 'NOT_HANDOFF_OWNER');
+      }
+      const updated = await prisma.pizzaHandoff.update({ where: { id: row.id }, data: { releasedAt: new Date(), releasedBy: req.userId as string } });
       if (mine) forwardHandoff(actorFor(req, party), updated, 'unmarked');
-      return res.json({ handoff: publicHandoff(updated, mine) });
+      return res.json({ handoff: publicHandoff(updated, req.userId) });
     }
 
     if (body.action === 'receipt_uploaded') {
-      if (!marked) throw new AppError('This online order is not marked as placed.', 409, 'HANDOFF_NOT_MARKED');
-      if (!(await partyReceipts(party.id)).some((r) => isLaterReceipt(r, { createdAt: row.orderedAt }))) {
+      if (!marked) throw new AppError('This order is not marked as placed.', 409, 'HANDOFF_NOT_MARKED');
+      const receipts = await partyReceipts(party.id);
+      if (!receipts.some((r) => isLaterReceipt(r, { createdAt: row.orderedAt }))) {
+        // Safer choice: a receipt from before the mark is never matched to it (it could be another order's). The
+        // hold stays; it only over-counts, never under-counts, until an underboss reviews the receipts.
+        const since = new Date(row.clickedAt ?? row.createdAt).getTime() - 24 * 3600_000;
+        if (receipts.some((r) => new Date(r.createdAt).getTime() >= since && !isLaterReceipt(r, { createdAt: row.orderedAt }))) {
+          throw new AppError(
+            "The only receipts we found were uploaded before you marked this order, so we can't match one to it automatically. A receipt still counts as a receipt; your underboss matches it when they review. Next time, mark the order first, then upload the receipt.",
+            409,
+            'RECEIPT_BEFORE_MARK'
+          );
+        }
         throw new AppError('We could not find a receipt uploaded after you marked this order. Upload the real receipt first.', 409, 'NO_RECEIPT_FOUND');
       }
       const updated = await prisma.pizzaHandoff.update({ where: { id: row.id }, data: { receiptCoveredAt: new Date() } });
-      return res.json({ handoff: publicHandoff(updated, mine) });
+      return res.json({ handoff: publicHandoff(updated, req.userId) });
     }
-    throw new AppError('action must be ordered, unmark or receipt_uploaded', 400, 'VALIDATION_FAILED');
+    throw new AppError('action must be ordered, unmark, release or receipt_uploaded', 400, 'VALIDATION_FAILED');
   } catch (e) {
     next(e);
   }

@@ -3043,15 +3043,20 @@ model PizzaHandoff {
   userId           String    @map("user_id")
   shopId           String    @map("shop_id")
   shopName         String    @map("shop_name")
-  // toast | square_online | chownow | slice | bentobox | website | phone
+  // toast | square_online | chownow | slice | bentobox | website | phone | in_person
   provider         String
   opopCartId       String?   @map("opop_cart_id")
   quoteId          String?   @map("quote_id")
   // OUR number: the quote's price ceiling for the checklist's cart (<= what was left of the budget)
   holdCents        Int       @default(0) @map("hold_cents")
+  // the last quote rsv saw for the cart: the fallback hold when a mark cannot re-quote
+  estimateCents     Int?      @map("estimate_cents")
+  quoteCeilingCents Int?      @map("quote_ceiling_cents")
   clickedAt        DateTime? @map("clicked_at") @db.Timestamptz
   orderedAt        DateTime? @map("ordered_at") @db.Timestamptz
   releasedAt       DateTime? @map("released_at") @db.Timestamptz
+  // the User.id who took the mark back (the owner, or a co-host who checked)
+  releasedBy       String?   @map("released_by")
   receiptCoveredAt DateTime? @map("receipt_covered_at") @db.Timestamptz
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz

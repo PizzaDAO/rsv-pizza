@@ -132,6 +132,21 @@ export function isLaterReceipt(receipt: Pick<BudgetReceipt, 'createdAt'>, order:
  * when there is no cap or nothing left, naming the order that holds the budget if there is one.
  * A confirmed order and its real receipt count once (see budgetBreakdown).
  */
+/**
+ * The party's budget without refusing anything: what is left (can be <= 0) and who holds it. For the host's
+ * own "I ordered it" mark, which is a fact and is recorded even when nothing is left (basil-14648 P2).
+ */
+export async function budgetLeft(party: OrderingParty): Promise<{ capCents: number | null; leftCents: number; held: BudgetOrder[] }> {
+  if (party.capCents === null) return { capCents: null, leftCents: 0, held: [] };
+  const [receipts, orders, handoffs] = await Promise.all([
+    partyReceipts(party.id),
+    prisma.pizzaOrder.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' } }),
+    partyHandoffOrders(party.id),
+  ]);
+  const { usedCents, held } = budgetBreakdown(receipts, [...orders, ...handoffs]);
+  return { capCents: party.capCents, leftCents: party.capCents - usedCents, held };
+}
+
 export async function remainingCapCents(party: OrderingParty): Promise<number> {
   if (party.capCents === null) {
     throw new AppError(
@@ -160,10 +175,13 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
 }
 
 /** What the UI needs to open the order (or the marked handoff) that holds the budget or blocks a new order. */
-export function holderData(o: BudgetOrder): { existingOrderId?: string; existingHandoffId?: string; existingStatus: string } {
+export function holderData(o: BudgetOrder): {
+  existingOrderId?: string; existingHandoffId?: string; existingStatus: string; existingShopName?: string; existingProvider?: string;
+} {
+  const shop = o.shopName ? { existingShopName: o.shopName } : {};
   return o.handoffId
-    ? { existingHandoffId: o.handoffId, existingStatus: o.status }
-    : { existingOrderId: o.opopOrderId, existingStatus: o.status };
+    ? { existingHandoffId: o.handoffId, existingStatus: o.status, ...shop, ...(o.provider ? { existingProvider: o.provider } : {}) }
+    : { existingOrderId: o.opopOrderId, existingStatus: o.status, ...shop };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +196,9 @@ export const HOST_ORDERED = 'host_ordered';
 
 export interface HandoffRowLike {
   id: string;
+  shopName?: string;
+  provider?: string;
+  userId?: string;
   holdCents: number;
   orderedAt: Date | string | null;
   releasedAt: Date | string | null;
@@ -189,6 +210,9 @@ export function handoffAsBudgetOrder(h: HandoffRowLike): (BudgetOrder & { handof
   if (!h.orderedAt || h.releasedAt) return null;
   return {
     handoffId: h.id,
+    shopName: h.shopName,
+    provider: h.provider,
+    userId: h.userId,
     status: HOST_ORDERED,
     ceilingCents: Math.max(0, h.holdCents | 0),
     confirmedTotalCents: null,
@@ -211,6 +235,11 @@ export interface BudgetOrder {
   opopOrderId?: string;
   /** Set on a marked "Order online" handoff (pizza_handoffs.id); such a row has no OPOP order. */
   handoffId?: string;
+  shopName?: string;
+  /** Handoffs: how the host said they ordered (toast, ..., phone, in_person). */
+  provider?: string;
+  /** Handoffs: the host who marked it. */
+  userId?: string;
   status: string;
   ceilingCents?: number | null;
   confirmedTotalCents?: number | null;

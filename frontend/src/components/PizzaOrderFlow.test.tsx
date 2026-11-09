@@ -292,7 +292,7 @@ describe('PizzaOrderFlow: "Order online" handoff (basil-14648 P2)', () => {
     mocks.handoffs.mockResolvedValue({ handoffs: [mark] });
     flow();
     expect(await screen.findByText('You said you ordered online at Toast')).toBeTruthy();
-    expect(screen.getByText(/\$180\.00 of your reimbursement budget is held/)).toBeTruthy();
+    expect(screen.getByText(/\$180\.00 USD of your reimbursement budget is held/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'I uploaded the receipt' })).toBeTruthy();
   });
 
@@ -318,11 +318,35 @@ describe('PizzaOrderFlow: "Order online" handoff (basil-14648 P2)', () => {
   });
 
   it('a budget held by a mark says so and opens it', async () => {
-    mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: 'h1' }));
+    mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: 'h1', heldHandoff: { id: 'h1', shopName: 'Regina', provider: 'toast', isMine: true } }));
     flow();
-    expect(await screen.findByText('Your reimbursement budget is held by an order you said you placed online.')).toBeTruthy();
+    expect(await screen.findByText('Your reimbursement budget is held by the order you said you placed online at Toast.')).toBeTruthy();
     mocks.handoffs.mockResolvedValue({ handoffs: [mark] });
     await userEvent.click(screen.getByRole('button', { name: 'Open that order' }));
     expect(await screen.findByText('You said you ordered online at Toast')).toBeTruthy();
+  });
+});
+
+describe('PizzaOrderFlow: honest copy for a budget held by a mark', () => {
+  it.each([
+    [{ provider: 'phone', isMine: true }, 'Your reimbursement budget is held by the order you said you placed with Regina by phone.'],
+    [{ provider: 'in_person', isMine: true }, 'Your reimbursement budget is held by the order you said you placed at Regina in person.'],
+    [{ provider: 'toast', isMine: false }, 'Your reimbursement budget is held by an order another host said they placed with Regina.'],
+  ])('%o', async (h, copy) => {
+    mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: 'h1', heldHandoff: { id: 'h1', shopName: 'Regina', ...h } }));
+    flow();
+    expect(await screen.findByText(copy)).toBeTruthy();
+  });
+
+  it('the second-order confirm names the shop of a handoff blocker', async () => {
+    mocks.place.mockRejectedValue(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingHandoffId: 'h1', existingStatus: 'host_ordered', existingShopName: 'Regina' } }));
+    mocks.build.mockResolvedValue({ cart: { id: 'c1' }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    flow();
+    await userEvent.click(await screen.findByText("Pick Sal's"));
+    await userEvent.click(screen.getByText('Build'));
+    await userEvent.click(screen.getByText('Approve'));
+    await userEvent.click(await screen.findByText('Place a second order anyway'));
+    expect(screen.getByText(/If Regina already has your first order/)).toBeTruthy();
   });
 });

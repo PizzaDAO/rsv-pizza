@@ -1101,9 +1101,13 @@
       "confirmSecondNo": "No, go back",
       "firstShop": "the first shop",
       "popupBlocked": "Your browser blocked the new tab. Use “Open the approval page” below.",
-      "blockedHeldHandoff": "Your reimbursement budget is held by an order you said you placed online.",
       "openHeldHandoff": "Open that order",
-      "headingHandoff": "Order from {{shop}} yourself"
+      "headingHandoff": "Order from {{shop}} yourself",
+      "blockedHeldHandoffOnline": "Your reimbursement budget is held by the order you said you placed online at {{provider}}.",
+      "blockedHeldHandoffWebsite": "Your reimbursement budget is held by the order you said you placed on {{shop}}'s website.",
+      "blockedHeldHandoffPhone": "Your reimbursement budget is held by the order you said you placed with {{shop}} by phone.",
+      "blockedHeldHandoffInPerson": "Your reimbursement budget is held by the order you said you placed at {{shop}} in person.",
+      "blockedHeldHandoffOther": "Your reimbursement budget is held by an order another host said they placed with {{shop}}."
     },
     "shops": {
       "finding": "Finding pizzerias near the venue…",
@@ -1120,7 +1124,8 @@
       "badgeUncallable": "We can't call it right now: call it yourself",
       "liveFound_one": "{{count}} pizzeria found near the venue.",
       "liveFound_other": "{{count}} pizzerias found near the venue.",
-      "badgeOnline": "Order online yourself"
+      "badgeOnline": "Order online yourself",
+      "onlineBlocked": "Ordering is blocked for this party right now (see above), so the shop's ordering page is off here."
     },
     "cart": {
       "back": "Pick a different pizzeria",
@@ -1220,7 +1225,8 @@
         "slice": "Slice",
         "bentobox": "BentoBox",
         "website": "the shop's website",
-        "phone": "phone"
+        "phone": "phone",
+        "in_person": "in person"
       },
       "checklistTitle": "Your order checklist",
       "checklistHelp": "Copy it, then enter it on the shop's site or read it out on the phone.",
@@ -1231,11 +1237,11 @@
       "copyFailed": "Couldn't copy. Select the checklist text and copy it yourself.",
       "placedCheckbox": "I placed this order with {{shop}}",
       "markOrdered": "Save: I ordered it",
-      "markHelp": "Only check this once you've placed the order. Until your receipt is in, this order's estimate is held from your reimbursement budget and a second order needs your OK.",
+      "markHelp": "Only check this once you've placed the order, and before you upload its receipt. Until the receipt is in, this order's estimate is held from your reimbursement budget and a second order needs your OK.",
       "saving": "Saving…",
       "saveError": "Couldn't save that. Try again.",
       "markedOnline": "You said you ordered online at {{provider}}",
-      "markedPhone": "You said you ordered from {{shop}}",
+      "markedPhone": "You said you ordered from {{shop}} by phone",
       "markedHold": "Upload your receipt from {{shop}} when you have it. Until then {{amount}} of your reimbursement budget is held for this order.",
       "markedNoHold": "Upload your receipt from {{shop}} when you have it.",
       "receiptCovered": "Your receipt counts for this order now. Nothing else is held for it.",
@@ -1258,7 +1264,23 @@
       "liveMarked": "Saved: you said you ordered from {{shop}}.",
       "liveReleased": "Taken back: nothing is held for {{shop}} now.",
       "liveReceipt": "Saved: your receipt counts for this order.",
-      "backToShops": "Back to pizzerias"
+      "backToShops": "Back to pizzerias",
+      "howTitle": "How did you order?",
+      "howOnline": "Online at {{provider}}",
+      "howWebsite": "On the shop's website",
+      "howPhone": "By phone",
+      "howInPerson": "In person",
+      "markedInPerson": "You said you ordered at {{shop}} in person",
+      "markedWebsite": "You said you ordered on {{shop}}'s website",
+      "markedByOther": "Another host of this party said they ordered from {{shop}}",
+      "markedNoCap": "This party has no reimbursement cap yet, so nothing is held, but this still counts as your party's order: a second order needs your OK. Upload the receipt from {{shop}} when you have it.",
+      "markedOverBudget": "This order's estimate is more than what's left of your reimbursement budget, so all that's left ({{amount}}) is held for it. Reimbursement can't go over your cap. Upload the receipt from {{shop}} when you have it.",
+      "markedNoBudget": "Nothing is left of your reimbursement budget, so nothing is held, but this still counts as your party's order: a second order needs your OK. Upload the receipt from {{shop}} when you have it.",
+      "releaseOther": "I checked: nothing was ordered, release it",
+      "confirmReleaseOther": "Release the order another host marked at {{shop}}? Only do this if you checked with {{shop}} that nothing was ordered. We record that you released it.",
+      "confirmReleaseOtherYes": "Yes, release it",
+      "liveReleasedOther": "Released: nothing is held for {{shop}} now. We recorded that you released it.",
+      "confirmSecondAt": "This party already has an order at {{existing}}. Mark a second order at {{shop}}? If both go through, you'll get (and pay for) both."
     }
   }
 }

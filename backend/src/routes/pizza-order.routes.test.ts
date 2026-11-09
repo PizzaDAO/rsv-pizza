@@ -1278,9 +1278,12 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
 
   it('phone and no-cart handoffs never reach pizza-mcp (it counts per cart and link provider only)', async () => {
     const c = await buildCart();
-    await click({ cartId: c.cart.id, provider: 'phone' });
+    await click({ cartId: c.cart.id, provider: 'phone', opened: false });
+    await click({ cartId: c.cart.id, provider: 'in_person', opened: false });
     await click({ provider: 'toast' });
     expect(counts()).toEqual([]);
+    // only an ordering page can be "opened"
+    expect((await click({ provider: 'phone' })).status).toBe(400);
   });
 
   it('"I ordered it" holds the quote ceiling, re-quoted with what is left, and blocks a second AI order', async () => {
@@ -1300,7 +1303,7 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     const blocked = await placeFrom(c2);
     expect(blocked.status).toBe(409);
     expect(blocked.body.error.code).toBe('ORDER_IN_PROGRESS');
-    expect(blocked.body.error).toMatchObject({ existingHandoffId: h.id, existingStatus: 'host_ordered' });
+    expect(blocked.body.error).toMatchObject({ existingHandoffId: h.id, existingStatus: 'host_ordered', existingShopName: "Sal's", existingProvider: 'toast' });
     expect(blocked.body.error.existingOrderId).toBeUndefined();
   });
 
@@ -1337,29 +1340,65 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     expect((await mark(h.id, 'ordered', host, { allowAnother: true })).status).toBe(200);
   });
 
-  it('CAP_EXHAUSTED when nothing is left, or when what is left does not cover the estimate', async () => {
+  it('a mark is a fact: with nothing left it is still recorded, holds 0 and blocks, and says it is over budget', async () => {
+    const c = await buildCart(); // quoted while the budget was there: estimate 21000 kept on the row
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    expect(h.estimateCents).toBe(21000);
     receipt('250.00', new Date(Date.now() - 60_000));
-    const h = (await click({ provider: 'website' })).body.handoff;
-    expect((await mark(h.id, 'ordered')).body.error.code).toBe('CAP_EXHAUSTED');
-    fake.docs.length = 0;
-    withHandoffMcp({ 'POST /carts/:id/quote': () => ({ status: 422, json: { code: 'SPEND_LIMIT_EXCEEDED', title: 'x', status: 422, detail: 'over', retryable: false } }) });
-    // the cart build quotes too; seed the cart row directly
-    await fake.db.pizzaCart.create({ data: { partyId: PARTY_ID, userId: 'host1', opopCartId: 'cart_x', shopId: 'pzl_osm_n1', recommendationVersion: 'v', quoteIds: [] } });
-    const h2 = (await click({ cartId: 'cart_x' })).body.handoff;
-    const res = await mark(h2.id, 'ordered');
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('CAP_EXHAUSTED');
-    expect(fake.handoffs.get(h2.id).orderedAt).toBeNull();
+    const res = await mark(h.id, 'ordered');
+    expect(res.status).toBe(200);
+    expect(res.body.handoff).toMatchObject({ marked: true, blocking: true, holdCents: 0, overBudget: true });
+    expect(res.body.budget).toMatchObject({ leftCents: 0, noCap: false });
+    // and it blocks a second order like any mark
+    const other = (await click({ shopId: 'pzl_osm_n2', shopName: "Luigi's", provider: 'phone', opened: false })).body.handoff;
+    expect((await mark(other.id, 'ordered')).body.error.code).toBe('ORDER_IN_PROGRESS');
   });
 
-  it('when pizza-mcp cannot re-quote (pickup passed, cart gone), the mark holds what is left of the budget', async () => {
+  it('when the low estimate is over what is left, the mark holds what is left (not refused)', async () => {
+    await fake.db.pizzaCart.create({ data: { partyId: PARTY_ID, userId: 'host1', opopCartId: 'cart_x', shopId: 'pzl_osm_n1', recommendationVersion: 'v', quoteIds: [] } });
+    withHandoffMcp({
+      'POST /carts/:id/quote': () => ({ status: 422, json: { code: 'SPEND_LIMIT_EXCEEDED', title: 'x', status: 422, detail: 'over', retryable: false, details: { max_total_cents: 25000, low_cents: 26000, expected_cents: 30000 } } }),
+    });
+    const h = (await click({ cartId: 'cart_x' })).body.handoff;
+    expect(h.estimateCents).toBe(30000);
+    const res = await mark(h.id, 'ordered');
+    expect(res.status).toBe(200);
+    expect(res.body.handoff).toMatchObject({ marked: true, holdCents: 25000, estimateCents: 30000, overBudget: true });
+  });
+
+  it('a party with no reimbursement cap still records the mark (hold 0, blocking)', async () => {
+    setParty({ reimbursementCapUsd: null });
+    const h = (await click({ provider: 'website' })).body.handoff;
+    const res = await mark(h.id, 'ordered');
+    expect(res.status).toBe(200);
+    expect(res.body.handoff).toMatchObject({ marked: true, blocking: true, holdCents: 0 });
+    expect(res.body.budget).toMatchObject({ noCap: true, leftCents: 0 });
+  });
+
+  it('when pizza-mcp cannot re-quote at mark time, the mark holds the cart\'s last estimate, not the whole budget', async () => {
+    let quotes = 0;
+    withHandoffMcp({
+      'POST /carts/:id/quote': (x: any) =>
+        ++quotes <= 2
+          ? { json: { quote_id: `q${quotes}`, cart_id: x.path.split('/')[2], price_ceiling_cents: 21000, estimate: { low_cents: 15000, expected_cents: 17000, high_cents: 21000 }, read_back: '' } }
+          : { status: 422, json: { code: 'VALIDATION_FAILED', title: 'x', status: 422, detail: 'pickup passed', retryable: false } },
+    });
+    const c = await buildCart(); // quote 1
+    const h = (await click({ cartId: c.cart.id })).body.handoff; // quote 2: estimate kept
+    expect(h.estimateCents).toBe(17000);
+    const res = await mark(h.id, 'ordered'); // quote 3 fails
+    expect(res.body.handoff).toMatchObject({ holdCents: 17000, overBudget: false });
+    expect(await remaining()).toBe(25000 - 17000);
+  });
+
+  it('with no cart and no estimate, a failed re-quote holds 0 and still blocks', async () => {
     await fake.db.pizzaCart.create({ data: { partyId: PARTY_ID, userId: 'host1', opopCartId: 'cart_x', shopId: 'pzl_osm_n1', recommendationVersion: 'v', quoteIds: [] } });
     withHandoffMcp({ 'POST /carts/:id/quote': () => ({ status: 422, json: { code: 'VALIDATION_FAILED', title: 'x', status: 422, detail: 'pickup passed', retryable: false } }) });
     const h = (await click({ cartId: 'cart_x' })).body.handoff;
-    expect((await mark(h.id, 'ordered')).body.handoff.holdCents).toBe(25000);
+    expect((await mark(h.id, 'ordered')).body.handoff).toMatchObject({ holdCents: 0, blocking: true });
   });
 
-  it('only the host who built the checklist may mark it ordered; any host may unmark or report the receipt', async () => {
+  it('only the host who marked it can take it back; a co-host can release it, recorded as theirs', async () => {
     const c = await buildCart();
     const h = (await click({ cartId: c.cart.id })).body.handoff;
     expect((await mark(h.id, 'ordered', cohostEditor)).body.error.code).toBe('NOT_HANDOFF_OWNER');
@@ -1367,9 +1406,15 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     const list = await request(app()).get(`${base}/handoffs`).set(cohostEditor);
     expect(list.body.handoffs[0]).toMatchObject({ id: h.id, marked: true, isMine: false, cartId: null });
     const un = await mark(h.id, 'unmark', cohostEditor);
-    expect(un.status).toBe(200);
-    expect(un.body.handoff).toMatchObject({ marked: false, blocking: false, holdCents: 0 });
+    expect(un.status).toBe(403);
+    expect(un.body.error.code).toBe('NOT_HANDOFF_OWNER');
+    const rel = await mark(h.id, 'release', cohostEditor);
+    expect(rel.status).toBe(200);
+    expect(rel.body.handoff).toMatchObject({ marked: false, blocking: false, holdCents: 0, releasedByMe: true, releasedByOwner: false });
+    expect(fake.handoffs.get(h.id).releasedBy).toBe('co1');
     expect(counts().filter((x) => x[2] === 'unmarked')).toEqual([]); // not the owner: no count in someone else's name
+    const asOwner = await request(app()).get(`${base}/handoffs`).set(host);
+    expect(asOwner.body.handoffs[0]).toMatchObject({ releasedByOwner: false, releasedByMe: false });
   });
 
   it('"I didn\'t order after all" frees the hold and the block at once, and counts "unmarked"', async () => {
@@ -1379,6 +1424,7 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     expect(await remaining()).toBe(4000);
     const res = await mark(h.id, 'unmark');
     expect(res.body.handoff.releasedAt).toBeTruthy();
+    expect(res.body.handoff).toMatchObject({ releasedByOwner: true, releasedByMe: true });
     expect(await remaining()).toBe(25000);
     expect(counts().pop()).toEqual([c.cart.id, 'toast', 'unmarked']);
     expect((await placeFrom(await buildCart())).status).toBe(201);
@@ -1390,7 +1436,8 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     const h = (await click({ cartId: c.cart.id })).body.handoff;
     receipt('30.00', new Date(Date.now() - 3600_000)); // before the mark
     await mark(h.id, 'ordered');
-    expect((await mark(h.id, 'receipt_uploaded')).body.error.code).toBe('NO_RECEIPT_FOUND');
+    // safer choice: a receipt from before the mark is never matched to it, and the host is told why
+    expect((await mark(h.id, 'receipt_uploaded')).body.error.code).toBe('RECEIPT_BEFORE_MARK');
     expect(await remaining()).toBe(25000 - 3000 - 21000);
     receipt('180.00', new Date(Date.now() + 1000));
     const ok = await mark(h.id, 'receipt_uploaded');
@@ -1407,7 +1454,9 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     const h = (await click({ cartId: 'cart_x' })).body.handoff;
     await mark(h.id, 'ordered');
     const cfg = (await request(app()).get(`${base}/config`).set(host)).body;
-    expect(cfg).toMatchObject({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: h.id });
+    expect(cfg).toMatchObject({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: h.id, heldHandoff: { id: h.id, shopName: "Sal's", provider: 'toast', isMine: true } });
+    const co = (await request(app()).get(`${base}/config`).set(cohostEditor)).body;
+    expect(co.heldHandoff).toMatchObject({ isMine: false });
   });
 
   it('a handoff of another party is a 404', async () => {
@@ -1441,5 +1490,36 @@ describe('host-entered ordering links (proxied to pizza-mcp, private to the host
     expect(del.status).toBe(200);
     expect(del.body).toEqual({ deleted: true });
     expect((await request(app()).delete(`${base}/shops/pzl_osm_n1/links/olk_1`).set(stranger)).status).toBe(404);
+  });
+});
+
+describe('handoffs: listing and limits', () => {
+  beforeEach(() => {
+    mcp = pizzaMcp({ 'POST /carts/:id/handoff': () => ({ status: 204, json: null }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  });
+  const click = (body: any = {}) =>
+    request(app()).post(`${base}/handoffs`).set(host).send({ shopId: 'pzl_osm_n1', shopName: "Sal's", provider: 'toast', ...body });
+
+  it('GET /handoffs always includes the standing mark, however many rows came after it', async () => {
+    const h = (await click({ provider: 'website' })).body.handoff;
+    await request(app()).post(`${base}/handoffs/${h.id}/mark`).set(host).send({ action: 'ordered' });
+    fake.handoffs.get(h.id).createdAt = new Date(Date.now() - 86_400_000);
+    for (let i = 0; i < 25; i++) await click({ shopId: `pzl_osm_x${i}`, shopName: `Shop ${i}` });
+    const list = (await request(app()).get(`${base}/handoffs`).set(host)).body.handoffs;
+    expect(list).toHaveLength(21);
+    expect(list.find((x: any) => x.id === h.id)).toMatchObject({ marked: true });
+  });
+
+  it('released rows do not count toward the 100 open rows per party', async () => {
+    for (let i = 0; i < 100; i++) {
+      await fake.db.pizzaHandoff.create({ data: { partyId: PARTY_ID, userId: 'host1', shopId: `pzl_osm_r${i}`, shopName: 'x', provider: 'toast', releasedAt: new Date() } });
+    }
+    expect((await click()).status).toBe(201);
+    for (let i = 0; i < 99; i++) {
+      await fake.db.pizzaHandoff.create({ data: { partyId: PARTY_ID, userId: 'host1', shopId: `pzl_osm_o${i}`, shopName: 'x', provider: 'toast' } });
+    }
+    const full = await click({ shopId: 'pzl_osm_new' });
+    expect(full.status).toBe(429);
   });
 });

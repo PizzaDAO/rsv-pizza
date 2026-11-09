@@ -90,20 +90,41 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
         const links = orderingLinks(shop);
         const providerLinks = links.filter((l) => l.provider !== 'website');
         const site = safeHref(links.find((l) => l.provider === 'website')?.url ?? shop.website ?? null);
-        const linkButtons = providerLinks.map((l) => (
-          <a
-            key={l.url}
-            href={safeHref(l.url)!}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => onOpenLink?.(shop, l)}
-            className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5"
-            aria-label={`${t('aiOrder.handoff.orderAtFor', { provider: t(`aiOrder.handoff.providers.${l.provider}`), shop: shop.name })} ${t('aiOrder.handoff.newTab')}`}
-          >
-            <ShoppingBag size={14} aria-hidden="true" /> {t('aiOrder.handoff.orderAt', { provider: t(`aiOrder.handoff.providers.${l.provider}`) })}
-          </a>
-        ));
-        const checklistButton = shop.tier !== 'native' && onChecklist && (
+        // a blocked party (no cap, budget used up) sees the shop's pages switched off, with the reason above the list
+        const linkButtons = providerLinks.map((l) => {
+          const label = t('aiOrder.handoff.orderAt', { provider: t(`aiOrder.handoff.providers.${l.provider}`) });
+          if (orderDisabled) {
+            return (
+              <button
+                key={l.url}
+                type="button"
+                disabled
+                aria-describedby={`${shop.id}-online-blocked`}
+                className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ShoppingBag size={14} aria-hidden="true" /> {label}
+              </button>
+            );
+          }
+          return (
+            <a
+              key={l.url}
+              href={safeHref(l.url)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onOpenLink?.(shop, l)}
+              className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5"
+              aria-label={`${t('aiOrder.handoff.orderAtFor', { provider: t(`aiOrder.handoff.providers.${l.provider}`), shop: shop.name })} ${t('aiOrder.handoff.newTab')}`}
+            >
+              <ShoppingBag size={14} aria-hidden="true" /> {label}
+            </a>
+          );
+        });
+        const blockedNote = orderDisabled && providerLinks.length > 0 && (
+          <p id={`${shop.id}-online-blocked`} className="text-xs text-theme-text-secondary">{t('aiOrder.shops.onlineBlocked')}</p>
+        );
+        // every shop: the host can always order it themselves with a checklist
+        const checklistButton = onChecklist && (
           <button
             type="button"
             onClick={() => onChecklist(shop)}
@@ -146,12 +167,15 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                   >
                     {t('aiOrder.shops.order')}
                   </button>
-                  {/* basil-14648 P2: the shop's own online ordering, as an alternative to the AI call */}
+                  {/* basil-14648 P2: the shop's own online ordering and a checklist, as alternatives to the AI call */}
                   {linkButtons}
+                  {blockedNote}
+                  {checklistButton}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
                   {linkButtons}
+                  {blockedNote}
                   {shop.phone && (
                     <a href={`tel:${shop.phone}`} className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                       <Phone size={14} aria-hidden="true" /> {formatPhone(shop.phone)}

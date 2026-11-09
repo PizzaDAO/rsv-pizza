@@ -97,7 +97,7 @@ describe('HandoffPanel', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true });
     panel();
     await userEvent.click(screen.getByRole('button', { name: 'Copy checklist' }));
-    expect(await screen.findByText(/Couldn't copy/)).toBeTruthy();
+    expect((await screen.findAllByText(/Couldn't copy/)).length).toBeGreaterThan(0);
   });
 
   it('"I placed this order" needs the checkbox, then marks; a click is never called "ordered"', async () => {
@@ -114,10 +114,12 @@ describe('HandoffPanel', () => {
     expect(mocks.record).not.toHaveBeenCalled(); // the click row is reused
   });
 
-  it('with no row yet (ordered by phone), creates one without a click, then marks', async () => {
+  it('with no click, asks how they ordered (by phone by default), creates a row without a click, then marks', async () => {
     mocks.mark.mockResolvedValue({ handoff: marked({ provider: 'phone' }) });
     panel({ shop: { ...shop, ordering_links: [] } });
     await userEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('radiogroup', { name: 'How did you order?' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'By phone' }).getAttribute('aria-checked')).toBe('true');
     await userEvent.click(screen.getByRole('button', { name: 'Save: I ordered it' }));
     expect(mocks.record).toHaveBeenCalledWith('p1', { shopId: 'pzl_1', shopName: "Sal's", provider: 'phone', cartId: 'cart_1', opened: false });
     expect(mocks.mark).toHaveBeenCalledWith('p1', 'h1', 'ordered', false);
@@ -147,7 +149,7 @@ describe('HandoffPanel', () => {
     mocks.mark.mockResolvedValueOnce({ handoff: marked({ receiptCovered: true }) });
     panel({ handoff: marked() });
     expect(screen.getByText('You said you ordered online at Toast')).toBeTruthy();
-    expect(screen.getByText(/\$210\.00 of your reimbursement budget is held/)).toBeTruthy();
+    expect(screen.getByText(/\$210\.00 USD of your reimbursement budget is held/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'I uploaded the receipt' }));
     expect(mocks.mark).toHaveBeenCalledWith('p1', 'h1', 'receipt_uploaded');
   });
@@ -238,5 +240,136 @@ describe('ShopPicker: order online', () => {
     render(<ShopPicker partyId="p" onSelect={vi.fn()} />);
     await screen.findByText("Sal's");
     expect(screen.queryByRole('link', { name: /Website/ })).toBeNull();
+  });
+});
+
+describe('HandoffPanel: review fixes', () => {
+  it('no click: the host can say "in person" or a provider; that is what the row and the copy say', async () => {
+    mocks.record.mockResolvedValue({ handoff: row({ clickedAt: null, provider: 'in_person' }) });
+    mocks.mark.mockResolvedValue({ handoff: marked({ clickedAt: null, provider: 'in_person' }) });
+    const { rerender, onHandoff } = panel();
+    await userEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('radio', { name: 'Online at Toast' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: "On the shop's website" })).toBeTruthy();
+    await userEvent.click(screen.getByRole('radio', { name: 'In person' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save: I ordered it' }));
+    expect(mocks.record).toHaveBeenCalledWith('p1', { shopId: 'pzl_1', shopName: "Sal's", provider: 'in_person', cartId: 'cart_1', opened: false });
+    rerender(<HandoffPanel partyId="p1" shop={shop} cartId="cart_1" checklist={checklist} hostName="Sam" handoff={onHandoff.mock.calls[0][0]} onHandoff={onHandoff} />);
+    expect(screen.getByText("You said you ordered at Sal's in person")).toBeTruthy();
+  });
+
+  it('a click names the provider: no question is asked, the clicked row is marked', async () => {
+    mocks.mark.mockResolvedValue({ handoff: marked() });
+    panel({ handoff: row({ provider: 'toast' }) });
+    await userEvent.click(screen.getByRole('checkbox'));
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save: I ordered it' }));
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it('over budget and no-cap marks are recorded and say so truthfully (amounts in USD)', () => {
+    const { unmount } = panel({ handoff: marked({ overBudget: true, holdCents: 4000, estimateCents: 21000 }) });
+    expect(screen.getByText(/all that's left \(\$40\.00 USD\) is held/)).toBeTruthy();
+    unmount();
+    panel({ handoff: marked({ overBudget: true, holdCents: 0, estimateCents: 21000 }) });
+    expect(screen.getByText(/Nothing is left of your reimbursement budget, so nothing is held/)).toBeTruthy();
+  });
+
+  it('a no-cap mark response says the party has no cap', async () => {
+    mocks.mark.mockResolvedValue({ handoff: marked({ holdCents: 0 }), budget: { capCents: null, leftCents: 0, noCap: true } });
+    const { rerender, onHandoff } = panel({ handoff: row() });
+    await userEvent.click(screen.getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save: I ordered it' }));
+    rerender(<HandoffPanel partyId="p1" shop={shop} cartId="cart_1" checklist={checklist} hostName="Sam" handoff={onHandoff.mock.calls[0][0]} onHandoff={onHandoff} />);
+    expect(screen.getByText(/no reimbursement cap yet/)).toBeTruthy();
+  });
+
+  it('a co-host sees other words and releases (not unmarks), after a confirm', async () => {
+    mocks.mark.mockResolvedValue({ handoff: row({ releasedAt: 'x', marked: false, isMine: false, releasedByMe: true }) });
+    panel({ handoff: marked({ isMine: false, cartId: null }) });
+    expect(screen.getByText("Another host of this party said they ordered from Sal's")).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "I didn't order after all" })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'I checked: nothing was ordered, release it' }));
+    expect(screen.getByText(/We record that you released it/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, release it' }));
+    expect(mocks.mark).toHaveBeenCalledWith('p1', 'h1', 'release');
+  });
+
+  it('one live region in every state; status-only take-back shows a visible confirmation and moves focus to it', async () => {
+    mocks.mark.mockResolvedValue({ handoff: row({ releasedAt: 'x', marked: false, releasedByOwner: true, releasedByMe: true }) });
+    const onHandoff = vi.fn();
+    const { container, rerender } = render(
+      <HandoffPanel partyId="p1" shop={shop} cartId={null} checklist={null} hostName="Sam" handoff={marked()} onHandoff={onHandoff} statusOnly />
+    );
+    const region = container.querySelector('[aria-live]');
+    expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: "I didn't order after all" }));
+    await userEvent.click(screen.getByRole('button', { name: "Yes, I didn't order" }));
+    rerender(<HandoffPanel partyId="p1" shop={shop} cartId={null} checklist={null} hostName="Sam" handoff={onHandoff.mock.calls[0][0]} onHandoff={onHandoff} statusOnly />);
+    const note = await screen.findByText("Taken back: nothing is held for Sal's now.", { selector: 'p:not([aria-live])' });
+    await waitFor(() => expect(document.activeElement).toBe(note));
+    expect(container.querySelector('[aria-live]')).toBe(region); // the same node: the announcement is not lost
+    expect(region?.textContent).toMatch(/Taken back/);
+  });
+
+  it('after a take-back in the checklist view, focus goes to the panel title', async () => {
+    mocks.mark.mockResolvedValue({ handoff: row({ releasedAt: 'x', marked: false }) });
+    const onHandoff = vi.fn();
+    const { rerender } = render(<HandoffPanel partyId="p1" shop={shop} cartId="cart_1" checklist={checklist} hostName="Sam" handoff={marked()} onHandoff={onHandoff} />);
+    await userEvent.click(screen.getByRole('button', { name: "I didn't order after all" }));
+    await userEvent.click(screen.getByRole('button', { name: "Yes, I didn't order" }));
+    rerender(<HandoffPanel partyId="p1" shop={shop} cartId="cart_1" checklist={checklist} hostName="Sam" handoff={onHandoff.mock.calls[0][0]} onHandoff={onHandoff} />);
+    await waitFor(() => expect(document.activeElement?.textContent).toBe('Order it yourself'));
+  });
+
+  it('the second-order confirm names the shop of the existing order', async () => {
+    mocks.mark.mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'ORDER_IN_PROGRESS', data: { existingShopName: "Luigi's" } }));
+    panel({ handoff: row() });
+    await userEvent.click(screen.getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save: I ordered it' }));
+    expect((await screen.findByRole('alertdialog')).textContent).toMatch(/already has an order at Luigi's\. Mark a second order at Sal's/);
+  });
+
+  it('a receipt uploaded before the mark: the server\'s explanation is shown', async () => {
+    mocks.mark.mockRejectedValueOnce(Object.assign(new Error('The only receipts we found were uploaded before you marked this order'), { code: 'RECEIPT_BEFORE_MARK' }));
+    panel({ handoff: marked() });
+    await userEvent.click(screen.getByRole('button', { name: 'I uploaded the receipt' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/before you marked this order/);
+  });
+
+  it('with no server checklist, the cart lines make one', () => {
+    panel({ checklist: null, fallbackLines: ['2 x Large Pepperoni'] });
+    expect(screen.getByText(/\[ \] 2 x Large Pepperoni/)).toBeTruthy();
+  });
+});
+
+describe('ShopPicker: review fixes', () => {
+  const s2 = (over: Partial<PizzaShop>): PizzaShop => ({
+    id: 'pzl_1', name: "Sal's", tier: 'listing', capability_summary: '', ordering: { channel: 'handoff', call_countries_ok: true, reasons: [] },
+    address: { line1: '1 Main St' }, phone: '+16175550101', distance_km: 1, open_now: false,
+    ordering_links: [{ id: null, provider: 'toast', url: 'https://order.toasttab.com/online/sals', label: 'x', source: 'place_data' }], ...over,
+  });
+
+  it('a blocked party sees the ordering pages switched off (no link), with the reason', async () => {
+    mocks.shops.mockResolvedValue({ pizzerias: [s2({})] });
+    render(<ShopPicker partyId="p" onSelect={vi.fn()} onChecklist={vi.fn()} orderDisabled />);
+    const btn = (await screen.findByRole('button', { name: /Order online at Toast/ })) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(screen.queryByRole('link', { name: /Toast/ })).toBeNull();
+    expect(screen.getByText(/the shop's ordering page is off here/)).toBeTruthy();
+  });
+
+  it('"Build a checklist" is offered on every shop: callable, native and handoff', async () => {
+    mocks.shops.mockResolvedValue({
+      pizzerias: [
+        s2({}),
+        s2({ id: 'pzl_2', name: 'Regina', ordering: { channel: 'ai_phone', call_countries_ok: true, reasons: [] }, ordering_links: [] }),
+        s2({ id: 'pz_3', name: 'Native', tier: 'native', ordering: { channel: 'api', call_countries_ok: true, reasons: [] }, ordering_links: [] }),
+      ],
+    });
+    render(<ShopPicker partyId="p" onSelect={vi.fn()} onChecklist={vi.fn()} />);
+    for (const n of ["Sal's", 'Regina', 'Native']) {
+      expect(await screen.findByRole('button', { name: `Build a checklist to order from ${n} yourself` })).toBeTruthy();
+    }
   });
 });
