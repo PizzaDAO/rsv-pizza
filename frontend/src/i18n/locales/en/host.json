@@ -620,6 +620,7 @@
       "budget": "Set up your budget",
       "funding": "Get reviewed for funding",
       "socials": "Post to socials",
+      "photoVideo": "Pick a photo/video person",
       "throwParty": "Throw the party"
     },
     "coach": {
@@ -633,6 +634,7 @@
       "budget": "Sketch your costs and stay within your reimbursement cap so payouts go smoothly.",
       "funding": "Once approved by your underboss, your reimbursement cap unlocks here.",
       "socials": "Share your event link across your channels to fill those seats.",
+      "photoVideo": "Ask a guest or co-host to be your photo/video person. Have them grab a few short clips (arrivals, the pizza reveal, a group shot, a quick quote from guests) in landscape and portrait, then upload them in the Photos tab after the party.",
       "throwParty": "Everything's set — print your essentials and go throw a great party!"
     },
     "status": {
@@ -999,6 +1001,27 @@
     "runningTotal": "Running total",
     "savingReceipt": "Saving receipt…",
     "receiptsRollingHelp": "Add receipts anytime — they're saved automatically and added up below.",
+    "pizzaCount": {
+      "readAuto_one": "We read {{count}} pizza",
+      "readAuto_other": "We read {{count}} pizzas",
+      "readHost_one": "{{count}} pizza (you)",
+      "readHost_other": "{{count}} pizzas (you)",
+      "aboutCount_one": "About {{count}} pizza?",
+      "aboutCount_other": "About {{count}} pizzas?",
+      "sizeCmAuto": "~{{cm}} cm",
+      "sizeCmHost": "{{cm}} cm",
+      "sizeMixed": "mixed sizes",
+      "sizeUnknown": "size?",
+      "edit": "Edit",
+      "done": "Done",
+      "prompt": "We couldn't read how many pizzas this receipt covers — add it if you know.",
+      "countPlaceholder": "How many pizzas? (optional)",
+      "sizePlaceholder": "Pizza size (optional)",
+      "sizeMixedOption": "Mixed / not sure",
+      "helper": "Helps us compare pizza prices around the world. It never changes what you're reimbursed.",
+      "saveFailed": "Couldn't save. Please try again.",
+      "invalidCount": "Enter a whole number from 1 to 5000."
+    },
     "eventPhotosDone": "Event photos added.",
     "statusSubmitted": "Submitted for review {{date}}",
     "statusReady": "Ready to submit.",

@@ -8,9 +8,10 @@ import {
   cityKeyFromPartyName,
   buildScopedWhereClause,
   UnderbossScope,
+  buildCityDisplayNameMap,
 } from '../helpers/underbossScope.js';
 import { sendToCityGroup, persistCityGroupMigration } from '../services/cityTelegramGroup.js';
-import { withBennySignature } from '../lib/bennySignature.js';
+import { formatForTelegram, postTelegramMessage } from '../lib/telegramFormat.js';
 import { isValidAppTab } from '../lib/broadcastApps.js';
 import {
   sendConnectInviteEmail,
@@ -167,9 +168,9 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
     }
 
     // Validate parseMode
-    const validParseModes = ['HTML', 'Markdown', 'None', undefined];
+    const validParseModes = ['Auto', 'HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
-      throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
+      throw new AppError('parseMode must be "Auto", "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
     }
 
     // mozzarella-25815: reject the entire request if any group is out of scope.
@@ -236,6 +237,12 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
     const results: Array<{ chatId: string; city: string; success: boolean; error?: string; linkResolved?: boolean }> = [];
 
+    // {city} must render the proper display name, not the lowercase cityKey.
+    const usesCityToken = /\{city\}/.test(message);
+    const cityNames = usesCityToken
+      ? await buildCityDisplayNameMap(groups.map((g: any) => String(g?.city || '')))
+      : new Map<string, string>();
+
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
       const { chatId, city, country } = group;
@@ -257,46 +264,21 @@ router.post('/broadcast', requireAuth, requireUnderbossAuth, async (req: Underbo
 
       // Replace template variables
       let personalizedMessage = message;
-      personalizedMessage = personalizedMessage.replace(/\{city\}/g, city || '');
+      personalizedMessage = personalizedMessage.replace(/\{city\}/g, cityNames.get((city || '').toLowerCase().trim()) || city || '');
       personalizedMessage = personalizedMessage.replace(/\{country\}/g, country || '');
       // Substitute (and strip-if-unresolved) the per-recipient link tokens.
       personalizedMessage = substituteLinkTokens(personalizedMessage, linkUrl, appLinkUrl);
-      personalizedMessage = withBennySignature(personalizedMessage);
 
       try {
-        const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
-        const telegramResponse = await fetch(
-          `https://api.telegram.org/bot${botToken}/sendMessage`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: personalizedMessage,
-              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-            }),
-          }
-        );
-
-        let telegramResult = await telegramResponse.json();
+        const fmt = formatForTelegram(personalizedMessage, parseMode);
+        const sendUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        let telegramResult = (await postTelegramMessage(sendUrl, { chat_id: chatId }, fmt)).json;
 
         // Auto-retry if group was upgraded to supergroup
         if (!telegramResult.ok && telegramResult.parameters?.migrate_to_chat_id) {
           const newChatId = String(telegramResult.parameters.migrate_to_chat_id);
           console.log(`[Telegram Broadcast] Group ${chatId} migrated to ${newChatId}, retrying...`);
-          const retryResponse = await fetch(
-            `https://api.telegram.org/bot${botToken}/sendMessage`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: newChatId,
-                text: personalizedMessage,
-                ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-              }),
-            }
-          );
-          telegramResult = await retryResponse.json();
+          telegramResult = (await postTelegramMessage(sendUrl, { chat_id: newChatId }, fmt)).json;
           if (telegramResult.ok) {
             // tonda-58293 FIX #6: persist the new supergroup id via the shared
             // helper. cityKey = lower(trim(city)); the broadcast `city` field is
@@ -526,9 +508,9 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
       throw new AppError('message must be 4096 characters or less', 400, 'VALIDATION_ERROR');
     }
 
-    const validParseModes = ['HTML', 'Markdown', 'None', undefined];
+    const validParseModes = ['Auto', 'HTML', 'Markdown', 'None', undefined];
     if (parseMode && !validParseModes.includes(parseMode)) {
-      throw new AppError('parseMode must be "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
+      throw new AppError('parseMode must be "Auto", "HTML", "Markdown", or "None"', 400, 'VALIDATION_ERROR');
     }
 
     // guanciale-58491: validate optional client-minted broadcastId (UUID). If a
@@ -670,24 +652,17 @@ router.post('/host-broadcast', requireAuth, requireUnderbossAuth, async (req: Un
         continue;
       }
 
-      const personalizedMessage = withBennySignature(baseMessage);
+      const personalizedMessage = baseMessage;
 
       try {
-        const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
-        const telegramResponse = await fetch(
+        const telegramResponse = { status: 0 };
+        const sent = await postTelegramMessage(
           `https://api.telegram.org/bot${botToken}/sendMessage`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId.toString(),
-              text: personalizedMessage,
-              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-            }),
-          }
+          { chat_id: chatId.toString() },
+          formatForTelegram(personalizedMessage, parseMode),
         );
-
-        const telegramResult = await telegramResponse.json();
+        const telegramResult = sent.json;
+        telegramResponse.status = sent.status;
 
         if (telegramResult.ok) {
           results.push({ partyId, city, hostName, success: true, linkResolved });
@@ -809,21 +784,13 @@ router.post('/host-test', requireAuth, requireUnderbossAuth, async (req: Underbo
     console.log(`[Telegram Host Test] ${req.underboss!.email} sending test to party ${partyId} at ${new Date().toISOString()}`);
 
     try {
-      const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
-      const telegramResponse = await fetch(
+      const sent = await postTelegramMessage(
         `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: party.hostTelegramChatId.toString(),
-            text: withBennySignature(message),
-            ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-          }),
-        }
+        { chat_id: party.hostTelegramChatId.toString() },
+        formatForTelegram(message, parseMode),
       );
-
-      const telegramResult = await telegramResponse.json();
+      const telegramResult = sent.json;
+      const telegramResponse = { status: sent.status };
 
       if (telegramResult.ok) {
         return res.json({ partyId, success: true });
@@ -888,39 +855,15 @@ router.post('/test', requireAuth, requireUnderbossAuth, async (req: UnderbossAut
     console.log(`[Telegram Test] ${req.underboss!.email} sending test to ${chatId} at ${new Date().toISOString()}`);
 
     try {
-      const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
-      const telegramResponse = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: withBennySignature(message),
-            ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-          }),
-        }
-      );
-
-      let telegramResult = await telegramResponse.json();
+      const fmt = formatForTelegram(message, parseMode);
+      const sendUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      let telegramResult = (await postTelegramMessage(sendUrl, { chat_id: chatId }, fmt)).json;
 
       // Auto-retry if group was upgraded to supergroup
       if (!telegramResult.ok && telegramResult.parameters?.migrate_to_chat_id) {
         const newChatId = String(telegramResult.parameters.migrate_to_chat_id);
         console.log(`[Telegram Test] Group ${chatId} migrated to ${newChatId}, retrying...`);
-        const retryResponse = await fetch(
-          `https://api.telegram.org/bot${botToken}/sendMessage`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: newChatId,
-              text: withBennySignature(message),
-              ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
-            }),
-          }
-        );
-        telegramResult = await retryResponse.json();
+        telegramResult = (await postTelegramMessage(sendUrl, { chat_id: newChatId }, fmt)).json;
         if (telegramResult.ok) {
           res.json({ chatId, success: true, migratedTo: newChatId });
         } else {
@@ -992,10 +935,12 @@ router.get('/groups', requireAuth, requireUnderbossAuth, async (req: UnderbossAu
       orderBy: { cityKey: 'asc' },
     });
 
+    const displayNames = await buildCityDisplayNameMap(rows.map((r) => r.cityKey));
     res.json({
       groups: rows.map((r) => ({
         id: r.id,
         cityKey: r.cityKey,
+        cityName: displayNames.get(r.cityKey) ?? r.cityKey,
         chatId: r.chatId !== null ? r.chatId.toString() : null,
         chatUrl: r.chatUrl,
         title: r.title,

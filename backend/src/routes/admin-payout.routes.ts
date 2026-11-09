@@ -64,7 +64,7 @@ import { sendToCityGroup } from '../services/cityTelegramGroup.js';
 import { sendTelegramMessage } from '../services/telegramSend.js';
 import { cityKeyFromPartyName } from '../helpers/underbossScope.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
-import { parsePizzaCountPatch, pizzaAutofillPatch, pizzaAutofillColumns, pizzaFieldsFromDoc } from '../services/pizzaCountAutofill.js';
+import { parsePizzaCountPatch, pizzaAutofillPatch, pizzaAutofillColumns, pizzaFieldsFromDoc, receiptUsdTotal } from '../services/pizzaCountAutofill.js';
 import { sanitizeLineSize, type OcrLineItemSize } from '../services/ocr.service.js'; // sfincione-40417
 
 const router = Router();
@@ -5958,6 +5958,14 @@ router.patch(
         pizzaData = pizzaAutofillPatch(
           doc, Array.isArray(data.ocrLineItems) ? data.ocrLineItems : null, doc.ocrRaw,
           doc.ocrConfidence == null ? null : Number(doc.ocrConfidence.toString()),
+          // Money as it will be after this request (an FX re-run above may have changed it).
+          receiptUsdTotal({
+            ocrAmount: data.ocrAmount !== undefined ? data.ocrAmount : doc.ocrAmount,
+            ocrCurrency: data.ocrCurrency !== undefined ? data.ocrCurrency : doc.ocrCurrency,
+            originalAmount: data.originalAmount !== undefined ? data.originalAmount : doc.originalAmount,
+            originalCurrency: data.originalCurrency !== undefined ? data.originalCurrency : doc.originalCurrency,
+            exchangeRate: data.exchangeRate !== undefined ? data.exchangeRate : doc.exchangeRate,
+          }),
         );
       }
 
@@ -6311,6 +6319,7 @@ router.post(
         take: limit,
         select: {
           id: true, url: true,
+          ocrAmount: true, ocrCurrency: true, originalAmount: true, originalCurrency: true, exchangeRate: true,
           pizzaCount: true, pizzaCountSource: true, pizzaCountConfidence: true,
           pizzaSizeCm: true, pizzaSizeLabel: true, pizzaSizeSource: true, pizzaSizeConfidence: true,
         },
@@ -6340,7 +6349,7 @@ router.post(
               ocrAttemptCount: { increment: 1 },
               ocrError: null,
               // sfincione-40417 (pizza count): host values stay sticky; never throws.
-              ...pizzaAutofillPatch(doc, result.lineItems, result.raw, result.confidence),
+              ...pizzaAutofillPatch(doc, result.lineItems, result.raw, result.confidence, receiptUsdTotal(doc)),
             },
           });
           succeeded += 1;
@@ -6501,7 +6510,10 @@ router.post(
               ocrAttemptedAt: new Date(),
               ocrAttemptCount: { increment: 1 },
               // sfincione-40417 (pizza count): host values stay sticky; never throws.
-              ...pizzaAutofillPatch(existing, result.lineItems, result.raw, result.confidence),
+              ...pizzaAutofillPatch(
+                existing, result.lineItems, result.raw, result.confidence,
+                unresolved ? null : receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+              ),
             },
           });
           ranInline = true;
@@ -6946,7 +6958,10 @@ router.post(
           ocrLanguage = result.language ? sanitizePgString(result.language) : null;
           ocrSummary = result.summary ? sanitizePgString(result.summary) : null;
           ocrError = unresolved ? 'CURRENCY_UNRESOLVED' : null;
-          pizzaCols = pizzaAutofillColumns(result.lineItems, result.raw, result.confidence);
+          pizzaCols = pizzaAutofillColumns(
+            result.lineItems, result.raw, result.confidence,
+            unresolved ? null : receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+          );
         } catch (err: any) {
           // Don't fail the request — persist the doc with the error so the
           // admin can fix the amount via the existing edit / retry-ocr UI.

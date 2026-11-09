@@ -36,6 +36,39 @@ export function cityKeyFromPartyName(name: string | null | undefined): string | 
   return match[1].trim().toLowerCase();
 }
 
+/** Title-case a lowercase city key ("mexico city" -> "Mexico City"). Fallback only. */
+export function titleCaseCityKey(key: string | null | undefined): string {
+  return (key || '')
+    .trim()
+    .replace(/(^|[\s\-/(])(\p{L})/gu, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
+}
+
+/**
+ * Map cityKey -> proper display name, using the original-case city portion of
+ * GPP party names ("Global Pizza Party Mexico City"). Keys with no party fall
+ * back to a title-cased key. Keys stay lowercase internally; this is display only.
+ */
+export async function buildCityDisplayNameMap(cityKeys: string[]): Promise<Map<string, string>> {
+  const wanted = new Set(cityKeys.map((k) => (k || '').toLowerCase().trim()).filter(Boolean));
+  const out = new Map<string, string>();
+  if (wanted.size > 0) {
+    const parties = await prisma.party.findMany({
+      where: { name: { startsWith: 'Global Pizza Party', mode: 'insensitive' } },
+      select: { name: true },
+    });
+    for (const p of parties) {
+      const key = cityKeyFromPartyName(p.name);
+      if (!key || !wanted.has(key) || out.has(key)) continue;
+      const m = p.name.match(/Global Pizza Party\s+(.+)/i);
+      const display = m ? m[1].trim() : '';
+      // Only trust a party-derived name that isn't itself all-lowercase.
+      if (display && display !== display.toLowerCase()) out.set(key, display);
+    }
+  }
+  for (const k of wanted) if (!out.has(k)) out.set(k, titleCaseCityKey(k));
+  return out;
+}
+
 /**
  * provola-58507: normalize a free-text city label (a moltobene captured-group
  * TITLE, a moltobene `/city/groups` cityName, OR an rsvpizza-derived cityKey)

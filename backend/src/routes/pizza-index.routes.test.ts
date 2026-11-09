@@ -251,7 +251,23 @@ describe('archive (history) lines', () => {
   it('queue defaults to event receipts', async () => {
     (prisma.$queryRaw as any).mockClear();
     await request(app()).get('/api/admin/pizza-index/queue').set('x-test-email', 'admin@x.com');
-    expect(sqlOf()).toContain('li.history_receipt_id IS NULL');
+    // keyed on the document, so neither archive nor community-submission lines leak into the GPP queue
+    expect(sqlOf()).toContain('li.document_id IS NOT NULL');
+    expect(sqlOf()).not.toContain('li.history_receipt_id IS NULL');
+    expect(sqlOf()).not.toContain('li.submission_id IS NOT NULL');
+  });
+
+  it('queue: origin=submission filters on submission_id; underbosses are guarded to document lines', async () => {
+    (prisma.$queryRaw as any).mockClear();
+    const ad = await request(app()).get('/api/admin/pizza-index/queue?origin=submission').set('x-test-email', 'admin@x.com');
+    expect(ad.status).toBe(200);
+    expect(sqlOf()).toContain('li.submission_id IS NOT NULL');
+    expect(sqlOf()).toContain("s.status = 'approved'");
+    (prisma.$queryRaw as any).mockClear();
+    const ub = await request(app()).get('/api/admin/pizza-index/queue?origin=submission').set('x-test-email', 'ub@x.com');
+    expect(ub.status).toBe(200);
+    expect(ub.body.receipts).toEqual([]);
+    expect(sqlOf()).toContain('AND li.document_id IS NOT NULL');
   });
 
   it('queue: underbosses never see archive receipts (no scope mapping); admins can filter them', async () => {
@@ -259,7 +275,7 @@ describe('archive (history) lines', () => {
     const ub = await request(app()).get('/api/admin/pizza-index/queue?origin=history&year=2022').set('x-test-email', 'ub@x.com');
     expect(ub.status).toBe(200);
     expect(ub.body.receipts).toEqual([]);
-    expect(sqlOf()).toContain('li.history_receipt_id IS NULL');
+    expect(sqlOf()).toContain('AND li.document_id IS NOT NULL');
     (prisma.$queryRaw as any).mockClear();
     const ad = await request(app()).get('/api/admin/pizza-index/queue?origin=history&year=2022').set('x-test-email', 'admin@x.com');
     expect(ad.status).toBe(200);
@@ -309,5 +325,50 @@ describe('public endpoint: years + trends', () => {
     expect(r.body.photos).toEqual([]);
     expect((await request(app()).get('/api/pizza-index/photos?country=India&year=2024')).status).toBe(404);
     expect((await request(app()).get('/api/pizza-index/photos?country=India&year=abc')).status).toBe(400);
+  });
+  it('events: itemized lines per event, no receipt urls; 404 for unpublished', async () => {
+    h.viewRows = [{ ...vrow(2026, 'delhi', 0.012), document_url: 'https://x/secret-receipt.jpg' }];
+    const r = await request(app()).get('/api/pizza-index/events?country=India&year=2026');
+    expect(r.status).toBe(200);
+    expect(r.body.events).toHaveLength(1);
+    const e = r.body.events[0];
+    expect(e.usd30).toBeCloseTo(0.012 * 706.86, 1);
+    expect(e.confirmed).toBe(true);
+    expect(e.lines[0]).toMatchObject({ name: 'Pizza', qty: 1, price: 100, currency: 'INR', diameterCm: 30, confirmed: true });
+    expect(JSON.stringify(r.body)).not.toContain('secret-receipt');
+    expect((await request(app()).get('/api/pizza-index/events?country=Peru&year=2026')).status).toBe(404);
+  });
+  it('public-receipts: full admins only', async () => {
+    h.viewRows = [{ ...vrow(2026, 'delhi', 0.012), document_url: 'https://x/secret-receipt.jpg', document_mime_type: 'image/jpeg' }];
+    expect((await request(app()).get('/api/admin/pizza-index/public-receipts?country=India')).status).toBe(401);
+    expect((await request(app()).get('/api/admin/pizza-index/public-receipts?country=India').set('x-test-email', 'ub@x.com')).status).toBe(403);
+    const r = await request(app()).get('/api/admin/pizza-index/public-receipts?country=India').set('x-test-email', 'admin@x.com');
+    expect(r.status).toBe(200);
+    expect(r.body.receipts['hist:2026:delhi|India']).toEqual([{ url: 'https://x/secret-receipt.jpg', mimeType: 'image/jpeg' }]);
+  });
+});
+
+describe('community submissions (admin)', () => {
+  const paths: Array<['get' | 'post', string]> = [
+    ['get', '/api/admin/pizza-index/submissions'],
+    ['get', '/api/admin/pizza-index/submissions/counts'],
+    ['get', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/extract'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/approve'],
+    ['post', '/api/admin/pizza-index/submissions/123e4567-e89b-42d3-a456-426614174000/reject'],
+  ];
+  it('requires login and full admin: underbosses get 403', async () => {
+    for (const [m, path] of paths) {
+      expect((await request(app())[m](path)).status, path).toBe(401);
+      expect((await request(app())[m](path).set('x-test-email', 'ub@x.com')).status, path).toBe(403);
+    }
+  });
+  it('404s (not 500) on a malformed submission id', async () => {
+    const r = await request(app()).get('/api/admin/pizza-index/submissions/not-a-uuid').set('x-test-email', 'admin@x.com');
+    expect(r.status).toBe(404);
+  });
+  it('validates the status filter for full admins', async () => {
+    const bad = await request(app()).get('/api/admin/pizza-index/submissions?status=nope').set('x-test-email', 'admin@x.com');
+    expect(bad.status).toBe(400);
   });
 });

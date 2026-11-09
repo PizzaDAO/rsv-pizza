@@ -39,6 +39,8 @@ export interface PizzaFields {
 }
 
 export const MAX_PIZZA_COUNT = 5000;
+/** A receipt implying more than this per pizza is a lump-sum catering line, not a pizza count. */
+export const MAX_USD_PER_PIZZA = 100;
 const MIN_SIZE_CM = 15;
 const MAX_SIZE_CM = 80;
 
@@ -243,6 +245,78 @@ export function derivePizzaAutofill(lineItems: unknown, ocrRaw: unknown, ocrConf
 }
 
 // ---------------------------------------------------------------------------
+// plausibility guard (USD per pizza)
+// ---------------------------------------------------------------------------
+
+/** The money columns of a payout_documents row (Decimals or numbers). */
+export interface ReceiptMoney {
+  ocrAmount?: unknown;
+  ocrCurrency?: string | null;
+  originalAmount?: unknown;
+  originalCurrency?: string | null;
+  exchangeRate?: unknown;
+}
+
+/**
+ * The receipt total in USD, or null when it can't be told. ocr_amount is
+ * documented as USD-converted but legacy rows hold the local-currency figure
+ * (a Nigerian receipt shows 754000), so it is only trusted as USD when the
+ * currency says USD. Otherwise: original_amount * exchange_rate.
+ */
+export function receiptUsdTotal(m: ReceiptMoney | null | undefined): number | null {
+  return receiptUsdTotalDetailed(m).usd;
+}
+
+/**
+ * Same as receiptUsdTotal, plus `corrected`: the non-USD row's ocr_amount
+ * matches neither original_amount * rate nor the local figure, i.e. an admin
+ * set ocrAmount + ocrCurrency by hand (original_* is left stale by that edit),
+ * so ocr_amount is used. Callers wanting a human check should flag these.
+ */
+export function receiptUsdTotalDetailed(m: ReceiptMoney | null | undefined): { usd: number | null; corrected: boolean } {
+  const none = { usd: null, corrected: false };
+  if (!m) return none;
+  const cur = (m.originalCurrency ?? m.ocrCurrency ?? '').trim().toUpperCase();
+  const ocrCur = (m.ocrCurrency ?? '').trim().toUpperCase();
+  if (cur && ocrCur && cur !== ocrCur) return none;
+  const orig = numOrNull(m.originalAmount);
+  const rate = numOrNull(m.exchangeRate);
+  const ocr = numOrNull(m.ocrAmount);
+  if (cur === 'USD') {
+    const usd = ocr ?? orig;
+    return usd !== null && usd >= 0 ? { usd: round2(usd), corrected: false } : none;
+  }
+  if (orig === null || orig < 0 || rate === null || !(rate > 0)) return none;
+  const product = orig * rate;
+  const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.02 * Math.abs(b), 0.01);
+  if (ocr !== null && ocr >= 0 && !near(ocr, product) && !near(ocr, orig)) {
+    return { usd: round2(ocr), corrected: true };
+  }
+  return { usd: round2(product), corrected: false };
+}
+
+/** USD per pizza, or null when the total or count is unknown. */
+export function usdPerPizza(count: number | null | undefined, usdTotal: number | null | undefined): number | null {
+  if (count == null || !(count > 0) || usdTotal == null || !Number.isFinite(usdTotal)) return null;
+  return usdTotal / count;
+}
+
+/**
+ * Is `count` plausible for a receipt of `usdTotal` USD? Total / count must be
+ * <= MAX_USD_PER_PIZZA. Unknown USD total (null) keeps today's behaviour: true.
+ */
+export function isPlausiblePizzaCount(count: number, usdTotal: number | null | undefined): boolean {
+  const per = usdPerPizza(count, usdTotal);
+  return per === null || per <= MAX_USD_PER_PIZZA;
+}
+
+/** Drop an implausible AUTO count (size handling unchanged). Pure. */
+export function guardAutofillCount(auto: PizzaAutofill, usdTotal: number | null | undefined): PizzaAutofill {
+  if (auto.count === null || isPlausiblePizzaCount(auto.count, usdTotal)) return auto;
+  return { ...auto, count: null, countConfidence: null, countSource: null };
+}
+
+// ---------------------------------------------------------------------------
 // merge (host stickiness + confidence precedence)
 // ---------------------------------------------------------------------------
 
@@ -297,11 +371,17 @@ export function mergeAutofill(existing: PizzaFields, auto: PizzaAutofill): Parti
 
 /**
  * Create-time columns for a brand-new receipt doc (nothing to preserve).
+ * `usdTotal` (see receiptUsdTotal) drops an implausible auto count; null = unknown.
  * NEVER throws: a failure here must not fail an upload.
  */
-export function pizzaAutofillColumns(lineItems: unknown, ocrRaw: unknown, ocrConfidence: number | null = null): Partial<PizzaFields> {
+export function pizzaAutofillColumns(
+  lineItems: unknown,
+  ocrRaw: unknown,
+  ocrConfidence: number | null = null,
+  usdTotal: number | null = null,
+): Partial<PizzaFields> {
   try {
-    return mergeAutofill(emptyPizzaFields(), derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence));
+    return mergeAutofill(emptyPizzaFields(), guardAutofillCount(derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence), usdTotal));
   } catch (err) {
     console.error('[pizzaCountAutofill] derive failed (ignored):', err instanceof Error ? err.message : err);
     return {};
@@ -317,9 +397,13 @@ export function pizzaAutofillPatch(
   lineItems: unknown,
   ocrRaw: unknown,
   ocrConfidence: number | null = null,
+  usdTotal: number | null = null,
 ): Partial<PizzaFields> {
   try {
-    return mergeAutofill(pizzaFieldsFromDoc(existingDoc), derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence));
+    return mergeAutofill(
+      pizzaFieldsFromDoc(existingDoc),
+      guardAutofillCount(derivePizzaAutofill(lineItems, ocrRaw, ocrConfidence), usdTotal),
+    );
   } catch (err) {
     console.error('[pizzaCountAutofill] derive failed (ignored):', err instanceof Error ? err.message : err);
     return {};

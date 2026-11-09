@@ -704,6 +704,8 @@ export async function sendTgAttendanceReminder(
 export interface CityTelegramGroupRow {
   id: string;
   cityKey: string;
+  /** Proper display name (capitalised); cityKey stays lowercase. */
+  cityName?: string;
   chatId: string | null;
   chatUrl: string | null;
   title: string | null;
@@ -4242,7 +4244,7 @@ export async function fetchHostAudience(): Promise<HostAudienceRow[]> {
 export async function sendTelegramBroadcast(
   groups: BroadcastGroup[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto',
   // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
   appTab: string | null = null
 ): Promise<BroadcastResponse> {
@@ -4256,7 +4258,7 @@ export async function sendTelegramBroadcast(
 export async function sendTelegramTest(
   chatId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/test', {
     method: 'POST',
@@ -4275,7 +4277,7 @@ export interface BroadcastHost {
 export async function sendHostTelegramBroadcast(
   hosts: BroadcastHost[],
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None',
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto',
   // parmigiano-58493: chosen app tab for the {appLink} token (null = none).
   appTab: string | null = null,
   // guanciale-58491: client-minted UUID double-send guard (null = none).
@@ -4291,7 +4293,7 @@ export async function sendHostTelegramBroadcast(
 export async function sendHostTelegramTest(
   partyId: string,
   message: string,
-  parseMode: 'HTML' | 'Markdown' | 'None' = 'None'
+  parseMode: 'Auto' | 'HTML' | 'Markdown' | 'None' = 'Auto'
 ): Promise<BroadcastResult> {
   return apiRequest<BroadcastResult>('/api/underboss/telegram/host-test', {
     method: 'POST',
@@ -5518,6 +5520,11 @@ export async function updatePayoutDocument(
     // under policy — alcohol, tips, personal items). Reversible. Same
     // exclusion semantics as `isDuplicate` everywhere it's read.
     ineligible?: boolean;
+    // sfincione-40417 (pizza count): admin-entered values count as 'host'
+    // (human). Any size 15-80 cm; pizzaSizeMixed records "mixed / not sure".
+    pizzaCount?: number | null;
+    pizzaSizeCm?: number | null;
+    pizzaSizeMixed?: boolean;
   },
 ): Promise<{
   id: string;
@@ -5540,6 +5547,13 @@ export async function updatePayoutDocument(
   ocrError: string | null;
   sortOrder: number;
   uploadedByUserId: string | null;
+  pizzaCount?: number | null;
+  pizzaCountSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaCountConfidence?: number | null;
+  pizzaSizeCm?: number | null;
+  pizzaSizeLabel?: string | null;
+  pizzaSizeSource?: 'ocr' | 'llm' | 'host' | null;
+  pizzaSizeConfidence?: number | null;
 }> {
   const res = await apiRequest<{ document: any }>(
     `/api/admin/payouts/documents/${docId}`,
@@ -6787,6 +6801,23 @@ export async function removeReimbursementReceipt(
   return apiRequest<ReimbursementMutationResponse>(
     `/api/parties/${partyId}/reimbursement/receipts/${docId}`,
     { method: 'DELETE', requireAuth: true }
+  );
+}
+
+/**
+ * sfincione-40417 (pizza count): correct (or fill in) how many pizzas / what size
+ * a receipt covers. Any co-host, any time (also after submit); never changes money.
+ * `pizzaSizeCm` must be one of 25/30/35/40/45 (or null to clear); `pizzaSizeMixed`
+ * records "mixed / not sure". Sending a key marks that value as host-entered.
+ */
+export async function updateReimbursementReceiptPizza(
+  partyId: string,
+  docId: string,
+  body: { pizzaCount?: number | null; pizzaSizeCm?: number | null; pizzaSizeMixed?: boolean }
+): Promise<{ receipt: PayoutDocument }> {
+  return apiRequest<{ receipt: PayoutDocument }>(
+    `/api/parties/${partyId}/reimbursement/receipts/${docId}`,
+    { method: 'PATCH', body, requireAuth: true }
   );
 }
 
@@ -8153,6 +8184,8 @@ export interface PizzaLineDto {
   documentId: string | null;
   partyId: string | null;
   historyReceiptId: string | null;
+  /** Set for lines of an approved community submission. */
+  submissionId: string | null;
   lineIndex: number;
   rawName: string;
   merchant: string | null;
@@ -8225,8 +8258,8 @@ export interface PizzaPresetDto {
 }
 
 export interface PizzaQueueReceipt {
-  /** 'history' = archive receipt (url is the Drive link; no preview, no photos). */
-  origin: 'event' | 'history';
+  /** 'history' = archive receipt (url is the Drive link; no preview, no photos); 'submission' = community receipt (no url). */
+  origin: 'event' | 'history' | 'submission';
   /** Event year, or the archive receipt year. */
   year: number | null;
   document: {
@@ -8268,7 +8301,7 @@ export interface PizzaQueueParams {
   partyId?: string;
   documentId?: string;
   /** Archive (2021-2025) receipts vs GPP event receipts. Archive is admin-only. */
-  origin?: 'event' | 'history' | 'all';
+  origin?: 'event' | 'history' | 'submission' | 'all';
   year?: number;
   limit?: number;
   offset?: number;
@@ -8287,8 +8320,6 @@ export interface PizzaStatusResponse {
   bundleLines: number;
   outlierLines: number;
   bySource: Record<string, number>;
-  partiesPendingPhoto?: number;
-  linesWithPhotoEstimate?: number;
 }
 
 export interface PizzaLinePatch {
@@ -8418,6 +8449,8 @@ export interface PublicPizzaCountry {
   countryCode: string | null;
   continent: string | null;
   nParties: number;
+  /** Receipts behind the figure. Optional until the backend ships it. */
+  nReceipts?: number;
   nLines: number;
   nPizzas: number;
   usdPerCm2: number;
@@ -8427,6 +8460,10 @@ export interface PublicPizzaCountry {
   ladderLocal: PizzaSizeLadder;
   /** No confirmed pizza size yet; the figure uses estimated sizes. Optional until the backend ships it. */
   estimated?: boolean;
+  /** Events in the figure on estimated sizes. Optional until the backend ships it. */
+  nEstimatedParties?: number;
+  /** Events in the figure that come from community-submitted receipts. */
+  nCommunityParties?: number;
 }
 
 export interface PublicPizzaTrendPoint {
@@ -8519,9 +8556,6 @@ export function runPizzaLlmPass(body: { limit?: number; dryRun?: boolean } = {})
 export function runPizzaVisionPass(body: { limit?: number; dryRun?: boolean; requireLlmPass?: boolean; includeLowConfidence?: boolean } = {}): Promise<PizzaPassResult> {
   return apiRequest(`${PIZZA_BASE}/vision-pass`, { method: 'POST', body, timeoutMs: 180_000 });
 }
-export function runPizzaPhotoPass(body: { limit?: number; dryRun?: boolean; partyIds?: string[] } = {}): Promise<PizzaPassResult> {
-  return apiRequest(`${PIZZA_BASE}/photo-pass`, { method: 'POST', body, timeoutMs: 240_000 });
-}
 export function fetchPublicPizzaIndex(year?: number): Promise<PublicPizzaIndex> {
   return apiRequest<PublicPizzaIndex>(`/api/pizza-index${year ? `?year=${year}` : ''}`, { requireAuth: false });
 }
@@ -8532,6 +8566,153 @@ export interface PublicPizzaCountryPhoto {
 }
 export function fetchPublicPizzaCountryPhotos(country: string, year?: number): Promise<{ country: string; photos: PublicPizzaCountryPhoto[] }> {
   return apiRequest(`/api/pizza-index/photos?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
+}
+export interface PublicPizzaEventLine {
+  name: string | null;
+  qty: number;
+  price: number | null;
+  currency: string | null;
+  shape: string | null;
+  diameterCm: number | null;
+  sizeLabel: string | null;
+  confirmed: boolean;
+  lumpSum: boolean;
+  usd30: number;
+}
+export interface PublicPizzaEvent {
+  id: string;
+  name: string | null;
+  city: string | null;
+  merchants: string[];
+  usd30: number;
+  confirmed: boolean;
+  nPizzas: number;
+  /** Built only from receipts sent in by the community. */
+  community?: boolean;
+  lines: PublicPizzaEventLine[];
+  photos: PublicPizzaCountryPhoto[];
+}
+export function fetchPublicPizzaCountryEvents(country: string, year?: number): Promise<{ country: string; events: PublicPizzaEvent[] }> {
+  return apiRequest(`/api/pizza-index/events?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`, { requireAuth: false });
+}
+// ---------------------------------------------------------------------------
+// Community receipt submissions (public form + admin review)
+// Mirrors backend/src/routes/pizza-index-submissions.routes.ts + services/pizzaSubmission.service.ts
+// ---------------------------------------------------------------------------
+
+export function requestPizzaSubmissionUpload(mimeType: string, fileSize: number): Promise<{ path: string; token: string }> {
+  return apiRequest('/api/pizza-index/submissions/upload-url', { method: 'POST', body: { mimeType, fileSize }, requireAuth: false });
+}
+/** Is the public form open? (kill switch app_config pizza_index.submissions_enabled) */
+export function fetchPizzaSubmissionsOpen(): Promise<{ open: boolean }> {
+  return apiRequest('/api/pizza-index/submissions/status', { requireAuth: false });
+}
+export interface PizzaSubmissionInput {
+  path: string;
+  receiptDate: string;
+  merchant: string;
+  city: string;
+  country: string;
+  countryCode?: string;
+  sizeNote?: string;
+  email?: string;
+  /** Honeypot: must stay empty. */
+  website?: string;
+}
+export function createPizzaSubmission(body: PizzaSubmissionInput): Promise<{ id: string; status: 'pending' }> {
+  return apiRequest('/api/pizza-index/submissions', { method: 'POST', body, requireAuth: false });
+}
+
+export interface PizzaSubmissionOcr {
+  amount: number;
+  currency: string | null;
+  confidence: number;
+  merchant?: string | null;
+  receiptDate?: string | null;
+}
+export interface PizzaSubmissionDto {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  submitterEmail: string | null;
+  submittedByUser: boolean;
+  notify: boolean;
+  /** Short-lived signed URLs (admin only). */
+  receiptUrl: string | null;
+  previewUrl: string | null;
+  mimeType: string;
+  receiptDate: string;
+  year: number;
+  country: string;
+  city: string | null;
+  merchant: string;
+  sizeNote: string | null;
+  kind: 'itemized' | 'lump_sum' | 'not_pizza' | null;
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  fxRate: number | null;
+  fxSource: string | null;
+  ocr: PizzaSubmissionOcr | null;
+  ocrAt: string | null;
+  duplicateOfId: string | null;
+  duplicateReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  rejectReason: string | null;
+}
+export interface PizzaSubmissionDraftLine {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  sizeLabel: string | null;
+  diameterCm: number | null;
+}
+export interface PizzaSubmissionDraft {
+  kind: 'itemized' | 'lump_sum' | 'not_pizza';
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  merchant: string | null;
+  receiptDate: string | null;
+  lines: PizzaSubmissionDraftLine[];
+}
+export interface PizzaSubmissionApproveBody {
+  kind: 'itemized' | 'lump_sum' | 'not_pizza';
+  currency: string | null;
+  total: number | null;
+  pizzaCount: number | null;
+  merchant?: string | null;
+  city?: string | null;
+  country?: string | null;
+  receiptDate?: string | null;
+  /** USD per 1 unit of currency; only needed when no automatic rate exists. */
+  fxRate?: number | null;
+  lines: PizzaSubmissionDraftLine[];
+}
+export function fetchPizzaSubmissions(params: { status?: 'pending' | 'approved' | 'rejected' | 'all'; limit?: number; offset?: number } = {}): Promise<{ total: number; submissions: PizzaSubmissionDto[] }> {
+  return apiRequest(`${PIZZA_BASE}/submissions${pizzaQs(params)}`);
+}
+export function fetchPizzaSubmissionCounts(): Promise<{ pending: number; approved: number; rejected: number }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/counts`);
+}
+export function extractPizzaSubmission(id: string): Promise<{ submission: PizzaSubmissionDto; draft: PizzaSubmissionDraft | null }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/extract`, { method: 'POST', body: {}, timeoutMs: 120_000 });
+}
+export function approvePizzaSubmission(id: string, body: PizzaSubmissionApproveBody): Promise<{ submission: PizzaSubmissionDto; linesWritten: number; warnings: string[] }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/approve`, { method: 'POST', body, timeoutMs: 60_000 });
+}
+export function rejectPizzaSubmission(id: string, reason?: string): Promise<{ submission: PizzaSubmissionDto }> {
+  return apiRequest(`${PIZZA_BASE}/submissions/${id}/reject`, { method: 'POST', body: { reason } });
+}
+
+export interface PizzaEventReceipt {
+  url: string;
+  mimeType: string | null;
+}
+/** Admin-only: receipt files per event id for the public drill-down. */
+export function fetchPizzaCountryReceipts(country: string, year?: number): Promise<{ country: string; receipts: Record<string, PizzaEventReceipt[]> }> {
+  return apiRequest(`${PIZZA_BASE}/public-receipts?country=${encodeURIComponent(country)}${year ? `&year=${year}` : ''}`);
 }
 
 // ---------------------------------------------------------------------------

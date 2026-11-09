@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Megaphone,
   Rocket,
+  Camera,
   LucideIcon,
 } from 'lucide-react';
 import type { Party, Guest } from '../../types';
@@ -131,6 +132,14 @@ export const GPP27_STEPS: Gpp27Step[] = [
     manual: true,
     isDone: manualIsDone('socials'),
     coachKey: 'gpp27.coach.socials',
+  },
+  {
+    id: 'photoVideo',
+    labelKey: 'gpp27.steps.photoVideo',
+    icon: Camera,
+    manual: true,
+    isDone: manualIsDone('photoVideo'),
+    coachKey: 'gpp27.coach.photoVideo',
   },
   {
     id: 'throwParty',

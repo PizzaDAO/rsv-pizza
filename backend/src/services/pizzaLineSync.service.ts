@@ -461,11 +461,16 @@ export function buildLumpSumWrite(
       const sub = it ? num((it as OcrItemLike).subtotal, 0) : 0;
       base += sub > 0 ? sub : w.qty * w.unitPriceList;
     }
-  } else {
-    if (!(c.receiptTotal && c.receiptTotal > 0) || !c.totalCurrency || !(c.totalFxRate && c.totalFxRate > 0)) return null;
-    base = c.receiptTotal;
-    currency = c.totalCurrency;
-    fxRate = c.totalFxRate;
+  }
+  const hasTotal = !!(c.receiptTotal && c.receiptTotal > 0) && !!c.totalCurrency && !!(c.totalFxRate && c.totalFxRate > 0);
+  // Pizza lines summing past the receipt total are misread: fall back to the total.
+  const linesOverTotal = mode === 'pizza_lines' && hasTotal && base * fxRate > c.receiptTotal! * c.totalFxRate! * 1.05;
+  if (mode === 'receipt_total' || linesOverTotal) {
+    if (!hasTotal) return null;
+    mode = 'receipt_total';
+    base = c.receiptTotal!;
+    currency = c.totalCurrency!;
+    fxRate = c.totalFxRate!;
   }
   if (!(base > 0)) return null;
 
@@ -939,6 +944,7 @@ export async function markDuplicateLines(): Promise<number> {
     UPDATE pizza_line_items li
     SET excluded = false, excluded_reason = NULL, updated_at = now()
     WHERE li.excluded_reason = 'duplicate_line' AND li.verified_at IS NULL AND li.updated_by IS NULL
+      AND li.document_id IS NOT NULL -- payout-document lines only: archive/submission lines are never auto-managed here
       AND li.id NOT IN (SELECT id FROM dup)`);
   return Number(marked);
 }
@@ -976,13 +982,13 @@ export async function reresolveUnverified(filter: { merchantKey?: string; partyI
       ...(filter.merchantKey ? { merchantKey: filter.merchantKey } : {}),
       ...(filter.partyIds ? { partyId: { in: filter.partyIds } } : {}),
     },
-    include: { party: { select: { country: true } }, historyReceipt: { select: { country: true } } },
+    include: { party: { select: { country: true } }, historyReceipt: { select: { country: true } }, submission: { select: { country: true } } },
   });
   let changed = 0;
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const r of rows) {
     const hint = labelHint(r.sizeLabel);
-    const resolved = resolveForItem(hint ? { size: { label: hint } } : {}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party?.country ?? r.historyReceipt?.country ?? null });
+    const resolved = resolveForItem(hint ? { size: { label: hint } } : {}, r.rawName, presets, { merchantKey: r.merchantKey, country: r.party?.country ?? r.historyReceipt?.country ?? r.submission?.country ?? null });
     const same =
       resolved.sizeSource === r.sizeSource &&
       resolved.presetId === r.presetId &&

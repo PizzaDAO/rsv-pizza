@@ -11,6 +11,7 @@ import {
   type PizzaShape,
 } from '../../lib/api';
 import { IconInput } from '../IconInput';
+import { lumpSumPill } from '../../utils/pizzaCount';
 import { Checkbox } from '../Checkbox';
 import {
   IN_TO_CM,
@@ -459,6 +460,12 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
                 <span className="w-3.5 h-3.5 rounded-full border border-theme-stroke flex-shrink-0" />
               )}
               <span className="truncate flex-1">{l.rawName}</span>
+              {/* sfincione-40417: synthetic per-receipt estimate from a pizza count. */}
+              {lumpSumPill(l) && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 whitespace-nowrap">
+                  {lumpSumPill(l)}
+                </span>
+              )}
               <span className="text-xs text-theme-text-muted whitespace-nowrap">
                 {l.qty}× {fmtLocal(l.unitPriceList, l.currency)}
               </span>
@@ -491,6 +498,11 @@ export function PizzaSizeEditor({ receipt, onLineUpdated, onNextReceipt, onMerch
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="font-medium break-words">{line.rawName}</div>
+            {lumpSumPill(line) && (
+              <div className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                {lumpSumPill(line)} · estimated: receipt total divided by the pizza count
+              </div>
+            )}
             <div className="text-xs text-theme-text-muted mt-0.5">
               {line.qty}× at {fmtLocal(line.unitPriceList, priceCur)} ({fmtUsd(line.unitPriceUsd)} USD)
               {line.unitPriceNet !== null && line.unitPriceNet !== line.unitPriceList && (

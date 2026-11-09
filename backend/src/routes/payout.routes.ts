@@ -32,7 +32,7 @@ import {
   getYtdPayoutTotalUsd,
 } from './tax-form.routes.js';
 import { getPayoutCaps } from '../lib/privateConfig.js';
-import { pizzaAutofillColumns, parsePizzaCountPatch } from '../services/pizzaCountAutofill.js';
+import { pizzaAutofillColumns, parsePizzaCountPatch, receiptUsdTotal } from '../services/pizzaCountAutofill.js';
 import {
   NON_TERMINAL_PAYOUT_STATUSES,
   payoutRowSnapshotFromUser,
@@ -1480,7 +1480,10 @@ router.post('/:partyId/payouts', async (req: AuthRequest, res: Response, next: N
             ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
             ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
             // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
-            ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
+            ...pizzaAutofillColumns(
+              ocr.lineItems, ocr.raw, ocr.confidence,
+              receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+            ),
             photoId: null,
           });
         });
@@ -2409,7 +2412,10 @@ router.patch('/:partyId/payouts/:payoutId', async (req: AuthRequest, res: Respon
           ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
           ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
           // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
-          ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
+          ...pizzaAutofillColumns(
+              ocr.lineItems, ocr.raw, ocr.confidence,
+              receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+            ),
           photoId: null,
         });
       } else {
@@ -3181,7 +3187,10 @@ router.post('/:partyId/reimbursement/receipts', async (req: AuthRequest, res: Re
             ocrLanguage: ocr.language ? sanitizePgString(ocr.language) : null,
             ocrSummary: ocr.summary ? sanitizePgString(ocr.summary) : null,
             // sfincione-40417 (pizza count): auto-fill (never throws, never touches money).
-            ...pizzaAutofillColumns(ocr.lineItems, ocr.raw, ocr.confidence),
+            ...pizzaAutofillColumns(
+              ocr.lineItems, ocr.raw, ocr.confidence,
+              receiptUsdTotal({ ocrAmount: fx.usdAmount, ocrCurrency: fx.originalCurrency, originalAmount: fx.originalAmount, originalCurrency: fx.originalCurrency, exchangeRate: fx.exchangeRate }),
+            ),
           });
         });
       } else {

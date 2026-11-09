@@ -176,6 +176,14 @@ describe('planDocSync: LLM-bundle lump sums (B2)', () => {
     const lump = planDocSync(items, prev, doc(count({ pizzaCount: 20 })), presets).writes.find((w) => w.lineIndex === LUMP_SUM_LINE_INDEX)!;
     expect(lump.unitPriceList).toBe(15);
   });
+  it('pizza lines summing past the receipt total fall back to the total', () => {
+    const items = [item('Pizzas x6', 1, 1074)];
+    const c = count({ pizzaCount: 6, receiptTotal: 216 });
+    const first = planDocSync(items, [], doc(c), presets).writes[0];
+    const lump = planDocSync(items, [bundleExisting(first)], doc(c), presets).writes.find((w) => w.lineIndex === LUMP_SUM_LINE_INDEX)!;
+    expect(lump.unitPriceList).toBe(36); // 216 / 6, not 1074 / 6
+    expect(lump.notes).toBe('lump_sum:host:receipt_total');
+  });
 });
 
 describe('docCountFromRow', () => {
@@ -239,9 +247,9 @@ describe('index: live-receipt lump sums (origin event)', () => {
     expect(pub.countries).toHaveLength(1);
     expect(pub.countries[0].estimated).toBe(true);
   });
-  it('dropped once the country has confirmed rows', () => {
+  it('dropped once the same event has confirmed rows', () => {
     const lump = row({ partyId: 'a', usdPerCm2: 0.05, isLumpSum: true, sizeConfidence: 0.5 });
-    const ok = row({ partyId: 'b', usdPerCm2: 0.01 });
+    const ok = row({ partyId: 'a', usdPerCm2: 0.01 });
     const pub = buildPublicIndexFromRows([lump, ok], 2026);
     expect(pub.countries[0].estimated).toBe(false);
     expect(pub.countries[0].usdPerCm2).toBeCloseTo(0.01);

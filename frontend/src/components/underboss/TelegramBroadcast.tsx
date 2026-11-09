@@ -180,7 +180,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
 
   // Message
   const [message, setMessage] = useState('');
-  const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('None');
+  const [parseMode, setParseMode] = useState<'Auto' | 'HTML' | 'Markdown' | 'None'>('Auto');
   // parmigiano-58493: chosen app for the {appLink} token (value = app `tab`, '' = none).
   const [selectedAppTab, setSelectedAppTab] = useState<string>('');
 
@@ -208,7 +208,7 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
           .filter((r) => r.chatId && r.cityKey)
           .map((r) => ({
             country: r.country || '',
-            city: r.cityKey,
+            city: r.cityName || r.cityKey,
             underboss: r.underboss || '',
             region: r.region || '',
             chatUrl: r.chatUrl || '',
@@ -1159,9 +1159,10 @@ export function TelegramBroadcast({ onClose, preSelectedCities, events, allHosts
                     </select>
                     <select
                       value={parseMode}
-                      onChange={(e) => setParseMode(e.target.value as 'HTML' | 'Markdown' | 'None')}
+                      onChange={(e) => setParseMode(e.target.value as 'Auto' | 'HTML' | 'Markdown' | 'None')}
                       className="bg-theme-surface border border-theme-stroke rounded-lg px-2 py-1 text-xs text-theme-text focus:outline-none focus:border-theme-stroke-hover"
                     >
+                      <option value="Auto">{t("telegram.formatAuto", "Auto (bold with **text**)")}</option>
                       <option value="None">{t('telegram.formatPlain')}</option>
                       <option value="HTML">{t('telegram.formatHtml')}</option>
                       <option value="Markdown">{t('telegram.formatMarkdown')}</option>

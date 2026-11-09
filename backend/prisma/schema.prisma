@@ -2782,6 +2782,9 @@ model PizzaLineItem {
   // Archive (pre-2026) lines point at a history receipt instead of a document/party.
   historyReceiptId String?       @map("history_receipt_id") @db.Uuid
   historyReceipt  PizzaHistoryReceipt? @relation(fields: [historyReceiptId], references: [id], onDelete: Cascade)
+  // Public receipt submissions (approved by an admin) point here instead of a document/party.
+  submissionId    String?        @map("submission_id") @db.Uuid
+  submission      PizzaSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   lineIndex       Int            @map("line_index")
   lineFingerprint String         @map("line_fingerprint")
   sourceCategory  String         @default("pizza") @map("source_category")
@@ -2853,6 +2856,53 @@ model PizzaHistoryReceipt {
   lines         PizzaLineItem[]
 
   @@map("pizza_history_receipts")
+}
+
+// sfincione-40417 (submissions): receipts sent in by anyone via rsv.pizza/pizza-index. RLS on,
+// no policies: only the backend (service role / pooler) reads it. storage_path is a path in the
+// PRIVATE `pizza-index-submissions` bucket and must never reach a public payload.
+model PizzaSubmission {
+  id               String    @id @default(uuid()) @db.Uuid
+  status           String    @default("pending") // 'pending' | 'approved' | 'rejected'
+  submitterUserId  String?   @map("submitter_user_id")
+  submitterEmail   String?   @map("submitter_email")
+  notify           Boolean   @default(false)
+  storagePath      String    @unique @map("storage_path")
+  ocrImagePath     String?   @map("ocr_image_path")
+  mimeType         String    @map("mime_type")
+  fileSize         Int       @map("file_size")
+  fileSha256       String    @unique @map("file_sha256")
+  receiptDate      DateTime  @map("receipt_date") @db.Date
+  year             Int
+  country          String
+  countryCode      String?   @map("country_code") @db.Char(2)
+  city             String?
+  region           String?
+  merchant         String
+  merchantKey      String?   @map("merchant_key")
+  sizeNote         String?   @map("size_note")
+  kind             String? // 'itemized' | 'lump_sum' | 'not_pizza', set on approve
+  currency         String?   @db.Char(3)
+  total            Decimal?  @db.Decimal(14, 4)
+  pizzaCount       Decimal?  @map("pizza_count") @db.Decimal(8, 2)
+  fxRate           Decimal?  @map("fx_rate") @db.Decimal(18, 8)
+  fxSource         String?   @map("fx_source")
+  fxDate           DateTime? @map("fx_date") @db.Date
+  ocrRaw           Json?     @map("ocr_raw")
+  ocrAt            DateTime? @map("ocr_at") @db.Timestamptz
+  duplicateOfId    String?   @map("duplicate_of") @db.Uuid
+  duplicateReason  String?   @map("duplicate_reason")
+  reviewedBy       String?   @map("reviewed_by")
+  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz
+  rejectReason     String?   @map("reject_reason")
+  ipHash           String?   @map("ip_hash")
+  eventKey         String?   @map("event_key") // generated column; never written by Prisma
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime? @map("updated_at") @db.Timestamptz
+  lines            PizzaLineItem[]
+
+  @@index([status, createdAt], map: "pizza_submissions_status_created")
+  @@map("pizza_submissions")
 }
 
 model PizzaLineSync {

@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
     <>
     <header className={`site-header border-b border-theme-stroke overflow-visible relative z-50 ${bgClass}`}>
       <div className="max-w-[1212px] mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity min-h-[40px]">
           <img
             src="/logo.png"
             alt="RSV.Pizza"
@@ -78,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative" ref={langRef}>
             <button
               onClick={() => setLangMenuOpen(prev => !prev)}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
+              className="flex items-center gap-1.5 px-2 py-1.5 min-h-[40px] rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-hover transition-all text-sm"
             >
               <Globe size={14} />
               <span className="font-bold">{currentLang.label}</span>

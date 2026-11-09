@@ -16,7 +16,7 @@
  */
 import { prisma } from '../config/database.js';
 import { getGppRegionByCityKey } from '../helpers/underbossScope.js';
-import { withBennySignature } from '../lib/bennySignature.js';
+import { formatForTelegram, postTelegramMessage } from '../lib/telegramFormat.js';
 import { refreshCityGroupFromMoltobene } from './moltobeneSync.js';
 
 const BOT_API = 'https://api.telegram.org';
@@ -92,7 +92,7 @@ export interface SendToCityGroupResult {
  *
  * @param cityKey  Already-normalized city key (caller should pass `lower(trim(city))`).
  * @param text     Message body.
- * @param parseMode Optional Telegram parse_mode ('HTML' | 'Markdown'); omit/None for plain.
+ * @param parseMode 'None' (default, plain) | 'Auto' | 'HTML' | 'Markdown'.
  * @param replyMarkup Optional Telegram reply_markup (e.g. an inline_keyboard);
  *   bocconcini-58533 uses this to attach URL + copy_text connect buttons.
  */
@@ -133,21 +133,19 @@ export async function sendToCityGroup(
     }
   }
 
-  const effectiveParseMode = parseMode && parseMode !== 'None' ? parseMode : undefined;
+  const fmt = formatForTelegram(text, parseMode ?? 'None');
 
   const send = async (sendChatId: string) => {
-    const resp = await fetch(`${BOT_API}/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { json } = await postTelegramMessage(
+      `${BOT_API}/bot${token}/sendMessage`,
+      {
         chat_id: sendChatId,
-        text: withBennySignature(text),
         disable_web_page_preview: true,
-        ...(effectiveParseMode && { parse_mode: effectiveParseMode }),
         ...(replyMarkup && { reply_markup: replyMarkup }),
-      }),
-    });
-    return resp.json() as Promise<any>;
+      },
+      fmt,
+    );
+    return json as any;
   };
 
   // provola-58505: a chat-not-found style failure means our stored id is stale
