@@ -299,6 +299,7 @@ model Party {
   guests                  Guest[]
   orders                  Order[]
   photos                  Photo[]
+  reels                   Reel[]
   partyKit                PartyKit?
   donations               Donation[]
   raffles                 Raffle[]
@@ -2941,4 +2942,28 @@ model PizzadaoServiceSend {
 
   @@index([kind, target, createdAt], map: "pizzadao_service_sends_target_idx")
   @@map("pizzadao_service_sends")
+}
+
+// Sizzle reels: host-requested slideshow videos rendered by the Railway reel-worker
+// (reel-worker/). The backend inserts a 'queued' row with a self-contained `spec`;
+// the worker claims it (FOR UPDATE SKIP LOCKED), renders, uploads to R2 and writes
+// `outputs` ({ "9x16": url, "16x9": url, "9x16_nomusic": url, "16x9_nomusic": url, poster }).
+model Reel {
+  id          String    @id @default(uuid()) @db.Uuid
+  partyId     String    @map("party_id") @db.Uuid
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  requestedBy String    @map("requested_by") // requester email
+  status      String    @default("queued") // queued | rendering | ready | failed
+  spec        Json
+  outputs     Json?
+  error       String?
+  progress    Int       @default(0)
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  startedAt   DateTime? @map("started_at") @db.Timestamptz
+  finishedAt  DateTime? @map("finished_at") @db.Timestamptz
+
+  @@index([status, createdAt])
+  @@index([partyId, createdAt])
+  @@map("reels")
 }
