@@ -2,7 +2,7 @@
  * ffmpeg command building (pure, unit-tested) plus a thin runner.
  * Every function returns an argv array; nothing goes through a shell.
  */
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import type { Ratio } from './types.js'
 
 export const FPS = 30
@@ -154,15 +154,44 @@ export function buildPosterArgs(video: string, out: string, atSeconds: number): 
   return ['-y', '-ss', String(atSeconds), '-i', video, '-frames:v', '1', '-q:v', '3', out]
 }
 
-export function runFfmpeg(args: string[], bin = 'ffmpeg'): Promise<void> {
+const active = new Set<ChildProcess>()
+
+/** Kill every in-flight ffmpeg/ffprobe (used on shutdown). */
+export function killAllChildren(): void {
+  for (const c of active) c.kill('SIGKILL')
+  active.clear()
+}
+
+export const DEFAULT_CALL_TIMEOUT_MS = 5 * 60 * 1000
+
+/** Run ffmpeg; SIGKILL it if it runs longer than timeoutMs. */
+export function runFfmpeg(args: string[], opts: { timeoutMs?: number; bin?: string } = {}): Promise<void> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS
   return new Promise((resolve, reject) => {
-    const p = spawn(bin, ['-hide_banner', '-loglevel', 'error', ...args], { stdio: ['ignore', 'ignore', 'pipe'] })
+    if (timeoutMs <= 0) return reject(new Error('job deadline exceeded'))
+    const bin = opts.bin ?? 'ffmpeg'
+    const p = spawn(bin, bin === 'ffmpeg' ? ['-hide_banner', '-loglevel', 'error', ...args] : args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    active.add(p)
     let err = ''
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      p.kill('SIGKILL')
+    }, timeoutMs)
     p.stderr.on('data', (d) => {
       err = (err + d.toString()).slice(-4000)
     })
-    p.on('error', reject)
-    p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${err.trim()}`))))
+    p.on('error', (e) => {
+      clearTimeout(timer)
+      active.delete(p)
+      reject(e)
+    })
+    p.on('close', (code) => {
+      clearTimeout(timer)
+      active.delete(p)
+      if (timedOut) return reject(new Error(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s`))
+      code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${err.trim()}`))
+    })
   })
 }
 
@@ -178,7 +207,7 @@ export function runFfprobe(file: string): Promise<ProbeResult> {
     const p = spawn(
       'ffprobe',
       ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, killSignal: 'SIGKILL' },
     )
     let out = ''
     let err = ''

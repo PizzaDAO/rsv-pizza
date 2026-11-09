@@ -26,6 +26,7 @@ const VARIANTS: Array<{ key: string; label: string }> = [
 export const ReelMaker: React.FC<ReelMakerProps> = ({ partyId, defaultTitle }) => {
   const [data, setData] = useState<ReelsOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState(defaultTitle ?? '');
   const [musicKey, setMusicKey] = useState('auto');
@@ -36,8 +37,8 @@ export const ReelMaker: React.FC<ReelMakerProps> = ({ partyId, defaultTitle }) =
     try {
       setData(await fetchReels(partyId));
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load reels');
+    } catch {
+      setLoadFailed(true);
     }
   }, [partyId]);
 
@@ -45,7 +46,7 @@ export const ReelMaker: React.FC<ReelMakerProps> = ({ partyId, defaultTitle }) =
     let cancelled = false;
     fetchReels(partyId)
       .then((d) => { if (!cancelled) setData(d); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load reels'); });
+      .catch(() => { if (!cancelled) setLoadFailed(true); });
     return () => { cancelled = true; };
   }, [partyId]);
 
@@ -89,13 +90,8 @@ export const ReelMaker: React.FC<ReelMakerProps> = ({ partyId, defaultTitle }) =
     }
   };
 
-  if (!data) {
-    return (
-      <div className="card p-6 flex items-center gap-2 text-theme-text-muted">
-        {error ? error : (<><Loader2 size={16} className="animate-spin" /> Loading reels</>)}
-      </div>
-    );
-  }
+  // Feature off (404), not allowed (403) or failed to load: render nothing.
+  if (!data || loadFailed) return null;
 
   const latestReady = data.reels.find((r) => r.status === 'ready' && r.outputs);
   const canMake = data.eligible && !active && data.photoCount >= data.minPhotos;

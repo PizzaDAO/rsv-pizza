@@ -15,6 +15,10 @@ export interface Config {
   music: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
   /** Public base URL for the output bucket (custom domain or r2.dev), no trailing slash. */
   publicBaseUrl: string
+  /** Origins photo URLs may be fetched from (our storage). */
+  photoOrigins: string[]
+  /** Whole-job deadline; always below staleMinutes so a hung job is failed before it can be reclaimed. */
+  jobDeadlineMs: number
 }
 
 function required(name: string): string {
@@ -25,6 +29,11 @@ function required(name: string): string {
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
+/** Leave 3 minutes of headroom before the row would look stale, never less than 1 minute. */
+export function jobDeadlineMs(staleMinutes: number): number {
+  return Math.max(60_000, (staleMinutes - 3) * 60_000)
+}
+
 export function loadConfig(env = process.env): Config {
   const get = (n: string) => env[n] || ''
   const r2 = {
@@ -33,6 +42,13 @@ export function loadConfig(env = process.env): Config {
     secretAccessKey: required('R2_SECRET_ACCESS_KEY'),
     bucket: required('R2_BUCKET_NAME'),
   }
+  const photoOrigins = (get('REEL_PHOTO_ORIGINS') || get('SUPABASE_URL'))
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => new URL(x).origin)
+  if (!photoOrigins.length) throw new Error('Set REEL_PHOTO_ORIGINS (or SUPABASE_URL): photos are only fetched from our storage')
+  const staleMinutes = Number(get('REEL_STALE_MINUTES')) || 20
   return {
     port: Number(get('PORT')) || 3000,
     databaseUrl: required('DATABASE_URL'),
@@ -40,7 +56,9 @@ export function loadConfig(env = process.env): Config {
     workerSecret: required('REEL_WORKER_SECRET'),
     pollMs: Number(get('REEL_POLL_MS')) || 5000,
     maxAttempts: Number(get('REEL_MAX_ATTEMPTS')) || 2,
-    staleMinutes: Number(get('REEL_STALE_MINUTES')) || 20,
+    staleMinutes,
+    photoOrigins,
+    jobDeadlineMs: jobDeadlineMs(staleMinutes),
     workDir: get('REEL_WORK_DIR') || '/tmp/reels',
     assetsDir: get('ASSETS_DIR') || path.resolve(here, '../assets'),
     r2,

@@ -27,6 +27,15 @@ beforeEach(() => {
 });
 
 describe('ReelMaker', () => {
+  it('renders nothing when the feature is off or the load fails', async () => {
+    fetchReels.mockRejectedValue(new Error('Not found'));
+    const { container } = render(<ReelMaker partyId="p1" />);
+    await waitFor(() => expect(fetchReels).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.innerHTML).toBe('');
+  });
+
+
   it('explains why a host cannot make a reel yet', async () => {
     fetchReels.mockResolvedValue({ ...base, eligible: false, reason: 'Reels can be made once the event has started' });
     render(<ReelMaker partyId="p1" defaultTitle="Slice Night" />);

@@ -33,7 +33,8 @@ export interface ReelSettings {
 }
 
 export const DEFAULT_REEL_SETTINGS: ReelSettings = {
-  enabled: true,
+  // Off until an admin turns it on (PUT /api/admin/reels/settings).
+  enabled: false,
   targetSeconds: 30,
   maxSeconds: 60,
   maxPhotos: 14,

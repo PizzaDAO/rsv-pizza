@@ -113,3 +113,13 @@ export function planTimeline(o: TimelineOptions): Timeline {
     totalSeconds: Math.round(total * 10) / 10,
   };
 }
+
+/** Photo URLs must come from our own storage origin (when configured). */
+export function isAllowedPhotoUrl(url: string, storageOrigin?: string): boolean {
+  if (!storageOrigin) return true;
+  try {
+    return new URL(url).origin === new URL(storageOrigin).origin;
+  } catch {
+    return false;
+  }
+}

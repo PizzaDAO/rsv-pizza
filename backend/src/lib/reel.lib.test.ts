@@ -107,6 +107,10 @@ describe('checkReelPermission', () => {
 });
 
 describe('normalizeReelSettings', () => {
+  it('is disabled by default', () => {
+    expect(DEFAULT_REEL_SETTINGS.enabled).toBe(false);
+    expect(normalizeReelSettings({}).enabled).toBe(false);
+  });
   it('returns defaults for junk', () => {
     expect(normalizeReelSettings(null)).toEqual(DEFAULT_REEL_SETTINGS);
     expect(normalizeReelSettings('x')).toEqual(DEFAULT_REEL_SETTINGS);

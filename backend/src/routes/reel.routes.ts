@@ -24,7 +24,7 @@ import { canUserEditParty } from '../helpers/partyAccess.js';
 import { brand } from '../config/brand.js';
 import { invalidate } from '../lib/privateConfig.js';
 import { getReelSettings, normalizeReelSettings, REEL_SETTINGS_KEY } from '../lib/reelConfig.js';
-import { selectReelPhotos } from '../lib/reelSelection.js';
+import { isAllowedPhotoUrl, selectReelPhotos } from '../lib/reelSelection.js';
 import { checkReelPermission } from '../lib/reelPermissions.js';
 import { buildReelSpec, cleanTitle, ALL_RATIOS, type ReelRatio } from '../lib/reelSpec.js';
 import {
@@ -63,6 +63,13 @@ function serializeReel(r: {
     createdAt: r.createdAt.toISOString(),
     finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
   };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The feature is off by default: behave as if the routes do not exist until an admin enables it. */
+async function requireEnabled(): Promise<void> {
+  if (!(await getReelSettings()).enabled) throw new AppError('Not found', 404, 'NOT_FOUND');
 }
 
 async function loadParty(partyId: string) {
@@ -129,6 +136,7 @@ export const reelRouter = Router();
 reelRouter.get('/:partyId/reels', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
+    await requireEnabled();
     const party = await loadParty(partyId);
     const access = await resolveAccess(req, partyId, party);
     if (!access.canEdit && !access.isAdmin) throw new AppError('Forbidden', 403, 'FORBIDDEN');
@@ -142,9 +150,9 @@ reelRouter.get('/:partyId/reels', requireAuth, async (req: AuthRequest, res: Res
     ]);
 
     res.json({
-      eligible: settings.enabled && access.permission.ok,
-      reason: !settings.enabled ? 'Reels are turned off' : access.permission.ok ? null : access.permission.message,
-      reasonCode: !settings.enabled ? 'DISABLED' : access.permission.ok ? null : access.permission.code,
+      eligible: access.permission.ok,
+      reason: access.permission.ok ? null : access.permission.message,
+      reasonCode: access.permission.ok ? null : access.permission.code,
       photoCount,
       minPhotos: settings.minPhotos,
       tracks: tracks.map((t) => ({ key: t.key, title: t.title, folder: t.folder })),
@@ -158,6 +166,8 @@ reelRouter.get('/:partyId/reels', requireAuth, async (req: AuthRequest, res: Res
 reelRouter.get('/:partyId/reels/:reelId', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, reelId } = req.params;
+    await requireEnabled();
+    if (!UUID_RE.test(reelId)) throw new AppError('Reel not found', 404, 'NOT_FOUND');
     const party = await loadParty(partyId);
     const access = await resolveAccess(req, partyId, party);
     if (!access.canEdit && !access.isAdmin) throw new AppError('Forbidden', 403, 'FORBIDDEN');
@@ -179,6 +189,7 @@ reelRouter.post('/:partyId/reels', requireAuth, reelRequestLimiter, async (req: 
       ratios?: unknown;
       excludeSponsorIds?: unknown;
     };
+    await requireEnabled();
     const party = await loadParty(partyId);
     const access = await resolveAccess(req, partyId, party);
     if (!access.permission.ok) {
@@ -186,7 +197,6 @@ reelRouter.post('/:partyId/reels', requireAuth, reelRequestLimiter, async (req: 
       throw new AppError(access.permission.message, status, access.permission.code);
     }
     const settings = await getReelSettings();
-    if (!settings.enabled) throw new AppError('Reels are turned off', 403, 'DISABLED');
     if (!party.photosEnabled) throw new AppError('Photos are not enabled for this event', 409, 'PHOTOS_DISABLED');
 
     const email = req.userEmail ?? 'unknown';
@@ -211,7 +221,11 @@ reelRouter.post('/:partyId/reels', requireAuth, reelRequestLimiter, async (req: 
         voteCount: true, payoutRole: true, status: true, deletedAt: true, createdAt: true,
       },
     });
-    const photos = selectReelPhotos(candidates, settings.maxPhotos, pickedIds);
+    const photos = selectReelPhotos(
+      candidates.filter((c) => isAllowedPhotoUrl(c.url, process.env.SUPABASE_URL)),
+      settings.maxPhotos,
+      pickedIds,
+    );
     if (photos.length < settings.minPhotos) {
       throw new AppError(
         `At least ${settings.minPhotos} approved photos are needed to make a reel`,

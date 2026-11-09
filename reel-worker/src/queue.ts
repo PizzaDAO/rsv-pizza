@@ -14,6 +14,8 @@ export interface Queue {
   done(id: string, outputs: ReelOutputs): Promise<void>
   /** Requeue while attempts remain, else mark failed. */
   fail(id: string, attempts: number, message: string): Promise<'queued' | 'failed'>
+  /** Put an in-flight row back in the queue without counting the attempt (graceful shutdown). */
+  requeue(id: string): Promise<void>
   failExhaustedStale(): Promise<number>
   close(): Promise<void>
 }
@@ -63,6 +65,12 @@ export function createQueue(opts: { databaseUrl: string; ssl: boolean; maxAttemp
       }
       await pool.query(`UPDATE reels SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`, [id, msg])
       return 'failed'
+    },
+    async requeue(id) {
+      await pool.query(
+        `UPDATE reels SET status = 'queued', attempts = GREATEST(attempts - 1, 0), started_at = NULL, progress = 0 WHERE id = $1 AND status = 'rendering'`,
+        [id],
+      )
     },
     async failExhaustedStale() {
       const r = await pool.query(FAIL_STALE_SQL, [opts.maxAttempts, opts.staleMinutes])

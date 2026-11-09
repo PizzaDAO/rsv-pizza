@@ -38,6 +38,7 @@ vi.mock('../middleware/auth.js', () => ({
 const canEdit = vi.hoisted(() => vi.fn());
 vi.mock('../helpers/partyAccess.js', () => ({ canUserEditParty: canEdit }));
 
+import { invalidateAll } from '../lib/privateConfig.js';
 import { reelRouter, adminReelRouter } from './reel.routes.js';
 import { errorHandler } from '../middleware/error.js';
 
@@ -77,7 +78,8 @@ beforeEach(() => {
   mockPrisma.photo.count.mockResolvedValue(8);
   mockPrisma.sponsor.findMany.mockResolvedValue([{ id: 's1', name: 'Acme', logoUrl: 'https://example.com/acme.png' }]);
   mockPrisma.guest.count.mockResolvedValue(25);
-  mockPrisma.appConfig.findUnique.mockResolvedValue(null);
+  mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify({ enabled: true }) });
+  invalidateAll();
   mockPrisma.reel.create.mockImplementation(async ({ data }: any) => ({
     ...data, progress: 0, outputs: null, error: null, createdAt: new Date(), finishedAt: null,
   }));
@@ -150,14 +152,43 @@ describe('POST /api/parties/:id/reels', () => {
     expect(res.body.error.code).toBe('INVALID_TRACK');
   });
 
-  it('honours the master switch from settings', async () => {
-    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify({ enabled: false }) });
-    const { invalidateAll } = await import('../lib/privateConfig.js');
+  it('is off by default: no config row means 404', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue(null);
     invalidateAll();
     const res = await request(app()).post('/api/parties/party-1/reels').set('x-user', 'host@example.com|u1').send({});
-    expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('DISABLED');
+    expect(res.status).toBe(404);
+    expect(mockPrisma.reel.create).not.toHaveBeenCalled();
+    await request(app()).get('/api/parties/party-1/reels').set('x-user', 'host@example.com|u1').expect(404);
+  });
+
+  it('is 404 when explicitly disabled', async () => {
+    mockPrisma.appConfig.findUnique.mockResolvedValue({ value: JSON.stringify({ enabled: false }) });
     invalidateAll();
+    await request(app()).post('/api/parties/party-1/reels').set('x-user', 'host@example.com|u1').send({}).expect(404);
+  });
+
+  it('ignores photos hosted outside our storage origin', async () => {
+    process.env.SUPABASE_URL = 'https://storage.example.com';
+    try {
+      const res = await request(app()).post('/api/parties/party-1/reels').set('x-user', 'host@example.com|u1').send({ musicKey: 'none' });
+      expect(res.status).toBe(422); // all fixtures are on example.com, not the storage origin
+    } finally {
+      delete process.env.SUPABASE_URL;
+    }
+  });
+});
+
+describe('GET /api/parties/:id/reels/:reelId', () => {
+  const OTHER = '11111111-2222-3333-4444-555555555555';
+  it('returns 404 for a reel that belongs to another party (IDOR)', async () => {
+    mockPrisma.reel.findFirst.mockResolvedValue(null);
+    const res = await request(app()).get(`/api/parties/party-1/reels/${OTHER}`).set('x-user', 'host@example.com|u1');
+    expect(res.status).toBe(404);
+    expect(mockPrisma.reel.findFirst).toHaveBeenCalledWith({ where: { id: OTHER, partyId: 'party-1' } });
+  });
+  it('404s on a non-uuid id without touching the db', async () => {
+    await request(app()).get('/api/parties/party-1/reels/nope').set('x-user', 'host@example.com|u1').expect(404);
+    expect(mockPrisma.reel.findFirst).not.toHaveBeenCalled();
   });
 });
 

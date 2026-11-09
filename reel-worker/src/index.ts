@@ -12,6 +12,7 @@ import { loadConfig } from './config.js'
 import { createQueue } from './queue.js'
 import { createStorage } from './storage.js'
 import { processJob } from './job.js'
+import { killAllChildren } from './ffmpeg.js'
 
 const cfg = loadConfig()
 const queue = createQueue({
@@ -26,6 +27,7 @@ let busy = false
 let wake: (() => void) | null = null
 let stopping = false
 let lastJobAt: string | null = null
+let currentJobId: string | null = null
 
 function authorized(header: string | undefined): boolean {
   const want = Buffer.from(`Bearer ${cfg.workerSecret}`)
@@ -71,9 +73,11 @@ async function loop(): Promise<void> {
       const job = await queue.claim()
       if (job) {
         busy = true
-        await processJob(job, { cfg, queue, storage })
+        currentJobId = job.id
+        await processJob(job, { cfg, queue, storage, isStopping: () => stopping })
         lastJobAt = new Date().toISOString()
         busy = false
+        currentJobId = null
         continue
       }
     } catch (err) {
@@ -92,7 +96,9 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     stopping = true
     wake?.()
     server.close()
-    // A render in flight is requeued by the stale-job reclaim after the next start.
-    setTimeout(() => process.exit(0), 3000).unref()
+    killAllChildren()
+    // Hand the in-flight row back (attempt not counted) so the next worker picks it up at once.
+    const requeue = currentJobId ? queue.requeue(currentJobId).catch((e) => console.error('requeue failed', e)) : Promise.resolve()
+    void Promise.race([requeue, new Promise((r) => setTimeout(r, 4000))]).then(() => process.exit(0))
   })
 }
