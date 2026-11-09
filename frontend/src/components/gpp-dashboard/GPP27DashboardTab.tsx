@@ -178,6 +178,9 @@ export const GPP27DashboardTab: React.FC = () => {
         case 'socials':
           goToTab('promo');
           break;
+        case 'photoVideo':
+          goToTab('photos');
+          break;
         case 'throwParty':
           // No tab — purely a manual checkpoint.
           break;
