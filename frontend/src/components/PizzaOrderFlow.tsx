@@ -7,11 +7,11 @@ import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
 import { InlineConfirm } from './InlineConfirm';
 import { HandoffPanel } from './HandoffPanel';
-import { HostMenuUpload } from './HostMenuUpload';
+import { HostMenuUpload, MenuRebuild } from './HostMenuUpload';
 import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
   getPizzaHandoffs, recordPizzaHandoff, handoffToResume, releasedByOtherHost, HandoffBudget,
-  isTerminalStatus, formatPhone, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
+  isTerminalStatus, formatPhone, menuPanelFits, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
 import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
 
@@ -100,8 +100,26 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // the host asked for it from the list (the panel opens straight away there)
   const [hostMenus, setHostMenus] = useState(false);
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  // a menu read (or removal) is in flight: Back, Build and Approve wait. `menuStart` is what it started on, so a
+  // late result never rebuilds a different shop's cart, a newer cart, or anything after Approve.
+  const [menuBusy, setMenuBusy] = useState(false);
+  const menuStart = useRef<{ shopId: string; cartId: string | null } | null>(null);
+  const live = useRef<{ shopId: string | null; cartId: string | null; pickup: string | null; step: Step; placing: boolean; decisions: Record<string, CartDecision> }>({
+    shopId: null, cartId: null, pickup: null, step: 'loading', placing: false, decisions: {},
+  });
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstStep = useRef(true);
+
+  useEffect(() => {
+    live.current = {
+      shopId: shop?.id ?? null,
+      cartId: cartState?.cart?.id ?? null,
+      pickup: cartState?.cart?.fulfillment?.scheduled_for ?? null,
+      step,
+      placing,
+      decisions,
+    };
+  }, [shop, cartState, step, placing, decisions]);
 
   const rememberPhones = useCallback((shops: PizzaShop[]) => {
     setPhones((prev) => {
@@ -205,17 +223,22 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   }, []);
 
   const onBuild = useCallback(
-    async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}) => {
-      if (!partyId || !shop) return;
+    async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}): Promise<boolean> => {
+      if (!partyId || !shop) return false;
       setBuilding(true);
       setError(null);
       setPlaceError(null);
       setInProgress(null);
       try {
         setDecisions(nextDecisions);
-        setCartState(await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions));
+        const built = await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions);
+        // the host picked another shop meanwhile: this cart is not theirs to see any more
+        if (live.current.shopId !== shop.id) return false;
+        setCartState(built);
+        return true;
       } catch (e) {
         if (!showHeldOrder(e as ApiError)) setError(e instanceof Error ? e.message : t('aiOrder.flow.buildError'));
+        return false;
       } finally {
         setBuilding(false);
       }
@@ -259,16 +282,24 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     [partyId, t]
   );
 
+  /** basil-14648 P2: a menu read starts (or ends): remember what it started on, and lock the cart step. */
+  const onMenuBusy = useCallback((busy: boolean) => {
+    if (busy) menuStart.current = { shopId: live.current.shopId ?? '', cartId: live.current.cartId };
+    setMenuBusy(busy);
+  }, []);
+
   /**
    * basil-14648 P2: the host added or removed their menu. A cart keeps its menu for life, so a built cart is rebuilt
-   * (a NEW cart on the new menu) with the same pickup time and choices. No cart yet: the next build uses it.
+   * (a NEW cart on the new menu) with the same pickup time and choices. No cart yet: the next build uses it. A
+   * result that comes back after the host moved on (another shop, a newer cart, Approve) rebuilds nothing.
    */
-  const onMenuChanged = useCallback(async () => {
-    const pickup = cartState?.cart?.fulfillment?.scheduled_for;
-    if (!cartState?.cart || !pickup) return false;
-    await onBuild(pickup, decisions);
-    return true;
-  }, [cartState, onBuild, decisions]);
+  const onMenuChanged = useCallback(async (): Promise<MenuRebuild> => {
+    const start = menuStart.current;
+    const now = live.current;
+    if (!start || start.shopId !== now.shopId || start.cartId !== now.cartId || now.step !== 'cart' || now.placing) return 'stale';
+    if (!now.cartId || !now.pickup) return 'no_cart';
+    return (await onBuild(now.pickup, now.decisions)) ? 'rebuilt' : 'failed';
+  }, [onBuild]);
 
   const onDecide = useCallback(
     (pickupAtIso: string, ref: string, choice: CartDecision) => onBuild(pickupAtIso, { ...decisions, [ref]: choice }),
@@ -613,13 +644,16 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           onBack={() => setStep('shops')}
           mode={mode}
           onSwitchToHandoff={() => setMode('handoff')}
+          locked={menuBusy}
           menuSlot={
-            hostMenus && shop.tier === 'listing' ? (
+            hostMenus && shop.tier === 'listing' && shop.capabilities?.host_menu_upload === true && menuPanelFits(cartState?.cart?.menu) ? (
               <HostMenuUpload
                 key={shop.id}
                 partyId={partyId}
                 shop={shop}
                 cartMenu={cartState?.cart?.menu ?? null}
+                hasEstimate={!!cartState?.quote}
+                onBusyChange={onMenuBusy}
                 defaultOpen={menuOpenFor === shop.id}
                 timeZone={party?.timezone ?? null}
                 rebuilding={building}

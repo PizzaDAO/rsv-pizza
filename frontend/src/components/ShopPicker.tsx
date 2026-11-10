@@ -137,8 +137,8 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
             <ListChecks size={14} aria-hidden="true" /> {t('aiOrder.handoff.buildChecklist')}
           </button>
         );
-        // basil-14648 P2: the host's own menu, for a closer estimate (listing shops only: a native shop has its own)
-        const menuButton = onUseMenu && shop.tier === 'listing' && (
+        // basil-14648 P2: the host's own menu, for a closer estimate: only where pizza-mcp says this shop takes one
+        const menuButton = onUseMenu && shop.tier === 'listing' && shop.capabilities?.host_menu_upload === true && (
           <button
             type="button"
             onClick={() => onUseMenu(shop)}

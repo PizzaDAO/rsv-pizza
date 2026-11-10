@@ -262,8 +262,8 @@ export class PizzaMcpClient {
     const form = new FormData();
     input.files.forEach((f, i) => {
       const ext = f.mime === 'application/pdf' ? 'pdf' : f.mime.split('/')[1];
-      // a copy into a plain ArrayBuffer: a Node Buffer may be a view on a larger pool
-      form.append('files[]', new Blob([new Uint8Array(f.bytes)], { type: f.mime }), `menu-${i + 1}.${ext}`);
+      // the Buffer itself (a Uint8Array view): Blob copies exactly its bytes, once
+      form.append('files[]', new Blob([f.bytes as Uint8Array<ArrayBuffer>], { type: f.mime }), `menu-${i + 1}.${ext}`);
     });
     return this.request<OpopHostMenuResult>(actor, 'POST', path, { rawBody: form, timeoutMs: 60_000 });
   }
@@ -271,22 +271,6 @@ export class PizzaMcpClient {
   /** Stop using this host's menu for new carts (carts already built keep theirs until they are rebuilt). */
   deleteHostMenu(actor: OpopActor, shopId: string) {
     return this.request<OpopHostMenuDeleteResult>(actor, 'DELETE', `/pizzerias/${encodeURIComponent(shopId)}/menu/host`);
-  }
-
-  /**
-   * Does this pizza-mcp take host menus? pizza-mcp has no capability flag for it, but its route checks the switch
-   * FIRST, before the shop, the scope or the body: a made-up listing id answers FEATURE_DISABLED when it is off and
-   * NOT_FOUND when it is on. Nothing is read, counted or stored. Anything else (down, a timeout) is "don't know".
-   */
-  async hostMenusProbe(actor: OpopActor): Promise<boolean | null> {
-    try {
-      await this.request<unknown>(actor, 'POST', '/pizzerias/pzl_probe_none/menu/host', { body: {}, timeoutMs: 3000 });
-      return true;
-    } catch (e) {
-      if (e instanceof AppError && e.code === 'FEATURE_DISABLED') return false;
-      if (e instanceof AppError && (e.code === 'NOT_FOUND' || e.code === 'VALIDATION_FAILED')) return true;
-      return null;
-    }
   }
 
   /**

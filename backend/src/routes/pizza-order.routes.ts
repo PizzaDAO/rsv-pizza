@@ -28,8 +28,9 @@ import {
   OpopOrderingProvider,
   HostMenuInput,
 } from '../services/pizzaMcp.client.js';
-import { hostMenusAvailable, hostMenusFlagOn, noteHostMenusDisabled } from '../lib/hostMenus.js';
-import { checkMenuUpload, checkMenuUrl, MENU_UPLOAD_LIMITS } from '../lib/uploadSniff.js';
+import { hostMenusFlagOn } from '../lib/hostMenus.js';
+import { checkMenuUpload, checkMenuUrl } from '../lib/uploadSniff.js';
+import { drainRequest, readMenuUpload } from '../lib/menuUpload.js';
 import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
 import { notifyHostOfOrder } from '../services/pizzaOrderNotify.js';
 import { withApprovalHold, holdUntilOf } from '../services/pizzaApproval.js';
@@ -148,8 +149,9 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
       const h = await prisma.pizzaHandoff.findFirst({ where: { id: heldHandoffId, partyId: party.id } });
       if (h) heldHandoff = { id: h.id, shopName: h.shopName, provider: h.provider, isMine: h.userId === req.userId };
     }
-    // basil-14648 P2: "Use this shop's real menu" only with rsv's switch on AND pizza-mcp taking host menus
-    const hostMenus = await hostMenusAvailable(getPizzaMcpClient(), actorFor(req, party));
+    // basil-14648 P2: rsv's switch for "Use this shop's real menu". Whether a shop takes one is pizza-mcp's
+    // `capabilities.host_menu_upload` on that shop (the UI hides the feature per shop).
+    const hostMenus = hostMenusFlagOn();
     res.json({
       enabled: true,
       hostMenus,
@@ -1108,52 +1110,6 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
 // sizes before forwarding and keeps nothing: no file, no link, no menu. Behind PIZZA_HOST_MENUS=1.
 // ---------------------------------------------------------------------------
 
-/** The request body, read through a byte cap as it streams: nothing past the cap is ever buffered. */
-function readCapped(req: AuthRequest, max: number): Promise<Buffer> {
-  const tooLarge = () => new AppError('The menu files are larger than 4 MB in total.', 413, 'MENU_TOO_LARGE');
-  const declared = Number(req.headers['content-length']);
-  if (Number.isFinite(declared) && declared > max) return Promise.reject(tooLarge());
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    let done = false;
-    req.on('data', (c: Buffer) => {
-      if (done) return;
-      size += c.length;
-      if (size > max) {
-        done = true;
-        chunks.length = 0;
-        // keep draining (discarded) so the 413 reaches the browser instead of a reset connection
-        req.resume();
-        reject(tooLarge());
-        return;
-      }
-      chunks.push(c);
-    });
-    req.on('end', () => !done && ((done = true), resolve(Buffer.concat(chunks))));
-    req.on('error', (e) => !done && ((done = true), reject(e)));
-  });
-}
-
-/** The files of a multipart upload (`files[]` or `files`), each as bytes. Their declared types are ignored. */
-async function multipartFiles(req: AuthRequest): Promise<Buffer[]> {
-  const raw = await readCapped(req, MENU_UPLOAD_LIMITS.maxBodyBytes);
-  let form: FormData;
-  try {
-    // the global fetch Response (this file's `Response` is express's)
-    form = await new globalThis.Response(new Uint8Array(raw), { headers: { 'content-type': String(req.headers['content-type']) } }).formData();
-  } catch {
-    throw new AppError('We couldn\'t read that upload. Try choosing the files again.', 400, 'VALIDATION_FAILED');
-  }
-  const files: Buffer[] = [];
-  for (const part of [...form.getAll('files[]'), ...form.getAll('files')]) {
-    if (typeof part === 'string') continue;
-    if (files.length >= MENU_UPLOAD_LIMITS.maxImages) throw new AppError('Send at most 3 photos of the menu.', 413, 'MENU_TOO_LARGE');
-    files.push(Buffer.from(await part.arrayBuffer()));
-  }
-  return files;
-}
-
 /** The gates every host-menu route shares: the party (host or co-host, pilot), rsv's switch, a listing shop. */
 async function hostMenuParty(req: AuthRequest) {
   const { party } = await loadPartyForOrdering(req.params.partyId, req);
@@ -1163,19 +1119,13 @@ async function hostMenuParty(req: AuthRequest) {
   return { party, shopId, actor: actorFor(req, party) };
 }
 
-/** pizza-mcp turned the feature off: say so once, and stop offering it. */
-function rethrowHostMenu(e: unknown): never {
-  if (e instanceof AppError && e.code === 'FEATURE_DISABLED') noteHostMenusDisabled();
-  throw e;
-}
-
 router.post('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { shopId, actor } = await hostMenuParty(req);
     const type = String(req.headers['content-type'] ?? '').toLowerCase();
     let input: HostMenuInput;
     if (type.startsWith('multipart/form-data')) {
-      const check = checkMenuUpload(await multipartFiles(req));
+      const check = checkMenuUpload(await readMenuUpload(req, res));
       if (!check.ok) throw new AppError(check.message, check.status, check.code);
       input = { kind: 'files', files: check.files };
     } else if (type.startsWith('application/json')) {
@@ -1186,7 +1136,7 @@ router.post('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: 
     } else {
       throw new AppError('Send the menu as photos, a PDF, or a link.', 415, 'UNSUPPORTED_MEDIA_TYPE');
     }
-    const r = await getPizzaMcpClient().submitHostMenu(actor, shopId, input).catch(rethrowHostMenu);
+    const r = await getPizzaMcpClient().submitHostMenu(actor, shopId, input);
     // only what the browser shows: the counts, the date, and the id (the menu itself stays on pizza-mcp)
     res.status(201).json({
       menuId: r.menu_id,
@@ -1199,6 +1149,8 @@ router.post('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: 
       },
     });
   } catch (e) {
+    // a refusal before (or while) the upload was read: drain it first, so the browser gets this answer
+    await drainRequest(req, res);
     next(e);
   }
 });
@@ -1206,7 +1158,7 @@ router.post('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: 
 router.delete('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { shopId, actor } = await hostMenuParty(req);
-    const r = await getPizzaMcpClient().deleteHostMenu(actor, shopId).catch(rethrowHostMenu);
+    const r = await getPizzaMcpClient().deleteHostMenu(actor, shopId);
     res.json({ expired: r.expired });
   } catch (e) {
     next(e);

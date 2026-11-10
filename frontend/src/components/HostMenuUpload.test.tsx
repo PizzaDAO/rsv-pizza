@@ -3,7 +3,7 @@ import i18n from 'i18next';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { HostMenuUpload } from './HostMenuUpload';
+import { HostMenuUpload, type MenuRebuild } from './HostMenuUpload';
 import { MenuFileError, hostMenuErrorKey, prepareMenuFiles } from '../lib/pizzaOrder';
 import type { HostMenuResult } from '../lib/pizzaOrder';
 
@@ -22,10 +22,11 @@ const apiError = (code: string) => Object.assign(new Error(`raw ${code} detail`)
 const jpg = (name = 'menu.jpg') => new File([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], name, { type: 'image/jpeg' });
 
 function setup(over: Partial<React.ComponentProps<typeof HostMenuUpload>> = {}) {
-  const onChanged = vi.fn(async () => true);
+  const onChanged = vi.fn(async (): Promise<MenuRebuild> => 'rebuilt');
+  const onBusyChange = vi.fn();
   const prepare = vi.fn(async (f: File[]) => f as Blob[]);
-  const utils = render(<HostMenuUpload partyId="p1" shop={shop} onChanged={onChanged} prepare={prepare} timeZone="America/New_York" {...over} />);
-  return { ...utils, onChanged, prepare };
+  const utils = render(<HostMenuUpload partyId="p1" shop={shop} onChanged={onChanged} onBusyChange={onBusyChange} prepare={prepare} timeZone="America/New_York" {...over} />);
+  return { ...utils, onChanged, prepare, onBusyChange };
 }
 
 async function chooseAndRead(files: File[]) {
@@ -43,7 +44,7 @@ describe('HostMenuUpload', () => {
     setup();
     expect(screen.getByText('Get a closer estimate')).toBeTruthy();
     expect(screen.getByRole('button', { name: "Use this shop's real menu" })).toBeTruthy();
-    expect(screen.getByText(/menu from Sal's, and we'll estimate from its real prices.*Only you see it/)).toBeTruthy();
+    expect(screen.getByText(/menu from Sal's, and we'll estimate from the prices on it\. Only you see it/)).toBeTruthy();
     for (const b of screen.getAllByRole('button')) expect(b.className).toMatch(/min-h-\[44px\]/);
   });
 
@@ -62,16 +63,20 @@ describe('HostMenuUpload', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Reading the menu… this can take up to a minute.'));
     resolve(result);
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith('added'));
-    expect(screen.getByText('Estimate from your menu (Nov 9)')).toBeTruthy();
+    // not "an estimate from your menu" until a cart on it has an estimate
+    expect(screen.getByText('Your menu (Nov 9)')).toBeTruthy();
+    expect(screen.queryByText(/Estimate from your menu/)).toBeNull();
     expect(screen.getByRole('status').textContent).toBe('Read 14 pizzas, 12 with prices ($12.00 to $26.00).');
+    // focus lands on the result's heading, not on the body
+    expect(document.activeElement).toBe(screen.getByText('Your menu (Nov 9)'));
     expect(screen.getByRole('button', { name: 'Remove my menu' })).toBeTruthy();
   });
 
   it('no cart yet: says the next build uses the menu', async () => {
     mocks.files.mockResolvedValue({ ...result, summary: { ...result.summary, priceRangeCents: null } });
-    setup({ onChanged: vi.fn(async () => false) });
+    setup({ onChanged: vi.fn(async (): Promise<MenuRebuild> => 'no_cart') });
     await chooseAndRead([jpg()]);
-    expect(await screen.findByText(/Read 14 pizzas, 12 with prices\. Build your order and we'll use it\./)).toBeTruthy();
+    expect((await screen.findAllByText(/Read 14 pizzas, 12 with prices\. Build your order and we'll use it\./)).length).toBe(2); // shown, and announced
   });
 
   it('while the cart is rebuilt, says so', async () => {
@@ -121,27 +126,69 @@ describe('HostMenuUpload', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith('added'));
   });
 
-  it('a menu from an earlier visit (the cart is on it): shown with its date; removing asks first, then rebuilds', async () => {
+  it('a menu from an earlier visit (the cart is on it and has an estimate): shown with its date; removing asks first, then rebuilds; focus stays sensible', async () => {
     mocks.del.mockResolvedValue({ expired: 1 });
-    const { onChanged } = setup({ cartMenu: { menu_id: 'lm_0', provenance: 'host_provided', as_of: '2026-11-02T15:00:00Z' } });
+    const { onChanged } = setup({ cartMenu: { menu_id: 'lm_0', provenance: 'host_provided', as_of: '2026-11-02T15:00:00Z' }, hasEstimate: true });
     expect(screen.getByText('Estimate from your menu (Nov 2)')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Remove my menu' }));
-    expect(screen.getByRole('alertdialog').textContent).toMatch(/Stop using your menu for Sal's\? Your order goes back to typical prices\./);
+    expect(screen.getByRole('alertdialog').textContent).toMatch(/Stop using your menu for Sal's\? We'll rebuild your order without it\./);
     await userEvent.click(screen.getByRole('button', { name: 'Remove it' }));
     expect(mocks.del).toHaveBeenCalledWith('p1', 'pzl_osm_n1');
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith('removed'));
-    expect(screen.getAllByText('Removed. New estimates use typical prices again.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Removed. New estimates no longer use your menu.').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Estimate from your menu/)).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: "Use this shop's real menu" }));
   });
 
   it('a failed removal says so and keeps the menu', async () => {
     mocks.del.mockRejectedValue(apiError('PIZZA_MCP_UNAVAILABLE'));
-    const { onChanged } = setup({ cartMenu: { menu_id: 'lm_0', provenance: 'host_provided', as_of: '2026-11-02T15:00:00Z' } });
+    const { onChanged } = setup({ cartMenu: { menu_id: 'lm_0', provenance: 'host_provided', as_of: '2026-11-02T15:00:00Z' }, hasEstimate: true });
     await userEvent.click(screen.getByRole('button', { name: 'Remove my menu' }));
     await userEvent.click(screen.getByRole('button', { name: 'Remove it' }));
     expect((await screen.findByRole('alert')).textContent).toBe("We couldn't remove your menu just now. Try again in a minute.");
     expect(onChanged).not.toHaveBeenCalled();
     expect(screen.getByText('Estimate from your menu (Nov 2)')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove my menu' })));
+  });
+
+  it('the rebuild failed: says so, and never claims an estimate from the menu', async () => {
+    mocks.files.mockResolvedValue(result);
+    setup({ onChanged: vi.fn(async (): Promise<MenuRebuild> => 'failed') });
+    await chooseAndRead([jpg()]);
+    expect((await screen.findAllByText(/We couldn't update your order with it yet\. Tap Rebuild order to use it\./)).length).toBe(2);
+    expect(screen.queryByText(/Estimate from your menu/)).toBeNull();
+  });
+
+  it('reports busy for the whole read and its rebuild, then not busy (also after a failure)', async () => {
+    let finish!: (r: MenuRebuild) => void;
+    mocks.files.mockResolvedValue(result);
+    const { onBusyChange } = setup({ onChanged: vi.fn(() => new Promise<MenuRebuild>((r) => (finish = r))) });
+    await chooseAndRead([jpg()]);
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    finish('rebuilt');
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+    mocks.files.mockRejectedValue(apiError('RATE_LIMITED'));
+    onBusyChange.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: 'Add a newer menu' }));
+    await userEvent.upload(screen.getByLabelText('Menu photos or PDF'), [jpg()]);
+    await userEvent.click(screen.getByRole('button', { name: 'Read the menu' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/by you or for this shop/);
+    expect(onBusyChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('"Not now" returns focus to the button that opened the panel; cancelling a removal returns it to Remove', async () => {
+    setup({ cartMenu: { menu_id: 'lm_0', provenance: 'host_provided', as_of: '2026-11-02T15:00:00Z' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Add a newer menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add a newer menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove my menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove my menu' }));
+  });
+
+  it('copy says photos lose their location data and a PDF is sent as it is', async () => {
+    setup({ defaultOpen: true });
+    expect(screen.getByText(/Photos are re-saved without their location data; a PDF is sent as it is\./)).toBeTruthy();
   });
 
   it('a generic cart shows the offer, not "your menu"', () => {
@@ -155,7 +202,7 @@ describe('every host-menu problem has its own plain copy', () => {
   const codes = [
     'MENU_UNREADABLE', 'MENU_TOO_LARGE', 'UNSUPPORTED_MEDIA_TYPE', 'URL_NOT_ALLOWED', 'MENU_CURRENCY_MISMATCH', 'RATE_LIMITED',
     'EXTRACTION_BUDGET_EXHAUSTED', 'EXTRACTION_UNAVAILABLE', 'FEATURE_DISABLED', 'NOT_A_LISTING', 'NO_FILES',
-    'PIZZA_MCP_UNAVAILABLE', 'TIMEOUT', 'PIZZA_MCP_AUTH', 'INSUFFICIENT_SCOPE', undefined,
+    'CANT_PREPARE', 'PIZZA_MCP_UNAVAILABLE', 'TIMEOUT', 'PIZZA_MCP_AUTH', 'INSUFFICIENT_SCOPE', undefined,
   ];
   it.each(codes)('%s', (code) => {
     const key = hostMenuErrorKey(code);
@@ -163,7 +210,8 @@ describe('every host-menu problem has its own plain copy', () => {
     expect(text).not.toBe(key);
     expect(text.length).toBeGreaterThan(20);
     // a next step or a way to keep going, never a dead end
-    expect(text).toMatch(/Try|Check|Use|Choose|still|nothing to add/);
+    expect(text).toMatch(/Try|Check|Use|Choose|still|nothing to add|without it/);
+    expect(text).not.toMatch(/typical/);
   });
 });
 
@@ -187,23 +235,32 @@ describe('prepareMenuFiles', () => {
   it('a photo is redrawn at most 2000 px on its longest side, as JPEG 0.8', async () => {
     (globalThis as { createImageBitmap?: unknown }).createImageBitmap = vi.fn(async () => ({ width: 4000, height: 3000, close: vi.fn() }));
     const draw = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: draw } as never);
+    const fillRect = vi.fn();
+    const ctx = { drawImage: draw, fillRect, fillStyle: '' };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
     const toBlob = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, cb: BlobCallback) {
       cb(new Blob([new Uint8Array(5)], { type: 'image/jpeg' }));
     });
     const [out] = await prepareMenuFiles([new File([new Uint8Array(9)], 'IMG_1.HEIC', { type: 'image/heic' })]);
     expect(draw).toHaveBeenCalledWith(expect.anything(), 0, 0, 2000, 1500);
+    // painted white first (a transparent PNG would turn black as JPEG)
+    expect(ctx.fillStyle).toBe('#ffffff');
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 2000, 1500);
+    expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(draw.mock.invocationCallOrder[0]);
     expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.8);
     expect(out.type).toBe('image/jpeg');
     expect((out as File).name).toBe('IMG_1.jpg');
   });
 
-  it('a photo this browser cannot draw: sent as is only when it is a JPEG, PNG or WebP', async () => {
+  it('a photo this browser cannot re-encode is refused, never sent as it is (its EXIF would go with it)', async () => {
     (globalThis as { createImageBitmap?: unknown }).createImageBitmap = vi.fn(async () => {
       throw new Error('decode');
     });
-    const f = jpg();
-    expect(await prepareMenuFiles([f])).toEqual([f]);
-    await expect(prepareMenuFiles([new File([new Uint8Array(3)], 'x.heic', { type: 'image/heic' })])).rejects.toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE' });
+    await expect(prepareMenuFiles([jpg()])).rejects.toMatchObject({ code: 'CANT_PREPARE' });
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = undefined;
+    await expect(prepareMenuFiles([jpg()])).rejects.toMatchObject({ code: 'CANT_PREPARE' });
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = vi.fn(async () => ({ width: 10, height: 10, close: vi.fn() }));
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    await expect(prepareMenuFiles([jpg()])).rejects.toMatchObject({ code: 'CANT_PREPARE' });
   });
 });

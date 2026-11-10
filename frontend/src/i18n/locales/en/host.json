@@ -1291,7 +1291,7 @@
       "offerTitle": "Get a closer estimate",
       "offer": "Use this shop's real menu",
       "offerFor": "Use the real menu from {{shop}}",
-      "offerHelp": "Add a photo, a PDF or a link to the menu from {{shop}}, and we'll estimate from its real prices instead of typical ones. Only you see it.",
+      "offerHelp": "Add a photo, a PDF or a link to the menu from {{shop}}, and we'll estimate from the prices on it. Only you see it.",
       "panelTitle": "Add the menu from {{shop}}",
       "close": "Not now",
       "modeLabel": "How to add the menu",
@@ -1312,16 +1312,16 @@
       "resultRange": "Read {{pizzas}} pizzas, {{priced}} with prices ({{low}} to {{high}}).",
       "rebuilding": "Updating your order with this menu…",
       "readNext": "Build your order and we'll use it.",
-      "private": "Only you see this menu. It changes your estimate, not the price: the shop's total on the call is the real price.",
+      "private": "Only you see this menu. It changes your estimate, not the price: the shop's total on the call is the real price. Photos are re-saved without their location data; a PDF is sent as it is.",
       "using": "Estimate from your menu ({{date}})",
       "usingHelp": "Read by software from the menu you added, so prices are estimates. Only you see it.",
       "replace": "Add a newer menu",
       "remove": "Remove my menu",
-      "removeConfirm": "Stop using your menu for {{shop}}? Your order goes back to typical prices.",
+      "removeConfirm": "Stop using your menu for {{shop}}? We'll rebuild your order without it.",
       "removeYes": "Remove it",
       "removeNo": "Keep it",
       "removing": "Removing your menu…",
-      "removed": "Removed. New estimates use typical prices again.",
+      "removed": "Removed. New estimates no longer use your menu.",
       "removeError": "We couldn't remove your menu just now. Try again in a minute.",
       "errors": {
         "MENU_UNREADABLE": "We couldn't read prices from that. Try a clearer, closer photo of the pizza section, or a link to the menu.",
@@ -1329,15 +1329,18 @@
         "UNSUPPORTED_MEDIA_TYPE": "Use JPEG, PNG or WebP photos, or a PDF on its own (not mixed with photos).",
         "URL_NOT_ALLOWED": "We can't read the menu from that link. Try the shop's own menu page, or add a photo of the menu instead.",
         "MENU_CURRENCY_MISMATCH": "The prices on that menu are in a different currency from this shop's. Check it's the menu for this shop.",
-        "RATE_LIMITED": "You've added several menus today. Try again tomorrow, or in a minute if one is still being read.",
-        "EXTRACTION_BUDGET_EXHAUSTED": "Menu reading is paused for now. You can still order: the estimate uses typical prices.",
+        "RATE_LIMITED": "Too many menus were added today, by you or for this shop. Try again tomorrow, or in a minute if one is still being read.",
+        "EXTRACTION_BUDGET_EXHAUSTED": "Menu reading is paused for now. You can still order without it.",
         "EXTRACTION_UNAVAILABLE": "We couldn't read the menu just now. Try again in a minute.",
-        "FEATURE_DISABLED": "Adding a menu isn't available right now. You can still order: the estimate uses typical prices.",
+        "FEATURE_DISABLED": "Adding a menu isn't available right now. You can still order without it.",
         "NOT_A_LISTING": "This shop has its own online menu, so there's nothing to add.",
         "NO_FILES": "Choose at least one photo or a PDF of the menu.",
         "NO_LINK": "Paste a link that starts with https://",
-        "default": "Something went wrong reading the menu. Try again, or keep going with typical prices."
-      }
+        "default": "Something went wrong reading the menu. Try again, or keep going without it.",
+        "CANT_PREPARE": "This browser couldn't prepare that photo to send. Try a JPEG or PNG photo, or a PDF."
+      },
+      "saved": "Your menu ({{date}})",
+      "rebuildFailed": "We couldn't update your order with it yet. Tap Rebuild order to use it."
     }
   }
 }

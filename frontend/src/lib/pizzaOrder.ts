@@ -39,6 +39,8 @@ export interface PizzaShop {
   /** basil-14648 P2: listing tier, best first. [] or absent when none. */
   ordering_links?: OrderingLink[];
   attribution?: string | null;
+  /** basil-14648 P2: pizza-mcp's per-shop answer to "can the host add this shop's menu here?". */
+  capabilities?: { host_menu_upload?: boolean } & Record<string, unknown>;
   distance_km: number | null;
   open_now: boolean;
 }
@@ -370,7 +372,6 @@ export interface HostMenuResult {
 
 /** The limits rsv and pizza-mcp enforce; checked here first so the host hears it before a long upload. */
 export const MENU_LIMITS = { maxImages: 3, maxTotalBytes: 4 * 1024 * 1024, longestSidePx: 2000, jpegQuality: 0.8, maxUrlChars: 500 } as const;
-const MENU_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /** Up to 75 s: a vision read takes 15-40 s on pizza-mcp, plus two hops. */
 const MENU_TIMEOUT_MS = 75_000;
@@ -386,15 +387,17 @@ export const deleteHostMenu = (partyId: string, shopId: string) =>
   apiRequest<{ expired: number }>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/menu/host`, { method: 'DELETE' });
 
 export class MenuFileError extends Error {
-  constructor(public code: 'MENU_TOO_LARGE' | 'UNSUPPORTED_MEDIA_TYPE' | 'NO_FILES') {
+  constructor(public code: 'MENU_TOO_LARGE' | 'UNSUPPORTED_MEDIA_TYPE' | 'NO_FILES' | 'CANT_PREPARE') {
     super(code);
   }
 }
 
 /**
- * Get the host's chosen files ready to send: photos are re-drawn at most 2000 px on the longest side as JPEG q0.8
- * (a phone photo becomes about 0.5-1 MB, and the re-encode drops the photo's EXIF data, location included). A PDF
- * goes as it is. Up to 3 photos or one PDF alone, 4 MB in total, else a MenuFileError.
+ * Get the host's chosen files ready to send: every photo is redrawn at most 2000 px on the longest side, on white
+ * (a transparent PNG stays readable), as JPEG q0.8. A phone photo becomes about 0.5-1 MB, and because the photo is
+ * re-encoded its EXIF data (location included) is not sent. A photo this browser can't redraw is refused
+ * (`CANT_PREPARE`), never sent as it is. A PDF goes as it is (its own metadata is not stripped). Up to 3 photos or one
+ * PDF alone, 4 MB in total, else a MenuFileError.
  */
 export async function prepareMenuFiles(files: File[]): Promise<Blob[]> {
   if (files.length === 0) throw new MenuFileError('NO_FILES');
@@ -404,34 +407,41 @@ export async function prepareMenuFiles(files: File[]): Promise<Blob[]> {
   const out: Blob[] = [];
   for (const f of files) {
     if (f.type === 'application/pdf') out.push(f);
-    else if (f.type.startsWith('image/') || f.type === '') out.push(await downscale(f));
+    else if (f.type.startsWith('image/') || f.type === '') out.push(await reencode(f));
     else throw new MenuFileError('UNSUPPORTED_MEDIA_TYPE');
   }
   if (out.reduce((n, b) => n + b.size, 0) > MENU_LIMITS.maxTotalBytes) throw new MenuFileError('MENU_TOO_LARGE');
   return out;
 }
 
-async function downscale(f: File): Promise<Blob> {
+async function reencode(f: File): Promise<Blob> {
+  if (typeof createImageBitmap !== 'function') throw new MenuFileError('CANT_PREPARE');
   let bmp: ImageBitmap;
   try {
     bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
   } catch {
-    // a format this browser can't draw: send it only if it is one pizza-mcp reads (it checks the bytes again)
-    if (MENU_IMAGE_TYPES.includes(f.type)) return f;
-    throw new MenuFileError('UNSUPPORTED_MEDIA_TYPE');
+    throw new MenuFileError('CANT_PREPARE');
   }
   const scale = Math.min(1, MENU_LIMITS.longestSidePx / Math.max(bmp.width, bmp.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(bmp.width * scale));
   canvas.height = Math.max(1, Math.round(bmp.height * scale));
   const ctx = canvas.getContext('2d');
-  if (!ctx) return f;
+  if (!ctx) throw new MenuFileError('CANT_PREPARE');
+  // JPEG has no transparency: paint white first, so a transparent menu PNG doesn't turn black
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   bmp.close?.();
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', MENU_LIMITS.jpegQuality));
-  if (!blob) return f;
+  if (!blob || blob.type !== 'image/jpeg') throw new MenuFileError('CANT_PREPARE');
   const name = (f.name || 'menu').replace(/\.[^.]+$/, '') + '.jpg';
   return new File([blob], name, { type: 'image/jpeg' });
+}
+
+/** Where the menu panel is offered: a cart on a generic or extracted menu, the host's own (to replace or remove it), or no cart yet. */
+export function menuPanelFits(menu: CartMenu | null | undefined): boolean {
+  return !menu || menu.provenance === 'generic' || menu.provenance === 'extracted' || menu.provenance === 'host_provided';
 }
 
 /** A menu's date for "estimate from your menu (Nov 9)", on the party's clock. */
@@ -459,6 +469,7 @@ export function hostMenuErrorKey(code: string | undefined): string {
     case 'FEATURE_DISABLED':
     case 'NOT_A_LISTING':
     case 'NO_FILES':
+    case 'CANT_PREPARE':
       return `aiOrder.menu.errors.${code}`;
     case 'EXTRACTION_UNAVAILABLE':
     case 'PIZZA_MCP_UNAVAILABLE':

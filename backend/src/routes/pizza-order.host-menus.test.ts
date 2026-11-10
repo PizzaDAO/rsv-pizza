@@ -6,6 +6,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { makeFakeDb, makeFakePizzaMcp, generateSigningKeyPem, PARTY_ID, FakeDb } from '../testutil/pizzaFakes.js';
 
 const m = vi.hoisted(() => ({ fake: null as any, party: null as any }));
@@ -33,7 +35,6 @@ vi.mock('../services/pizzaOrderNotify.js', () => ({ notifyHostOfOrder: vi.fn() }
 import router from './pizza-order.routes.js';
 import { errorHandler } from '../middleware/error.js';
 import { PizzaMcpClient, setPizzaMcpClientForTests } from '../services/pizzaMcp.client.js';
-import { resetHostMenusCacheForTests } from '../lib/hostMenus.js';
 import { sniffMenuMime, checkMenuUpload, checkMenuUrl } from '../lib/uploadSniff.js';
 
 const host = { 'x-user-id': 'host1', 'x-user-email': 'host@x.com' };
@@ -79,7 +80,6 @@ beforeEach(() => {
   process.env.PIZZA_MCP_URL = 'https://api.openpizza.xyz';
   process.env.PIZZA_ORDERING_PARTY_IDS = PARTY_ID;
   process.env.PIZZA_HOST_MENUS = '1';
-  resetHostMenusCacheForTests();
   fake = makeFakeDb();
   fake.users.set('host1', { id: 'host1', email: 'host@x.com' });
   m.fake = fake;
@@ -92,19 +92,58 @@ beforeEach(() => {
   hostRoute = () => ({ status: 201, json: result });
   deleteRoute = () => ({ json: { expired: 1 } });
   mcp = makeFakePizzaMcp({
-    // a made-up shop id (the probe) is NOT_FOUND while pizza-mcp takes host menus
-    'POST /pizzerias/:id/menu/host': (c) => (c.path.includes('pzl_probe_none') ? problem(404, 'NOT_FOUND') : hostRoute()),
+    'POST /pizzerias/:id/menu/host': () => hostRoute(),
     'DELETE /pizzerias/:id/menu/host': () => deleteRoute(),
   });
   setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
 });
 afterEach(() => {
   setPizzaMcpClientForTests(null);
-  resetHostMenusCacheForTests();
   for (const k of ENV) (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]));
 });
 
-const uploads = () => mcp.calls.filter((c) => c.method === 'POST' && !c.path.includes('pzl_probe_none'));
+/** A raw multipart POST written in 64 KB chunks, with or without a declared Content-Length. */
+async function rawUpload(fileBytes: number, declare: boolean): Promise<{ status: number; body: string }> {
+  const server = http.createServer(app());
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const { port } = server.address() as AddressInfo;
+  const boundary = 'XyZmenu';
+  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files[]"; filename="m.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`);
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  const body = Buffer.concat([head, pad([0xff, 0xd8, 0xff], fileBytes), tail]);
+  try {
+    return await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          host: '127.0.0.1', port, method: 'POST', path: menuPath,
+          headers: { ...host, 'content-type': `multipart/form-data; boundary=${boundary}`, ...(declare ? { 'content-length': body.length } : {}) },
+        },
+        (res) => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (c) => (text += c));
+          res.on('end', () => resolve({ status: res.statusCode!, body: text }));
+        }
+      );
+      req.on('error', reject);
+      let off = 0;
+      const write = () => {
+        while (off < body.length) {
+          const chunk = body.subarray(off, off + 65536);
+          off += chunk.length;
+          if (!req.write(chunk)) return req.once('drain', write);
+        }
+        req.end();
+      };
+      write();
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+}
+
+const uploads = () => mcp.calls.filter((c) => c.method === 'POST');
 const storedNothing = () => {
   expect(fake.carts.size).toBe(0);
   expect(fake.orders.size).toBe(0);
@@ -145,39 +184,22 @@ describe('uploadSniff', () => {
   });
 });
 
-describe('config: hostMenus only with rsv\'s switch AND pizza-mcp taking host menus', () => {
-  it('rsv switch off: false, and pizza-mcp is never asked', async () => {
-    delete process.env.PIZZA_HOST_MENUS;
+describe('config: hostMenus is rsv\'s switch (each shop says whether it takes a menu)', () => {
+  it('on: true, and pizza-mcp is not asked', async () => {
     const r = await request(app()).get(`${base}/config`).set(host);
-    expect(r.body).toMatchObject({ enabled: true, hostMenus: false });
+    expect(r.body).toMatchObject({ enabled: true, hostMenus: true });
     expect(mcp.calls).toHaveLength(0);
   });
 
-  it('on at pizza-mcp: true, from one probe that reads, counts and stores nothing; the answer is cached', async () => {
-    expect((await request(app()).get(`${base}/config`).set(host)).body.hostMenus).toBe(true);
-    expect((await request(app()).get(`${base}/config`).set(host)).body.hostMenus).toBe(true);
-    expect(mcp.calls).toHaveLength(1);
-    expect(mcp.calls[0]).toMatchObject({ method: 'POST', path: '/pizzerias/pzl_probe_none/menu/host', body: {} });
-  });
-
-  it('off at pizza-mcp (FEATURE_DISABLED): false', async () => {
-    mcp = makeFakePizzaMcp({ 'POST /pizzerias/:id/menu/host': () => problem(404, 'FEATURE_DISABLED') });
-    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  it('off: false', async () => {
+    delete process.env.PIZZA_HOST_MENUS;
     expect((await request(app()).get(`${base}/config`).set(host)).body.hostMenus).toBe(false);
   });
 
-  it('pizza-mcp down: false (never a guess), and the config still answers', async () => {
-    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: (async () => { throw new TypeError('down'); }) as typeof fetch }));
-    const r = await request(app()).get(`${base}/config`).set(host);
-    expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ enabled: true, hostMenus: false });
-  });
-
-  it('a party outside the pilot: hostMenus false, nothing asked', async () => {
+  it('a party outside the pilot: hostMenus false', async () => {
     process.env.PIZZA_ORDERING_PARTY_IDS = '';
     const r = await request(app()).get(`${base}/config`).set(host);
     expect(r.body).toMatchObject({ enabled: false, hostMenus: false });
-    expect(mcp.calls).toHaveLength(0);
   });
 });
 
@@ -260,6 +282,20 @@ describe('POST /shops/:shopId/menu/host', () => {
     expect(uploads()).toHaveLength(0);
   });
 
+  it('an oversized DECLARED length: the body is drained, so the client reads the 413 (not a reset), and nothing is forwarded', async () => {
+    const r = await rawUpload(5 * 1024 * 1024, true);
+    expect(r.status).toBe(413);
+    expect(JSON.parse(r.body).error.code).toBe('MENU_TOO_LARGE');
+    expect(uploads()).toHaveLength(0);
+  });
+
+  it('an oversized CHUNKED body (no declared length): refused while it streams, the client still reads the 413', async () => {
+    const r = await rawUpload(5 * 1024 * 1024, false);
+    expect(r.status).toBe(413);
+    expect(JSON.parse(r.body).error.code).toBe('MENU_TOO_LARGE');
+    expect(uploads()).toHaveLength(0);
+  });
+
   it('4 photos (413) and a PDF with a photo (415): nothing forwarded', async () => {
     let req = request(app()).post(menuPath).set(host);
     for (let i = 0; i < 4; i++) req = req.attach('files[]', JPEG, { filename: `p${i}.jpg`, contentType: 'image/jpeg' });
@@ -316,13 +352,27 @@ describe('POST /shops/:shopId/menu/host', () => {
     storedNothing();
   });
 
-  it('FEATURE_DISABLED from pizza-mcp: passed on, and the config stops offering it', async () => {
-    expect((await request(app()).get(`${base}/config`).set(host)).body.hostMenus).toBe(true);
+  it('FEATURE_DISABLED from pizza-mcp: passed on', async () => {
     hostRoute = () => problem(404, 'FEATURE_DISABLED');
     const r = await request(app()).post(menuPath).set(host).send({ url: 'https://sals.example/menu' });
     expect(r.status).toBe(404);
     expect(r.body.error.code).toBe('FEATURE_DISABLED');
-    expect((await request(app()).get(`${base}/config`).set(host)).body.hostMenus).toBe(false);
+  });
+
+  it('busboy limits: a form field (400), an unknown file field (400), 4 files (413); nothing forwarded', async () => {
+    const field = await request(app()).post(menuPath).set(host).field('note', 'hi').attach('files[]', JPEG, { filename: 'm.jpg', contentType: 'image/jpeg' });
+    expect(field.status).toBe(400);
+    const other = await request(app()).post(menuPath).set(host).attach('photo', JPEG, { filename: 'm.jpg', contentType: 'image/jpeg' });
+    expect(other.status).toBe(400);
+    expect(uploads()).toHaveLength(0);
+  });
+
+  it('a refusal by the gates (switch off) on a large upload still reaches the browser as the answer', async () => {
+    delete process.env.PIZZA_HOST_MENUS;
+    const big = pad([0xff, 0xd8, 0xff], 3 * 1024 * 1024);
+    const r = await request(app()).post(menuPath).set(host).attach('files[]', big, { filename: 'big.jpg', contentType: 'image/jpeg' });
+    expect(r.status).toBe(404);
+    expect(r.body.error.code).toBe('FEATURE_DISABLED');
   });
 });
 

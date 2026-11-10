@@ -126,4 +126,16 @@ describe('CartReview', () => {
     render(<CartReview {...props({ cartState: state })} />);
     expect(screen.queryByText(/your menu/)).toBeNull();
   });
+
+  it('basil-14648 P2: locked while a menu read runs: Back, Rebuild and Approve are disabled', async () => {
+    const onApprove = vi.fn();
+    const onBack = vi.fn();
+    render(<CartReview {...props({ locked: true, onApprove, onBack })} />);
+    await userEvent.type(screen.getByLabelText('Your mobile number'), '6175550123');
+    for (const name of [/Pick a different pizzeria/, /Rebuild order/, /Approve and have the AI call/]) {
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled, String(name)).toBe(true);
+    }
+    await userEvent.click(screen.getByRole('button', { name: /Approve and have the AI call/ }));
+    expect(onApprove).not.toHaveBeenCalled();
+  });
 });

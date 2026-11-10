@@ -40,6 +40,8 @@ interface CartReviewProps {
   onSwitchToHandoff?: () => void;
   /** basil-14648 P2: "Use this shop's real menu" (HostMenuUpload), shown above the estimate when offered. */
   menuSlot?: React.ReactNode;
+  /** A menu read is in flight: Back, Build, the pizza questions and Approve wait for it. */
+  locked?: boolean;
 }
 
 const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; children: React.ReactNode }> = ({ id, label, help, children }) => (
@@ -52,7 +54,7 @@ const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; child
 
 export const CartReview: React.FC<CartReviewProps> = ({
   shop, cartState, building, error, approveError, approveNotice, defaultName, partyDate, timeZone, city, onBuild, onDecide, onApprove, placing, onBack,
-  mode = 'ai', handoffSlot, onSwitchToHandoff, menuSlot,
+  mode = 'ai', handoffSlot, onSwitchToHandoff, menuSlot, locked = false,
 }) => {
   const handoff = mode === 'handoff';
   const { t, i18n } = useTranslation('host');
@@ -107,7 +109,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={onBack} className="min-h-[44px] -ml-1 px-1 inline-flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text">
+      <button type="button" onClick={onBack} disabled={locked} className="disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] -ml-1 px-1 inline-flex items-center gap-1 text-sm text-theme-text-secondary hover:text-theme-text">
         <ArrowLeft size={16} aria-hidden="true" /> {t('aiOrder.cart.back')}
       </button>
       <h4 className="font-semibold text-theme-text text-base break-words">{shop.name}</h4>
@@ -126,7 +128,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
         <button
           type="button"
           className={`${cartState ? 'btn-secondary' : 'btn-primary'} w-full sm:w-auto text-sm min-h-[44px] py-2 px-4 flex items-center justify-center gap-2`}
-          disabled={building || !pickupIso}
+          disabled={building || locked || !pickupIso}
           onClick={() => pickupIso && onBuild(pickupIso)}
         >
           {building && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
@@ -152,7 +154,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
                     key={c.id}
                     type="button"
                     className="btn-secondary text-sm min-h-[44px] py-2 px-4"
-                    disabled={building || !pickupIso}
+                    disabled={building || locked || !pickupIso}
                     onClick={() => pickupIso && onDecide(pickupIso, i.ref, c.id)}
                   >
                     {c.label}
@@ -262,7 +264,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
           <button
             type="button"
             className="btn-primary w-full text-sm min-h-[44px] py-2 flex items-center justify-center gap-2"
-            disabled={!ready || placing}
+            disabled={!ready || placing || locked || building}
             aria-describedby={missing ? `${uid}-missing` : undefined}
             onClick={() => e164 && onApprove({ ...(isPhone ? { ceilingCents } : {}), substitution: dealsOk ? 'deals_ok' : 'exact', contact: { name: name.trim(), phone: e164 } })}
           >
@@ -281,7 +283,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
       {!handoff && isPhone && onSwitchToHandoff && hasProviderLink(shop) && (
         <div className="pt-2 border-t border-theme-stroke space-y-2">
           <p className="text-sm text-theme-text-secondary">{t('aiOrder.handoff.orIntro')}</p>
-          <button type="button" className="btn-secondary w-full text-sm min-h-[44px] py-2 inline-flex items-center justify-center gap-2" onClick={onSwitchToHandoff}>
+          <button type="button" className="btn-secondary w-full text-sm min-h-[44px] py-2 inline-flex items-center justify-center gap-2" disabled={locked} onClick={onSwitchToHandoff}>
             <ShoppingBag size={14} aria-hidden="true" /> {t('aiOrder.handoff.switch')}
           </button>
         </div>
