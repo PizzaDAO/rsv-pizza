@@ -19,26 +19,12 @@ import {
   checkCheckinVelocitySuperhuman,
   type FakeDetectionGuest,
 } from '../lib/fakeDetection.js';
+import { paidRowHasProof } from './hostFastPass.service.js';
 import { buildSybilWalletSetFromDb, scorePartiesByIds } from '../lib/fakeDetectionScan.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const MAX_REPORT_PAGE = 100;
-
-function paidRowHasProof(row: {
-  payoutMethod: string | null;
-  transactionHash: string | null;
-  wireReference: string | null;
-  mercuryCardLast4: string | null;
-  mercuryCardId: string | null;
-  externalProofUrl: string | null;
-}): boolean {
-  const has = (v: string | null) => !!v && v.trim() !== '';
-  if (has(row.externalProofUrl)) return true;
-  if (row.payoutMethod === 'usdc_base') return has(row.transactionHash);
-  if (row.payoutMethod === 'wire') return has(row.wireReference);
-  if (row.payoutMethod === 'mercury_card') return has(row.mercuryCardLast4) || has(row.mercuryCardId);
-  return false;
-}
+export const MAX_REPORT_PAGE = 50;
+export const DEFAULT_REPORT_PAGE = 25;
 
 export interface HostCandidate {
   userId: string;
@@ -117,6 +103,8 @@ export interface HostTrustRow {
   todayTier: 'fast_pass' | 'building' | 'new' | 'flagged';
   /** New tier and today's tier disagree about "trusted". */
   disagrees: boolean;
+  /** Fake-event risk was not scored, so a missing fake_risk blocker or penalty may change the tier. */
+  provisional: boolean;
   parties: HostPartyRow[];
 }
 
@@ -153,6 +141,7 @@ export async function loadHostTrustRows(
         select: {
           status: true,
           reviewedBy: true,
+          hostUserId: true,
           payoutWalletAddress: true,
           payoutMethod: true,
           transactionHash: true,
@@ -188,7 +177,8 @@ export async function loadHostTrustRows(
     walletsByUser.get(uid)!.add(lw);
   };
   for (const u of users) addWallet(u.id, u.payoutWalletAddress);
-  for (const p of parties) for (const po of p.payouts) addWallet(p.userId, po.payoutWalletAddress);
+  // Only payouts whose recipient is the host: admins can pay a co-host or other recipient on this party.
+  for (const p of parties) for (const po of p.payouts) if (po.hostUserId === p.userId) addWallet(p.userId, po.payoutWalletAddress);
   const allWallets = Array.from(new Set(Array.from(walletsByUser.values()).flatMap((s) => Array.from(s))));
   const usersByWallet = new Map<string, Set<string>>();
   if (allWallets.length) {
@@ -333,6 +323,7 @@ export async function loadHostTrustRows(
       trust,
       todayTier: today.tier,
       disagrees: (trust.tier === 'trusted') !== (today.tier === 'fast_pass'),
+      provisional: !opts.scoreFakeRisk,
       parties: rows,
     });
   }

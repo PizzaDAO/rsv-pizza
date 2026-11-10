@@ -51,8 +51,15 @@ const PIZZADAO_LABEL: Record<HostTrustItem['pizzadao'], string> = {
 
 const TIERS: Array<TrustTier | ''> = ['', 'trusted', 'building', 'new', 'restricted'];
 
-function TierChip({ tier }: { tier: TrustTier }) {
-  return <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-medium ${TIER_STYLE[tier]}`}>{tier}</span>;
+function TierChip({ tier, provisional }: { tier: TrustTier; provisional?: boolean }) {
+  return (
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full border text-xs font-medium ${TIER_STYLE[tier]} ${provisional ? 'border-dashed' : ''}`}
+      title={provisional ? 'Provisional: fake-event risk is not checked in the list. Open the row to check.' : undefined}
+    >
+      {tier}{provisional ? ' (provisional)' : ''}
+    </span>
+  );
 }
 
 function Detail({ host }: { host: HostTrustItem }) {
@@ -172,7 +179,7 @@ export function PaymentsHostsPage() {
     setBusy(true);
     setError(null);
     try {
-      const page = await fetchHostTrust({ q: q.trim() || undefined, tier: tier || undefined, offset: nextOffset, limit: 50 });
+      const page = await fetchHostTrust({ q: q.trim() || undefined, tier: tier || undefined, offset: nextOffset, limit: 25 });
       setHosts((prev) => (append ? [...prev, ...page.hosts] : page.hosts));
       setTotal(page.total);
       setOffset(nextOffset + page.limit);
@@ -226,7 +233,7 @@ export function PaymentsHostsPage() {
         </div>
         <p className="text-sm text-theme-text-muted mb-4">
           Read-only. Hosts with a party in the next 60 days or an event payout in the last 90. Nothing here changes a budget,
-          a payout or what a host sees. {total} host{total === 1 ? '' : 's'}.
+          a payout or what a host sees. {total} host{total === 1 ? '' : 's'}. Tiers in the list are provisional until you open a row: fake-event risk is only checked there, and it can add a blocker. The tier filter only filters the loaded page.
         </p>
 
         <form
@@ -242,7 +249,7 @@ export function PaymentsHostsPage() {
             className="rounded-lg bg-theme-input border border-theme-stroke px-3 py-2 text-theme-text text-sm"
             aria-label="Tier filter (this page of results)"
           >
-            {TIERS.map((t) => <option key={t || 'all'} value={t}>{t ? `Tier: ${t}` : 'All tiers'}</option>)}
+            {TIERS.map((t) => <option key={t || 'all'} value={t}>{t ? `Tier: ${t} (filters within this page)` : 'All tiers'}</option>)}
           </select>
           <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke text-sm">Search</button>
         </form>
@@ -267,7 +274,7 @@ export function PaymentsHostsPage() {
                     onClick={() => setOpen(open === h.userId ? null : h.userId)}
                   >
                     <td className="p-2"><div className="font-medium text-theme-text">{h.name || h.email}</div><div className="text-xs text-theme-text-muted">{h.email}</div></td>
-                    <td className="p-2"><TierChip tier={h.tier} /></td>
+                    <td className="p-2"><TierChip tier={h.tier} provisional={h.provisional} /></td>
                     <td className="p-2">{h.score}</td>
                     <td className="p-2">{h.verifiedParties}{h.verifiedPartiesRaw !== h.verifiedParties ? ` (${h.verifiedPartiesRaw} raw)` : ''}</td>
                     <td className="p-2">{h.completedParties}</td>
@@ -275,7 +282,8 @@ export function PaymentsHostsPage() {
                     <td className="p-2">{h.accountAgeDays}d</td>
                     <td className="p-2">{TODAY_LABEL[h.todayTier]}{h.disagrees ? ' *' : ''}</td>
                     <td className="p-2">{PIZZADAO_LABEL[h.pizzadao]}</td>
-                    <td className="p-2 text-red-700">{h.blockers.map((b) => BLOCKER_LABEL[b] ?? b).join(', ') || '-'}</td>
+                    <td className="p-2 text-red-700">{h.blockers.map((b) => BLOCKER_LABEL[b] ?? b).join(', ') || '-'}
+                      {h.provisional && <div className="text-xs text-theme-text-muted">Fake risk: open row to check</div>}</td>
                   </tr>
                   {open === h.userId && (
                     <tr className="bg-theme-surface/50"><td colSpan={10} className="p-4"><Detail host={h} /></td></tr>

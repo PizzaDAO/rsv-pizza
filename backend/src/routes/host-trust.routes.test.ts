@@ -12,7 +12,7 @@ const m = vi.hoisted(() => ({
   rows: [] as Array<{ key: string; value: string }>,
   audit: [] as unknown[],
   prisma: {
-    appConfig: { findMany: vi.fn(), upsert: vi.fn() },
+    appConfig: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
     appConfigAudit: { findMany: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -32,7 +32,8 @@ vi.mock('../middleware/auth.js', () => ({
   isSuperAdmin: m.isSuperAdmin,
 }));
 vi.mock('../services/hostTrust.service.js', () => ({
-  MAX_REPORT_PAGE: 100,
+  MAX_REPORT_PAGE: 50,
+  DEFAULT_REPORT_PAGE: 25,
   listHostCandidates: m.listHostCandidates,
   loadHostTrustRows: m.loadHostTrustRows,
 }));
@@ -64,7 +65,8 @@ beforeEach(() => {
   m.prisma.appConfig.upsert.mockImplementation(async (a: unknown) => a);
   m.prisma.appConfigAudit.create.mockImplementation(async (a: unknown) => a);
   m.prisma.appConfigAudit.findMany.mockResolvedValue([]);
-  m.prisma.$transaction.mockImplementation(async (ops: unknown[]) => Promise.all(ops));
+  m.prisma.appConfig.findUnique.mockImplementation(async ({ where }: any) => m.rows.find((r) => r.key === where.key) ?? null);
+  m.prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(m.prisma));
   m.listHostCandidates.mockResolvedValue({ hosts: [{ userId: 'h1', name: 'Host', email: 'h@example.com' }], total: 1 });
   m.loadHostTrustRows.mockResolvedValue([]);
 });
@@ -101,6 +103,7 @@ describe('report gating', () => {
     expect(res.status).toBe(200);
     expect(res.body.total).toBe(1);
     expect(res.body.hosts).toEqual([]);
+    expect(m.loadHostTrustRows.mock.calls[0][3]).toEqual({ scoreFakeRisk: false });
   });
 });
 

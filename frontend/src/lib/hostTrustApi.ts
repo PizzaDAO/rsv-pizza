@@ -49,6 +49,8 @@ export interface HostTrustItem {
   pizzadao: 'not_checked' | 'unavailable' | 'ok' | 'ambiguous';
   todayTier: 'fast_pass' | 'building' | 'new' | 'flagged';
   disagrees: boolean;
+  /** Fake-event risk not scored in the list; open the row to check. */
+  provisional?: boolean;
   parties?: HostPartyRow[];
 }
 

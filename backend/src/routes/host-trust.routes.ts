@@ -16,7 +16,7 @@ import { requireAuth, isPaymentAdmin, isSuperAdmin, AuthRequest } from '../middl
 import { AppError } from '../middleware/error.js';
 import { checkSettingChange, readSettings, writeSetting } from '../lib/appSettings.js';
 import { HOST_TRUST_SETTINGS, HOST_TRUST_SETTING_BY_KEY, getHostTrustConfig } from '../lib/hostTrustSettings.js';
-import { MAX_REPORT_PAGE, listHostCandidates, loadHostTrustRows, type HostTrustRow } from '../services/hostTrust.service.js';
+import { DEFAULT_REPORT_PAGE, MAX_REPORT_PAGE, listHostCandidates, loadHostTrustRows, type HostTrustRow } from '../services/hostTrust.service.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -58,6 +58,7 @@ function serializeRow(r: HostTrustRow, withParties: boolean) {
     pizzadao: r.trust.pizzadao,
     todayTier: r.todayTier,
     disagrees: r.disagrees,
+    provisional: r.provisional,
     ...(withParties ? { parties: r.parties } : {}),
   };
 }
@@ -117,7 +118,7 @@ router.put('/settings', requireSuperAdmin, async (req: AuthRequest, res: Respons
     if (!check.ok) throw new AppError(check.message, 400, check.code);
     if (value === current) return res.json({ ok: true, unchanged: true, value: current });
 
-    await writeSetting(def, current, value as number, req.userEmail ?? 'unknown', noteStr || null);
+    await writeSetting(def, value as number, req.userEmail ?? 'unknown', noteStr || null);
     res.json({ ok: true, value, loosening: check.loosening });
   } catch (err) {
     next(err);
@@ -151,12 +152,12 @@ router.get('/', requirePaymentAdmin, requireReportEnabled, async (req: AuthReque
     const now = new Date();
     const { config } = await getHostTrustConfig();
     const offset = Math.max(0, parseInt(String(req.query.offset ?? '0'), 10) || 0);
-    const limit = Math.min(MAX_REPORT_PAGE, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const limit = Math.min(MAX_REPORT_PAGE, Math.max(1, parseInt(String(req.query.limit ?? String(DEFAULT_REPORT_PAGE)), 10) || DEFAULT_REPORT_PAGE));
     const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 100) : undefined;
     const tier = typeof req.query.tier === 'string' ? req.query.tier : undefined;
 
     const { hosts, total } = await listHostCandidates({ q, offset, limit }, now);
-    const rows = await loadHostTrustRows(hosts.map((h) => h.userId), config, now, { scoreFakeRisk: true });
+    const rows = await loadHostTrustRows(hosts.map((h) => h.userId), config, now, { scoreFakeRisk: false }); // list is provisional: fake-risk is scored on the row detail only
     const byId = new Map(rows.map((r) => [r.userId, r]));
     // Keep the candidate order (name asc); the tier filter applies to this page only.
     const ordered = hosts.map((h) => byId.get(h.userId)).filter((r): r is HostTrustRow => !!r);

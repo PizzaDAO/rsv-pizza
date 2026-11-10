@@ -9,7 +9,8 @@
  *  - Moving a value back toward the default (loosening relative to the stored value) is allowed
  *    only with a non-empty note, and every change is audited (`app_config_audit`).
  *  - If the DB cannot be read, each setting resolves to its failure value (the strict one), never
- *    the default. A missing or invalid row resolves to the default.
+ *    the default. A missing row resolves to the default; an existing but invalid row resolves to the
+ *    failure value.
  *
  * Pure helpers (no DB) are exported separately so they can be unit tested.
  */
@@ -44,7 +45,7 @@ export function isValidSettingValue(def: SettingDef, v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= def.min && v <= def.max;
 }
 
-/** Resolve one raw stored string. Missing -> default, unparseable or out of bounds -> default too (never throws). */
+/** Resolve one raw stored string. Missing -> default; unparseable or out of bounds -> failure value (never throws). */
 export function resolveRaw(def: SettingDef, raw: string | undefined | null): ResolvedSetting {
   if (raw == null) return { value: def.default, source: 'default' };
   try {
@@ -137,22 +138,26 @@ export async function readSettings(defs: SettingDef[]): Promise<SettingsSnapshot
   }
 }
 
-/** Persist one validated change and append an audit row in one transaction. */
+/**
+ * Persist one validated change and append an audit row in one transaction. The audit oldValue is
+ * read inside the transaction, so it is the value actually replaced.
+ */
 export async function writeSetting(
   def: SettingDef,
-  oldValue: number,
   newValue: number,
   actorEmail: string,
   note: string | null,
 ): Promise<void> {
-  await prisma.$transaction([
-    prisma.appConfig.upsert({
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.appConfig.findUnique({ where: { key: def.key } });
+    const oldValue = resolveRaw(def, row?.value).value;
+    await tx.appConfig.upsert({
       where: { key: def.key },
       create: { key: def.key, value: JSON.stringify(newValue) },
       update: { value: JSON.stringify(newValue), updatedAt: new Date() },
-    }),
-    prisma.appConfigAudit.create({
+    });
+    await tx.appConfigAudit.create({
       data: { key: def.key, oldValue, newValue, actorEmail, note },
-    }),
-  ]);
+    });
+  });
 }

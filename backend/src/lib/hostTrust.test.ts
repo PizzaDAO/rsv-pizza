@@ -52,6 +52,21 @@ describe('defaults lock today behaviour (Q1)', () => {
   });
 });
 
+describe('calibration (Fast Pass parity)', () => {
+  it('a minimal qualifying Fast Pass host is trusted under defaults', () => {
+    // exactly 2 verified parties, account just past 45 days, no underboss/check-in/turnout data
+    const two = [
+      verifiedParty('a', 20, { underbossOk: false, photoCount: 1 }),
+      verifiedParty('b', 30, { underbossOk: false, photoCount: 1 }),
+    ];
+    const acct = daysAgo(46);
+    const r = computeHostTrust(input(two, { accountCreatedAt: acct }), cfg(), NOW);
+    expect(computeTrackRecord(two, acct, NOW, HOST).tier).toBe('fast_pass');
+    expect(r.tier).toBe('trusted');
+    expect(r.score).toBeGreaterThanOrEqual(cfg().gates.trustedMinScore);
+  });
+});
+
 describe('registry', () => {
   it('is internally consistent', () => {
     expect(validateRegistry(HOST_TRUST_SETTINGS)).toEqual([]);
@@ -261,6 +276,15 @@ describe('stricter-only settings', () => {
     expect(checkSettingChange(d, 2, 2.5)).toMatchObject({ ok: false, code: 'OUT_OF_RANGE' });
     expect(checkSettingChange(d, 2, 999)).toMatchObject({ ok: false, code: 'OUT_OF_RANGE' });
     expect(checkSettingChange(d, 2, '3' as unknown)).toMatchObject({ ok: false, code: 'OUT_OF_RANGE' });
+  });
+
+  it('new_max_score: raising it is stricter, lowering needs a note, failure value is strict', () => {
+    const d = def('new_max_score');
+    expect(d.looserWhen).toBe('lower');
+    expect(checkSettingChange(d, 20, 30)).toEqual({ ok: true, loosening: false });
+    expect(checkSettingChange(d, 30, 25)).toMatchObject({ ok: false, code: 'NOTE_REQUIRED' });
+    expect(checkSettingChange(d, 20, 10, 'x')).toMatchObject({ ok: false, code: 'OUT_OF_RANGE' });
+    expect(d.failure).toBeGreaterThan(d.default);
   });
 
   it('the report switch is free to flip', () => {

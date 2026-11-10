@@ -3,12 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { fetchHostTrustEnabled } from '../lib/hostTrustApi';
 import { TaxFormRequestsSection } from '../components/payments-admin/TaxFormRequestsSection';
 import { IconInput } from '../components/IconInput';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 import {
   fetchAdminMe,
-  fetchUnderbossMe,
+    fetchUnderbossMe,
   listAdminPayouts,
   fetchPayoutsByParty,
   getAdminPayout,
@@ -192,6 +193,11 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
   const isRegionalPortal = !!regions;
 
   const [role, setRole] = useState<RoleState>({ kind: 'loading' });
+  const [hostsReportOn, setHostsReportOn] = useState(false);
+  useEffect(() => {
+    if (role.kind !== 'allowed' || role.role === 'underboss') return;
+    fetchHostTrustEnabled().then((r) => setHostsReportOn(r.enabled)).catch(() => setHostsReportOn(false));
+  }, [role]);
 
   // panuozzo-92114: the URL query string is the source of restore-on-load state
   // for filters + view mode. We parse it ONCE in the lazy useState initialisers
@@ -1165,7 +1171,7 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               Record External Payment
             </button>
           )}
-          {!isUnderboss && (
+          {!isUnderboss && hostsReportOn && (
             <Link
               to="/payments/hosts"
               className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-sm text-theme-text"
