@@ -3,6 +3,10 @@ import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
 import { prisma } from './config/database.js';
+import { assertSecretsConfigured } from './config/secrets.js';
+
+// Refuse to boot in production/preview with a missing, weak or placeholder JWT_SECRET.
+assertSecretsConfigured();
 
 // Serialize BigInt as string in JSON. The only BigInt in the schema today is
 // parties.host_telegram_chat_id, which is sensitive enough that we never want

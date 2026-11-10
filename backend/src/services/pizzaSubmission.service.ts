@@ -30,6 +30,7 @@ import { loadPresets } from './pizzaLineSync.service.js';
 import { buildHistoryLines, type HistoryKind, type HistoryLineIn, type HistoryRecord } from './pizzaManualLines.js';
 import { normalizeMerchantKey } from './pizzaSize.service.js';
 import { invalidatePizzaIndexCache, refreshOutliers } from './pizzaIndex.service.js';
+import { getJwtSecret } from '../config/secrets.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -104,7 +105,7 @@ export function normalizeIp(ip: string | undefined): string {
 }
 
 export function hashIp(ip: string | undefined): string {
-  const secret = process.env.PIZZA_SUBMISSION_IP_SECRET || process.env.JWT_SECRET || 'pizza-submissions';
+  const secret = process.env.PIZZA_SUBMISSION_IP_SECRET || getJwtSecret();
   return crypto.createHash('sha256').update(`${normalizeIp(ip)}|${secret}`).digest('hex');
 }
 
