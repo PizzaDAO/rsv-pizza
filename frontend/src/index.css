@@ -133,6 +133,35 @@ body {
   transform: translateY(-2px);
 }
 
+/* A disabled button must look disabled (it used to keep the hover lift and full colour). */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-primary:disabled:hover,
+.btn-secondary:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* basil-14648: AI ordering flow. Status colours that pass AA (4.5:1) on both themes; the light
+   values are checked against the darker top of the GPP gradient. Scoped to .ai-order. */
+.ai-order {
+  --ai-warn: #ffb347;
+  --ai-success: #4ade80;
+  --ai-error: #ff6b6b;
+  --ai-accent: #c4b5fd;
+}
+.gpp-theme .ai-order,
+body.gpp-theme-active .ai-order {
+  --ai-warn: #4f2c00;
+  --ai-success: #0a4019;
+  --ai-error: #6e0f0b;
+  --ai-accent: #3b1676;
+}
+/* White on the brand red is 3.6:1; inside the flow the primary button uses a deeper red (5:1+). */
+.ai-order .btn-primary { background-color: #c8262a; }
+.ai-order .btn-primary:hover:not(:disabled) { background-color: #b01f23; }
+
 /* Input styling */
 input[type="text"],
 input[type="email"],

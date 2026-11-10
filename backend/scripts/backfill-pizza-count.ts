@@ -50,7 +50,7 @@ async function main() {
 
   for (;;) {
     const docs: Array<Record<string, any>> = await prisma.payoutDocument.findMany({
-      where: { kind: 'receipt', pizzaCountSource: null, pizzaSizeSource: null, ...(cursor ? { id: { gt: cursor } } : {}) },
+      where: { kind: 'receipt', source: 'upload', pizzaCountSource: null, pizzaSizeSource: null, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: 'asc' },
       take: BATCH,
       select: {

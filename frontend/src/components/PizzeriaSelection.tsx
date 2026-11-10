@@ -10,6 +10,9 @@ import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { IconInput } from './IconInput';
 import { OrderCheckout } from './OrderCheckout';
+import { PizzaOrderFlow } from './PizzaOrderFlow';
+import { AiOrderDialog } from './AiOrderDialog';
+import { usePizzaOrderingEnabled } from '../lib/pizzaOrder';
 import { CallRecordingPlayer } from './CallRecordingPlayer';
 import { uuid } from '../lib/utils';
 
@@ -19,6 +22,8 @@ interface PizzeriaSelectionProps {
 
 export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded = false }) => {
   const { party, guests, recommendations } = usePizza();
+  // flag AND backend allowlist: the build flag alone must not show the button to a host outside the pilot
+  const aiOrderingEnabled = usePizzaOrderingEnabled(party?.id);
 
   // AI order state
   const [orderPizzeria, setOrderPizzeria] = useState<Pizzeria | null>(null);
@@ -455,8 +460,8 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {/* AI Order button - disabled while AI ordering is Coming Soon */}
-                  {false && pizzeria.phone && recommendations.length > 0 && (
+                  {/* AI Order button - hidden unless VITE_AI_ORDERING=1 (basil-14648); the backend party allowlist still decides */}
+                  {aiOrderingEnabled && pizzeria.phone && recommendations.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setOrderPizzeria(pizzeria)}
@@ -815,7 +820,7 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
       )}
 
       {/* AI Order Checkout Modal */}
-      {orderPizzeria && (
+      {orderPizzeria && !aiOrderingEnabled && (
         <OrderCheckout
           pizzeria={orderPizzeria}
           orderingOption={aiOrderOption}
@@ -823,6 +828,13 @@ export const PizzeriaSelection: React.FC<PizzeriaSelectionProps> = ({ embedded =
           onClose={() => setOrderPizzeria(null)}
           onOrderComplete={handleOrderComplete}
         />
+      )}
+
+      {/* basil-14648: the new ordering flow (pizza-mcp), pre-sorted to the shop the host clicked */}
+      {orderPizzeria && aiOrderingEnabled && (
+        <AiOrderDialog onClose={() => setOrderPizzeria(null)}>
+          <PizzaOrderFlow gated preferName={orderPizzeria.name} fallback={<p className="text-sm text-theme-text-muted p-4">AI ordering is not available for this party yet.</p>} />
+        </AiOrderDialog>
       )}
 
       {/* AI Call Complete Modal */}

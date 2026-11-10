@@ -1,0 +1,423 @@
+import '../i18n';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { OrderStatus } from './OrderStatus';
+import type { PizzaOrderView } from '../lib/pizzaOrder';
+
+const mocks = vi.hoisted(() => ({ settle: vi.fn(), get: vi.fn(), cancel: vi.fn() }));
+vi.mock('../lib/pizzaOrder', async () => {
+  const actual = await vi.importActual<typeof import('../lib/pizzaOrder')>('../lib/pizzaOrder');
+  return { ...actual, getPizzaOrder: mocks.get, settlePizzaOrder: mocks.settle, cancelPizzaOrder: mocks.cancel };
+});
+
+const order = (over: Partial<PizzaOrderView> = {}): PizzaOrderView => ({
+  id: '1', opopOrderId: 'ord_1', tier: 'listing', shopId: 'pzl_x', shopName: "Sal's", status: 'confirmed_by_shop',
+  paymentStatus: null, ceilingCents: 21000, confirmedTotalCents: 18740, readyAtText: 'about 6:30', summary: null,
+  payoutDocumentId: 'd1', call: null, nextAction: null, isMine: true, ...over,
+});
+const noop = () => undefined;
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('OrderStatus', () => {
+  it('shows the confirmed total and ready time', () => {
+    render(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Sal's confirmed")).toBeTruthy();
+    expect(screen.getByText(/\$187\.40/)).toBeTruthy();
+  });
+
+  it("shows pizza-mcp's call.deferred (until / reason / message) when present and renders fine without", () => {
+    const withDeferred = order({ status: 'calling', call: { deferred: { until: '2026-10-30T22:00:00Z', reason: 'outside_window', message: 'Shops are closed until 5pm.' } } });
+    const { unmount } = render(<OrderStatus partyId="p" order={withDeferred} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/Shops are closed until 5pm\./)).toBeTruthy();
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', call: { deferred: null } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/Next try:/)).toBeNull();
+  });
+
+  it('needs_review is terminal: no polling spinner, call-it-yourself script shown', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review' })} orderScript="read this out" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/read this out/)).toBeTruthy();
+    expect(screen.getByText('Back to pizzerias')).toBeTruthy();
+  });
+
+  it('an approval the shop cannot take (pizza-mcp 422 on its page) has a way out: the copy says so, and cancel leads to another pizzeria', async () => {
+    const pending = order({ status: 'awaiting_approval', cancelable: true, nextAction: { type: 'open_url', url: 'https://mcp.example/confirm/c1' } as never, payoutDocumentId: null });
+    const canceled = order({ status: 'canceled', blocking: false, outcome: { nothing_ordered: true, reason: 'canceled', message: 'You canceled before we called. Nothing was ordered.' }, payoutDocumentId: null });
+    const onUpdate = vi.fn();
+    mocks.get.mockResolvedValue({ order: pending, stale: false });
+    mocks.cancel.mockResolvedValue({ order: canceled });
+    const { rerender } = render(<OrderStatus partyId="p" order={pending} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText(/If that page says the shop can't be called right now, cancel this order and pick another pizzeria\./)).toBeTruthy();
+    await userEvent.click(screen.getByText('Cancel this order'));
+    // UX audit P2-9: an in-place confirm, not window.confirm
+    expect(screen.getByRole('alertdialog').textContent).toMatch(/Cancel the order at Sal's\?/);
+    await userEvent.click(screen.getByText('Yes, cancel it'));
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledWith(canceled));
+    rerender(<OrderStatus partyId="p" order={canceled} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('an expired approval offers Start over, not a dead link', () => {
+    const expired = order({ status: 'awaiting_approval', restartable: true, nextAction: { type: 'none' } });
+    render(<OrderStatus partyId="p" order={expired} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('The approval link expired')).toBeTruthy();
+    expect(screen.getByText('Start over')).toBeTruthy();
+    expect(screen.queryByText('Open the approval page')).toBeNull();
+  });
+
+  it('a live order the host placed can be canceled; a co-host cannot', () => {
+    const live = order({ status: 'calling', cancelable: true });
+    const { unmount } = render(<OrderStatus partyId="p" order={live} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Cancel this order')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={{ ...live, isMine: false }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Cancel this order')).toBeNull();
+  });
+
+  it('offers the approval link only to the placing host', () => {
+    const waiting = order({ status: 'awaiting_price_approval', nextAction: { type: 'open_url', url: 'https://api.openpizza.xyz/confirm/c1' } });
+    const { unmount } = render(<OrderStatus partyId="p" order={waiting} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Review the higher price').closest('a')?.getAttribute('href')).toBe('https://api.openpizza.xyz/confirm/c1');
+    unmount();
+    render(<OrderStatus partyId="p" order={{ ...waiting, isMine: false }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Review the higher price')).toBeNull();
+  });
+
+  it('shows the call-it-yourself script when the shop refused', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'refused' })} orderScript="Hi, I'd like to place an order" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/place an order/)).toBeTruthy();
+  });
+
+  it('needs_review copy is honest both ways (not "we think the shop confirmed") and a holding one can be released', async () => {
+    mocks.settle.mockResolvedValue({ order: order({ status: 'needs_review', released: true }) });
+    const onUpdate = vi.fn();
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText(/could not confirm the order at Sal's/)).toBeTruthy();
+    expect(document.body.textContent).toMatch(/nothing was ordered, or that the shop did take it/);
+    expect(document.body.textContent).not.toMatch(/We think/);
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
+    expect(screen.getByRole('alertdialog').textContent).toMatch(/Release the order at Sal's/);
+    await userEvent.click(screen.getByText('Yes, release it'));
+    expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('Release asks first, like Cancel: declining settles nothing', async () => {
+    mocks.settle.mockClear();
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+    await userEvent.click(screen.getByText('Not yet'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    // Escape backs out too
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(mocks.settle).not.toHaveBeenCalled();
+  });
+
+  it('needs_review only says "release it below" when the button is there', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).not.toMatch(/release it below/);
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/release it below/);
+  });
+
+  it('with no outcome, unreachable does not claim nothing was ordered, or a retry that may not have happened', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'unreachable' })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/We could not complete the call/);
+    expect(document.body.textContent).not.toMatch(/nothing was ordered/i);
+    expect(document.body.textContent).not.toMatch(/after retrying/);
+  });
+
+  it('shows the released state, with no release button and the way to order again', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', released: true, releasable: false, blocking: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("A host released the order at Sal's")).toBeTruthy();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('hides "Order from another pizzeria" where the backend would block it', () => {
+    const blocked = order({ status: 'unreachable', blocking: true, releasable: true, outcome: { nothing_ordered: false, reason: 'ambiguous_dial', message: 'm' } });
+    const { unmount } = render(<OrderStatus partyId="p" order={blocked} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Order from another pizzeria')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false, outcome: { nothing_ordered: true, reason: 'refused_ai', message: 'm' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Order from another pizzeria')).toBeTruthy();
+  });
+
+  it('with no outcome the way out never suggests ordering again is safe', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false })} orderScript="read this" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Order from another pizzeria')).toBeNull();
+    expect(screen.getByText('Back to pizzerias')).toBeTruthy();
+    expect(screen.getByText('The order, to check with the shop')).toBeTruthy();
+    expect(screen.queryByText('Order to read out')).toBeNull();
+  });
+
+  const mayExist = { nothing_ordered: false, reason: 'outcome_unclear', message: 'An order may exist at the shop.' };
+
+  it.each(['canceled', 'unreachable', 'refused', 'needs_review', 'shop_requires_prepay'])('%s with nothing_ordered false: truthful copy, release, no way to reorder', async (status) => {
+    mocks.settle.mockClear();
+    mocks.settle.mockResolvedValue({ order: order({ status, released: true }) });
+    render(<OrderStatus partyId="p" order={order({ status, blocking: true, releasable: true, confirmedTotalCents: null, outcome: mayExist })} orderScript="read this" checkScript="Hi, I'm checking on a pickup order" shopPhone="+16175550101" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    // UX audit P1-7: a why line, numbered steps, and "Please don't" (no all-caps "Do NOT")
+    expect(screen.getByText('An order may exist at the shop.')).toBeTruthy();
+    expect(screen.getByText("Call Sal's and ask whether they have your pickup order.").closest('ol')).toBeTruthy();
+    expect(screen.getByText("Please don't order again until you've checked with them.")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\bNOT\b/);
+    expect(document.body.textContent).toMatch(/release it below/);
+    expect(document.body.textContent).not.toMatch(/Order to read out|Order from another pizzeria|Nothing was ordered at/);
+    expect(screen.getByText('The order, to check with the shop')).toBeTruthy();
+    // UX audit P1-8: a Call button, and the check-on-order script (not "I'd like to place an order")
+    expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
+    expect(screen.getByText(/checking on a pickup order/)).toBeTruthy();
+    expect(screen.queryByText('read this')).toBeNull();
+    await userEvent.click(screen.getByText('I checked: nothing was ordered, release it'));
+    await userEvent.click(screen.getByText('Yes, release it'));
+    expect(mocks.settle).toHaveBeenCalledWith('p', 'ord_1', 'nothing_ordered');
+  });
+
+  it('an unknown reason is read by nothing_ordered, both ways', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'unreachable', blocking: true, releasable: true, outcome: { ...mayExist, reason: 'a_reason_added_next_year' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Check with Sal's before ordering again")).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'unreachable', blocking: false, outcome: { nothing_ordered: true, reason: 'a_reason_added_next_year', message: 'Fine.' } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+  });
+
+  it('an ended order that may exist can take the receipt, and once covered it can be left and is not offered it again', () => {
+    const o = order({ status: 'canceled', blocking: true, releasable: true, outcome: mayExist });
+    const { unmount } = render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    // UX audit P2-8: on an order that may not exist, the button says when it applies
+    expect(screen.getByText('They had it: I picked it up and uploaded the receipt')).toBeTruthy();
+    expect(screen.queryByText('I uploaded the receipt')).toBeNull();
+    expect(screen.queryByText('Done')).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={{ ...o, receiptCovered: true }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/uploaded the receipt/)).toBeNull();
+    expect(screen.getByText('Done')).toBeTruthy();
+  });
+
+  it('price_approval_dropped stays open: approve or cancel, no release, and cancel says it does not undo anything at the shop', async () => {
+    const o = order({ status: 'approval_timeout', blocking: true, releasable: false, cancelable: true, nextAction: { type: 'open_url', url: 'https://x/confirm' }, outcome: { nothing_ordered: false, reason: 'price_approval_dropped', message: 'You can still approve.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    // pizza-mcp e62620e: an open approval_timeout keeps its own title; the body still says an order may exist
+    expect(screen.getByText('Approval timed out')).toBeTruthy();
+    expect(document.body.textContent).toMatch(/You can still approve\./);
+    expect(document.body.textContent).not.toMatch(/Nothing was ordered|nothing is ordered/i);
+    expect(screen.getByText('Open the approval page')).toBeTruthy();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
+    await userEvent.click(screen.getByText('Cancel this order'));
+    expect(screen.getByRole('alertdialog').textContent).toMatch(/does not cancel anything they may already have/);
+  });
+
+  it('a transient deferral says so, still shows the next try and is not "Calling"', () => {
+    const o = order({ status: 'calling', cancelable: true, call: { deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'We hit a temporary problem and will try the call again shortly.' } } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Our call to Sal's is delayed")).toBeTruthy();
+    expect(screen.getByText(/temporary problem/)).toBeTruthy();
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
+    expect(screen.queryByText("Calling Sal's")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/nothing was ordered/i);
+  });
+
+  it('pizza-mcp 41b81d7: call_check_pending (deferred + checking) reads as waiting to call back, offers cancel, shows the next try', async () => {
+    const msg = 'An earlier call to the shop is still being checked; we will call as soon as that check is done.';
+    const o = order({ status: 'calling', cancelable: true, confirmedTotalCents: null, payoutDocumentId: null, call: { deferred: { until: '2026-11-01T12:05:00Z', reason: 'call_check_pending', message: msg }, checking: { message: 'The call ended and the result is being checked.' } } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Waiting to call Sal's back")).toBeTruthy();
+    expect(document.body.textContent).toContain(msg);
+    expect(screen.getByText(/Next try:/)).toBeTruthy();
+    expect(screen.queryByText("Calling Sal's")).toBeNull();
+    expect(screen.queryByText("Checking the call with Sal's")).toBeNull();
+    expect(screen.getByText('Cancel this order')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Sal's confirmed|Receipts list|Pay at pickup/);
+  });
+
+  it('call.attempts is never shown, however large', () => {
+    const call = { attempts: 3, last_outcome: 'not_dialed', deferred: { until: '2026-11-01T12:05:00Z', reason: 'transient', message: 'Soon.' } } as PizzaOrderView['call'];
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', call })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).not.toMatch(/\b3\b|tried|attempt|times/i);
+  });
+
+  it('a call running for most of an hour reads as waiting: still spinning, still polled, no error tone', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    mocks.get.mockResolvedValue({ order: order({ status: 'calling' }), stale: false });
+    const o = order({ status: 'calling', timeline: [{ at: new Date(Date.now() - 55 * 60_000).toISOString(), status: 'calling' }] });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Still waiting on our call to Sal's").className).not.toContain('ffb347');
+    expect(document.querySelector('.animate-spin')).toBeTruthy();
+    expect(document.body.textContent).toMatch(/up to an hour/);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    mocks.get.mockReset();
+    vi.useRealTimers();
+  });
+
+  it('a blocking confirmed order still lets the host leave with Done', () => {
+    render(<OrderStatus partyId="p" order={order({ blocking: true })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Done')).toBeTruthy();
+  });
+
+  it('a co-host can release and can say the receipt is in', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'needs_review', releasable: true, isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('I checked: nothing was ordered, release it')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ isMine: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
+  });
+
+  it("a refused 'I uploaded the receipt' shows why", async () => {
+    mocks.settle.mockRejectedValueOnce(new Error('Upload the real receipt first.'));
+    render(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={noop} onDone={noop} />);
+    await userEvent.click(screen.getByText('I uploaded the receipt'));
+    expect(await screen.findByText('Upload the real receipt first.')).toBeTruthy();
+  });
+
+  it('an approval_timeout saying "nothing yet" stays open: approval copy, not "Nothing was ordered"', () => {
+    const o = order({ status: 'approval_timeout', outcome: { nothing_ordered: true, reason: 'price_approval_timeout', message: 'Nothing is ordered yet.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Approval timed out')).toBeTruthy();
+    expect(screen.queryByText("Nothing was ordered at Sal's")).toBeNull();
+  });
+
+  it("shows pizza-mcp's outcome.message; nothing_ordered true says so and offers no release", () => {
+    const o = order({ status: 'unreachable', outcome: { nothing_ordered: true, reason: 'no_answer', message: 'Nobody picked up at Sal\'s.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Nothing was ordered at Sal's")).toBeTruthy();
+    expect(screen.getByText(/Nobody picked up/)).toBeTruthy();
+    expect(screen.queryByText('I checked: nothing was ordered, release it')).toBeNull();
+  });
+
+  it('ambiguous_dial warns the host not to order again before checking with the shop', () => {
+    const o = order({ status: 'needs_review', releasable: true, outcome: { nothing_ordered: false, reason: 'ambiguous_dial', message: 'We may have reached the shop.' } });
+    render(<OrderStatus partyId="p" order={o} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText(/Check with Sal's before ordering again/)).toBeTruthy();
+    expect(document.body.textContent).toMatch(/Please don't order again until you've checked with them\./);
+    expect(screen.getByText('I checked: nothing was ordered, release it')).toBeTruthy();
+  });
+
+  it('a missing or unknown outcome keeps the cautious copy', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'needs_review', outcome: undefined })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/It may be that nothing was ordered, or that the shop did take it/);
+  });
+
+  it('keeps polling a fresh confirmation (settling) and offers "I uploaded the receipt"', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockResolvedValue({ order: order({ status: 'needs_review' }), stale: false });
+    const onUpdate = vi.fn();
+    render(<OrderStatus partyId="p" order={order({ settling: true })} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalled();
+    expect(screen.getByText('I uploaded the receipt')).toBeTruthy();
+    vi.useRealTimers();
+  });
+
+  it('pizza-mcp 662d51c: a call being checked is not confirmed: shows the message, no cancel, no receipt copy, keeps polling, then resolves', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    const msg = 'The call ended and the result is being checked.';
+    const checking = order({ status: 'calling', confirmedTotalCents: null, payoutDocumentId: null, cancelable: true, call: { checking: { message: msg } } });
+    mocks.get.mockResolvedValueOnce({ order: checking, stale: false }).mockResolvedValueOnce({ order: order(), stale: false });
+    const onUpdate = vi.fn();
+    const { rerender } = render(<OrderStatus partyId="p" order={checking} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Checking the call with Sal's")).toBeTruthy();
+    expect(document.body.textContent).toContain(msg);
+    expect(document.body.textContent).toMatch(/not confirmed until this check is done/);
+    expect(document.body.textContent).not.toMatch(/Sal's confirmed|Receipts list|Pay at pickup|uploaded the receipt/);
+    // even if a stale flag said cancelable, the button is not offered while checking
+    expect(screen.queryByText('Cancel this order')).toBeNull();
+    expect(screen.queryByText(/Order from another pizzeria|Back to pizzerias|Done/)).toBeNull();
+    expect(document.querySelector('.animate-spin')).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(10_500);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'confirmed_by_shop' }));
+    rerender(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={onUpdate} onDone={noop} />);
+    expect(screen.getByText("Sal's confirmed")).toBeTruthy();
+    mocks.get.mockReset();
+    vi.useRealTimers();
+  });
+
+  it('an old confirmation is not polled', async () => {
+    vi.useFakeTimers();
+    mocks.get.mockReset();
+    render(<OrderStatus partyId="p" order={order({ settling: false })} orderScript="" onUpdate={noop} onDone={noop} />);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.get).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+  it('UX audit P1-1: the status is a polite live region, and errors are alerts', async () => {
+    mocks.settle.mockRejectedValueOnce(new Error('Nope.'));
+    render(<OrderStatus partyId="p" order={order()} orderScript="" onUpdate={noop} onDone={noop} />);
+    const live = screen.getByRole('status');
+    expect(live.getAttribute('aria-live')).toBe('polite');
+    expect(live.textContent).toMatch(/Sal's confirmed/);
+    await userEvent.click(screen.getByText('I uploaded the receipt'));
+    expect((await screen.findByRole('alert')).textContent).toBe('Nope.');
+  });
+
+  it('UX audit P0-2 / pizza-mcp 64fb2ac: a price approval counts down to the shop\'s hold (holdUntil), not the link expiry', () => {
+    const hold = new Date(Date.now() + 150_000).toISOString();
+    const linkExpiry = new Date(Date.now() + 15 * 60_000).toISOString();
+    const o = order({ status: 'awaiting_price_approval', confirmedTotalCents: null, call: { shop_total_cents: 23450 }, holdUntil: hold, nextAction: { type: 'open_url', url: 'https://x/confirm', expires_at: linkExpiry } });
+    const { unmount } = render(<OrderStatus partyId="p" order={o} orderScript="" timeZone="America/New_York" onUpdate={noop} onDone={noop} />);
+    expect(document.body.textContent).toMatch(/Sal's quoted \$234\.50 \(over your \$210\.00\)\. Approve or decline from the email we sent you\. Sal's is holding the line until /);
+    expect(screen.getByText(/^2:[0-9]{2} left to answer$/)).toBeTruthy();
+    unmount();
+    // only the link's expiry: no countdown (it would say 14 minutes while the shop hangs up after 3)
+    render(<OrderStatus partyId="p" order={{ ...o, holdUntil: null }} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/left to answer/)).toBeNull();
+    expect(document.body.textContent).toMatch(/holding the line, so please answer quickly/);
+  });
+
+  it('pizza-mcp 64fb2ac: the Call button uses the order view\'s shop number, and the listing only as a fallback', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'refused', shop: { name: "Sal's", phone: '+16175550101', phoneDisplay: '(617) 555-0101' } })} orderScript="x" shopPhone="+19995550000" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', shop: null })} orderScript="x" shopPhone="+16175550199" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Call Sal's · (617) 555-0199").closest('a')?.getAttribute('href')).toBe('tel:+16175550199');
+  });
+
+  it('pizza-mcp 64fb2ac: no approval link once pizza-mcp says approving can do nothing (live: false)', () => {
+    const na = { type: 'open_url' as const, url: 'https://x/confirm/lconf_1', expires_at: new Date(Date.now() + 600_000).toISOString() };
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'awaiting_price_approval', nextAction: { ...na, live: true } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Review the higher price')).toBeTruthy();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'awaiting_price_approval', nextAction: { ...na, live: false } })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText('Review the higher price')).toBeNull();
+  });
+
+  it('UX audit P2-1/P2-6: the limit reads as a limit before approval, and the next try has the zone and no seconds', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'awaiting_approval', confirmedTotalCents: null })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Your limit: up to $210.00.')).toBeTruthy();
+    expect(screen.queryByText(/You approved/)).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'calling', call: { deferred: { until: '2026-11-14T21:00:30Z', reason: 'outside_call_window', message: 'Closed.' } } })} orderScript="" timeZone="America/New_York" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText('Next try: Sat, 4:00 PM EST.')).toBeTruthy();
+  });
+
+  it('UX audit P2-20: a co-host is not told to enter a code', () => {
+    render(<OrderStatus partyId="p" order={order({ status: 'awaiting_approval', isMine: false, confirmedTotalCents: null })} orderScript="" onUpdate={noop} onDone={noop} />);
+    expect(screen.getByText("Waiting for approval of the call to Sal's")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/enter it there|we email you/i);
+  });
+
+  it('UX audit P1-8: no Call button without a phone, or once nothing was ordered', () => {
+    const { unmount } = render(<OrderStatus partyId="p" order={order({ status: 'refused' })} orderScript="x" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/^Call Sal's/)).toBeNull();
+    unmount();
+    render(<OrderStatus partyId="p" order={order({ status: 'refused', blocking: false, outcome: { nothing_ordered: true, reason: 'refused_ai', message: 'm' } })} orderScript="x" shopPhone="+16175550101" onUpdate={noop} onDone={noop} />);
+    expect(screen.queryByText(/^Call Sal's/)).toBeNull();
+    expect(screen.getByText('Order to read out')).toBeTruthy();
+  });
+});
