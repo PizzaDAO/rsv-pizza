@@ -1,0 +1,509 @@
+{
+  "v": 1,
+  "cases": [
+    {
+      "input": {
+        "country": "US",
+        "region": "MA",
+        "city": "Boston"
+      },
+      "keys": ["city:US-MA:boston", "state:US-MA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Massachusetts",
+        "city": "Cambridge"
+      },
+      "keys": ["city:US-MA:cambridge", "state:US-MA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "us",
+        "region": "ma",
+        "city": "Somerville"
+      },
+      "keys": ["city:US-MA:somerville", "state:US-MA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "USA",
+        "region": "New York",
+        "city": "New York City"
+      },
+      "keys": ["city:US-NY:new-york", "state:US-NY", "country:US"]
+    },
+    {
+      "input": {
+        "country": "United States",
+        "region": "NY",
+        "city": "NYC"
+      },
+      "keys": ["city:US-NY:new-york", "state:US-NY", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "N.Y.",
+        "city": "Brooklyn"
+      },
+      "keys": ["city:US-NY:brooklyn", "state:US-NY", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "California",
+        "city": "Los Angeles"
+      },
+      "keys": ["city:US-CA:los-angeles", "state:US-CA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "CA",
+        "city": "LA"
+      },
+      "keys": ["city:US-CA:los-angeles", "state:US-CA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "California",
+        "city": "SF"
+      },
+      "keys": ["city:US-CA:san-francisco", "state:US-CA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "DC",
+        "city": "Washington, D.C."
+      },
+      "keys": ["city:US-DC:washington", "state:US-DC", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "District of Columbia",
+        "city": "Washington DC"
+      },
+      "keys": ["city:US-DC:washington", "state:US-DC", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Missouri",
+        "city": "Saint Louis"
+      },
+      "keys": ["city:US-MO:st-louis", "state:US-MO", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "PA",
+        "city": "Philly"
+      },
+      "keys": ["city:US-PA:philadelphia", "state:US-PA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "West Virginia",
+        "city": "Charleston"
+      },
+      "keys": ["city:US-WV:charleston", "state:US-WV", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Texas",
+        "city": "San Antonio"
+      },
+      "keys": ["city:US-TX:san-antonio", "state:US-TX", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "",
+        "city": "Austin"
+      },
+      "keys": ["country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Narnia",
+        "city": "Austin"
+      },
+      "keys": ["country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "MA",
+        "city": ""
+      },
+      "keys": ["state:US-MA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": null,
+        "city": null
+      },
+      "keys": ["country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "MA",
+        "city": "   "
+      },
+      "keys": ["state:US-MA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "CA",
+        "region": "ON",
+        "city": "Toronto"
+      },
+      "keys": ["city:CA-ON:toronto", "state:CA-ON", "country:CA"]
+    },
+    {
+      "input": {
+        "country": "Canada",
+        "region": "Ontario",
+        "city": "Ottawa"
+      },
+      "keys": ["city:CA-ON:ottawa", "state:CA-ON", "country:CA"]
+    },
+    {
+      "input": {
+        "country": "CA",
+        "region": "Quebec",
+        "city": "Montréal"
+      },
+      "keys": ["city:CA-QC:montreal", "state:CA-QC", "country:CA"]
+    },
+    {
+      "input": {
+        "country": "CA",
+        "region": "BC",
+        "city": "Vancouver"
+      },
+      "keys": ["city:CA-BC:vancouver", "state:CA-BC", "country:CA"]
+    },
+    {
+      "input": {
+        "country": "CA",
+        "region": "Newfoundland and Labrador",
+        "city": "St. John's"
+      },
+      "keys": ["city:CA-NL:st-john-s", "state:CA-NL", "country:CA"]
+    },
+    {
+      "input": {
+        "country": "CA",
+        "region": null,
+        "city": "Calgary"
+      },
+      "keys": ["country:CA"]
+    },
+    {
+      "input": {
+        "country": "IN",
+        "region": "Karnataka",
+        "city": "Bangalore"
+      },
+      "keys": ["city:IN:bengaluru", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "IN",
+        "region": null,
+        "city": "Bengaluru"
+      },
+      "keys": ["city:IN:bengaluru", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "India",
+        "region": "Maharashtra",
+        "city": "Bombay"
+      },
+      "keys": ["city:IN:mumbai", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "IN",
+        "region": "West Bengal",
+        "city": "Calcutta"
+      },
+      "keys": ["city:IN:kolkata", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "IN",
+        "region": "Tamil Nadu",
+        "city": "Madras"
+      },
+      "keys": ["city:IN:chennai", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "NG",
+        "region": "Lagos",
+        "city": "Lagos"
+      },
+      "keys": ["city:NG:lagos", "country:NG"]
+    },
+    {
+      "input": {
+        "country": "GB",
+        "region": "England",
+        "city": "London"
+      },
+      "keys": ["city:GB:london", "country:GB"]
+    },
+    {
+      "input": {
+        "country": "United Kingdom",
+        "region": null,
+        "city": "Manchester"
+      },
+      "keys": ["city:GB:manchester", "country:GB"]
+    },
+    {
+      "input": {
+        "country": "IT",
+        "region": null,
+        "city": "Roma"
+      },
+      "keys": ["city:IT:rome", "country:IT"]
+    },
+    {
+      "input": {
+        "country": "IT",
+        "region": null,
+        "city": "Milano"
+      },
+      "keys": ["city:IT:milan", "country:IT"]
+    },
+    {
+      "input": {
+        "country": "DE",
+        "region": null,
+        "city": "München"
+      },
+      "keys": ["city:DE:munich", "country:DE"]
+    },
+    {
+      "input": {
+        "country": "DE",
+        "region": null,
+        "city": "Köln"
+      },
+      "keys": ["city:DE:cologne", "country:DE"]
+    },
+    {
+      "input": {
+        "country": "MX",
+        "region": null,
+        "city": "Ciudad de México"
+      },
+      "keys": ["city:MX:mexico-city", "country:MX"]
+    },
+    {
+      "input": {
+        "country": "BR",
+        "region": null,
+        "city": "São Paulo"
+      },
+      "keys": ["city:BR:sao-paulo", "country:BR"]
+    },
+    {
+      "input": {
+        "country": "FR",
+        "region": null,
+        "city": "Paris"
+      },
+      "keys": ["city:FR:paris", "country:FR"]
+    },
+    {
+      "input": {
+        "country": "",
+        "region": null,
+        "city": "Boston"
+      },
+      "keys": []
+    },
+    {
+      "input": {
+        "country": null,
+        "region": "MA",
+        "city": "Boston"
+      },
+      "keys": []
+    },
+    {
+      "input": {
+        "country": "Atlantis",
+        "region": null,
+        "city": "Boston"
+      },
+      "keys": []
+    },
+    {
+      "input": {
+        "country": "JP",
+        "region": null,
+        "city": "!!!"
+      },
+      "keys": ["country:JP"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "TX",
+        "city": "Roma"
+      },
+      "keys": ["city:US-TX:roma", "state:US-TX", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "NY",
+        "city": "Bombay"
+      },
+      "keys": ["city:US-NY:bombay", "state:US-NY", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "NJ",
+        "city": "NYC"
+      },
+      "keys": ["city:US-NJ:nyc", "state:US-NJ", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "LA",
+        "city": "La"
+      },
+      "keys": ["city:US-LA:la", "state:US-LA", "country:US"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "IL",
+        "city": "Saint Louis"
+      },
+      "keys": ["city:US-IL:saint-louis", "state:US-IL", "country:US"]
+    },
+    {
+      "input": {
+        "country": "IN",
+        "region": null,
+        "city": "Roma"
+      },
+      "keys": ["city:IN:roma", "country:IN"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Puerto Rico",
+        "city": "San Juan"
+      },
+      "keys": ["city:PR:san-juan", "country:PR"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "PR",
+        "city": "Ponce"
+      },
+      "keys": ["city:PR:ponce", "country:PR"]
+    },
+    {
+      "input": {
+        "country": "PR",
+        "region": null,
+        "city": "Ponce"
+      },
+      "keys": ["city:PR:ponce", "country:PR"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Guam",
+        "city": "Hagåtña"
+      },
+      "keys": ["city:GU:hagatna", "country:GU"]
+    },
+    {
+      "input": {
+        "country": "US",
+        "region": "Virgin Islands",
+        "city": "Charlotte Amalie"
+      },
+      "keys": ["city:VI:charlotte-amalie", "country:VI"]
+    },
+    {
+      "input": {
+        "country": "PL",
+        "region": null,
+        "city": "Łódź"
+      },
+      "keys": ["city:PL:lodz", "country:PL"]
+    },
+    {
+      "input": {
+        "country": "DE",
+        "region": null,
+        "city": "Straße"
+      },
+      "keys": ["city:DE:strasse", "country:DE"]
+    },
+    {
+      "input": {
+        "country": "VN",
+        "region": null,
+        "city": "Đà Nẵng"
+      },
+      "keys": ["city:VN:da-nang", "country:VN"]
+    },
+    {
+      "input": {
+        "country": "NO",
+        "region": null,
+        "city": "Tromsø"
+      },
+      "keys": ["city:NO:tromso", "country:NO"]
+    },
+    {
+      "input": {
+        "country": "IS",
+        "region": null,
+        "city": "Þórshöfn"
+      },
+      "keys": ["city:IS:thorshofn", "country:IS"]
+    },
+    {
+      "input": {
+        "country": "DK",
+        "region": null,
+        "city": "Ærøskøbing"
+      },
+      "keys": ["city:DK:aeroskobing", "country:DK"]
+    },
+    {
+      "input": {
+        "country": "FR",
+        "region": null,
+        "city": "Œuvres"
+      },
+      "keys": ["city:FR:oeuvres", "country:FR"]
+    }
+  ]
+}

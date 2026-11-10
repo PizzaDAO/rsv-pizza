@@ -97,6 +97,7 @@ import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-584
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
 import pizzaSubmissionRoutes, { pizzaSubmissionCronRouter } from './routes/pizza-index-submissions.routes.js';
+import pricePriorsRoutes from './routes/price-priors.routes.js'; // basil-14648 P2: signed price priors for pizza-mcp (aggregate only)
 import pizzaIndexRoutes, { publicPizzaIndexRouter } from './routes/pizza-index.routes.js'; // sfincione-40417: Pizza Price Index (admin/UB review + public aggregates)
 import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
@@ -258,6 +259,7 @@ app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated c
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/pizza-index/submissions', pizzaSubmissionRoutes); // sfincione-40417: public receipt submissions (anonymous allowed); before the aggregates router
+app.use('/api/pizza-index', pricePriorsRoutes); // basil-14648 P2: /priors and /priors.jws, before the aggregates router
 app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public aggregates only (n>=3 parties, GPP 2026), cached 1h
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config

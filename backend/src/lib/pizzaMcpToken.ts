@@ -120,3 +120,55 @@ export function mintPizzaMcpToken(input: MintInput): string {
   // jsonwebtoken adds no jwk/jku header and keeps the explicit iat/exp above.
   return jwt.sign(claims, key, { algorithm: 'ES256', keyid: kid });
 }
+
+// ---------------------------------------------------------------------------
+// basil-14648 P2: signed DOCUMENTS (price priors), pizza-mcp docs/CLIENTS.md section 4.
+//
+// Same key and kid as the access tokens, but a distinct type so a document can never
+// pass for a token (and vice versa):
+//   header {"alg":"ES256","kid":<kid>,"typ":"price-priors+jwt"}
+//   claims {iss, aud, iat, exp = iat + 8 days, use:"price_priors", v:1, generated_at, rows}
+//   NO sub, azp, scope or jti.
+// pizza-mcp's verifySignedDocument requires typ/use exactly, no sub, iss = the trusted
+// issuer, aud = its canonical URL, exp - iat <= 8 days, and an iat newer than its last import.
+// ---------------------------------------------------------------------------
+
+export const PRICE_PRIORS_TYP = 'price-priors+jwt';
+export const PRICE_PRIORS_USE = 'price_priors';
+export const PRICE_PRIORS_LIFETIME_S = 8 * 86400;
+
+export interface PriceDocumentBody {
+  v: 1;
+  generated_at: string;
+  rows: unknown[];
+}
+
+/** True when a priors document can be signed (key + audience configured). */
+export function canSignPriceDocument(): boolean {
+  return hasSigningKey() && pizzaMcpAudience() !== null;
+}
+
+/** Compact JWS of the price-priors document. Throws if the key or audience is unset. */
+export function signPriceDocument(doc: PriceDocumentBody, opts: { nowS?: number } = {}): string {
+  const aud = pizzaMcpAudience();
+  if (!aud) throw new Error('PIZZA_MCP_URL is not set');
+  const key = privateKey();
+  const kid = kidFor(crypto.createPublicKey(key).export({ format: 'jwk' }));
+  const iat = opts.nowS ?? Math.floor(Date.now() / 1000);
+  const header = { alg: 'ES256', kid, typ: PRICE_PRIORS_TYP };
+  const claims = {
+    iss: pizzaMcpIssuer(),
+    aud,
+    iat,
+    exp: iat + PRICE_PRIORS_LIFETIME_S,
+    use: PRICE_PRIORS_USE,
+    v: doc.v,
+    generated_at: doc.generated_at,
+    rows: doc.rows,
+  };
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const body = `${enc(header)}.${enc(claims)}`;
+  // JWS ES256 = raw r||s (IEEE P1363), not DER.
+  const sig = crypto.sign('sha256', Buffer.from(body), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+  return `${body}.${sig}`;
+}
