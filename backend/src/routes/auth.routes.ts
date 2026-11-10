@@ -5,6 +5,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
 import { brand } from '../config/brand.js';
+import { getJwtSecret } from '../config/secrets.js';
 
 const router = Router();
 
@@ -233,10 +234,7 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
     }
 
     // Generate JWT
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
-    }
+    const jwtSecret = getJwtSecret();
 
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email },
@@ -323,10 +321,7 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
     }
 
     // Generate JWT
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
-    }
+    const jwtSecret = getJwtSecret();
 
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email },
@@ -365,10 +360,7 @@ router.patch('/profile', async (req: Request, res: Response, next: NextFunction)
     }
 
     const token = authHeader.split(' ')[1];
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
-    }
+    const jwtSecret = getJwtSecret();
 
     // Verify token
     let decoded: { userId: string; email: string };
