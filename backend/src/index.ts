@@ -19,6 +19,7 @@ import userRoutes from './routes/user.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
+import { reelRouter, adminReelRouter } from './routes/reel.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
 import heicRoutes from './routes/heic.routes.js'; // taleggio-71042: server-side HEIC->JPEG convert
 import kitRoutes from './routes/kit.routes.js';
@@ -189,6 +190,7 @@ app.use('/api/admin/survey-questions', surveyQuestionsAdminRouter); // pugliese-
 app.use('/api/admin/survey-question-sets', surveyQuestionSetsAdminRouter); // pugliese-58297: survey question set version bump — before /api/admin catch-all
 app.use('/api/admin/survey-responses', surveyResponsesAdminRouter); // gnocchi-58507: admin survey responses feed — before /api/admin catch-all
 app.use('/api/admin/mercury', adminMercuryRoutes); // stromboli-58524: Mercury wire reconciliation — before /api/admin catch-all
+app.use('/api/admin/reels', adminReelRouter); // sizzle reels: admin settings + music library (before /api/admin catch-all)
 app.use('/api/admin/series', adminSeriesRoutes); // white-label: admin event-series CRUD + per-series checklist — before /api/admin catch-all
 app.use('/api/admin', adminRoutes);          // Admin management routes
 app.use('/api/graphics-admin', graphicsAdminRoutes); // Graphics admin management
@@ -214,6 +216,7 @@ app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global phot
 app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
 app.use('/api/parties', pizzaOrderRoutes); // basil-14648: AI ordering (host/co-host + pilot allowlist on every route)
+app.use('/api/parties', reelRouter); // Sizzle reels (host/co-host/admin; auth per route)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
 app.use('/api/parties', donationRoutes); // Donation routes (some are public)
