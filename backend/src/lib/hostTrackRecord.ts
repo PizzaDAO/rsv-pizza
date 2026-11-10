@@ -143,13 +143,22 @@ export function isCompletedParty(p: HostPartyHistory, now: Date): boolean {
   return !!p.date && p.date.getTime() < now.getTime() && !p.cancelledAt;
 }
 
-function receiptsOnTime(p: HostPartyHistory): boolean {
+/** The subset of FAST_PASS_THRESHOLDS that decides whether one party is verified. Overridable for the trust report. */
+export interface PartyVerifyThresholds {
+  minRsvps: number;
+  receiptDeadlineDays: number;
+}
+
+export function receiptsOnTime(
+  p: HostPartyHistory,
+  t: PartyVerifyThresholds = FAST_PASS_THRESHOLDS,
+): boolean {
   if (!p.date || p.receiptCount === 0 || !p.firstReceiptAt) return false;
-  return p.firstReceiptAt.getTime() <= p.date.getTime() + FAST_PASS_THRESHOLDS.receiptDeadlineDays * DAY_MS;
+  return p.firstReceiptAt.getTime() <= p.date.getTime() + t.receiptDeadlineDays * DAY_MS;
 }
 
 /** Payouts that count as proof for a party: paid, with proof, reviewed by someone other than the host. */
-function qualifyingPayouts(p: HostPartyHistory, hostEmail: string | null) {
+export function qualifyingPayouts(p: HostPartyHistory, hostEmail: string | null) {
   const host = hostEmail?.trim().toLowerCase() ?? null;
   return p.payouts.filter(
     (po) =>
@@ -165,11 +174,16 @@ function qualifyingPayouts(p: HostPartyHistory, hostEmail: string | null) {
  * payout reviewed by an admin other than the host (and none rejected),
  * on-time non-duplicate receipts, host-designated photos, enough real RSVPs.
  */
-export function isVerifiedParty(p: HostPartyHistory, now: Date, hostEmail: string | null = null): boolean {
+export function isVerifiedParty(
+  p: HostPartyHistory,
+  now: Date,
+  hostEmail: string | null = null,
+  t: PartyVerifyThresholds = FAST_PASS_THRESHOLDS,
+): boolean {
   if (!isCompletedParty(p, now) || isScamTagged(p.eventTags)) return false;
   if (p.payouts.some((po) => po.status === 'rejected')) return false;
   if (qualifyingPayouts(p, hostEmail).length === 0) return false;
-  return receiptsOnTime(p) && p.rolePhotoCount > 0 && p.rsvpCount >= FAST_PASS_THRESHOLDS.minRsvps;
+  return receiptsOnTime(p, t) && p.rolePhotoCount > 0 && p.rsvpCount >= t.minRsvps;
 }
 
 export function computeTrackRecord(

@@ -10,6 +10,7 @@ import { FunnelTab } from '../components/underboss/FunnelTab';
 import { OptinABTab } from '../components/underboss/OptinABTab';
 import { RsvpCheckboxesTab } from '../components/admin/RsvpCheckboxesTab';
 import { ReelSettingsPanel } from '../components/admin/ReelSettingsPanel';
+import { HostTrustSettingsPanel } from '../components/admin/HostTrustSettingsPanel';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight, Megaphone,
@@ -1622,6 +1623,12 @@ export function AdminPage() {
           {activeTab === 'admin' && (
             <section className="mb-10">
               <ReelSettingsPanel />
+            </section>
+          )}
+
+          {activeTab === 'admin' && isSuperAdmin && (
+            <section className="mb-10">
+              <HostTrustSettingsPanel />
             </section>
           )}
 

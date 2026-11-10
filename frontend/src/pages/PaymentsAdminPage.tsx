@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ShieldX, Loader2, DollarSign, Download, Plus, Search } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -1164,6 +1164,14 @@ export function PaymentsAdminPage({ regionFilter, portalSlug }: PaymentsAdminPag
               <Plus size={14} />
               Record External Payment
             </button>
+          )}
+          {!isUnderboss && (
+            <Link
+              to="/payments/hosts"
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface border border-theme-stroke hover:bg-theme-surface-hover text-sm text-theme-text"
+            >
+              Hosts
+            </Link>
           )}
           <button
             type="button"

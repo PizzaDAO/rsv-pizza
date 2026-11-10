@@ -31,6 +31,7 @@ import { SeriesLandingPage } from './pages/SeriesLandingPage';
 const SuggestionsPage = React.lazy(() => import('./pages/SuggestionsPage').then(m => ({ default: m.SuggestionsPage })));
 const TaxFormRequestPage = React.lazy(() => import('./pages/TaxFormRequestPage').then(m => ({ default: m.TaxFormRequestPage })));
 const PaymentsAdminPage = React.lazy(() => import('./pages/PaymentsAdminPage').then(m => ({ default: m.PaymentsAdminPage })));
+const PaymentsHostsPage = React.lazy(() => import('./pages/PaymentsHostsPage').then(m => ({ default: m.PaymentsHostsPage })));
 const LatamPaymentsPage = React.lazy(() => import('./pages/LatamPaymentsPage').then(m => ({ default: m.LatamPaymentsPage })));
 const SouthAfricaPaymentsPage = React.lazy(() => import('./pages/SouthAfricaPaymentsPage').then(m => ({ default: m.SouthAfricaPaymentsPage })));
 const AfricaPaymentsPage = React.lazy(() => import('./pages/AfricaPaymentsPage').then(m => ({ default: m.AfricaPaymentsPage })));
@@ -122,6 +123,8 @@ function App() {
             {/* /payments must come before /:slug */}
             <Route path="/tax-form" element={<Suspense fallback={null}><TaxFormRequestPage /></Suspense>} />
             <Route path="/payments" element={<PaymentsAdminPage />} />
+            {/* trusted hosts phase 1: read-only admin report; must come before /:slug */}
+            <Route path="/payments/hosts" element={<PaymentsHostsPage />} />
             {/* argentina-92103: regional LATAM portal for the LATAM
                 underboss. Wraps PaymentsAdminPage with regionFilter +
                 portalSlug. Must come before /:slug. */}

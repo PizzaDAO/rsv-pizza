@@ -1720,6 +1720,21 @@ model AppConfig {
   @@map("app_config")
 }
 
+// Append-only audit of admin edits made through the generic settings UI
+// (lib/appSettings.ts). Values are integers; `key` is the app_config key.
+model AppConfigAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  key        String
+  oldValue   Int      @map("old_value")
+  newValue   Int      @map("new_value")
+  actorEmail String   @map("actor_email")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([key, createdAt(sort: Desc)])
+  @@map("app_config_audit")
+}
+
 // soppressata-50927: GPP27 City Host Agreement clauses, stored as DATA so they
 // can be edited / reordered / re-versioned without a deploy. The frontend
 // renders one Checkbox per active clause (ordered by sortOrder), interpolating

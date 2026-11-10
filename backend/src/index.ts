@@ -39,6 +39,7 @@ import sponsorRoutes from './routes/sponsor.routes.js';
 import partnerIntakeRoutes from './routes/partner-intake.routes.js';
 import budgetRoutes from './routes/budget.routes.js';
 import { adminFastPassRouter, hostFastPassRouter } from './routes/host-fast-pass.routes.js';
+import hostTrustRoutes from './routes/host-trust.routes.js'; // host trust report + settings (read-only; before /api/admin catch-all)
 import payoutRoutes from './routes/payout.routes.js';
 import eventAssistantRoutes from './routes/eventAssistant.routes.js';
 import payoutDocumentVoteRoutes from './routes/payout-document-vote.routes.js';
@@ -171,6 +172,7 @@ app.use('/api/admin/logo-bg-audit', logoAuditRoutes); // Graphics-admin logo cle
 app.use('/api/admin/tax-form-requests', adminTaxFormRequestRouter); // calzone-70821: before /api/admin catch-all
 app.use('/api/admin/tax-forms', adminTaxFormRouter); // salame-92110: admin tax-form review (before /api/admin catch-all)
 app.use('/api/admin/pizza-index', pizzaIndexRoutes); // sfincione-40417: admin/UB-gated, before /api/admin catch-all
+app.use('/api/admin/host-trust', hostTrustRoutes); // trusted hosts phase 1: read-only report + settings (before /api/admin catch-all)
 app.use('/api/admin/host-fast-pass', adminFastPassRouter); // host fast pass review assist + budget pre-approval (before /api/admin catch-all)
 app.use('/api/admin/payouts', adminPayoutRoutes); // Host payouts admin dashboard (before /api/admin catch-all)
 app.use('/api/admin/payout-wallet', payoutWalletRouter); // coppa-91827: hot wallet address + balances (before /api/admin catch-all)
