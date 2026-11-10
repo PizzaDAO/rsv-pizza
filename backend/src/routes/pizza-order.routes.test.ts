@@ -1221,3 +1221,72 @@ describe('pizza-mcp 64fb2ac: party_name, OrderView.shop, the real price-approval
     }
   });
 });
+
+describe('pizza-mcp 1c7113d: MENU_GONE and QUOTE_EXPIRED at place', () => {
+  const useMcp = (over: Record<string, any>) => {
+    mcp = pizzaMcp(over);
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  };
+  const problem = (code: string, status = 409) => ({ status, json: { code, title: code, status, detail: code, retryable: false } });
+  const orderPosts = () => mcp.calls.filter((x) => x.method === 'POST' && x.path === '/orders');
+
+  it('QUOTE_EXPIRED: rsv prices the same cart again and returns the new quote; nothing stored; placing with it works', async () => {
+    const c = await buildCart();
+    let first = true;
+    useMcp({
+      'POST /orders': (call: any) =>
+        first
+          ? ((first = false), problem('QUOTE_EXPIRED'))
+          : { status: 201, json: { order: opopOrder({ id: `ord_${call.body.quote_id}`, status: 'awaiting_approval' }), next_action: null } },
+      'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }),
+      'POST /carts/:id/quote': () => ({ json: { quote_id: 'q_fresh', cart_id: c.cart.id, price_ceiling_cents: 21000, binding: false, read_back: 'x' } }),
+    });
+    const res = await placeFrom(c);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('QUOTE_EXPIRED');
+    expect(res.body.error.message).toBe("The order changed after it was priced, so nothing was ordered and Sal's wasn't called. We priced it again: check the new estimate and approve again.");
+    expect(res.body.error.quote.quote_id).toBe('q_fresh');
+    expect(res.body.error.cart.id).toBe(c.cart.id);
+    expect(fake.orders.size).toBe(0);
+    // the requote was asked with what is left of the budget, and the new quote belongs to the cart now
+    expect(mcp.calls.find((x) => x.path.endsWith('/quote'))!.body.max_total_cents).toBe(25000);
+    expect(fake.carts.get(c.cart.id).quoteIds).toContain('q_fresh');
+    const again = await placeFrom({ ...c, quote: res.body.error.quote });
+    expect(again.status).toBe(201);
+    expect(orderPosts()).toHaveLength(2);
+  });
+
+  it('MENU_GONE at place: 409 with truthful copy and rebuild: true; nothing stored', async () => {
+    const c = await buildCart();
+    useMcp({ 'POST /orders': () => problem('MENU_GONE') });
+    const res = await placeFrom(c);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({ code: 'MENU_GONE', rebuild: true });
+    expect(res.body.error.message).toBe("The menu at Sal's changed since this order was built, so nothing was ordered and the shop wasn't called. We're rebuilding the order on the current menu: check it and approve again.");
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('QUOTE_EXPIRED on a cart whose menu is gone, or that will not quote: MENU_GONE (rebuild), never a dead end', async () => {
+    const c = await buildCart();
+    for (const over of [
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false, issues: [{ code: 'MENU_GONE' }], menu: { menu_id: 'lm_x', provenance: 'host_provided', as_of: 'x', unavailable: true } }) }) },
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }), 'POST /carts/:id/quote': () => problem('MENU_GONE') },
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false }) }) },
+    ]) {
+      useMcp({ 'POST /orders': () => problem('QUOTE_EXPIRED'), ...over });
+      const res = await placeFrom(c);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatchObject({ code: 'MENU_GONE', rebuild: true });
+    }
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('an edit to a cart whose menu is gone: MENU_GONE (rebuild), no quote asked', async () => {
+    const c = await buildCart();
+    useMcp({ 'PATCH /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false, issues: [{ code: 'MENU_GONE' }], menu: { menu_id: 'lm_x', provenance: 'host_provided', as_of: 'x', unavailable: true } }) }) });
+    const res = await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('MENU_GONE');
+    expect(mcp.calls.some((x) => x.path.endsWith('/quote'))).toBe(false);
+  });
+});

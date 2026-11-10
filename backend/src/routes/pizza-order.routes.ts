@@ -227,6 +227,45 @@ async function quoteIfReady(actor: OpopActor, cart: OpopCart, remainingCents: nu
   return q;
 }
 
+/**
+ * pizza-mcp 1c7113d: a cart keeps the menu it was built on, and its quote freezes the lines. Placing then refuses
+ * when that menu is gone (MENU_GONE) or anything changed after the quote (QUOTE_EXPIRED). Nothing was ordered and
+ * the shop was not called. Never a dead end: an expired quote is priced again here (the host reviews the new
+ * estimate and approves again), and a gone menu tells the browser to rebuild the cart from the recommendations.
+ */
+function menuGone(shopName: string): AppError {
+  return new AppError(
+    `The menu at ${shopName} changed since this order was built, so nothing was ordered and the shop wasn't called. We're rebuilding the order on the current menu: check it and approve again.`,
+    409,
+    'MENU_GONE',
+    { rebuild: true }
+  );
+}
+const hasMenuGone = (cart: OpopCart) =>
+  (cart.issues ?? []).some((i) => i.code === 'MENU_GONE') || (cart as { menu?: { unavailable?: boolean } }).menu?.unavailable === true;
+
+/** The quote went stale between review and place: price the same cart again, or say the menu is gone. */
+async function requoteAfterExpiry(actor: OpopActor, cartId: string, shopName: string, remainingCents: number): Promise<never> {
+  const client = getPizzaMcpClient();
+  let cart: OpopCart;
+  let quote: OpopQuote | null;
+  try {
+    cart = await client.getCart(actor, cartId);
+    if (hasMenuGone(cart)) throw menuGone(shopName);
+    quote = await quoteIfReady(actor, cart, remainingCents);
+  } catch (e) {
+    if (e instanceof AppError && (e.code === 'MENU_GONE' || e.code === 'QUOTE_INVALID')) throw menuGone(shopName);
+    throw e;
+  }
+  if (!quote) throw menuGone(shopName);
+  throw new AppError(
+    `The order changed after it was priced, so nothing was ordered and ${shopName} wasn't called. We priced it again: check the new estimate and approve again.`,
+    409,
+    'QUOTE_EXPIRED',
+    { cart, quote }
+  );
+}
+
 /** The cart row binds an OPOP cart to the party, host and shop that built it. */
 async function ownedCartRow(cartId: string, party: OrderingParty, req: AuthRequest) {
   const row = await prisma.pizzaCart.findUnique({ where: { opopCartId: cartId } });
@@ -403,6 +442,8 @@ router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthReques
       { cart_id: cartId, expected_version: expected, ops: body.ops as OpopCartRequest['ops'] },
       expected
     );
+    // an edit to a cart whose menu is gone cannot be quoted: rebuild it (pizza-mcp 1c7113d)
+    if (hasMenuGone(cart)) throw menuGone((await client.getShop(actor, cart.pizzeria_id)).name);
     res.json({ cart, quote: await quoteIfReady(actor, cart, remaining), capCents: party.capCents, remainingCapCents: remaining });
   } catch (e) {
     next(e);
@@ -512,6 +553,8 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     try {
       placed = await client.placeOrder(actor, request, key);
     } catch (e) {
+      if (e instanceof AppError && e.code === 'MENU_GONE') throw menuGone(shop.name);
+      if (e instanceof AppError && e.code === 'QUOTE_EXPIRED') await requoteAfterExpiry(actor, cartId, shop.name, remaining);
       // pizza-mcp refused to call this shop (an opt-out, a number it has paused until an operator checks it, a
       // changed number...). Nothing was created there, so nothing blocks here: say so, and send the host on.
       if (e instanceof AppError && e.code === 'CALLS_NOT_AVAILABLE_HERE') {

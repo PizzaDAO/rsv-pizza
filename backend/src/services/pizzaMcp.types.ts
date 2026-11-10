@@ -426,6 +426,8 @@ export interface components {
         };
         OpmsMenu: {
             pizzeria_id: string;
+            /** @description Listing shops: the stored menu this is (absent for the generic template and native menus). A cart keeps the menu it was created on. */
+            menu_id?: string;
             version: string;
             currency: string;
             as_of: string;
@@ -547,6 +549,8 @@ export interface components {
             /** @description The menu as read (provenance host_provided). Private to the caller; prices are estimates. */
             menu: {
                 pizzeria_id: string;
+                /** @description Listing shops: the stored menu this is (absent for the generic template and native menus). A cart keeps the menu it was created on. */
+                menu_id?: string;
                 version: string;
                 currency: string;
                 as_of: string;
@@ -762,6 +766,16 @@ export interface components {
                 pizza_count: number;
                 pickup_at: string | null;
                 estimate_text: string | null;
+            };
+            /** @description Listing carts: the menu this cart was built on. A cart keeps it for its whole life, so a menu uploaded later applies to NEW carts only. host_provided means the caller's own menu (read by software, prices are estimates). */
+            menu?: {
+                /** @description The stored menu the cart uses; null for the generic template. */
+                menu_id: string | null;
+                /** @enum {string} */
+                provenance: "native" | "host_provided" | "extracted" | "observed" | "generic";
+                as_of: string;
+                /** @description true: the menu this cart was built on is gone (removed or expired). The cart has a MENU_GONE issue and can't be quoted or placed; build a new cart. */
+                unavailable?: boolean;
             };
         } & {
             [key: string]: unknown;
