@@ -384,6 +384,25 @@ export interface components {
                 channel: "api" | "ai_phone" | "handoff";
                 call_countries_ok: boolean;
                 reasons: string[];
+                /** @description Listing shops: other ways we can place the order. Today only `email` (get_quote with channel email, then place_order with email_order). */
+                alternatives?: {
+                    /** @constant */
+                    channel: "email";
+                    /** @description Whether this shop can get an email order from this caller now (shop-level gates: switch, pilot address, do-not-contact, a verified client). The order-level rules below are checked at get_quote / place_order. */
+                    available: boolean;
+                    /** @description The pickup must be at least this far ahead (hours). */
+                    min_lead_hours: number;
+                    /** @description ...and at most this far ahead (days). */
+                    max_lead_days: number;
+                    min_pizzas: number;
+                    max_pizzas: number;
+                    /** @description The most an email order's total may ever be. */
+                    max_total_cents: number;
+                    /** @description Why it is not available (codes): disabled, not_in_pilot, no_shop_email, do_not_contact, possible_opt_out, unverified. Empty when available. A client must treat a code it does not know as not available. */
+                    reasons: string[];
+                    /** @description Plain words for the host. */
+                    message: string;
+                }[];
             };
             website?: string | null;
             /** @description Listing tier: pages where the human can order online themselves (Toast, Square Online, ChowNow, Slice, BentoBox, the shop's site). [] when none. Never complete checkout there for the user. */
@@ -407,6 +426,8 @@ export interface components {
                 half_and_half: boolean;
                 /** @description Listing shops: true when POST /pizzerias/{id}/menu/host takes the caller's own menu for this shop (host menus are on here, and the shop has not opted out). Absent on native shops, which have their own menu. */
                 host_menu_upload?: boolean;
+                /** @description Listing shops: true when this caller can place an email order with this shop now (get_quote channel email, place_order email_order); the same fact as `ordering.alternatives[channel=email].available`, whose `reasons` say why not. Order-level rules (lead time, size, total) are checked at quote and place. Absent on native shops. */
+                email_order?: boolean;
             };
             address: {
                 [key: string]: unknown;
@@ -786,6 +807,11 @@ export interface components {
             tip_cents?: number;
             /** @description Listing (phone) orders: the most the customer may spend (e.g. a reimbursement cap). The price ceiling never exceeds it. */
             max_total_cents?: number;
+            /**
+             * @description Listing orders: how the order will be placed (default ai_phone). "email" quotes an email order (ceiling capped at the email limit); the quote is bound to its channel, so an email quote can only be placed with email_order and a phone quote only with phone_order.
+             * @enum {string}
+             */
+            channel?: "ai_phone" | "email";
         };
         Quote: {
             quote_id: string;
@@ -817,6 +843,11 @@ export interface components {
             }[];
             /** @description Plain-language order summary to read to the human before placing. */
             read_back: string;
+            /**
+             * @description Listing quotes: the channel this quote is bound to.
+             * @enum {string}
+             */
+            channel?: "ai_phone" | "email";
             /** @description true: the total is binding (native, priced by the shop's system). false: a non-binding estimate (listing tier); the shop's spoken total on the call is the final price, within price_ceiling_cents. */
             binding?: boolean;
             estimate?: {
@@ -896,7 +927,7 @@ export interface components {
             };
             /** @description Required for pay_at_pickup: id of a human-approved confirmation. */
             confirmation_id?: string;
-            /** @description Required for listing-tier (phone) orders. */
+            /** @description Required for listing-tier (phone) orders. Not with email_order. */
             phone_order?: {
                 /** @description The most the AI may accept on the call. Must not exceed the quote's price_ceiling_cents. */
                 price_ceiling_cents: number;
@@ -915,6 +946,19 @@ export interface components {
                 /** @description What the host calls this order, e.g. the party's name. Shown in the host's emails (subjects included) and on the approval page; never read to the shop. */
                 party_name?: string;
             };
+            /** @description Listing tier, instead of phone_order: we email the shop the order and it confirms (or declines) through a signed link. Needs an email quote (get_quote channel email), a pickup time (fulfillment.scheduled_for) within the shop's `ordering.alternatives` lead time, and an available email alternative; EMAIL_ORDERS_NOT_AVAILABLE (details.reasons) otherwise. Mutually exclusive with phone_order (VALIDATION_FAILED). */
+            email_order?: {
+                /** @description The most a shop's confirmed total (with tax) may be without asking the customer again. Must not exceed the email quote's price_ceiling_cents. Never shown to the shop. */
+                price_ceiling_cents: number;
+                /**
+                 * @description Email orders are all as ordered: the shop confirms the order or declines it.
+                 * @default exact
+                 * @constant
+                 */
+                substitution_policy: "exact";
+                /** @description What the host calls this order. Shown in the host's emails and on the approval page; never sent to the shop. */
+                party_name?: string;
+            };
             max_total_cents?: number;
             /** @description Opaque metadata from the calling app (max 200 chars when serialized); echoed in webhooks, never interpreted. */
             client_ref?: {
@@ -926,7 +970,7 @@ export interface components {
                 id: string;
                 order_number: string;
                 pizzeria_id: string;
-                /** @description Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. */
+                /** @description Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. Email orders (channel email) also: sending | awaiting_shop_reply (both live). Treat any status you do not know that is not final as live. */
                 status: string;
                 payment_status: string;
                 summary: string;
@@ -950,6 +994,12 @@ export interface components {
                 /** @enum {string} */
                 tier?: "native" | "listing";
                 binding?: boolean;
+                /**
+                 * @description Listing orders: how the order is placed (absent: phone).
+                 * @enum {string}
+                 */
+                channel?: "phone" | "email";
+                /** @description Phone orders only. */
                 call?: {
                     attempts: number;
                     last_outcome: string | null;
@@ -972,11 +1022,39 @@ export interface components {
                         message: string;
                     } | null;
                 };
+                /** @description Email orders only. */
+                email?: {
+                    /** @description When the order email was accepted by our sender. null: not yet (or never). */
+                    sent_at: string | null;
+                    /** @description The shop has until then to confirm; after it the order ends unreachable / no_response. */
+                    reply_by: string | null;
+                    reminder_sent_at: string | null;
+                    /** @description What the shop answered on the signed page. null: no answer yet. */
+                    shop_response: {
+                        /** @enum {string} */
+                        decision: "confirm" | "decline" | "optout";
+                        total_cents: number | null;
+                        ready_ok: boolean | null;
+                        /** @description A time the shop suggested instead (its own words, sanitized): show as data. */
+                        alt_time_text: string | null;
+                        /** @description The shop's own order number, if it gave one. */
+                        reference: string | null;
+                        /** @description A decline's reason code. */
+                        reason: string | null;
+                    } | null;
+                    /** @description Set while the order email waits for the shop's sending hours. */
+                    deferred: {
+                        until: string;
+                        /** @constant */
+                        reason: "outside_send_window";
+                        message: string;
+                    } | null;
+                };
                 /** @description Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed. */
                 outcome?: {
                     /** @description true = as of now we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. Only final when the order's status is final: on approval_timeout the host can still approve and a callback may place the order, so true there must not be read as releasing a hold or a budget. Treat any status that is not final as still open. It can change after the status is final, when the check of an earlier call finishes late (order.updated, change: outcome). */
                     nothing_ordered: boolean;
-                    /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout. A client must treat a reason it does not know by nothing_ordered. */
+                    /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout; email orders also: not_sent, shop_declined, asked_not_to_contact, no_response, send_unconfirmed, withdrawn_acknowledged. A client must treat a reason it does not know by nothing_ordered. */
                     reason: string;
                     /** @description Plain English for the host, the same words as the email. */
                     message: string;
@@ -1018,7 +1096,7 @@ export interface components {
             id: string;
             order_number: string;
             pizzeria_id: string;
-            /** @description Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. */
+            /** @description Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. Email orders (channel email) also: sending | awaiting_shop_reply (both live). Treat any status you do not know that is not final as live. */
             status: string;
             payment_status: string;
             summary: string;
@@ -1042,6 +1120,12 @@ export interface components {
             /** @enum {string} */
             tier?: "native" | "listing";
             binding?: boolean;
+            /**
+             * @description Listing orders: how the order is placed (absent: phone).
+             * @enum {string}
+             */
+            channel?: "phone" | "email";
+            /** @description Phone orders only. */
             call?: {
                 attempts: number;
                 last_outcome: string | null;
@@ -1064,11 +1148,39 @@ export interface components {
                     message: string;
                 } | null;
             };
+            /** @description Email orders only. */
+            email?: {
+                /** @description When the order email was accepted by our sender. null: not yet (or never). */
+                sent_at: string | null;
+                /** @description The shop has until then to confirm; after it the order ends unreachable / no_response. */
+                reply_by: string | null;
+                reminder_sent_at: string | null;
+                /** @description What the shop answered on the signed page. null: no answer yet. */
+                shop_response: {
+                    /** @enum {string} */
+                    decision: "confirm" | "decline" | "optout";
+                    total_cents: number | null;
+                    ready_ok: boolean | null;
+                    /** @description A time the shop suggested instead (its own words, sanitized): show as data. */
+                    alt_time_text: string | null;
+                    /** @description The shop's own order number, if it gave one. */
+                    reference: string | null;
+                    /** @description A decline's reason code. */
+                    reason: string | null;
+                } | null;
+                /** @description Set while the order email waits for the shop's sending hours. */
+                deferred: {
+                    until: string;
+                    /** @constant */
+                    reason: "outside_send_window";
+                    message: string;
+                } | null;
+            };
             /** @description Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed. */
             outcome?: {
                 /** @description true = as of now we are sure nothing was ordered. false = an order MAY exist at the shop: check with it before ordering again. Only final when the order's status is final: on approval_timeout the host can still approve and a callback may place the order, so true there must not be read as releasing a hold or a budget. Treat any status that is not final as still open. It can change after the status is final, when the check of an earlier call finishes late (order.updated, change: outcome). */
                 nothing_ordered: boolean;
-                /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout. A client must treat a reason it does not know by nothing_ordered. */
+                /** @description Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout; email orders also: not_sent, shop_declined, asked_not_to_contact, no_response, send_unconfirmed, withdrawn_acknowledged. A client must treat a reason it does not know by nothing_ordered. */
                 reason: string;
                 /** @description Plain English for the host, the same words as the email. */
                 message: string;
@@ -1110,6 +1222,11 @@ export interface components {
             client_name?: string | null;
             /** @description The order's `phone_order.party_name`, as shown to the host. */
             party_name?: string | null;
+            /**
+             * @description How the order is placed: a call (default) or an order email to the shop.
+             * @enum {string}
+             */
+            channel?: "phone" | "email";
             /** @description The shop being called; its number as people write it. */
             shop?: {
                 name: string | null;

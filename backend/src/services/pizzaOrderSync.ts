@@ -49,12 +49,34 @@ export function isDraftReceiptTrigger(
   return null;
 }
 
-function confirmedTotalCents(o: OpopOrder, tier: string): number | null {
+/**
+ * The shop's total. Email orders (basil-14648 P2) have no `call`: the total the shop typed on its signed page is
+ * `email.shop_response.total_cents` (a confirm), mirrored in `totals.total_cents` once pizza-mcp records it. It is
+ * set from `awaiting_price_approval` on, like a call's quoted total: the budget then holds the higher of the two.
+ */
+export function confirmedTotalCents(o: OpopOrder, tier: string): number | null {
   if (tier === 'native') return o.totals?.total_cents ?? null;
+  if (o.channel === 'email') {
+    const r = o.email?.shop_response;
+    if (r?.decision === 'confirm' && typeof r.total_cents === 'number' && r.total_cents > 0) return r.total_cents;
+    // `totals` is 0 until the shop answered: only a positive total from a confirming shop counts
+    const t = o.totals?.total_cents;
+    return r?.decision === 'confirm' && typeof t === 'number' && t > 0 ? t : null;
+  }
   // still `calling` (the call is being checked): a total the judge has not passed is not a confirmed total
   if (o.status === 'calling') return null;
   const shop = o.call?.shop_total_cents;
   return typeof shop === 'number' ? shop : null;
+}
+
+/** "Sat Nov 22, 6:30 PM": a call's spoken ready time, or (email) the pickup the shop accepted, as pizza-mcp words it. */
+function readyTextOf(o: OpopOrder): string | null {
+  if (o.channel === 'email') {
+    const p = o.promised_at;
+    // pizza-mcp sends the pickup words here for an email order; an ISO instant goes to readyAt instead
+    return typeof p === 'string' && p.trim() && !ISO_RE.test(p) ? p.trim().slice(0, 80) : null;
+  }
+  return o.call?.ready_at_text ?? null;
 }
 
 // Only real ISO-8601 timestamps. `new Date("around 6")` happily returns June 2001.
@@ -123,7 +145,7 @@ export async function applyOrderUpdate(
       summary: order.summary ?? row.summary,
       confirmedTotalCents: total ?? row.confirmedTotalCents,
       readyAt: parseDate(order.promised_at) ?? row.readyAt,
-      readyAtText: order.call?.ready_at_text ?? row.readyAtText,
+      readyAtText: readyTextOf(order) ?? row.readyAtText,
       lastView: order as unknown as Prisma.InputJsonValue,
       nextAction: (order.next_action ?? null) as unknown as Prisma.InputJsonValue,
       timelineLen,
@@ -143,7 +165,7 @@ export async function applyOrderUpdate(
     // Still confirmed: keep the draft's total and notes current (a re-quoted price, new substitutions).
     await db.payoutDocument.updateMany({
       where: { pizzaOrderId: row.id, source: { not: 'upload' } },
-      data: { ocrSummary: draftSummary(source, row.shopName, total), ocrRaw: draftRaw(source, row, order, total) as Prisma.InputJsonValue },
+      data: { ocrSummary: draftSummary(source, row.shopName, total, order.channel), ocrRaw: draftRaw(source, row, order, total) as Prisma.InputJsonValue },
     });
   }
   if (source && !row.payoutDocumentId) {
@@ -164,7 +186,7 @@ export async function applyOrderUpdate(
           // Stop the OCR backfill loop from fetching a URL that is not a file.
           ocrAttemptCount: 3,
           ocrAttemptedAt: new Date(),
-          ocrSummary: draftSummary(source, row.shopName, total),
+          ocrSummary: draftSummary(source, row.shopName, total, order.channel),
           ocrRaw: draftRaw(source, row, order, total) as Prisma.InputJsonValue,
           uploadedByUserId: hostUser ? row.userId : null,
           uploadedByEmail: hostUser?.email ?? null,
@@ -181,8 +203,10 @@ export async function applyOrderUpdate(
   return { row, applied: true, draftCreated };
 }
 
-function draftSummary(source: 'ai_call' | 'opop_native', shopName: string, total: number | null): string {
-  return `${source === 'ai_call' ? 'AI phone order' : 'Online order'} at ${shopName}: ${
+function draftSummary(source: 'ai_call' | 'opop_native', shopName: string, total: number | null, channel?: string | null): string {
+  // an email order reuses the `ai_call` source (no payout_documents migration); its label says what it was
+  const kind = source === 'opop_native' ? 'Online order' : channel === 'email' ? 'Email order' : 'AI phone order';
+  return `${kind} at ${shopName}: ${
     total != null ? `$${(total / 100).toFixed(2)}` : 'total pending'
   }. Reminder only: upload your real receipt to be reimbursed.`.slice(0, 300);
 }
@@ -190,12 +214,15 @@ function draftSummary(source: 'ai_call' | 'opop_native', shopName: string, total
 function draftRaw(source: string, row: PizzaOrder, order: OpopOrder, total: number | null) {
   return {
     source,
+    channel: order.channel === 'email' ? 'email' : 'phone',
     opop_order_id: row.opopOrderId,
     shop_id: row.shopId,
     shop_name: row.shopName,
     confirmed_total_cents: total,
-    ready_at_text: order.call?.ready_at_text ?? null,
+    ready_at_text: readyTextOf(order),
     changes: order.call?.changes ?? [],
+    // the shop's own order number, when it gave one on the email form (shop data: shown as text only)
+    ...(order.channel === 'email' ? { shop_reference: order.email?.shop_response?.reference ?? null } : {}),
     summary: order.summary ?? null,
   };
 }

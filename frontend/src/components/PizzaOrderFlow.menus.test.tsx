@@ -150,7 +150,7 @@ describe('PizzaOrderFlow: host menus, rebuilding', () => {
     act(() => mocks.busy!(true));
     expect(await act(() => mocks.changed!('added'))).toBe('rebuilt');
     expect(mocks.build).toHaveBeenCalledTimes(2);
-    expect(mocks.build.mock.calls[1]).toEqual(['p1', 'pzl_1', [], '2026-11-14T22:00:00Z', {}]);
+    expect(mocks.build.mock.calls[1]).toEqual(['p1', 'pzl_1', [], '2026-11-14T22:00:00Z', {}, 'ai_phone']);
     act(() => mocks.busy!(false));
     act(() => mocks.busy!(true));
     expect(await act(() => mocks.changed!('removed'))).toBe('rebuilt');

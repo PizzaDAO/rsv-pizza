@@ -21,10 +21,15 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 export const FREE_STATUSES: ReadonlySet<string> = new Set(['refused', 'unreachable', 'canceled', 'shop_requires_prepay']);
 
 /**
- * Statuses pizza-mcp always lets a host cancel. `awaiting_price_approval` is NOT here: it answers 409
+ * Statuses pizza-mcp always lets a host cancel. `awaiting_price_approval` is NOT here: on a call it answers 409
  * there (the shop is on the line). `calling` depends on the dial, see isCancelable.
+ * Email orders (basil-14648 P2): `sending` and `awaiting_shop_reply` are live and cancelable (pizza-mcp emails the
+ * shop a withdrawal once the order went out). See isCancelable for what else an email order allows.
  */
-export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set(['awaiting_approval', 'approval_timeout', 'held']);
+export const CANCELABLE_STATUSES: ReadonlySet<string> = new Set(['awaiting_approval', 'approval_timeout', 'held', 'sending', 'awaiting_shop_reply']);
+
+/** pizza-mcp's OrderView.channel in lastView. Absent = a phone order. */
+const isEmail = (row: { lastView?: unknown }) => (row.lastView as { channel?: unknown } | null | undefined)?.channel === 'email';
 
 /**
  * How long after entering `confirmed_by_shop` we keep polling. Since pizza-mcp 662d51c the judge rules BEFORE
@@ -78,9 +83,19 @@ export function checkingOf(row: { status: string; lastView?: unknown }): { messa
  * A deferral wins over a check: pizza-mcp's cancelOrder allows a `calling` order whose dial is pending (retry_at set),
  * including `call_check_pending`, where the earlier call's check is still running.
  */
-export function isCancelable(row: { status: string; lastView?: unknown }): boolean {
+export function isCancelable(row: { status: string; lastView?: unknown; readyAt?: Date | string | null }, now = Date.now()): boolean {
   if (CANCELABLE_STATUSES.has(row.status)) return true;
   if (deferredOf(row)) return true;
+  if (isEmail(row)) {
+    // an email order's price approval has no shop on the line: pizza-mcp lets the host call it off (the shop is told)
+    if (row.status === 'awaiting_price_approval') return true;
+    // a confirmed email order can be canceled until its pickup (pizza-mcp emails the shop the cancellation). `readyAt`
+    // is the pickup time rsv placed it for; unknown = let pizza-mcp decide (it refuses after the pickup).
+    if (row.status === 'confirmed_by_shop') {
+      const t = row.readyAt ? new Date(row.readyAt).getTime() : NaN;
+      return !Number.isFinite(t) || t > now;
+    }
+  }
   return false;
 }
 
