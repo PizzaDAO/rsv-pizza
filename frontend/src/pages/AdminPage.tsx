@@ -9,6 +9,7 @@ import { CopyEmailButton } from '../components/CopyEmailButton';
 import { FunnelTab } from '../components/underboss/FunnelTab';
 import { OptinABTab } from '../components/underboss/OptinABTab';
 import { RsvpCheckboxesTab } from '../components/admin/RsvpCheckboxesTab';
+import { ReelSettingsPanel } from '../components/admin/ReelSettingsPanel';
 import {
   Shield, ShieldCheck, UserPlus, Trash2, Loader2,
   Mail, User, Globe, Check, X, Pencil, ListChecks, Calendar, Tag, FileText, ChevronDown, ChevronUp, Download, Palette, DollarSign, ArrowRight, Megaphone,
@@ -1616,6 +1617,12 @@ export function AdminPage() {
             <FunnelTab regions={[]} />
           </section>
             </>
+          )}
+
+          {activeTab === 'admin' && (
+            <section className="mb-10">
+              <ReelSettingsPanel />
+            </section>
           )}
 
           {activeTab === 'experiments' && (
