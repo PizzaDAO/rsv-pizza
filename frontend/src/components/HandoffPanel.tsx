@@ -6,7 +6,7 @@ import { IconInput } from './IconInput';
 import { InlineConfirm } from './InlineConfirm';
 import {
   addShopOrderingLink, deleteShopOrderingLink, markPizzaHandoff, recordPizzaHandoff, orderingLinks, orderName, safeHref,
-  formatCents, formatPhone, Checklist, HandoffProvider, OrderingLink, PizzaHandoffView, PizzaShop,
+  formatCents, formatPhone, releasedByOtherHost, Checklist, HandoffBudget, HandoffProvider, OrderingLink, PizzaHandoffView, PizzaShop,
 } from '../lib/pizzaOrder';
 
 type ApiError = Error & { code?: string; data?: { existingShopName?: string } };
@@ -26,6 +26,8 @@ interface HandoffPanelProps {
   onHandoff: (h: PizzaHandoffView) => void;
   /** Status only: a resumed mark (no checklist, no links). */
   statusOnly?: boolean;
+  /** The party budget from GET /handoffs, so the copy after a reload matches the copy at mark time. */
+  budget?: HandoffBudget | null;
   onDone?: () => void;
 }
 
@@ -41,7 +43,7 @@ const usd = (c: number) => `${formatCents(c)} USD`;
  * clicked; with no click, the host says how they ordered (by phone unless they choose otherwise).
  */
 export const HandoffPanel: React.FC<HandoffPanelProps> = ({
-  partyId, shop, cartId, checklist, fallbackLines, hostName, handoff, onHandoff, statusOnly, onDone,
+  partyId, shop, cartId, checklist, fallbackLines, hostName, handoff, onHandoff, statusOnly, onDone, budget,
 }) => {
   const { t } = useTranslation('host');
   const uid = useId();
@@ -201,6 +203,13 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
     </button>
   );
 
+  // the host's own mark, released by a co-host who checked: say so (they may have ordered after all)
+  const releasedByOther = handoff && releasedByOtherHost(handoff) && !releasedNote && (
+    <p className="p-3 rounded-xl border border-theme-stroke border-l-4 border-l-[color:var(--ai-warn)] bg-theme-surface text-sm text-theme-text">
+      {t('aiOrder.handoff.releasedByOther', { shop: handoff.shopName })}
+    </p>
+  );
+
   let body: React.ReactNode;
   if (marked && handoff) {
     // ---- the host said they ordered: what is held and what to do next ----
@@ -212,10 +221,15 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
           : handoff.provider === 'in_person'
             ? t('aiOrder.handoff.markedInPerson', { shop: handoff.shopName })
             : t('aiOrder.handoff.markedOnline', { provider: providerName(handoff.provider) });
+    const noCap = budgetNote === 'noCap' || budget?.noCap === true;
     const holdLine = handoff.receiptCovered
       ? t('aiOrder.handoff.receiptCovered')
-      : budgetNote === 'noCap'
+      : noCap
         ? t('aiOrder.handoff.markedNoCap', { shop: handoff.shopName })
+        : handoff.holdsRest
+          ? handoff.holdCents > 0
+            ? t('aiOrder.handoff.markedHoldRest', { shop: handoff.shopName, amount: usd(handoff.holdCents) })
+            : t('aiOrder.handoff.markedNoBudget', { shop: handoff.shopName })
         : handoff.overBudget
           ? handoff.holdCents > 0
             ? t('aiOrder.handoff.markedOverBudget', { shop: handoff.shopName, amount: usd(handoff.holdCents) })
@@ -260,6 +274,7 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
     // ---- a resumed mark that was just taken back: say so, visibly ----
     body = (
       <>
+        {releasedByOther}
         {releasedNote && (
           <p ref={releasedRef} tabIndex={-1} className="p-3 rounded-xl border border-theme-stroke bg-theme-surface text-sm text-theme-text outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ai-accent)]">
             {releasedNote}
@@ -275,6 +290,7 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
       <>
         <h5 id={`${uid}-title`} ref={titleRef} tabIndex={-1} className="text-sm font-semibold text-theme-text outline-none">{t('aiOrder.handoff.title')}</h5>
         {releasedNote && <p className="text-sm text-theme-text">{releasedNote}</p>}
+        {releasedByOther}
         <p className="text-sm text-theme-text-secondary">{t('aiOrder.handoff.intro', { shop: shop.name })}</p>
 
         {(links.length > 0 || shop.phone) && (

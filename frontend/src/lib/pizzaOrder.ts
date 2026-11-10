@@ -297,6 +297,8 @@ export interface PizzaHandoffView {
   estimateCents?: number | null;
   /** Marked, but holding less than the estimate: what was left of the budget did not cover it. */
   overBudget?: boolean;
+  /** Marked with no cart or no quote: the amount is unknown, so it holds the rest of the budget until a receipt. */
+  holdsRest?: boolean;
   /** Taken back by the host who marked it ("I didn't order after all"). */
   releasedByOwner?: boolean;
   /** Taken back (or released) by the viewer. */
@@ -311,7 +313,17 @@ export interface PizzaHandoffView {
   isMine: boolean;
 }
 
-export const getPizzaHandoffs = (partyId: string) => apiRequest<{ handoffs: PizzaHandoffView[] }>(`${base(partyId)}/handoffs`);
+/** The party's budget as the backend sees it (USD cents). `noCap`: no reimbursement cap is set. */
+export interface HandoffBudget {
+  capCents: number | null;
+  leftCents: number;
+  noCap: boolean;
+}
+export const getPizzaHandoffs = (partyId: string) =>
+  apiRequest<{ handoffs: PizzaHandoffView[]; budget?: HandoffBudget }>(`${base(partyId)}/handoffs`);
+
+/** A mark of mine that another host released: tell me once (I may have ordered after all). */
+export const releasedByOtherHost = (h: PizzaHandoffView) => h.isMine && !!h.releasedAt && !h.releasedByOwner && !h.releasedByMe;
 
 /** The host opened the shop's ordering page (`opened`), or is about to mark a phone order (`opened: false`). */
 export const recordPizzaHandoff = (
@@ -326,7 +338,7 @@ export const markPizzaHandoff = (
   action: 'ordered' | 'unmark' | 'release' | 'receipt_uploaded',
   allowAnother = false
 ) =>
-  apiRequest<{ handoff: PizzaHandoffView; budget?: { capCents: number | null; leftCents: number; noCap: boolean } }>(`${base(partyId)}/handoffs/${handoffId}/mark`, {
+  apiRequest<{ handoff: PizzaHandoffView; budget?: HandoffBudget }>(`${base(partyId)}/handoffs/${handoffId}/mark`, {
     method: 'POST',
     body: { action, ...(allowAnother ? { allowAnother: true } : {}) },
   });
@@ -367,6 +379,8 @@ export function orderName(full: string | null | undefined): string {
 
 /** The marked handoff to reopen on load: one a host still has to settle (receipt or "didn't order"). */
 export function handoffToResume(handoffs: PizzaHandoffView[]): PizzaHandoffView | undefined {
+  // receiptCovered is set only when a receipt was really matched: a mark that holds 0 (no budget left) still waits
+  // for its receipt, so it is resumed too
   return handoffs.find((h) => h.marked && !h.receiptCovered);
 }
 

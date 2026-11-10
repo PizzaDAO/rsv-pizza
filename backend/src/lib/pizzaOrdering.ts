@@ -265,11 +265,19 @@ const hasReceiptToCount = (o: BudgetOrder) => CONFIRMED_STATUSES.has(o.status) |
  * Orders that hold nothing (released, nothing_ordered true, IVR needs_review...) cost nothing. An ended order that
  * may exist at the shop (`canceled` or `unreachable` too) is held until a host releases it or its receipt offsets it.
  */
-export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[], orders: T[]): { usedCents: number; held: T[]; covered: T[] } {
+/**
+ * `covered`: nothing is owed any more (a receipt took it, OR it never held anything). `receiptMatched`: a real
+ * receipt was actually consumed for it. Only the latter may ever be shown as "your receipt counts for it".
+ */
+export function budgetBreakdown<T extends BudgetOrder>(
+  receipts: BudgetReceipt[],
+  orders: T[]
+): { usedCents: number; held: T[]; covered: T[]; receiptMatched: T[] } {
   const free = receipts.filter((r) => r.cents > 0).map((r) => ({ ...r, left: r.cents }));
   const available = (o: T) => free.filter((r) => r.left > 0 && isLaterReceipt(r, o));
   const held: T[] = [];
   const covered: T[] = [];
+  const receiptMatched: T[] = [];
 
   // Exact matches first, so a host's "this receipt covers it" cannot take another order's receipt.
   const unmatched = orders.filter(isBlocking).filter((o) => {
@@ -279,6 +287,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
     const match = available(o).find((r) => r.left === r.cents && Math.abs(r.cents - total) <= tol);
     if (!match) return true;
     match.left = 0;
+    receiptMatched.push(o);
     covered.push(o);
     return false;
   });
@@ -292,6 +301,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
         const receipt = available(o)[0];
         if (receipt) {
           receipt.left = 0;
+          receiptMatched.push(o);
           owed = 0;
         }
       } else {
@@ -299,6 +309,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
           const taken = Math.min(r.left, owed);
           r.left -= taken;
           owed -= taken;
+          if (taken > 0 && !receiptMatched.includes(o)) receiptMatched.push(o);
         }
       }
     }
@@ -306,7 +317,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
     else covered.push(o);
     open += owed;
   }
-  return { usedCents: receipts.reduce((a, r) => a + Math.max(r.cents, 0), 0) + open, held, covered };
+  return { usedCents: receipts.reduce((a, r) => a + Math.max(r.cents, 0), 0) + open, held, covered, receiptMatched };
 }
 
 export function budgetUsedCents(receipts: BudgetReceipt[], orders: BudgetOrder[]): number {

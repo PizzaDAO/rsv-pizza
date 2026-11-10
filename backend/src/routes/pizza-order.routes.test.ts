@@ -1326,8 +1326,8 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     expect(refused.body.error.existingHandoffId).toBe(a.id);
     const ok = await mark(b.id, 'ordered', host, { allowAnother: true });
     expect(ok.status).toBe(200);
-    expect(ok.body.handoff).toMatchObject({ marked: true, holdCents: 0 }); // no cart: holds 0, still blocks
-    expect(ok.body.handoff.blocking).toBe(true);
+    // no cart: the amount is unknown, so it holds the rest of the budget (25000 - 21000), and blocks
+    expect(ok.body.handoff).toMatchObject({ marked: true, holdCents: 4000, holdsRest: true, blocking: true });
   });
 
   it('an open AI order blocks a mark unless the host confirms a second order', async () => {
@@ -1375,7 +1375,7 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     expect(res.body.budget).toMatchObject({ noCap: true, leftCents: 0 });
   });
 
-  it('when pizza-mcp cannot re-quote at mark time, the mark holds the cart\'s last estimate, not the whole budget', async () => {
+  it('when pizza-mcp cannot re-quote at mark time, the mark holds the last ceiling seen for the cart, not the whole budget', async () => {
     let quotes = 0;
     withHandoffMcp({
       'POST /carts/:id/quote': (x: any) =>
@@ -1387,15 +1387,15 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     const h = (await click({ cartId: c.cart.id })).body.handoff; // quote 2: estimate kept
     expect(h.estimateCents).toBe(17000);
     const res = await mark(h.id, 'ordered'); // quote 3 fails
-    expect(res.body.handoff).toMatchObject({ holdCents: 17000, overBudget: false });
-    expect(await remaining()).toBe(25000 - 17000);
+    expect(res.body.handoff).toMatchObject({ holdCents: 21000, overBudget: false, holdsRest: false });
+    expect(await remaining()).toBe(25000 - 21000);
   });
 
-  it('with no cart and no estimate, a failed re-quote holds 0 and still blocks', async () => {
+  it('with no quote or estimate ever captured, a failed re-quote holds the rest of the budget', async () => {
     await fake.db.pizzaCart.create({ data: { partyId: PARTY_ID, userId: 'host1', opopCartId: 'cart_x', shopId: 'pzl_osm_n1', recommendationVersion: 'v', quoteIds: [] } });
     withHandoffMcp({ 'POST /carts/:id/quote': () => ({ status: 422, json: { code: 'VALIDATION_FAILED', title: 'x', status: 422, detail: 'pickup passed', retryable: false } }) });
     const h = (await click({ cartId: 'cart_x' })).body.handoff;
-    expect((await mark(h.id, 'ordered')).body.handoff).toMatchObject({ holdCents: 0, blocking: true });
+    expect((await mark(h.id, 'ordered')).body.handoff).toMatchObject({ holdCents: 25000, holdsRest: true, blocking: true });
   });
 
   it('only the host who marked it can take it back; a co-host can release it, recorded as theirs', async () => {
@@ -1457,6 +1457,64 @@ describe('handoffs: the click, the "I ordered it" mark, receipts and release', (
     expect(cfg).toMatchObject({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: null, heldHandoffId: h.id, heldHandoff: { id: h.id, shopName: "Sal's", provider: 'toast', isMine: true } });
     const co = (await request(app()).get(`${base}/config`).set(cohostEditor)).body;
     expect(co.heldHandoff).toMatchObject({ isMine: false });
+  });
+
+  // --- review repros RV1-RV3, made permanent ---
+  it('RV1: a mark that holds 0 is NOT receipt-covered (nothing consumed), at mark time or after a reload', async () => {
+    receipt('250.00', new Date(Date.now() - 60_000)); // budget used up before the mark
+    const h = (await click({ provider: 'website' })).body.handoff;
+    const m = await mark(h.id, 'ordered');
+    expect(m.body.handoff).toMatchObject({ holdCents: 0, receiptCovered: false, marked: true });
+    const r = (await request(app()).get(`${base}/handoffs`).set(host)).body;
+    expect(r.handoffs[0]).toMatchObject({ id: h.id, receiptCovered: false, holdCents: 0 });
+    expect(r.budget).toEqual({ capCents: 25000, leftCents: 0, noCap: false });
+    // a receipt that IS consumed after the host says so does count
+    receipt('40.00', new Date(Date.now() + 1000));
+    await mark(h.id, 'receipt_uploaded');
+    expect((await request(app()).get(`${base}/handoffs`).set(host)).body.handoffs[0].receiptCovered).toBe(true);
+  });
+
+  it('RV2: a cart-less mark holds the rest of the budget, so a second AI order cannot spend it too', async () => {
+    const h = (await click({ provider: 'phone', opened: false })).body.handoff;
+    const m = await mark(h.id, 'ordered');
+    expect(m.body.handoff).toMatchObject({ holdCents: 25000, holdsRest: true });
+    expect(await remaining()).toBeNull();
+    const cfg = (await request(app()).get(`${base}/config`).set(host)).body;
+    expect(cfg).toMatchObject({ blockedReason: 'CAP_EXHAUSTED', heldHandoffId: h.id });
+    expect((await buildCart()).error.code).toBe('CAP_EXHAUSTED');
+    // the receipt replaces the rest-of-budget hold
+    receipt('60.00', new Date(Date.now() + 1000));
+    await mark(h.id, 'receipt_uploaded');
+    expect(await remaining()).toBe(25000 - 6000);
+  });
+
+  it('RV3: numbers in the click or mark body are ignored (never a hold or estimate from the client)', async () => {
+    const h = (await click({ provider: 'website', estimateCents: 1, holdCents: 1, quoteCeilingCents: 1 })).body.handoff;
+    const stored = fake.handoffs.get(h.id);
+    expect(stored.estimateCents ?? null).toBeNull();
+    expect(stored.quoteCeilingCents ?? null).toBeNull();
+    expect(stored.holdCents).toBe(0);
+    const m = await mark(h.id, 'ordered', host, { holdCents: 99999, estimateCents: 99999 });
+    expect(m.body.handoff).toMatchObject({ holdCents: 25000, holdsRest: true });
+    expect(m.body.handoff.estimateCents).toBeNull();
+  });
+
+  it('a successful re-quote after the cart changes refreshes the stored estimate of an unmarked handoff', async () => {
+    let total = 21000;
+    withHandoffMcp({
+      'POST /carts/:id/quote': (x: any) => ({ json: { quote_id: `q_${total}`, cart_id: x.path.split('/')[2], price_ceiling_cents: total, estimate: { low_cents: 1, expected_cents: total - 3000, high_cents: total }, read_back: '' } }),
+    });
+    const c = await buildCart();
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    expect(fake.handoffs.get(h.id)).toMatchObject({ quoteCeilingCents: 21000, estimateCents: 18000 });
+    total = 12000; // the host drops pizzas
+    await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    expect(fake.handoffs.get(h.id)).toMatchObject({ quoteCeilingCents: 12000, estimateCents: 9000, quoteId: 'q_12000' });
+    // a marked row keeps the numbers its hold was set from
+    await mark(h.id, 'ordered');
+    total = 5000;
+    await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    expect(fake.handoffs.get(h.id)).toMatchObject({ holdCents: 12000, quoteCeilingCents: 12000 });
   });
 
   it('a handoff of another party is a 404', async () => {

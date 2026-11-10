@@ -9,7 +9,7 @@ import { InlineConfirm } from './InlineConfirm';
 import { HandoffPanel } from './HandoffPanel';
 import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
-  getPizzaHandoffs, recordPizzaHandoff, handoffToResume,
+  getPizzaHandoffs, recordPizzaHandoff, handoffToResume, releasedByOtherHost, HandoffBudget,
   isTerminalStatus, formatPhone, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
 } from '../lib/pizzaOrder';
 import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
@@ -29,6 +29,24 @@ interface PizzaOrderFlowProps {
    * and a retry on a load error instead of the fallback ("not available" was wrong while it loaded).
    */
   gated?: boolean;
+}
+
+/** "Another host released your mark" is shown once per device and mark (a convenience: storage may be absent). */
+const SEEN_KEY = 'rsv.handoffReleasedSeen';
+function releasedSeen(id: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem(SEEN_KEY) || '[]') as string[]).includes(id);
+  } catch {
+    return false;
+  }
+}
+function markReleasedSeen(id: string) {
+  try {
+    const seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]') as string[];
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen.filter((x) => x !== id), id].slice(-50)));
+  } catch {
+    /* storage unavailable: the notice simply shows again next time */
+  }
 }
 
 /** An order that is still live at pizza-mcp: a second one now would race it. */
@@ -62,6 +80,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // basil-14648 P2: the cart step for "order it yourself" (checklist + the shop's own ordering page), and its row
   const [mode, setMode] = useState<'ai' | 'handoff'>('ai');
   const [handoff, setHandoff] = useState<PizzaHandoffView | null>(null);
+  // the party budget as GET /handoffs reports it: the panel's copy after a reload matches the copy at mark time
+  const [handoffBudget, setHandoffBudget] = useState<HandoffBudget | null>(null);
+  // a mark of mine another host released, not yet acknowledged on this device
+  const [releasedNotice, setReleasedNotice] = useState<PizzaHandoffView | null>(null);
   // set when the server names an existing order: a live or confirmed one, or (capExhausted) one that holds the budget
   const [inProgress, setInProgress] = useState<{ existingOrderId?: string; existingHandoffId?: string; existingStatus?: string; capExhausted?: boolean; existingShop?: string } | null>(null);
   const [confirmSecond, setConfirmSecond] = useState(false);
@@ -100,11 +122,14 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setHeldHandoff(cfg.heldHandoff ?? null);
         setHasLocation(!cfg.location || cfg.location.lat != null || !!cfg.location.address);
         // resume an order in flight (page reload while the AI is calling) or one a host still has to settle
-        const [{ orders }, { handoffs }] = await Promise.all([
+        const [{ orders }, handoffList] = await Promise.all([
           getPizzaOrders(partyId).catch(() => ({ orders: [] as PizzaOrderView[] })),
-          getPizzaHandoffs(partyId).catch(() => ({ handoffs: [] as PizzaHandoffView[] })),
+          getPizzaHandoffs(partyId).catch(() => ({ handoffs: [] as PizzaHandoffView[], budget: undefined })),
         ]);
         if (cancelled) return;
+        const handoffs = handoffList.handoffs;
+        setHandoffBudget(handoffList.budget ?? null);
+        setReleasedNotice(handoffs.find((h) => releasedByOtherHost(h) && !releasedSeen(h.id)) ?? null);
         const resume = orderToResume(orders);
         // basil-14648 P2: a marked, unreleased "Order online" mark with no receipt yet is settled like an order
         const resumeHandoff = resume ? undefined : handoffToResume(handoffs ?? []);
@@ -215,8 +240,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       setInProgress(null);
       setError(null);
       try {
-        const found = (await getPizzaHandoffs(partyId)).handoffs.find((h) => h.id === handoffId);
+        const list = await getPizzaHandoffs(partyId);
+        const found = list.handoffs.find((h) => h.id === handoffId);
         if (!found) throw new Error('no handoff');
+        setHandoffBudget(list.budget ?? null);
         setHandoff(found);
         setStep('handoff');
       } catch {
@@ -335,7 +362,6 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setHeldOrderId(cfg.heldOrderId ?? null);
           setHeldHandoffId(cfg.heldHandoffId ?? null);
           setHeldHandoff(cfg.heldHandoff ?? null);
-        setHeldHandoff(cfg.heldHandoff ?? null);
         })
         .catch(() => undefined);
     },
@@ -455,6 +481,22 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         </div>
       )}
 
+      {releasedNotice && step === 'shops' && (
+        <div role="status" className="p-3 mb-3 rounded-xl border border-theme-stroke border-l-4 border-l-[color:var(--ai-warn)] bg-theme-surface space-y-2">
+          <p className="text-sm text-theme-text">{t('aiOrder.flow.releasedByOtherNotice', { shop: releasedNotice.shopName })}</p>
+          <button
+            type="button"
+            className="btn-secondary w-full text-sm min-h-[44px] py-2"
+            onClick={() => {
+              markReleasedSeen(releasedNotice.id);
+              setReleasedNotice(null);
+            }}
+          >
+            {t('aiOrder.flow.dismiss')}
+          </button>
+        </div>
+      )}
+
       {uncallableNotice && step === 'shops' && (
         <div role="status" className="p-3 mb-3 rounded-xl border border-theme-stroke bg-theme-surface space-y-2">
           <p className="text-sm text-theme-text">{uncallableNotice.message}</p>
@@ -537,6 +579,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
               handoff={handoff && handoff.shopId === shop.id && (handoff.marked || (handoff.cartId ?? null) === (cartState?.cart?.id ?? null)) ? handoff : null}
               onHandoff={onHandoff}
               onDone={onDone}
+              budget={handoffBudget}
             />
           }
         />
@@ -553,6 +596,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           onHandoff={onHandoff}
           statusOnly
           onDone={onDone}
+          budget={handoffBudget}
         />
       )}
 

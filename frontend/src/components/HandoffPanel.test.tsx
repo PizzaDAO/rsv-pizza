@@ -373,3 +373,34 @@ describe('ShopPicker: review fixes', () => {
     }
   });
 });
+
+describe('HandoffPanel: second review', () => {
+  it('a mark with no cart (unknown amount) says the rest of the budget is held until the receipt', () => {
+    panel({ handoff: marked({ holdsRest: true, holdCents: 25000, cartId: null }) });
+    expect(screen.getByText(/We don't know how much you ordered, so we're holding the rest of your reimbursement budget \(\$250\.00 USD\)/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'I uploaded the receipt' })).toBeTruthy();
+  });
+
+  it('a 0-hold mark is not shown as receipt-covered: the receipt button stays', () => {
+    panel({ handoff: marked({ holdCents: 0, overBudget: true, estimateCents: 21000, receiptCovered: false }) });
+    expect(screen.queryByText(/Your receipt counts for this order now/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'I uploaded the receipt' })).toBeTruthy();
+  });
+
+  it('after a reload, the no-cap copy comes from GET /handoffs budget, as it did at mark time', () => {
+    panel({ handoff: marked({ holdCents: 0 }), statusOnly: true, budget: { capCents: null, leftCents: 0, noCap: true } });
+    expect(screen.getByText(/no reimbursement cap yet/)).toBeTruthy();
+  });
+
+  it('the owner is told when a co-host released their mark; the co-host and the owner\'s own take-back are not', () => {
+    const rel = (over: Partial<PizzaHandoffView>) => row({ releasedAt: '2026-11-09T13:00:00Z', marked: false, ...over });
+    const { unmount } = panel({ handoff: rel({ isMine: true, releasedByOwner: false, releasedByMe: false }) });
+    expect(screen.getByText(/Another host released the order you marked at Sal's/)).toBeTruthy();
+    unmount();
+    const b = panel({ handoff: rel({ isMine: true, releasedByOwner: true, releasedByMe: true }) });
+    expect(screen.queryByText(/Another host released/)).toBeNull();
+    b.unmount();
+    panel({ handoff: rel({ isMine: false, releasedByOwner: false, releasedByMe: true }) });
+    expect(screen.queryByText(/Another host released/)).toBeNull();
+  });
+});

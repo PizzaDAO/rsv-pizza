@@ -223,3 +223,22 @@ describe('basil-14648 P2: a marked "Order online" handoff in the budget', () => 
     expect(holderData({ opopOrderId: 'ord_1', status: 'calling' })).toEqual({ existingOrderId: 'ord_1', existingStatus: 'calling' });
   });
 });
+
+describe('basil-14648 P2 review: covered vs receiptMatched', () => {
+  const h = (over: Record<string, unknown> = {}) =>
+    handoffAsBudgetOrder({ id: 'h1', holdCents: 0, orderedAt: ORDERED, releasedAt: null, receiptCoveredAt: null, ...over } as any)!;
+
+  it('a mark that holds 0 is "covered" (nothing owed) but never receiptMatched', () => {
+    const r = budgetBreakdown([], [h()]);
+    expect(r.covered).toHaveLength(1);
+    expect(r.receiptMatched).toEqual([]);
+  });
+
+  it('receiptMatched only when a receipt is actually consumed', () => {
+    const o = h({ holdCents: 5000, receiptCoveredAt: after });
+    expect(budgetBreakdown([later(4000)], [o]).receiptMatched).toEqual([o]);
+    expect(budgetBreakdown([older(4000)], [o]).receiptMatched).toEqual([]);
+    const ai = confirmed({ confirmedTotalCents: 15000 });
+    expect(budgetBreakdown([later(15000)], [ai]).receiptMatched).toEqual([ai]); // exact total match
+  });
+});

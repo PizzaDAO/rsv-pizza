@@ -137,6 +137,11 @@ export function makeFakeDb() {
           handoffs.set(row.id, row);
           return { ...row };
         },
+        updateMany: async ({ where, data }: any) => {
+          let count = 0;
+          for (const h of handoffs.values()) if (matches(h, where)) { Object.assign(h, data, { updatedAt: new Date() }); count++; }
+          return { count };
+        },
         update: async ({ where, data }: any) => {
           const row = handoffs.get(where.id);
           if (!row) throw new Error('not found');

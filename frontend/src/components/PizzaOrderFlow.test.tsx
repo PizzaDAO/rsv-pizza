@@ -350,3 +350,31 @@ describe('PizzaOrderFlow: honest copy for a budget held by a mark', () => {
     expect(screen.getByText(/If Regina already has your first order/)).toBeTruthy();
   });
 });
+
+describe('PizzaOrderFlow: second review', () => {
+  const base = {
+    id: 'h9', shopId: 'pzl_9', shopName: 'Regina', provider: 'phone', cartId: null, holdCents: 0, clickedAt: null,
+    orderedAt: '2026-11-09T12:00:00Z', marked: true, blocking: true, receiptCovered: false,
+  };
+
+  it('a 0-hold mark with no receipt is resumed, with the no-cap copy from GET /handoffs', async () => {
+    mocks.handoffs.mockResolvedValue({ handoffs: [{ ...base, releasedAt: null, isMine: true }], budget: { capCents: null, leftCents: 0, noCap: true } });
+    flow();
+    expect(await screen.findByText('You said you ordered from Regina by phone')).toBeTruthy();
+    expect(screen.getByText(/no reimbursement cap yet/)).toBeTruthy();
+  });
+
+  it('tells the owner, once per device, that another host released their mark', async () => {
+    try { localStorage.removeItem('rsv.handoffReleasedSeen'); } catch { /* none */ }
+    const released = { ...base, marked: false, blocking: false, releasedAt: '2026-11-09T13:00:00Z', isMine: true, releasedByOwner: false, releasedByMe: false };
+    mocks.handoffs.mockResolvedValue({ handoffs: [released] });
+    const { unmount } = flow();
+    expect(await screen.findByText(/Another host released the order you marked at Regina/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText(/Another host released/)).toBeNull();
+    unmount();
+    flow();
+    expect(await screen.findByText("Pick Sal's")).toBeTruthy();
+    expect(screen.queryByText(/Another host released/)).toBeNull();
+  });
+});

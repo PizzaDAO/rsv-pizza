@@ -235,11 +235,24 @@ async function recordQuote(cartId: string, quoteId: string) {
   await prisma.pizzaCart.update({ where: { opopCartId: cartId }, data: { quoteIds: { push: quoteId } } });
 }
 
+/**
+ * basil-14648 P2: every successful quote of a cart refreshes the numbers its not-yet-marked handoffs keep (the
+ * cart may have changed since). A marked row keeps the numbers its hold was set from.
+ */
+async function rememberQuoteOnHandoffs(cartId: string, q: OpopQuote) {
+  const estimate = q.estimate?.expected_cents ?? q.totals?.total_cents ?? q.price_ceiling_cents ?? null;
+  await prisma.pizzaHandoff.updateMany({
+    where: { opopCartId: cartId, orderedAt: null },
+    data: { quoteId: q.quote_id, quoteCeilingCents: q.price_ceiling_cents ?? null, estimateCents: estimate },
+  });
+}
+
 /** Quote only a ready cart. `max_total_cents` is what the party may still spend, not the whole cap. */
 async function quoteIfReady(actor: OpopActor, cart: OpopCart, remainingCents: number): Promise<OpopQuote | null> {
   if (!cart.ready_for_quote || cart.lines.length === 0) return null;
   const q = await getPizzaMcpClient().quote(actor, cart.id, { max_total_cents: remainingCents });
   await recordQuote(cart.id, q.quote_id);
+  await rememberQuoteOnHandoffs(cart.id, q);
   return q;
 }
 
@@ -736,6 +749,9 @@ function publicHandoff(h: any, viewerId: string | undefined, opts: { receiptMatc
     estimateCents: h.estimateCents ?? null,
     // the mark holds less than the order's estimate: what was left of the budget did not cover it
     overBudget: marked && h.estimateCents != null && h.holdCents < h.estimateCents,
+    // no cart or no quote/estimate was ever captured: we don't know the amount, so the mark holds the rest of the
+    // budget until a receipt replaces it (or the host takes it back)
+    holdsRest: marked && (!h.opopCartId || (h.quoteCeilingCents == null && h.estimateCents == null)),
     clickedAt: h.clickedAt,
     orderedAt: h.orderedAt,
     releasedAt: h.releasedAt,
@@ -781,6 +797,7 @@ async function quoteCart(actor: OpopActor, cartId: string, leftCents: number): P
   try {
     const q = await getPizzaMcpClient().quote(actor, cartId, leftCents > 0 ? { max_total_cents: leftCents } : {});
     await recordQuote(cartId, q.quote_id);
+    await rememberQuoteOnHandoffs(cartId, q);
     const estimate = q.estimate?.expected_cents ?? q.totals?.total_cents ?? null;
     return { ok: true, quoteId: q.quote_id, ceilingCents: q.price_ceiling_cents ?? null, estimateCents: estimate ?? q.price_ceiling_cents ?? null };
   } catch (e) {
@@ -805,9 +822,15 @@ router.get('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, res
     const rows = [...byId.values()].sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
     const orders = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
     const marks = standing.map((r) => handoffAsBudgetOrder(r)).filter((o): o is NonNullable<typeof o> => o !== null);
-    const { covered } = budgetBreakdown(await partyReceipts(party.id), [...orders, ...marks]);
-    const coveredIds = new Set(covered.map((o: any) => o.handoffId).filter(Boolean));
-    res.json({ handoffs: rows.map((r) => publicHandoff(r, req.userId, { receiptMatched: coveredIds.has(r.id) })) });
+    // only a receipt actually consumed counts as "your receipt counts for it": a mark that holds 0 is not covered
+    const { receiptMatched } = budgetBreakdown(await partyReceipts(party.id), [...orders, ...marks]);
+    const matchedIds = new Set(receiptMatched.map((o: any) => o.handoffId).filter(Boolean));
+    const budget = await budgetLeft(party);
+    res.json({
+      handoffs: rows.map((r) => publicHandoff(r, req.userId, { receiptMatched: matchedIds.has(r.id) })),
+      // the same budget state the mark answered with, so the copy after a reload matches (USD cents)
+      budget: { capCents: budget.capCents, leftCents: Math.max(0, budget.leftCents), noCap: budget.capCents === null },
+    });
   } catch (e) {
     next(e);
   }
@@ -879,9 +902,11 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
  *  - ordered: "I placed this order". A fact, so it is ALWAYS recorded once the host confirms (a second order needs
  *    `allowAnother`: 409 ORDER_IN_PROGRESS otherwise). It blocks a second order and holds the quote's price
  *    ceiling, re-quoted here with what is left of the budget, so the hold never comes from the browser. When the
- *    re-quote fails (pickup time passed, cart expired) it holds the cart's last known estimate. The hold is clamped
- *    to what is left, which may be 0 (no budget left, no cap, or the estimate over it): then `overBudget` says so.
- *    With no cart it holds 0 and still blocks. Only the host who built the checklist can mark it.
+ *    re-quote fails (pickup time passed, cart expired) it holds the last ceiling rsv saw for the cart, else its
+ *    estimate. With no cart, or no quote/estimate ever captured, the amount is unknown: it holds the REST of the
+ *    budget (`holdsRest`) until a receipt replaces it or the host takes it back. Always clamped to what is left,
+ *    which may be 0 (no budget left, no cap, or the estimate over it: `overBudget` / `budget.noCap` say so).
+ *    Only the host who built the checklist can mark it.
  *  - unmark: "I didn't order after all". Only the host who marked it; frees it at once.
  *  - release: a co-host who checked that nothing was ordered frees it; recorded as theirs (released_by).
  *  - receipt_uploaded: one receipt uploaded AFTER the mark replaces the hold (any host). A receipt uploaded before
@@ -913,7 +938,8 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
       }
       const budget = await budgetLeft(party);
       const left = Math.max(0, budget.leftCents);
-      let holdCents = 0;
+      // unknown amount (no cart, or no quote/estimate ever captured): hold the rest of the budget
+      let holdCents = left;
       let estimateCents: number | null = row.estimateCents;
       let quoteCeilingCents: number | null = row.quoteCeilingCents;
       let quoteId: string | null = row.quoteId;
@@ -924,14 +950,14 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
           quoteId = q.quoteId;
           quoteCeilingCents = q.ceilingCents;
           estimateCents = q.estimateCents;
-          holdCents = q.ceilingCents ?? q.estimateCents ?? 0;
+          holdCents = q.ceilingCents ?? q.estimateCents ?? left;
         } else if (q.overBudget) {
           // the low estimate is over what is left: hold all of it (the mark still counts as the party's order)
           estimateCents = q.estimateCents ?? estimateCents;
           holdCents = left;
         } else {
-          // no fresh quote: the cart's last known estimate (not the whole budget)
-          holdCents = estimateCents ?? quoteCeilingCents ?? 0;
+          // no fresh quote: the last ceiling we saw for the cart, else its estimate; with neither, the rest
+          holdCents = quoteCeilingCents ?? estimateCents ?? left;
         }
       }
       holdCents = Math.max(0, Math.min(Math.round(holdCents), left));
