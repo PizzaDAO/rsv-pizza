@@ -23,6 +23,11 @@ type ApiError = Error & { code?: string; data?: { existingOrderId?: string; exis
 
 /** basil-14648 P2: email refusals about THIS order (lead time, size, total), not the shop: the shop stays emailable. */
 const ORDER_LEVEL_EMAIL_REASONS = ['lead_time', 'too_small', 'too_large', 'over_total_cap'];
+/** No reasons, or any reason that is not about this order: the shop can't get an email order from us now. */
+const isShopLevelEmailRefusal = (err: ApiError) => {
+  const reasons = Array.isArray(err.data?.reasons) ? err.data!.reasons! : [];
+  return !reasons.length || reasons.some((r) => !ORDER_LEVEL_EMAIL_REASONS.includes(r));
+};
 
 interface PizzaOrderFlowProps {
   /** Shown when this party is not in the pilot (and, unless `gated`, while that is being checked). */
@@ -248,7 +253,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setCartState(built);
         return true;
       } catch (e) {
-        if (!showHeldOrder(e as ApiError)) setError(e instanceof Error ? e.message : t('aiOrder.flow.buildError'));
+        const err = e as ApiError;
+        // basil-14648 P2: a refusal about the shop takes "Email the order" off it for the session (same rule as at place)
+        if (err.code === 'EMAIL_ORDERS_NOT_AVAILABLE' && isShopLevelEmailRefusal(err)) setUnemailable((prev) => new Set(prev).add(shop.id));
+        if (!showHeldOrder(err)) setError(e instanceof Error ? e.message : t('aiOrder.flow.buildError'));
         return false;
       } finally {
         setBuilding(false);
@@ -371,8 +379,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           // basil-14648 P2: nothing was ordered or sent. A refusal about the shop (an opt-out, an unverified account,
           // a cap) takes "Email the order" off that shop for this session; one about this order (lead time, size)
           // leaves it, so the host can change the pickup or have the AI call instead (both are on this step).
-          const reasons = Array.isArray(err.data?.reasons) ? err.data!.reasons! : [];
-          if (!reasons.length || reasons.some((r) => !ORDER_LEVEL_EMAIL_REASONS.includes(r))) setUnemailable((prev) => new Set(prev).add(shop.id));
+          if (isShopLevelEmailRefusal(err)) setUnemailable((prev) => new Set(prev).add(shop.id));
           setPlaceError(err.message || t('aiOrder.flow.placeError'));
         } else if (err.code === 'QUOTE_EXPIRED' && (err.data as { quote?: unknown } | undefined)?.quote) {
           // pizza-mcp 1c7113d: nothing was ordered; rsv priced the same cart again. The host reviews and approves again.

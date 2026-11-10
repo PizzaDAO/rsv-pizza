@@ -257,6 +257,23 @@ describe('the email order card', () => {
     await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledWith(canceled));
   });
 
+  it.each([
+    ['awaiting_approval', null, 'Cancel the email order to Sal\'s? Nothing has been sent yet.', 'Cancel this order'],
+    // a send waiting for the shop's hours has not left
+    ['sending', { until: '2026-11-19T13:00:00.000Z', message: 'm' }, 'Cancel the email order to Sal\'s? Nothing has been sent yet.', 'Cancel this order'],
+    // any other send may already have left: never "nothing sent"
+    ['sending', null, "Withdraw the order from Sal's? We email them that it's withdrawn.", 'Withdraw the order'],
+    ['awaiting_shop_reply', null, "Withdraw the order from Sal's? We email them that it's withdrawn.", 'Withdraw the order'],
+    ['awaiting_price_approval', null, "Decline the total from Sal's? We tell them not to make it. Nothing was ordered, so it stops counting against your budget.", "Decline the total from Sal's"],
+  ] as const)('the cancel confirm in %s (deferred %o) is truthful', async (status, deferred, copy, label) => {
+    const e = { ...order().email!, sentAt: status === 'sending' ? null : order().email!.sentAt, deferred };
+    render(<OrderStatus partyId="p" order={order({ status, cancelable: true, email: e })} orderScript="" onUpdate={vi.fn()} onDone={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    const text = screen.getByRole('alertdialog').textContent!;
+    expect(text).toContain(copy);
+    if (!copy.includes('Nothing has been sent')) expect(text).not.toMatch(/Nothing has been sent/);
+  });
+
   it('a confirmed email order can be canceled before pickup, with the shop told', async () => {
     render(<OrderStatus partyId="p" order={order({ status: 'confirmed_by_shop', cancelable: true, confirmedTotalCents: 30000 })} orderScript="" onUpdate={vi.fn()} onDone={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: "Cancel the order with Sal's" }));

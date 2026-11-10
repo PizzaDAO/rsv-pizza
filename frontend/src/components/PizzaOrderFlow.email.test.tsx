@@ -78,6 +78,20 @@ describe('PizzaOrderFlow: email orders', () => {
     expect(mocks.build.mock.calls[1][5]).toBe('ai_phone');
   });
 
+  it.each([
+    [['unverified'], true],
+    [[], true],
+    [['lead_time'], false],
+    [['too_small', 'too_large'], false],
+  ])('a refusal at build (%o) takes the email option off the shop: %s', async (reasons, gone) => {
+    mocks.build.mockRejectedValueOnce(Object.assign(new Error("We can't email Sal's this order."), { code: 'EMAIL_ORDERS_NOT_AVAILABLE', data: { reasons } }));
+    render(<PizzaOrderFlow fallback={<p>fallback</p>} />);
+    await userEvent.click(await screen.findByText("Email Sal's"));
+    await userEvent.click(screen.getByText('Build'));
+    await vi.waitFor(() => expect(mocks.build).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(last().emailAlt == null).toBe(gone));
+  });
+
   it('a refusal about the shop takes the email option off it; one about the order keeps it', async () => {
     const refuse = (reasons: string[]) => Object.assign(new Error("We can't email Sal's this order: x. Nothing was ordered and nothing was sent."), { code: 'EMAIL_ORDERS_NOT_AVAILABLE', data: { reasons } });
     mocks.place.mockRejectedValueOnce(refuse(['lead_time'])).mockRejectedValueOnce(refuse(['do_not_contact']));

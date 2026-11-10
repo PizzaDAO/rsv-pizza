@@ -182,9 +182,14 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
                 isEmail
                   ? order.status === 'confirmed_by_shop'
                     ? t('aiOrder.email.confirmCancelConfirmed', { shop: order.shopName })
-                    : order.status === 'awaiting_approval' || (order.status === 'sending' && !order.email?.sentAt)
-                      ? t('aiOrder.email.confirmCancelBefore', { shop: order.shopName })
-                      : t('aiOrder.email.confirmWithdraw', { shop: order.shopName })
+                    : order.status === 'awaiting_price_approval'
+                      // the shop was told not to start until we confirm: declining frees the budget
+                      ? t('aiOrder.email.confirmDeclinePrice', { shop: order.shopName })
+                      // "nothing sent" only when we know it: before the approval, or a send still waiting for the
+                      // shop's hours. Any other `sending` may already have left (a send in flight)
+                      : order.status === 'awaiting_approval' || (order.status === 'sending' && !!order.email?.deferred)
+                        ? t('aiOrder.email.confirmCancelBefore', { shop: order.shopName })
+                        : t('aiOrder.email.confirmWithdraw', { shop: order.shopName })
                   : order.outcome?.nothing_ordered === false || !!order.call?.checking
                   ? t('aiOrder.status.confirmStopCallback', { shop: order.shopName })
                   : t('aiOrder.status.confirmCancel', { shop: order.shopName })
@@ -220,7 +225,9 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
                 ? t('aiOrder.status.canceling')
                 : isEmail && order.status === 'confirmed_by_shop'
                   ? t('aiOrder.email.cancelConfirmed', { shop: order.shopName })
-                  : isEmail && ['awaiting_shop_reply', 'awaiting_price_approval'].includes(order.status)
+                  : isEmail && order.status === 'awaiting_price_approval'
+                    ? t('aiOrder.email.declinePrice', { shop: order.shopName })
+                    : isEmail && (order.status === 'awaiting_shop_reply' || (order.status === 'sending' && !order.email?.deferred))
                     ? t('aiOrder.email.cancelWithdraw')
                     : t('aiOrder.status.cancelOrder')}
             </button>

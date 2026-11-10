@@ -145,10 +145,19 @@ export interface EmailView {
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/;
 const iso = (v: unknown) => (typeof v === 'string' && ISO_RE.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
-/** Shop-entered words (an alternative time, its order number): one short line, shown as data only. */
+/**
+ * Shop-entered words (an alternative time, its order number): one short line, shown as data only. Control and format
+ * characters go, bidi overrides and isolates (U+202A-202E, U+2066-2069) and zero-width ones included, so shop text
+ * can't reorder or hide what the host reads around it.
+ */
 const shopText = (v: unknown, max: number) => {
   if (typeof v !== 'string') return null;
-  const one = v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  const one = v
+    .replace(/[\p{Cc}\u2028\u2029]+/gu, ' ')
+    .replace(/[\p{Cf}]+/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
   return one || null;
 };
 

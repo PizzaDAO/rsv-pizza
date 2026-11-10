@@ -139,6 +139,11 @@ describe('the email view rsv passes to the browser', () => {
       shopResponse: { decision: 'decline', totalCents: null, readyOk: null, altTimeText: 'Sun 6pm works', reference: null, reason: 'cant_make_time' },
       deferred: null,
     });
+    // bidi overrides, isolates and zero-width characters can't reorder or hide what the host reads
+    const evil = emailViewOf({
+      lastView: { channel: 'email', email: { shop_response: { decision: 'decline', alt_time_text: 'Sun \u202Eevif\u202C at \u2066six\u2069\u200B pm\u2028ok\uFEFF', reference: 'A\u200D-\u061C17' } } },
+    });
+    expect(evil!.shopResponse).toMatchObject({ altTimeText: 'Sun evif at six pm ok', reference: 'A-17' });
     expect(emailViewOf({ lastView: { call: {} } })).toBeNull();
     expect(channelOf({ lastView: { channel: 'email' } })).toBe('email');
     expect(channelOf({ lastView: null })).toBe('phone');

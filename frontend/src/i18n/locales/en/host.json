@@ -1364,8 +1364,10 @@
       "confirmCancelBefore": "Cancel the email order to {{shop}}? Nothing has been sent yet.",
       "confirmWithdraw": "Withdraw the order from {{shop}}? We email them that it's withdrawn. Until they confirm they got that, it still counts against your budget.",
       "confirmCancelConfirmed": "Cancel the confirmed order at {{shop}}? We email them the cancellation. If the pickup is soon, call them too. Until they confirm they got it, it still counts against your budget.",
+      "confirmDeclinePrice": "Decline the total from {{shop}}? We tell them not to make it. Nothing was ordered, so it stops counting against your budget.",
       "cancelWithdraw": "Withdraw the order",
       "cancelConfirmed": "Cancel the order with {{shop}}",
+      "declinePrice": "Decline the total from {{shop}}",
       "status": {
         "approveTitle": "Approve the email to {{shop}}",
         "approveDetail": "When the approval page opens we email you a 6-digit code from Open Pizza; enter it there within 10 minutes. We don't email {{shop}} until you do.",
