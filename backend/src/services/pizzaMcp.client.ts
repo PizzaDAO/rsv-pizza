@@ -29,6 +29,10 @@ export type OpopOrder = S['Order'];
 export type OpopProblem = S['Problem'];
 export type OpopOrderingLink = S['OrderingLink'];
 export type OpopChecklist = S['Checklist'];
+export type OpopHostMenuResult = S['HostMenuResult'];
+export type OpopHostMenuDeleteResult = S['HostMenuDeleteResult'];
+/** What rsv forwards for a host menu: the sniffed files (bytes and the type their bytes say), or a link. */
+export type HostMenuInput = { kind: 'files'; files: Array<{ bytes: Buffer; mime: string }> } | { kind: 'url'; url: string };
 /** pizza-mcp's handoff providers (ORDERING_PROVIDERS). */
 export const OPOP_ORDERING_PROVIDERS = ['toast', 'square_online', 'chownow', 'slice', 'bentobox', 'website'] as const;
 export type OpopOrderingProvider = (typeof OPOP_ORDERING_PROVIDERS)[number];
@@ -128,6 +132,8 @@ export class PizzaMcpClient {
       timeoutMs?: number;
       /** The endpoint answers 204 No Content: resolve with null instead of "unexpected response". */
       noContent?: boolean;
+      /** A ready body (multipart FormData): sent as is, fetch sets its own Content-Type with the boundary. */
+      rawBody?: FormData;
     } = {}
   ): Promise<T> {
     if (!this.baseUrl) throw new AppError('Ordering is not configured', 503, 'PIZZA_MCP_NOT_CONFIGURED');
@@ -150,10 +156,10 @@ export class PizzaMcpClient {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: 'application/json',
-          ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...(opts.body !== undefined && !opts.rawBody ? { 'Content-Type': 'application/json' } : {}),
           ...opts.headers,
         },
-        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        body: opts.rawBody ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
         redirect: 'error',
         signal: AbortSignal.timeout(opts.timeoutMs ?? this.timeoutMs),
       });
@@ -243,6 +249,44 @@ export class PizzaMcpClient {
   /** Aggregate funnel counter on pizza-mcp (204). Needs a cart this host owns; stores no principal, cart or party. */
   recordHandoff(actor: OpopActor, cartId: string, body: { provider: OpopOrderingProvider; event: 'opened' | 'marked_ordered' | 'unmarked' }) {
     return this.request<null>(actor, 'POST', `/carts/${encodeURIComponent(cartId)}/handoff`, { body, noContent: true, timeoutMs: 5000 });
+  }
+
+  /**
+   * basil-14648 P2: the host's own menu for a listing shop (pizza-mcp #5/#8, behind its HOST_MENUS switch). Photos
+   * or a PDF go as multipart `files[]` (rsv has already checked the bytes), a link as JSON. Private to this host on
+   * pizza-mcp: it only changes THEIR new carts. A vision read can take 15-40 s, hence the long timeout.
+   */
+  submitHostMenu(actor: OpopActor, shopId: string, input: HostMenuInput) {
+    const path = `/pizzerias/${encodeURIComponent(shopId)}/menu/host`;
+    if (input.kind === 'url') return this.request<OpopHostMenuResult>(actor, 'POST', path, { body: { url: input.url }, timeoutMs: 60_000 });
+    const form = new FormData();
+    input.files.forEach((f, i) => {
+      const ext = f.mime === 'application/pdf' ? 'pdf' : f.mime.split('/')[1];
+      // a copy into a plain ArrayBuffer: a Node Buffer may be a view on a larger pool
+      form.append('files[]', new Blob([new Uint8Array(f.bytes)], { type: f.mime }), `menu-${i + 1}.${ext}`);
+    });
+    return this.request<OpopHostMenuResult>(actor, 'POST', path, { rawBody: form, timeoutMs: 60_000 });
+  }
+
+  /** Stop using this host's menu for new carts (carts already built keep theirs until they are rebuilt). */
+  deleteHostMenu(actor: OpopActor, shopId: string) {
+    return this.request<OpopHostMenuDeleteResult>(actor, 'DELETE', `/pizzerias/${encodeURIComponent(shopId)}/menu/host`);
+  }
+
+  /**
+   * Does this pizza-mcp take host menus? pizza-mcp has no capability flag for it, but its route checks the switch
+   * FIRST, before the shop, the scope or the body: a made-up listing id answers FEATURE_DISABLED when it is off and
+   * NOT_FOUND when it is on. Nothing is read, counted or stored. Anything else (down, a timeout) is "don't know".
+   */
+  async hostMenusProbe(actor: OpopActor): Promise<boolean | null> {
+    try {
+      await this.request<unknown>(actor, 'POST', '/pizzerias/pzl_probe_none/menu/host', { body: {}, timeoutMs: 3000 });
+      return true;
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'FEATURE_DISABLED') return false;
+      if (e instanceof AppError && (e.code === 'NOT_FOUND' || e.code === 'VALIDATION_FAILED')) return true;
+      return null;
+    }
   }
 
   /**

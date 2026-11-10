@@ -183,7 +183,7 @@ describe('access: authentication, host/co-host, allowlist', () => {
     }
     const cfg = await request(app()).get(`${base}/config`).set(host);
     expect(cfg.status).toBe(200);
-    expect(cfg.body).toEqual({ enabled: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
+    expect(cfg.body).toEqual({ enabled: false, hostMenus: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
     expect(mcp.calls).toHaveLength(0);
   });
 
