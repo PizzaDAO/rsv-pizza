@@ -203,6 +203,34 @@ describe('PizzaOrderFlow: reaching the existing order', () => {
     expect(screen.queryByText('Build')).toBeNull();
   });
 
+  it('pizza-mcp 1c7113d QUOTE_EXPIRED: the new quote replaces the old one, the reason sits by Approve, and approving again places it', async () => {
+    mocks.build.mockResolvedValue({ cart: { id: 'c1', fulfillment: { scheduled_for: '2026-11-01T18:00:00Z' } }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    const msg = "The order changed after it was priced, so nothing was ordered and Sal's wasn't called. We priced it again: check the new estimate and approve again.";
+    mocks.place
+      .mockRejectedValueOnce(Object.assign(new Error(msg), { code: 'QUOTE_EXPIRED', data: { cart: { id: 'c1' }, quote: { quote_id: 'q2' } } }))
+      .mockResolvedValueOnce({ order: row({ status: 'awaiting_approval', opopOrderId: 'ord_new' }), next_action: null });
+    await userEvent.click(await toCart());
+    await userEvent.click(screen.getByText('Approve'));
+    expect((await screen.findByTestId('approve-error')).textContent).toBe(msg);
+    expect(mocks.build).toHaveBeenCalledTimes(1); // no rebuild needed
+    await userEvent.click(screen.getByText('Approve'));
+    expect(mocks.place).toHaveBeenCalledTimes(2);
+    expect(mocks.place.mock.calls[1][1]).toMatchObject({ quoteId: 'q2', cartId: 'c1' });
+    expect(await screen.findByText("Approve the call to Sal's")).toBeTruthy();
+  });
+
+  it('pizza-mcp 1c7113d MENU_GONE: the cart is rebuilt from the recommendations at the same pickup time, and the host is told why', async () => {
+    mocks.build.mockResolvedValue({ cart: { id: 'c1', fulfillment: { scheduled_for: '2026-11-01T18:00:00Z' } }, quote: { quote_id: 'q1' }, recommendationVersion: 'v', issues: [], notices: [], dropped: [] });
+    const msg = "The menu at Sal's changed since this order was built, so nothing was ordered and the shop wasn't called. We're rebuilding the order on the current menu: check it and approve again.";
+    mocks.place.mockRejectedValueOnce(Object.assign(new Error(msg), { code: 'MENU_GONE', data: { rebuild: true } }));
+    await userEvent.click(await toCart());
+    await userEvent.click(screen.getByText('Approve'));
+    expect(await screen.findByText(msg)).toBeTruthy();
+    expect(mocks.build).toHaveBeenCalledTimes(2);
+    expect(mocks.build.mock.calls[1][3]).toBe('2026-11-01T18:00:00Z');
+    expect(screen.getByText('Approve')).toBeTruthy(); // still on the cart, not stuck
+  });
+
   it('a failed lookup says so wherever the host is', async () => {
     mocks.config.mockResolvedValue(cfg({ blockedReason: 'CAP_EXHAUSTED', heldOrderId: 'ord_held' }));
     mocks.order.mockRejectedValue(new Error('down'));

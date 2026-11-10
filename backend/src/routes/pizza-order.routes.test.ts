@@ -1581,3 +1581,148 @@ describe('handoffs: listing and limits', () => {
     expect(full.status).toBe(429);
   });
 });
+
+describe('pizza-mcp 1c7113d: MENU_GONE and QUOTE_EXPIRED at place', () => {
+  const useMcp = (over: Record<string, any>) => {
+    mcp = pizzaMcp(over);
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  };
+  const problem = (code: string, status = 409) => ({ status, json: { code, title: code, status, detail: code, retryable: false } });
+  const orderPosts = () => mcp.calls.filter((x) => x.method === 'POST' && x.path === '/orders');
+
+  it('QUOTE_EXPIRED: rsv prices the same cart again and returns the new quote; nothing stored; placing with it works', async () => {
+    const c = await buildCart();
+    let first = true;
+    useMcp({
+      'POST /orders': (call: any) =>
+        first
+          ? ((first = false), problem('QUOTE_EXPIRED'))
+          : { status: 201, json: { order: opopOrder({ id: `ord_${call.body.quote_id}`, status: 'awaiting_approval' }), next_action: null } },
+      'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }),
+      'POST /carts/:id/quote': () => ({ json: { quote_id: 'q_fresh', cart_id: c.cart.id, price_ceiling_cents: 21000, binding: false, read_back: 'x' } }),
+    });
+    const res = await placeFrom(c);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('QUOTE_EXPIRED');
+    expect(res.body.error.message).toBe("The order changed after it was priced, so nothing was ordered and Sal's wasn't called. We priced it again: check the new estimate and approve again.");
+    expect(res.body.error.quote.quote_id).toBe('q_fresh');
+    expect(res.body.error.cart.id).toBe(c.cart.id);
+    expect(fake.orders.size).toBe(0);
+    // the requote was asked with what is left of the budget, and the new quote belongs to the cart now
+    expect(mcp.calls.find((x) => x.path.endsWith('/quote'))!.body.max_total_cents).toBe(25000);
+    expect(fake.carts.get(c.cart.id).quoteIds).toContain('q_fresh');
+    const again = await placeFrom({ ...c, quote: res.body.error.quote });
+    expect(again.status).toBe(201);
+    expect(orderPosts()).toHaveLength(2);
+  });
+
+  it('MENU_GONE at place: 409 with truthful copy and rebuild: true; nothing stored', async () => {
+    const c = await buildCart();
+    useMcp({ 'POST /orders': () => problem('MENU_GONE') });
+    const res = await placeFrom(c);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({ code: 'MENU_GONE', rebuild: true });
+    expect(res.body.error.message).toBe("The menu at Sal's changed since this order was built, so nothing was ordered and the shop wasn't called. We're rebuilding the order on the current menu: check it and approve again.");
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('QUOTE_EXPIRED on a cart whose menu is gone, or that will not quote: MENU_GONE (rebuild), never a dead end', async () => {
+    const c = await buildCart();
+    for (const over of [
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false, issues: [{ code: 'MENU_GONE' }], menu: { menu_id: 'lm_x', provenance: 'host_provided', as_of: 'x', unavailable: true } }) }) },
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }), 'POST /carts/:id/quote': () => problem('MENU_GONE') },
+      { 'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false }) }) },
+    ]) {
+      useMcp({ 'POST /orders': () => problem('QUOTE_EXPIRED'), ...over });
+      const res = await placeFrom(c);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatchObject({ code: 'MENU_GONE', rebuild: true });
+    }
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('an edit to a cart whose menu is gone: MENU_GONE (rebuild), no quote asked', async () => {
+    const c = await buildCart();
+    useMcp({ 'PATCH /carts/:id': () => ({ json: cartView({ id: c.cart.id, ready_for_quote: false, issues: [{ code: 'MENU_GONE' }], menu: { menu_id: 'lm_x', provenance: 'host_provided', as_of: 'x', unavailable: true } }) }) });
+    const res = await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('MENU_GONE');
+    expect(mcp.calls.some((x) => x.path.endsWith('/quote'))).toBe(false);
+  });
+});
+
+describe('handoffs with pizza-mcp 1c7113d MENU_GONE / QUOTE_EXPIRED', () => {
+  let quoteMode: 'ok' | 'MENU_GONE' | 'QUOTE_EXPIRED' | 'QUOTE_INVALID' = 'ok';
+  let ceiling = 21000;
+  const problem = (code: string, status = 409) => ({ status, json: { code, title: code, status, detail: code, retryable: false } });
+  beforeEach(() => {
+    quoteMode = 'ok';
+    ceiling = 21000;
+    mcp = pizzaMcp({
+      'POST /carts/:id/handoff': () => ({ status: 204, json: null }),
+      'POST /carts/:id/quote': (x: any) =>
+        quoteMode === 'ok'
+          ? { json: { quote_id: `q_${ceiling}`, cart_id: x.path.split('/')[2], price_ceiling_cents: ceiling, estimate: { low_cents: 1, expected_cents: ceiling - 2000, high_cents: ceiling }, binding: false, read_back: 'x' } }
+          : problem(quoteMode),
+    });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  });
+  const click = (body: any = {}) =>
+    request(app()).post(`${base}/handoffs`).set(host).send({ shopId: 'pzl_osm_n1', shopName: "Sal's", provider: 'toast', ...body });
+  const mark = (id: string) => request(app()).post(`${base}/handoffs/${id}/mark`).set(host).send({ action: 'ordered' });
+
+  it.each(['MENU_GONE', 'QUOTE_EXPIRED', 'QUOTE_INVALID'] as const)(
+    'a mark whose re-quote answers %s is still recorded, holding the last ceiling seen (the host already ordered)',
+    async (code) => {
+      const c = await buildCart();
+      const h = (await click({ cartId: c.cart.id })).body.handoff;
+      quoteMode = code;
+      const res = await mark(h.id);
+      expect(res.status).toBe(200);
+      expect(res.body.handoff).toMatchObject({ marked: true, blocking: true, holdCents: 21000, holdsRest: false });
+    }
+  );
+
+  it('a click on a cart whose menu is gone keeps no numbers, so the later mark holds the rest of the budget', async () => {
+    const c = await buildCart();
+    quoteMode = 'MENU_GONE';
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    expect(h.estimateCents ?? null).toBeNull();
+    // the cart build stored numbers before the menu went: they are on the row only if a quote for it succeeded
+    const stored = fake.handoffs.get(h.id);
+    expect(stored.quoteCeilingCents ?? null).toBeNull();
+    const res = await mark(h.id);
+    expect(res.body.handoff).toMatchObject({ holdsRest: true, holdCents: 25000 });
+  });
+
+  it('QUOTE_EXPIRED at an AI place re-prices the cart, and that new quote refreshes an unmarked handoff on it', async () => {
+    const c = await buildCart();
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    expect(fake.handoffs.get(h.id).quoteCeilingCents).toBe(21000);
+    let first = true;
+    mcp = pizzaMcp({
+      'POST /carts/:id/handoff': () => ({ status: 204, json: null }),
+      'POST /orders': () => (first ? ((first = false), problem('QUOTE_EXPIRED')) : problem('QUOTE_EXPIRED')),
+      'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }),
+      'POST /carts/:id/quote': () => ({ json: { quote_id: 'q_fresh', cart_id: c.cart.id, price_ceiling_cents: 18000, estimate: { low_cents: 1, expected_cents: 16000, high_cents: 18000 }, binding: false, read_back: 'x' } }),
+    });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const res = await placeFrom(c);
+    expect(res.body.error.code).toBe('QUOTE_EXPIRED');
+    expect(fake.handoffs.get(h.id)).toMatchObject({ quoteId: 'q_fresh', quoteCeilingCents: 18000, estimateCents: 16000 });
+  });
+
+  it('a cart edit that answers MENU_GONE leaves the handoff numbers alone (rebuild, nothing re-priced)', async () => {
+    const c = await buildCart();
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    mcp = pizzaMcp({
+      'POST /carts/:id/handoff': () => ({ status: 204, json: null }),
+      'PATCH /carts/:id': () => ({ json: cartView({ id: c.cart.id, issues: [{ code: 'MENU_GONE', title: 'gone', status: 409, retryable: false }] }) }),
+      'GET /carts/:id': () => ({ json: cartView({ id: c.cart.id }) }),
+    });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const res = await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    expect(res.body.error.code).toBe('MENU_GONE');
+    expect(fake.handoffs.get(h.id)).toMatchObject({ quoteCeilingCents: 21000 });
+  });
+});

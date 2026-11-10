@@ -299,6 +299,22 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setUncallableNotice({ message: err.message || t('aiOrder.flow.cantCall', { shop: shop.name }), shopName: shop.name, phone: shop.phone });
           setCartState(null);
           setStep('shops');
+        } else if (err.code === 'QUOTE_EXPIRED' && (err.data as { quote?: unknown } | undefined)?.quote) {
+          // pizza-mcp 1c7113d: nothing was ordered; rsv priced the same cart again. The host reviews and approves again.
+          const fresh = err.data as unknown as { cart?: CartResponse['cart']; quote: CartResponse['quote'] };
+          setCartState({ ...cartState, cart: fresh.cart ?? cartState.cart, quote: fresh.quote });
+          setPlaceError(err.message);
+        } else if (err.code === 'MENU_GONE' || err.code === 'QUOTE_EXPIRED') {
+          // the cart's menu is gone: rebuild it from the recommendations, same pickup time and choices, then say why
+          const pickup = (cartState.cart as { fulfillment?: { scheduled_for?: string | null } }).fulfillment?.scheduled_for;
+          if (pickup) {
+            await onBuild(pickup, decisions);
+            // shown above the rebuilt cart whether or not it can be quoted right away
+            setError(err.message);
+          } else {
+            setCartState(null);
+            setError(err.message);
+          }
         } else if (err.code === 'ORDER_IN_PROGRESS') {
           // never silently place a second order: the host chooses
           // the server names the existing order's shop (an AI order or a handoff mark), for the second-order confirm
@@ -327,7 +343,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setPlacing(false);
       }
     },
-    [partyId, shop, cartState, showHeldOrder, t]
+    [partyId, shop, cartState, showHeldOrder, onBuild, decisions, t]
   );
 
   // Leaving an order may have changed the budget (a release, a receipt): refresh the notice.
