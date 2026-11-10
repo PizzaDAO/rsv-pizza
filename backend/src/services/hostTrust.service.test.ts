@@ -18,6 +18,11 @@ import { defaultHostTrustConfig } from '../lib/hostTrustSettings.js';
 
 const NOW = new Date('2026-06-01T12:00:00Z');
 
+/** payout.findMany is used for (a) payouts the host received and (b) wallet lookups across hosts. */
+function walletQueries(received: unknown[], byWallet: unknown[]) {
+  return async ({ where }: any) => (where.hostUserId?.in ? received : byWallet);
+}
+
 function setup(payoutHostUserId: string, otherWallet: string) {
   m.prisma.user.findMany.mockResolvedValue([
     { id: 'owner', name: 'O', email: 'o@example.com', createdAt: new Date('2025-01-01'), payoutWalletAddress: '0xowner' },
@@ -35,7 +40,7 @@ function setup(payoutHostUserId: string, otherWallet: string) {
   m.prisma.photo.groupBy.mockResolvedValue([]);
   m.prisma.payoutDocument.findMany.mockResolvedValue([]);
   // The recipient (a co-host) owns that wallet.
-  m.prisma.payout.findMany.mockResolvedValue([{ hostUserId: 'cohost', payoutWalletAddress: otherWallet }]);
+  m.prisma.payout.findMany.mockImplementation(walletQueries([], [{ hostUserId: 'cohost', payoutWalletAddress: otherWallet }]));
 }
 
 describe('shared payee', () => {
@@ -48,7 +53,16 @@ describe('shared payee', () => {
 
   it('the owner wallet used by another account still blocks', async () => {
     setup('owner', '0xowner');
-    m.prisma.payout.findMany.mockResolvedValue([{ hostUserId: 'other', payoutWalletAddress: '0xowner' }]);
+    m.prisma.payout.findMany.mockImplementation(walletQueries([], [{ hostUserId: 'other', payoutWalletAddress: '0xowner' }]));
+    const [row] = await loadHostTrustRows(['owner'], defaultHostTrustConfig(), NOW, { scoreFakeRisk: false });
+    expect(row.trust.blockers).toContain('shared_payee');
+  });
+
+  it('a wallet from a payout the host received on another party counts', async () => {
+    setup('cohost', '0xcohost');
+    m.prisma.payout.findMany.mockImplementation(
+      walletQueries([{ hostUserId: 'owner', payoutWalletAddress: '0xelsewhere' }], [{ hostUserId: 'other', payoutWalletAddress: '0xelsewhere' }]),
+    );
     const [row] = await loadHostTrustRows(['owner'], defaultHostTrustConfig(), NOW, { scoreFakeRisk: false });
     expect(row.trust.blockers).toContain('shared_payee');
   });

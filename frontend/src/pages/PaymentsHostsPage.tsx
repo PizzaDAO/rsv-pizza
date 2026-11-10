@@ -62,54 +62,72 @@ function TierChip({ tier, provisional }: { tier: TrustTier; provisional?: boolea
   );
 }
 
-function Detail({ host }: { host: HostTrustItem }) {
+function Detail({ host, onChecked }: { host: HostTrustItem; onChecked: (h: HostTrustItem) => void }) {
   const [full, setFull] = useState<HostTrustItem | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchHostTrustDetail(host.userId)
-      .then((h) => !cancelled && setFull(h))
-      .catch((e) => !cancelled && setErr(e instanceof Error ? e.message : 'Could not load parties'));
+      .then((h) => {
+        if (cancelled) return;
+        setFull(h);
+        onChecked(h);
+      })
+      .catch((e) => !cancelled && setErr(e instanceof Error ? e.message : 'Could not load the full check'));
     return () => {
       cancelled = true;
     };
-  }, [host.userId]);
+    // onChecked is stable (useCallback in the parent); re-fetch only when the host changes.
+  }, [host.userId, onChecked]);
 
+  // Tier, score, reasons, gates and blockers come from the full check (it includes fake-event risk).
+  const checked = full;
   return (
     <div className="grid gap-4 md:grid-cols-2 text-sm">
       <div>
-        <div className="font-medium text-theme-text mb-1">Why this score</div>
-        <ul className="space-y-0.5 text-theme-text-secondary">
-          {host.reasons.map((r) => (
-            <li key={r.signal}>
-              <span className={r.points < 0 ? 'text-red-600' : 'text-emerald-700'}>{r.points > 0 ? `+${r.points}` : r.points}</span> {r.detail}
-            </li>
-          ))}
-          {host.reasons.length === 0 && <li>No signals yet.</li>}
-        </ul>
-        <div className="font-medium text-theme-text mt-3 mb-1">Gates for trusted</div>
-        <ul className="space-y-0.5 text-theme-text-secondary">
-          {host.gates.map((g) => (
-            <li key={g.id}>
-              {g.met ? 'Met' : 'Missing'}: {g.id}
-              {g.need != null ? ` (${g.have} of ${g.need})` : ''}
-            </li>
-          ))}
-        </ul>
-        {host.blockers.length > 0 && (
+        {!checked && !err && (
+          <div className="flex items-center gap-2 text-theme-text-muted"><Loader2 size={16} className="animate-spin" /> Checking fake-event risk</div>
+        )}
+        {err && <p className="text-red-600">{err}</p>}
+        {checked && (
           <>
-            <div className="font-medium text-red-700 mt-3 mb-1">Blockers</div>
-            <ul className="space-y-0.5 text-red-700">
-              {host.blockers.map((b) => (
-                <li key={b}>{BLOCKER_LABEL[b] ?? b}</li>
+            <div className="flex items-center gap-2 mb-2">
+              <TierChip tier={checked.tier} />
+              <span className="text-theme-text">Score {checked.score}</span>
+            </div>
+            <div className="font-medium text-theme-text mb-1">Why this score</div>
+            <ul className="space-y-0.5 text-theme-text-secondary">
+              {checked.reasons.map((r) => (
+                <li key={r.signal}>
+                  <span className={r.points < 0 ? 'text-red-600' : 'text-emerald-700'}>{r.points > 0 ? `+${r.points}` : r.points}</span> {r.detail}
+                </li>
+              ))}
+              {checked.reasons.length === 0 && <li>No signals yet.</li>}
+            </ul>
+            <div className="font-medium text-theme-text mt-3 mb-1">Gates for trusted</div>
+            <ul className="space-y-0.5 text-theme-text-secondary">
+              {checked.gates.map((g) => (
+                <li key={g.id}>
+                  {g.met ? 'Met' : 'Missing'}: {g.id}
+                  {g.need != null ? ` (${g.have} of ${g.need})` : ''}
+                </li>
               ))}
             </ul>
+            {checked.blockers.length > 0 && (
+              <>
+                <div className="font-medium text-red-700 mt-3 mb-1">Blockers</div>
+                <ul className="space-y-0.5 text-red-700">
+                  {checked.blockers.map((b) => (
+                    <li key={b}>{BLOCKER_LABEL[b] ?? b}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </>
         )}
       </div>
       <div className="overflow-x-auto">
         <div className="font-medium text-theme-text mb-1">Parties</div>
-        {err && <p className="text-red-600">{err}</p>}
         {!full && !err && <Loader2 size={16} className="animate-spin" />}
         {full?.parties && (
           <table className="w-full text-xs">
@@ -146,6 +164,8 @@ type Gate = 'loading' | 'denied' | 'off' | 'ok';
 export function PaymentsHostsPage() {
   const [gate, setGate] = useState<Gate>('loading');
   const [q, setQ] = useState('');
+  // The search applies on submit: `search` is the submitted text, `reloadKey` forces a reload.
+  const [search, setSearch] = useState({ q: '', key: 0 });
   const [tier, setTier] = useState<TrustTier | ''>('');
   const [hosts, setHosts] = useState<HostTrustItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -175,11 +195,11 @@ export function PaymentsHostsPage() {
     };
   }, []);
 
-  const load = useCallback(async (nextOffset: number, append: boolean) => {
+  const load = useCallback(async (query: string, tierFilter: TrustTier | '', nextOffset: number, append: boolean) => {
     setBusy(true);
     setError(null);
     try {
-      const page = await fetchHostTrust({ q: q.trim() || undefined, tier: tier || undefined, offset: nextOffset, limit: 25 });
+      const page = await fetchHostTrust({ q: query.trim() || undefined, tier: tierFilter || undefined, offset: nextOffset, limit: 25 });
       setHosts((prev) => (append ? [...prev, ...page.hosts] : page.hosts));
       setTotal(page.total);
       setOffset(nextOffset + page.limit);
@@ -189,12 +209,17 @@ export function PaymentsHostsPage() {
     } finally {
       setBusy(false);
     }
-  }, [q, tier]);
+  }, []);
+
+  // Replace the list row with the checked one so its chip stops saying provisional.
+  const onChecked = useCallback((h: HostTrustItem) => {
+    setHosts((prev) => prev.map((x) => (x.userId === h.userId ? { ...h, parties: undefined, provisional: false } : x)));
+  }, []);
 
   useEffect(() => {
-    if (gate === 'ok') void load(0, false);
+    if (gate === 'ok') void load(search.q, tier, 0, false);
     // Search is submitted with Enter / the button; tier reloads right away.
-  }, [gate, tier]);
+  }, [gate, tier, load, search]);
 
   if (gate === 'loading') {
     return <Layout><div className="flex justify-center py-32"><Loader2 className="animate-spin" /></div></Layout>;
@@ -238,7 +263,7 @@ export function PaymentsHostsPage() {
 
         <form
           className="flex gap-2 mb-4 flex-wrap items-center"
-          onSubmit={(e) => { e.preventDefault(); void load(0, false); }}
+          onSubmit={(e) => { e.preventDefault(); setSearch((s) => ({ q, key: s.key + 1 })); }}
         >
           <div className="flex-1 min-w-[12rem]">
             <IconInput icon={Search} placeholder="Search name or email" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -286,7 +311,7 @@ export function PaymentsHostsPage() {
                       {h.provisional && <div className="text-xs text-theme-text-muted">Fake risk: open row to check</div>}</td>
                   </tr>
                   {open === h.userId && (
-                    <tr className="bg-theme-surface/50"><td colSpan={10} className="p-4"><Detail host={h} /></td></tr>
+                    <tr className="bg-theme-surface/50"><td colSpan={10} className="p-4"><Detail host={h} onChecked={onChecked} /></td></tr>
                   )}
                 </Fragment>
               ))}
@@ -301,7 +326,7 @@ export function PaymentsHostsPage() {
         <div className="mt-4 flex items-center gap-3">
           {busy && <Loader2 size={16} className="animate-spin" />}
           {hasMore && !busy && (
-            <button type="button" onClick={() => void load(offset, true)} className="px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke text-sm">
+            <button type="button" onClick={() => void load(search.q, tier, offset, true)} className="px-4 py-2 rounded-lg bg-theme-surface border border-theme-stroke text-sm">
               Load more
             </button>
           )}

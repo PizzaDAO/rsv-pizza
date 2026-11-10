@@ -179,6 +179,12 @@ export async function loadHostTrustRows(
   for (const u of users) addWallet(u.id, u.payoutWalletAddress);
   // Only payouts whose recipient is the host: admins can pay a co-host or other recipient on this party.
   for (const p of parties) for (const po of p.payouts) if (po.hostUserId === p.userId) addWallet(p.userId, po.payoutWalletAddress);
+  // Also wallets on payouts the host received on any party (same as hostFastPass.service.ts).
+  const received = await prisma.payout.findMany({
+    where: { hostUserId: { in: userIds }, payoutWalletAddress: { not: null } },
+    select: { hostUserId: true, payoutWalletAddress: true },
+  });
+  for (const r of received) addWallet(r.hostUserId, r.payoutWalletAddress);
   const allWallets = Array.from(new Set(Array.from(walletsByUser.values()).flatMap((s) => Array.from(s))));
   const usersByWallet = new Map<string, Set<string>>();
   if (allWallets.length) {

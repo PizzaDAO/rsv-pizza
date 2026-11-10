@@ -9,7 +9,7 @@ import { IconInput } from '../components/IconInput';
 import { SavedViewsMenu } from '../components/SavedViewsMenu';
 import {
   fetchAdminMe,
-    fetchUnderbossMe,
+  fetchUnderbossMe,
   listAdminPayouts,
   fetchPayoutsByParty,
   getAdminPayout,
