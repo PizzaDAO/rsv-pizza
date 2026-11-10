@@ -7,6 +7,7 @@ import { CartReview } from './CartReview';
 import { OrderStatus } from './OrderStatus';
 import { InlineConfirm } from './InlineConfirm';
 import { HandoffPanel } from './HandoffPanel';
+import { HostMenuUpload } from './HostMenuUpload';
 import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
   getPizzaHandoffs, recordPizzaHandoff, handoffToResume, releasedByOtherHost, HandoffBudget,
@@ -95,6 +96,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // shop phones from the listing: the Call button's fallback when the order view has no `shop.phone` (pizza-mcp
   // before 64fb2ac, or a row stored before it)
   const [phones, setPhones] = useState<ReadonlyMap<string, string>>(() => new Map());
+  // basil-14648 P2: "Use this shop's real menu" is offered (rsv's switch and pizza-mcp both on), and for which shop
+  // the host asked for it from the list (the panel opens straight away there)
+  const [hostMenus, setHostMenus] = useState(false);
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstStep = useRef(true);
 
@@ -116,6 +121,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         if (cancelled) return;
         setEnabled(cfg.enabled);
         if (!cfg.enabled) return;
+        setHostMenus(cfg.hostMenus === true);
         setBlockedReason(cfg.blockedReason);
         setHeldOrderId(cfg.heldOrderId ?? null);
         setHeldHandoffId(cfg.heldHandoffId ?? null);
@@ -252,6 +258,17 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     },
     [partyId, t]
   );
+
+  /**
+   * basil-14648 P2: the host added or removed their menu. A cart keeps its menu for life, so a built cart is rebuilt
+   * (a NEW cart on the new menu) with the same pickup time and choices. No cart yet: the next build uses it.
+   */
+  const onMenuChanged = useCallback(async () => {
+    const pickup = cartState?.cart?.fulfillment?.scheduled_for;
+    if (!cartState?.cart || !pickup) return false;
+    await onBuild(pickup, decisions);
+    return true;
+  }, [cartState, onBuild, decisions]);
 
   const onDecide = useCallback(
     (pickupAtIso: string, ref: string, choice: CartDecision) => onBuild(pickupAtIso, { ...decisions, [ref]: choice }),
@@ -545,10 +562,23 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
             setError(null);
             setPlaceError(null);
             setUncallableNotice(null);
+            setMenuOpenFor(null);
             setStep('cart');
           }}
+          onUseMenu={hostMenus ? (s) => {
+            setShop(s);
+            setMode('ai');
+            setHandoff(null);
+            setCartState(null);
+            setError(null);
+            setPlaceError(null);
+            setUncallableNotice(null);
+            setMenuOpenFor(s.id);
+            setStep('cart');
+          } : undefined}
           onChecklist={(s) => {
             setShop(s);
+            setMenuOpenFor(null);
             setMode('handoff');
             setHandoff(null);
             setCartState(null);
@@ -583,6 +613,20 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           onBack={() => setStep('shops')}
           mode={mode}
           onSwitchToHandoff={() => setMode('handoff')}
+          menuSlot={
+            hostMenus && shop.tier === 'listing' ? (
+              <HostMenuUpload
+                key={shop.id}
+                partyId={partyId}
+                shop={shop}
+                cartMenu={cartState?.cart?.menu ?? null}
+                defaultOpen={menuOpenFor === shop.id}
+                timeZone={party?.timezone ?? null}
+                rebuilding={building}
+                onChanged={onMenuChanged}
+              />
+            ) : null
+          }
           handoffSlot={
             <HandoffPanel
               partyId={partyId}

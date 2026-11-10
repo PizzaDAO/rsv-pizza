@@ -51,6 +51,15 @@ export interface CartLine {
   summary: string;
   dietary_firm?: string[];
 }
+export type MenuProvenance = 'native' | 'host_provided' | 'extracted' | 'observed' | 'generic';
+/** pizza-mcp CartView.menu: the menu a listing cart was built on. A cart keeps it for life. */
+export interface CartMenu {
+  menu_id: string | null;
+  provenance: MenuProvenance;
+  as_of: string;
+  /** The menu is gone (removed or expired): the cart can't be quoted; build a new one. */
+  unavailable?: boolean;
+}
 export interface PizzaCart {
   id: string;
   pizzeria_id: string;
@@ -58,6 +67,9 @@ export interface PizzaCart {
   lines: CartLine[];
   ready_for_quote: boolean;
   checklist?: Checklist;
+  /** basil-14648 P2: listing carts only. `host_provided` = the host's own menu (read by software). */
+  menu?: CartMenu;
+  fulfillment?: { scheduled_for?: string | null };
 }
 export interface PizzaQuote {
   quote_id: string;
@@ -182,6 +194,8 @@ const base = (partyId: string) => `/api/parties/${partyId}/pizza`;
 
 export interface PizzaOrderConfig {
   enabled: boolean;
+  /** basil-14648 P2: rsv's switch is on AND pizza-mcp takes host menus: offer "Use this shop's real menu". */
+  hostMenus?: boolean;
   capCents: number | null;
   remainingCapCents: number | null;
   /** e.g. NO_REIMBURSEMENT_CAP / CAP_EXHAUSTED: ordering is on for the party but blocked right now. */
@@ -342,6 +356,118 @@ export const markPizzaHandoff = (
     method: 'POST',
     body: { action, ...(allowAnother ? { allowAnother: true } : {}) },
   });
+
+// ---------------------------------------------------------------------------
+// basil-14648 P2: the host's own menu for a listing shop (plans/rsv-p2-host-menus.md). Private to the host on
+// pizza-mcp; it only changes their NEW carts, so the flow rebuilds the cart after an upload or a removal.
+// ---------------------------------------------------------------------------
+export interface HostMenuResult {
+  menuId: string;
+  provenance: MenuProvenance;
+  asOf: string;
+  summary: { pizzaItems: number; pricedItems: number; priceRangeCents: [number, number] | null };
+}
+
+/** The limits rsv and pizza-mcp enforce; checked here first so the host hears it before a long upload. */
+export const MENU_LIMITS = { maxImages: 3, maxTotalBytes: 4 * 1024 * 1024, longestSidePx: 2000, jpegQuality: 0.8, maxUrlChars: 500 } as const;
+const MENU_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/** Up to 75 s: a vision read takes 15-40 s on pizza-mcp, plus two hops. */
+const MENU_TIMEOUT_MS = 75_000;
+
+export const submitHostMenuFiles = (partyId: string, shopId: string, files: Blob[]) => {
+  const form = new FormData();
+  files.forEach((f, i) => form.append('files[]', f, f instanceof File ? f.name : `menu-${i + 1}`));
+  return apiRequest<HostMenuResult>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/menu/host`, { method: 'POST', body: form, timeoutMs: MENU_TIMEOUT_MS });
+};
+export const submitHostMenuUrl = (partyId: string, shopId: string, url: string) =>
+  apiRequest<HostMenuResult>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/menu/host`, { method: 'POST', body: { url }, timeoutMs: MENU_TIMEOUT_MS });
+export const deleteHostMenu = (partyId: string, shopId: string) =>
+  apiRequest<{ expired: number }>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/menu/host`, { method: 'DELETE' });
+
+export class MenuFileError extends Error {
+  constructor(public code: 'MENU_TOO_LARGE' | 'UNSUPPORTED_MEDIA_TYPE' | 'NO_FILES') {
+    super(code);
+  }
+}
+
+/**
+ * Get the host's chosen files ready to send: photos are re-drawn at most 2000 px on the longest side as JPEG q0.8
+ * (a phone photo becomes about 0.5-1 MB, and the re-encode drops the photo's EXIF data, location included). A PDF
+ * goes as it is. Up to 3 photos or one PDF alone, 4 MB in total, else a MenuFileError.
+ */
+export async function prepareMenuFiles(files: File[]): Promise<Blob[]> {
+  if (files.length === 0) throw new MenuFileError('NO_FILES');
+  const pdfs = files.filter((f) => f.type === 'application/pdf');
+  if (pdfs.length > 0 && files.length > 1) throw new MenuFileError('UNSUPPORTED_MEDIA_TYPE');
+  if (pdfs.length === 0 && files.length > MENU_LIMITS.maxImages) throw new MenuFileError('MENU_TOO_LARGE');
+  const out: Blob[] = [];
+  for (const f of files) {
+    if (f.type === 'application/pdf') out.push(f);
+    else if (f.type.startsWith('image/') || f.type === '') out.push(await downscale(f));
+    else throw new MenuFileError('UNSUPPORTED_MEDIA_TYPE');
+  }
+  if (out.reduce((n, b) => n + b.size, 0) > MENU_LIMITS.maxTotalBytes) throw new MenuFileError('MENU_TOO_LARGE');
+  return out;
+}
+
+async function downscale(f: File): Promise<Blob> {
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+  } catch {
+    // a format this browser can't draw: send it only if it is one pizza-mcp reads (it checks the bytes again)
+    if (MENU_IMAGE_TYPES.includes(f.type)) return f;
+    throw new MenuFileError('UNSUPPORTED_MEDIA_TYPE');
+  }
+  const scale = Math.min(1, MENU_LIMITS.longestSidePx / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bmp.width * scale));
+  canvas.height = Math.max(1, Math.round(bmp.height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return f;
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', MENU_LIMITS.jpegQuality));
+  if (!blob) return f;
+  const name = (f.name || 'menu').replace(/\.[^.]+$/, '') + '.jpg';
+  return new File([blob], name, { type: 'image/jpeg' });
+}
+
+/** A menu's date for "estimate from your menu (Nov 9)", on the party's clock. */
+export function formatMenuDate(iso: string | null | undefined, lang: string, timeZone?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(lang || 'en', { month: 'short', day: 'numeric', timeZone: safeTimeZone(timeZone) }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+/** Every problem a menu upload can end in, as the i18n key of plain copy with a next step. */
+export function hostMenuErrorKey(code: string | undefined): string {
+  switch (code) {
+    case 'MENU_UNREADABLE':
+    case 'MENU_TOO_LARGE':
+    case 'UNSUPPORTED_MEDIA_TYPE':
+    case 'URL_NOT_ALLOWED':
+    case 'MENU_CURRENCY_MISMATCH':
+    case 'RATE_LIMITED':
+    case 'EXTRACTION_BUDGET_EXHAUSTED':
+    case 'FEATURE_DISABLED':
+    case 'NOT_A_LISTING':
+    case 'NO_FILES':
+      return `aiOrder.menu.errors.${code}`;
+    case 'EXTRACTION_UNAVAILABLE':
+    case 'PIZZA_MCP_UNAVAILABLE':
+    case 'TIMEOUT':
+      return 'aiOrder.menu.errors.EXTRACTION_UNAVAILABLE';
+    default:
+      return 'aiOrder.menu.errors.default';
+  }
+}
 
 export const addShopOrderingLink = (partyId: string, shopId: string, url: string) =>
   apiRequest<{ link: OrderingLink }>(`${base(partyId)}/shops/${encodeURIComponent(shopId)}/links`, { method: 'POST', body: { url } });

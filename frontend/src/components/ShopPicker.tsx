@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw, ListChecks, ShoppingBag } from 'lucide-react';
+import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw, ListChecks, ShoppingBag, BookOpen } from 'lucide-react';
 import { getPizzaShops, shopBadge, formatPhone, orderingLinks, safeHref, OrderingLink, PizzaShop } from '../lib/pizzaOrder';
 
 interface ShopPickerProps {
@@ -19,6 +19,8 @@ interface ShopPickerProps {
   onChecklist?: (shop: PizzaShop) => void;
   /** basil-14648 P2: the host opened one of the shop's ordering pages (recorded; never blocks the new tab). */
   onOpenLink?: (shop: PizzaShop, link: OrderingLink) => void;
+  /** basil-14648 P2: open the shop with "Use this shop's real menu" (listing shops; only when host menus are on). */
+  onUseMenu?: (shop: PizzaShop) => void;
 }
 
 const toneClass: Record<'green' | 'purple' | 'gray', string> = {
@@ -30,7 +32,7 @@ const toneClass: Record<'green' | 'purple' | 'gray', string> = {
 const addressLine = (a: Record<string, unknown>) =>
   [a.line1, a.city, a.region].filter((x) => typeof x === 'string' && x).join(', ');
 
-export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded, onChecklist, onOpenLink }) => {
+export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded, onChecklist, onOpenLink, onUseMenu }) => {
   const { t } = useTranslation('host');
   const [shops, setShops] = useState<PizzaShop[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +137,18 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
             <ListChecks size={14} aria-hidden="true" /> {t('aiOrder.handoff.buildChecklist')}
           </button>
         );
+        // basil-14648 P2: the host's own menu, for a closer estimate (listing shops only: a native shop has its own)
+        const menuButton = onUseMenu && shop.tier === 'listing' && (
+          <button
+            type="button"
+            onClick={() => onUseMenu(shop)}
+            disabled={orderDisabled}
+            className="btn-secondary text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5"
+            aria-label={t('aiOrder.menu.offerFor', { shop: shop.name })}
+          >
+            <BookOpen size={14} aria-hidden="true" /> {t('aiOrder.menu.offer')}
+          </button>
+        );
         const Icon = badge.tone === 'green' ? Zap : badge.tone === 'purple' ? Bot : 'handoff' in badge && badge.handoff ? ShoppingBag : Phone;
         const addr = addressLine(shop.address);
         return (
@@ -171,6 +185,7 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                   {linkButtons}
                   {blockedNote}
                   {checklistButton}
+                  {menuButton}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
@@ -196,6 +211,7 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                     </a>
                   )}
                   {checklistButton}
+                  {menuButton}
                 </div>
               )}
             </div>

@@ -111,4 +111,19 @@ describe('CartReview', () => {
     render(<CartReview {...props({ shop: { ...shop('listing'), phone: '+16175550101' }, cartState: { ...base, cart: null, quote: null } })} />);
     expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
   });
+
+  it('basil-14648 P2: says the estimate is from the host\'s own menu (dated), and renders the menu slot above it', () => {
+    const state: CartResponse = { ...base, cart: { ...base.cart!, menu: { menu_id: 'lm_1', provenance: 'host_provided', as_of: '2026-11-09T15:00:00Z' } } };
+    render(<CartReview {...props({ cartState: state, timeZone: 'America/New_York', menuSlot: <p>MENU SLOT</p> })} />);
+    expect(screen.getByText('Estimate from your menu (Nov 9)')).toBeTruthy();
+    const slot = screen.getByText('MENU SLOT');
+    const estimate = screen.getByText(/Estimate \$150.00 to \$210.00/);
+    expect(slot.compareDocumentPosition(estimate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('basil-14648 P2: a generic cart says nothing about "your menu"', () => {
+    const state: CartResponse = { ...base, cart: { ...base.cart!, menu: { menu_id: null, provenance: 'generic', as_of: '2026-11-09T15:00:00Z' } } };
+    render(<CartReview {...props({ cartState: state })} />);
+    expect(screen.queryByText(/your menu/)).toBeNull();
+  });
 });

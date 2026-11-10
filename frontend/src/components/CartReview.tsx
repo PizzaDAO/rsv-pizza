@@ -4,7 +4,7 @@ import { Loader2, Clock, DollarSign, User, Phone, ArrowLeft, ShoppingBag } from 
 import { IconInput } from './IconInput';
 import {
   CartResponse, CartDecision, PizzaShop, formatCents, toE164, defaultPickupLocal, zonedLocalToIso, safeTimeZone, formatWhen, formatPhone,
-  hasProviderLink,
+  hasProviderLink, formatMenuDate,
 } from '../lib/pizzaOrder';
 
 interface CartReviewProps {
@@ -38,6 +38,8 @@ interface CartReviewProps {
   handoffSlot?: React.ReactNode;
   /** Offered on a callable listing shop that also takes orders online. */
   onSwitchToHandoff?: () => void;
+  /** basil-14648 P2: "Use this shop's real menu" (HostMenuUpload), shown above the estimate when offered. */
+  menuSlot?: React.ReactNode;
 }
 
 const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; children: React.ReactNode }> = ({ id, label, help, children }) => (
@@ -50,10 +52,10 @@ const Field: React.FC<{ id: string; label: string; help?: React.ReactNode; child
 
 export const CartReview: React.FC<CartReviewProps> = ({
   shop, cartState, building, error, approveError, approveNotice, defaultName, partyDate, timeZone, city, onBuild, onDecide, onApprove, placing, onBack,
-  mode = 'ai', handoffSlot, onSwitchToHandoff,
+  mode = 'ai', handoffSlot, onSwitchToHandoff, menuSlot,
 }) => {
   const handoff = mode === 'handoff';
-  const { t } = useTranslation('host');
+  const { t, i18n } = useTranslation('host');
   const tz = safeTimeZone(timeZone);
   const [pickupLocal, setPickupLocal] = useState(() => defaultPickupLocal(partyDate, new Date(), tz));
   const [name, setName] = useState(defaultName);
@@ -133,6 +135,7 @@ export const CartReview: React.FC<CartReviewProps> = ({
       </div>
 
       {error && <p role="alert" className="text-sm text-[color:var(--ai-error)]">{error}</p>}
+      {menuSlot}
       <p role="status" className="sr-only">{building ? t('aiOrder.cart.liveBuilding') : quote ? t('aiOrder.cart.liveReady') : ''}</p>
 
       {cartState?.issues.length ? (
@@ -188,6 +191,12 @@ export const CartReview: React.FC<CartReviewProps> = ({
             <p className="text-sm text-theme-text whitespace-pre-line">{quote.read_back}</p>
           )}
           {pickupIso && <p className="text-sm text-theme-text-secondary">{t('aiOrder.cart.pickupAt', { time: formatWhen(pickupIso, tz) })}</p>}
+          {/* basil-14648 P2: say where the estimate comes from when it is the host's own menu */}
+          {cartState?.cart?.menu?.provenance === 'host_provided' && (
+            <p className="text-sm font-medium text-theme-text">
+              {t('aiOrder.menu.using', { date: formatMenuDate(cartState.cart.menu.as_of, i18n.language, tz) })}
+            </p>
+          )}
           {quote.estimate ? (
             <p className="text-sm text-theme-text-secondary">
               {t('aiOrder.cart.estimate', { low: formatCents(quote.estimate.low_cents), high: formatCents(quote.estimate.high_cents), expected: formatCents(quote.estimate.expected_cents) })}
