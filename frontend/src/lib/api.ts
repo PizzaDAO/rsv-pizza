@@ -46,9 +46,9 @@ export async function apiRequest<T>(
   const { method = 'GET', body, requireAuth = true } = options;
   const timeoutMs = options.timeoutMs === undefined ? DEFAULT_API_TIMEOUT_MS : options.timeoutMs;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  // basil-14648 P2: a FormData body (a menu upload) goes as multipart; the browser sets the boundary itself
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
 
   if (requireAuth) {
     const token = getAuthToken();
@@ -69,7 +69,7 @@ export async function apiRequest<T>(
     response = await fetch(`${API_URL}${endpoint}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
       ...(timeoutMs && timeoutMs > 0 ? { signal: timeoutSignal(timeoutMs) } : {}),
     });
   } catch (e: any) {

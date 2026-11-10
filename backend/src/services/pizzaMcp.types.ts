@@ -405,6 +405,8 @@ export interface components {
                 pickup: boolean;
                 delivery: boolean;
                 half_and_half: boolean;
+                /** @description Listing shops: true when POST /pizzerias/{id}/menu/host takes the caller's own menu for this shop (host menus are on here, and the shop has not opted out). Absent on native shops, which have their own menu. */
+                host_menu_upload?: boolean;
             };
             address: {
                 [key: string]: unknown;

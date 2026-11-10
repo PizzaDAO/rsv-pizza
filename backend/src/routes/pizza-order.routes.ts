@@ -26,7 +26,11 @@ import {
   OpopQuote,
   OPOP_ORDERING_PROVIDERS,
   OpopOrderingProvider,
+  HostMenuInput,
 } from '../services/pizzaMcp.client.js';
+import { hostMenusFlagOn } from '../lib/hostMenus.js';
+import { checkMenuUpload, checkMenuUrl } from '../lib/uploadSniff.js';
+import { drainRequest, readMenuUpload } from '../lib/menuUpload.js';
 import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
 import { notifyHostOfOrder } from '../services/pizzaOrderNotify.js';
 import { withApprovalHold, holdUntilOf } from '../services/pizzaApproval.js';
@@ -126,7 +130,7 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
 router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party, enabled } = await loadPartyForOrdering(req.params.partyId, req, { requireEnabled: false });
-    if (!enabled) return res.json({ enabled: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
+    if (!enabled) return res.json({ enabled: false, hostMenus: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
     let remaining: number | null = null;
     let blockedReason: string | null = null;
     let heldOrderId: string | null = null;
@@ -145,8 +149,12 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
       const h = await prisma.pizzaHandoff.findFirst({ where: { id: heldHandoffId, partyId: party.id } });
       if (h) heldHandoff = { id: h.id, shopName: h.shopName, provider: h.provider, isMine: h.userId === req.userId };
     }
+    // basil-14648 P2: rsv's switch for "Use this shop's real menu". Whether a shop takes one is pizza-mcp's
+    // `capabilities.host_menu_upload` on that shop (the UI hides the feature per shop).
+    const hostMenus = hostMenusFlagOn();
     res.json({
       enabled: true,
+      hostMenus,
       capCents: party.capCents,
       remainingCapCents: remaining,
       blockedReason,
@@ -1090,6 +1098,68 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
       return res.json({ handoff: await handoffView(updated, req.userId) });
     }
     throw new AppError('action must be ordered, unmark, release or receipt_uploaded', 400, 'VALIDATION_FAILED');
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// basil-14648 P2: the host's own menu for a listing shop (plans/rsv-p2-host-menus.md). Photos (up to 3) or one PDF,
+// or a link, passed through to pizza-mcp with THIS host's own token: the menu is private to them there and only
+// changes their new carts (a co-host's carts keep the shop's usual menu). rsv checks the type (magic bytes) and the
+// sizes before forwarding and keeps nothing: no file, no link, no menu. Behind PIZZA_HOST_MENUS=1.
+// ---------------------------------------------------------------------------
+
+/** The gates every host-menu route shares: the party (host or co-host, pilot), rsv's switch, a listing shop. */
+async function hostMenuParty(req: AuthRequest) {
+  const { party } = await loadPartyForOrdering(req.params.partyId, req);
+  if (!hostMenusFlagOn()) throw new AppError('Adding a menu is not available yet.', 404, 'FEATURE_DISABLED');
+  const shopId = shopIdParam(req.params.shopId);
+  if (!shopId.startsWith('pzl_')) throw new AppError('This shop has its own online menu, so there is nothing to add.', 409, 'NOT_A_LISTING');
+  return { party, shopId, actor: actorFor(req, party) };
+}
+
+router.post('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { shopId, actor } = await hostMenuParty(req);
+    const type = String(req.headers['content-type'] ?? '').toLowerCase();
+    let input: HostMenuInput;
+    if (type.startsWith('multipart/form-data')) {
+      const check = checkMenuUpload(await readMenuUpload(req, res));
+      if (!check.ok) throw new AppError(check.message, check.status, check.code);
+      input = { kind: 'files', files: check.files };
+    } else if (type.startsWith('application/json')) {
+      const body = isObj(req.body) ? req.body : {};
+      const url = checkMenuUrl(body.url);
+      if (!url.ok) throw new AppError(url.message, 400, 'URL_NOT_ALLOWED');
+      input = { kind: 'url', url: url.url };
+    } else {
+      throw new AppError('Send the menu as photos, a PDF, or a link.', 415, 'UNSUPPORTED_MEDIA_TYPE');
+    }
+    const r = await getPizzaMcpClient().submitHostMenu(actor, shopId, input);
+    // only what the browser shows: the counts, the date, and the id (the menu itself stays on pizza-mcp)
+    res.status(201).json({
+      menuId: r.menu_id,
+      provenance: r.menu.provenance,
+      asOf: r.menu.as_of,
+      summary: {
+        pizzaItems: r.summary.pizza_items,
+        pricedItems: r.summary.priced_items,
+        priceRangeCents: r.summary.price_range_cents ?? null,
+      },
+    });
+  } catch (e) {
+    // a refusal before (or while) the upload was read: drain it first, so the browser gets this answer
+    await drainRequest(req, res);
+    next(e);
+  }
+});
+
+router.delete('/:partyId/pizza/shops/:shopId/menu/host', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { shopId, actor } = await hostMenuParty(req);
+    const r = await getPizzaMcpClient().deleteHostMenu(actor, shopId);
+    res.json({ expired: r.expired });
   } catch (e) {
     next(e);
   }

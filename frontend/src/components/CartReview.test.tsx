@@ -111,4 +111,31 @@ describe('CartReview', () => {
     render(<CartReview {...props({ shop: { ...shop('listing'), phone: '+16175550101' }, cartState: { ...base, cart: null, quote: null } })} />);
     expect(screen.getByText("Call Sal's · (617) 555-0101").closest('a')?.getAttribute('href')).toBe('tel:+16175550101');
   });
+
+  it('basil-14648 P2: says the estimate is from the host\'s own menu (dated), and renders the menu slot above it', () => {
+    const state: CartResponse = { ...base, cart: { ...base.cart!, menu: { menu_id: 'lm_1', provenance: 'host_provided', as_of: '2026-11-09T15:00:00Z' } } };
+    render(<CartReview {...props({ cartState: state, timeZone: 'America/New_York', menuSlot: <p>MENU SLOT</p> })} />);
+    expect(screen.getByText('Estimate from your menu (Nov 9)')).toBeTruthy();
+    const slot = screen.getByText('MENU SLOT');
+    const estimate = screen.getByText(/Estimate \$150.00 to \$210.00/);
+    expect(slot.compareDocumentPosition(estimate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('basil-14648 P2: a generic cart says nothing about "your menu"', () => {
+    const state: CartResponse = { ...base, cart: { ...base.cart!, menu: { menu_id: null, provenance: 'generic', as_of: '2026-11-09T15:00:00Z' } } };
+    render(<CartReview {...props({ cartState: state })} />);
+    expect(screen.queryByText(/your menu/)).toBeNull();
+  });
+
+  it('basil-14648 P2: locked while a menu read runs: Back, Rebuild and Approve are disabled', async () => {
+    const onApprove = vi.fn();
+    const onBack = vi.fn();
+    render(<CartReview {...props({ locked: true, onApprove, onBack })} />);
+    await userEvent.type(screen.getByLabelText('Your mobile number'), '6175550123');
+    for (const name of [/Pick a different pizzeria/, /Rebuild order/, /Approve and have the AI call/]) {
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled, String(name)).toBe(true);
+    }
+    await userEvent.click(screen.getByRole('button', { name: /Approve and have the AI call/ }));
+    expect(onApprove).not.toHaveBeenCalled();
+  });
 });

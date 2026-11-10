@@ -235,7 +235,8 @@ export function makeFakePizzaMcp(
       path,
       query: Object.fromEntries(url.searchParams),
       headers,
-      body: init.body ? JSON.parse(init.body) : undefined,
+      // a multipart upload (FormData) is kept as is for the test to read
+      body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body ?? undefined,
       claims,
     };
     calls.push(call);
