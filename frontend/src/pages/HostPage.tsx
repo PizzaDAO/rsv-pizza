@@ -19,7 +19,7 @@ import { PizzaStyleAndToppings } from '../components/PizzaStyleAndToppings';
 import { PizzeriaSelection } from '../components/PizzeriaSelection';
 import { AiCallHistory } from '../components/AiCallHistory';
 import { DonationSummary } from '../components/DonationSummary';
-import { PhotoGallery } from '../components/photos';
+import { PhotoGallery, ReelMaker } from '../components/photos';
 import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 import { fetchXAvatarToSupabase } from '../utils/avatarUtils';
@@ -531,6 +531,9 @@ function HostPageContent() {
                       photoModeration={true}
                     />
                   </div>
+
+                  {/* Sizzle reel: on-demand highlight video (host / co-host after the event; admins any time) */}
+                  <ReelMaker partyId={party.id} defaultTitle={party.name} />
 
                   {/* Previous Year Photos — GPP events only */}
                   {party.eventType === 'gpp' && party.customUrl && (

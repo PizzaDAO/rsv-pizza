@@ -703,7 +703,7 @@ interface PublicCache {
 let publicCache: PublicCache | null = null;
 
 /** true unless app_config `pizza_index.submissions_public` is 'false'/'0' (a read failure counts as included). */
-async function communityIncluded(): Promise<boolean> {
+export async function communityIncluded(): Promise<boolean> {
   try {
     const row = await prisma.appConfig.findUnique({ where: { key: 'pizza_index.submissions_public' } });
     const v = row?.value.trim().toLowerCase();
