@@ -1726,3 +1726,81 @@ describe('handoffs with pizza-mcp 1c7113d MENU_GONE / QUOTE_EXPIRED', () => {
     expect(fake.handoffs.get(h.id)).toMatchObject({ quoteCeilingCents: 21000 });
   });
 });
+
+describe('handoff review 3 (X1-X3, permanent)', () => {
+  beforeEach(() => {
+    mcp = pizzaMcp({ 'POST /carts/:id/handoff': () => ({ status: 204, json: null }) });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  });
+  const click = (body: any = {}, who: any = host) =>
+    request(app()).post(`${base}/handoffs`).set(who).send({ shopId: 'pzl_osm_n1', shopName: "Sal's", provider: 'toast', ...body });
+  const mark = (id: string, action: string, who: any = host, extra: any = {}) =>
+    request(app()).post(`${base}/handoffs/${id}/mark`).set(who).send({ action, ...extra });
+  const receipt = (usd: string, createdAt: Date) =>
+    fake.docs.push({ id: `d${fake.docs.length}`, partyId: PARTY_ID, kind: 'receipt', source: 'upload', ocrAmount: { toString: () => usd }, isDuplicate: false, ineligible: false, createdAt });
+  const remaining = async () => (await request(app()).get(`${base}/config`).set(host)).body.remainingCapCents;
+
+  it('X1: a later receipt that another order consumed never makes the mark "covered"; receipt_uploaded says so', async () => {
+    await fake.db.pizzaOrder.create({ data: { partyId: PARTY_ID, userId: 'host1', opopOrderId: 'ord_ai1', tier: 'listing', shopId: 'pzl_osm_n1', shopName: "Sal's", status: 'confirmed_by_shop', ceilingCents: 7000, confirmedTotalCents: 6000, createdAt: new Date(Date.now() - 120_000) } });
+    const h = (await click({ provider: 'phone', opened: false })).body.handoff;
+    const m = await mark(h.id, 'ordered', host, { allowAnother: true });
+    expect(m.body.handoff).toMatchObject({ holdsRest: true, holdCents: 25000 - 6000, receiptCovered: false });
+    receipt('60.00', new Date(Date.now() + 1000)); // the AI order's receipt: its total matches exactly
+    const r = await mark(h.id, 'receipt_uploaded');
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('RECEIPT_TAKEN');
+    expect(fake.handoffs.get(h.id).receiptCoveredAt ?? null).toBeNull();
+    const g = (await request(app()).get(`${base}/handoffs`).set(host)).body;
+    expect(g.handoffs[0]).toMatchObject({ id: h.id, receiptCovered: false, holdCents: 19000 });
+    // this order's own receipt then counts
+    receipt('150.00', new Date(Date.now() + 2000));
+    const ok = await mark(h.id, 'receipt_uploaded');
+    expect(ok.body.handoff.receiptCovered).toBe(true);
+    expect(await remaining()).toBe(25000 - 6000 - 15000);
+  });
+
+  it('X1b: receipt_covered_at alone (its receipt gone to another order later) is never shown as covered', async () => {
+    const h = (await click({ provider: 'phone', opened: false })).body.handoff;
+    await mark(h.id, 'ordered');
+    fake.handoffs.get(h.id).receiptCoveredAt = new Date(); // paired, but no receipt exists any more
+    expect((await request(app()).get(`${base}/handoffs`).set(host)).body.handoffs[0].receiptCovered).toBe(false);
+    expect((await mark(h.id, 'ordered')).body).toMatchObject({ replayed: true, handoff: { receiptCovered: false } });
+  });
+
+  it('X2: a co-host resumed into the owner\'s rest-of-budget mark sees it as another host\'s, with the budget state', async () => {
+    const h = (await click({ provider: 'phone', opened: false })).body.handoff;
+    await mark(h.id, 'ordered');
+    const g = (await request(app()).get(`${base}/handoffs`).set(cohostEditor)).body;
+    expect(g.handoffs[0]).toMatchObject({ id: h.id, isMine: false, marked: true, holdsRest: true, holdCents: 25000, cartId: null });
+    expect(g.budget).toEqual({ capCents: 25000, leftCents: 0, noCap: false });
+  });
+
+  it('X3: a released row is never re-marked with its stale numbers (409 HANDOFF_RELEASED; a new mark gets a fresh row)', async () => {
+    let total = 5000;
+    let fail = false;
+    mcp = pizzaMcp({
+      'POST /carts/:id/handoff': () => ({ status: 204, json: null }),
+      'POST /carts/:id/quote': (x: any) =>
+        fail
+          ? { status: 422, json: { code: 'VALIDATION_FAILED', title: 'x', status: 422, detail: 'x', retryable: false } }
+          : { json: { quote_id: `q_${total}`, cart_id: x.path.split('/')[2], price_ceiling_cents: total, read_back: '' } },
+    });
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+    const c = await buildCart();
+    const h = (await click({ cartId: c.cart.id })).body.handoff;
+    await mark(h.id, 'ordered');
+    await mark(h.id, 'unmark');
+    total = 20000;
+    await request(app()).patch(`${base}/cart/${c.cart.id}`).set(host).send({ ops: [{ op: 'remove_line', line_id: 'l1' }] });
+    fail = true;
+    const again = await mark(h.id, 'ordered');
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('HANDOFF_RELEASED');
+    // the UI path: a new row for the same cart, which carries the refreshed numbers (20000), not the stale 5000
+    const fresh = (await click({ cartId: c.cart.id, provider: 'toast', opened: false })).body.handoff;
+    expect(fresh.id).not.toBe(h.id);
+    expect(fake.handoffs.get(fresh.id).quoteCeilingCents).toBe(20000);
+    const m = await mark(fresh.id, 'ordered');
+    expect(m.body.handoff.holdCents).toBe(20000);
+  });
+});

@@ -228,7 +228,9 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
         ? t('aiOrder.handoff.markedNoCap', { shop: handoff.shopName })
         : handoff.holdsRest
           ? handoff.holdCents > 0
-            ? t('aiOrder.handoff.markedHoldRest', { shop: handoff.shopName, amount: usd(handoff.holdCents) })
+            ? handoff.isMine
+              ? t('aiOrder.handoff.markedHoldRest', { shop: handoff.shopName, amount: usd(handoff.holdCents) })
+              : t('aiOrder.handoff.markedHoldRestOther', { shop: handoff.shopName, amount: usd(handoff.holdCents) })
             : t('aiOrder.handoff.markedNoBudget', { shop: handoff.shopName })
         : handoff.overBudget
           ? handoff.holdCents > 0

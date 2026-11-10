@@ -404,3 +404,20 @@ describe('HandoffPanel: second review', () => {
     expect(screen.queryByText(/Another host released/)).toBeNull();
   });
 });
+
+describe('HandoffPanel: review 3', () => {
+  it('a co-host sees the other-host wording for a rest-of-budget hold', () => {
+    panel({ handoff: marked({ holdsRest: true, holdCents: 25000, isMine: false, cartId: null }) });
+    expect(screen.getByText(/The host who marked it didn't say how much they ordered, so the rest of your party's reimbursement budget \(\$250\.00 USD\)/)).toBeTruthy();
+    expect(screen.queryByText(/We don't know how much you ordered/)).toBeNull();
+  });
+
+  it('RECEIPT_TAKEN keeps the mark uncovered: the alert explains and the receipt button stays', async () => {
+    mocks.mark.mockRejectedValueOnce(Object.assign(new Error('The receipts uploaded after you marked this order already count for other orders.'), { code: 'RECEIPT_TAKEN' }));
+    panel({ handoff: marked() });
+    await userEvent.click(screen.getByRole('button', { name: 'I uploaded the receipt' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/already count for other orders/);
+    expect(screen.getByRole('button', { name: 'I uploaded the receipt' })).toBeTruthy();
+    expect(screen.queryByText(/Your receipt counts for this order now/)).toBeNull();
+  });
+});

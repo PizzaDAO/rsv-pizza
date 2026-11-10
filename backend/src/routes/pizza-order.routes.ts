@@ -236,15 +236,15 @@ async function recordQuote(cartId: string, quoteId: string) {
 }
 
 /**
- * basil-14648 P2: every successful quote of a cart refreshes the numbers its not-yet-marked handoffs keep (the
- * cart may have changed since). A marked row keeps the numbers its hold was set from.
+ * basil-14648 P2: every successful quote of a cart refreshes the numbers its handoffs keep (the cart may have
+ * changed since): not-yet-marked rows and released ones (a new mark copies them). A standing mark keeps the numbers
+ * its hold was set from.
  */
 async function rememberQuoteOnHandoffs(cartId: string, q: OpopQuote) {
   const estimate = q.estimate?.expected_cents ?? q.totals?.total_cents ?? q.price_ceiling_cents ?? null;
-  await prisma.pizzaHandoff.updateMany({
-    where: { opopCartId: cartId, orderedAt: null },
-    data: { quoteId: q.quote_id, quoteCeilingCents: q.price_ceiling_cents ?? null, estimateCents: estimate },
-  });
+  const data = { quoteId: q.quote_id, quoteCeilingCents: q.price_ceiling_cents ?? null, estimateCents: estimate };
+  await prisma.pizzaHandoff.updateMany({ where: { opopCartId: cartId, orderedAt: null }, data });
+  await prisma.pizzaHandoff.updateMany({ where: { opopCartId: cartId, releasedAt: { not: null } }, data });
 }
 
 /** Quote only a ready cart. `max_total_cents` is what the party may still spend, not the whole cap. */
@@ -804,7 +804,9 @@ function publicHandoff(h: any, viewerId: string | undefined, opts: { receiptMatc
     // the host's own mark: holds hold_cents and blocks a second order until released
     marked,
     blocking: marked,
-    receiptCovered: !!h.receiptCoveredAt || opts.receiptMatched === true,
+    // ONLY when budgetBreakdown really consumed a receipt for it (never from receipt_covered_at alone: that receipt
+    // may have gone to another order, and a mark that holds 0 owes nothing without any receipt)
+    receiptCovered: marked && opts.receiptMatched === true,
     isMine: forOwner,
     createdAt: h.createdAt,
     updatedAt: h.updatedAt,
@@ -817,6 +819,29 @@ function forwardHandoff(actor: OpopActor, row: { opopCartId: string | null; prov
   getPizzaMcpClient()
     .recordHandoff(actor, row.opopCartId, { provider: row.provider, event })
     .catch((e) => console.warn('[pizza-handoff] pizza-mcp count failed', (e as Error)?.message));
+}
+
+/**
+ * The party's marks a real receipt was consumed for (budgetBreakdown.receiptMatched), over every order and standing
+ * mark. `override` replaces one row first: "what if this receipt pairing were saved?".
+ */
+async function receiptMatchedHandoffs(partyId: string, override?: { id: string } & Record<string, unknown>): Promise<Set<string>> {
+  const [receipts, orders, standing] = await Promise.all([
+    partyReceipts(partyId),
+    prisma.pizzaOrder.findMany({ where: { partyId } }),
+    prisma.pizzaHandoff.findMany({ where: { partyId, orderedAt: { not: null }, releasedAt: null }, orderBy: { orderedAt: 'desc' } }),
+  ]);
+  const rows = standing.map((r) => (override && r.id === override.id ? { ...r, ...override } : r));
+  const marks = rows.map((r) => handoffAsBudgetOrder(r as any)).filter((o): o is NonNullable<typeof o> => o !== null);
+  const { receiptMatched } = budgetBreakdown(receipts, [...orders, ...marks]);
+  return new Set(receiptMatched.map((o: any) => o.handoffId).filter(Boolean));
+}
+
+/** A handoff for the browser, with receiptCovered computed from real receipt consumption. */
+async function handoffView(row: any, viewerId: string | undefined) {
+  const marked = !!row.orderedAt && !row.releasedAt;
+  const matched = marked ? (await receiptMatchedHandoffs(row.partyId)).has(row.id) : false;
+  return publicHandoff(row, viewerId, { receiptMatched: matched });
 }
 
 async function handoffRow(handoffId: string, party: OrderingParty) {
@@ -863,11 +888,8 @@ router.get('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, res
     ]);
     const byId = new Map([...standing, ...recent].map((r) => [r.id, r]));
     const rows = [...byId.values()].sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
-    const orders = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
-    const marks = standing.map((r) => handoffAsBudgetOrder(r)).filter((o): o is NonNullable<typeof o> => o !== null);
     // only a receipt actually consumed counts as "your receipt counts for it": a mark that holds 0 is not covered
-    const { receiptMatched } = budgetBreakdown(await partyReceipts(party.id), [...orders, ...marks]);
-    const matchedIds = new Set(receiptMatched.map((o: any) => o.handoffId).filter(Boolean));
+    const matchedIds = await receiptMatchedHandoffs(party.id);
     const budget = await budgetLeft(party);
     res.json({
       handoffs: rows.map((r) => publicHandoff(r, req.userId, { receiptMatched: matchedIds.has(r.id) })),
@@ -896,10 +918,12 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
     const opened = body.opened !== false;
     if (opened && !isOpopProvider(provider)) throw new AppError('Only an ordering page can be opened', 400, 'VALIDATION_FAILED');
     let cartId: string | null = null;
+    let lastQuoteId: string | null = null;
     if (body.cartId !== undefined && body.cartId !== null && body.cartId !== '') {
       cartId = opopIdParam(String(body.cartId));
       const cartRow = await ownedCartRow(cartId, party, req);
       if (cartRow.shopId !== shopId) throw new AppError('Cart does not belong to this shop', 400, 'CART_MISMATCH');
+      lastQuoteId = cartRow.quoteIds[cartRow.quoteIds.length - 1] ?? null;
     }
     const userId = req.userId as string;
     const open = await prisma.pizzaHandoff.findFirst({
@@ -917,8 +941,15 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
       if ((await prisma.pizzaHandoff.count({ where: { partyId: party.id, releasedAt: null } })) >= MAX_OPEN_HANDOFFS_PER_PARTY) {
         throw new AppError('Too many open online-order records for this party.', 429, 'TOO_MANY_HANDOFFS');
       }
+      // a new row on a cart starts from the numbers of the cart's LATEST quote, when another row kept them
+      const known = cartId && lastQuoteId
+        ? await prisma.pizzaHandoff.findFirst({ where: { partyId: party.id, opopCartId: cartId, quoteId: lastQuoteId }, orderBy: { updatedAt: 'desc' } })
+        : null;
       row = await prisma.pizzaHandoff.create({
-        data: { partyId: party.id, userId, shopId, shopName, provider, opopCartId: cartId, clickedAt: opened ? new Date() : null },
+        data: {
+          partyId: party.id, userId, shopId, shopName, provider, opopCartId: cartId, clickedAt: opened ? new Date() : null,
+          ...(known ? { quoteId: known.quoteId, quoteCeilingCents: known.quoteCeilingCents, estimateCents: known.estimateCents } : {}),
+        },
       });
     }
     const actor = actorFor(req, party);
@@ -934,7 +965,7 @@ router.post('/:partyId/pizza/handoffs', requireAuth, async (req: AuthRequest, re
       }
     }
     if (opened) forwardHandoff(actor, row, 'opened');
-    res.status(open ? 200 : 201).json({ handoff: publicHandoff(row, req.userId) });
+    res.status(open ? 200 : 201).json({ handoff: await handoffView(row, req.userId) });
   } catch (e) {
     next(e);
   }
@@ -965,7 +996,11 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
 
     if (body.action === 'ordered') {
       if (!mine) throw new AppError('Only the host who built this checklist can mark it ordered.', 403, 'NOT_HANDOFF_OWNER');
-      if (marked) return res.json({ handoff: publicHandoff(row, req.userId), replayed: true });
+      if (marked) return res.json({ handoff: await handoffView(row, req.userId), replayed: true });
+      // a released row is never re-marked (its numbers are stale): a new mark gets a new row, as the UI does
+      if (row.releasedAt) {
+        throw new AppError('This order was taken back. Mark the order again from the checklist.', 409, 'HANDOFF_RELEASED');
+      }
       const orders = await prisma.pizzaOrder.findMany({ where: { partyId: party.id } });
       const blockers = [
         ...orders.filter((o: any) => isBlocking(o)),
@@ -1010,7 +1045,7 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
       });
       forwardHandoff(actorFor(req, party), updated, 'marked_ordered');
       return res.json({
-        handoff: publicHandoff(updated, req.userId),
+        handoff: await handoffView(updated, req.userId),
         // the party's budget in USD cents (reimbursement caps are in USD); noCap = no reimbursement cap set
         budget: { capCents: budget.capCents, leftCents: left, noCap: budget.capCents === null },
       });
@@ -1042,8 +1077,17 @@ router.post('/:partyId/pizza/handoffs/:handoffId/mark', requireAuth, async (req:
         }
         throw new AppError('We could not find a receipt uploaded after you marked this order. Upload the real receipt first.', 409, 'NO_RECEIPT_FOUND');
       }
-      const updated = await prisma.pizzaHandoff.update({ where: { id: row.id }, data: { receiptCoveredAt: new Date() } });
-      return res.json({ handoff: publicHandoff(updated, req.userId) });
+      // only save the pairing if a receipt would really be consumed for THIS mark (not already taken by another order)
+      const now = new Date();
+      if (!(await receiptMatchedHandoffs(party.id, { id: row.id, receiptCoveredAt: now })).has(row.id)) {
+        throw new AppError(
+          "The receipts uploaded after you marked this order already count for other orders. Upload this order's own receipt, then tap again.",
+          409,
+          'RECEIPT_TAKEN'
+        );
+      }
+      const updated = await prisma.pizzaHandoff.update({ where: { id: row.id }, data: { receiptCoveredAt: now } });
+      return res.json({ handoff: await handoffView(updated, req.userId) });
     }
     throw new AppError('action must be ordered, unmark, release or receipt_uploaded', 400, 'VALIDATION_FAILED');
   } catch (e) {

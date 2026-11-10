@@ -1284,7 +1284,8 @@
       "liveReleasedOther": "Released: nothing is held for {{shop}} now. We recorded that you released it.",
       "confirmSecondAt": "This party already has an order at {{existing}}. Mark a second order at {{shop}}? If both go through, you'll get (and pay for) both.",
       "markedHoldRest": "We don't know how much you ordered, so we're holding the rest of your reimbursement budget ({{amount}}) until you upload the receipt from {{shop}}.",
-      "releasedByOther": "Another host released the order you marked at {{shop}}: it no longer holds your budget or blocks a new order. If you did order, mark it again."
+      "releasedByOther": "Another host released the order you marked at {{shop}}: it no longer holds your budget or blocks a new order. If you did order, mark it again.",
+      "markedHoldRestOther": "The host who marked it didn't say how much they ordered, so the rest of your party's reimbursement budget ({{amount}}) is held until the receipt from {{shop}} is uploaded."
     }
   }
 }
