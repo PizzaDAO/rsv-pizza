@@ -35,6 +35,9 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+        env:
+          # basil-14648: AI pizza ordering UI (repo variable; unset = off)
+          VITE_AI_ORDERING: ${{ vars.VITE_AI_ORDERING }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
