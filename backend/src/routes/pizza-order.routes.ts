@@ -29,6 +29,7 @@ import {
   HostMenuInput,
 } from '../services/pizzaMcp.client.js';
 import { hostMenusFlagOn } from '../lib/hostMenus.js';
+import { emailOrdersFlagOn, emailOrderable, emailAlternativeOf, emailOrderProblems, emailNotAvailable, channelOf, emailViewOf, EmailAlternative } from '../lib/emailOrders.js';
 import { checkMenuUpload, checkMenuUrl } from '../lib/uploadSniff.js';
 import { drainRequest, readMenuUpload } from '../lib/menuUpload.js';
 import { applyOrderUpdate } from '../services/pizzaOrderSync.js';
@@ -96,6 +97,10 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
     // call details incl. shop total, changes and (when pizza-mcp provides it) `deferred`. `attempts` counts dialed
     // calls only (pizza-mcp 9ad5364 leaves out `not_dialed` rows) but is still not shown: the outcome says what happened.
     call: view?.call ?? null,
+    // basil-14648 P2: how the order is placed (phone = a call), and for an email order what the shop has seen and
+    // answered (sent, reply-by, reminder, its answer). Never the shop's address: pizza-mcp does not send it.
+    channel: channelOf(row),
+    email: emailViewOf(row),
     timeline: view?.timeline ?? [],
     // the approval link belongs to the host who placed the order
     nextAction: forOwner ? row.nextAction : null,
@@ -130,7 +135,7 @@ function publicOrder(row: any, forOwner: boolean, opts: { receiptMatched?: boole
 router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { party, enabled } = await loadPartyForOrdering(req.params.partyId, req, { requireEnabled: false });
-    if (!enabled) return res.json({ enabled: false, hostMenus: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
+    if (!enabled) return res.json({ enabled: false, hostMenus: false, emailOrders: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
     let remaining: number | null = null;
     let blockedReason: string | null = null;
     let heldOrderId: string | null = null;
@@ -155,6 +160,9 @@ router.get('/:partyId/pizza/config', requireAuth, async (req: AuthRequest, res: 
     res.json({
       enabled: true,
       hostMenus,
+      // basil-14648 P2: rsv's switch for "Email the order". Per shop it also needs pizza-mcp's
+      // `capabilities.email_order` and an available `ordering.alternatives[email]` (the UI checks both).
+      emailOrders: emailOrdersFlagOn(),
       capCents: party.capCents,
       remainingCapCents: remaining,
       blockedReason,
@@ -255,10 +263,16 @@ async function rememberQuoteOnHandoffs(cartId: string, q: OpopQuote) {
   await prisma.pizzaHandoff.updateMany({ where: { opopCartId: cartId, releasedAt: { not: null } }, data });
 }
 
-/** Quote only a ready cart. `max_total_cents` is what the party may still spend, not the whole cap. */
-async function quoteIfReady(actor: OpopActor, cart: OpopCart, remainingCents: number): Promise<OpopQuote | null> {
+type Channel = 'ai_phone' | 'email';
+
+/**
+ * Quote only a ready cart. `max_total_cents` is what the party may still spend, not the whole cap. An email order's
+ * quote is bound to `channel: "email"` (pizza-mcp caps its ceiling at the email limit, and only `email_order` can
+ * place it).
+ */
+async function quoteIfReady(actor: OpopActor, cart: OpopCart, remainingCents: number, channel: Channel = 'ai_phone'): Promise<OpopQuote | null> {
   if (!cart.ready_for_quote || cart.lines.length === 0) return null;
-  const q = await getPizzaMcpClient().quote(actor, cart.id, { max_total_cents: remainingCents });
+  const q = await getPizzaMcpClient().quote(actor, cart.id, { max_total_cents: remainingCents, ...(channel === 'email' ? { channel } : {}) });
   await recordQuote(cart.id, q.quote_id);
   await rememberQuoteOnHandoffs(cart.id, q);
   return q;
@@ -282,14 +296,14 @@ const hasMenuGone = (cart: OpopCart) =>
   (cart.issues ?? []).some((i) => i.code === 'MENU_GONE') || (cart as { menu?: { unavailable?: boolean } }).menu?.unavailable === true;
 
 /** The quote went stale between review and place: price the same cart again, or say the menu is gone. */
-async function requoteAfterExpiry(actor: OpopActor, cartId: string, shopName: string, remainingCents: number): Promise<never> {
+async function requoteAfterExpiry(actor: OpopActor, cartId: string, shopName: string, remainingCents: number, channel: Channel = 'ai_phone'): Promise<never> {
   const client = getPizzaMcpClient();
   let cart: OpopCart;
   let quote: OpopQuote | null;
   try {
     cart = await client.getCart(actor, cartId);
     if (hasMenuGone(cart)) throw menuGone(shopName);
-    quote = await quoteIfReady(actor, cart, remainingCents);
+    quote = await quoteIfReady(actor, cart, remainingCents, channel);
   } catch (e) {
     if (e instanceof AppError && (e.code === 'MENU_GONE' || e.code === 'QUOTE_INVALID')) throw menuGone(shopName);
     throw e;
@@ -301,6 +315,43 @@ async function requoteAfterExpiry(actor: OpopActor, cartId: string, shopName: st
     'QUOTE_EXPIRED',
     { cart, quote }
   );
+}
+
+/** The channel a request asks for. `email` only behind rsv's switch: off, it is refused, never silently a call. */
+function channelParam(v: unknown): Channel {
+  if (v === undefined || v === null || v === '' || v === 'ai_phone') return 'ai_phone';
+  if (v !== 'email') throw new AppError('channel must be ai_phone or email', 400, 'VALIDATION_FAILED');
+  if (!emailOrdersFlagOn()) throw new AppError('Email orders are not available yet.', 404, 'FEATURE_DISABLED');
+  return 'email';
+}
+
+/** The shop's email alternative when this host may email it now; else EMAIL_ORDERS_NOT_AVAILABLE with pizza-mcp's reasons. */
+async function emailAltFor(actor: OpopActor, shopId: string): Promise<{ alt: EmailAlternative; shopName: string }> {
+  const shop = await getPizzaMcpClient().getShop(actor, shopId);
+  const alt = emailOrderable(shop);
+  if (!alt) {
+    const seen = emailAlternativeOf(shop);
+    const reasons = seen?.reasons.length ? seen.reasons : ['not_available'];
+    throw emailNotAvailable(shop.name, reasons, { alt: seen, fallback: seen?.message });
+  }
+  return { alt, shopName: shop.name };
+}
+
+/**
+ * pizza-mcp's EMAIL_ORDERS_NOT_AVAILABLE (`details.reasons` are codes; an unknown one reads as "can't email"), in
+ * the host's words. Nothing was created or sent there. Anything else passes through.
+ */
+function rethrowEmailRefusal(e: unknown, shopName: string, alt: EmailAlternative | null) {
+  if (!(e instanceof AppError) || e.code !== 'EMAIL_ORDERS_NOT_AVAILABLE') return;
+  const reasons = ((e.data as { opop?: { details?: { reasons?: unknown } } } | undefined)?.opop?.details?.reasons ?? []) as unknown[];
+  const codes = reasons.filter((r): r is string => typeof r === 'string').slice(0, 20);
+  throw emailNotAvailable(shopName, codes.length ? codes : ['not_available'], { alt, fallback: e.message, status: e.statusCode });
+}
+
+/** Lead time and size against the shop's published email rules: a plain 400 before anything is built or sent. */
+function assertEmailFits(alt: EmailAlternative, shopName: string, o: { pickupAt?: Date | null; pizzas?: number | null }) {
+  const problems = emailOrderProblems(alt, o);
+  if (problems.length) throw emailNotAvailable(shopName, problems, { alt, status: 400 });
 }
 
 /** The cart row binds an OPOP cart to the party, host and shop that built it. */
@@ -316,10 +367,15 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
     const remaining = await remainingCapCents(party);
     const body = isObj(req.body) ? req.body : {};
     const shopId = shopIdParam(String(body.shopId ?? ''));
+    const channel = channelParam(body.channel);
     const pickupAt = typeof body.pickupAt === 'string' ? new Date(body.pickupAt) : null;
     if (!pickupAt || Number.isNaN(pickupAt.getTime()) || pickupAt.getTime() < Date.now() + 5 * 60_000) {
       throw new AppError('Pick a pickup time at least 5 minutes from now.', 400, 'PICKUP_TIME_REQUIRED');
     }
+    const actor = actorFor(req, party);
+    // basil-14648 P2: an email order is checked against the shop's published rules first (pizza-mcp checks again)
+    const email = channel === 'email' ? await emailAltFor(actor, shopId) : null;
+    if (email) assertEmailFits(email.alt, email.shopName, { pickupAt });
     const decisions: Record<string, Decision> = {};
     if (isObj(body.decisions)) {
       for (const [k, v] of Object.entries(body.decisions)) {
@@ -329,12 +385,13 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
 
     let lines: OrderLineSpec[];
     try {
-      lines = recommendationsToLines(body.recommendations);
+      // a call takes up to 30 pizzas; an email order up to the shop's published maximum
+      lines = recommendationsToLines(body.recommendations, email ? { maxPizzas: email.alt.max_pizzas } : {});
     } catch (e) {
       if (e instanceof RecommendationError) throw new AppError(e.message, 400, e.code);
       throw e;
     }
-    const actor = actorFor(req, party);
+    if (email) assertEmailFits(email.alt, email.shopName, { pizzas: lines.reduce((a, l) => a + l.quantity, 0) });
     const client = getPizzaMcpClient();
     const facts = menuFacts(await client.getMenu(actor, shopId));
 
@@ -414,7 +471,7 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
         client_line_ref: r.spec.ref,
       });
     }
-    const common = { issues, notices, dropped, recommendationVersion: recVersion, capCents: party.capCents, remainingCapCents: remaining };
+    const common = { issues, notices, dropped, recommendationVersion: recVersion, capCents: party.capCents, remainingCapCents: remaining, channel };
     if (ops.length === 0) return res.json({ cart: null, quote: null, ...common });
     // pickup only in v1; scheduled_for is required for phone orders
     ops.push({ op: 'set_fulfillment', type: 'pickup', scheduled_for: pickupAt.toISOString() });
@@ -424,7 +481,13 @@ router.post('/:partyId/pizza/cart', requireAuth, async (req: AuthRequest, res: R
       data: { partyId: party.id, userId: req.userId as string, opopCartId: cart.id, shopId, recommendationVersion: recVersion, quoteIds: [] },
     });
     // No quote while a question is open: a partial order must be an explicit choice, never a surprise.
-    const quote = issues.length === 0 ? await quoteIfReady(actor, cart, remaining) : null;
+    let quote: OpopQuote | null = null;
+    try {
+      quote = issues.length === 0 ? await quoteIfReady(actor, cart, remaining, channel) : null;
+    } catch (e) {
+      if (email) rethrowEmailRefusal(e, email.shopName, email.alt);
+      throw e;
+    }
     res.json({ cart, quote, ...common });
   } catch (e) {
     next(e);
@@ -453,8 +516,11 @@ router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthReques
     }
     const actor = actorFor(req, party);
     const client = getPizzaMcpClient();
-    // The 30-pizza phone-order limit applies to edits too: simulate them first.
+    const channel = channelParam(body.channel);
     const current = await client.getCart(actor, cartId);
+    const email = channel === 'email' ? await emailAltFor(actor, current.pizzeria_id) : null;
+    const maxPizzas = email ? email.alt.max_pizzas : MAX_PIZZAS_PER_ORDER;
+    // The 30-pizza phone-order limit (an email order: the shop's own) applies to edits too: simulate them first.
     const qty = new Map(current.lines.map((l) => [l.id, l.quantity]));
     for (const op of body.ops as Array<Record<string, unknown>>) {
       if (op.op === 'remove_line') qty.delete(String(op.line_id));
@@ -465,12 +531,21 @@ router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthReques
       }
     }
     const total = [...qty.values()].reduce((a, b) => a + b, 0);
-    if (total > MAX_PIZZAS_PER_ORDER) {
+    if (total > maxPizzas) {
       throw new AppError(
-        `${total} pizzas is too many for an automated order (max ${MAX_PIZZAS_PER_ORDER}). Call the shop yourself.`,
+        `${total} pizzas is too many for an automated order (max ${maxPizzas}). Call the shop yourself.`,
         400,
         'TOO_MANY_PIZZAS'
       );
+    }
+    if (email) assertEmailFits(email.alt, email.shopName, { pizzas: total });
+    // a new pickup time must still fit the email lead time
+    if (email) {
+      for (const op of body.ops as Array<Record<string, unknown>>) {
+        if (op.op === 'set_fulfillment' && typeof op.scheduled_for === 'string') {
+          assertEmailFits(email.alt, email.shopName, { pickupAt: new Date(op.scheduled_for) });
+        }
+      }
     }
     const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : undefined;
     const cart = await client.updateCart(
@@ -481,7 +556,7 @@ router.patch('/:partyId/pizza/cart/:cartId', requireAuth, async (req: AuthReques
     );
     // an edit to a cart whose menu is gone cannot be quoted: rebuild it (pizza-mcp 1c7113d)
     if (hasMenuGone(cart)) throw menuGone((await client.getShop(actor, cart.pizzeria_id)).name);
-    res.json({ cart, quote: await quoteIfReady(actor, cart, remaining), capCents: party.capCents, remainingCapCents: remaining });
+    res.json({ cart, quote: await quoteIfReady(actor, cart, remaining, channel), capCents: party.capCents, remainingCapCents: remaining, channel });
   } catch (e) {
     next(e);
   }
@@ -508,6 +583,8 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     if (!E164_RE.test(phone)) throw new AppError('Phone must be in international format, e.g. +16175550123', 400, 'VALIDATION_FAILED');
 
     const pol = isObj(body.policy) ? body.policy : {};
+    // basil-14648 P2: `email` = we email the shop the order instead of calling it (needs rsv's switch)
+    const channel = channelParam(pol.channel);
     const substitution = pol.substitution === 'deals_ok' ? 'deals_ok' : 'exact';
     const minPizzaCount = pol.minPizzaCount === undefined ? undefined : Number(pol.minPizzaCount);
     if (minPizzaCount !== undefined && (!Number.isInteger(minPizzaCount) || minPizzaCount < 1 || minPizzaCount > 100)) {
@@ -541,8 +618,22 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
     if (cart.pizzeria_id !== cartRow.shopId) throw new AppError('Cart does not belong to this shop', 400, 'CART_MISMATCH');
     const shop = await client.getShop(actor, cartRow.shopId);
     const tier = shop.tier === 'native' ? 'native' : 'listing';
-    if (tier === 'listing' && shop.ordering?.channel !== 'ai_phone') {
+    if (channel === 'email' && tier !== 'listing') throw new AppError('This shop takes orders online: there is nothing to email.', 409, 'NOT_A_LISTING');
+    if (tier === 'listing' && channel === 'ai_phone' && shop.ordering?.channel !== 'ai_phone') {
       throw new AppError('We cannot place an automated call to this shop. Use the order script and call them yourself.', 409, 'CALLS_NOT_AVAILABLE_HERE');
+    }
+    // basil-14648 P2: the email channel needs both of pizza-mcp's answers on the shop, and its published rules
+    let emailAlt: EmailAlternative | null = null;
+    let pickupAt: Date | null = null;
+    if (channel === 'email') {
+      emailAlt = emailOrderable(shop);
+      if (!emailAlt) {
+        const seen = emailAlternativeOf(shop);
+        throw emailNotAvailable(shop.name, seen?.reasons.length ? seen.reasons : ['not_available'], { alt: seen, fallback: seen?.message });
+      }
+      const when = (cart as { fulfillment?: { scheduled_for?: string | null } }).fulfillment?.scheduled_for;
+      pickupAt = typeof when === 'string' && !Number.isNaN(Date.parse(when)) ? new Date(when) : null;
+      assertEmailFits(emailAlt, shop.name, { pickupAt, pizzas: cart.lines.reduce((a, l) => a + l.quantity, 0) });
     }
 
     const ceilingCents = Number(pol.ceilingCents);
@@ -556,13 +647,35 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
           'SPEND_LIMIT_EXCEEDED'
         );
       }
+      if (emailAlt && ceilingCents > emailAlt.max_total_cents) {
+        throw new AppError(
+          `An email order can't be over $${(emailAlt.max_total_cents / 100).toFixed(2)}. Lower your limit.`,
+          422,
+          'SPEND_LIMIT_EXCEEDED'
+        );
+      }
     }
 
     const contact = { name, phone, ...(email ? { email } : {}) };
     const partyName = partyLabel(party.name);
     const client_ref = { party_id: party.id, rsvp_user_id: req.userId as string };
     const request: OpopPlaceOrderRequest =
-      tier === 'listing'
+      tier === 'listing' && channel === 'email'
+        ? {
+            quote_id: quoteId,
+            payment_mode: 'pay_at_pickup',
+            contact,
+            // email orders are all as ordered: the shop confirms the order or declines it. The ceiling is never shown
+            // to the shop; over it, the host is asked again (the one-tap price email).
+            email_order: {
+              price_ceiling_cents: ceilingCents,
+              substitution_policy: 'exact',
+              ...(partyName ? { party_name: partyName } : {}),
+            },
+            max_total_cents: remaining,
+            client_ref,
+          }
+        : tier === 'listing'
         ? {
             quote_id: quoteId,
             payment_mode: 'pay_at_pickup',
@@ -592,7 +705,17 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
       placed = await client.placeOrder(actor, request, key);
     } catch (e) {
       if (e instanceof AppError && e.code === 'MENU_GONE') throw menuGone(shop.name);
-      if (e instanceof AppError && e.code === 'QUOTE_EXPIRED') await requoteAfterExpiry(actor, cartId, shop.name, remaining);
+      if (e instanceof AppError && e.code === 'QUOTE_EXPIRED') await requoteAfterExpiry(actor, cartId, shop.name, remaining, channel);
+      // basil-14648 P2: pizza-mcp would not email this shop this order. Nothing was created or sent: say why and offer
+      // the call (or the host's own phone call). `details.reasons` are codes; an unknown one reads as "can't email".
+      rethrowEmailRefusal(e, shop.name, emailAlt);
+      // an email quote placed as a call (or the reverse), or the order out of pizza-mcp's bounds: price it again for
+      // the right channel when that is what pizza-mcp asks, else a plain 400 in pizza-mcp's words
+      if (e instanceof AppError && e.code === 'VALIDATION_FAILED' && channel === 'email') {
+        const opop = (e.data as { opop?: { path?: unknown; suggestions?: Array<{ action?: unknown }> } } | undefined)?.opop;
+        if (opop?.suggestions?.some((x) => x?.action === 'requote')) await requoteAfterExpiry(actor, cartId, shop.name, remaining, channel);
+        throw new AppError(`${e.message.trim().replace(/[.!?]*$/, '.')} Nothing was ordered and nothing was sent.`, 400, 'VALIDATION_FAILED', { path: typeof opop?.path === 'string' ? opop.path : null });
+      }
       // pizza-mcp refused to call this shop (an opt-out, a number it has paused until an operator checks it, a
       // changed number...). Nothing was created there, so nothing blocks here: say so, and send the host on.
       if (e instanceof AppError && e.code === 'CALLS_NOT_AVAILABLE_HERE') {
@@ -636,6 +759,8 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
         ceilingCents: finalTier === 'listing' ? ceilingCents : null,
         recKey,
         quoteId,
+        // basil-14648 P2: an email order's pickup (the shop confirms it, or declines): its cancel ends there
+        ...(pickupAt ? { readyAt: pickupAt } : {}),
         summary: o.summary ?? null,
         lastView: o as any,
         nextAction: na as any,
@@ -651,6 +776,7 @@ router.post('/:partyId/pizza/orders', requireAuth, async (req: AuthRequest, res:
         ceilingCents: finalTier === 'listing' ? ceilingCents : null,
         recKey,
         quoteId,
+        ...(pickupAt ? { readyAt: pickupAt } : {}),
         ...(na ? { nextAction: na as any } : {}),
       },
     });
@@ -720,6 +846,7 @@ router.post('/:partyId/pizza/orders/:orderId/cancel', requireAuth, async (req: A
     if (!isCancelable(row)) {
       throw new AppError('This order can no longer be canceled here. Call the shop.', 409, 'CANCEL_NOT_ALLOWED');
     }
+    // an order that moved on meanwhile (a call started, an email order's pickup passed) is pizza-mcp's 409, as it said it
     const view = await getPizzaMcpClient().cancelOrder(actorFor(req, party), orderId);
     const result = await prisma.$transaction((tx) => applyOrderUpdate(tx, view, { clientRef: { party_id: party.id, rsvp_user_id: row.userId } }));
     res.json({ order: publicOrder(result.row ?? row, true) });

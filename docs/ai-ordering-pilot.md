@@ -187,3 +187,30 @@ Note the webhook path is `/api/pizza-mcp/webhook` (the example in CLIENTS.md use
   quarantined ends `unreachable` with `nothing_ordered: true` (`not_dialed`, or `pending_operator_review` when the hold is an unread
   call) and holds nothing.
 - Co-hosts see an order but not its approval link; only the host who placed it is polled / notified.
+
+## Email orders (basil-14648 P2, plans/rsv-p2-email-orders.md §7)
+
+An alternative to the AI call for big orders a day or more ahead: pizza-mcp emails the shop one structured order and the
+shop confirms its total with tax (or declines) through a signed link. Same cart, approval code, ceiling, budget hold and
+webhooks as a call. No migration on rsv: the channel is read from the order view (`lastView.channel`).
+
+- **Switches, all needed:** rsv's `PIZZA_EMAIL_ORDERS=1` on the backend (unset = off: no option in the UI, and the cart
+  and order routes refuse `channel: "email"` with 404 `FEATURE_DISABLED`), plus pizza-mcp's answer on the shop:
+  `capabilities.email_order` and an available `ordering.alternatives[channel=email]` with no `reasons`. pizza-mcp itself
+  sends nothing real unless its `EMAIL_ORDERS_ENABLED` and sender settings are on (a go-live switch: Snax's OK).
+- **Rules** come from the shop's alternative (`min_lead_hours` 24, `max_lead_days` 21, `min_pizzas` 8, `max_pizzas` 40,
+  `max_total_cents` $800) and are checked by rsv before building or placing, and again by pizza-mcp. An email order may be
+  bigger than a call (30). The ceiling is never shown to the shop.
+- **Requests:** the quote carries `channel: "email"` (bound to it), the order `email_order: {price_ceiling_cents,
+  party_name}` instead of `phone_order`, with `client_ref` as usual. `EMAIL_ORDERS_NOT_AVAILABLE` (`details.reasons`)
+  comes back as a 4xx in plain words ("Nothing was ordered and nothing was sent"); a refusal about the shop takes the email
+  option off that shop for the session, one about the order (lead time, size) does not.
+- **Statuses:** `sending` and `awaiting_shop_reply` are live: they block a second order and hold the ceiling. The host can
+  cancel in `sending`, `awaiting_shop_reply`, `awaiting_price_approval` (no shop on the line) and `confirmed_by_shop` until
+  the pickup (rsv stores the pickup in `readyAt`); pizza-mcp emails the shop a withdrawal or cancellation.
+- **Totals:** an email order has no `call`. The confirmed total is `email.shop_response.total_cents` (else
+  `totals.total_cents`); the budget hold and the draft receipt (source `ai_call`, summary "Email order at ...") use it.
+- **Outcomes:** new reasons `not_sent`, `shop_declined`, `asked_not_to_contact`, `no_response`, `send_unconfirmed`,
+  `withdrawn_acknowledged`. Only `nothing_ordered` decides. `no_response` and a cancel after the email left are `false`
+  (held, blocking) until the shop presses "received" on the withdrawal: pizza-mcp then sends `change: "outcome"` with
+  `true` and the hold is freed. A host who checked with the shop can still release it by hand.

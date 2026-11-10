@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw, ListChecks, ShoppingBag, BookOpen } from 'lucide-react';
-import { getPizzaShops, shopBadge, formatPhone, orderingLinks, safeHref, OrderingLink, PizzaShop } from '../lib/pizzaOrder';
+import { Loader2, Phone, MapPin, Bot, Zap, ExternalLink, RotateCw, ListChecks, ShoppingBag, BookOpen, Mail } from 'lucide-react';
+import {
+  getPizzaShops, shopBadge, formatPhone, orderingLinks, safeHref, OrderingLink, PizzaShop, emailOrderable, emailUnavailableNote, formatCents,
+} from '../lib/pizzaOrder';
 
 interface ShopPickerProps {
   partyId: string;
@@ -21,6 +23,12 @@ interface ShopPickerProps {
   onOpenLink?: (shop: PizzaShop, link: OrderingLink) => void;
   /** basil-14648 P2: open the shop with "Use this shop's real menu" (listing shops; only when host menus are on). */
   onUseMenu?: (shop: PizzaShop) => void;
+  /** basil-14648 P2: rsv's PIZZA_EMAIL_ORDERS switch (the shop list then says why a shop can't get one, when that matters). */
+  emailOrders?: boolean;
+  /** basil-14648 P2: "Email the order", for shops pizza-mcp says can get one. */
+  onEmail?: (shop: PizzaShop) => void;
+  /** Shops pizza-mcp refused to email this session. */
+  unemailable?: ReadonlySet<string>;
 }
 
 const toneClass: Record<'green' | 'purple' | 'gray', string> = {
@@ -32,7 +40,9 @@ const toneClass: Record<'green' | 'purple' | 'gray', string> = {
 const addressLine = (a: Record<string, unknown>) =>
   [a.line1, a.city, a.region].filter((x) => typeof x === 'string' && x).join(', ');
 
-export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded, onChecklist, onOpenLink, onUseMenu }) => {
+export const ShopPicker: React.FC<ShopPickerProps> = ({
+  partyId, onSelect, preferName, uncallable, orderDisabled, hasLocation = true, onLoaded, onChecklist, onOpenLink, onUseMenu, emailOrders, onEmail, unemailable,
+}) => {
   const { t } = useTranslation('host');
   const [shops, setShops] = useState<PizzaShop[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +159,32 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
             <BookOpen size={14} aria-hidden="true" /> {t('aiOrder.menu.offer')}
           </button>
         );
+        // basil-14648 P2: "Email the order", only where rsv's switch AND pizza-mcp (capability + available) say yes
+        const emailAlt = onEmail && !unemailable?.has(shop.id) ? emailOrderable(shop, emailOrders) : null;
+        const emailNote = !emailAlt && !unemailable?.has(shop.id) ? emailUnavailableNote(shop, emailOrders) : null;
+        const emailHelpId = `${shop.id}-email-help`;
+        const emailBlock = emailAlt ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onEmail?.(shop)}
+              disabled={orderDisabled}
+              className={`${badge.orderable ? 'btn-secondary' : 'btn-primary'} text-sm min-h-[44px] py-2 px-3 inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`}
+              aria-label={t('aiOrder.email.offerFor', { shop: shop.name })}
+              aria-describedby={emailHelpId}
+            >
+              <Mail size={14} aria-hidden="true" /> {t('aiOrder.email.offer')}
+            </button>
+            <p id={emailHelpId} className="text-xs text-theme-text-secondary sm:max-w-[18rem]">
+              {t('aiOrder.email.offerHelp', {
+                shop: shop.name, minHours: emailAlt.min_lead_hours, maxDays: emailAlt.max_lead_days, minPizzas: emailAlt.min_pizzas, maxPizzas: emailAlt.max_pizzas,
+                maxTotal: formatCents(emailAlt.max_total_cents),
+              })}
+            </p>
+          </>
+        ) : emailNote ? (
+          <p className="text-xs text-theme-text-secondary sm:max-w-[18rem]">{t('aiOrder.email.unavailable', { why: emailNote })}</p>
+        ) : null;
         const Icon = badge.tone === 'green' ? Zap : badge.tone === 'purple' ? Bot : 'handoff' in badge && badge.handoff ? ShoppingBag : Phone;
         const addr = addressLine(shop.address);
         return (
@@ -181,6 +217,7 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                   >
                     {t('aiOrder.shops.order')}
                   </button>
+                  {emailBlock}
                   {/* basil-14648 P2: the shop's own online ordering and a checklist, as alternatives to the AI call */}
                   {linkButtons}
                   {blockedNote}
@@ -189,6 +226,7 @@ export const ShopPicker: React.FC<ShopPickerProps> = ({ partyId, onSelect, prefe
                 </div>
               ) : (
                 <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
+                  {emailBlock}
                   {linkButtons}
                   {blockedNote}
                   {shop.phone && (

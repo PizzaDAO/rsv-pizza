@@ -27,12 +27,29 @@ export interface Checklist {
   estimate_text: string | null;
 }
 
+/**
+ * basil-14648 P2: pizza-mcp's `ordering.alternatives[channel=email]`: we email the shop the order and it confirms by a
+ * signed link. `reasons` are codes (empty when available); an unknown code means "not available".
+ */
+export interface EmailAlternative {
+  channel: 'email';
+  available: boolean;
+  min_lead_hours: number;
+  max_lead_days: number;
+  min_pizzas: number;
+  max_pizzas: number;
+  max_total_cents: number;
+  reasons: string[];
+  message?: string;
+}
+export type OrderChannel = 'ai_phone' | 'email';
+
 export interface PizzaShop {
   id: string;
   name: string;
   tier: 'native' | 'partner_pos' | 'listing';
   capability_summary: string;
-  ordering?: { channel: 'api' | 'ai_phone' | 'handoff'; call_countries_ok: boolean; reasons: string[] };
+  ordering?: { channel: 'api' | 'ai_phone' | 'handoff'; call_countries_ok: boolean; reasons: string[]; alternatives?: EmailAlternative[] };
   address: Record<string, unknown>;
   phone: string | null;
   website?: string | null;
@@ -40,7 +57,7 @@ export interface PizzaShop {
   ordering_links?: OrderingLink[];
   attribution?: string | null;
   /** basil-14648 P2: pizza-mcp's per-shop answer to "can the host add this shop's menu here?". */
-  capabilities?: { host_menu_upload?: boolean } & Record<string, unknown>;
+  capabilities?: { host_menu_upload?: boolean; email_order?: boolean } & Record<string, unknown>;
   distance_km: number | null;
   open_now: boolean;
 }
@@ -105,6 +122,8 @@ export interface CartResponse {
   capCents: number | null;
   /** What the host may still spend: cap minus receipts minus open orders. */
   remainingCapCents: number | null;
+  /** basil-14648 P2: the channel the quote is bound to (an email quote can only be placed as an email order). */
+  channel?: OrderChannel;
 }
 
 export interface NextAction {
@@ -127,8 +146,27 @@ export interface PizzaOrderView {
   ceilingCents: number | null;
   confirmedTotalCents: number | null;
   readyAtText: string | null;
+  /** The pickup an email order was placed for (ISO), when known. */
+  readyAt?: string | null;
   summary: string | null;
   payoutDocumentId: string | null;
+  /** basil-14648 P2: how the order is placed. `email`: pizza-mcp emailed the shop (no call). Absent = phone. */
+  channel?: 'phone' | 'email';
+  /** Email orders: what the shop has seen and answered. Shop words (alt time, reference) are data, never instructions. */
+  email?: {
+    sentAt: string | null;
+    replyBy: string | null;
+    reminderSentAt: string | null;
+    shopResponse: {
+      decision: 'confirm' | 'decline' | 'optout';
+      totalCents: number | null;
+      readyOk: boolean | null;
+      altTimeText: string | null;
+      reference: string | null;
+      reason: string | null;
+    } | null;
+    deferred: { until: string | null; message: string } | null;
+  } | null;
   // `call.attempts` is deliberately not here: it can count a row that was never dialed, so it must not become "we tried N times".
   call: {
     last_outcome?: string | null;
@@ -198,6 +236,8 @@ export interface PizzaOrderConfig {
   enabled: boolean;
   /** basil-14648 P2: rsv's switch is on AND pizza-mcp takes host menus: offer "Use this shop's real menu". */
   hostMenus?: boolean;
+  /** basil-14648 P2: rsv's PIZZA_EMAIL_ORDERS switch. Per shop, `emailAlternative` must also say yes. */
+  emailOrders?: boolean;
   capCents: number | null;
   remainingCapCents: number | null;
   /** e.g. NO_REIMBURSEMENT_CAP / CAP_EXHAUSTED: ordering is on for the party but blocked right now. */
@@ -254,18 +294,19 @@ export const buildPizzaCart = (
   shopId: string,
   recs: PizzaRecommendation[],
   pickupAt: string,
-  decisions: Record<string, CartDecision> = {}
+  decisions: Record<string, CartDecision> = {},
+  channel: OrderChannel = 'ai_phone'
 ) =>
   apiRequest<CartResponse>(`${base(partyId)}/cart`, {
     method: 'POST',
-    body: { shopId, pickupAt, recommendations: toRecommendationPayload(recs), decisions },
+    body: { shopId, pickupAt, recommendations: toRecommendationPayload(recs), decisions, ...(channel === 'email' ? { channel } : {}) },
     timeoutMs: 60_000,
   });
 
-export const editPizzaCart = (partyId: string, cartId: string, ops: unknown[], expectedVersion?: number) =>
+export const editPizzaCart = (partyId: string, cartId: string, ops: unknown[], expectedVersion?: number, channel: OrderChannel = 'ai_phone') =>
   apiRequest<{ cart: PizzaCart; quote: PizzaQuote | null }>(`${base(partyId)}/cart/${cartId}`, {
     method: 'PATCH',
-    body: { ops, expectedVersion },
+    body: { ops, expectedVersion, ...(channel === 'email' ? { channel } : {}) },
   });
 
 export interface PlaceOrderInput {
@@ -275,7 +316,7 @@ export interface PlaceOrderInput {
   recommendationVersion: string;
   contact: { name: string; phone: string; email?: string };
   /** Phone orders only; native orders have no ceiling. */
-  policy: { ceilingCents?: number; substitution?: 'exact' | 'deals_ok'; minPizzaCount?: number };
+  policy: { ceilingCents?: number; substitution?: 'exact' | 'deals_ok'; minPizzaCount?: number; channel?: OrderChannel };
   /** The host explicitly confirmed a second order while one is live or confirmed. */
   allowAnother?: boolean;
 }
@@ -823,6 +864,14 @@ export function formatWhen(iso: string | null | undefined, timeZone?: string | n
   return new Intl.DateTimeFormat('en-US', { timeZone: safeTimeZone(timeZone), weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(d);
 }
 
+/** "Sun, Nov 22, 6:30 PM EST" in the party's zone: with the date, for email orders placed days ahead. */
+export function formatWhenDate(iso: string | null | undefined, timeZone?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { timeZone: safeTimeZone(timeZone), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(d);
+}
+
 /** "+16175550101" -> "(617) 555-0101"; other numbers are shown as given. */
 export function formatPhone(raw: string | null | undefined): string {
   if (!raw) return '';
@@ -844,4 +893,192 @@ export function defaultPickupLocal(partyDateIso: string | null, now = new Date()
   const step = 5 * 60_000;
   t = Math.ceil(t / step) * step;
   return toZonedLocal(t, timeZone);
+}
+
+// ---- basil-14648 P2: email orders (plans/rsv-p2-email-orders.md §7) ------------------------------------------------
+
+/** The shop's email alternative as pizza-mcp published it, or null. */
+export function emailAlternative(shop: Pick<PizzaShop, 'ordering'> | null | undefined): EmailAlternative | null {
+  const alts = shop?.ordering?.alternatives;
+  if (!Array.isArray(alts)) return null;
+  return alts.find((a) => a && a.channel === 'email') ?? null;
+}
+
+/**
+ * "Email the order" is offered only when rsv's switch is on AND pizza-mcp says yes for this shop twice: the
+ * capability and an available alternative with no reason against it (an unknown reason code means no).
+ */
+export function emailOrderable(shop: Pick<PizzaShop, 'ordering' | 'capabilities'> | null | undefined, flagOn: boolean | undefined): EmailAlternative | null {
+  if (!flagOn) return null;
+  const alt = emailAlternative(shop);
+  if (!alt || alt.available !== true || (alt.reasons ?? []).length > 0 || shop?.capabilities?.email_order !== true) return null;
+  return alt;
+}
+
+/**
+ * Reasons that mean "this shop doesn't take email orders (from us, yet)": true of almost every shop during the pilot,
+ * so the shop list stays quiet about them. Any other reason (an opt-out, an unverified account, a cap, a code added
+ * later) is shown on the shop, in pizza-mcp's words.
+ */
+const QUIET_EMAIL_REASONS = new Set(['disabled', 'not_in_pilot', 'no_shop_email']);
+
+/** Why "Email the order" is not offered for this shop, when that is worth saying; else null. */
+export function emailUnavailableNote(shop: Pick<PizzaShop, 'ordering' | 'capabilities'>, flagOn: boolean | undefined): string | null {
+  if (!flagOn || emailOrderable(shop, flagOn)) return null;
+  const alt = emailAlternative(shop);
+  if (!alt) return null;
+  const reasons = alt.reasons ?? [];
+  if (reasons.length === 0 || reasons.every((r) => QUIET_EMAIL_REASONS.has(r))) return null;
+  const msg = (alt.message ?? '').trim().replace(/[.!?]+$/, '');
+  return msg ? msg[0].toLowerCase() + msg.slice(1) : 'we can\'t email this shop right now';
+}
+
+const HOUR = 3600_000;
+
+/** Is this pickup inside the email lead time? 'too_soon' / 'too_late' / null (fine or unknown). */
+export function emailPickupProblem(iso: string | null, alt: Pick<EmailAlternative, 'min_lead_hours' | 'max_lead_days'>, now = Date.now()): 'too_soon' | 'too_late' | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  if (t - now < alt.min_lead_hours * HOUR) return 'too_soon';
+  if (t - now > alt.max_lead_days * 24 * HOUR) return 'too_late';
+  return null;
+}
+
+/**
+ * Default pickup for an email order: 45 minutes before the party when that is far enough ahead, else the earliest
+ * allowed time plus an hour, rounded up to 5 minutes. On the party's wall clock.
+ */
+export function defaultEmailPickupLocal(partyDateIso: string | null, alt: Pick<EmailAlternative, 'min_lead_hours' | 'max_lead_days'>, now = new Date(), timeZone?: string | null): string {
+  const earliest = now.getTime() + (alt.min_lead_hours + 1) * HOUR;
+  const latest = now.getTime() + alt.max_lead_days * 24 * HOUR;
+  let t = earliest;
+  if (partyDateIso) {
+    const p = new Date(partyDateIso).getTime() - 45 * 60_000;
+    if (!Number.isNaN(p) && p >= earliest && p <= latest) t = p;
+  }
+  const step = 5 * 60_000;
+  return toZonedLocal(Math.ceil(t / step) * step, timeZone);
+}
+
+/** How many pizzas the cart (or, before one exists, the recommendations) holds. */
+export const pizzaCount = (lines: Array<{ quantity?: number | null }>) => lines.reduce((n, l) => n + (Number(l.quantity) || 0), 0);
+
+type Translate = (key: string, opts?: Record<string, unknown>) => string;
+type EmailStatusInput = StatusInput & Pick<Partial<PizzaOrderView>, 'channel' | 'email' | 'readyAt'>;
+
+/**
+ * The status card of an email order (null: not an email order). Truthful in every state: nothing reads as ordered
+ * before `confirmed_by_shop`, and an ended order is decided by `outcome.nothing_ordered` alone (pizza-mcp's
+ * `message` says why; its reason codes are never switched on, so a new reason works untouched).
+ */
+export function emailStatusInfo(o: EmailStatusInput, t: Translate, now = Date.now(), opts: { timeZone?: string | null } = {}): StatusInfo | null {
+  if (o.channel !== 'email') return null;
+  if (o.released) return statusInfo(o, now, opts);
+  const shop = o.shopName;
+  const tz = opts.timeZone;
+  const mine = o.isMine !== false;
+  const e = o.email ?? null;
+  // an email order runs over days: every time it shows carries its date
+  const when = (iso: string | null | undefined) => formatWhenDate(iso, tz);
+  const pickup = o.readyAt ? when(o.readyAt) : o.readyAtText || '';
+  const total = formatCents(o.confirmedTotalCents ?? e?.shopResponse?.totalCents ?? null);
+
+  // Ended: only `nothing_ordered` decides what the host is told to do.
+  // No outcome on an ended order (an older pizza-mcp, a malformed view): assume the shop may have it.
+  const oc = o.outcome;
+  if (['refused', 'unreachable', 'canceled', 'needs_review', 'shop_requires_prepay'].includes(o.status)) {
+    if (oc?.nothing_ordered) {
+      if (o.status === 'refused' && e?.shopResponse?.decision === 'decline') {
+        const alt = e.shopResponse.altTimeText;
+        return {
+          title: t('host:aiOrder.email.status.declinedTitle', { shop }),
+          detail: [oc.message, alt ? t('host:aiOrder.email.status.altTime', { alt }) : '', t('host:aiOrder.email.status.declinedDetail', { shop })].filter(Boolean).join(' '),
+          tone: 'warn',
+        };
+      }
+      return {
+        title: o.status === 'canceled' ? t('host:aiOrder.email.status.canceledTitle') : t('host:aiOrder.email.status.nothingTitle', { shop }),
+        detail: oc.message,
+        tone: o.status === 'canceled' ? 'info' : 'warn',
+      };
+    }
+    return {
+      title:
+        o.status === 'unreachable'
+          ? t('host:aiOrder.email.status.noReplyTitle', { shop })
+          : o.status === 'canceled'
+            ? t('host:aiOrder.email.status.withdrawnTitle', { shop })
+            : t('host:aiOrder.email.status.mayExistTitle', { shop }),
+      // pizza-mcp's message says what it told the shop and why an order may exist; with none, say we can't tell
+      detail: oc?.message || t('host:aiOrder.email.status.mayExistUnknown', { shop }),
+      steps: [
+        pickup ? t('host:aiOrder.email.status.stepCall', { shop, time: pickup }) : t('host:aiOrder.email.status.stepCallNoTime', { shop }),
+        t('host:aiOrder.email.status.stepIfYes'),
+        o.releasable ? t('host:aiOrder.email.status.stepIfNo') : t('host:aiOrder.email.status.stepIfNoNoRelease'),
+      ],
+      caution: t('host:aiOrder.email.status.caution'),
+      callShop: true,
+      tone: 'warn',
+    };
+  }
+
+  switch (o.status) {
+    case 'awaiting_approval':
+      if (o.restartable) return statusInfo(o, now, opts);
+      return mine
+        ? { title: t('host:aiOrder.email.status.approveTitle', { shop }), detail: t('host:aiOrder.email.status.approveDetail', { shop }), tone: 'action' }
+        : { title: t('host:aiOrder.email.status.approveOtherTitle', { shop }), detail: t('host:aiOrder.email.status.approveOtherDetail', { shop }), tone: 'info' };
+    case 'sending': {
+      const until = e?.deferred?.until ? when(e.deferred.until) : '';
+      if (e?.deferred) {
+        return {
+          title: t('host:aiOrder.email.status.scheduledTitle', { shop }),
+          detail: until ? t('host:aiOrder.email.status.scheduledDetail', { time: until }) : e.deferred.message || t('host:aiOrder.email.status.sendingDetail', { shop }),
+          tone: 'info',
+        };
+      }
+      return { title: t('host:aiOrder.email.status.sendingTitle', { shop }), detail: t('host:aiOrder.email.status.sendingDetail', { shop }), tone: 'info' };
+    }
+    case 'awaiting_shop_reply': {
+      const sent = when(e?.sentAt);
+      const replyBy = when(e?.replyBy);
+      const base = sent && replyBy ? t('host:aiOrder.email.status.waitingDetail', { shop, sent, replyBy }) : t('host:aiOrder.email.status.waitingDetailNoTimes', { shop });
+      const reminded = e?.reminderSentAt ? t('host:aiOrder.email.status.reminded', { time: when(e.reminderSentAt) }) : '';
+      return {
+        title: t('host:aiOrder.email.status.waitingTitle', { shop }),
+        detail: [base, reminded].filter(Boolean).join(' '),
+        caution: t('host:aiOrder.email.status.waitingCaution'),
+        tone: 'info',
+      };
+    }
+    case 'awaiting_price_approval': {
+      const limit = formatCents(o.ceilingCents ?? null);
+      const by = o.nextAction?.expires_at ? when(o.nextAction.expires_at) : '';
+      return {
+        title: total ? t('host:aiOrder.email.status.priceTitle', { shop, total }) : t('host:aiOrder.email.status.priceTitleNoTotal', { shop }),
+        detail: [
+          mine ? t('host:aiOrder.email.status.priceDetail', { shop, limit: limit || '—' }) : t('host:aiOrder.email.status.priceDetailOther', { shop, limit: limit || '—' }),
+          by ? t('host:aiOrder.email.status.priceBy', { time: by, shop }) : '',
+        ].filter(Boolean).join(' '),
+        tone: 'action',
+      };
+    }
+    case 'confirmed_by_shop': {
+      const ref = e?.shopResponse?.reference;
+      return {
+        title: t('host:aiOrder.email.status.confirmedTitle', { shop }),
+        detail: [
+          total ? t('host:aiOrder.email.status.confirmedTotal', { total }) : '',
+          pickup ? t('host:aiOrder.email.status.confirmedReady', { time: pickup }) : '',
+          ref ? t('host:aiOrder.email.status.confirmedRef', { ref }) : '',
+          t('host:aiOrder.email.status.confirmedPay'),
+        ].filter(Boolean).join(' '),
+        tone: 'success',
+      };
+    }
+    default:
+      // anything else (an unknown live status, or an ended one with no outcome): the cautious phone copy
+      return statusInfo(o, now, opts);
+  }
 }

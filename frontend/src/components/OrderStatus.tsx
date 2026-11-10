@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, BellRing, Phone, Info } from 'lucide-react';
 import {
   getPizzaOrder, cancelPizzaOrder, settlePizzaOrder, PizzaOrderView, statusInfo, isTerminalStatus, formatCents,
-  formatWhen, approvalDeadline, callNumber,
+  formatWhen, approvalDeadline, callNumber, emailStatusInfo,
 } from '../lib/pizzaOrder';
 import { InlineConfirm } from './InlineConfirm';
 
@@ -94,12 +94,15 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
     };
   }, [partyId, order.opopOrderId, order.status, order.restartable, order.settling, order.isMine, onUpdate]);
 
-  const info = statusInfo(order, Date.now(), { timeZone });
+  // basil-14648 P2: an email order has its own truthful copy (nothing reads as ordered before the shop confirms)
+  const isEmail = order.channel === 'email';
+  const info = (isEmail ? emailStatusInfo(order, t, Date.now(), { timeZone }) : null) ?? statusInfo(order, Date.now(), { timeZone });
   const waiting = !isTerminalStatus(order.status) && !order.restartable;
   // `live: false` (pizza-mcp's approval view): approving can no longer do anything, so no link to a dead page
   const url = order.nextAction?.type === 'open_url' && order.nextAction.live !== false ? order.nextAction.url : null;
   const deferred = order.call?.deferred ?? null;
-  const nextTry = formatWhen(deferred?.until, timeZone);
+  // an email order's scheduled send is in its own copy
+  const nextTry = isEmail ? '' : formatWhen(deferred?.until, timeZone);
   const finished = order.status === 'confirmed_by_shop' || order.status === 'completed' || !!order.receiptCovered;
   // "another pizzeria" says it is fine to order again: only when pizza-mcp is sure, or a host checked and released it
   const safeToReorder = order.outcome?.nothing_ordered === true || !!order.released;
@@ -109,13 +112,15 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
   const showLeave = (!waiting || order.restartable) && (finished || !order.blocking);
   const call = callNumber(order, shopPhone);
   const callable = !!call && !!info.callShop && !safeToReorder;
-  const deadline = approvalDeadline(order);
+  // the 3-minute hold countdown is a call's: an email price approval has a day, said in its copy
+  const deadline = isEmail ? null : approvalDeadline(order);
   const beforeApproval = order.status === 'awaiting_approval';
   const Icon =
     info.tone === 'success' ? CheckCircle2
       : info.tone === 'warn' || info.tone === 'error' ? AlertTriangle
         : info.tone === 'action' ? BellRing
-          : waiting ? Loader2
+          // a shop's email reply can take days: a clock, not a spinner
+          : waiting && !(isEmail && order.status === 'awaiting_shop_reply') ? Loader2
             : order.status === 'canceled' ? Info : Clock;
   const color =
     info.tone === 'success' ? 'text-[color:var(--ai-success)]'
@@ -127,7 +132,7 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
     <div className="space-y-3">
       <div className="p-3 bg-theme-surface rounded-xl border border-theme-stroke" role="status" aria-live="polite" aria-atomic="true">
         <div className="flex items-start gap-2">
-          <Icon size={18} aria-hidden="true" className={`${color} flex-shrink-0 mt-0.5 ${waiting && info.tone === 'info' ? 'animate-spin' : ''}`} />
+          <Icon size={18} aria-hidden="true" className={`${color} flex-shrink-0 mt-0.5 ${Icon === Loader2 && info.tone === 'info' ? 'animate-spin' : ''}`} />
           <div className="min-w-0">
             <p className={`text-sm font-semibold ${color}`}>{info.title}</p>
             {info.detail && <p className="text-sm text-theme-text-secondary mt-1">{info.detail}</p>}
@@ -174,7 +179,13 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
           {pending === 'cancel' ? (
             <InlineConfirm
               message={
-                order.outcome?.nothing_ordered === false || !!order.call?.checking
+                isEmail
+                  ? order.status === 'confirmed_by_shop'
+                    ? t('aiOrder.email.confirmCancelConfirmed', { shop: order.shopName })
+                    : order.status === 'awaiting_approval' || (order.status === 'sending' && !order.email?.sentAt)
+                      ? t('aiOrder.email.confirmCancelBefore', { shop: order.shopName })
+                      : t('aiOrder.email.confirmWithdraw', { shop: order.shopName })
+                  : order.outcome?.nothing_ordered === false || !!order.call?.checking
                   ? t('aiOrder.status.confirmStopCallback', { shop: order.shopName })
                   : t('aiOrder.status.confirmCancel', { shop: order.shopName })
               }
@@ -205,7 +216,13 @@ export const OrderStatus: React.FC<OrderStatusProps> = ({ partyId, order, orderS
                 setPending('cancel');
               }}
             >
-              {canceling ? t('aiOrder.status.canceling') : t('aiOrder.status.cancelOrder')}
+              {canceling
+                ? t('aiOrder.status.canceling')
+                : isEmail && order.status === 'confirmed_by_shop'
+                  ? t('aiOrder.email.cancelConfirmed', { shop: order.shopName })
+                  : isEmail && ['awaiting_shop_reply', 'awaiting_price_approval'].includes(order.status)
+                    ? t('aiOrder.email.cancelWithdraw')
+                    : t('aiOrder.status.cancelOrder')}
             </button>
           )}
           {cancelError && <p role="alert" className="text-sm text-[color:var(--ai-error)] mt-1">{cancelError}</p>}

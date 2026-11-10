@@ -183,7 +183,7 @@ describe('access: authentication, host/co-host, allowlist', () => {
     }
     const cfg = await request(app()).get(`${base}/config`).set(host);
     expect(cfg.status).toBe(200);
-    expect(cfg.body).toEqual({ enabled: false, hostMenus: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
+    expect(cfg.body).toEqual({ enabled: false, hostMenus: false, emailOrders: false, capCents: null, remainingCapCents: null, blockedReason: null, location: null });
     expect(mcp.calls).toHaveLength(0);
   });
 
@@ -1802,5 +1802,186 @@ describe('handoff review 3 (X1-X3, permanent)', () => {
     expect(fake.handoffs.get(fresh.id).quoteCeilingCents).toBe(20000);
     const m = await mark(fresh.id, 'ordered');
     expect(m.body.handoff.holdCents).toBe(20000);
+  });
+});
+
+describe('email orders (basil-14648 P2, plans/rsv-p2-email-orders.md §7)', () => {
+  const ALT = { channel: 'email', available: true, min_lead_hours: 24, max_lead_days: 21, min_pizzas: 8, max_pizzas: 40, max_total_cents: 80000, reasons: [], message: 'ok' };
+  const H = 3600_000;
+  const later = (h: number) => new Date(Date.now() + h * H).toISOString();
+  function emailMcp(over: Record<string, any> = {}, alt: any = ALT, cap: unknown = true) {
+    return pizzaMcp({
+      'GET /pizzerias/:id': (c: any) => ({
+        json: { id: c.path.split('/').pop(), name: "Sal's", tier: 'listing', ordering: { channel: 'ai_phone', alternatives: alt ? [alt] : [] }, capabilities: { email_order: cap } },
+      }),
+      ...over,
+    });
+  }
+  const use = (f: ReturnType<typeof pizzaMcp>) => {
+    mcp = f;
+    setPizzaMcpClientForTests(new PizzaMcpClient({ fetchImpl: mcp.fetchImpl }));
+  };
+  const emailCart = (over: any = {}) =>
+    request(app()).post(`${base}/cart`).set(host).send({ shopId: 'pzl_osm_n1', recommendations: [rec], pickupAt: later(48), channel: 'email', ...over });
+  beforeEach(() => {
+    process.env.PIZZA_EMAIL_ORDERS = '1';
+    use(emailMcp());
+  });
+  afterEach(() => {
+    delete process.env.PIZZA_EMAIL_ORDERS;
+  });
+
+  it('/config says whether rsv offers email orders', async () => {
+    expect((await request(app()).get(`${base}/config`).set(host)).body.emailOrders).toBe(true);
+    delete process.env.PIZZA_EMAIL_ORDERS;
+    expect((await request(app()).get(`${base}/config`).set(host)).body.emailOrders).toBe(false);
+  });
+
+  it('rsv\'s switch off: the email channel is refused, never quietly a call', async () => {
+    delete process.env.PIZZA_EMAIL_ORDERS;
+    const res = await emailCart();
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('FEATURE_DISABLED');
+    expect(mcp.calls.filter((c) => c.path === '/carts')).toHaveLength(0);
+  });
+
+  it('builds the cart and quotes it bound to the email channel', async () => {
+    const res = await emailCart();
+    expect(res.status).toBe(200);
+    expect(res.body.channel).toBe('email');
+    const q = mcp.calls.find((c) => c.path.endsWith('/quote'))!;
+    expect(q.body).toEqual({ max_total_cents: 25000, channel: 'email' });
+  });
+
+  it('checks the published lead time and size first; an email order may be bigger than a call', async () => {
+    const soon = await emailCart({ pickupAt: later(3) });
+    expect(soon.status).toBe(400);
+    expect(soon.body.error).toMatchObject({ code: 'EMAIL_ORDERS_NOT_AVAILABLE', reasons: ['lead_time'] });
+    expect(soon.body.error.message).toMatch(/24 hours to 21 days/);
+    const small = await emailCart({ recommendations: [{ ...rec, quantity: 4 }] });
+    expect(small.body.error).toMatchObject({ code: 'EMAIL_ORDERS_NOT_AVAILABLE', reasons: ['too_small'] });
+    const big = await emailCart({ recommendations: [{ ...rec, quantity: 36 }] });
+    expect(big.status).toBe(200);
+    // the same 36 pizzas as a call: over the call limit
+    const call = await request(app()).post(`${base}/cart`).set(host).send({ shopId: 'pzl_osm_n1', recommendations: [{ ...rec, quantity: 36 }], pickupAt: later(48) });
+    expect(call.body.error.code).toBe('TOO_MANY_PIZZAS');
+    expect((await emailCart({ recommendations: [{ ...rec, quantity: 41 }] })).body.error.code).toBe('TOO_MANY_PIZZAS');
+  });
+
+  it('a shop pizza-mcp would not email (or without the capability) says why, and builds nothing', async () => {
+    use(emailMcp({}, { ...ALT, available: false, reasons: ['unverified'], message: 'Email orders need a verified account.' }));
+    const res = await emailCart();
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({ code: 'EMAIL_ORDERS_NOT_AVAILABLE', reasons: ['unverified'] });
+    expect(res.body.error.message).toMatch(/Nothing was ordered and nothing was sent/);
+    use(emailMcp({}, ALT, false));
+    expect((await emailCart()).status).toBe(409);
+    expect(mcp.calls.filter((c) => c.path === '/carts')).toHaveLength(0);
+  });
+
+  const placeEmail = async (polOver: any = {}, cartOver: any = {}) => {
+    const c = (await emailCart(cartOver)).body;
+    return {
+      c,
+      res: await request(app())
+        .post(`${base}/orders`)
+        .set(host)
+        .send(orderBody({ quoteId: c.quote.quote_id, cartId: c.cart.id, shopId: c.cart.pizzeria_id, policy: { ceilingCents: 21000, channel: 'email', ...polOver } })),
+    };
+  };
+
+  it('places with email_order (not phone_order), keeps client_ref and the party name, and stores the pickup', async () => {
+    const pickup = later(48);
+    use(emailMcp({ 'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { type: 'pickup', scheduled_for: pickup } }) }) }));
+    const { res } = await placeEmail();
+    expect(res.status).toBe(201);
+    const call = mcp.calls.find((x) => x.method === 'POST' && x.path === '/orders')!;
+    expect(call.body.phone_order).toBeUndefined();
+    expect(call.body).toMatchObject({
+      payment_mode: 'pay_at_pickup',
+      email_order: { price_ceiling_cents: 21000, substitution_policy: 'exact', party_name: 'Pizza Party' },
+      max_total_cents: 25000,
+      client_ref: { party_id: PARTY_ID, rsvp_user_id: 'host1' },
+    });
+    expect(new Date(fake.byOpop(res.body.order.opopOrderId).readyAt).toISOString()).toBe(pickup);
+  });
+
+  it('refuses a pickup that no longer fits the lead time, and a limit over the email cap', async () => {
+    use(emailMcp({ 'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { scheduled_for: later(2) } }) }) }));
+    const { res } = await placeEmail();
+    expect(res.status).toBe(400);
+    expect(res.body.error.reasons).toEqual(['lead_time']);
+    setParty({ reimbursementCapUsd: 2000 });
+    use(emailMcp({ 'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { scheduled_for: later(48) } }) }) }));
+    const over = await placeEmail({ ceilingCents: 90000 });
+    expect(over.res.status).toBe(422);
+    expect(over.res.body.error.code).toBe('SPEND_LIMIT_EXCEEDED');
+    expect(mcp.calls.filter((x) => x.method === 'POST' && x.path === '/orders')).toHaveLength(0);
+  });
+
+  it("maps pizza-mcp's EMAIL_ORDERS_NOT_AVAILABLE (details.reasons): nothing was created, nothing blocks", async () => {
+    use(emailMcp({
+      'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { scheduled_for: later(48) } }) }),
+      'POST /orders': () => ({ status: 422, json: { code: 'EMAIL_ORDERS_NOT_AVAILABLE', title: 't', detail: 'This shop asked not to be contacted by Open Pizza.', status: 422, retryable: false, details: { reasons: ['do_not_contact'] } } }),
+    }));
+    const { res } = await placeEmail();
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatchObject({ code: 'EMAIL_ORDERS_NOT_AVAILABLE', reasons: ['do_not_contact'] });
+    expect(res.body.error.message).toMatch(/^We can't email Sal's this order: the shop asked us not to contact it\. Nothing was ordered/);
+    expect(fake.orders.size).toBe(0);
+  });
+
+  it('VALIDATION_FAILED asking for a requote prices the cart again for email; any other is a plain 400', async () => {
+    use(emailMcp({
+      'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { scheduled_for: later(48) } }) }),
+      'POST /orders': () => ({ status: 400, json: { code: 'VALIDATION_FAILED', title: 't', detail: 'This estimate was made for a phone order.', status: 400, retryable: false, path: 'email_order', suggestions: [{ action: 'requote' }] } }),
+    }));
+    const { res } = await placeEmail();
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('QUOTE_EXPIRED');
+    expect(mcp.calls.filter((c) => c.path.endsWith('/quote')).at(-1)!.body.channel).toBe('email');
+    use(emailMcp({
+      'GET /carts/:id': (c: any) => ({ json: cartView({ id: c.path.split('/').pop(), fulfillment: { scheduled_for: later(48) } }) }),
+      'POST /orders': () => ({ status: 400, json: { code: 'VALIDATION_FAILED', title: 't', detail: 'Send phone_order or email_order, not both.', status: 400, retryable: false, path: 'email_order' } }),
+    }));
+    const plain = await placeEmail();
+    expect(plain.res.status).toBe(400);
+    expect(plain.res.body.error.message).toBe('Send phone_order or email_order, not both. Nothing was ordered and nothing was sent.');
+  });
+
+  const mk = (over: Record<string, unknown>) =>
+    fake.db.pizzaOrder.create({
+      data: { partyId: PARTY_ID, userId: 'host1', opopOrderId: `ord_${Math.random().toString(36).slice(2, 8)}`, tier: 'listing', shopId: 'pzl_osm_n1', shopName: "Sal's", ...over },
+    });
+  const emailView = { channel: 'email', email: { sent_at: '2026-11-10T14:10:00.000Z', reply_by: '2026-11-12T14:10:00.000Z', reminder_sent_at: null, shop_response: null, deferred: null } };
+
+  it.each(['sending', 'awaiting_shop_reply', 'awaiting_price_approval'])('cancels an email order in %s through pizza-mcp (it used to be a 409 here)', async (status) => {
+    const o = await mk({ status, lastView: emailView });
+    const res = await request(app()).post(`${base}/orders/${o.opopOrderId}/cancel`).set(host).send({});
+    expect(res.status).toBe(200);
+    expect(mcp.calls.filter((c) => c.path.endsWith('/cancel'))).toHaveLength(1);
+  });
+
+  it('a confirmed email order is cancelable before its pickup, not after; the card says so', async () => {
+    const before = await mk({ status: 'confirmed_by_shop', lastView: emailView, readyAt: new Date(Date.now() + 5 * H) });
+    const view = (await request(app()).get(`${base}/orders`).set(host)).body.orders.find((x: any) => x.opopOrderId === before.opopOrderId);
+    expect(view).toMatchObject({ cancelable: true, channel: 'email', email: { sentAt: '2026-11-10T14:10:00.000Z', replyBy: '2026-11-12T14:10:00.000Z' } });
+    expect((await request(app()).post(`${base}/orders/${before.opopOrderId}/cancel`).set(host).send({})).status).toBe(200);
+    mcp.calls.length = 0;
+    const after = await mk({ status: 'confirmed_by_shop', lastView: emailView, readyAt: new Date(Date.now() - 60_000) });
+    const res = await request(app()).post(`${base}/orders/${after.opopOrderId}/cancel`).set(host).send({});
+    expect(res.status).toBe(409);
+    expect(mcp.calls).toHaveLength(0);
+    // a confirmed CALL is never cancelable here
+    const call = await mk({ status: 'confirmed_by_shop', lastView: { call: {} }, readyAt: new Date(Date.now() + 5 * H) });
+    expect((await request(app()).post(`${base}/orders/${call.opopOrderId}/cancel`).set(host).send({})).status).toBe(409);
+  });
+
+  it('a live email order blocks a second order like a call does', async () => {
+    await mk({ status: 'awaiting_shop_reply', lastView: emailView });
+    const c = await buildCart();
+    const res = await placeFrom(c);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('ORDER_IN_PROGRESS');
   });
 });

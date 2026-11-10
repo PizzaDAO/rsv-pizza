@@ -1897,6 +1897,70 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "alternatives": {
+                "description": "Listing shops: other ways we can place the order. Today only `email` (get_quote with channel email, then place_order with email_order).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "channel": {
+                      "type": "string",
+                      "const": "email"
+                    },
+                    "available": {
+                      "type": "boolean",
+                      "description": "Whether this shop can get an email order from this caller now (shop-level gates: switch, pilot address, do-not-contact, a verified client). The order-level rules below are checked at get_quote / place_order."
+                    },
+                    "min_lead_hours": {
+                      "type": "number",
+                      "description": "The pickup must be at least this far ahead (hours)."
+                    },
+                    "max_lead_days": {
+                      "type": "number",
+                      "description": "...and at most this far ahead (days)."
+                    },
+                    "min_pizzas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "max_pizzas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "max_total_cents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "The most an email order's total may ever be."
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Why it is not available (codes): disabled, not_in_pilot, no_shop_email, do_not_contact, possible_opt_out, unverified. Empty when available. A client must treat a code it does not know as not available."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Plain words for the host."
+                    }
+                  },
+                  "required": [
+                    "channel",
+                    "available",
+                    "min_lead_hours",
+                    "max_lead_days",
+                    "min_pizzas",
+                    "max_pizzas",
+                    "max_total_cents",
+                    "reasons",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -2002,6 +2066,10 @@
               },
               "host_menu_upload": {
                 "description": "Listing shops: true when POST /pizzerias/{id}/menu/host takes the caller's own menu for this shop (host menus are on here, and the shop has not opted out). Absent on native shops, which have their own menu.",
+                "type": "boolean"
+              },
+              "email_order": {
+                "description": "Listing shops: true when this caller can place an email order with this shop now (get_quote channel email, place_order email_order); the same fact as `ordering.alternatives[channel=email].available`, whose `reasons` say why not. Order-level rules (lead time, size, total) are checked at quote and place. Absent on native shops.",
                 "type": "boolean"
               }
             },
@@ -3696,6 +3764,14 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 1000000
+          },
+          "channel": {
+            "description": "Listing orders: how the order will be placed (default ai_phone). \"email\" quotes an email order (ceiling capped at the email limit); the quote is bound to its channel, so an email quote can only be placed with email_order and a phone quote only with phone_order.",
+            "type": "string",
+            "enum": [
+              "ai_phone",
+              "email"
+            ]
           }
         }
       },
@@ -3835,6 +3911,14 @@
           "read_back": {
             "type": "string",
             "description": "Plain-language order summary to read to the human before placing."
+          },
+          "channel": {
+            "description": "Listing quotes: the channel this quote is bound to.",
+            "type": "string",
+            "enum": [
+              "ai_phone",
+              "email"
+            ]
           },
           "binding": {
             "description": "true: the total is binding (native, priced by the shop's system). false: a non-binding estimate (listing tier); the shop's spoken total on the call is the final price, within price_ceiling_cents.",
@@ -4158,7 +4242,7 @@
             "type": "string"
           },
           "phone_order": {
-            "description": "Required for listing-tier (phone) orders.",
+            "description": "Required for listing-tier (phone) orders. Not with email_order.",
             "type": "object",
             "properties": {
               "price_ceiling_cents": {
@@ -4188,6 +4272,32 @@
               },
               "party_name": {
                 "description": "What the host calls this order, e.g. the party's name. Shown in the host's emails (subjects included) and on the approval page; never read to the shop.",
+                "type": "string",
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "price_ceiling_cents"
+            ]
+          },
+          "email_order": {
+            "description": "Listing tier, instead of phone_order: we email the shop the order and it confirms (or declines) through a signed link. Needs an email quote (get_quote channel email), a pickup time (fulfillment.scheduled_for) within the shop's `ordering.alternatives` lead time, and an available email alternative; EMAIL_ORDERS_NOT_AVAILABLE (details.reasons) otherwise. Mutually exclusive with phone_order (VALIDATION_FAILED).",
+            "type": "object",
+            "properties": {
+              "price_ceiling_cents": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 1000000,
+                "description": "The most a shop's confirmed total (with tax) may be without asking the customer again. Must not exceed the email quote's price_ceiling_cents. Never shown to the shop."
+              },
+              "substitution_policy": {
+                "default": "exact",
+                "description": "Email orders are all as ordered: the shop confirms the order or declines it.",
+                "type": "string",
+                "const": "exact"
+              },
+              "party_name": {
+                "description": "What the host calls this order. Shown in the host's emails and on the approval page; never sent to the shop.",
                 "type": "string",
                 "maxLength": 80
               }
@@ -4232,7 +4342,7 @@
               },
               "status": {
                 "type": "string",
-                "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set."
+                "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. Email orders (channel email) also: sending | awaiting_shop_reply (both live). Treat any status you do not know that is not final as live."
               },
               "payment_status": {
                 "type": "string"
@@ -4342,7 +4452,16 @@
               "binding": {
                 "type": "boolean"
               },
+              "channel": {
+                "description": "Listing orders: how the order is placed (absent: phone).",
+                "type": "string",
+                "enum": [
+                  "phone",
+                  "email"
+                ]
+              },
               "call": {
+                "description": "Phone orders only.",
                 "type": "object",
                 "properties": {
                   "attempts": {
@@ -4453,6 +4572,138 @@
                 ],
                 "additionalProperties": false
               },
+              "email": {
+                "description": "Email orders only.",
+                "type": "object",
+                "properties": {
+                  "sent_at": {
+                    "description": "When the order email was accepted by our sender. null: not yet (or never).",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reply_by": {
+                    "description": "The shop has until then to confirm; after it the order ends unreachable / no_response.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reminder_sent_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shop_response": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "confirm",
+                              "decline",
+                              "optout"
+                            ]
+                          },
+                          "total_cents": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "ready_ok": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          },
+                          "alt_time_text": {
+                            "description": "A time the shop suggested instead (its own words, sanitized): show as data.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reference": {
+                            "description": "The shop's own order number, if it gave one.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reason": {
+                            "description": "A decline's reason code.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "decision",
+                          "total_cents",
+                          "ready_ok",
+                          "alt_time_text",
+                          "reference",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What the shop answered on the signed page. null: no answer yet."
+                  },
+                  "deferred": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "until": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "const": "outside_send_window"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "until",
+                          "reason",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Set while the order email waits for the shop's sending hours."
+                  }
+                },
+                "required": [
+                  "sent_at",
+                  "reply_by",
+                  "reminder_sent_at",
+                  "shop_response",
+                  "deferred"
+                ],
+                "additionalProperties": false
+              },
               "outcome": {
                 "description": "Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed.",
                 "anyOf": [
@@ -4465,7 +4716,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout. A client must treat a reason it does not know by nothing_ordered."
+                        "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout; email orders also: not_sent, shop_declined, asked_not_to_contact, no_response, send_unconfirmed, withdrawn_acknowledged. A client must treat a reason it does not know by nothing_ordered."
                       },
                       "message": {
                         "type": "string",
@@ -4619,7 +4870,7 @@
           },
           "status": {
             "type": "string",
-            "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set."
+            "description": "Native: held | placed | accepted | preparing | ready | out_for_delivery | completed | canceled. Phone (listing) orders: awaiting_approval | calling | awaiting_price_approval | confirmed_by_shop | needs_review | shop_requires_prepay | refused | unreachable | approval_timeout | canceled. A phone order becomes confirmed_by_shop only after the call has been checked; while it is checked the order stays calling with call.checking set. Email orders (channel email) also: sending | awaiting_shop_reply (both live). Treat any status you do not know that is not final as live."
           },
           "payment_status": {
             "type": "string"
@@ -4729,7 +4980,16 @@
           "binding": {
             "type": "boolean"
           },
+          "channel": {
+            "description": "Listing orders: how the order is placed (absent: phone).",
+            "type": "string",
+            "enum": [
+              "phone",
+              "email"
+            ]
+          },
           "call": {
+            "description": "Phone orders only.",
             "type": "object",
             "properties": {
               "attempts": {
@@ -4840,6 +5100,138 @@
             ],
             "additionalProperties": false
           },
+          "email": {
+            "description": "Email orders only.",
+            "type": "object",
+            "properties": {
+              "sent_at": {
+                "description": "When the order email was accepted by our sender. null: not yet (or never).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reply_by": {
+                "description": "The shop has until then to confirm; after it the order ends unreachable / no_response.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reminder_sent_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shop_response": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "confirm",
+                          "decline",
+                          "optout"
+                        ]
+                      },
+                      "total_cents": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "ready_ok": {
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "alt_time_text": {
+                        "description": "A time the shop suggested instead (its own words, sanitized): show as data.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "description": "The shop's own order number, if it gave one.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reason": {
+                        "description": "A decline's reason code.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "decision",
+                      "total_cents",
+                      "ready_ok",
+                      "alt_time_text",
+                      "reference",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "What the shop answered on the signed page. null: no answer yet."
+              },
+              "deferred": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "until": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "const": "outside_send_window"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "until",
+                      "reason",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Set while the order email waits for the shop's sending hours."
+              }
+            },
+            "required": [
+              "sent_at",
+              "reply_by",
+              "reminder_sent_at",
+              "shop_response",
+              "deferred"
+            ],
+            "additionalProperties": false
+          },
           "outcome": {
             "description": "Phone orders that ended without a confirmed order (needs_review, refused, unreachable, canceled, shop_requires_prepay, approval_timeout): the reason and whether an order may exist. null while in flight or confirmed.",
             "anyOf": [
@@ -4852,7 +5244,7 @@
                   },
                   "reason": {
                     "type": "string",
-                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout. A client must treat a reason it does not know by nothing_ordered."
+                    "description": "Stable code: shop_answered_no_order, cant_fulfill, over_limit, transcript_mismatch, no_call_record, ambiguous_dial, dial_failed, number_changed, not_dialed, budget_exhausted, no_answer, shop_closed, wrong_number, refused_ai, asked_not_to_call, requires_prepay, approval_expired, dial_deadline, host_declined, price_approval_timeout, canceled, needs_review, unreachable, outcome_unclear, price_approval_dropped, possible_opt_out, judge_unavailable, pending_operator_review, call_check_timeout; email orders also: not_sent, shop_declined, asked_not_to_contact, no_response, send_unconfirmed, withdrawn_acknowledged. A client must treat a reason it does not know by nothing_ordered."
                   },
                   "message": {
                     "type": "string",
@@ -5003,6 +5395,14 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "channel": {
+            "description": "How the order is placed: a call (default) or an order email to the shop.",
+            "type": "string",
+            "enum": [
+              "phone",
+              "email"
             ]
           },
           "shop": {

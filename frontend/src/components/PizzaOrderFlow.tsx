@@ -12,13 +12,17 @@ import {
   buildPizzaCart, getPizzaOrder, getPizzaOrderConfig, getPizzaOrders, getPizzaShops, placePizzaOrder, orderToResume,
   getPizzaHandoffs, recordPizzaHandoff, handoffToResume, releasedByOtherHost, HandoffBudget,
   isTerminalStatus, formatPhone, menuPanelFits, CartResponse, CartDecision, PizzaHandoffView, PizzaOrderConfig, PizzaOrderView, PizzaShop,
+  emailOrderable, OrderChannel,
 } from '../lib/pizzaOrder';
 import { generateCheckOrderScript, generatePhoneOrderScript } from '../lib/ordering';
 
 // basil-14648 P2: 'handoff' = a resumed "I ordered it online" mark (the host settles it there)
 type Step = 'loading' | 'shops' | 'cart' | 'status' | 'handoff';
 
-type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingHandoffId?: string; existingStatus?: string; existingShopName?: string } };
+type ApiError = Error & { code?: string; data?: { existingOrderId?: string; existingHandoffId?: string; existingStatus?: string; existingShopName?: string; reasons?: string[] } };
+
+/** basil-14648 P2: email refusals about THIS order (lead time, size, total), not the shop: the shop stays emailable. */
+const ORDER_LEVEL_EMAIL_REASONS = ['lead_time', 'too_small', 'too_large', 'over_total_cap'];
 
 interface PizzaOrderFlowProps {
   /** Shown when this party is not in the pilot (and, unless `gated`, while that is being checked). */
@@ -50,8 +54,9 @@ function markReleasedSeen(id: string) {
   }
 }
 
-/** An order that is still live at pizza-mcp: a second one now would race it. */
-const LIVE = ['awaiting_approval', 'calling', 'awaiting_price_approval'];
+/** An order that is still live at pizza-mcp: a second one now would race it. Email orders add `sending` and `awaiting_shop_reply`. */
+const LIVE = ['awaiting_approval', 'calling', 'awaiting_price_approval', 'sending', 'awaiting_shop_reply'];
+const isLive = (s: string) => LIVE.includes(s);
 
 /**
  * basil-14648: shop picker -> cart review -> approve (on pizza-mcp's page) -> status.
@@ -100,6 +105,11 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   // the host asked for it from the list (the panel opens straight away there)
   const [hostMenus, setHostMenus] = useState(false);
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  // basil-14648 P2: "Email the order" (rsv's PIZZA_EMAIL_ORDERS and, per shop, pizza-mcp's answer), the channel the
+  // cart is built and quoted for, and shops pizza-mcp refused to email this session
+  const [emailOrders, setEmailOrders] = useState(false);
+  const [channel, setChannel] = useState<OrderChannel>('ai_phone');
+  const [unemailable, setUnemailable] = useState<ReadonlySet<string>>(() => new Set());
   // a menu read (or removal) is in flight: Back, Build and Approve wait. `menuStart` is what it started on, so a
   // late result never rebuilds a different shop's cart, a newer cart, or anything after Approve.
   const [menuBusy, setMenuBusy] = useState(false);
@@ -140,6 +150,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setEnabled(cfg.enabled);
         if (!cfg.enabled) return;
         setHostMenus(cfg.hostMenus === true);
+        setEmailOrders(cfg.emailOrders === true);
         setBlockedReason(cfg.blockedReason);
         setHeldOrderId(cfg.heldOrderId ?? null);
         setHeldHandoffId(cfg.heldHandoffId ?? null);
@@ -223,7 +234,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
   }, []);
 
   const onBuild = useCallback(
-    async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}): Promise<boolean> => {
+    async (pickupAtIso: string, nextDecisions: Record<string, CartDecision> = {}, forChannel: OrderChannel = channel): Promise<boolean> => {
       if (!partyId || !shop) return false;
       setBuilding(true);
       setError(null);
@@ -231,7 +242,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       setInProgress(null);
       try {
         setDecisions(nextDecisions);
-        const built = await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions);
+        const built = await buildPizzaCart(partyId, shop.id, recommendations, pickupAtIso, nextDecisions, forChannel);
         // the host picked another shop meanwhile: this cart is not theirs to see any more
         if (live.current.shopId !== shop.id) return false;
         setCartState(built);
@@ -243,8 +254,17 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setBuilding(false);
       }
     },
-    [partyId, shop, recommendations, showHeldOrder, t]
+    [partyId, shop, recommendations, showHeldOrder, t, channel]
   );
+
+  /** basil-14648 P2: call instead of email (or the reverse). A quote is bound to its channel: the cart is built again. */
+  const onSwitchChannel = useCallback((next: OrderChannel) => {
+    setChannel(next);
+    setCartState(null);
+    setError(null);
+    setPlaceError(null);
+    setInProgress(null);
+  }, []);
 
   const viewExisting = useCallback(
     async (orderId: string | null | undefined) => {
@@ -324,7 +344,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           shopId: shop.id,
           recommendationVersion: cartState.recommendationVersion,
           contact: input.contact,
-          policy: { ceilingCents: input.ceilingCents, substitution: input.substitution },
+          policy: { ceilingCents: input.ceilingCents, substitution: input.substitution, ...(channel === 'email' ? { channel } : {}) },
           ...(allowAnother ? { allowAnother: true } : {}),
         });
         // Open the approval page only once the order exists (no blank tab on an error). A blocked popup is fine:
@@ -347,6 +367,13 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           setUncallableNotice({ message: err.message || t('aiOrder.flow.cantCall', { shop: shop.name }), shopName: shop.name, phone: shop.phone });
           setCartState(null);
           setStep('shops');
+        } else if (err.code === 'EMAIL_ORDERS_NOT_AVAILABLE') {
+          // basil-14648 P2: nothing was ordered or sent. A refusal about the shop (an opt-out, an unverified account,
+          // a cap) takes "Email the order" off that shop for this session; one about this order (lead time, size)
+          // leaves it, so the host can change the pickup or have the AI call instead (both are on this step).
+          const reasons = Array.isArray(err.data?.reasons) ? err.data!.reasons! : [];
+          if (!reasons.length || reasons.some((r) => !ORDER_LEVEL_EMAIL_REASONS.includes(r))) setUnemailable((prev) => new Set(prev).add(shop.id));
+          setPlaceError(err.message || t('aiOrder.flow.placeError'));
         } else if (err.code === 'QUOTE_EXPIRED' && (err.data as { quote?: unknown } | undefined)?.quote) {
           // pizza-mcp 1c7113d: nothing was ordered; rsv priced the same cart again. The host reviews and approves again.
           const fresh = err.data as unknown as { cart?: CartResponse['cart']; quote: CartResponse['quote'] };
@@ -391,7 +418,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
         setPlacing(false);
       }
     },
-    [partyId, shop, cartState, showHeldOrder, onBuild, decisions, t]
+    [partyId, shop, cartState, showHeldOrder, onBuild, decisions, t, channel]
   );
 
   // Leaving an order may have changed the budget (a release, a receipt): refresh the notice.
@@ -399,6 +426,7 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
     setOrder(null);
     setHandoff(null);
     setMode('ai');
+    setChannel('ai_phone');
     setCartState(null);
     setError(null);
     setPlaceError(null);
@@ -470,12 +498,14 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
       : blockedReason === 'CAP_EXHAUSTED'
         ? heldOrderId ? t('aiOrder.flow.blockedHeld') : heldHandoffId ? heldHandoffCopy() : t('aiOrder.flow.blockedNoBudget')
         : blockedReason ? t('aiOrder.flow.blockedOther') : null;
-  const existingLive = !!inProgress?.existingStatus && LIVE.includes(inProgress.existingStatus);
+  const existingLive = !!inProgress?.existingStatus && isLive(inProgress.existingStatus);
   const stepHeading =
     step === 'shops'
       ? t('aiOrder.flow.headingShops')
       : step === 'cart' && shop
-        ? mode === 'handoff' ? t('aiOrder.flow.headingHandoff', { shop: shop.name }) : t('aiOrder.flow.headingCart', { shop: shop.name })
+        ? mode === 'handoff'
+          ? t('aiOrder.flow.headingHandoff', { shop: shop.name })
+          : channel === 'email' ? t('aiOrder.email.headingCart', { shop: shop.name }) : t('aiOrder.flow.headingCart', { shop: shop.name })
         : step === 'status' || step === 'handoff' ? t('aiOrder.flow.headingStatus') : t('aiOrder.flow.loading');
 
   const inProgressPanel = inProgress && (
@@ -585,9 +615,24 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           orderDisabled={!!blockedReason}
           hasLocation={hasLocation}
           onLoaded={rememberPhones}
+          emailOrders={emailOrders}
+          unemailable={unemailable}
+          onEmail={emailOrders ? (s) => {
+            setShop(s);
+            setMode('ai');
+            setChannel('email');
+            setHandoff(null);
+            setCartState(null);
+            setError(null);
+            setPlaceError(null);
+            setUncallableNotice(null);
+            setMenuOpenFor(null);
+            setStep('cart');
+          } : undefined}
           onSelect={(s) => {
             setShop(s);
             setMode('ai');
+            setChannel('ai_phone');
             setHandoff(null);
             setCartState(null);
             setError(null);
@@ -605,12 +650,14 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
             setPlaceError(null);
             setUncallableNotice(null);
             setMenuOpenFor(s.id);
+            setChannel('ai_phone');
             setStep('cart');
           } : undefined}
           onChecklist={(s) => {
             setShop(s);
             setMenuOpenFor(null);
             setMode('handoff');
+            setChannel('ai_phone');
             setHandoff(null);
             setCartState(null);
             setError(null);
@@ -644,6 +691,10 @@ export const PizzaOrderFlow: React.FC<PizzaOrderFlowProps> = ({ fallback, prefer
           onBack={() => setStep('shops')}
           mode={mode}
           onSwitchToHandoff={() => setMode('handoff')}
+          channel={channel}
+          emailAlt={unemailable.has(shop.id) ? null : emailOrderable(shop, emailOrders)}
+          onSwitchChannel={onSwitchChannel}
+          callable={!uncallable.has(shop.id) && shop.ordering?.channel === 'ai_phone'}
           locked={menuBusy}
           menuSlot={
             hostMenus && shop.tier === 'listing' && shop.capabilities?.host_menu_upload === true && menuPanelFits(cartState?.cart?.menu) ? (

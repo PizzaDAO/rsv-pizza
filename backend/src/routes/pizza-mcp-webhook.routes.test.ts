@@ -444,3 +444,58 @@ describe('pizza-mcp 64fb2ac: a price approval webhook carries the real hold', ()
     }
   });
 });
+
+describe('POST /api/pizza-mcp/webhook: email orders (basil-14648 P2)', () => {
+  const emailView = (shop_response: Record<string, unknown> | null = null) => ({
+    sent_at: '2026-11-10T14:10:00.000Z', reply_by: '2026-11-12T14:10:00.000Z', reminder_sent_at: null, shop_response, deferred: null,
+  });
+  const order = (status: string, timeline: number, extra: Record<string, unknown> = {}) =>
+    opopOrder({ status, channel: 'email', call: undefined, email: emailView(), promised_at: null, ...extra }, timeline);
+
+  it('awaiting_shop_reply -> confirmed_by_shop: the total comes from the shop\'s answer, and the draft receipt is made once', async () => {
+    await post(delivery(order('awaiting_shop_reply', 3)));
+    expect(fake.byOpop('ord_1')).toMatchObject({ status: 'awaiting_shop_reply', confirmedTotalCents: null, payoutDocumentId: null });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    expect(m.notify).not.toHaveBeenCalled();
+    const confirmed = order('confirmed_by_shop', 4, {
+      promised_at: 'Sat Nov 22, 6:30 PM',
+      totals: { subtotal_cents: 0, discount_cents: 0, delivery_fee_cents: 0, service_fee_cents: 0, tax_cents: 0, tip_cents: 0, total_cents: 41250 },
+      email: emailView({ decision: 'confirm', total_cents: 41250, ready_ok: true, alt_time_text: null, reference: 'A-17', reason: null }),
+    });
+    await post(delivery(confirmed));
+    const row = fake.byOpop('ord_1');
+    expect(row).toMatchObject({ status: 'confirmed_by_shop', confirmedTotalCents: 41250, readyAtText: 'Sat Nov 22, 6:30 PM' });
+    expect(row.payoutDocumentId).toBeTruthy();
+    expect(fake.docs).toHaveLength(1);
+    expect(fake.docs[0]).toMatchObject({ source: 'ai_call', ocrAmount: null });
+    expect(fake.docs[0].ocrSummary).toMatch(/^Email order at .*\$412\.50/);
+    expect(fake.docs[0].ocrRaw).toMatchObject({ channel: 'email', confirmed_total_cents: 41250, shop_reference: 'A-17' });
+    expect(m.notify).toHaveBeenCalledTimes(1);
+    // the same confirmation again makes no second draft
+    await post(delivery(confirmed));
+    expect(fake.docs).toHaveLength(1);
+  });
+
+  it('no_response holds on the status event; only the shop\'s acknowledgement (change "outcome") releases it', async () => {
+    const ended = (nothing_ordered: boolean, reason: string) =>
+      order('unreachable', 5, { outcome: { nothing_ordered, reason, message: `msg ${reason}` } });
+    await post(delivery(ended(false, 'no_response'), { createdAt: '2026-11-12T14:11:00.000Z', extra: { previous_status: 'awaiting_shop_reply' } }));
+    expect(fake.byOpop('ord_1').status).toBe('unreachable');
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(true);
+    await post(delivery(ended(true, 'withdrawn_acknowledged'), { createdAt: '2026-11-12T15:00:00.000Z', extra: { change: 'outcome', previous_status: 'unreachable' } }));
+    expect(fake.byOpop('ord_1').lastView.outcome).toMatchObject({ nothing_ordered: true, reason: 'withdrawn_acknowledged' });
+    expect(isBlocking(fake.byOpop('ord_1'))).toBe(false);
+  });
+
+  it('a host cancel after the confirmation removes the "confirmed" draft but still holds until the shop acknowledges', async () => {
+    const answered = emailView({ decision: 'confirm', total_cents: 30000, ready_ok: true, alt_time_text: null, reference: null, reason: null });
+    await post(delivery(order('confirmed_by_shop', 4, { email: answered })));
+    expect(fake.docs).toHaveLength(1);
+    await post(delivery(order('canceled', 5, { email: answered, outcome: { nothing_ordered: false, reason: 'canceled', message: 'm' } })));
+    const row = fake.byOpop('ord_1');
+    expect(row.payoutDocumentId).toBeNull();
+    expect(fake.docs).toHaveLength(0);
+    expect(row.confirmedTotalCents).toBe(30000);
+    expect(isBlocking(row)).toBe(true);
+  });
+});

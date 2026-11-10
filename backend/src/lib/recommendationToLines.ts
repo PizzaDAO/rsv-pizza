@@ -148,8 +148,12 @@ export function recommendationToLine(rec: RecommendationInput): OrderLineSpec {
   return spec;
 }
 
-/** All recommendations -> line specs, enforcing the phone-order size cap. */
-export function recommendationsToLines(recs: unknown): OrderLineSpec[] {
+/**
+ * All recommendations -> line specs, enforcing the phone-order size cap. basil-14648 P2: an email order passes the
+ * shop's own published maximum (`maxPizzas`, pizza-mcp's `alternatives[email].max_pizzas`).
+ */
+export function recommendationsToLines(recs: unknown, opts: { maxPizzas?: number } = {}): OrderLineSpec[] {
+  const max = opts.maxPizzas && opts.maxPizzas > 0 ? Math.floor(opts.maxPizzas) : MAX_PIZZAS_PER_ORDER;
   if (!Array.isArray(recs) || recs.length === 0) {
     throw new RecommendationError('No pizza recommendations to order', 'NO_RECOMMENDATIONS');
   }
@@ -158,9 +162,9 @@ export function recommendationsToLines(recs: unknown): OrderLineSpec[] {
   }
   const lines = recs.map((r) => recommendationToLine(r as RecommendationInput));
   const total = lines.reduce((n, l) => n + l.quantity, 0);
-  if (total > MAX_PIZZAS_PER_ORDER) {
+  if (total > max) {
     throw new RecommendationError(
-      `${total} pizzas is too many for an automated order (max ${MAX_PIZZAS_PER_ORDER}). Call the shop yourself.`,
+      `${total} pizzas is too many for an automated order (max ${max}). Call the shop yourself.`,
       'TOO_MANY_PIZZAS'
     );
   }
