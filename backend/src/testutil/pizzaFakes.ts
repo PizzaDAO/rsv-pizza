@@ -19,6 +19,7 @@ export function makeFakeDb() {
   const carts = new Map<string, any>();
   const parties = new Map<string, any>();
   const users = new Map<string, any>();
+  const handoffs = new Map<string, any>(); // basil-14648 P2: pizza_handoffs, by id
   let seq = 0;
   const byOpop = (id: string) => [...orders.values()].find((o) => o.opopOrderId === id) ?? null;
 
@@ -113,6 +114,42 @@ export function makeFakeDb() {
         return { count };
       },
     },
+    // basil-14648 P2: pizza_handoffs. `where` supports equality, `null`, and `{ not: null }`.
+    pizzaHandoff: (() => {
+      const matches = (h: any, where: any = {}) =>
+        Object.entries(where).every(([k, v]) =>
+          v && typeof v === 'object' && 'not' in (v as any) ? (h[k] ?? null) !== (v as any).not : (h[k] ?? null) === v
+        );
+      const sorted = (rows: any[], orderBy?: any) => {
+        const [k, dir] = Object.entries(orderBy ?? { createdAt: 'desc' })[0] as [string, string];
+        return [...rows].sort((a, b) => (new Date(a[k] ?? 0).getTime() - new Date(b[k] ?? 0).getTime()) * (dir === 'desc' ? -1 : 1) || (dir === 'desc' ? b._seq - a._seq : a._seq - b._seq));
+      };
+      return {
+        findMany: async ({ where, orderBy, take }: any = {}) => sorted([...handoffs.values()].filter((h) => matches(h, where)), orderBy).slice(0, take ?? Infinity),
+        findFirst: async ({ where, orderBy }: any = {}) => sorted([...handoffs.values()].filter((h) => matches(h, where)), orderBy)[0] ?? null,
+        count: async ({ where }: any = {}) => [...handoffs.values()].filter((h) => matches(h, where)).length,
+        create: async ({ data }: any) => {
+          const now = new Date();
+          const row = {
+            id: `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`, _seq: seq, opopCartId: null, quoteId: null, holdCents: 0,
+            clickedAt: null, orderedAt: null, releasedAt: null, receiptCoveredAt: null, createdAt: now, updatedAt: now, ...data,
+          };
+          handoffs.set(row.id, row);
+          return { ...row };
+        },
+        updateMany: async ({ where, data }: any) => {
+          let count = 0;
+          for (const h of handoffs.values()) if (matches(h, where)) { Object.assign(h, data, { updatedAt: new Date() }); count++; }
+          return { count };
+        },
+        update: async ({ where, data }: any) => {
+          const row = handoffs.get(where.id);
+          if (!row) throw new Error('not found');
+          Object.assign(row, data, { updatedAt: new Date() });
+          return { ...row };
+        },
+      };
+    })(),
     party: { findUnique: async ({ where }: any) => parties.get(where.id) ?? null },
     user: { findUnique: async ({ where }: any) => users.get(where.id) ?? null },
     // rolls back on throw, like a real transaction
@@ -129,7 +166,7 @@ export function makeFakeDb() {
       }
     },
   };
-  return { db, orders, docs, events, carts, parties, users, byOpop };
+  return { db, orders, docs, events, carts, parties, users, handoffs, byOpop };
 }
 
 export type FakeDb = ReturnType<typeof makeFakeDb>;
@@ -208,6 +245,7 @@ export function makeFakePizzaMcp(
     });
     if (!key) return new Response(JSON.stringify({ code: 'NOT_FOUND', title: 'nf', status: 404, retryable: false }), { status: 404 });
     const out = routes[key](call);
+    if (out.status === 204) return new Response(null, { status: 204 });
     return new Response(JSON.stringify(out.json), { status: out.status ?? 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return { fetchImpl, calls };

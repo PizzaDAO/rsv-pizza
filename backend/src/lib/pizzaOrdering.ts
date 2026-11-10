@@ -132,6 +132,21 @@ export function isLaterReceipt(receipt: Pick<BudgetReceipt, 'createdAt'>, order:
  * when there is no cap or nothing left, naming the order that holds the budget if there is one.
  * A confirmed order and its real receipt count once (see budgetBreakdown).
  */
+/**
+ * The party's budget without refusing anything: what is left (can be <= 0) and who holds it. For the host's
+ * own "I ordered it" mark, which is a fact and is recorded even when nothing is left (basil-14648 P2).
+ */
+export async function budgetLeft(party: OrderingParty): Promise<{ capCents: number | null; leftCents: number; held: BudgetOrder[] }> {
+  if (party.capCents === null) return { capCents: null, leftCents: 0, held: [] };
+  const [receipts, orders, handoffs] = await Promise.all([
+    partyReceipts(party.id),
+    prisma.pizzaOrder.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' } }),
+    partyHandoffOrders(party.id),
+  ]);
+  const { usedCents, held } = budgetBreakdown(receipts, [...orders, ...handoffs]);
+  return { capCents: party.capCents, leftCents: party.capCents - usedCents, held };
+}
+
 export async function remainingCapCents(party: OrderingParty): Promise<number> {
   if (party.capCents === null) {
     throw new AppError(
@@ -140,11 +155,12 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
       'NO_REIMBURSEMENT_CAP'
     );
   }
-  const [receipts, orders] = await Promise.all([
+  const [receipts, orders, handoffs] = await Promise.all([
     partyReceipts(party.id),
     prisma.pizzaOrder.findMany({ where: { partyId: party.id }, orderBy: { createdAt: 'desc' } }),
+    partyHandoffOrders(party.id),
   ]);
-  const { usedCents, held } = budgetBreakdown(receipts, orders);
+  const { usedCents, held } = budgetBreakdown(receipts, [...orders, ...handoffs]);
   const remaining = party.capCents - usedCents;
   if (remaining <= 0) {
     const holder = held[0];
@@ -152,14 +168,78 @@ export async function remainingCapCents(party: OrderingParty): Promise<number> {
       'There is no reimbursement budget left for another order (cap minus receipts and open orders).',
       422,
       'CAP_EXHAUSTED',
-      holder ? { existingOrderId: holder.opopOrderId, existingStatus: holder.status } : undefined
+      holder ? holderData(holder) : undefined
     );
   }
   return remaining;
 }
 
-interface BudgetOrder {
+/** What the UI needs to open the order (or the marked handoff) that holds the budget or blocks a new order. */
+export function holderData(o: BudgetOrder): {
+  existingOrderId?: string; existingHandoffId?: string; existingStatus: string; existingShopName?: string; existingProvider?: string;
+} {
+  const shop = o.shopName ? { existingShopName: o.shopName } : {};
+  return o.handoffId
+    ? { existingHandoffId: o.handoffId, existingStatus: o.status, ...shop, ...(o.provider ? { existingProvider: o.provider } : {}) }
+    : { existingOrderId: o.opopOrderId, existingStatus: o.status, ...shop };
+}
+
+// ---------------------------------------------------------------------------
+// basil-14648 P2: "Order online" handoffs (pizza_handoffs). The host's own "I ordered it" mark behaves like a
+// CONFIRMED order with no shop total: it blocks a second order (unless the host confirms one), holds its
+// hold_cents, and one later uploaded receipt replaces the hold once the host says it is uploaded.
+// A click alone (no mark) holds and blocks nothing. Released ("I didn't order after all") frees it.
+// ---------------------------------------------------------------------------
+
+/** Status a marked handoff takes in the budget: in CONFIRMED_STATUSES, never terminal, so it blocks until released. */
+export const HOST_ORDERED = 'host_ordered';
+
+export interface HandoffRowLike {
+  id: string;
+  shopName?: string;
+  provider?: string;
+  userId?: string;
+  holdCents: number;
+  orderedAt: Date | string | null;
+  releasedAt: Date | string | null;
+  receiptCoveredAt: Date | string | null;
+}
+
+/** A marked, unreleased handoff as a budget order; null for a click, an unmark or a release. */
+export function handoffAsBudgetOrder(h: HandoffRowLike): (BudgetOrder & { handoffId: string }) | null {
+  if (!h.orderedAt || h.releasedAt) return null;
+  return {
+    handoffId: h.id,
+    shopName: h.shopName,
+    provider: h.provider,
+    userId: h.userId,
+    status: HOST_ORDERED,
+    ceilingCents: Math.max(0, h.holdCents | 0),
+    confirmedTotalCents: null,
+    receiptCoveredAt: h.receiptCoveredAt,
+    releasedAt: null,
+    createdAt: h.orderedAt,
+  };
+}
+
+/** The party's marked, unreleased handoffs, as budget orders. */
+export async function partyHandoffOrders(partyId: string): Promise<Array<BudgetOrder & { handoffId: string }>> {
+  const rows = await prisma.pizzaHandoff.findMany({
+    where: { partyId, orderedAt: { not: null }, releasedAt: null },
+    orderBy: { orderedAt: 'desc' },
+  });
+  return rows.map(handoffAsBudgetOrder).filter((o): o is BudgetOrder & { handoffId: string } => o !== null);
+}
+
+export interface BudgetOrder {
   opopOrderId?: string;
+  /** Set on a marked "Order online" handoff (pizza_handoffs.id); such a row has no OPOP order. */
+  handoffId?: string;
+  shopName?: string;
+  /** Handoffs: how the host said they ordered (toast, ..., phone, in_person). */
+  provider?: string;
+  /** Handoffs: the host who marked it. */
+  userId?: string;
   status: string;
   ceilingCents?: number | null;
   confirmedTotalCents?: number | null;
@@ -170,7 +250,8 @@ interface BudgetOrder {
   createdAt?: Date | string | null;
 }
 
-const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']);
+// `host_ordered` = a marked handoff (basil-14648 P2): the host ordered on the shop's own site, so it can have a receipt.
+const CONFIRMED_STATUSES = new Set(['confirmed_by_shop', 'needs_review', 'completed', 'placed', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'host_ordered']);
 /** An order that can have a real receipt, so that receipt must not be counted on top of its hold. */
 const hasReceiptToCount = (o: BudgetOrder) => CONFIRMED_STATUSES.has(o.status) || mayExistAtShop(o);
 
@@ -184,11 +265,19 @@ const hasReceiptToCount = (o: BudgetOrder) => CONFIRMED_STATUSES.has(o.status) |
  * Orders that hold nothing (released, nothing_ordered true, IVR needs_review...) cost nothing. An ended order that
  * may exist at the shop (`canceled` or `unreachable` too) is held until a host releases it or its receipt offsets it.
  */
-export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[], orders: T[]): { usedCents: number; held: T[]; covered: T[] } {
+/**
+ * `covered`: nothing is owed any more (a receipt took it, OR it never held anything). `receiptMatched`: a real
+ * receipt was actually consumed for it. Only the latter may ever be shown as "your receipt counts for it".
+ */
+export function budgetBreakdown<T extends BudgetOrder>(
+  receipts: BudgetReceipt[],
+  orders: T[]
+): { usedCents: number; held: T[]; covered: T[]; receiptMatched: T[] } {
   const free = receipts.filter((r) => r.cents > 0).map((r) => ({ ...r, left: r.cents }));
   const available = (o: T) => free.filter((r) => r.left > 0 && isLaterReceipt(r, o));
   const held: T[] = [];
   const covered: T[] = [];
+  const receiptMatched: T[] = [];
 
   // Exact matches first, so a host's "this receipt covers it" cannot take another order's receipt.
   const unmatched = orders.filter(isBlocking).filter((o) => {
@@ -198,6 +287,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
     const match = available(o).find((r) => r.left === r.cents && Math.abs(r.cents - total) <= tol);
     if (!match) return true;
     match.left = 0;
+    receiptMatched.push(o);
     covered.push(o);
     return false;
   });
@@ -211,6 +301,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
         const receipt = available(o)[0];
         if (receipt) {
           receipt.left = 0;
+          receiptMatched.push(o);
           owed = 0;
         }
       } else {
@@ -218,6 +309,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
           const taken = Math.min(r.left, owed);
           r.left -= taken;
           owed -= taken;
+          if (taken > 0 && !receiptMatched.includes(o)) receiptMatched.push(o);
         }
       }
     }
@@ -225,7 +317,7 @@ export function budgetBreakdown<T extends BudgetOrder>(receipts: BudgetReceipt[]
     else covered.push(o);
     open += owed;
   }
-  return { usedCents: receipts.reduce((a, r) => a + Math.max(r.cents, 0), 0) + open, held, covered };
+  return { usedCents: receipts.reduce((a, r) => a + Math.max(r.cents, 0), 0) + open, held, covered, receiptMatched };
 }
 
 export function budgetUsedCents(receipts: BudgetReceipt[], orders: BudgetOrder[]): number {

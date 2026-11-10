@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../config/database.js', () => ({ prisma: {} }));
 
-import { budgetBreakdown, budgetUsedCents, isLaterReceipt } from './pizzaOrdering.js';
+import { budgetBreakdown, budgetUsedCents, isLaterReceipt, handoffAsBudgetOrder, holderData, HOST_ORDERED } from './pizzaOrdering.js';
 import { isBlocking, isCancelable, isSettling, checkingOf, deferredOf, SETTLE_WINDOW_MS } from './pizzaOrderStatus.js';
 
 const ORDERED = new Date('2026-11-01T12:00:00Z');
@@ -164,5 +164,81 @@ describe('isSettling', () => {
     expect(isSettling(row, at + SETTLE_WINDOW_MS)).toBe(false);
     expect(isSettling({ status: 'confirmed_by_shop', confirmedAt: null }, at)).toBe(false);
     expect(isSettling({ status: 'needs_review', confirmedAt: ORDERED }, at)).toBe(false);
+  });
+});
+
+describe('basil-14648 P2: a marked "Order online" handoff in the budget', () => {
+  const handoff = (over: Record<string, unknown> = {}) => ({
+    id: 'h1', holdCents: 21000, orderedAt: ORDERED, releasedAt: null, receiptCoveredAt: null, ...over,
+  });
+  const asOrder = (over: Record<string, unknown> = {}) => handoffAsBudgetOrder(handoff(over) as any)!;
+
+  it('a click alone (no mark) is not a budget order: it holds and blocks nothing', () => {
+    expect(handoffAsBudgetOrder(handoff({ orderedAt: null }) as any)).toBeNull();
+  });
+
+  it('a mark holds hold_cents and blocks, like a confirmed order with no shop total', () => {
+    const o = asOrder();
+    expect(o).toMatchObject({ handoffId: 'h1', status: HOST_ORDERED, ceilingCents: 21000, confirmedTotalCents: null });
+    expect(isBlocking(o)).toBe(true);
+    expect(budgetUsedCents([], [o])).toBe(21000);
+  });
+
+  it('a later receipt replaces the hold once the host says it is uploaded', () => {
+    expect(budgetUsedCents([later(18000)], [asOrder()])).toBe(18000 + 21000); // not paired yet: counted on top
+    const covered = asOrder({ receiptCoveredAt: after });
+    const r = budgetBreakdown([later(18000)], [covered]);
+    expect(r.usedCents).toBe(18000);
+    expect(r.covered).toEqual([covered]);
+  });
+
+  it('one later receipt replaces the hold even when it is bigger or smaller (no shop total to match)', () => {
+    expect(budgetUsedCents([later(30000)], [asOrder({ receiptCoveredAt: after })])).toBe(30000);
+    expect(budgetUsedCents([later(5000)], [asOrder({ receiptCoveredAt: after })])).toBe(5000);
+  });
+
+  it('an earlier receipt does not cover it, and an unread receipt (0 cents) offsets nothing', () => {
+    expect(budgetUsedCents([older(18000)], [asOrder({ receiptCoveredAt: after })])).toBe(18000 + 21000);
+    expect(budgetUsedCents([later(0)], [asOrder({ receiptCoveredAt: after })])).toBe(21000);
+  });
+
+  it('release frees it at once', () => {
+    expect(handoffAsBudgetOrder(handoff({ releasedAt: after }) as any)).toBeNull();
+  });
+
+  it('a mark with no cart holds 0 and still blocks', () => {
+    const o = asOrder({ holdCents: 0 });
+    expect(isBlocking(o)).toBe(true);
+    expect(budgetUsedCents([], [o])).toBe(0);
+  });
+
+  it('two holders share receipts: each later receipt covers one of them', () => {
+    const ai = confirmed({ receiptCoveredAt: after, confirmedTotalCents: null, ceilingCents: 10000 });
+    const h = asOrder({ receiptCoveredAt: after });
+    expect(budgetUsedCents([later(9000), later(19000)], [ai, h])).toBe(28000);
+  });
+
+  it('holderData names the handoff, never a fake OPOP order id', () => {
+    expect(holderData(asOrder())).toEqual({ existingHandoffId: 'h1', existingStatus: HOST_ORDERED });
+    expect(holderData({ opopOrderId: 'ord_1', status: 'calling' })).toEqual({ existingOrderId: 'ord_1', existingStatus: 'calling' });
+  });
+});
+
+describe('basil-14648 P2 review: covered vs receiptMatched', () => {
+  const h = (over: Record<string, unknown> = {}) =>
+    handoffAsBudgetOrder({ id: 'h1', holdCents: 0, orderedAt: ORDERED, releasedAt: null, receiptCoveredAt: null, ...over } as any)!;
+
+  it('a mark that holds 0 is "covered" (nothing owed) but never receiptMatched', () => {
+    const r = budgetBreakdown([], [h()]);
+    expect(r.covered).toHaveLength(1);
+    expect(r.receiptMatched).toEqual([]);
+  });
+
+  it('receiptMatched only when a receipt is actually consumed', () => {
+    const o = h({ holdCents: 5000, receiptCoveredAt: after });
+    expect(budgetBreakdown([later(4000)], [o]).receiptMatched).toEqual([o]);
+    expect(budgetBreakdown([older(4000)], [o]).receiptMatched).toEqual([]);
+    const ai = confirmed({ confirmedTotalCents: 15000 });
+    expect(budgetBreakdown([later(15000)], [ai]).receiptMatched).toEqual([ai]); // exact total match
   });
 });
