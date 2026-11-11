@@ -51,6 +51,33 @@ export function assertSecretsConfigured(env: Env = process.env): void {
   }
 }
 
+/**
+ * Shared secrets that authenticate callers but are optional at runtime. These are only
+ * reported (never thrown on), so a weak value shows up in the logs without taking the API down.
+ * PIZZA_MCP_SIGNING_KEY (a private key) and SUPABASE_SERVICE_ROLE_KEY (provider-issued) are
+ * not length-checked here.
+ */
+const REPORTED_SECRETS = [
+  'PIZZADAO_FOLLOWUP_INBOUND_KEY',
+  'PIZZADAO_TELEGRAM_SERVICE_KEY',
+  'PIZZA_MCP_WEBHOOK_SECRET',
+] as const;
+
+/** One line per weak or placeholder shared secret (names and reasons only, never values). Unset is not reported. */
+export function weakOptionalSecrets(env: Env = process.env): string[] {
+  return REPORTED_SECRETS.flatMap((name) => {
+    if (!env[name]?.trim()) return [];
+    const problem = secretProblem(env[name]);
+    return problem ? [`${name} ${problem}`] : [];
+  });
+}
+
+/** Logs a warning for each weak optional secret. No-op outside deployed environments. */
+export function warnWeakOptionalSecrets(env: Env = process.env, log: (msg: string) => void = console.warn): void {
+  if (!isDeployedEnv(env)) return;
+  for (const line of weakOptionalSecrets(env)) log(`[secrets] WARNING: ${line}; rotate it (openssl rand -hex 32)`);
+}
+
 /** The JWT signing secret. Fails closed: throws when unset, or weak in a deployed environment. */
 export function getJwtSecret(env: Env = process.env): string {
   assertSecretsConfigured(env);
