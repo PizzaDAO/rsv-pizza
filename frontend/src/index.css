@@ -687,6 +687,57 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   overflow: hidden;
 }
 
+/* ─── White-label brand themes (wl-theme-assets) ───
+ * Token-only overrides, inert unless the class is applied (via
+ * VITE_BRAND_THEME_CLASS => BRAND.themeClass on <html>). Both are dark themes.
+ * Primary accents: Team1 #E6212F, Monad #6E54FF. White on either primary is
+ * >= 4.5:1 (AA); --accent-hover is the lighter tint so accent-coloured text on the
+ * dark backgrounds clears AA too (#FF4D5A 5.9:1, #8F7BFF 6.0:1). */
+.team1-theme {
+  --bg-main: #0f0f12;
+  --bg-card: rgba(255, 255, 255, 0.07);
+  --bg-card-hover: rgba(255, 255, 255, 0.1);
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --bg-surface-hover: rgba(255, 255, 255, 0.08);
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+  --bg-input: rgba(255, 255, 255, 0.06);
+  --bg-input-focus: rgba(255, 255, 255, 0.09);
+  --bg-header: #17171c;
+  --text-primary: rgba(255, 255, 255, 0.94);
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.25);
+  --stroke: rgba(255, 255, 255, 0.12);
+  --stroke-hover: rgba(255, 255, 255, 0.22);
+  --stroke-strong: rgba(255, 255, 255, 0.32);
+  --accent: #E6212F;
+  --accent-hover: #FF4D5A;
+  --error: #FF4D5A;
+  --color-scheme: dark;
+}
+
+.monad-theme {
+  --bg-main: #0E091C;
+  --bg-card: rgba(221, 215, 254, 0.07);
+  --bg-card-hover: rgba(221, 215, 254, 0.11);
+  --bg-surface: rgba(221, 215, 254, 0.05);
+  --bg-surface-hover: rgba(221, 215, 254, 0.09);
+  --bg-overlay: rgba(14, 9, 28, 0.78);
+  --bg-input: rgba(221, 215, 254, 0.07);
+  --bg-input-focus: rgba(221, 215, 254, 0.1);
+  --bg-header: #1a1230;
+  --text-primary: rgba(255, 255, 255, 0.94);
+  --text-secondary: rgba(221, 215, 254, 0.78);
+  --text-muted: rgba(221, 215, 254, 0.6);
+  --text-faint: rgba(221, 215, 254, 0.28);
+  --stroke: rgba(221, 215, 254, 0.14);
+  --stroke-hover: rgba(221, 215, 254, 0.24);
+  --stroke-strong: rgba(221, 215, 254, 0.34);
+  --accent: #6E54FF;
+  --accent-hover: #8F7BFF;
+  --color-scheme: dark;
+}
+
 /* ─── Adding New Themes ───
  *
  * The theming system uses CSS custom properties (design tokens) with Tailwind
