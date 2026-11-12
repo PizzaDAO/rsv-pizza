@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { secretForWrite, verifySecret } from '../lib/secretHash.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
@@ -64,8 +65,8 @@ router.get('/:partyId/venue-report', requireAuth, async (req: AuthRequest, res: 
         notes: party.venueReportNotes,
         published: party.venueReportPublished,
         slug: party.venueReportSlug,
+        // party-password-hash: hosts see only whether a password is set, never the value.
         hasPassword: !!party.venueReportPassword,
-        password: party.venueReportPassword,
         venues: party.venues,
       },
     });
@@ -130,7 +131,10 @@ router.post('/:partyId/venue-report/publish', requireAuth, async (req: AuthReque
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    // party-password-hash: undefined = keep the current password (a republish that doesn't
+    // re-send it used to wipe it), null/'' = clear, string = bcrypt hash.
     const { password } = req.body || {};
+    const passwordToWrite = await secretForWrite(password);
 
     // Generate slug if not already set
     let slug = existingParty.venueReportSlug;
@@ -143,7 +147,7 @@ router.post('/:partyId/venue-report/publish', requireAuth, async (req: AuthReque
       data: {
         venueReportPublished: true,
         venueReportSlug: slug,
-        venueReportPassword: password || null,
+        ...(passwordToWrite !== undefined && { venueReportPassword: passwordToWrite }),
       },
     });
 
@@ -226,7 +230,7 @@ router.get('/public/:slug/venue', async (req: AuthRequest, res: Response, next: 
       throw new AppError('Venue report not found', 404, 'NOT_FOUND');
     }
 
-    if (check.venueReportPassword && check.venueReportPassword !== password) {
+    if (check.venueReportPassword && !(password && (await verifySecret(check.venueReportPassword, password)))) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 

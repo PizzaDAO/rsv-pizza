@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
+import { redactPartySecrets } from '../lib/secretHash.js';
 
 const router = Router();
 
@@ -252,7 +253,7 @@ router.patch('/:partyId/venues/:venueId/select', async (req: AuthRequest, res: R
       }),
     ]);
 
-    res.json({ venue, party });
+    res.json({ venue, party: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }

@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
+import { secretForWrite, verifySecret, redactPartySecrets } from '../lib/secretHash.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import crypto from 'crypto';
@@ -164,7 +165,8 @@ router.get('/:partyId/report', requireAuth, async (req: AuthRequest, res: Respon
         // Report settings
         reportPublished: party.reportPublished,
         reportPublicSlug: party.reportPublicSlug,
-        reportPassword: party.reportPassword || null,
+        // party-password-hash: hosts see only whether a password is set, never the value.
+        hasReportPassword: !!party.reportPassword,
         reportStatsConfig: party.reportStatsConfig || null,
 
         // quattro-71244: gamified dashboard host-set KPI goals.
@@ -267,7 +269,7 @@ router.patch('/:partyId/report', requireAuth, async (req: AuthRequest, res: Resp
       },
     });
 
-    res.json({ success: true, party });
+    res.json({ success: true, party: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }
@@ -300,8 +302,10 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    // Accept optional password
+    // Optional password. party-password-hash: undefined = keep the current one (a republish
+    // that doesn't re-send it used to wipe it), null/'' = clear, string = bcrypt hash.
     const { password } = req.body || {};
+    const passwordToWrite = await secretForWrite(password);
 
     // Generate slug if not already set
     let slug = existingParty.reportPublicSlug;
@@ -314,7 +318,7 @@ router.post('/:partyId/report/publish', requireAuth, async (req: AuthRequest, re
       data: {
         reportPublished: true,
         reportPublicSlug: slug,
-        reportPassword: password || null,
+        ...(passwordToWrite !== undefined && { reportPassword: passwordToWrite }),
       },
     });
 
@@ -420,7 +424,7 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
 
     // Sponsors tagged on this event bypass publish + password
     const sponsorBypass = check ? await isSponsorForReport(publicSlug, req.userEmail) : false;
-    if (check?.reportPassword && !sponsorBypass && check.reportPassword !== password) {
+    if (check?.reportPassword && !sponsorBypass && !(password && (await verifySecret(check.reportPassword, password)))) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 

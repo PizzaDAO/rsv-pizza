@@ -137,7 +137,6 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     expectedAttendance: dbParty.expected_attendance ?? null,
     hideGuests: dbParty.hide_guests || false,
     requireApproval: dbParty.require_approval || false,
-    password: dbParty.password,
     hasPassword: dbParty.has_password,
     eventImageUrl: dbParty.event_image_url,
     description: dbParty.description,

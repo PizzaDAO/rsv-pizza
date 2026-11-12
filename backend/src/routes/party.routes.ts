@@ -25,6 +25,7 @@ import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
 import { siteForParty, brandedSeriesBySlug } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
+import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -243,7 +244,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     // Map to include hostName from user for backwards compatibility
     const partiesWithHost = parties.map(party => ({
-      ...party,
+      ...redactPartySecrets(party),
       hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
       user: undefined, // Remove user object from response
     }));
@@ -318,6 +319,9 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     // self-enroll into gpp2026/gpp2027 (site_url NULL). Unknown/inactive slugs are ignored.
     const brandedSeries = await brandedSeriesBySlug(seriesSlug);
 
+    // party-password-hash: store a bcrypt hash, never the plaintext.
+    const passwordToWrite = (await secretForWrite(password)) ?? null;
+
     const party = await prisma.party.create({
       data: {
         ...(brandedSeries ? { eventSeriesId: brandedSeries.id } : {}),
@@ -344,7 +348,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
         requireApproval: requireApproval || false,
-        password: password || null,
+        password: passwordToWrite,
         eventImageUrl: eventImageUrl || null,
         description: description || null,
         customUrl: customUrl || null,
@@ -398,7 +402,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     // Return with hostName for backwards compatibility
     res.status(201).json({
       party: {
-        ...party,
+        ...redactPartySecrets(party),
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
       }
@@ -463,7 +467,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     // Return with hostName, userId for ownership checks, canEdit flag, and allowedTabs
     res.json({
       party: {
-        ...party,
+        ...redactPartySecrets(party),
         coHosts: enrichedCoHosts,
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
@@ -852,6 +856,9 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       }
     }
 
+    // party-password-hash: undefined = keep, null/'' = clear, string = bcrypt hash.
+    const passwordToWrite = await secretForWrite(password);
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -880,7 +887,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
         ...(availableToppings !== undefined && { availableToppings }),
         ...(availableDietaryOptions !== undefined && { availableDietaryOptions }),
         ...(showToppingsOnRsvp !== undefined && { showToppingsOnRsvp }),
-        ...(password !== undefined && { password: password || null }),
+        ...(passwordToWrite !== undefined && { password: passwordToWrite }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
@@ -993,7 +1000,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     // Return with hostName for backwards compatibility
     res.json({
       party: {
-        ...party,
+        ...redactPartySecrets(party),
         hostName: (party as any).eventType === 'gpp' ? 'PizzaDAO' : (party.user?.name || null),
         user: undefined,
         // arugula-38633 v2 follow-up: numeric-tag fallback for the cap.
@@ -1122,7 +1129,7 @@ router.post('/:id/cancel', async (req: AuthRequest, res: Response, next: NextFun
     await triggerWebhook('party.cancelled', party, req.userId!);
     await triggerWebhook('party.deleted', { id }, req.userId!);
 
-    res.json({ success: true, party });
+    res.json({ success: true, party: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }
@@ -1159,7 +1166,7 @@ router.post('/:id/reinstate', async (req: AuthRequest, res: Response, next: Next
 
     await triggerWebhook('party.reinstated', party, req.userId!);
 
-    res.json({ success: true, party });
+    res.json({ success: true, party: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }

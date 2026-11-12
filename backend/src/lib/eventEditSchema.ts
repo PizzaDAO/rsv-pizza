@@ -104,6 +104,16 @@ function fmtCoHosts(v: unknown): string {
     .join(', ');
 }
 
+/**
+ * party-password-hash: the event password is write-only (stored as a bcrypt hash), so the
+ * diff never shows a value, only whether one is set. `true` is how the current snapshot says
+ * "a password is set" (see eventAssistant.service buildCurrentSnapshot).
+ */
+export function fmtSecret(v: unknown): string {
+  if (v === null || v === undefined || v === '' || v === false) return '(none)';
+  return '(set)';
+}
+
 function fmtDatetime(v: unknown): string {
   if (v === null || v === undefined || v === '') return '(not set)';
   return String(v);
@@ -252,8 +262,9 @@ export const EVENT_EDIT_CATALOG: readonly CatalogField[] = [
     key: 'password',
     type: 'string',
     label: 'Event password',
-    description: '',
-    format: fmtString,
+    description:
+      'Write-only. The current password is never shown (has_password says whether one is set). A string sets or replaces it; null removes it.',
+    format: fmtSecret,
   },
   {
     key: 'custom_url',

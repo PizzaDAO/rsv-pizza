@@ -86,7 +86,8 @@ function buildCurrentSnapshot(party: any, role: RequesterRole): Record<string, u
     available_beverages: party.availableBeverages ?? [],
     available_toppings: party.availableToppings ?? [],
     available_dietary_options: party.availableDietaryOptions ?? [],
-    password: party.password ?? null,
+    // party-password-hash: never send the password (or its hash) to the model, only whether one is set.
+    has_password: !!party.password,
     custom_url: party.customUrl ?? null,
     event_tags: party.eventTags ?? [],
     donation_enabled: party.donationEnabled ?? false,
@@ -126,6 +127,7 @@ function buildCurrentSnapshot(party: any, role: RequesterRole): Record<string, u
   // Keep only the keys visible to this role's catalog so admin-only snapshot
   // values can't leak into a non-admin diff.
   const allowed = new Set(getCatalog(role).map((f) => f.key));
+  if (allowed.has('password')) allowed.add('has_password');
   const filtered: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(snap)) {
     if (allowed.has(k)) filtered[k] = v;
@@ -380,6 +382,12 @@ export async function runEventAssistant(params: {
   // Build the snapshot used for diffing. For `date` we diff against the current
   // stored ISO; map snapshot's event_datetime → date so the diff is meaningful.
   const diffCurrent: Record<string, unknown> = { ...snapshot };
+  // party-password-hash: the snapshot carries `has_password`, not the secret. Diff `password`
+  // against a stand-in that the catalog formatter renders as (set)/(none).
+  if ('has_password' in diffCurrent) {
+    diffCurrent.password = diffCurrent.has_password ? true : null;
+    delete diffCurrent.has_password;
+  }
   if ('event_datetime' in diffCurrent) {
     diffCurrent.date = diffCurrent.event_datetime;
     delete diffCurrent.event_datetime;

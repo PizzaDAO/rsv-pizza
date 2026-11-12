@@ -198,7 +198,6 @@ export interface VenueReport {
   published?: boolean;
   slug?: string | null;
   hasPassword?: boolean;
-  password?: string | null;
   venues: Venue[];
 }
 
@@ -295,7 +294,7 @@ export interface Party {
   expectedAttendance?: number | null;
   hideGuests: boolean;
   requireApproval: boolean;
-  password?: string | null;
+  // party-password-hash: the event password is write-only; the client only knows whether one is set.
   hasPassword?: boolean;
   eventImageUrl: string | null;
   description: string | null;
@@ -942,7 +941,8 @@ export interface EventReport {
   // Report settings
   reportPublished?: boolean;
   reportPublicSlug?: string | null;
-  reportPassword?: string | null;
+  // party-password-hash: the report password is write-only; hosts only learn whether one is set.
+  hasReportPassword?: boolean;
   reportStatsConfig?: Record<string, { override?: number | null; hidden?: boolean }> | null;
 
   // Related data
