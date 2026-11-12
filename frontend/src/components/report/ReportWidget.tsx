@@ -114,7 +114,6 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       const result = await getReport(partyId);
       if (result?.report) {
         setReport(result.report);
-        setReportPassword(result.report.reportPassword || '');
       } else if (partyRef.current) {
         // Fallback: Build report from party data if API returns nothing
         setReport(buildFallbackReport(partyRef.current, guestsRef.current));
@@ -284,14 +283,16 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
 
     setPublishingState('publishing');
     try {
-      const result = await publishReport(partyId, reportPassword || undefined);
+      // party-password-hash: a blank field keeps the current password (undefined), it never clears it.
+      const result = await publishReport(partyId, reportPassword.trim() || undefined);
       if (result) {
         setReport(prev => prev ? {
           ...prev,
           reportPublished: true,
           reportPublicSlug: result.reportPublicSlug,
-          reportPassword: reportPassword || null,
+          hasReportPassword: result.hasPassword ?? (prev.hasReportPassword || !!reportPassword.trim()),
         } : null);
+        setReportPassword('');
       } else {
         setError('Failed to publish report');
       }
@@ -300,6 +301,18 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
       setError('Failed to publish report');
     } finally {
       setPublishingState('idle');
+    }
+  };
+
+  // party-password-hash: set/replace (string) or remove (null) the report password. Write-only:
+  // the field always starts empty and is cleared after a save.
+  const saveReportPassword = async (value: string | null) => {
+    const result = await publishReport(partyId, value);
+    if (result) {
+      setReport(prev => prev ? { ...prev, hasReportPassword: result.hasPassword ?? !!value } : null);
+      setReportPassword('');
+    } else {
+      setError('Failed to update report password');
     }
   };
 
@@ -579,7 +592,7 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
               <div className="flex items-center gap-2 text-green-400">
                 <Eye size={16} />
                 <span className="text-sm font-medium">{t('report.reportPublished')}</span>
-                {report.reportPassword && (
+                {report.hasReportPassword && (
                   <span className="flex items-center gap-1 text-xs text-theme-text-muted bg-theme-surface px-2 py-0.5 rounded">
                     <Lock size={10} />
                     {t('report.passwordProtected')}
@@ -615,18 +628,34 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                   type="text"
                   value={reportPassword}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
-                  placeholder={t('report.passwordOptional')}
+                  placeholder={report.hasReportPassword ? t('report.passwordSetReplace') : t('report.passwordOptional')}
+                  autoComplete="new-password"
                 />
                 <button
-                  onClick={async () => {
-                    await publishReport(partyId, reportPassword || undefined);
-                    setReport(prev => prev ? { ...prev, reportPassword: reportPassword || null } : null);
+                  onClick={() => {
+                    const trimmed = reportPassword.trim();
+                    if (trimmed) saveReportPassword(trimmed);
                   }}
-                  className="btn-secondary text-sm py-2 px-3 whitespace-nowrap"
+                  disabled={!reportPassword.trim()}
+                  className="btn-secondary text-sm py-2 px-3 whitespace-nowrap disabled:opacity-50"
                 >
                   {t('report.update')}
                 </button>
               </div>
+              {(reportPassword || report.hasReportPassword) && (
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs text-white/40">{t('report.passwordHelper')}</p>
+                  {report.hasReportPassword && (
+                    <button
+                      type="button"
+                      onClick={() => saveReportPassword(null)}
+                      className="shrink-0 text-xs text-white/40 hover:text-white/70 underline"
+                    >
+                      {t('report.removePassword')}
+                    </button>
+                  )}
+                </div>
+              )}
               <button
                 onClick={handleUnpublish}
                 disabled={publishingState === 'unpublishing'}
@@ -650,8 +679,15 @@ export function ReportWidget({ partyId }: ReportWidgetProps) {
                 type="text"
                 value={reportPassword}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReportPassword(e.target.value)}
-                placeholder={t('report.passwordPlaceholder')}
+                placeholder={report.hasReportPassword ? t('report.passwordSetReplace') : t('report.passwordPlaceholder')}
+                autoComplete="new-password"
               />
+              {/* Unpublished: no "Remove password" here, because the publish endpoint is also
+                  the password writer and would publish the report as a side effect. A blank
+                  field keeps any existing password; remove it after publishing. */}
+              {(reportPassword || report.hasReportPassword) && (
+                <p className="text-xs text-white/40">{t('report.passwordHelper')}</p>
+              )}
               <button
                 onClick={handlePublish}
                 disabled={publishingState === 'publishing'}

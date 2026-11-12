@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
 import { siteForParty } from '../lib/siteBrand.js';
+import { verifySecret } from '../lib/secretHash.js';
 
 const router = Router();
 
@@ -197,7 +198,7 @@ router.post('/:inviteCode/verify-password', async (req: Request, res: Response, 
       throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
     }
 
-    const valid = party.password === password;
+    const valid = party.password ? await verifySecret(party.password, String(password)) : false;
     res.json({ valid });
   } catch (error) {
     next(error);

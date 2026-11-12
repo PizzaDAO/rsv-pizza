@@ -6,6 +6,7 @@ import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
 import guestsRouter from './guests.js';
+import { secretForWrite, redactPartySecrets } from '../../lib/secretHash.js';
 
 const router = Router();
 
@@ -159,6 +160,9 @@ router.post('/', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest,
         }]
       : [];
 
+    // party-password-hash: store a bcrypt hash, never the plaintext.
+    const passwordToWrite = (await secretForWrite(password)) ?? null;
+
     const party = await prisma.party.create({
       data: {
         name: name.trim(),
@@ -174,7 +178,7 @@ router.post('/', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest,
         maxGuests: maxGuests || null,
         hideGuests: hideGuests || false,
         requireApproval: requireApproval || false,
-        password: password || null,
+        password: passwordToWrite,
         eventImageUrl: eventImageUrl || null,
         description: description || null,
         customUrl: customUrl || null,
@@ -186,7 +190,7 @@ router.post('/', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest,
     // Trigger webhook
     await triggerWebhook('party.created', party, req.apiKey!.userId);
 
-    res.status(201).json({ data: party });
+    res.status(201).json({ data: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }
@@ -229,7 +233,7 @@ router.get('/:id', requireApiKey(SCOPES.PARTIES_READ), async (req: ApiKeyRequest
 
     res.json({
       data: {
-        ...party,
+        ...redactPartySecrets(party),
         guestCount: party._count.guests,
         _count: undefined,
       },
@@ -292,6 +296,9 @@ router.patch('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequ
       }
     }
 
+    // party-password-hash: undefined = keep, null/'' = clear, string = bcrypt hash.
+    const passwordToWrite = await secretForWrite(password);
+
     const party = await prisma.party.update({
       where: { id },
       data: {
@@ -308,7 +315,7 @@ router.patch('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequ
         ...(requireApproval !== undefined && { requireApproval }),
         ...(availableBeverages !== undefined && { availableBeverages }),
         ...(availableToppings !== undefined && { availableToppings }),
-        ...(password !== undefined && { password: password || null }),
+        ...(passwordToWrite !== undefined && { password: passwordToWrite }),
         ...(eventImageUrl !== undefined && { eventImageUrl: eventImageUrl || null }),
         ...(description !== undefined && { description: description || null }),
         ...(customUrl !== undefined && { customUrl: customUrl || null }),
@@ -319,7 +326,7 @@ router.patch('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequ
     // Trigger webhook
     await triggerWebhook('party.updated', party, req.apiKey!.userId);
 
-    res.json({ data: party });
+    res.json({ data: redactPartySecrets(party) });
   } catch (error) {
     next(error);
   }

@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { createWebhookSignature } from '../middleware/apiKey.js';
+import { redactPartySecrets } from '../lib/secretHash.js';
 
 // Webhook event types
 export const WEBHOOK_EVENTS = [
@@ -74,7 +75,8 @@ export async function triggerWebhook(event: WebhookEvent, data: any, userId: str
     const payload: WebhookPayload = {
       event,
       timestamp: new Date().toISOString(),
-      data,
+      // party-password-hash: never ship a party secret (hash or plaintext) to a webhook.
+      data: event.startsWith('party.') ? redactPartySecrets(data) : data,
     };
 
     const payloadString = JSON.stringify(payload);

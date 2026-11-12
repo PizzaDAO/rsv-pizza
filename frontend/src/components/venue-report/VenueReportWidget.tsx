@@ -26,8 +26,9 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
       const data = await getVenueReport(partyId);
       if (data) {
         setReport(data);
+        // party-password-hash: the password is write-only; the field always starts empty.
         setUsePassword(data.hasPassword || false);
-        setPassword(data.password || '');
+        setPassword('');
       }
     } catch (error) {
       console.error('Error loading venue report:', error);
@@ -59,17 +60,38 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const result = await publishVenueReport(partyId, usePassword ? password : undefined);
+      // party-password-hash: unchecked = remove (null); checked + blank = keep the current
+      // password (undefined, never clears); checked + text = set/replace.
+      const trimmed = password.trim();
+      const result = await publishVenueReport(partyId, usePassword ? (trimmed || undefined) : null);
       if (result) {
         setReport(prev => prev ? {
           ...prev,
           published: true,
           slug: result.venueReportSlug,
-          hasPassword: !!password && usePassword,
+          hasPassword: result.hasPassword ?? (usePassword && (!!trimmed || !!prev.hasPassword)),
         } : null);
+        setPassword('');
       }
     } catch (error) {
       console.error('Error publishing venue report:', error);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // Remove the password from an already-published venue report (republishes with null).
+  const handleRemovePassword = async () => {
+    setPublishing(true);
+    try {
+      const result = await publishVenueReport(partyId, null);
+      if (result) {
+        setReport(prev => prev ? { ...prev, hasPassword: false } : null);
+        setUsePassword(false);
+        setPassword('');
+      }
+    } catch (error) {
+      console.error('Error removing venue report password:', error);
     } finally {
       setPublishing(false);
     }
@@ -215,14 +237,30 @@ export const VenueReportWidget: React.FC<VenueReportWidgetProps> = ({ partyId })
           label="Require password to view"
         />
         {usePassword && (
-          <IconInput
-            icon={Lock}
-            iconSize={16}
-            type="text"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Set a password"
-          />
+          <div>
+            <IconInput
+              icon={Lock}
+              iconSize={16}
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={report.hasPassword ? 'Password (set: type to replace)' : 'Set a password'}
+              autoComplete="new-password"
+            />
+            <div className="mt-1 flex items-start justify-between gap-3">
+              <p className="text-xs text-white/40">Viewers need this password. Share it when you send the link.</p>
+              {report.published && report.hasPassword && (
+                <button
+                  type="button"
+                  onClick={handleRemovePassword}
+                  disabled={publishing}
+                  className="shrink-0 text-xs text-white/40 hover:text-white/70 underline disabled:opacity-50"
+                >
+                  Remove password
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Publish/Unpublish buttons */}

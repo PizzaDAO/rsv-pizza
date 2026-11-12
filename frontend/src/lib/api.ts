@@ -2542,17 +2542,18 @@ export async function updateReport(
   }
 }
 
-// Publish report
+// Publish report. party-password-hash: `password` undefined keeps the current password,
+// null clears it, a string sets/replaces it.
 export async function publishReport(
   partyId: string,
-  password?: string
-): Promise<{ reportPublicSlug: string; publicUrl: string } | null> {
+  password?: string | null
+): Promise<{ reportPublicSlug: string; publicUrl: string; hasPassword?: boolean } | null> {
   try {
-    return await apiRequest<{ success: boolean; reportPublicSlug: string; publicUrl: string }>(
+    return await apiRequest<{ success: boolean; reportPublicSlug: string; publicUrl: string; hasPassword?: boolean }>(
       `/api/parties/${partyId}/report/publish`,
       {
         method: 'POST',
-        body: password ? { password } : undefined,
+        body: password === undefined ? undefined : { password },
         requireAuth: true,
       }
     );
@@ -4097,17 +4098,18 @@ export async function updateVenueReport(
   }
 }
 
-// Publish venue report
+// Publish venue report. party-password-hash: `password` undefined keeps the current password,
+// null clears it, a string sets/replaces it.
 export async function publishVenueReport(
   partyId: string,
-  password?: string
-): Promise<{ venueReportSlug: string; publicUrl: string } | null> {
+  password?: string | null
+): Promise<{ venueReportSlug: string; publicUrl: string; hasPassword?: boolean } | null> {
   try {
-    return await apiRequest<{ success: boolean; venueReportSlug: string; publicUrl: string }>(
+    return await apiRequest<{ success: boolean; venueReportSlug: string; publicUrl: string; hasPassword?: boolean }>(
       `/api/parties/${partyId}/venue-report/publish`,
       {
         method: 'POST',
-        body: password ? { password } : undefined,
+        body: password === undefined ? undefined : { password },
         requireAuth: true,
       }
     );

@@ -28,6 +28,7 @@
     "@privy-io/server-auth": "^1.32.5",
     "@supabase/supabase-js": "^2.117.2",
     "archiver": "^8.0.0",
+    "bcryptjs": "^3.0.3",
     "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",

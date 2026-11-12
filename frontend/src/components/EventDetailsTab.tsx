@@ -177,7 +177,6 @@ export const EventDetailsTab: React.FC = () => {
       const partyAddress = party.address || '';
       const partyVenueName = party.venueName || null;
       const partyDescription = party.description || '';
-      const partyPassword = party.password || '';
       const partyCustomUrl = party.customUrl || '';
       const partyEventImageUrl = party.eventImageUrl || '';
       const partyMaxGuests = party.maxGuests?.toString() || '';
@@ -203,7 +202,6 @@ export const EventDetailsTab: React.FC = () => {
       setAddress(partyAddress);
       setVenueName(partyVenueName);
       setDescription(partyDescription);
-      setPassword(partyPassword);
       setCustomUrl(partyCustomUrl);
       setEventImageUrl(partyEventImageUrl);
       setImagePreview(partyEventImageUrl || null);
@@ -231,7 +229,6 @@ export const EventDetailsTab: React.FC = () => {
         timezone: partyTimezone,
         address: partyAddress,
         description: partyDescription,
-        password: partyPassword,
         customUrl: partyCustomUrl,
         eventImageUrl: partyEventImageUrl,
         maxGuests: partyMaxGuests,
@@ -616,6 +613,14 @@ export const EventDetailsTab: React.FC = () => {
     await saveField('options', updates, partyPatch);
   };
 
+  // party-password-hash: the event password is write-only (stored as a bcrypt hash). The field
+  // always starts empty; typing a new one replaces it, "Remove password" clears it, and a blank
+  // field never saves (tabbing through the form used to wipe the password).
+  const savePassword = async (value: string | null) => {
+    const ok = await saveField('options', { password: value }, { hasPassword: !!value });
+    if (ok) setPassword('');
+  };
+
   // Check if name has changed
   const nameHasChanged = () => {
     if (!originalValues) return false;
@@ -877,14 +882,30 @@ export const EventDetailsTab: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onBlur={() => {
-                    const trimmed = password.trim() || null;
-                    saveOptions({ password: trimmed }, { password: trimmed });
+                    const trimmed = password.trim();
+                    if (!trimmed) return; // blank never saves or clears
+                    savePassword(trimmed);
                   }}
-                  placeholder="Event Password"
+                  placeholder={party.hasPassword ? 'Event Password (set: type to replace)' : 'Event Password'}
                   autoComplete="new-password"
                 />
+                {(password || party.hasPassword) && (
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <p className="text-xs text-white/40">Guests need this password. Share it when you invite them.</p>
+                    {party.hasPassword && (
+                      <button
+                        type="button"
+                        onClick={() => savePassword(null)}
+                        disabled={savingField === 'options'}
+                        className="shrink-0 text-xs text-white/40 hover:text-white/70 underline disabled:opacity-50"
+                      >
+                        Remove password
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              {password && (
+              {(password || party.hasPassword) && (
                 <Checkbox
                   checked={shareToUnlock}
                   onChange={() => {
@@ -902,7 +923,7 @@ export const EventDetailsTab: React.FC = () => {
                   label="Share to Unlock"
                 />
               )}
-              {password && shareToUnlock && (
+              {(password || party.hasPassword) && shareToUnlock && (
                 <IconInput
                   icon={Lock}
                   multiline

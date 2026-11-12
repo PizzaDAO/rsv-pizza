@@ -886,7 +886,6 @@ export interface DbParty {
   expected_attendance?: number | null;
   hide_guests: boolean;
   require_approval: boolean;
-  password?: string | null;
   has_password?: boolean;
   event_image_url: string | null;
   description: string | null;

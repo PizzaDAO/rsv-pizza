@@ -114,7 +114,7 @@ describe('mergeHostOnlyPartyFields', () => {
     expect(p.allowed_tabs).toEqual(['details']);
     expect(p.co_hosts).toEqual([{ id: 'a', email: 'x@y.z' }]);
     // The password is intentionally NOT surfaced to the client by this stage.
-    expect(p.password).toBeUndefined();
+    expect((p as unknown as Record<string, unknown>).password).toBeUndefined();
   });
 
   it('does not merge host-only fields when canEdit is not true', () => {
