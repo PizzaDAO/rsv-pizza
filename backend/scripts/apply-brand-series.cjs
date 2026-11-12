@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Upsert the `team1` and `monad` white-label event_series rows (see plans/whitelabel-team1-monad.md §5).
+/** Upsert the `team1`, `monad` and `doge` white-label event_series rows (see plans/whitelabel-team1-monad.md §5).
  *  Idempotent, keyed by slug. DRY RUN by default (read-only); --apply to write.
  *  On an existing row only the brand-defining fields are updated, so later edits made in
  *  /admin/series (tags, approval, checklist defaults, ...) are not overwritten.
@@ -31,13 +31,23 @@ const brandRow = (slug, label, brandName, publicTags) => ({
   photosPublic: true,
 });
 
+// Doge Day (Own The Doge): a global day, Saturday 2027-11-02 (stored as midnight UTC, like /admin/series).
+const dogeRow = {
+  ...brandRow('doge', 'Doge Day', 'Doge Day', ['Doge Day', 'Own The Doge']),
+  name: 'Doge Day 2027',
+  eventDate: new Date('2027-11-02T00:00:00.000Z'),
+};
+
 const ROWS = [
   brandRow('team1', 'Team1', 'Team1 Pizza', ['Team1', 'Avalanche']),
   brandRow('monad', 'Monad', 'Monad Pizza', ['Monad']),
+  dogeRow,
 ];
 
 // Fields refreshed on an existing row.
 const UPDATE_KEYS = ['name', 'displayName', 'brandName', 'siteUrl', 'themeClass', 'logoUrl', 'ogImageUrl', 'isActive'];
+// Only compared when the row defines it (team1/monad have no event date); Dates compare by time.
+const DATE_KEYS = ['eventDate'];
 
 (async () => {
   console.log(`\n=== brand series (${APPLY ? 'APPLY' : 'DRY RUN'}) ===`);
@@ -51,6 +61,9 @@ const UPDATE_KEYS = ['name', 'displayName', 'brandName', 'siteUrl', 'themeClass'
     }
     const update = {};
     for (const k of UPDATE_KEYS) if (existing[k] !== row[k]) update[k] = row[k];
+    for (const k of DATE_KEYS) {
+      if (row[k] && (!existing[k] || existing[k].getTime() !== row[k].getTime())) update[k] = row[k];
+    }
     if (!Object.keys(update).length) {
       console.log(`OK   '${row.slug}' already up to date`);
       continue;
@@ -61,7 +74,7 @@ const UPDATE_KEYS = ['name', 'displayName', 'brandName', 'siteUrl', 'themeClass'
   if (APPLY) {
     const rows = await prisma.eventSeries.findMany({
       where: { slug: { in: ROWS.map((r) => r.slug) } },
-      select: { slug: true, siteUrl: true, brandName: true, isActive: true },
+      select: { slug: true, siteUrl: true, brandName: true, isActive: true, eventDate: true },
     });
     console.log('verified:', JSON.stringify(rows));
   }

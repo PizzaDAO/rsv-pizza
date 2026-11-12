@@ -738,6 +738,34 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   --color-scheme: dark;
 }
 
+/* Doge Day (Own The Doge, doge.rsv.pizza). Palette from ownthedoge.com: brand dark brown
+ * #302d25, cream #f4ebd7, Doge gold #F2A73A. Dark theme: cream text on dark brown, gold
+ * accent. Gold is too light for the global white button text, so primary buttons use the
+ * brand brown on gold (>= 6:1); gold text on the dark backgrounds is ~8:1. */
+.doge-theme {
+  --bg-main: #24211b;
+  --bg-card: rgba(244, 235, 215, 0.07);
+  --bg-card-hover: rgba(244, 235, 215, 0.11);
+  --bg-surface: rgba(244, 235, 215, 0.05);
+  --bg-surface-hover: rgba(244, 235, 215, 0.09);
+  --bg-overlay: rgba(36, 33, 27, 0.78);
+  --bg-input: rgba(244, 235, 215, 0.07);
+  --bg-input-focus: rgba(244, 235, 215, 0.1);
+  --bg-header: #302d25;
+  --text-primary: #f4ebd7;
+  --text-secondary: rgba(244, 235, 215, 0.8);
+  --text-muted: rgba(244, 235, 215, 0.64);
+  --text-faint: rgba(244, 235, 215, 0.3);
+  --stroke: rgba(244, 235, 215, 0.16);
+  --stroke-hover: rgba(244, 235, 215, 0.26);
+  --stroke-strong: rgba(244, 235, 215, 0.36);
+  --accent: #F2A73A;
+  --accent-hover: #F7BE5E;
+  --error: #FF6B6B;
+  --color-scheme: dark;
+}
+.doge-theme .btn-primary { color: #302d25; }
+
 /* ─── Adding New Themes ───
  *
  * The theming system uses CSS custom properties (design tokens) with Tailwind

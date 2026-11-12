@@ -39,6 +39,9 @@ export const OPEN_FILES = new Set([
   '/brands/monad/logo.png',
   '/brands/monad/favicon.png',
   '/brands/monad/og.png',
+  '/brands/doge/logo.png',
+  '/brands/doge/favicon.png',
+  '/brands/doge/og.png',
 ]);
 
 /** Paths that bypass the gate: hashed build assets and an explicit file allowlist. */
