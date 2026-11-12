@@ -188,7 +188,8 @@ describe('Party Routes', () => {
       // In-memory fake of the where-clause brandedSeriesBySlug sends: slug match,
       // isActive, siteUrl not null.
       const SERIES = [
-        { id: 'series-team1', slug: 'team1', isActive: true, siteUrl: 'https://team1.rsv.pizza' }, // brand-check-ignore-line
+        { id: 'series-team1', slug: 'team1', isActive: true, siteUrl: 'https://team1.rsv.pizza', publicTags: ['team1', 'web3'] }, // brand-check-ignore-line
+        { id: 'series-notags', slug: 'notags', isActive: true, siteUrl: 'https://notags.rsv.pizza', publicTags: [] }, // brand-check-ignore-line
         { id: 'series-gpp', slug: 'gpp2026', isActive: true, siteUrl: null },
         { id: 'series-old', slug: 'oldbrand', isActive: false, siteUrl: 'https://old.rsv.pizza' }, // brand-check-ignore-line
       ];
@@ -219,6 +220,26 @@ describe('Party Routes', () => {
         const data = await create({ seriesSlug: 'team1' });
         expect(data.eventSeriesId).toBe('series-team1');
         expect(data.eventType).toBeUndefined();
+      });
+
+      it('applies the branded series publicTags as eventTags', async () => {
+        const data = await create({ seriesSlug: 'team1' });
+        expect(data.eventTags).toEqual(['team1', 'web3']);
+      });
+
+      it('a body eventTags cannot override the series tags (create never read it)', async () => {
+        const data = await create({ seriesSlug: 'team1', eventTags: ['go'] });
+        expect(data.eventTags).toEqual(['team1', 'web3']);
+      });
+
+      it('series with no publicTags leaves eventTags unset', async () => {
+        const data = await create({ seriesSlug: 'notags' });
+        expect('eventTags' in data).toBe(false);
+      });
+
+      it('no branded series: eventTags unset', async () => {
+        const data = await create({ seriesSlug: 'gpp2026' });
+        expect('eventTags' in data).toBe(false);
       });
 
       it('ignores gpp2026 (site_url NULL)', async () => {

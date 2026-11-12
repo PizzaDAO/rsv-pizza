@@ -20,6 +20,7 @@ import {
   validateSurveyAnswers,
 } from '../lib/surveyQuestions.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
+import { brand } from '../config/brand.js';
 import { siteForParty } from '../lib/siteBrand.js';
 
 const SURVEY_TAB = 'survey';
@@ -31,7 +32,9 @@ export function buildSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   guest: { name: string; email: string },
   token: string,
-  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
+  baseUrl: string = 'https://rsv.pizza', // brand-check-ignore-line
+  /** Pass only for a branded party: swaps the PizzaDAO wording for neutral copy. */
+  branded: boolean = false
 ): { subject: string; html: string } {
   const surveyUrl = `${baseUrl}/survey/${token}`;
 
@@ -65,7 +68,7 @@ export function buildSurveyEmail(
           ${flyerBlock}
           <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
             <h2 style="color: #1a1a2e; margin-top: 0;">Thanks for coming, ${escape(firstName)}!</h2>
-            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear what you thought of <strong>${escape(party.name)}</strong>. It takes less than a minute and helps us throw better PizzaDAO events.</p>
+            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear what you thought of <strong>${escape(party.name)}</strong>. It takes less than a minute and helps us throw better ${branded ? '' : 'PizzaDAO '}events.</p>
           </div>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${surveyUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Take the survey</a>
@@ -164,7 +167,8 @@ async function sendSurveyToParty(
             { name: party.name, eventImageUrl: party.eventImageUrl },
             { name: g.name, email: g.email! },
             token,
-            site.url
+            site.url,
+            site.name !== brand.name
           );
 
           const resp = await fetch('https://api.resend.com/emails', {

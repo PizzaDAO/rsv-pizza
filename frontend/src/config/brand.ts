@@ -33,6 +33,10 @@ export const BRAND = {
   logoUrl: (env.VITE_BRAND_LOGO_URL || '/logo.png').trim(),
   /** Social share / OG image. */
   ogImageUrl: (env.VITE_BRAND_OG_IMAGE || '/logo.png').trim(),
+  /** Browser-tab icon. Defaults to the logo (previous behavior). */
+  faviconUrl: (env.VITE_BRAND_FAVICON_URL || env.VITE_BRAND_LOGO_URL || '/logo.png').trim(),
+  /** True when a brand supplied its own (wide, 1200x630) OG image. */
+  hasCustomOgImage: !!(env.VITE_BRAND_OG_IMAGE || '').trim(),
   /** User-facing support address. */
   supportEmail: (env.VITE_BRAND_SUPPORT_EMAIL || 'help@rsv.pizza').trim(),
   /**

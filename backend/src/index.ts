@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
-import { errorHandler } from './middleware/error.js';
+import { errorHandler, AppError } from './middleware/error.js';
+import { isAllowedOrigin } from './lib/cors.js';
 import { prisma } from './config/database.js';
 import { assertSecretsConfigured, warnWeakOptionalSecrets } from './config/secrets.js';
 
@@ -133,14 +134,12 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     // Check against whitelist or Vercel preview URLs
-    if (
-      ALLOWED_ORIGINS.includes(origin) ||
-      /^https:\/\/rsvpizza.*\.vercel\.app$/.test(origin)  // Allow RSVPizza Vercel preview deployments only
-    ) {
+    if (isAllowedOrigin(origin, ALLOWED_ORIGINS)) {
       return callback(null, true);
     }
 
-    callback(new Error('Not allowed by CORS'));
+    // AppError so the error handler answers 403 instead of 500.
+    callback(new AppError('Not allowed by CORS', 403, 'CORS_FORBIDDEN'));
   },
   credentials: true,
 }));

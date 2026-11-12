@@ -121,11 +121,11 @@ export async function siteForOrigin(origin: string | null | undefined, fallbackU
 }
 
 /** Active series with a site_url, by slug (for party-creation stamping). Null otherwise. */
-export async function brandedSeriesBySlug(slug: unknown): Promise<{ id: string } | null> {
+export async function brandedSeriesBySlug(slug: unknown): Promise<{ id: string; publicTags?: string[] } | null> {
   if (typeof slug !== 'string' || !slug.trim()) return null;
   const s = await prisma.eventSeries.findFirst({
     where: { slug: slug.trim(), isActive: true, siteUrl: { not: null } },
-    select: { id: true },
+    select: { id: true, publicTags: true },
   });
   return s ?? null;
 }

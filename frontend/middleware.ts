@@ -28,9 +28,8 @@ const HMAC_MESSAGE = 'site-gate-v1';
  * every unknown path to index.html, so an extension or prefix match would let
  * the SPA shell through ungated.
  */
-const OPEN_FILES = new Set([
+export const OPEN_FILES = new Set([
   '/logo.png',
-  '/favicon.ico',
   '/party.svg',
   '/fonts/Hub-191-Display.otf',
   '/fonts/Hub-191-Regular.otf',

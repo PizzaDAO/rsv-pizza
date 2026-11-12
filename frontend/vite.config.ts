@@ -16,6 +16,10 @@ function brandIndexHtml(mode: string): Plugin {
   const tagline = v('VITE_BRAND_TAGLINE', 'Pizza Party Planner');
   const domain = v('VITE_BRAND_DOMAIN', 'rsv.pizza').replace(/\/+$/, ''); // brand-check-ignore-line
   const logo = v('VITE_BRAND_LOGO_URL', '/logo.png');
+  // Tab icon. Defaults to the logo URL (previous behavior); set to a square favicon asset to override.
+  const favicon = v('VITE_BRAND_FAVICON_URL', logo);
+  // A brand-supplied OG image is a wide share card, not the 512px logo.
+  const customOg = !!(env.VITE_BRAND_OG_IMAGE || process.env.VITE_BRAND_OG_IMAGE || '').trim();
   const ogRaw = v('VITE_BRAND_OG_IMAGE', '/logo.png');
   const description = v('VITE_BRAND_DESCRIPTION', 'Invite your friends to share some pizza!');
   const origin = `https://${domain}`;
@@ -24,13 +28,20 @@ function brandIndexHtml(mode: string): Plugin {
   return {
     name: 'brand-index-html',
     transformIndexHtml(html) {
-      return html
-        .replace('<link rel="icon" type="image/png" href="/logo.png" />', () => `<link rel="icon" type="image/png" href="${esc(logo)}" />`)
+      let out = html
+        .replace('<link rel="icon" type="image/png" href="/logo.png" />', () => `<link rel="icon" type="image/png" href="${esc(favicon)}" />`)
         .replaceAll('RSV.Pizza - Pizza Party Planner', () => esc(title)) // brand-check-ignore-line
         .replaceAll('Invite your friends to share some pizza!', () => esc(description))
         .replaceAll('content="https://rsv.pizza/logo.png"', () => `content="${esc(og)}"`) // brand-check-ignore-line
         .replaceAll('content="https://rsv.pizza/"', () => `content="${esc(origin)}/"`) // brand-check-ignore-line
         .replace('content="RSV.Pizza" />', () => `content="${esc(name)}" />`); // brand-check-ignore-line
+      if (customOg) {
+        out = out
+          .replace('<meta property="og:image:width" content="512" />', () => '<meta property="og:image:width" content="1200" />')
+          .replace('<meta property="og:image:height" content="512" />', () => '<meta property="og:image:height" content="630" />')
+          .replace('<meta name="twitter:card" content="summary" />', () => '<meta name="twitter:card" content="summary_large_image" />');
+      }
+      return out;
     },
   };
 }

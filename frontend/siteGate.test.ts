@@ -28,7 +28,7 @@ describe('siteGate', () => {
   });
 
   it('lets static assets through', async () => {
-    for (const p of ['/assets/a.js', '/logo.png', '/brands/team1/logo.png', '/favicon.ico', '/fonts/Hub-191-Regular.otf']) {
+    for (const p of ['/assets/a.js', '/logo.png', '/brands/team1/logo.png', '/fonts/Hub-191-Regular.otf']) {
       expect(isOpenAsset(p)).toBe(true);
       expect(await siteGate(req(p), PW)).toBeNull();
     }
@@ -73,5 +73,15 @@ describe('siteGate', () => {
       const res = await login(PW, evil);
       expect(res?.headers.get('location')).toBe('/');
     }
+  });
+});
+
+describe("OPEN_FILES", () => {
+  it("every entry exists in frontend/public", async () => {
+    const { OPEN_FILES } = await import("./middleware");
+    const { existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const missing = [...OPEN_FILES].filter((f) => !existsSync(join(__dirname, "public", f)));
+    expect(missing).toEqual([]);
   });
 });

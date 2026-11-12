@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BRAND } from '../config/brand';
 import { useNavigate } from 'react-router-dom';
 import { usePizza } from '../contexts/PizzaContext';
 import { PartyPopper, Copy, Check, X, Calendar, User, Loader2, Users, MapPin, Lock, Image, FileText, Link as LinkIcon, Upload, Trash2, ChevronDown, ChevronUp, ExternalLink, Pizza, Globe, EyeOff } from 'lucide-react';
@@ -657,7 +658,7 @@ export const PartyHeader: React.FC = () => {
 
                 {/* Event Info */}
                 <div className="flex-1 p-4">
-                  <p className="text-xs text-theme-text-muted mb-1">RSV.Pizza</p>
+                  <p className="text-xs text-theme-text-muted mb-1">{BRAND.name}</p>
                   <h3 className="text-lg font-bold text-theme-text mb-2 line-clamp-2">{party.name}</h3>
                   {party.description && (
                     <p className="text-sm text-theme-text-secondary line-clamp-3 mb-3">

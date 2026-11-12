@@ -321,6 +321,10 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const party = await prisma.party.create({
       data: {
         ...(brandedSeries ? { eventSeriesId: brandedSeries.id } : {}),
+        // Same as the GPP create path: the series' public tags become the party's eventTags.
+        // (Party has no internal-tags column, and this endpoint never accepted eventTags from
+        // the body, so there is nothing explicit to preserve.) Empty -> field omitted, as before.
+        ...(brandedSeries?.publicTags?.length ? { eventTags: brandedSeries.publicTags } : {}),
         name: partyName,
         date: date ? new Date(date) : null,
         endTime: endTime ? new Date(endTime) : null,

@@ -31,6 +31,8 @@ import { buildSurveyEmail } from './survey.routes.js';
 import { buildInviteEmail } from './v1/guests.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
 import { errorHandler } from '../middleware/error.js';
+import { buildReminderHtml, buildReminderText, renderUnsubscribePage } from './reminder.routes.js';
+import { _resetSiteBrandCache } from '../lib/siteBrand.js';
 
 function app() {
   const a = express();
@@ -149,5 +151,59 @@ describe('no-series emails are byte-identical to pre-change output', () => {
     mockPrisma.hostSurveyResponse.upsert.mockResolvedValue({});
     expect(await sendHostSurveyEmail('p1')).toBe(true);
     expect(lastResend()).toMatchSnapshot();
+  });
+});
+
+// White-label audit M3: brand copy only changes for a branded series; defaults keep the exact old literals.
+describe('brand copy fallbacks (M3)', () => {
+  const reminderParams = {
+    guestName: 'Gus', whenText: 'Mon', addressText: '1 St', partyName: 'Snapshot Party',
+    eventUrl: 'https://rsv.pizza/e', unsubUrl: 'https://api.rsv.pizza/u', venueName: null, address: null, imageUrl: null,
+  };
+
+  it('reminder footer keeps "on RSV.Pizza." by default and uses the site name when given', () => {
+    expect(buildReminderHtml(reminderParams)).toContain("RSVP'd to Snapshot Party on RSV.Pizza.<br>");
+    expect(buildReminderText(reminderParams)).toContain("RSVP'd to Snapshot Party on RSV.Pizza.");
+    expect(buildReminderHtml({ ...reminderParams, siteName: 'Team1 Pizza' })).toContain("on Team1 Pizza.<br>");
+    expect(buildReminderText({ ...reminderParams, siteName: 'Team1 Pizza' })).toContain('on Team1 Pizza.');
+  });
+
+  it('unsubscribe page keeps the rsv.pizza link by default', () => {
+    const html = renderUnsubscribePage('T', 'M', true);
+    expect(html).toContain('<p><a href="https://rsv.pizza">Back to RSV.Pizza</a></p>');
+    const branded = renderUnsubscribePage('T', 'M', true, { url: 'https://team1.rsv.pizza', name: 'Team1 Pizza' });
+    expect(branded).toContain('<a href="https://team1.rsv.pizza">Back to Team1 Pizza</a>');
+    expect(branded).not.toContain('Back to RSV.Pizza');
+  });
+
+  it('guest survey: PizzaDAO wording by default, neutral when branded', () => {
+    const args = [{ name: 'P' }, { name: 'G', email: 'g@x.com' }, 'tok'] as const;
+    expect(buildSurveyEmail(...args).html).toContain('throw better PizzaDAO events.');
+    expect(buildSurveyEmail(...args, 'https://team1.rsv.pizza', true).html).toContain('throw better events.');
+  });
+
+  it('host survey for a branded party: team signature, full-name subject, no PizzaDAO', async () => {
+    vi.clearAllMocks();
+    _resetSiteBrandCache();
+    process.env.RESEND_API_KEY = 're_test';
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}), text: async () => '', headers: new Headers() });
+    mockPrisma.eventSeries.findMany.mockResolvedValue([
+      { id: 's-t1', slug: 'team1', siteUrl: 'https://team1.rsv.pizza', brandName: 'Team1 Pizza', displayName: 'T', name: 'T' },
+    ]);
+    mockPrisma.party.findUnique.mockResolvedValue({
+      id: 'p1', name: 'Team1 Global Pizza Party Lisbon', customUrl: null, inviteCode: 'abc123',
+      eventImageUrl: null, eventSeriesId: 's-t1', estimatedAttendance: null, userId: 'u1',
+      user: { id: 'u1', email: 'host@example.com', name: 'Hosty McHost' },
+    });
+    mockPrisma.hostSurveyResponse.findUnique.mockResolvedValue({ token: 'host-tok' });
+    mockPrisma.hostSurveyResponse.upsert.mockResolvedValue({});
+    expect(await sendHostSurveyEmail('p1')).toBe(true);
+    const body = lastResend();
+    expect(body.subject).toBe('How did hosting Team1 Global Pizza Party Lisbon go? Tell us 🍕');
+    expect(body.html).toContain('Best,<br>Team1 Pizza team</p>');
+    expect(body.html).not.toContain('PizzaDAO');
+    expect(body.html).not.toContain('Dread Pizza');
+    _resetSiteBrandCache();
+    delete process.env.RESEND_API_KEY;
   });
 });

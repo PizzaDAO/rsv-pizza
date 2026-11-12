@@ -21,7 +21,7 @@ export default function BrandHelmet() {
   return (
     <Helmet>
       <title>{title}</title>
-      <link rel="icon" type="image/png" href={BRAND.logoUrl} />
+      <link rel="icon" type="image/png" href={BRAND.faviconUrl} />
       <meta name="title" content={title} />
       <meta name="description" content={description} />
 
@@ -30,11 +30,11 @@ export default function BrandHelmet() {
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={ogImage} />
-      <meta property="og:image:width" content="512" />
-      <meta property="og:image:height" content="512" />
+      <meta property="og:image:width" content={BRAND.hasCustomOgImage ? '1200' : '512'} />
+      <meta property="og:image:height" content={BRAND.hasCustomOgImage ? '630' : '512'} />
       <meta property="og:site_name" content={BRAND.name} />
 
-      <meta name="twitter:card" content="summary" />
+      <meta name="twitter:card" content={BRAND.hasCustomOgImage ? 'summary_large_image' : 'summary'} />
       <meta name="twitter:url" content={`${BRAND.url}/`} />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
