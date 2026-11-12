@@ -967,4 +967,106 @@ describe('Party Routes', () => {
       expect(res.body.options[0].enabled).toBe(true);
     });
   });
+
+  describe('GET /api/parties/:id/guests + /my-guest (guests-anon-exposure PR1a)', () => {
+    const COHOST_ID = 'cohost-user-789';
+    const COHOST_EMAIL = 'cohost@example.com';
+    const FORBIDDEN_KEYS = [
+      'survey_token', 'surveyToken', 'privy_user_id', 'visitor_session_id', 'email_resend_id',
+      'email_status', 'reminder_sent_at', 'nft_token_id', 'nft_transaction_hash',
+      'discount_claimed_at', 'wallet_source',
+    ];
+    const guestRow = {
+      id: 'g1', partyId: PARTY_ID, name: 'Guest One', email: 'g1@example.com', ethereumAddress: null,
+      roles: [], mailingListOptIn: false, dietaryRestrictions: [], likedToppings: [], dislikedToppings: [],
+      likedBeverages: [], dislikedBeverages: [], pizzeriaRankings: [], suggestedPizzerias: [],
+      swcOptIn: false, swcCaOptIn: false, swcAuOptIn: false, swcEuOptIn: false, swcUkOptIn: false,
+      swcBrOptIn: false, ethconfOptIn: false, optinAbVariant: null, submittedAt: new Date('2026-01-01'),
+      submittedVia: 'link', checkedInAt: null, approved: null, checkedInBy: null, status: 'CONFIRMED',
+      waitlistPosition: null, promotedAt: null,
+    };
+    const party = (coHosts: any[] = []) => ({ id: PARTY_ID, userId: HOST_USER_ID, coHosts, eventType: 'regular', user: { name: 'H' } });
+
+    it('owner gets snake_case DbGuest rows with no sensitive keys, via one indexed query', async () => {
+      mockPrisma.party.findUnique.mockResolvedValueOnce(party());
+      mockPrisma.guest.findMany.mockResolvedValueOnce([guestRow]);
+      const res = await request(createTestApp())
+        .get(`/api/parties/${PARTY_ID}/guests`)
+        .set('Authorization', `Bearer ${makeToken(HOST_USER_ID, HOST_EMAIL)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.guests).toHaveLength(1);
+      expect(res.body.guests[0]).toMatchObject({ id: 'g1', party_id: PARTY_ID, name: 'Guest One', email: 'g1@example.com', submitted_via: 'link' });
+      for (const k of FORBIDDEN_KEYS) expect(res.body.guests[0]).not.toHaveProperty(k);
+      expect(mockPrisma.guest.findMany).toHaveBeenCalledTimes(1);
+      const arg = mockPrisma.guest.findMany.mock.calls[0][0];
+      expect(arg.where).toEqual({ partyId: PARTY_ID, status: { not: 'INVITED' } });
+      for (const k of ['surveyToken', 'privyUserId', 'visitorSessionId', 'emailResendId', 'nftTokenId', 'walletSource']) {
+        expect(arg.select).not.toHaveProperty(k);
+      }
+    });
+
+    it('co-host with canEdit gets the list', async () => {
+      mockPrisma.party.findUnique.mockResolvedValueOnce(party([{ email: COHOST_EMAIL, canEdit: true }]));
+      mockPrisma.guest.findMany.mockResolvedValueOnce([guestRow]);
+      const res = await request(createTestApp())
+        .get(`/api/parties/${PARTY_ID}/guests`)
+        .set('Authorization', `Bearer ${makeToken(COHOST_ID, COHOST_EMAIL)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.guests).toHaveLength(1);
+    });
+
+    it('non-editor (including a co-host without canEdit) gets 404 and no guest query', async () => {
+      mockPrisma.party.findUnique.mockResolvedValue(party([{ email: COHOST_EMAIL, canEdit: false }]));
+      for (const [id, email] of [[OTHER_USER_ID, OTHER_EMAIL], [COHOST_ID, COHOST_EMAIL]]) {
+        const res = await request(createTestApp())
+          .get(`/api/parties/${PARTY_ID}/guests`)
+          .set('Authorization', `Bearer ${makeToken(id, email)}`);
+        expect(res.status).toBe(404);
+      }
+      expect(mockPrisma.guest.findMany).not.toHaveBeenCalled();
+    });
+
+    it('unauthenticated gets 401', async () => {
+      const res = await request(createTestApp()).get(`/api/parties/${PARTY_ID}/guests`);
+      expect(res.status).toBe(401);
+      expect(mockPrisma.guest.findMany).not.toHaveBeenCalled();
+    });
+
+    it('wrong party (unknown id or malformed id) gets 404', async () => {
+      mockPrisma.party.findUnique.mockResolvedValueOnce(null);
+      const token = makeToken(HOST_USER_ID, HOST_EMAIL);
+      const a = await request(createTestApp()).get('/api/parties/00000000-0000-0000-0000-0000000000ff/guests').set('Authorization', `Bearer ${token}`);
+      expect(a.status).toBe(404);
+      const b = await request(createTestApp()).get('/api/parties/not-a-uuid/guests').set('Authorization', `Bearer ${token}`);
+      expect(b.status).toBe(404);
+      expect(mockPrisma.guest.findMany).not.toHaveBeenCalled();
+    });
+
+    it('my-guest returns only the caller own row (lookup keyed on the token email)', async () => {
+      mockPrisma.guest.findFirst.mockResolvedValueOnce({ id: 'g1', name: 'Me', email: OTHER_EMAIL, status: 'CONFIRMED' });
+      const res = await request(createTestApp())
+        .get(`/api/parties/${PARTY_ID}/my-guest`)
+        .set('Authorization', `Bearer ${makeToken(OTHER_USER_ID, 'Other@Example.com')}`);
+      expect(res.status).toBe(200);
+      expect(res.body.guest).toMatchObject({ id: 'g1' });
+      const arg = mockPrisma.guest.findFirst.mock.calls[0][0];
+      expect(arg.where.partyId).toBe(PARTY_ID);
+      expect(arg.where.email.equals).toBe('other@example.com');
+      for (const k of ['surveyToken', 'privyUserId', 'visitorSessionId']) expect(arg.select).not.toHaveProperty(k);
+    });
+
+    it('my-guest returns null when no row, null for a malformed party id, 401 unauthenticated', async () => {
+      const token = makeToken(OTHER_USER_ID, OTHER_EMAIL);
+      mockPrisma.guest.findFirst.mockResolvedValueOnce(null);
+      const a = await request(createTestApp()).get(`/api/parties/${PARTY_ID}/my-guest`).set('Authorization', `Bearer ${token}`);
+      expect(a.status).toBe(200);
+      expect(a.body).toEqual({ guest: null });
+      mockPrisma.guest.findFirst.mockClear();
+      const b = await request(createTestApp()).get('/api/parties/bogus/my-guest').set('Authorization', `Bearer ${token}`);
+      expect(b.body).toEqual({ guest: null });
+      expect(mockPrisma.guest.findFirst).not.toHaveBeenCalled();
+      const c = await request(createTestApp()).get(`/api/parties/${PARTY_ID}/my-guest`);
+      expect(c.status).toBe(401);
+    });
+  });
 });

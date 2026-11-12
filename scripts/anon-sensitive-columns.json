@@ -40,5 +40,8 @@
     "photo_reminder_sent_at",
     "attendance_reminder_sent_at",
     "host_survey_sent_at"
+  ],
+  "experiment_flags": [
+    "updated_by"
   ]
 }

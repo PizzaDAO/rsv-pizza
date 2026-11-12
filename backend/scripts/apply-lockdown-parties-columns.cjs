@@ -10,6 +10,12 @@
  *   2. the PR that stops reading host-only columns from anon is live on prod (~24h earlier, so
  *      cached SPA bundles that still select host_telegram_* age out).
  *
+ * D9 (guests-anon-exposure): the SAME run also locks `public.experiment_flags`: REVOKE SELECT from
+ * anon/authenticated, then GRANT SELECT (key, enabled) only, so `updated_by` (admin emails) is no
+ * longer anon-readable. The frontend only runs `.select('enabled').eq('key', k)` on it
+ * (getExperimentFlag in frontend/src/lib/supabase.ts). Included in dry run, --simulate, --apply
+ * verification and --rollback.
+ *
  * Modes (exactly one; default is a read-only dry run):
  *   (none)       dry run: counts/names only, never values. Read-only.
  *   --simulate   BEGIN; lock_timeout; REVOKE+GRANT; SET LOCAL ROLE anon; run the real query shapes
@@ -37,13 +43,17 @@ const prisma = new PrismaClient();
 
 const ROOT = path.join(__dirname, '../..');
 const ALLOW_ALL = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/parties-anon-columns.json'), 'utf8'));
-const SENSITIVE = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/anon-sensitive-columns.json'), 'utf8')).parties;
+const SENSITIVE_ALL = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/anon-sensitive-columns.json'), 'utf8'));
+const SENSITIVE = SENSITIVE_ALL.parties;
+const FLAGS_SENSITIVE = SENSITIVE_ALL.experiment_flags || [];
+const FLAGS_ALLOW = ['key', 'enabled']; // D9: the only experiment_flags columns anon may read
 const ROLES = ['anon', 'authenticated'];
 const TX_OPTS = { timeout: 60000, maxWait: 15000 };
 const SENTINEL = 'SIMULATION_ROLLBACK';
 
 const ROLLBACK_SQL = [
   'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.parties TO anon, authenticated',
+  'GRANT SELECT ON public.experiment_flags TO anon, authenticated', // D9 inverse (restores table-level SELECT)
   `NOTIFY pgrst, 'reload schema'`,
 ];
 
@@ -52,30 +62,34 @@ function lockdownSql(allow) {
   return [
     'REVOKE ALL ON public.parties FROM anon, authenticated',
     `GRANT SELECT (${allow.map(q).join(', ')}) ON public.parties TO anon, authenticated`,
+    // D9: experiment_flags.updated_by holds admin emails; expose only key + enabled.
+    'REVOKE SELECT ON public.experiment_flags FROM anon, authenticated',
+    `GRANT SELECT (${FLAGS_ALLOW.map(q).join(', ')}) ON public.experiment_flags TO anon, authenticated`,
     `NOTIFY pgrst, 'reload schema'`,
   ];
 }
 
-async function tableColumns(db) {
+async function tableColumns(db, table = 'parties') {
   const rows = await db.$queryRawUnsafe(
-    `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='parties' ORDER BY ordinal_position`);
+    `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`, table);
   return rows.map((r) => r.column_name);
 }
 
 /** { role: { readable: Set<col>, tableSelect: bool, writePrivs: string[] } } */
-async function privileges(db, cols) {
+async function privileges(db, cols, table = 'parties') {
+  const rel = `public.${table}`;
   const out = {};
   for (const role of ROLES) {
     const rows = await db.$queryRawUnsafe(
-      `SELECT c AS col, has_column_privilege($1, 'public.parties', c, 'SELECT') AS ok FROM unnest($2::text[]) AS c`, role, cols);
+      `SELECT c AS col, has_column_privilege($1, $3::regclass, c, 'SELECT') AS ok FROM unnest($2::text[]) AS c`, role, cols, rel);
     const t = await db.$queryRawUnsafe(
-      `SELECT has_table_privilege($1,'public.parties','SELECT') AS sel,
-              has_table_privilege($1,'public.parties','INSERT') AS ins,
-              has_table_privilege($1,'public.parties','UPDATE') AS upd,
-              has_table_privilege($1,'public.parties','DELETE') AS del,
-              has_table_privilege($1,'public.parties','TRUNCATE') AS trunc,
-              has_table_privilege($1,'public.parties','REFERENCES') AS refs,
-              has_table_privilege($1,'public.parties','TRIGGER') AS trig`, role);
+      `SELECT has_table_privilege($1,$2::regclass,'SELECT') AS sel,
+              has_table_privilege($1,$2::regclass,'INSERT') AS ins,
+              has_table_privilege($1,$2::regclass,'UPDATE') AS upd,
+              has_table_privilege($1,$2::regclass,'DELETE') AS del,
+              has_table_privilege($1,$2::regclass,'TRUNCATE') AS trunc,
+              has_table_privilege($1,$2::regclass,'REFERENCES') AS refs,
+              has_table_privilege($1,$2::regclass,'TRIGGER') AS trig`, role, rel);
     const x = t[0];
     out[role] = {
       readable: new Set(rows.filter((r) => r.ok).map((r) => r.col)),
@@ -107,6 +121,26 @@ async function verify(db, allow) {
     if (!cols.includes(c)) continue;
     for (const role of ROLES) if (priv[role].readable.has(c)) problems.push(`${role}: SENSITIVE column readable: ${c}`);
   }
+  problems.push(...(await verifyFlags(db)));
+  return problems;
+}
+
+/** D9: experiment_flags must expose exactly key + enabled (no table-level SELECT, no updated_by). */
+async function verifyFlags(db) {
+  const cols = await tableColumns(db, 'experiment_flags');
+  const priv = await privileges(db, cols, 'experiment_flags');
+  const problems = [];
+  for (const role of ROLES) {
+    const p = priv[role];
+    if (p.tableSelect) problems.push(`${role}: experiment_flags still has table-level SELECT`);
+    for (const c of cols) {
+      const want = FLAGS_ALLOW.includes(c);
+      const have = p.readable.has(c);
+      if (want && !have) problems.push(`${role}: experiment_flags allowlisted column NOT readable: ${c}`);
+      if (!want && have) problems.push(`${role}: experiment_flags non-allowlisted column STILL readable: ${c}`);
+    }
+    for (const c of FLAGS_SENSITIVE) if (p.readable.has(c)) problems.push(`${role}: experiment_flags SENSITIVE column readable: ${c}`);
+  }
   return problems;
 }
 
@@ -128,8 +162,16 @@ async function dryRun(allow, cols) {
     console.log(`\n!! allowlisted columns missing from the table (the GRANT would fail): ${missing.join(', ')}`);
     if (missing.includes('has_password')) console.log('   -> run backend/scripts/apply-parties-has-password.cjs --apply first.');
   }
+  const fcols = await tableColumns(prisma, 'experiment_flags');
+  const fpriv = await privileges(prisma, fcols, 'experiment_flags');
+  for (const role of ROLES) {
+    const p = fpriv[role];
+    const sens = FLAGS_SENSITIVE.filter((c) => p.readable.has(c));
+    console.log(`\n[${role}] experiment_flags: table-level SELECT=${p.tableSelect}; readable columns ${p.readable.size}/${fcols.length}; SENSITIVE readable now (${sens.length}): ${sens.join(', ') || 'none'}`);
+  }
+  console.log(`experiment_flags after lockdown: readable columns = ${FLAGS_ALLOW.join(', ')}`);
   const stmts = lockdownSql(allow);
-  console.log(`\nWould run ${stmts.length} statements (REVOKE ALL; GRANT SELECT on ${allow.length} columns; NOTIFY).`);
+  console.log(`\nWould run ${stmts.length} statements (parties: REVOKE ALL + GRANT SELECT on ${allow.length} columns; experiment_flags: REVOKE SELECT + GRANT SELECT (${FLAGS_ALLOW.join(', ')}); NOTIFY).`);
   console.log('Dry run only. Use --simulate (rolled back) to test, --apply to execute, --rollback to undo.');
 }
 
@@ -148,6 +190,8 @@ function simulationChecks(allow) {
     ['ArtDisplayPage underboss_status', `SELECT underboss_status FROM public.parties WHERE id = '00000000-0000-0000-0000-000000000000' LIMIT 1`],
     ['findApprovedGppPartyInCity filters', `SELECT ${list} FROM public.parties WHERE event_type = 'gpp' AND city = 'zz' AND underboss_status = 'approved' LIMIT 1`],
     ['count head (createParty fallback)', `SELECT count(id) FROM public.parties`],
+    ['experiment_flags getExperimentFlag (enabled by key)', `SELECT enabled FROM public.experiment_flags WHERE key = 'zz-sim' LIMIT 1`],
+    ['experiment_flags key + enabled', `SELECT key, enabled FROM public.experiment_flags LIMIT 1`],
   ];
   const denied = [
     ['select *', `SELECT * FROM public.parties LIMIT 1`],
@@ -155,6 +199,9 @@ function simulationChecks(allow) {
     ['filter on password', `SELECT id FROM public.parties WHERE password IS NOT NULL LIMIT 1`],
     ['filter on report_password', `SELECT id FROM public.parties WHERE report_password IS NOT NULL LIMIT 1`],
     ['filter on co_hosts', `SELECT id FROM public.parties WHERE co_hosts IS NOT NULL LIMIT 1`],
+    ['experiment_flags select *', `SELECT * FROM public.experiment_flags LIMIT 1`],
+    ...FLAGS_SENSITIVE.map((c) => [`experiment_flags select ${c}`, `SELECT ${q(c)} FROM public.experiment_flags LIMIT 1`]),
+    ['experiment_flags filter on updated_by', `SELECT key FROM public.experiment_flags WHERE updated_by IS NOT NULL LIMIT 1`],
     ['update', `UPDATE public.parties SET name = name WHERE false`],
     ['delete', `DELETE FROM public.parties WHERE false`],
   ];
@@ -195,8 +242,9 @@ async function main() {
       for (const s of ROLLBACK_SQL) await tx.$executeRawUnsafe(s);
     }, TX_OPTS);
     const priv = await privileges(prisma, cols);
-    const ok = ROLES.every((r) => priv[r].tableSelect);
-    console.log(ok ? 'OK   table-level privileges restored for anon, authenticated' : 'FAIL privileges not restored - investigate');
+    const fpriv = await privileges(prisma, await tableColumns(prisma, 'experiment_flags'), 'experiment_flags');
+    const ok = ROLES.every((r) => priv[r].tableSelect && fpriv[r].tableSelect);
+    console.log(ok ? 'OK   table-level privileges restored for anon, authenticated (parties + experiment_flags)' : 'FAIL privileges not restored - investigate');
     if (!ok) process.exit(1);
     return;
   }

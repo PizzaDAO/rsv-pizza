@@ -412,6 +412,147 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
   }
 });
 
+// ---------------------------------------------------------------------------
+// guests-anon-exposure PR1a: authenticated replacements for the anon `guests` reads.
+// Registered before the `/:id` catch-all (no earlier-mounted router shadows
+// `/:id/guests` or `/:id/my-guest`).
+// ---------------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Only the fields the host UI renders (frontend DbGuest). Deliberately EXCLUDES
+// survey_token, privy_user_id, visitor_session_id, email_resend_id, email_status*,
+// reminder*, nft_*, discount_claimed_at, wallet_source.
+const HOST_GUEST_SELECT = {
+  id: true,
+  partyId: true,
+  name: true,
+  email: true,
+  ethereumAddress: true,
+  roles: true,
+  mailingListOptIn: true,
+  dietaryRestrictions: true,
+  likedToppings: true,
+  dislikedToppings: true,
+  likedBeverages: true,
+  dislikedBeverages: true,
+  pizzeriaRankings: true,
+  suggestedPizzerias: true,
+  swcOptIn: true,
+  swcCaOptIn: true,
+  swcAuOptIn: true,
+  swcEuOptIn: true,
+  swcUkOptIn: true,
+  swcBrOptIn: true,
+  ethconfOptIn: true,
+  optinAbVariant: true,
+  submittedAt: true,
+  submittedVia: true,
+  checkedInAt: true,
+  approved: true,
+  checkedInBy: true,
+  status: true,
+  waitlistPosition: true,
+  promotedAt: true,
+} as const;
+
+// GET /api/parties/:id/guests - host guest list (editors only), snake_case DbGuest shape.
+// One indexed query on guests(party_id); no N+1.
+router.get('/:id/guests', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+    // Same rule as HostPage canEdit (owner / super admin / GPP editor / co-host with canEdit).
+    const party = await getPartyWithOwnershipCheck(id, req.userId, req.userEmail);
+    if (!party) {
+      throw new AppError('Party not found', 404, 'PARTY_NOT_FOUND');
+    }
+
+    const rows = await prisma.guest.findMany({
+      where: { partyId: id, status: { not: 'INVITED' } },
+      orderBy: { submittedAt: 'asc' },
+      select: HOST_GUEST_SELECT,
+    });
+
+    res.json({
+      guests: rows.map((g) => ({
+        id: g.id,
+        party_id: g.partyId,
+        name: g.name,
+        email: g.email ?? undefined,
+        ethereum_address: g.ethereumAddress ?? undefined,
+        roles: g.roles,
+        mailing_list_opt_in: g.mailingListOptIn,
+        dietary_restrictions: g.dietaryRestrictions,
+        liked_toppings: g.likedToppings,
+        disliked_toppings: g.dislikedToppings,
+        liked_beverages: g.likedBeverages,
+        disliked_beverages: g.dislikedBeverages,
+        pizzeria_rankings: g.pizzeriaRankings,
+        suggested_pizzerias: g.suggestedPizzerias,
+        swc_opt_in: g.swcOptIn,
+        swc_ca_opt_in: g.swcCaOptIn,
+        swc_au_opt_in: g.swcAuOptIn,
+        swc_eu_opt_in: g.swcEuOptIn,
+        swc_uk_opt_in: g.swcUkOptIn,
+        swc_br_opt_in: g.swcBrOptIn,
+        ethconf_opt_in: g.ethconfOptIn,
+        optin_ab_variant: g.optinAbVariant,
+        submitted_at: g.submittedAt,
+        submitted_via: g.submittedVia,
+        checked_in_at: g.checkedInAt,
+        approved: g.approved,
+        checked_in_by: g.checkedInBy,
+        status: g.status,
+        waitlist_position: g.waitlistPosition,
+        promoted_at: g.promotedAt,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/parties/:id/my-guest - the caller's OWN guest row at this party (self only, no editor check).
+// Replaces the anon email-filtered `isUserGuestAtParty` / `getExistingGuest` reads.
+router.get('/:id/my-guest', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const email = req.userEmail?.toLowerCase();
+    if (!email || !UUID_RE.test(id)) {
+      return res.json({ guest: null });
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { partyId: id, email: { equals: email, mode: 'insensitive' } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        ethereumAddress: true,
+        walletSource: true,
+        roles: true,
+        mailingListOptIn: true,
+        optinAbVariant: true,
+        dietaryRestrictions: true,
+        likedToppings: true,
+        dislikedToppings: true,
+        likedBeverages: true,
+        dislikedBeverages: true,
+        pizzeriaRankings: true,
+        status: true,
+        checkedInAt: true,
+        checkedInBy: true,
+      },
+    });
+
+    res.json({ guest: guest ?? null });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/parties/:id - Get party details
 router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
