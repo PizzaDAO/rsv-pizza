@@ -20,6 +20,7 @@ function toPublic(s: {
   themeClass: string | null; logoUrl: string | null; ogImageUrl: string | null;
   flyerTemplateKey: string | null;
   siteUrl: string | null; brandName: string | null;
+  createFlow: string | null; nameTemplate: string | null;
   description: string | null; eventType: string | null; publicTags: string[];
   requireApproval: boolean; hideGuests: boolean; photosEnabled: boolean; photosPublic: boolean;
   eventDate: Date | null; eventStartTime: string | null; eventEndTime: string | null;
@@ -36,6 +37,8 @@ function toPublic(s: {
     flyerTemplateKey: s.flyerTemplateKey,
     siteUrl: s.siteUrl,
     brandName: s.brandName,
+    createFlow: s.createFlow,
+    nameTemplate: s.nameTemplate,
     description: s.description,
     eventType: s.eventType,
     publicTags: s.publicTags,
@@ -52,7 +55,7 @@ function toPublic(s: {
 // Only public branding columns — never internalTags.
 const PUBLIC_SELECT = {
   id: true, slug: true, name: true, displayName: true, isActive: true,
-  themeClass: true, logoUrl: true, ogImageUrl: true, flyerTemplateKey: true, siteUrl: true, brandName: true, description: true,
+  themeClass: true, logoUrl: true, ogImageUrl: true, flyerTemplateKey: true, siteUrl: true, brandName: true, createFlow: true, nameTemplate: true, description: true,
   eventType: true, publicTags: true, requireApproval: true, hideGuests: true,
   photosEnabled: true, photosPublic: true, eventDate: true,
   eventStartTime: true, eventEndTime: true,
@@ -83,6 +86,30 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
     });
     if (!row) throw new AppError('Series not found', 404, 'NOT_FOUND');
     res.json({ series: toPublic(row) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/series/:slug/cities/:city/count — how many live events the series already has in a
+// city (soft "a party already exists in <city>" hint for the global_day create flow). Returns only
+// a number: no event data, no PII.
+router.get('/:slug/cities/:city/count', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const slug = req.params.slug?.trim();
+    const city = req.params.city?.trim();
+    if (!slug || !city) throw new AppError('slug and city are required', 400, 'VALIDATION_ERROR');
+    const series = await prisma.eventSeries.findUnique({ where: { slug }, select: { id: true, siteUrl: true, isActive: true } });
+    if (!series || !series.isActive || !series.siteUrl) throw new AppError('Series not found', 404, 'NOT_FOUND');
+    // lower(city) = lower($1): parameterized exact match (no ILIKE wildcards), uses idx_parties_city_lower.
+    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT COUNT(*)::bigint AS n FROM parties
+      WHERE event_series_id = ${series.id}::uuid
+        AND lower(city) = lower(${city.slice(0, 100)})
+        AND cancelled_at IS NULL
+        AND underboss_status IN ('pending', 'approved', 'listed')`;
+    const count = Number(rows[0]?.n ?? 0);
+    res.json({ city, count });
   } catch (error) {
     next(error);
   }

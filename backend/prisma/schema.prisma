@@ -379,6 +379,11 @@ model EventSeries {
   // build user-facing links/emails for a branded series. Null = rsv.pizza defaults.
   siteUrl   String? @map("site_url")
   brandName String? @map("brand_name")
+  // White-label create flow preset: 'global_day' | 'meetup' | 'hackathon' (validated in code,
+  // see src/lib/createPresets.ts). NULL = the generic create flow (current behavior).
+  createFlow String? @map("create_flow")
+  // Optional event-name template override. Tokens: {city} {brand} {series}. NULL = preset default.
+  nameTemplate String? @map("name_template")
 
   // Event defaults (mirror of GPP_DEFAULTS in gpp.routes.ts)
   description     String?
