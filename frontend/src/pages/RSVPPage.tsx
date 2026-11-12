@@ -5,6 +5,7 @@ import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtPart
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
 import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
+import { BRAND_FEATURES } from '../config/brandScope';
 import { DonationPublicStats } from '../types';
 import { useRSVPForm, dbPartyToRSVPData } from '../hooks/useRSVPForm';
 import { publicEventTags } from '../lib/eventTags';
@@ -49,10 +50,10 @@ function dbPartyToPublicEvent(party: DbParty, inviteCode: string): PublicEvent {
     // paccheri-58541: strip internal/control tags (e.g. 'refund', 'paid') at
     // this Supabase-direct public boundary so they never leak to RSVPers.
     eventTags: publicEventTags(party.event_tags),
-    donationEnabled: party.donation_enabled,
+    donationEnabled: BRAND_FEATURES.donations && party.donation_enabled,
     donationRecipient: party.donation_recipient,
     donationRecipientUrl: party.donation_recipient_url,
-    nftEnabled: party.nft_enabled,
+    nftEnabled: BRAND_FEATURES.nftMinting && party.nft_enabled,
     nftChain: party.nft_chain,
     turtleRolesEnabled: party.turtle_roles_enabled,
   } as PublicEvent;

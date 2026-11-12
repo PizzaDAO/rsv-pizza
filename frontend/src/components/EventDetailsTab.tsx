@@ -7,6 +7,7 @@ import { IconInput } from './IconInput';
 import { usePizza } from '../contexts/PizzaContext';
 import { updateParty, uploadEventImage, cancelParty, reinstateParty } from '../lib/supabase';
 import { mintHostTelegramConnectToken, disconnectHostTelegram } from '../lib/api';
+import { BRAND_FEATURES } from '../config/brandScope';
 import { CustomUrlInput } from './CustomUrlInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { TimePickerInput } from './TimePickerInput';
@@ -1039,7 +1040,7 @@ export const EventDetailsTab: React.FC = () => {
               />
 
               {/* NFT Settings — hidden for GPP events (managed from /admin) */}
-              {party?.eventType !== 'gpp' && (
+              {BRAND_FEATURES.nftMinting && party?.eventType !== 'gpp' && (
                 <>
                   <Checkbox
                     checked={nftEnabled}
@@ -1086,7 +1087,7 @@ export const EventDetailsTab: React.FC = () => {
         </div>
 
         {/* Donations Section */}
-        <DonationSettings />
+        {BRAND_FEATURES.donations && <DonationSettings />}
 
         {/* Hosts Section */}
         <HostsManager

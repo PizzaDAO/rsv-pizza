@@ -160,7 +160,10 @@ export function EventPage() {
           return;
         }
 
-        const foundEvent = result;
+        // White-label (D8): donations + NFT minting are hidden on branded builds.
+        const foundEvent = result && BRAND.isBranded
+          ? { ...result, donationEnabled: false, nftEnabled: false }
+          : result;
         if (foundEvent) {
           setEvent(foundEvent);
           setCanEditAsCoHost(false);

@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { useTheme } from '../contexts/ThemeContext';
 import { brandUrl } from '../config/brand';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
 
 /**
@@ -13,8 +14,16 @@ import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSe
  * Renders the series' own branding (name, description, OG image, theme class)
  * and its public events. Config comes from GET /api/series/:slug (+ /events).
  */
-export function SeriesLandingPage() {
-  const { slug = '' } = useParams<{ slug: string }>();
+interface SeriesLandingPageProps {
+  /** Use this series slug instead of the `:slug` route param (branded home). */
+  slugOverride?: string;
+  /** Show a "Create an event" call to action pointing at /new. */
+  showCreateCta?: boolean;
+}
+
+export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLandingPageProps = {}) {
+  const params = useParams<{ slug: string }>();
+  const slug = slugOverride || params.slug || '';
   const { themeClass, backgroundStyle } = useTheme();
   const [series, setSeries] = useState<PublicSeries | null>(null);
   const [events, setEvents] = useState<PublicSeriesEvent[]>([]);
@@ -100,6 +109,14 @@ export function SeriesLandingPage() {
           )}
         </header>
 
+        {showCreateCta && (
+          <div className="text-center mb-10">
+            <Link to="/new" className="btn-primary inline-flex items-center gap-2">
+              Create an event
+            </Link>
+          </div>
+        )}
+
         <section>
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             {events.length > 0 ? `${events.length} event${events.length === 1 ? '' : 's'}` : 'Events'}
@@ -134,11 +151,13 @@ export function SeriesLandingPage() {
           )}
         </section>
 
-        <div className="mt-10 text-center">
-          <Link to="/map" className="text-sm text-theme-accent underline underline-offset-2">
-            View all events on the map →
-          </Link>
-        </div>
+        {!IS_SERIES_SCOPED && (
+          <div className="mt-10 text-center">
+            <Link to="/map" className="text-sm text-theme-accent underline underline-offset-2">
+              View all events on the map →
+            </Link>
+          </div>
+        )}
       </main>
       <Footer />
     </div>

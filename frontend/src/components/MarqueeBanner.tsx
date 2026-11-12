@@ -1,4 +1,5 @@
 import React from 'react';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 
 const CONTENT = (
   <>
@@ -34,6 +35,8 @@ const Set: React.FC<{ ariaHidden?: boolean }> = ({ ariaHidden }) => (
  * Because -50% equals exactly one set's width, the loop restart is invisible.
  */
 export const MarqueeBanner: React.FC = () => {
+  // White-label series builds: this promotes PizzaDAO's GPP site; hide it.
+  if (IS_SERIES_SCOPED) return null;
   return (
     <a
       href="https://globalpizza.party"
