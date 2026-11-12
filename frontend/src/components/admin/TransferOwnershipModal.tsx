@@ -8,6 +8,7 @@
  * Mounted from HostsManager under the primary host row when the caller is an
  * admin or underboss.
  */
+import { BRAND } from '../../config/brand';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Mail, AlertCircle, ArrowRightLeft, Loader2, X } from 'lucide-react';
@@ -143,7 +144,7 @@ const TransferOwnershipModal: React.FC<TransferOwnershipModalProps> = ({
               autoComplete="off"
             />
             <p className="text-xs text-white/40 mt-1">
-              Must be an existing rsv.pizza user — they need to have logged in at least once.
+              Must be an existing {BRAND.domain} user — they need to have logged in at least once.
             </p>
           </div>
 

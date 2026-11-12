@@ -12,6 +12,15 @@
 // hardcoded here). console.warn only — never surface to the user.
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { BRAND } from '../config/brand';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
+
+/** Brand builds don't ask guests to join PizzaDAO's mailing list. */
+const HIDE_PIZZADAO_MAILING_LIST = BRAND.isBranded || IS_SERIES_SCOPED;
+
+function applyBrandFilter(rows: RsvpCheckboxConfig[]): RsvpCheckboxConfig[] {
+  return HIDE_PIZZADAO_MAILING_LIST ? rows.filter((r) => r.id !== 'mailing_list') : rows;
+}
 
 export interface RsvpCheckboxConfig {
   id: string;
@@ -221,7 +230,7 @@ export function useRsvpCheckboxConfig(partyId: string | null | undefined): {
 
         // Merge: per-party override row replaces global row entirely by id.
         if (overrides.length === 0) {
-          setConfig(global);
+          setConfig(applyBrandFilter(global));
         } else {
           const overrideById = new Map(overrides.map((r) => [r.id, r]));
           const merged: RsvpCheckboxConfig[] = global.map((g) => overrideById.get(g.id) ?? g);
@@ -230,12 +239,12 @@ export function useRsvpCheckboxConfig(partyId: string | null | undefined): {
             if (!global.some((g) => g.id === o.id)) merged.push(o);
           }
           merged.sort((a, b) => a.position - b.position);
-          setConfig(merged);
+          setConfig(applyBrandFilter(merged));
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e : new Error(String(e)));
-          setConfig(FALLBACK_CONFIG);
+          setConfig(applyBrandFilter(FALLBACK_CONFIG));
         }
       } finally {
         if (!cancelled) setLoading(false);

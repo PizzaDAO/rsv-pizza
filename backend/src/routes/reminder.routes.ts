@@ -30,7 +30,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { brand } from '../config/brand.js';
-import { siteForParty } from '../lib/siteBrand.js';
+import { siteForParty, type SiteBrand } from '../lib/siteBrand.js';
 
 const router = Router();
 
@@ -146,7 +146,7 @@ function buildEventUrl(ctx: ReminderEventCtx, baseUrl: string = 'https://rsv.piz
   return `${baseUrl}/${slug}`;
 }
 
-function buildReminderHtml(params: {
+export function buildReminderHtml(params: {
   guestName: string;
   whenText: string;
   addressText: string;
@@ -156,9 +156,11 @@ function buildReminderHtml(params: {
   venueName: string | null;
   address: string | null;
   imageUrl: string | null;
+  siteName?: string;
 }): string {
   const { guestName, whenText, addressText, partyName, eventUrl, unsubUrl, venueName, address, imageUrl } =
     params;
+  const siteName = params.siteName ?? 'RSV.Pizza'; // brand-check-ignore-line
 
   const whereHtml = venueName && address
     ? `<p style="margin: 10px 0;"><strong>Where:</strong> ${venueName}<br><span style="color: #666; font-size: 14px;">${address}</span></p>`
@@ -197,7 +199,7 @@ function buildReminderHtml(params: {
         </div>
 
         <div style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">
-          <p>You're receiving this because you RSVP'd to ${partyName} on RSV.Pizza.<br>
+          <p>You're receiving this because you RSVP'd to ${partyName} on ${siteName}.<br>
           <a href="${unsubUrl}" style="color: #999; text-decoration: underline;">Unsubscribe from reminders for this event</a></p>
         </div>
       </body>
@@ -205,13 +207,14 @@ function buildReminderHtml(params: {
   `;
 }
 
-function buildReminderText(params: {
+export function buildReminderText(params: {
   guestName: string;
   whenText: string;
   addressText: string;
   partyName: string;
   eventUrl: string;
   unsubUrl: string;
+  siteName?: string;
 }): string {
   return [
     `Hi ${params.guestName},`,
@@ -226,7 +229,7 @@ function buildReminderText(params: {
     `See you there!`,
     '',
     `--`,
-    `You're receiving this because you RSVP'd to ${params.partyName} on RSV.Pizza.`,
+    `You're receiving this because you RSVP'd to ${params.partyName} on ${params.siteName ?? 'RSV.Pizza'}.`,
     `Unsubscribe from reminders for this event: ${params.unsubUrl}`,
   ].join('\n');
 }
@@ -253,6 +256,7 @@ async function sendReminderEmail(
     venueName: ctx.partyVenueName,
     address: ctx.partyAddress,
     imageUrl: ctx.partyImageUrl,
+    siteName: site.name,
   });
   const text = buildReminderText({
     guestName: guest.name,
@@ -261,6 +265,7 @@ async function sendReminderEmail(
     partyName: ctx.partyName,
     eventUrl,
     unsubUrl,
+    siteName: site.name,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -424,7 +429,12 @@ router.get('/cron/event-reminders', async (req: Request, res: Response, next: Ne
 
 // ---------- GET / POST /api/reminders/unsubscribe ----------
 
-function renderUnsubscribePage(title: string, message: string, ok: boolean): string {
+export function renderUnsubscribePage(
+  title: string,
+  message: string,
+  ok: boolean,
+  site: { url: string; name: string } = { url: 'https://rsv.pizza', name: 'RSV.Pizza' }, // brand-check-ignore-line
+): string {
   const accent = ok ? '#4ade80' : '#ff393a';
   return `<!DOCTYPE html>
 <html lang="en">
@@ -445,7 +455,7 @@ function renderUnsubscribePage(title: string, message: string, ok: boolean): str
   <div class="card">
     <h1>${title}</h1>
     <p>${message}</p>
-    <p><a href="https://rsv.pizza">Back to RSV.Pizza</a></p>
+    <p><a href="${site.url}">Back to ${site.name}</a></p>
   </div>
 </body>
 </html>`;
@@ -483,6 +493,18 @@ async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // Brand the "Back to" link when the guest's party belongs to a branded series.
+  let pageSite: SiteBrand | undefined;
+  try {
+    const g = await prisma.guest.findUnique({
+      where: { id: guestId },
+      select: { party: { select: { eventSeriesId: true } } },
+    });
+    if (g?.party?.eventSeriesId) pageSite = await siteForParty(g.party, 'https://rsv.pizza'); // brand-check-ignore-line
+  } catch {
+    pageSite = undefined;
+  }
+
   try {
     await prisma.guest.update({
       where: { id: guestId },
@@ -516,6 +538,7 @@ async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
         'Unsubscribed',
         "You won't receive any more reminder emails for this event.",
         true,
+        pageSite,
       ),
     );
 }

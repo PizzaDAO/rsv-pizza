@@ -103,12 +103,27 @@ async function getPartyBySlug(slug: string) {
   return null;
 }
 
+/**
+ * Real slugs: custom_url / invite_code are all [A-Za-z0-9_-] (checked against prod,
+ * 2026-11). Legacy slug_aliases (old city slugs) also contain unicode letters and the
+ * odd parenthesis, e.g. "sãopaulo", "alicante(alacant)". None contain / \ : . or spaces.
+ */
+const SAFE_SLUG = /^[\p{L}\p{M}\p{N}_()-]+$/u;
+function isSafeSlug(slug: unknown): slug is string {
+  return typeof slug === 'string' && SAFE_SLUG.test(slug);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { slug } = req.query;
   const userAgent = req.headers['user-agent'];
 
   // If not a crawler, redirect to the SPA event page
+  // The slug comes straight from the URL, so only redirect for slug-shaped values:
+  // anything containing a slash, backslash, colon or dot would be an open redirect.
   if (!isCrawler(userAgent)) {
+    if (!isSafeSlug(slug)) {
+      return res.status(404).setHeader('Content-Type', 'text/plain').send('Not found');
+    }
     return res.redirect(302, `/${slug}`);
   }
 

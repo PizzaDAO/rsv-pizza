@@ -55,6 +55,7 @@ New brand vars (all optional; unset = RSV.Pizza):
 | `VITE_BRAND_TAGLINE` | `Pizza Party Planner` | |
 | `VITE_BRAND_DOMAIN` | `rsv.pizza` | bare domain, no scheme; drives `BRAND.url` and all `brandUrl()` links |
 | `VITE_BRAND_LOGO_URL` | `/logo.png` | header/favicon logo (bundle path or CDN URL) |
+| `VITE_BRAND_FAVICON_URL` | logo URL | browser-tab icon (defaults to the logo) |
 | `VITE_BRAND_OG_IMAGE` | `/logo.png` | social share image (resolved absolute on the brand domain) |
 | `VITE_BRAND_SUPPORT_EMAIL` | `help@rsv.pizza` | |
 | `VITE_BRAND_THEME_CLASS` | `` (empty) | theme override class; see §3 |

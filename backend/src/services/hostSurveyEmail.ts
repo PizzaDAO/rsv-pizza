@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
+import { brand } from '../config/brand.js';
 import { siteForParty } from '../lib/siteBrand.js';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
@@ -32,7 +33,9 @@ function buildHostSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   hostName: string | null | undefined,
   token: string,
-  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
+  baseUrl: string = 'https://rsv.pizza', // brand-check-ignore-line
+  /** Branded party only: "<Brand> team" signature + non-GPP subject. */
+  brandName?: string
 ): { subject: string; html: string } {
   const surveyUrl = `${baseUrl}/host-survey/${token}`;
 
@@ -46,7 +49,7 @@ function buildHostSurveyEmail(
           </div>`
     : '';
 
-  const subject = `How did hosting ${city} go? Tell us 🍕`;
+  const subject = `How did hosting ${brandName ? party.name : city} go? Tell us 🍕`;
 
   const html = `
       <!DOCTYPE html>
@@ -59,12 +62,12 @@ function buildHostSurveyEmail(
           ${flyerBlock}
           <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
             <h2 style="color: #1a1a2e; margin-top: 0;">Thanks for hosting, ${greeting}!</h2>
-            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear how hosting <strong>${escapeHtml(city)}</strong> went. It takes less than a minute and helps us support hosts better next time.</p>
+            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear how hosting <strong>${escapeHtml(brandName ? party.name : city)}</strong> went. It takes less than a minute and helps us support hosts better next time.</p>
           </div>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${surveyUrl}" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Take the host survey</a>
           </div>
-          <p style="color: #555; font-size: 14px;">Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>
+          <p style="color: #555; font-size: 14px;">Best,<br>${brandName ? `${escapeHtml(brandName)} team` : 'Dread Pizza Roberts<br>PizzaDAO'}</p>
         </body>
       </html>
     `;
@@ -127,7 +130,8 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
       { name: party.name, eventImageUrl: party.eventImageUrl },
       party.user.name,
       token,
-      site.url
+      site.url,
+      site.name !== brand.name ? site.name : undefined
     );
 
     const resp = await fetch(RESEND_ENDPOINT, {
