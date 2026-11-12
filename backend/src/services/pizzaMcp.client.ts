@@ -72,6 +72,11 @@ export interface PizzaMcpClientOptions {
 
 const API_PREFIX = '/api/v1';
 const DEFAULT_TIMEOUT_MS = 20_000;
+/**
+ * Shop discovery only: pizza-mcp answers from its stored shops at once, but with nothing stored for an area it asks the
+ * live place sources (OpenStreetMap), which can take much longer while they are slow. Every other call keeps 20 s.
+ */
+export const DISCOVERY_TIMEOUT_MS = 45_000;
 
 /** sha256(partyId + recommendationVersion + shopId), hex. 64 chars: inside OPOP's 8-100 limit. */
 export function orderIdempotencyKey(
@@ -184,6 +189,7 @@ export class PizzaMcpClient {
   findShops(actor: OpopActor, q: { near: string; radius_km?: number; q?: string }) {
     return this.request<{ pizzerias: OpopPizzeria[]; note?: string }>(actor, 'GET', '/pizzerias', {
       query: { near: q.near, radius_km: q.radius_km, q: q.q, fulfillment: 'pickup' },
+      timeoutMs: DISCOVERY_TIMEOUT_MS,
     });
   }
 

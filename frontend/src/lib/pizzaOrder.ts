@@ -271,7 +271,10 @@ export function usePizzaOrderingEnabled(partyId: string | undefined): boolean {
   return AI_ORDERING_ENABLED && !!partyId && enabled;
 }
 
-export const getPizzaShops = (partyId: string) => apiRequest<{ pizzerias: PizzaShop[]; note?: string }>(`${base(partyId)}/shops`);
+/** Above the backend's 45 s discovery timeout, so a slow first search of an area is not cut off at the 30 s default. */
+const SHOPS_TIMEOUT_MS = 50_000;
+export const getPizzaShops = (partyId: string) =>
+  apiRequest<{ pizzerias: PizzaShop[]; note?: string }>(`${base(partyId)}/shops`, { timeoutMs: SHOPS_TIMEOUT_MS });
 
 /** Only the facts the backend turns into order text; nothing else leaves the browser. */
 export function toRecommendationPayload(recs: PizzaRecommendation[]) {
