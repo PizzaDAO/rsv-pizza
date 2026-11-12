@@ -64,6 +64,7 @@ async function main() {
     const docs: Array<Record<string, any>> = await prisma.payoutDocument.findMany({
       where: {
         kind: 'receipt',
+        source: 'upload', // basil-14648: pizza-order drafts are not receipts
         pizzaCount: { not: null },
         OR: [{ pizzaCountSource: null }, { pizzaCountSource: { not: 'host' } }],
         ...(cursor ? { id: { gt: cursor } } : {}),
@@ -132,7 +133,7 @@ async function main() {
       const ids = toClear.slice(i, i + BATCH).map((a) => a.id as string);
       // Re-assert the scope in the WHERE so a host edit made since the read is never overwritten.
       const res = await prisma.payoutDocument.updateMany({
-        where: { id: { in: ids }, kind: 'receipt', OR: [{ pizzaCountSource: null }, { pizzaCountSource: { not: 'host' } }] },
+        where: { id: { in: ids }, kind: 'receipt', source: 'upload', OR: [{ pizzaCountSource: null }, { pizzaCountSource: { not: 'host' } }] },
         data: { pizzaCount: null, pizzaCountSource: null, pizzaCountConfidence: null },
       });
       cleared += res.count;

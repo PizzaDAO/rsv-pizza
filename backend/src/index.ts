@@ -3,6 +3,11 @@ import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './middleware/error.js';
 import { prisma } from './config/database.js';
+import { assertSecretsConfigured, warnWeakOptionalSecrets } from './config/secrets.js';
+
+// Refuse to boot in production/preview with a missing, weak or placeholder JWT_SECRET.
+assertSecretsConfigured();
+warnWeakOptionalSecrets();
 
 // Serialize BigInt as string in JSON. The only BigInt in the schema today is
 // parties.host_telegram_chat_id, which is sensitive enough that we never want
@@ -57,6 +62,9 @@ import funnelRoutes from './routes/funnel.routes.js';
 import v1Routes from './routes/v1/index.js';
 import { setupSwagger } from './swagger.js';
 import aiPhoneRoutes from './routes/ai-phone.routes.js';
+import pizzaOrderRoutes from './routes/pizza-order.routes.js'; // basil-14648: AI ordering through pizza-mcp (OPOP), allowlisted parties only
+import pizzaMcpWebhookRoutes from './routes/pizza-mcp-webhook.routes.js'; // basil-14648: signed order.updated webhook (raw body)
+import jwksRoutes from './routes/jwks.routes.js'; // basil-14648: public JWKS for the tokens we mint for pizza-mcp
 import telegramRoutes from './routes/telegram.routes.js';
 import telegramLinkCallbackRoutes from './routes/telegram-link-callback.routes.js'; // provola-58505: moltobene host-link callback
 import telegramInboundRoutes from './routes/telegram-inbound.routes.js'; // suppli-58533: moltobene host DM submissions
@@ -95,6 +103,7 @@ import suggestionsRoutes from './routes/suggestions.routes.js'; // scarpetta-584
 import savedViewsRoutes from './routes/saved-views.routes.js'; // montanara-58497: per-account saved filter views (/payments + /underboss)
 import bizdevRoutes from './routes/bizdev.routes.js'; // soppressata-72251: per-partner BizDev industry report (companies-only, no PII)
 import pizzaSubmissionRoutes, { pizzaSubmissionCronRouter } from './routes/pizza-index-submissions.routes.js';
+import pricePriorsRoutes from './routes/price-priors.routes.js'; // basil-14648 P2: signed price priors for pizza-mcp (aggregate only)
 import pizzaIndexRoutes, { publicPizzaIndexRouter } from './routes/pizza-index.routes.js'; // sfincione-40417: Pizza Price Index (admin/UB review + public aggregates)
 import adminMercuryRoutes from './routes/admin-mercury.routes.js'; // stromboli-58524: Mercury wire auto-reconciliation
 
@@ -139,6 +148,11 @@ app.use(cors({
 // express.raw() handler sees the unparsed body bytes that Svix signed.
 // bounce-rate-heuristic.
 app.use('/api/webhooks/resend', resendWebhookRouter);
+
+// basil-14648: pizza-mcp webhook ALSO needs the raw bytes (HMAC over the exact body), so it
+// mounts before express.json() too. JWKS is public and static.
+app.use('/api/pizza-mcp', pizzaMcpWebhookRoutes);
+app.use('/.well-known', jwksRoutes);
 
 // Logo-cleanup upload accepts base64-encoded images up to ~5 MB raw
 // (~6.7 MB base64). Must be registered BEFORE the global express.json()
@@ -208,6 +222,7 @@ app.use('/api/heic', heicRoutes); // taleggio-71042: public server-side HEIC->JP
 app.use('/api/photos', photoFeedRoutes); // margherita-43821: public global photos feed
 app.use('/api/payouts', payoutDocumentVoteRoutes); // napoletana-58210: vote on payout-sourced pizza photos
 app.use('/api/parties', photoRoutes); // Photo routes first (some are public)
+app.use('/api/parties', pizzaOrderRoutes); // basil-14648: AI ordering (host/co-host + pilot allowlist on every route)
 app.use('/api/parties', reelRouter); // Sizzle reels (host/co-host/admin; auth per route)
 app.use('/api/parties', hostTelegramRoutes); // Host Telegram connect/disconnect routes (host only)
 app.use('/api/parties', kitRoutes);   // Kit routes for party kit requests
@@ -251,6 +266,7 @@ app.use('/api/side', sideRoutes); // rigatoni-58919: side-event admin/UB-gated c
 app.use('/api/cities', citiesRoutes); // Public list of cities hosting GPP events
 app.use('/api/config', configRoutes); // marinara-71630 P5: admin/UB-gated city-tier + sponsorship-pricing + GPP27 reimbursement config
 app.use('/api/pizza-index/submissions', pizzaSubmissionRoutes); // sfincione-40417: public receipt submissions (anonymous allowed); before the aggregates router
+app.use('/api/pizza-index', pricePriorsRoutes); // basil-14648 P2: /priors and /priors.jws, before the aggregates router
 app.use('/api/pizza-index', publicPizzaIndexRouter); // sfincione-40417: public aggregates only (n>=3 parties, GPP 2026), cached 1h
 app.use('/api/leaderboard', publicLeaderboardRoutes); // stromboli-71593: public /leaderboard ranking GPP parties + countries
 app.use('/api/series', seriesRoutes); // white-label: public read-only event-series branding config

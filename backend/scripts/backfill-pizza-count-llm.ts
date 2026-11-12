@@ -43,7 +43,7 @@ async function main() {
     FROM payout_documents d
     JOIN parties p ON p.id = d.party_id
     JOIN pizza_line_sync s ON s.document_id = d.id
-    WHERE d.kind = 'receipt' AND d.is_duplicate = false AND d.ineligible = false
+    WHERE d.kind = 'receipt' AND d.source = 'upload' AND d.is_duplicate = false AND d.ineligible = false
       AND d.pizza_count IS NULL AND d.pizza_count_source IS NULL
       AND COALESCE(EXTRACT(YEAR FROM p.date)::int, EXTRACT(YEAR FROM d.created_at)::int) = ${args.year}
       AND EXISTS (SELECT 1 FROM pizza_line_items li WHERE li.document_id = d.id AND (li.is_bundle = true OR li.excluded_reason = 'lump_sum'))

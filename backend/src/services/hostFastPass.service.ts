@@ -80,7 +80,7 @@ export async function loadHostTrackRecord(
         },
       },
       payoutDocuments: {
-        where: { kind: 'receipt' },
+        where: { kind: 'receipt', source: 'upload' },
         select: { createdAt: true, isDuplicate: true, ineligible: true },
       },
       guests: { select: { email: true, status: true, approved: true } },
@@ -244,7 +244,7 @@ export async function loadReviewAssist(
   // Receipt reuse: same stored file, or same file name + size, already on a
   // different party. One batched query (indexed on url), matched in memory.
   const receipts = await prisma.payoutDocument.findMany({
-    where: { partyId, kind: 'receipt', isDuplicate: false },
+    where: { partyId, kind: 'receipt', source: 'upload', isDuplicate: false },
     select: { url: true, fileName: true, fileSize: true },
   });
   let reusedReceiptCount = 0;

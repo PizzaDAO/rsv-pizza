@@ -89,6 +89,7 @@ import { cleanupOrphanedUploads, normalizeIp, canonicalLocation } from '../servi
 
 process.env.SUPABASE_URL = 'https://proj.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test-key';
+process.env.PIZZA_SUBMISSION_IP_SECRET = 'test-ip-secret';
 
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 1)]);
 const PDF = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(64, 2)]);

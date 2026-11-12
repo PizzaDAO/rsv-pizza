@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './error.js';
 import { prisma } from '../config/database.js';
+import { getJwtSecret } from '../config/secrets.js';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -67,12 +68,9 @@ export const optionalAuth = (
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
-      const secret = process.env.JWT_SECRET;
-      if (secret) {
-        const decoded = jwt.verify(token, secret) as { userId: string; email: string };
-        req.userId = decoded.userId;
-        req.userEmail = decoded.email;
-      }
+      const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; email: string };
+      req.userId = decoded.userId;
+      req.userEmail = decoded.email;
     }
   } catch {
     // Silently ignore invalid tokens for optional auth
@@ -93,9 +91,10 @@ export const requireAuth = (
     }
 
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
+    let secret: string;
+    try {
+      secret = getJwtSecret();
+    } catch {
       throw new AppError('JWT secret not configured', 500, 'CONFIG_ERROR');
     }
 

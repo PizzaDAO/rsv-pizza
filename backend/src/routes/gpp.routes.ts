@@ -13,6 +13,7 @@ import { getCountryCode } from '../lib/countryCode.js';
 import { getScoringWeights } from '../lib/privateConfig.js';
 import { publicTags, isInternalTag } from '../lib/eventTags.js';
 import { brand } from '../config/brand.js';
+import { getJwtSecret } from '../config/secrets.js';
 import { countryCodeToRegion, countryNameToRegion } from '../lib/countryRegion.js';
 
 const router = Router();
@@ -569,10 +570,8 @@ async function resolveCallerIsModerator(req: Request): Promise<boolean> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return false;
   const token = authHeader.slice(7);
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return false;
   try {
-    const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; email: string };
     const email = decoded.email;
     if (!email) return false;
     return (await isAdmin(email)) || (await isUnderboss(email));
