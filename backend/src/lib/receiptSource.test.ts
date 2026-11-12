@@ -74,6 +74,7 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
       'routes/telegram-inbound.routes.ts': 1, // create
       'routes/admin-payout.routes.ts': 1, // admin doc-kind validation list
       'services/hostFastPass.service.ts': 2, // cross-party url/name reuse lookups (draft urls are unique per order)
+      'services/hostTrust.service.ts': 2, // the same cross-party url/name reuse lookups as hostFastPass
       'services/pizzaOrderSync.ts': 1, // the draft create itself (source set on the next line)
     };
     const offenders: string[] = [];

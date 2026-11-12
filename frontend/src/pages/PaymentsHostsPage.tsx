@@ -4,6 +4,7 @@
  * budget, payout or host view. The backend returns 404 until the report switch is on.
  */
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { BRAND } from '../config/brand';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, Search, ShieldX, Users } from 'lucide-react';
@@ -249,7 +250,7 @@ export function PaymentsHostsPage() {
 
   return (
     <Layout>
-      <Helmet><title>Hosts | RSV.Pizza</title></Helmet>
+      <Helmet><title>{`Hosts | ${BRAND.name}`}</title></Helmet>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <Users size={22} className="text-theme-accent" />

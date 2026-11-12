@@ -152,7 +152,7 @@ export async function loadHostTrustRows(
         },
       },
       payoutDocuments: {
-        where: { kind: 'receipt' },
+        where: { kind: 'receipt', source: 'upload' },
         select: { url: true, fileName: true, fileSize: true, createdAt: true, isDuplicate: true, ineligible: true },
       },
       guests: { select: { email: true, status: true, approved: true, checkedInAt: true } },
