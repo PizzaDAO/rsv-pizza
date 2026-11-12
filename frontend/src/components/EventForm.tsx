@@ -11,6 +11,9 @@ import { createParty as createPartyAPI, uploadEventImage } from '../lib/supabase
 import { CustomUrlInput } from './CustomUrlInput';
 import { parseDateTimeInTimezone, formatDateDisplay, formatTimeDisplay, formatTimezoneDisplay } from '../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
+import { BRAND } from '../config/brand';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
+import { fetchPublicSeries } from '../lib/api';
 
 export function EventForm() {
   const { t } = useTranslation('account');
@@ -62,6 +65,25 @@ export function EventForm() {
       console.warn('Timezone detection failed, using UTC', error);
       setTimezone('UTC');
     }
+  }, []);
+
+  // Series-scoped builds (e.g. Doge Day): pre-fill the date with the series' event date.
+  // Inert on the default build and on series without an event date. Only fills empty fields, so
+  // anything the host already typed (or changes afterwards) wins.
+  useEffect(() => {
+    if (!IS_SERIES_SCOPED) return;
+    let cancelled = false;
+    fetchPublicSeries(BRAND.seriesSlug)
+      .then(({ series }) => {
+        if (cancelled || !series.eventDate) return;
+        const d = series.eventDate.slice(0, 10);
+        setStartDate((prev) => prev || d);
+        setEndDate((prev) => prev || d);
+        if (series.eventStartTime) setStartTime((prev) => prev || series.eventStartTime!);
+        if (series.eventEndTime) setEndTime((prev) => prev || series.eventEndTime!);
+      })
+      .catch(() => { /* no prefill if the series can't be loaded */ });
+    return () => { cancelled = true; };
   }, []);
 
   // Check for pending party form data after auth redirect

@@ -21,6 +21,47 @@ interface SeriesLandingPageProps {
   showCreateCta?: boolean;
 }
 
+/** Live countdown to a series' global event day. Hooks live here (not in the page) so the
+ *  page's early returns stay hook-safe. */
+function EventCountdown({ eventDate }: { eventDate: string }) {
+  const target = new Date(eventDate).getTime();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (Number.isNaN(target)) return null;
+
+  const dateLabel = new Date(target).toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  });
+  const diff = target - now;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const days = Math.floor(diff / 86_400_000);
+  const parts = [
+    { label: 'days', value: String(days) },
+    { label: 'hours', value: pad(Math.floor(diff / 3_600_000) % 24) },
+    { label: 'minutes', value: pad(Math.floor(diff / 60_000) % 60) },
+    { label: 'seconds', value: pad(Math.floor(diff / 1000) % 60) },
+  ];
+
+  return (
+    <div className="text-center mb-10" data-testid="event-countdown">
+      <p className="text-lg font-semibold text-theme-text mb-3">{dateLabel}</p>
+      {diff > 0 && (
+        <div className="inline-flex gap-3" role="timer" aria-label={`${days} days until ${dateLabel}`}>
+          {parts.map((p) => (
+            <div key={p.label} className="min-w-[4.5rem] rounded-xl border border-theme-stroke bg-theme-surface px-3 py-3">
+              <div className="text-3xl font-bold tabular-nums text-theme-text">{p.value}</div>
+              <div className="text-xs uppercase tracking-wide text-theme-text-muted">{p.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLandingPageProps = {}) {
   const params = useParams<{ slug: string }>();
   const slug = slugOverride || params.slug || '';
@@ -84,6 +125,10 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
 
   const title = series.displayName || series.name;
   const ogImage = series.ogImageUrl || undefined;
+  // Global-day mode: a series-scoped build whose series has an event date (e.g. Doge Day).
+  // Shows a countdown and leads each party card with its city/country, like GPP.
+  const globalDay = IS_SERIES_SCOPED && !!series.eventDate;
+  const cityCount = new Set(events.map((e) => [e.city, e.country].filter(Boolean).join(', ')).filter(Boolean)).size;
 
   return (
     <div className={`min-h-screen ${pageThemeClass}`} style={backgroundStyle}>
@@ -109,6 +154,8 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
           )}
         </header>
 
+        {globalDay && series.eventDate && <EventCountdown eventDate={series.eventDate} />}
+
         {showCreateCta && (
           <div className="text-center mb-10">
             <Link to="/new" className="btn-primary inline-flex items-center gap-2">
@@ -119,7 +166,11 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
 
         <section>
           <h2 className="text-lg font-semibold text-theme-text mb-4">
-            {events.length > 0 ? `${events.length} event${events.length === 1 ? '' : 's'}` : 'Events'}
+            {events.length > 0
+              ? globalDay && cityCount > 0
+                ? `${events.length} part${events.length === 1 ? 'y' : 'ies'} in ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`
+                : `${events.length} event${events.length === 1 ? '' : 's'}`
+              : 'Events'}
           </h2>
 
           {events.length === 0 ? (
@@ -133,9 +184,19 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
                   className="block rounded-xl border border-theme-stroke hover:bg-theme-surface-hover p-4 transition-colors"
                 >
                   {/* Brand builds title cards by event name (several events can share a city); GPP keeps city titles. */}
-                  <div className="font-medium text-theme-text">{IS_SERIES_SCOPED ? e.name : (e.city || e.name)}</div>
+                  {globalDay && (e.city || e.country) ? (
+                    <>
+                      <div className="flex items-center gap-1.5 text-lg font-semibold text-theme-text">
+                        <MapPin size={16} className="shrink-0 text-theme-accent" />
+                        {[e.city, e.country].filter(Boolean).join(', ')}
+                      </div>
+                      <div className="mt-0.5 text-sm text-theme-text-secondary">{e.name}</div>
+                    </>
+                  ) : (
+                    <div className="font-medium text-theme-text">{IS_SERIES_SCOPED ? e.name : (e.city || e.name)}</div>
+                  )}
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-theme-text-muted">
-                    {e.country && (
+                    {e.country && !(globalDay && (e.city || e.country)) && (
                       <span className="inline-flex items-center gap-1"><MapPin size={12} />{IS_SERIES_SCOPED && e.city ? `${e.city}, ${e.country}` : e.country}</span>
                     )}
                     {e.date && (
