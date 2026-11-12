@@ -253,14 +253,6 @@ export async function mockUserPreferences(page: Page, preferences: any = null) {
     });
   });
 
-  // Also mock the Supabase direct query for user_preferences
-  await page.route(`**/*.supabase.co/rest/v1/user_preferences*`, (route) => {
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(preferences ? [preferences] : []),
-    });
-  });
 }
 
 /**

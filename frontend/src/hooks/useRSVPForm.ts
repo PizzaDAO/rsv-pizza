@@ -303,10 +303,10 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
 
   // ---- Effects ----
 
-  // Load saved preferences when user is logged in or when email matches
+  // Load saved preferences for logged-in users only (D6: no prefill from a typed email)
   useEffect(() => {
     async function loadSavedPreferences() {
-      const emailToCheck = user?.email || email;
+      const emailToCheck = user?.email;
       if (!emailToCheck || preferencesLoaded) return;
 
       const prefs = await getUserPreferences(emailToCheck);
@@ -325,7 +325,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     if (isOpen) {
       loadSavedPreferences();
     }
-  }, [user?.email, email, preferencesLoaded, isOpen]);
+  }, [user?.email, preferencesLoaded, isOpen]);
 
   // Auto-deselect liked toppings that conflict with dietary restrictions
   useEffect(() => {

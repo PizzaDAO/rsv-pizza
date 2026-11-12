@@ -163,12 +163,12 @@ async function setupGuestManagementMocks(page: Page) {
       return route.fallback();
     }),
 
-    // Mock Supabase guests query — return all mock guests
-    page.route('**/*.supabase.co/rest/v1/guests*', (route) => {
+    // Mock backend guests endpoint — return all mock guests
+    page.route('**/api/parties/*/guests', (route) => {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(MOCK_DB_GUESTS),
+        body: JSON.stringify({ guests: MOCK_DB_GUESTS }),
       });
     }),
 
@@ -177,9 +177,6 @@ async function setupGuestManagementMocks(page: Page) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     }),
     page.route('**/*.supabase.co/rest/v1/notable_attendees*', (route) => {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-    }),
-    page.route('**/*.supabase.co/rest/v1/user_preferences*', (route) => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     }),
 

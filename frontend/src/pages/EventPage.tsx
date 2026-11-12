@@ -7,7 +7,7 @@ import { markdownRemarkPlugins } from '../lib/safeMarkdown';
 import { MarkdownBoundary } from '../components/ErrorBoundary';
 import { MapPin, Users, Pizza, Loader2, Lock, AlertCircle, Settings, Heart, Camera, Link2, LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { verifyPartyPassword, isUserGuestAtParty, getExistingGuest, ExistingGuestData } from '../lib/supabase';
+import { verifyPartyPassword, getMyGuest, ExistingGuestData } from '../lib/supabase';
 import { getEventBySlug, PublicEvent, getPhotoStats, verifyTweet, trackLinkClick, getDonationStats } from '../lib/api';
 import { IconInput } from '../components/IconInput';
 import { HostsList, HostsAvatars } from '../components/HostsList';
@@ -171,14 +171,10 @@ export function EventPage() {
           // Check if logged-in user has already RSVP'd and fetch their data
           let hasRSVPd = false;
           if (user?.email) {
-            hasRSVPd = await isUserGuestAtParty(foundEvent.id, user.email);
+            const guestData = await getMyGuest(foundEvent.id);
+            hasRSVPd = !!guestData;
             setUserHasRSVPd(hasRSVPd);
-
-            if (hasRSVPd) {
-              const inviteCode = foundEvent.customUrl || foundEvent.inviteCode;
-              const guestData = await getExistingGuest(inviteCode, user.email);
-              setExistingGuestData(guestData);
-            }
+            if (guestData) setExistingGuestData(guestData);
           }
 
           // Check if current user is a host (primary or co-host)
@@ -852,8 +848,7 @@ export function EventPage() {
             setUserHasRSVPd(true);
             // Refetch guest data if user is logged in
             if (user?.email && event) {
-              const inviteCode = event.customUrl || event.inviteCode;
-              const guestData = await getExistingGuest(inviteCode, user.email);
+              const guestData = await getMyGuest(event.id);
               setExistingGuestData(guestData);
             }
           }}
