@@ -1013,8 +1013,8 @@ export interface DbGuest {
 // allowlist (scripts/parties-anon-columns.json, mirrored in apply-lockdown-parties-columns.cjs),
 // and must never appear in SENSITIVE_PARTY_COLUMNS. After the column lockdown a column that is
 // selected here but not granted makes EVERY party read fail with 42501. Host-only fields
-// (host_telegram_*, cancelled_by, reimbursement_cap_appeal_note, password) are merged in from
-// GET /api/parties/:id in getPartyWithGuests.
+// (host_telegram_*, cancelled_by, reimbursement_cap_appeal_note) are merged in from
+// GET /api/parties/:id in getPartyWithGuests. `password` is deliberately never sent to the client.
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, estimated_attendance, target_attendance, expected_attendance, hide_guests,
