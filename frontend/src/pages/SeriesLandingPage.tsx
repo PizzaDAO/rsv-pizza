@@ -132,10 +132,11 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
                   href={brandUrl(e.slug)}
                   className="block rounded-xl border border-theme-stroke hover:bg-theme-surface-hover p-4 transition-colors"
                 >
-                  <div className="font-medium text-theme-text">{e.city || e.name}</div>
+                  {/* Brand builds title cards by event name (several events can share a city); GPP keeps city titles. */}
+                  <div className="font-medium text-theme-text">{IS_SERIES_SCOPED ? e.name : (e.city || e.name)}</div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-theme-text-muted">
                     {e.country && (
-                      <span className="inline-flex items-center gap-1"><MapPin size={12} />{e.country}</span>
+                      <span className="inline-flex items-center gap-1"><MapPin size={12} />{IS_SERIES_SCOPED && e.city ? `${e.city}, ${e.country}` : e.country}</span>
                     )}
                     {e.date && (
                       <span className="inline-flex items-center gap-1">
