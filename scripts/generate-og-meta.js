@@ -16,15 +16,27 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 async function generateOGMetaPages() {
   console.log('Generating static HTML pages with OG meta tags...\n');
 
-  // Fetch all parties with custom URLs
-  const { data: parties, error } = await supabase
-    .from('parties')
-    .select('*')
-    .not('custom_url', 'is', null);
+  // Fetch all parties with custom URLs. Explicit allowlist (never select('*'): anon cannot read
+  // host-only columns). Paginated: PostgREST caps a single response at 1000 rows.
+  const OG_COLUMNS = 'name,date,timezone,duration,description,address,event_image_url,custom_url';
+  const PAGE = 1000;
+  const parties = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('parties')
+      .select(OG_COLUMNS)
+      .not('custom_url', 'is', null)
+      .order('custom_url', { ascending: true })
+      .range(from, from + PAGE - 1);
 
-  if (error) {
-    console.error('Error fetching parties:', error);
-    return;
+    if (error) {
+      console.error('Error fetching parties:', error);
+      // Fail the build loudly: silently shipping zero OG pages is worse than a red build.
+      process.exitCode = 1;
+      return;
+    }
+    parties.push(...data);
+    if (data.length < PAGE) break;
   }
 
   console.log(`Found ${parties.length} parties with custom URLs\n`);
@@ -146,4 +158,4 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
-generateOGMetaPages().catch(console.error);
+generateOGMetaPages().catch((err) => { console.error(err); process.exitCode = 1; });

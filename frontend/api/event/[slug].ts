@@ -30,10 +30,14 @@ function isCrawler(userAgent: string | undefined): boolean {
   );
 }
 
+// Explicit allowlist: anon must never `select=*` from parties (password and other host-only
+// columns are not granted to anon). Every column here must be in scripts/parties-anon-columns.json.
+const OG_PARTY_COLUMNS = 'name,date,duration,description,address,event_image_url,custom_url,invite_code';
+
 async function getPartyBySlug(slug: string) {
   // Try custom URL first
   let response = await fetch(
-    `${SUPABASE_URL}/rest/v1/parties?custom_url=eq.${encodeURIComponent(slug)}&select=*`,
+    `${SUPABASE_URL}/rest/v1/parties?custom_url=eq.${encodeURIComponent(slug)}&select=${OG_PARTY_COLUMNS}`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -51,7 +55,7 @@ async function getPartyBySlug(slug: string) {
 
   // Try invite_code
   response = await fetch(
-    `${SUPABASE_URL}/rest/v1/parties?invite_code=eq.${encodeURIComponent(slug)}&select=*`,
+    `${SUPABASE_URL}/rest/v1/parties?invite_code=eq.${encodeURIComponent(slug)}&select=${OG_PARTY_COLUMNS}`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -82,7 +86,7 @@ async function getPartyBySlug(slug: string) {
     const aliasData = await aliasResponse.json();
     if (aliasData && aliasData.length > 0) {
       const partyResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/parties?id=eq.${encodeURIComponent(aliasData[0].party_id)}&select=*`,
+        `${SUPABASE_URL}/rest/v1/parties?id=eq.${encodeURIComponent(aliasData[0].party_id)}&select=${OG_PARTY_COLUMNS}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,

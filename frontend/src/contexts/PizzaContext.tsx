@@ -102,6 +102,17 @@ export function dbGuestToGuest(dbGuest: db.DbGuest): Guest {
   };
 }
 
+/**
+ * Host-only fields (anon can no longer read these columns) come from GET /api/parties/:id at
+ * load time. A SAFE re-read after an update doesn't carry them, so copy them from the loaded party.
+ */
+export function preserveHostOnlyFields(next: Party, prev: Party): void {
+  next.hostTelegramChatId = prev.hostTelegramChatId;
+  next.hostTelegramLinkToken = prev.hostTelegramLinkToken;
+  next.reimbursementCapAppealNote = prev.reimbursementCapAppealNote;
+  next.cancelledBy = prev.cancelledBy;
+}
+
 // Convert database party to app party
 export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
   return {
@@ -481,6 +492,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
       updatedParty.canEdit = party.canEdit;
       updatedParty.allowedTabs = party.allowedTabs;
+      preserveHostOnlyFields(updatedParty, party);
       setParty(updatedParty);
       // Regenerate beverage recommendations with new beverage selection
       if (beverages.length > 0) {
@@ -506,6 +518,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
       updatedParty.canEdit = party.canEdit;
       updatedParty.allowedTabs = party.allowedTabs;
+      preserveHostOnlyFields(updatedParty, party);
       setParty(updatedParty);
     }
   };
@@ -519,6 +532,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Preserve canEdit/allowedTabs — re-fetch from Supabase loses these computed fields
       updatedParty.canEdit = party.canEdit;
       updatedParty.allowedTabs = party.allowedTabs;
+      preserveHostOnlyFields(updatedParty, party);
       setParty(updatedParty);
     }
   };
