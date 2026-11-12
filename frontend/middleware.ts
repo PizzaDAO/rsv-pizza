@@ -75,9 +75,6 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// Paths the original matcher excluded (kept for the gate-off case).
-const LEGACY_MATCHER_EXCLUDE = /^\/(api|_next\/static|_next\/image|assets|favicon\.ico|logo\.png|party\.svg)/;
-
 // ---- Main middleware ----
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
@@ -88,10 +85,6 @@ export default async function middleware(request: Request) {
   if (sitePassword) {
     const gated = await siteGate(request, sitePassword);
     if (gated) return gated;
-  } else if (LEGACY_MATCHER_EXCLUDE.test(pathname)) {
-    // The matcher below is broad (so the gate can cover every page); with no
-    // gate, keep the exact paths the old matcher excluded out of this middleware.
-    return next();
   }
 
   // Skip home page
@@ -285,8 +278,11 @@ export default async function middleware(request: Request) {
 }
 
 export const config = {
-  // Broad on purpose: the optional password gate must cover every page route and
-  // static HTML. With no SITE_PASSWORD the handler returns next() for the paths
-  // the previous matcher excluded (LEGACY_MATCHER_EXCLUDE), so nothing changes.
-  matcher: ['/:path*'],
+  matcher: [
+    /*
+     * Match all paths except static assets and internal routes.
+     * The middleware itself further filters by bot user-agent.
+     */
+    '/((?!api|_next/static|_next/image|assets|favicon.ico|logo.png|party.svg).*)',
+  ],
 };

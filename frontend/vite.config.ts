@@ -25,12 +25,12 @@ function brandIndexHtml(mode: string): Plugin {
     name: 'brand-index-html',
     transformIndexHtml(html) {
       return html
-        .replace('<link rel="icon" type="image/png" href="/logo.png" />', `<link rel="icon" type="image/png" href="${esc(logo)}" />`)
-        .replaceAll('RSV.Pizza - Pizza Party Planner', esc(title)) // brand-check-ignore-line
-        .replaceAll('Invite your friends to share some pizza!', esc(description))
-        .replaceAll('content="https://rsv.pizza/logo.png"', `content="${esc(og)}"`) // brand-check-ignore-line
-        .replaceAll('content="https://rsv.pizza/"', `content="${esc(origin)}/"`) // brand-check-ignore-line
-        .replace('content="RSV.Pizza" />', `content="${esc(name)}" />`); // brand-check-ignore-line
+        .replace('<link rel="icon" type="image/png" href="/logo.png" />', () => `<link rel="icon" type="image/png" href="${esc(logo)}" />`)
+        .replaceAll('RSV.Pizza - Pizza Party Planner', () => esc(title)) // brand-check-ignore-line
+        .replaceAll('Invite your friends to share some pizza!', () => esc(description))
+        .replaceAll('content="https://rsv.pizza/logo.png"', () => `content="${esc(og)}"`) // brand-check-ignore-line
+        .replaceAll('content="https://rsv.pizza/"', () => `content="${esc(origin)}/"`) // brand-check-ignore-line
+        .replace('content="RSV.Pizza" />', () => `content="${esc(name)}" />`); // brand-check-ignore-line
     },
   };
 }

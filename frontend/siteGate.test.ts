@@ -28,10 +28,21 @@ describe('siteGate', () => {
   });
 
   it('lets static assets through', async () => {
-    for (const p of ['/assets/a.js', '/logo.png', '/brands/x/logo.png', '/favicon.ico', '/cdn/a/b.jpg', '/fonts/a.woff2']) {
+    for (const p of ['/assets/a.js', '/logo.png', '/brands/team1/logo.png', '/favicon.ico', '/fonts/Hub-191-Regular.otf']) {
       expect(isOpenAsset(p)).toBe(true);
       expect(await siteGate(req(p), PW)).toBeNull();
     }
+  });
+
+  it('does not let unknown paths with extensions or prefixes bypass the gate', async () => {
+    const html = { headers: { accept: 'text/html,application/xhtml+xml' } };
+    for (const p of ['/x.png', '/brands/foo', '/_next/x', '/cdn/a.jpg', '/index.html']) {
+      expect((await siteGate(req(p, html), PW))?.status).toBe(401);
+      // also ungated-Accept requests (curl */*) for non-allowlisted paths
+      expect((await siteGate(req(p), PW))?.status).toBe(401);
+    }
+    // even an allowlisted file is gated when asked for as a page
+    expect((await siteGate(req('/logo.png', html), PW))?.status).toBe(401);
   });
 
   it('rejects a wrong password and sets no cookie', async () => {
@@ -58,7 +69,7 @@ describe('siteGate', () => {
   });
 
   it('does not allow open redirects via next', async () => {
-    for (const evil of ['//evil.com', 'https://evil.com', '/\\evil.com']) {
+    for (const evil of ['//evil.com', 'https://evil.com', '/\\evil.com', '/\t/evil.com', '/\n/evil.com', '/caf\u00e9\u4e2d', '/a\u0000b']) {
       const res = await login(PW, evil);
       expect(res?.headers.get('location')).toBe('/');
     }

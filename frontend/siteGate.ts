@@ -17,22 +17,29 @@ export const GATE_COOKIE = 'site_gate';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const HMAC_MESSAGE = 'site-gate-v1';
 
-/** Paths that bypass the gate: build assets and non-HTML static files. */
+/**
+ * Real public files (frontend/public) that may load before login, e.g. on the
+ * password form or in link previews. Exact paths only: vercel.json rewrites
+ * every unknown path to index.html, so an extension or prefix match would let
+ * the SPA shell through ungated.
+ */
+const OPEN_FILES = new Set([
+  '/logo.png',
+  '/favicon.ico',
+  '/party.svg',
+  '/fonts/Hub-191-Display.otf',
+  '/fonts/Hub-191-Regular.otf',
+  '/brands/team1/logo.png',
+  '/brands/team1/favicon.png',
+  '/brands/team1/og.png',
+  '/brands/monad/logo.png',
+  '/brands/monad/favicon.png',
+  '/brands/monad/og.png',
+]);
+
+/** Paths that bypass the gate: hashed build assets and an explicit file allowlist. */
 export function isOpenAsset(pathname: string): boolean {
-  if (
-    pathname.startsWith('/assets/') ||
-    pathname.startsWith('/_next/') ||
-    pathname.startsWith('/cdn/') ||
-    pathname.startsWith('/brands/')
-  ) {
-    return true;
-  }
-  const last = pathname.split('/').pop() || '';
-  const dot = last.lastIndexOf('.');
-  if (dot === -1) return false;
-  const ext = last.slice(dot + 1).toLowerCase();
-  // HTML (incl. /index.html) must stay gated; everything else with an extension is a static file.
-  return ext !== 'html' && ext !== 'htm';
+  return pathname.startsWith('/assets/') || OPEN_FILES.has(pathname);
 }
 
 async function hmacHex(key: string, message: string): Promise<string> {
@@ -62,6 +69,9 @@ function readCookie(header: string | null, name: string): string | null {
 function safeNext(value: unknown): string {
   if (typeof value !== 'string') return '/';
   // Same-origin relative paths only (blocks //evil.com and /\evil.com).
+  // Printable ASCII only: rejects tabs/newlines (browsers strip them, turning "/\t/evil.com" into "//evil.com")
+  // and non-Latin-1 text that would make the Location header throw.
+  if (!/^[\x20-\x7e]+$/.test(value)) return '/';
   if (!value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/';
   if (value.startsWith(GATE_PATH)) return '/';
   return value;
@@ -136,7 +146,10 @@ export async function siteGate(request: Request, password: string | undefined): 
     });
   }
 
-  if (isOpenAsset(url.pathname)) return null;
+  // Anything a browser asks for as a page is gated, whatever the path.
+  const wantsHtml = (request.headers.get('accept') || '').includes('text/html');
+  if (!wantsHtml && isOpenAsset(url.pathname)) return null;
+  if (wantsHtml && url.pathname.startsWith('/assets/')) return null;
 
   const cookie = readCookie(request.headers.get('cookie'), GATE_COOKIE);
   if (cookie && timingSafeEqual(cookie, expected)) return null;
