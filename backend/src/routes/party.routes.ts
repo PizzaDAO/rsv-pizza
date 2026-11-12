@@ -334,7 +334,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     // party-password-hash: store a bcrypt hash, never the plaintext.
     const passwordToWrite = (await secretForWrite(password)) ?? null;
 
-    const party = await prisma.party.create({
+    const createParty = (customUrlOverride?: string | null) => prisma.party.create({
       data: {
         ...(brandedSeries ? { eventSeriesId: brandedSeries.id } : {}),
         // Same as the GPP create path: the series' public tags become the party's eventTags.
@@ -382,7 +382,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
           timezone: presetOut.timezone,
           address: presetOut.address,
           addressIsCityDefault: presetOut.addressIsCityDefault,
-          customUrl: presetOut.customUrl,
+          customUrl: customUrlOverride !== undefined ? customUrlOverride : presetOut.customUrl,
           maxGuests: presetOut.maxGuests,
           requireApproval: presetOut.requireApproval,
           hideGuests: presetOut.hideGuests,
@@ -398,6 +398,19 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         user: { select: { name: true } },
       },
     });
+
+    // Generated custom URLs can lose a race (unique custom_url): retry with the next free
+    // suffix (bounded). A client-sent customUrl keeps today's behavior (error propagates).
+    const urlTries: Array<string | undefined> = presetOut?.urlGenerated ? [undefined, ...presetOut.urlRetry] : [undefined];
+    let party!: Awaited<ReturnType<typeof createParty>>;
+    for (let i = 0; ; i++) {
+      try {
+        party = await createParty(urlTries[i]);
+        break;
+      } catch (e: any) {
+        if (!(presetOut?.urlGenerated && e?.code === 'P2002' && i + 1 < urlTries.length)) throw e;
+      }
+    }
 
     // Add the host as a guest so they can bypass password protection
     if (req.userEmail) {

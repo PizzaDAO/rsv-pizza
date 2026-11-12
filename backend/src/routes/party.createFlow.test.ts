@@ -4,6 +4,7 @@ import request from 'supertest';
 
 const mockPrisma = vi.hoisted(() => ({
   party: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
+  slugAlias: { findMany: vi.fn() },
   guest: { create: vi.fn() },
   user: { findUnique: vi.fn() },
   eventSeries: { findFirst: vi.fn() },
@@ -58,6 +59,7 @@ beforeEach(() => {
   mockPrisma.user.findUnique.mockResolvedValue({ name: 'Host' });
   mockPrisma.party.count.mockResolvedValue(0);
   mockPrisma.party.findMany.mockResolvedValue([]);
+  mockPrisma.slugAlias.findMany.mockResolvedValue([]);
   mockPrisma.party.create.mockResolvedValue({ id: 'p1', name: 'P', inviteCode: 'abc', userId: 'u1', user: { name: 'Host' } });
   mockPrisma.guest.create.mockResolvedValue({ id: 'g' });
 });
@@ -109,7 +111,7 @@ describe('POST /api/parties create-flow presets', () => {
       expect((await post({ ...body, timezone: 'Mars/Base' })).status).toBe(400);
       expect((await post({ ...body, timezone: undefined })).status).toBe(400);
       expect((await post({ seriesSlug: 'doge', timezone: 'America/Chicago' })).status).toBe(400);
-      expect((await post({ ...body, startTime: '20:00', endTime: '19:00' })).status).toBe(400);
+      expect((await post({ ...body, startTime: '20:00', endTime: '25:00' })).status).toBe(400);
       expect(mockPrisma.party.create).not.toHaveBeenCalled();
     });
 
@@ -135,6 +137,38 @@ describe('POST /api/parties create-flow presets', () => {
       await post({ ...body, placeId: 'abc', venueName: 'Joes' });
       expect(created().addressIsCityDefault).toBe(false);
     });
+    it('explicit addressIsCityDefault=true wins over placeId (Places city pick)', async () => {
+      await post({ ...body, placeId: 'abc', addressIsCityDefault: true });
+      expect(created().addressIsCityDefault).toBe(true);
+    });
+
+    it('end at/before start rolls to the next day (20:00 -> 00:30)', async () => {
+      await post({ ...body, startTime: '20:00', endTime: '00:30' });
+      expect(created().date.toISOString()).toBe('2027-11-03T01:00:00.000Z');
+      expect(created().endTime.toISOString()).toBe('2027-11-03T05:30:00.000Z');
+      expect(created().duration).toBe(4.5);
+    });
+
+    it('skips custom URLs held by slug aliases', async () => {
+      mockPrisma.slugAlias.findMany.mockResolvedValue([{ oldSlug: 'doge-austin' }]);
+      await post(body);
+      expect(created().customUrl).toBe('doge-austin-2');
+    });
+
+    it('retries the next suffix on a unique-violation race for a generated URL', async () => {
+      mockPrisma.party.create
+        .mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }))
+        .mockResolvedValueOnce({ id: 'p1', name: 'P', inviteCode: 'abc', userId: 'u1', user: { name: 'Host' } });
+      const res = await post(body);
+      expect(res.status).toBe(201);
+      expect(mockPrisma.party.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.party.create.mock.calls[0][0].data.customUrl).toBe('doge-austin');
+      expect(mockPrisma.party.create.mock.calls[1][0].data.customUrl).toBe('doge-austin-2');
+    });
+
+    it('capacity must be a bounded integer', async () => {
+      for (const maxGuests of [1.5, 1e9, -3]) expect((await post({ ...body, maxGuests })).status).toBe(400);
+    });
   });
 
   describe('meetup (Team1)', () => {
@@ -159,6 +193,15 @@ describe('POST /api/parties create-flow presets', () => {
       expect(created().addressIsCityDefault).toBe(true);
       expect(created().endTime.toISOString()).toBe('2027-03-04T21:00:00.000Z');
       expect((await post({ ...body, endTime: '2027-03-04T10:00:00Z' })).status).toBe(400);
+    });
+
+    it('caps a meetup at 24h and ignores a client duration', async () => {
+      expect((await post({ ...body, endTime: '2027-03-06T18:30:00Z' })).status).toBe(400);
+      await post({ ...body, endTime: '2027-03-04T21:30:00Z', duration: 999 });
+      expect(created().duration).toBe(3);
+      mockPrisma.party.create.mockClear();
+      await post({ ...body, duration: 999 });
+      expect(created().duration).toBeNull();
     });
 
     it('requires a date', async () => {
@@ -196,6 +239,7 @@ describe('POST /api/parties create-flow presets', () => {
       expect((await post({ ...body, maxGuests: undefined })).status).toBe(400);
       expect((await post({ ...body, endTime: '2027-03-30T23:00:00Z' })).status).toBe(400);
       expect((await post({ ...body, endTime: '2027-03-04T14:00:00Z' })).status).toBe(400);
+      expect((await post({ ...body, endTime: undefined, duration: 5 })).status).toBe(400); // end required
       expect(mockPrisma.party.create).not.toHaveBeenCalled();
     });
   });

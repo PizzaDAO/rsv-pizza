@@ -38,6 +38,9 @@ export interface BrandCreateOverrides {
   eventImageUrl: string | null;
   description: string | null;
   pinnedApps: string[];
+  /** Remaining free generated custom-URL candidates, for P2002 retries (empty if client-sent). */
+  urlRetry: string[];
+  urlGenerated: boolean;
   externalLinks?: Array<{ label: string; url: string }>;
 }
 
@@ -55,7 +58,8 @@ function postedLocalHM(v: unknown, tz: string): string | null {
   if (typeof v !== 'string' || !v.trim()) return null;
   if (parseHM(v)) return v.trim();
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? null : localHM(d, tz);
+  if (Number.isNaN(d.getTime())) throw bad('Invalid start or end time');
+  return localHM(d, tz);
 }
 
 function cleanExternalLinks(v: unknown): Array<{ label: string; url: string }> | undefined {
@@ -136,29 +140,37 @@ export async function applyCreatePreset(
     if (!s || !e) throw bad('Invalid start or end time');
     date = localToUTC(y, mo, d, s.h, s.m, timezone as string);
     endTime = localToUTC(y, mo, d, e.h, e.m, timezone as string);
-    if (endTime <= date) throw bad('End time must be after start time');
+    // End at/before start on the locked day = ends after midnight: roll to the next day (<= +24h).
+    if (endTime <= date) endTime = new Date(endTime.getTime() + DAY_MS);
+    if (endTime <= date || endTime.getTime() - date.getTime() > DAY_MS) throw bad('End time must be after start time');
   } else {
     if (!body.date) throw bad('Start date and time are required');
     date = new Date(body.date);
     if (Number.isNaN(date.getTime())) throw bad('Invalid start date');
+    if (preset.dateMode === 'range' && !body.endTime) throw bad('End date and time are required');
     if (body.endTime) {
       endTime = new Date(body.endTime);
       if (Number.isNaN(endTime.getTime())) throw bad('Invalid end date');
       if (endTime <= date) throw bad('End time must be after start time');
-      if (preset.maxSpanDays && endTime.getTime() - date.getTime() > preset.maxSpanDays * DAY_MS) {
-        throw bad(`Events can span at most ${preset.maxSpanDays} days`);
+      const span = endTime.getTime() - date.getTime();
+      const maxSpan = preset.maxSpanDays ? preset.maxSpanDays * DAY_MS : preset.dateMode === 'single' ? DAY_MS : null;
+      if (maxSpan && span > maxSpan) {
+        throw bad(preset.dateMode === 'single' ? 'A meetup must end within 24 hours of its start' : `Events can span at most ${preset.maxSpanDays} days`);
       }
     }
   }
-  const duration = endTime && date ? Math.round(((endTime.getTime() - date.getTime()) / 3_600_000) * 100) / 100 : (body.duration || null);
+  // Never trust a client-sent duration for presets: derive from start/end.
+  const duration = endTime && date ? Math.round(((endTime.getTime() - date.getTime()) / 3_600_000) * 100) / 100 : null;
 
   // ---- capacity ----
   const maxGuestsNum = body.maxGuests ? Number(body.maxGuests) : null;
-  if (maxGuestsNum !== null && (!Number.isFinite(maxGuestsNum) || maxGuestsNum < 1)) throw bad('Capacity must be a positive number');
+  if (maxGuestsNum !== null && (!Number.isInteger(maxGuestsNum) || maxGuestsNum < 1 || maxGuestsNum > 100000)) throw bad('Capacity must be a whole number between 1 and 100000');
   if (preset.requireMaxGuests && !maxGuestsNum) throw bad('Capacity is required');
 
   // ---- custom URL: client value wins (route validates it); else <series>-<city> with collision suffixes ----
   let customUrl: string | null = body.customUrl || null;
+  let urlRetry: string[] = [];
+  let urlGenerated = false;
   if (!customUrl && series.slug) {
     const candidates = customUrlCandidates(series.slug, city || '');
     if (candidates.length) {
@@ -166,8 +178,18 @@ export async function applyCreatePreset(
         where: { customUrl: { in: candidates } },
         select: { customUrl: true },
       });
-      const takenSet = new Set(taken.map((t: { customUrl: string | null }) => t.customUrl));
-      customUrl = candidates.find((c) => !takenSet.has(c)) ?? null;
+      const aliases = await prisma.slugAlias.findMany({
+        where: { oldSlug: { in: candidates } },
+        select: { oldSlug: true },
+      });
+      const takenSet = new Set<string | null>([
+        ...taken.map((t: { customUrl: string | null }) => t.customUrl),
+        ...aliases.map((a: { oldSlug: string }) => a.oldSlug),
+      ]);
+      const free = candidates.filter((c) => !takenSet.has(c));
+      customUrl = free[0] ?? null;
+      urlRetry = free.slice(1);
+      urlGenerated = true;
     }
   }
 
@@ -175,9 +197,13 @@ export async function applyCreatePreset(
   const pick = <T>(bodyVal: unknown, presetVal: T | undefined, seriesVal: T | undefined, fallback: T): T =>
     typeof bodyVal === 'boolean' ? (bodyVal as unknown as T) : presetVal !== undefined ? presetVal : seriesVal !== undefined ? seriesVal : fallback;
 
-  const cityOnly = preset.dateMode === 'fixed'
-    ? !body.venueName && !body.placeId
-    : body.addressIsCityDefault === true;
+  // An explicit addressIsCityDefault=true wins (a Places city pick carries a place_id but is still
+  // "city only"). global_day without the flag falls back to "no venue/place sent".
+  const cityOnly = body.addressIsCityDefault === true
+    ? true
+    : preset.dateMode === 'fixed'
+      ? !body.venueName && !body.placeId
+      : false;
 
   const pinnedApps = [...preset.pinnedApps];
   if (series.flyerTemplateKey && !pinnedApps.includes('flyer')) pinnedApps.push('flyer');
@@ -199,6 +225,8 @@ export async function applyCreatePreset(
     eventImageUrl: body.eventImageUrl || series.ogImageUrl || null,
     description: (typeof body.description === 'string' && body.description.trim()) || series.description || null,
     pinnedApps,
+    urlRetry,
+    urlGenerated,
     externalLinks: cleanExternalLinks(body.externalLinks),
   };
 }

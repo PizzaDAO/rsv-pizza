@@ -319,8 +319,17 @@ export function AdminSeriesPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteUrl', e.target.value)} />
               <IconInput icon={Type} placeholder="Brand name (e.g. Team1 Pizza)" value={form.brandName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('brandName', e.target.value)} />
-              <IconInput icon={Tag} placeholder="Create flow: global_day | meetup | hackathon (blank = generic form)" value={form.createFlow}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('createFlow', e.target.value)} />
+              <select
+                value={form.createFlow}
+                onChange={(e) => set('createFlow', e.target.value)}
+                aria-label="Create flow"
+                className="w-full bg-theme-surface border border-theme-stroke rounded-xl px-3 py-3 text-theme-text"
+              >
+                <option value="">Create flow: generic form (default)</option>
+                <option value="global_day">global_day (fixed-date, city-first)</option>
+                <option value="meetup">meetup (host picks date)</option>
+                <option value="hackathon">hackathon (multi-day, applications)</option>
+              </select>
               <IconInput icon={Type} placeholder="Event name template (e.g. {series} {city}; blank = preset default)" value={form.nameTemplate}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('nameTemplate', e.target.value)} />
               <IconInput icon={Tag} placeholder="Public tags (comma-separated)" value={form.publicTags}

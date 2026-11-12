@@ -101,14 +101,14 @@ router.get('/:slug/cities/:city/count', async (req: Request, res: Response, next
     if (!slug || !city) throw new AppError('slug and city are required', 400, 'VALIDATION_ERROR');
     const series = await prisma.eventSeries.findUnique({ where: { slug }, select: { id: true, siteUrl: true, isActive: true } });
     if (!series || !series.isActive || !series.siteUrl) throw new AppError('Series not found', 404, 'NOT_FOUND');
-    const count = await prisma.party.count({
-      where: {
-        eventSeriesId: series.id,
-        city: { equals: city.slice(0, 100), mode: 'insensitive' },
-        cancelledAt: null,
-        underbossStatus: { in: ['pending', 'approved', 'listed'] },
-      },
-    });
+    // lower(city) = lower($1): parameterized exact match (no ILIKE wildcards), uses idx_parties_city_lower.
+    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT COUNT(*)::bigint AS n FROM parties
+      WHERE event_series_id = ${series.id}::uuid
+        AND lower(city) = lower(${city.slice(0, 100)})
+        AND cancelled_at IS NULL
+        AND underboss_status IN ('pending', 'approved', 'listed')`;
+    const count = Number(rows[0]?.n ?? 0);
     res.json({ city, count });
   } catch (error) {
     next(error);

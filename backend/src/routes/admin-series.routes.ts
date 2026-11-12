@@ -60,6 +60,13 @@ function createFlowOrNull(v: unknown): string | null {
   }
   return s;
 }
+/** 'HH:MM' (00:00-23:59) or null. */
+function hmOrNull(v: unknown): string | null {
+  const s = str(v);
+  if (!s) return null;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) throw new AppError('Times must be HH:MM (24-hour)', 400, 'VALIDATION_ERROR');
+  return s;
+}
 function strArr(v: unknown): string[] | undefined {
   if (!Array.isArray(v)) return undefined;
   return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => (x as string).trim());
@@ -112,8 +119,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         hideGuests: bool(b.hideGuests) ?? false,
         photosEnabled: bool(b.photosEnabled) ?? true,
         photosPublic: bool(b.photosPublic) ?? true,
-        eventStartTime: str(b.eventStartTime) ?? null,
-        eventEndTime: str(b.eventEndTime) ?? null,
+        eventStartTime: hmOrNull(b.eventStartTime),
+        eventEndTime: hmOrNull(b.eventEndTime),
         eventDate: b.eventDate ? new Date(b.eventDate as string) : null,
         fundingWalletAddress: str(b.fundingWalletAddress) ?? null,
       },
@@ -150,8 +157,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.hideGuests !== undefined) data.hideGuests = bool(b.hideGuests);
     if (b.photosEnabled !== undefined) data.photosEnabled = bool(b.photosEnabled);
     if (b.photosPublic !== undefined) data.photosPublic = bool(b.photosPublic);
-    if (b.eventStartTime !== undefined) data.eventStartTime = str(b.eventStartTime) ?? null;
-    if (b.eventEndTime !== undefined) data.eventEndTime = str(b.eventEndTime) ?? null;
+    if (b.eventStartTime !== undefined) data.eventStartTime = hmOrNull(b.eventStartTime);
+    if (b.eventEndTime !== undefined) data.eventEndTime = hmOrNull(b.eventEndTime);
     if (b.eventDate !== undefined) data.eventDate = b.eventDate ? new Date(b.eventDate as string) : null;
     if (b.fundingWalletAddress !== undefined) data.fundingWalletAddress = str(b.fundingWalletAddress) ?? null;
 
