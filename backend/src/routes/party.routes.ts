@@ -101,6 +101,7 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       // porchetta-81402: surface cancellation state so HomePage can render
       // the "Cancelled" pill on cancelled events.
       cancelledAt: true,
+      eventSeriesId: true,
       _count: { select: { guests: true } },
     };
 
@@ -188,6 +189,7 @@ router.get('/my-events', async (req: AuthRequest, res: Response, next: NextFunct
       role: p.role,
       // porchetta-81402: HomePage renders a "Cancelled" pill from this field.
       cancelledAt: p.cancelledAt ? p.cancelledAt.toISOString() : null,
+      eventSeriesId: p.eventSeriesId ?? null,
     }));
 
     // Sort by date ascending (nulls last)

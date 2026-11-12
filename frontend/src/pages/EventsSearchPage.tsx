@@ -8,6 +8,7 @@ import { IconInput } from '../components/IconInput';
 import { fetchPublicEventsForSearch } from '../lib/api';
 import { GPP_REGIONS } from '../types';
 import { formatShortDate } from '../utils/dateUtils';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 import {
   EMPTY_FILTERS,
   EventSearchFilters,
@@ -117,7 +118,8 @@ export function EventsSearchPage() {
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Search by event name, city, venue, or country"
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${IS_SERIES_SCOPED ? '' : 'lg:grid-cols-4'}`}>
+            {!IS_SERIES_SCOPED && (
             <select
               aria-label="Continent"
               className={SELECT_CLASS}
@@ -129,6 +131,7 @@ export function EventsSearchPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            )}
             <select
               aria-label="Country"
               className={SELECT_CLASS}
@@ -140,6 +143,7 @@ export function EventsSearchPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            {!IS_SERIES_SCOPED && (
             <select
               aria-label="Region"
               className={SELECT_CLASS}
@@ -151,6 +155,7 @@ export function EventsSearchPage() {
                 <option key={r.id} value={r.id}>{r.label}</option>
               ))}
             </select>
+            )}
             <select
               aria-label="City"
               className={SELECT_CLASS}
