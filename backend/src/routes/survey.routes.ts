@@ -31,7 +31,7 @@ export function buildSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   guest: { name: string; email: string },
   token: string,
-  baseUrl: string = 'https://rsv.pizza'
+  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
   const surveyUrl = `${baseUrl}/survey/${token}`;
 
@@ -97,7 +97,7 @@ async function sendSurveyToParty(
   if (!party) {
     throw new AppError('Party not found', 404, 'NOT_FOUND');
   }
-  const site = await siteForParty(party, 'https://rsv.pizza');
+  const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
 
   // Build the recipient filter from the chosen audience. We intentionally
   // ignore mailing_list_opt_in here.

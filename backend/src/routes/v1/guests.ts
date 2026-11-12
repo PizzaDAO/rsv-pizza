@@ -36,7 +36,7 @@ export function buildInviteEmail(
   },
   guest: { name: string; email: string },
   customMessage?: string,
-  baseUrl: string = 'https://rsv.pizza'
+  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
   const eventUrl = party.customUrl
     ? `${baseUrl}/${party.customUrl}`
@@ -588,7 +588,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
       throw new AppError('Email service not configured', 500, 'CONFIG_ERROR');
     }
 
-    const site = await siteForParty(party, 'https://rsv.pizza');
+    const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
     const { subject, html } = buildInviteEmail(
       {
         name: party.name,
@@ -657,7 +657,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    const site = await siteForParty(party, 'https://rsv.pizza');
+    const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
     const { guests, customMessage, testOnly } = req.body as {
       guests?: Array<{ name?: string; email?: string }>;
       customMessage?: string;

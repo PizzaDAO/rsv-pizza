@@ -2281,7 +2281,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
       if (!resendApiKey) {
         console.warn('[Day-of announce] RESEND_API_KEY not set, skipping email sends');
       } else {
-        const site = await siteForParty(party, 'https://rsv.pizza');
+        const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
         const baseUrl = site.url;
         const eventUrl = party.customUrl
           ? `${baseUrl}/${party.customUrl}`

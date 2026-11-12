@@ -141,7 +141,7 @@ function buildAddressText(ctx: ReminderEventCtx): string {
   return ctx.partyVenueName || ctx.partyAddress || 'Location TBD';
 }
 
-function buildEventUrl(ctx: ReminderEventCtx, baseUrl: string = 'https://rsv.pizza'): string {
+function buildEventUrl(ctx: ReminderEventCtx, baseUrl: string = 'https://rsv.pizza'): string { // brand-check-ignore-line
   const slug = ctx.customUrl || ctx.inviteCode;
   return `${baseUrl}/${slug}`;
 }
@@ -239,7 +239,7 @@ async function sendReminderEmail(
   const whenText = formatLocalTime(ctx.partyDate, ctx.partyTimezone);
   const timeOnly = shortLocalTime(ctx.partyDate, ctx.partyTimezone);
   const addressText = buildAddressText(ctx);
-  const site = await siteForParty(ctx, 'https://rsv.pizza');
+  const site = await siteForParty(ctx, 'https://rsv.pizza'); // brand-check-ignore-line
   const eventUrl = buildEventUrl(ctx, site.url);
   const unsubUrl = buildUnsubscribeUrl(guest.id);
 

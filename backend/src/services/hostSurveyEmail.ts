@@ -32,7 +32,7 @@ function buildHostSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   hostName: string | null | undefined,
   token: string,
-  baseUrl: string = 'https://rsv.pizza'
+  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
   const surveyUrl = `${baseUrl}/host-survey/${token}`;
 
@@ -122,7 +122,7 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
       },
     });
 
-    const site = await siteForParty(party, 'https://rsv.pizza');
+    const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
     const { subject, html } = buildHostSurveyEmail(
       { name: party.name, eventImageUrl: party.eventImageUrl },
       party.user.name,

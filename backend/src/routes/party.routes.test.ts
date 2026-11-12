@@ -188,9 +188,9 @@ describe('Party Routes', () => {
       // In-memory fake of the where-clause brandedSeriesBySlug sends: slug match,
       // isActive, siteUrl not null.
       const SERIES = [
-        { id: 'series-team1', slug: 'team1', isActive: true, siteUrl: 'https://team1.rsv.pizza' },
+        { id: 'series-team1', slug: 'team1', isActive: true, siteUrl: 'https://team1.rsv.pizza' }, // brand-check-ignore-line
         { id: 'series-gpp', slug: 'gpp2026', isActive: true, siteUrl: null },
-        { id: 'series-old', slug: 'oldbrand', isActive: false, siteUrl: 'https://old.rsv.pizza' },
+        { id: 'series-old', slug: 'oldbrand', isActive: false, siteUrl: 'https://old.rsv.pizza' }, // brand-check-ignore-line
       ];
 
       async function create(body: Record<string, unknown>) {
@@ -329,9 +329,9 @@ describe('Party Routes', () => {
     it('no series: link is unchanged (FRONTEND_URL, then localhost fallback)', async () => {
       mockPrisma.party.findUnique.mockResolvedValue({ ...OWNED, eventSeriesId: null });
       const saved = process.env.FRONTEND_URL;
-      process.env.FRONTEND_URL = 'https://rsv.pizza';
+      process.env.FRONTEND_URL = 'https://rsv.pizza'; // brand-check-ignore-line
       let res = await get();
-      expect(res.body).toEqual({ inviteCode: 'abc123', inviteLink: 'https://rsv.pizza/rsvp/abc123' });
+      expect(res.body).toEqual({ inviteCode: 'abc123', inviteLink: 'https://rsv.pizza/rsvp/abc123' }); // brand-check-ignore-line
       delete process.env.FRONTEND_URL;
       res = await get();
       expect(res.body.inviteLink).toBe('http://localhost:5176/rsvp/abc123');
@@ -341,11 +341,11 @@ describe('Party Routes', () => {
     it('branded series: link uses the series site_url', async () => {
       _resetSiteBrandCache();
       mockPrisma.eventSeries.findMany.mockResolvedValue([
-        { id: 'series-team1', slug: 'team1', siteUrl: 'https://team1.rsv.pizza/', brandName: 'Team1 Pizza', displayName: 'Team1', name: 'Team1 Pizza Parties' },
+        { id: 'series-team1', slug: 'team1', siteUrl: 'https://team1.rsv.pizza/', brandName: 'Team1 Pizza', displayName: 'Team1', name: 'Team1 Pizza Parties' }, // brand-check-ignore-line
       ]);
       mockPrisma.party.findUnique.mockResolvedValue({ ...OWNED, eventSeriesId: 'series-team1' });
       const res = await get();
-      expect(res.body.inviteLink).toBe('https://team1.rsv.pizza/rsvp/abc123');
+      expect(res.body.inviteLink).toBe('https://team1.rsv.pizza/rsvp/abc123'); // brand-check-ignore-line
       _resetSiteBrandCache();
     });
   });

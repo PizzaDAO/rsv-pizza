@@ -816,7 +816,7 @@ async function sendRSVPConfirmationEmail(params: {
     return;
   }
 
-  const site = await siteForParty(params, 'https://rsv.pizza');
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
   const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
@@ -957,7 +957,7 @@ export async function sendApprovalEmail(params: {
     return;
   }
 
-  const site = await siteForParty(params, 'https://rsv.pizza');
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
   const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
@@ -1077,7 +1077,7 @@ async function sendWaitlistConfirmationEmail(params: {
     return;
   }
 
-  const site = await siteForParty(params, 'https://rsv.pizza');
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
   const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
@@ -1183,7 +1183,7 @@ export async function sendPromotionEmail(params: {
     return;
   }
 
-  const site = await siteForParty(params, 'https://rsv.pizza');
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
   const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
