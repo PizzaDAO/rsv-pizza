@@ -1,12 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { FlyerGenerator } from './FlyerGenerator';
 import { usePizza } from '../../contexts/PizzaContext';
+import { BrandFlyerNotice } from '../generative/BrandFlyerNotice';
+import { IS_SERIES_SCOPED } from '../../config/brandScope';
 
 export function FlyerTab({ sponsorLogoOnly }: { sponsorLogoOnly?: boolean } = {}) {
   const { t } = useTranslation('host');
   const { party } = usePizza();
 
   if (!party) return null;
+
+  // White-label builds: FlyerGenerator renders GPP art only, so never show it here.
+  if (IS_SERIES_SCOPED) return <BrandFlyerNotice />;
 
   // Only show for GPP events
   if (party.eventType !== 'gpp') {

@@ -203,6 +203,11 @@ export interface CreatePartyData {
   coHosts?: any[];
   shareToUnlock?: boolean;
   shareTweetText?: string | null;
+  // Streamlined series create flow. Sent only when defined, so generic callers
+  // produce byte-identical bodies.
+  endTime?: string;
+  addressIsCityDefault?: boolean;
+  externalLinks?: Array<{label: string; url: string}>;
 }
 
 export interface UpdatePartyData {
@@ -340,6 +345,9 @@ export async function createPartyApi(data: CreatePartyData) {
       coHosts: data.coHosts,
       shareToUnlock: data.shareToUnlock,
       shareTweetText: data.shareTweetText,
+      ...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
+      ...(data.addressIsCityDefault !== undefined ? { addressIsCityDefault: data.addressIsCityDefault } : {}),
+      ...(data.externalLinks !== undefined ? { externalLinks: data.externalLinks } : {}),
     },
   });
 }

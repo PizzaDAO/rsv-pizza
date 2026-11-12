@@ -99,6 +99,11 @@ export interface PublicSeries {
   eventDate: string | null;
   eventStartTime: string | null;
   eventEndTime: string | null;
+  // Streamlined create flow (wl-create-backend). Optional: absent on older backends,
+  // which means the generic create form.
+  createFlow?: string | null;
+  nameTemplate?: string | null;
+  brandName?: string | null;
 }
 
 export interface PublicSeriesEvent {
