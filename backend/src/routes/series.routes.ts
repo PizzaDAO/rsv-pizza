@@ -19,6 +19,7 @@ function toPublic(s: {
   id: string; slug: string; name: string; displayName: string; isActive: boolean;
   themeClass: string | null; logoUrl: string | null; ogImageUrl: string | null;
   flyerTemplateKey: string | null;
+  siteUrl: string | null; brandName: string | null;
   description: string | null; eventType: string | null; publicTags: string[];
   requireApproval: boolean; hideGuests: boolean; photosEnabled: boolean; photosPublic: boolean;
   eventDate: Date | null; eventStartTime: string | null; eventEndTime: string | null;
@@ -33,6 +34,8 @@ function toPublic(s: {
     logoUrl: s.logoUrl,
     ogImageUrl: s.ogImageUrl,
     flyerTemplateKey: s.flyerTemplateKey,
+    siteUrl: s.siteUrl,
+    brandName: s.brandName,
     description: s.description,
     eventType: s.eventType,
     publicTags: s.publicTags,
@@ -49,7 +52,7 @@ function toPublic(s: {
 // Only public branding columns — never internalTags.
 const PUBLIC_SELECT = {
   id: true, slug: true, name: true, displayName: true, isActive: true,
-  themeClass: true, logoUrl: true, ogImageUrl: true, flyerTemplateKey: true, description: true,
+  themeClass: true, logoUrl: true, ogImageUrl: true, flyerTemplateKey: true, siteUrl: true, brandName: true, description: true,
   eventType: true, publicTags: true, requireApproval: true, hideGuests: true,
   photosEnabled: true, photosPublic: true, eventDate: true,
   eventStartTime: true, eventEndTime: true,

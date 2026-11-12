@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, Shield, Plus, Trash2, Tag, Type, Image, Palette, Wallet, FileText, Calendar, Clock } from 'lucide-react';
+import { Loader2, Shield, Plus, Trash2, Tag, Type, Image, Palette, Wallet, Globe, FileText, Calendar, Clock } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { IconInput } from '../components/IconInput';
@@ -33,6 +33,8 @@ const BLANK_FORM = {
   logoUrl: '',
   ogImageUrl: '',
   flyerTemplateKey: '',
+  siteUrl: '',
+  brandName: '',
   fundingWalletAddress: '',
   publicTags: '',
   eventDate: '',
@@ -56,6 +58,8 @@ function seriesToForm(s: EventSeries): FormState {
     logoUrl: s.logoUrl ?? '',
     ogImageUrl: s.ogImageUrl ?? '',
     flyerTemplateKey: s.flyerTemplateKey ?? '',
+    siteUrl: s.siteUrl ?? '',
+    brandName: s.brandName ?? '',
     fundingWalletAddress: s.fundingWalletAddress ?? '',
     publicTags: (s.publicTags ?? []).join(', '),
     eventDate: s.eventDate ? s.eventDate.slice(0, 10) : '',
@@ -79,6 +83,8 @@ function formToInput(f: FormState): SeriesInput {
     logoUrl: f.logoUrl.trim() || null,
     ogImageUrl: f.ogImageUrl.trim() || null,
     flyerTemplateKey: f.flyerTemplateKey.trim() || null,
+    siteUrl: f.siteUrl.trim() || null,
+    brandName: f.brandName.trim() || null,
     fundingWalletAddress: f.fundingWalletAddress.trim() || null,
     publicTags: f.publicTags.split(',').map((t) => t.trim()).filter(Boolean),
     eventDate: f.eventDate || null,
@@ -282,6 +288,10 @@ export function AdminSeriesPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('ogImageUrl', e.target.value)} />
               <IconInput icon={Image} placeholder="Flyer template key (e.g. gpp, avax)" value={form.flyerTemplateKey}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('flyerTemplateKey', e.target.value)} />
+              <IconInput icon={Globe} placeholder="Site URL (https origin, e.g. https://events.example.com)" value={form.siteUrl}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteUrl', e.target.value)} />
+              <IconInput icon={Type} placeholder="Brand name (e.g. Team1 Pizza)" value={form.brandName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('brandName', e.target.value)} />
               <IconInput icon={Tag} placeholder="Public tags (comma-separated)" value={form.publicTags}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('publicTags', e.target.value)} />
               <IconInput icon={Wallet} placeholder="Reimbursement wallet (config only — no auto-send yet)" value={form.fundingWalletAddress}
