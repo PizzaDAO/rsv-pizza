@@ -43,7 +43,7 @@ function siteUrlOrNull(v: unknown): string | null {
   let u: URL;
   try { u = new URL(s); } catch { throw new AppError('siteUrl must be a valid URL', 400, 'VALIDATION_ERROR'); }
   if (u.protocol !== 'https:' || u.pathname !== '/' || u.search || u.hash || u.username || u.password || s.replace(/\/$/, '') !== u.origin) {
-    throw new AppError('siteUrl must be an https origin with no path (e.g. https://team1.rsv.pizza)', 400, 'VALIDATION_ERROR');
+    throw new AppError('siteUrl must be an https origin with no path (e.g. https://events.example.com)', 400, 'VALIDATION_ERROR');
   }
   return u.origin;
 }

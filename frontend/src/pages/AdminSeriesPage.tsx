@@ -288,7 +288,7 @@ export function AdminSeriesPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('ogImageUrl', e.target.value)} />
               <IconInput icon={Image} placeholder="Flyer template key (e.g. gpp, avax)" value={form.flyerTemplateKey}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('flyerTemplateKey', e.target.value)} />
-              <IconInput icon={Globe} placeholder="Site URL (https origin, e.g. https://team1.rsv.pizza)" value={form.siteUrl}
+              <IconInput icon={Globe} placeholder="Site URL (https origin, e.g. https://events.example.com)" value={form.siteUrl}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteUrl', e.target.value)} />
               <IconInput icon={Type} placeholder="Brand name (e.g. Team1 Pizza)" value={form.brandName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('brandName', e.target.value)} />
