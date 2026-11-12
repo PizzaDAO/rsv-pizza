@@ -12,7 +12,7 @@ import { BRAND } from '../config/brand';
  * old www host). og:image is resolved to an absolute URL on the brand domain.
  */
 const title = `${BRAND.name} - ${BRAND.tagline}`;
-const description = 'Invite your friends to share some pizza!';
+const description = BRAND.description;
 const ogImage = /^https?:\/\//i.test(BRAND.ogImageUrl)
   ? BRAND.ogImageUrl
   : `${BRAND.url}/${BRAND.ogImageUrl.replace(/^\/+/, '')}`;

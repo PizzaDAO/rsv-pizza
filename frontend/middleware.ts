@@ -1,4 +1,5 @@
 import { next } from '@vercel/edge';
+import { siteGate } from './siteGate';
 
 // ---- Bot detection ----
 const CRAWLER_USER_AGENTS = [
@@ -79,6 +80,13 @@ export default async function middleware(request: Request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
+  // Optional password gate (white-label previews). Inert unless SITE_PASSWORD is set.
+  const sitePassword = process.env.SITE_PASSWORD;
+  if (sitePassword) {
+    const gated = await siteGate(request, sitePassword);
+    if (gated) return gated;
+  }
+
   // Skip home page
   if (pathname === '/') return next();
 
@@ -118,7 +126,10 @@ export default async function middleware(request: Request) {
     if (!event) return next();
 
     // ---- Build meta tag values (mirrors EventPage.tsx logic) ----
-    const baseUrl = 'https://www.rsv.pizza';
+    // Default keeps today's www host; a brand deploy sets VITE_BRAND_DOMAIN.
+    const brandDomain = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
+    const baseUrl = brandDomain ? `https://${brandDomain}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
+    const brandName = (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
     const pageUrl = `${baseUrl}/${slug}`;
 
     const ogImageUrl = (() => {
@@ -189,7 +200,7 @@ export default async function middleware(request: Request) {
     // Replace <title>
     html = html.replace(
       /<title>[^<]*<\/title>/,
-      `<title>${escapeHtml(metaTitle)} | RSV.Pizza</title>`
+      `<title>${escapeHtml(metaTitle)} | ${escapeHtml(brandName)}</title>`
     );
 
     // Replace meta name="title"
@@ -269,9 +280,12 @@ export default async function middleware(request: Request) {
 export const config = {
   matcher: [
     /*
-     * Match all paths except static assets and internal routes.
+     * Match all paths except built assets and API functions.
      * The middleware itself further filters by bot user-agent.
+     * Prefixes end in "/" on purpose: vercel.json rewrites every other unknown
+     * path to index.html, so a looser prefix (e.g. "/apixyz", "/logo.pngx")
+     * would serve the app past the password gate.
      */
-    '/((?!api|_next/static|_next/image|assets|favicon.ico|logo.png|party.svg).*)',
+    '/((?!api/|assets/).*)',
   ],
 };

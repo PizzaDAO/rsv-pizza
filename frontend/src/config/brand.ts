@@ -41,6 +41,15 @@ export const BRAND = {
    * existing `.gpp-theme` class.
    */
   themeClass: (env.VITE_BRAND_THEME_CLASS || '').trim(),
+  /** Default meta description (BrandHelmet + index.html). */
+  description: (env.VITE_BRAND_DESCRIPTION || 'Invite your friends to share some pizza!').trim(),
+  /**
+   * Event series this build is scoped to (white-label deploys). Empty string =
+   * unscoped (rsv.pizza). Not consumed yet; wired up in a later PR.
+   */
+  seriesSlug: (env.VITE_BRAND_SERIES_SLUG || '').trim(),
+  /** True when this build is a white-label (non-default) brand. */
+  isBranded: !!(env.VITE_BRAND_NAME || env.VITE_BRAND_DOMAIN || '').trim(),
 } as const;
 
 /** Build an absolute brand URL: brandUrl('my-party') -> https://rsv.pizza/my-party */
