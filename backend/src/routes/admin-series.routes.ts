@@ -36,6 +36,17 @@ router.use(requireSuperAdmin);
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
 }
+/** https origin only (no path/query/hash), normalised to `https://host[:port]`; null if absent. */
+function siteUrlOrNull(v: unknown): string | null {
+  const s = str(v);
+  if (!s) return null;
+  let u: URL;
+  try { u = new URL(s); } catch { throw new AppError('siteUrl must be a valid URL', 400, 'VALIDATION_ERROR'); }
+  if (u.protocol !== 'https:' || u.pathname !== '/' || u.search || u.hash || u.username || u.password || s.replace(/\/$/, '') !== u.origin) {
+    throw new AppError('siteUrl must be an https origin with no path (e.g. https://team1.rsv.pizza)', 400, 'VALIDATION_ERROR');
+  }
+  return u.origin;
+}
 function strArr(v: unknown): string[] | undefined {
   if (!Array.isArray(v)) return undefined;
   return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => (x as string).trim());
@@ -76,6 +87,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         logoUrl: str(b.logoUrl) ?? null,
         ogImageUrl: str(b.ogImageUrl) ?? null,
         flyerTemplateKey: str(b.flyerTemplateKey) ?? null,
+        siteUrl: siteUrlOrNull(b.siteUrl),
+        brandName: str(b.brandName) ?? null,
         description: str(b.description) ?? null,
         eventType: str(b.eventType) ?? null,
         publicTags: strArr(b.publicTags) ?? [],
@@ -110,6 +123,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
     if (b.logoUrl !== undefined) data.logoUrl = str(b.logoUrl) ?? null;
     if (b.ogImageUrl !== undefined) data.ogImageUrl = str(b.ogImageUrl) ?? null;
     if (b.flyerTemplateKey !== undefined) data.flyerTemplateKey = str(b.flyerTemplateKey) ?? null;
+    if (b.siteUrl !== undefined) data.siteUrl = siteUrlOrNull(b.siteUrl);
+    if (b.brandName !== undefined) data.brandName = str(b.brandName) ?? null;
     if (b.description !== undefined) data.description = str(b.description) ?? null;
     if (b.eventType !== undefined) data.eventType = str(b.eventType) ?? null;
     if (b.publicTags !== undefined) data.publicTags = strArr(b.publicTags) ?? [];

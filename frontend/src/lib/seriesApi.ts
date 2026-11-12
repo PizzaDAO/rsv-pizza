@@ -15,6 +15,8 @@ export interface EventSeries {
   logoUrl: string | null;
   ogImageUrl: string | null;
   flyerTemplateKey: string | null;
+  siteUrl: string | null;
+  brandName: string | null;
   description: string | null;
   eventType: string | null;
   publicTags: string[];
@@ -116,6 +118,8 @@ export interface PublicSeriesEvent {
 export interface PublicSeriesWithId extends PublicSeries {
   id: string;
   flyerTemplateKey: string | null;
+  siteUrl: string | null;
+  brandName: string | null;
 }
 
 export async function fetchPublicSeriesList(): Promise<{ series: PublicSeriesWithId[] }> {

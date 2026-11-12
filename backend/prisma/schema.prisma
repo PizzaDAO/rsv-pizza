@@ -375,6 +375,10 @@ model EventSeries {
   // Which generative flyer template this series uses (key into the frontend flyer
   // template registry, e.g. 'gpp' | 'avax'). Null = default behavior.
   flyerTemplateKey String? @map("flyer_template_key")
+  // White-label: the brand's own site origin (https, no path) and display name, used to
+  // build user-facing links/emails for a branded series. Null = rsv.pizza defaults.
+  siteUrl   String? @map("site_url")
+  brandName String? @map("brand_name")
 
   // Event defaults (mirror of GPP_DEFAULTS in gpp.routes.ts)
   description     String?
