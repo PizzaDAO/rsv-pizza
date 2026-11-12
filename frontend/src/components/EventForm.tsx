@@ -68,7 +68,7 @@ export function EventForm() {
   }, []);
 
   // Series-scoped builds (e.g. Doge Day): pre-fill the date with the series' event date.
-  // Inert on rsv.pizza and on series without an event date. Only fills empty fields, so
+  // Inert on the default build and on series without an event date. Only fills empty fields, so
   // anything the host already typed (or changes afterwards) wins.
   useEffect(() => {
     if (!IS_SERIES_SCOPED) return;

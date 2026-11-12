@@ -738,7 +738,7 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
   --color-scheme: dark;
 }
 
-/* Doge Day (Own The Doge, doge.rsv.pizza). Palette from ownthedoge.com: brand dark brown
+/* Doge Day (Own The Doge brand site). Palette from ownthedoge.com: brand dark brown
  * #302d25, cream #f4ebd7, Doge gold #F2A73A. Dark theme: cream text on dark brown, gold
  * accent. Gold is too light for the global white button text, so primary buttons use the
  * brand brown on gold (>= 6:1); gold text on the dark backgrounds is ~8:1. */
