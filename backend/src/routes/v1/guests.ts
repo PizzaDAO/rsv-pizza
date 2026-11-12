@@ -6,7 +6,7 @@ import { AppError } from '../../middleware/error.js';
 import { triggerWebhook } from '../../services/webhook.service.js';
 import { setDeleteContext } from '../../helpers/auditContext.js';
 import { canUserAccessTab } from '../../helpers/partyAccess.js';
-import { brand } from '../../config/brand.js';
+import { siteForParty } from '../../lib/siteBrand.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :partyId
 
@@ -35,9 +35,9 @@ export function buildInviteEmail(
     eventImageUrl?: string | null;
   },
   guest: { name: string; email: string },
-  customMessage?: string
+  customMessage?: string,
+  baseUrl: string = 'https://rsv.pizza'
 ): { subject: string; html: string } {
-  const baseUrl = 'https://rsv.pizza';
   const eventUrl = party.customUrl
     ? `${baseUrl}/${party.customUrl}`
     : `${baseUrl}/${party.inviteCode}`;
@@ -588,6 +588,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
       throw new AppError('Email service not configured', 500, 'CONFIG_ERROR');
     }
 
+    const site = await siteForParty(party, 'https://rsv.pizza');
     const { subject, html } = buildInviteEmail(
       {
         name: party.name,
@@ -598,7 +599,9 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
         timezone: party.timezone,
         eventImageUrl: party.eventImageUrl,
       },
-      { name: guest.name, email: guest.email }
+      { name: guest.name, email: guest.email },
+      undefined,
+      site.url
     );
 
     const response = await fetch('https://api.resend.com/emails', {
@@ -608,7 +611,7 @@ router.post('/:guestId/send-invite', requireApiKey(SCOPES.GUESTS_WRITE), async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: brand.fromEmail,
+        from: site.fromEmail,
         to: [guest.email],
         subject,
         html,
@@ -654,6 +657,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
+    const site = await siteForParty(party, 'https://rsv.pizza');
     const { guests, customMessage, testOnly } = req.body as {
       guests?: Array<{ name?: string; email?: string }>;
       customMessage?: string;
@@ -752,7 +756,8 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   eventImageUrl: party.eventImageUrl,
                 },
                 { name, email: normalizedEmail },
-                customMessage
+                customMessage,
+                site.url
               );
 
               const resp = await fetch('https://api.resend.com/emails', {
@@ -762,7 +767,7 @@ router.post('/bulk-invite', requireAuth, async (req: AuthRequest, res: Response,
                   Authorization: `Bearer ${resendApiKey}`,
                 },
                 body: JSON.stringify({
-                  from: brand.fromEmail,
+                  from: site.fromEmail,
                   to: [normalizedEmail],
                   subject,
                   html,

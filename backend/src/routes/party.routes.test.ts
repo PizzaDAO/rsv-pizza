@@ -29,6 +29,10 @@ const mockPrisma = vi.hoisted(() => ({
     findUnique: vi.fn(),
     findMany: vi.fn(),
   },
+  eventSeries: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+  },
   admin: {
     findUnique: vi.fn(),
   },
@@ -116,6 +120,7 @@ vi.mock('../middleware/auth.js', () => ({
 }));
 
 import partyRoutes from './party.routes.js';
+import { _resetSiteBrandCache } from '../lib/siteBrand.js';
 import { errorHandler } from '../middleware/error.js';
 
 function createTestApp() {
@@ -177,6 +182,71 @@ describe('Party Routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.party).toBeDefined();
       expect(mockPrisma.party.create).toHaveBeenCalledTimes(1);
+    });
+
+    describe('seriesSlug stamping (white-label)', () => {
+      // In-memory fake of the where-clause brandedSeriesBySlug sends: slug match,
+      // isActive, siteUrl not null.
+      const SERIES = [
+        { id: 'series-team1', slug: 'team1', isActive: true, siteUrl: 'https://team1.rsv.pizza' },
+        { id: 'series-gpp', slug: 'gpp2026', isActive: true, siteUrl: null },
+        { id: 'series-old', slug: 'oldbrand', isActive: false, siteUrl: 'https://old.rsv.pizza' },
+      ];
+
+      async function create(body: Record<string, unknown>) {
+        mockPrisma.eventSeries.findFirst.mockImplementation(async ({ where }: any) =>
+          SERIES.find(
+            (r) =>
+              r.slug === where.slug &&
+              (where.isActive === undefined || r.isActive === where.isActive) &&
+              (where.siteUrl?.not === null ? r.siteUrl !== null : true)
+          ) ?? null
+        );
+        mockPrisma.user.findUnique.mockResolvedValue({ name: 'Host User' });
+        mockPrisma.party.create.mockResolvedValue({
+          id: PARTY_ID, name: 'P', inviteCode: 'abc123', userId: HOST_USER_ID, user: { name: 'Host User' },
+        });
+        mockPrisma.guest.create.mockResolvedValue({ id: 'g' });
+        const res = await request(createTestApp())
+          .post('/api/parties')
+          .set('Authorization', `Bearer ${makeToken(HOST_USER_ID, HOST_EMAIL)}`)
+          .send({ name: 'P', ...body });
+        expect(res.status).toBe(201);
+        return mockPrisma.party.create.mock.calls[0][0].data;
+      }
+
+      it('stamps eventSeriesId for an active series with site_url', async () => {
+        const data = await create({ seriesSlug: 'team1' });
+        expect(data.eventSeriesId).toBe('series-team1');
+        expect(data.eventType).toBeUndefined();
+      });
+
+      it('ignores gpp2026 (site_url NULL)', async () => {
+        const data = await create({ seriesSlug: 'gpp2026' });
+        expect('eventSeriesId' in data).toBe(false);
+      });
+
+      it('ignores an inactive branded series', async () => {
+        const data = await create({ seriesSlug: 'oldbrand' });
+        expect('eventSeriesId' in data).toBe(false);
+      });
+
+      it('ignores an unknown series', async () => {
+        const data = await create({ seriesSlug: 'nope' });
+        expect('eventSeriesId' in data).toBe(false);
+      });
+
+      it('ignores a non-string seriesSlug without querying', async () => {
+        const data = await create({ seriesSlug: { slug: 'team1' } });
+        expect('eventSeriesId' in data).toBe(false);
+        expect(mockPrisma.eventSeries.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('no seriesSlug: data has no eventSeriesId and no series lookup', async () => {
+        const data = await create({});
+        expect('eventSeriesId' in data).toBe(false);
+        expect(mockPrisma.eventSeries.findFirst).not.toHaveBeenCalled();
+      });
     });
 
     it('validates custom URL format', async () => {
@@ -246,6 +316,37 @@ describe('Party Routes', () => {
         .send({ name: 'Test Party' });
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /api/parties/:id/invite-link (white-label base URL)', () => {
+    const OWNED = { id: PARTY_ID, userId: HOST_USER_ID, coHosts: [], inviteCode: 'abc123' };
+    const get = () =>
+      request(createTestApp())
+        .get(`/api/parties/${PARTY_ID}/invite-link`)
+        .set('Authorization', `Bearer ${makeToken(HOST_USER_ID, HOST_EMAIL)}`);
+
+    it('no series: link is unchanged (FRONTEND_URL, then localhost fallback)', async () => {
+      mockPrisma.party.findUnique.mockResolvedValue({ ...OWNED, eventSeriesId: null });
+      const saved = process.env.FRONTEND_URL;
+      process.env.FRONTEND_URL = 'https://rsv.pizza';
+      let res = await get();
+      expect(res.body).toEqual({ inviteCode: 'abc123', inviteLink: 'https://rsv.pizza/rsvp/abc123' });
+      delete process.env.FRONTEND_URL;
+      res = await get();
+      expect(res.body.inviteLink).toBe('http://localhost:5176/rsvp/abc123');
+      if (saved !== undefined) process.env.FRONTEND_URL = saved;
+    });
+
+    it('branded series: link uses the series site_url', async () => {
+      _resetSiteBrandCache();
+      mockPrisma.eventSeries.findMany.mockResolvedValue([
+        { id: 'series-team1', slug: 'team1', siteUrl: 'https://team1.rsv.pizza/', brandName: 'Team1 Pizza', displayName: 'Team1', name: 'Team1 Pizza Parties' },
+      ]);
+      mockPrisma.party.findUnique.mockResolvedValue({ ...OWNED, eventSeriesId: 'series-team1' });
+      const res = await get();
+      expect(res.body.inviteLink).toBe('https://team1.rsv.pizza/rsvp/abc123');
+      _resetSiteBrandCache();
     });
   });
 

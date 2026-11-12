@@ -4,24 +4,24 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
-import { brand } from '../config/brand.js';
+import { siteForOrigin, type SiteBrand } from '../lib/siteBrand.js';
 import { getJwtSecret } from '../config/secrets.js';
 
 const router = Router();
 
 // Helper function to send magic link email
-async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string) {
+async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
   const emailHtml = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sign In to RSV.Pizza</title>
+        <title>Sign In to ${site.name}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSV.Pizza</h1>
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to ${site.name}</h1>
           <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
         </div>
 
@@ -47,9 +47,9 @@ async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: str
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [email],
-      subject: `RSV.Pizza Code ${code}`,
+      subject: `${site.name} Code ${code}`,
       html: emailHtml,
     }),
   });
@@ -113,7 +113,9 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     });
 
     // Send magic link email
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176';
+    // Exact-match the request Origin against registered series site_urls; else today's FRONTEND_URL.
+    const site = await siteForOrigin(req.get('origin'), process.env.FRONTEND_URL || 'http://localhost:5176');
+    const frontendUrl = site.url;
     const magicLinkUrl = `${frontendUrl}/auth/verify?token=${token}`;
 
     // Log for development
@@ -129,7 +131,7 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     if (resendApiKey) {
       try {
         // mushroom-48468: use normalized lowercase for `to:` field
-        await sendMagicLinkEmail(normalized, magicLinkUrl, code, resendApiKey);
+        await sendMagicLinkEmail(normalized, magicLinkUrl, code, resendApiKey, site);
       } catch (emailError) {
         console.error('Failed to send magic link email:', emailError);
         // Don't fail the request if email fails

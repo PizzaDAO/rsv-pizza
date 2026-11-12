@@ -1,0 +1,376 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`no-series emails are byte-identical to pre-change output > RSVP confirmation (send-confirmation) 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RSVP Confirmed</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="https://cdn.example.com/flyer.png" alt="Snapshot Party" style="max-width: 100%; border-radius: 12px;" />
+        </div>
+  
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Going!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP is confirmed</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> Snapshot Party</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> Monday, June 15, 2026 at 2:00 PM</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> 123 Pizza St</p>
+        </div>
+
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
+        </div>
+  
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://rsv.pizza/snap-party" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>See you there, Gus!</p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "You're going to Snapshot Party! 🍕",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > approval email 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RSVP Approved</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 You're Approved!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">Your RSVP has been confirmed</p>
+        </div>
+
+        <div style="background: #d4edda; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #28a745;">
+          <p style="color: #155724; font-size: 16px; margin: 0; font-weight: 600;">Great news! The host has approved your RSVP.</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <img src="https://cdn.example.com/flyer.png" alt="Snapshot Party" style="width: 100%; max-width: 540px; height: auto; border-radius: 12px; display: block; margin: 0 auto 20px auto;" />
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> Snapshot Party</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> Monday, June 15, 2026 at 2:00 PM</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> The Venue<br><span style="color: #666; font-size: 14px;">123 Pizza St</span></p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://rsv.pizza/abc123" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>See you there, Gus!</p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "You're approved for Snapshot Party! 🍕",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > guest survey email 1`] = `
+{
+  "html": "
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>How was the event?</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://cdn.example.com/flyer.png" alt="Snapshot Party" style="max-width: 100%; border-radius: 12px;" />
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="color: #1a1a2e; margin-top: 0;">Thanks for coming, Gus!</h2>
+            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear what you thought of <strong>Snapshot Party</strong>. It takes less than a minute and helps us throw better PizzaDAO events.</p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://rsv.pizza/survey/tok-1" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Take the survey</a>
+          </div>
+        </body>
+      </html>
+    ",
+  "subject": "How was Snapshot Party? Tell us 🍕",
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > host survey email 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>How did hosting go?</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://cdn.example.com/flyer.png" alt="Global Pizza Party Snapville" style="max-width: 100%; border-radius: 12px;" />
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="color: #1a1a2e; margin-top: 0;">Thanks for hosting, Hosty!</h2>
+            <p style="margin: 0; color: #333; font-size: 15px;">We'd love to hear how hosting <strong>Snapville</strong> went. It takes less than a minute and helps us support hosts better next time.</p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://rsv.pizza/host-survey/host-tok" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Take the host survey</a>
+          </div>
+          <p style="color: #555; font-size: 14px;">Best,<br>Dread Pizza Roberts<br>PizzaDAO</p>
+        </body>
+      </html>
+    ",
+  "subject": "How did hosting Snapville go? Tell us 🍕",
+  "to": [
+    "host@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > magic link (no Origin header) 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In to RSV.Pizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSV.Pizza</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
+          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">550000</div>
+          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
+          <p style="margin-top: 20px;">
+            If you didn't request this email, you can safely ignore it.
+          </p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "RSV.Pizza Code 550000",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > magic link (spoofed Origin) 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In to RSV.Pizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSV.Pizza</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
+          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">550000</div>
+          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
+          <p style="margin-top: 20px;">
+            If you didn't request this email, you can safely ignore it.
+          </p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "RSV.Pizza Code 550000",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > magic link (unregistered Origin) 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In to RSV.Pizza</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">🍕 Sign In to RSV.Pizza</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 16px; margin: 0;">Enter this code to sign in:</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px 20px; border-radius: 12px; text-align: center; margin: 30px 0;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666; font-weight: 600;">YOUR SIGN-IN CODE</p>
+          <div style="font-size: 48px; font-weight: 700; letter-spacing: 8px; color: #ff393a; margin: 10px 0;">550000</div>
+          <p style="margin: 15px 0 0 0; font-size: 13px; color: #999;">This code expires in 15 minutes</p>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 13px;">
+          <p style="margin-top: 20px;">
+            If you didn't request this email, you can safely ignore it.
+          </p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "RSV.Pizza Code 550000",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > public API invite email 1`] = `
+{
+  "html": "
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>You're invited!</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://cdn.example.com/flyer.png" alt="Snapshot Party" style="max-width: 100%; border-radius: 12px;" />
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="color: #1a1a2e; margin-top: 0;">Snapshot Party</h2>
+            <p><strong>When:</strong> Monday, June 15, 2026 at 2:00 PM</p>
+            <p><strong>Where:</strong> 123 Pizza St</p>
+          </div>
+          
+          <div style="background: #fff; border-left: 4px solid #ff393a; padding: 16px 20px; border-radius: 6px; margin: 20px 0; white-space: pre-wrap;">
+            <p style="margin: 0; color: #333; font-size: 15px;">See you there</p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://rsv.pizza/abc123" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">RSVP Now</a>
+          </div>
+        </body>
+      </html>
+    ",
+  "subject": "You're invited to Snapshot Party!",
+}
+`;
+
+exports[`no-series emails are byte-identical to pre-change output > waitlist promotion email 1`] = `
+{
+  "from": "RSV.Pizza <noreply@rsv.pizza>",
+  "html": "
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>You're In!</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="https://cdn.example.com/flyer.png" alt="Snapshot Party" style="max-width: 100%; border-radius: 12px;" />
+        </div>
+  
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 40px 20px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #ffffff; font-size: 32px; margin: 0 0 10px 0;">You're In!</h1>
+          <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0;">A spot opened up just for you</p>
+        </div>
+
+        <div style="background: #d4edda; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #28a745;">
+          <p style="color: #155724; font-size: 16px; margin: 0; font-weight: 600;">
+            Great news! You've been moved from the waitlist to confirmed!
+          </p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+          <h2 style="color: #1a1a2e; margin-top: 0; margin-bottom: 20px;">Event Details</h2>
+          <p style="margin: 10px 0;"><strong>Event:</strong> Snapshot Party</p>
+          <p style="margin: 10px 0;"><strong>When:</strong> Monday, June 15, 2026 at 2:00 PM</p>
+          <p style="margin: 10px 0;"><strong>Where:</strong> 123 Pizza St</p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h3 style="color: #1a1a2e; margin-top: 0; margin-bottom: 15px;">Your Check-In QR Code</h3>
+          <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Show this at the event for quick check-in</p>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Frsv.pizza%2Fcheckin%2Fabc123%2Fg1&bgcolor=f9f9f9&color=1a1a2e" alt="Check-in QR Code" style="width: 200px; height: 200px; border-radius: 8px;" />
+          <p style="color: #999; font-size: 12px; margin-top: 15px;">Guest: Gus</p>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://rsv.pizza/snap-party" style="display: inline-block; background: #ff393a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Event Page</a>
+        </div>
+
+        <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+          <p>See you there, Gus!</p>
+        </div>
+      </body>
+    </html>
+  ",
+  "subject": "You're in! A spot opened up at Snapshot Party",
+  "to": [
+    "guest@example.com",
+  ],
+}
+`;

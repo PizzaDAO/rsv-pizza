@@ -30,6 +30,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
 
 const router = Router();
 
@@ -104,6 +105,7 @@ interface ReminderEventCtx {
   partyImageUrl: string | null;
   inviteCode: string;
   customUrl: string | null;
+  eventSeriesId?: string | null;
 }
 
 interface ReminderGuestRow {
@@ -139,9 +141,9 @@ function buildAddressText(ctx: ReminderEventCtx): string {
   return ctx.partyVenueName || ctx.partyAddress || 'Location TBD';
 }
 
-function buildEventUrl(ctx: ReminderEventCtx): string {
+function buildEventUrl(ctx: ReminderEventCtx, baseUrl: string = 'https://rsv.pizza'): string {
   const slug = ctx.customUrl || ctx.inviteCode;
-  return `https://rsv.pizza/${slug}`;
+  return `${baseUrl}/${slug}`;
 }
 
 function buildReminderHtml(params: {
@@ -237,7 +239,8 @@ async function sendReminderEmail(
   const whenText = formatLocalTime(ctx.partyDate, ctx.partyTimezone);
   const timeOnly = shortLocalTime(ctx.partyDate, ctx.partyTimezone);
   const addressText = buildAddressText(ctx);
-  const eventUrl = buildEventUrl(ctx);
+  const site = await siteForParty(ctx, 'https://rsv.pizza');
+  const eventUrl = buildEventUrl(ctx, site.url);
   const unsubUrl = buildUnsubscribeUrl(guest.id);
 
   const html = buildReminderHtml({
@@ -267,7 +270,7 @@ async function sendReminderEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [guest.email],
       subject: `Tonight at ${timeOnly}: ${ctx.partyName} 🍕`,
       html,
@@ -338,6 +341,7 @@ router.get('/cron/event-reminders', async (req: Request, res: Response, next: Ne
         eventImageUrl: true,
         inviteCode: true,
         customUrl: true,
+        eventSeriesId: true,
       },
     });
 
@@ -384,6 +388,7 @@ router.get('/cron/event-reminders', async (req: Request, res: Response, next: Ne
           partyImageUrl: party.eventImageUrl,
           inviteCode: party.inviteCode,
           customUrl: party.customUrl,
+          eventSeriesId: party.eventSeriesId,
         },
         resendApiKey,
       );
