@@ -57,7 +57,7 @@ function HostPageContent() {
   const { inviteCode, tab } = useParams<{ inviteCode: string; tab?: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { loadParty, mergeParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty } = usePizza();
+  const { loadParty, mergeParty, party, partyLoading, guests, generateRecommendations, orderExpectedGuests, setOrderExpectedGuests, setGuests, setParty, guestsLoadFailed, retryGuests } = usePizza();
   const [error, setError] = useState<string | null>(null);
   const [loadedCode, setLoadedCode] = useState<string | null>(null);
 
@@ -321,6 +321,15 @@ function HostPageContent() {
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
+
+        {guestsLoadFailed && (
+          <div className="mb-4 px-4 py-3 rounded-lg border border-[#ff393a]/50 bg-[#ff393a]/10 text-sm text-theme-text flex items-center justify-between gap-3" data-testid="guests-load-failed">
+            <span>{t('errors.guestsLoadFailed')}</span>
+            <button type="button" className="underline font-medium" onClick={() => { void retryGuests(); }}>
+              {t('errors.guestsRetry')}
+            </button>
+          </div>
+        )}
 
         {/* Brand builds: new events are listed publicly only after admin approval. */}
         {IS_SERIES_SCOPED && party.underbossStatus === 'pending' && (

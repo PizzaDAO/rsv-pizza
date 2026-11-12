@@ -12,6 +12,8 @@
     "partyNotFound": "Party Not Found",
     "partyNotFoundDesc": "Party not found. The link may be invalid or expired.",
     "unableToLoad": "Unable to load party.",
+    "guestsLoadFailed": "Couldn't load the guest list. This is not an empty list.",
+    "guestsRetry": "Retry",
     "goHome": "Go to Home"
   },
   "pizza": {

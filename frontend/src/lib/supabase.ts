@@ -1483,8 +1483,10 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
 }
 
 // Host-only guest list via the backend (editor-gated). Anon can no longer read `guests`.
-// Returns [] when logged out, when the caller can't edit the party (401/403/404), or on error.
-async function fetchAllGuests(partyId: string): Promise<DbGuest[]> {
+// Returns [] when logged out or when the caller can't edit the party (401/403/404: a legit
+// "no list for you"). Returns null on a transient failure (429, 5xx, network, bad body) so
+// callers keep their previous state instead of blanking the list.
+export async function fetchAllGuests(partyId: string): Promise<DbGuest[] | null> {
   const token = localStorage.getItem('authToken');
   if (!token) return [];
   try {
@@ -1492,13 +1494,14 @@ async function fetchAllGuests(partyId: string): Promise<DbGuest[]> {
     const response = await fetch(`${apiUrl}/api/parties/${partyId}/guests`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
-    if (!response.ok) return [];
+    if (response.status === 401 || response.status === 403 || response.status === 404) return [];
+    if (!response.ok) return null;
     const body = await response.json();
     const list = Array.isArray(body) ? body : body?.guests;
-    return Array.isArray(list) ? (list as DbGuest[]) : [];
+    return Array.isArray(list) ? (list as DbGuest[]) : null;
   } catch (error) {
     console.warn('Could not fetch guests via API:', error);
-    return [];
+    return null;
   }
 }
 
@@ -1525,7 +1528,19 @@ export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
   }
 }
 
-export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
+// Initial load: retry transient failures a couple of times before giving up (null).
+export async function fetchAllGuestsWithRetry(partyId: string): Promise<DbGuest[] | null> {
+  const delays = [400, 1200];
+  let result = await fetchAllGuests(partyId);
+  for (const d of delays) {
+    if (result !== null) break;
+    await new Promise((r) => setTimeout(r, d));
+    result = await fetchAllGuests(partyId);
+  }
+  return result;
+}
+
+export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[]; guestsLoadFailed: boolean } | null> {
   // Single query: match on custom_url OR invite_code
   const { data: partyData, error: partyError } = await supabase
     .from('parties')
@@ -1583,11 +1598,11 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     }
   })();
 
-  const guestsPromise = fetchAllGuests(party.id);
+  const guestsPromise = fetchAllGuestsWithRetry(party.id);
 
   const [, guestsResult] = await Promise.all([enrichPromise, guestsPromise]);
 
-  return { party, guests: guestsResult };
+  return { party, guests: guestsResult ?? [], guestsLoadFailed: guestsResult === null };
 }
 
 export async function updatePartyBeverages(partyId: string, availableBeverages: string[]): Promise<DbParty | null> {
@@ -1951,7 +1966,7 @@ export async function promoteGuest(guestId: string, partyId: string): Promise<bo
   return false;
 }
 
-export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
+export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[] | null> {
   return fetchAllGuests(partyId);
 }
 
@@ -2002,46 +2017,62 @@ export async function getAllParties(): Promise<DbParty[]> {
 // Subscribe to guest changes (real-time). Host-side pages only (see useGuestsRealtime).
 // A DB trigger broadcasts "guests changed" (op only, no guest data) on `guests:<partyId>`;
 // we then refetch through the backend. One ref-counted channel per party (supabase-js reuses
-// same-topic channels, which caused nduja-91384), debounced 750 ms trailing / 5 s max wait.
+// same-topic channels, which caused nduja-91384).
+// The topic is public (anyone with the key can SEND on it), so a broadcast is only a hint:
+// refetches are rate limited to one per GUESTS_MIN_INTERVAL_MS per party (first change after a
+// quiet period refetches immediately, later ones coalesce into one trailing refetch), and
+// payloads whose `op` isn't insert/update/delete are ignored. A failed refetch (null) keeps the
+// previous state.
 export const GUESTS_BROADCAST_EVENT = 'guests_changed';
 export const GUESTS_TOPIC_PREFIX = 'guests:';
-const GUESTS_DEBOUNCE_MS = 750;
-const GUESTS_MAX_WAIT_MS = 5000;
+export const GUESTS_MIN_INTERVAL_MS = 10000;
+const GUESTS_VALID_OPS = new Set(['insert', 'update', 'delete']);
 
 interface GuestsChannelEntry {
-  channel: ReturnType<typeof supabase.channel>;
+  channel: ReturnType<typeof supabase.channel> | null;
   listeners: Set<(guests: DbGuest[]) => void>;
   timer: ReturnType<typeof setTimeout> | null;
-  firstPendingAt: number | null;
+  lastFetchAt: number;
+  disposed: boolean;
+  ready: Promise<void>;
 }
 const guestsChannels = new Map<string, GuestsChannelEntry>();
+// Removals still in flight, so a fast re-subscribe never reuses a channel that is `leaving`.
+const guestsRemovals = new Map<string, Promise<unknown>>();
 
 export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[]) => void) {
   let entry = guestsChannels.get(partyId);
   if (!entry) {
     const created: GuestsChannelEntry = {
-      channel: undefined as unknown as GuestsChannelEntry['channel'],
+      channel: null,
       listeners: new Set(),
       timer: null,
-      firstPendingAt: null,
+      lastFetchAt: 0,
+      disposed: false,
+      ready: Promise.resolve(),
     };
     const run = async () => {
       created.timer = null;
-      created.firstPendingAt = null;
+      created.lastFetchAt = Date.now();
       const guests = await getGuestsByPartyId(partyId);
+      if (guests === null || created.disposed) return; // keep previous state on error
       created.listeners.forEach((l) => l(guests));
     };
-    const fire = () => {
-      const now = Date.now();
-      if (created.firstPendingAt === null) created.firstPendingAt = now;
-      if (created.timer) clearTimeout(created.timer);
-      const wait = Math.max(0, Math.min(GUESTS_DEBOUNCE_MS, created.firstPendingAt + GUESTS_MAX_WAIT_MS - now));
-      created.timer = setTimeout(run, wait);
+    const fire = (msg?: { payload?: { op?: unknown } }) => {
+      const op = msg?.payload?.op;
+      if (typeof op !== 'string' || !GUESTS_VALID_OPS.has(op.toLowerCase())) return;
+      if (created.timer) return; // a refetch is already scheduled
+      const wait = created.lastFetchAt + GUESTS_MIN_INTERVAL_MS - Date.now();
+      if (wait <= 0) void run();
+      else created.timer = setTimeout(run, wait);
     };
-    created.channel = supabase
-      .channel(`${GUESTS_TOPIC_PREFIX}${partyId}`, { config: { private: false, broadcast: { self: false } } })
-      .on('broadcast', { event: GUESTS_BROADCAST_EVENT }, fire)
-      .subscribe();
+    created.ready = (guestsRemovals.get(partyId) ?? Promise.resolve()).then(() => {
+      if (created.disposed) return;
+      created.channel = supabase
+        .channel(`${GUESTS_TOPIC_PREFIX}${partyId}`, { config: { private: false, broadcast: { self: false } } })
+        .on('broadcast', { event: GUESTS_BROADCAST_EVENT }, fire)
+        .subscribe();
+    });
     guestsChannels.set(partyId, created);
     entry = created;
   }
@@ -2050,10 +2081,17 @@ export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[])
 
   return () => {
     mine.listeners.delete(callback);
-    if (mine.listeners.size === 0) {
+    if (mine.listeners.size === 0 && !mine.disposed) {
+      mine.disposed = true;
       if (mine.timer) clearTimeout(mine.timer);
-      supabase.removeChannel(mine.channel);
       if (guestsChannels.get(partyId) === mine) guestsChannels.delete(partyId);
+      const removal = mine.ready
+        .then(() => (mine.channel ? supabase.removeChannel(mine.channel) : undefined))
+        .catch(() => undefined)
+        .finally(() => {
+          if (guestsRemovals.get(partyId) === removal) guestsRemovals.delete(partyId);
+        });
+      guestsRemovals.set(partyId, removal);
     }
   };
 }
