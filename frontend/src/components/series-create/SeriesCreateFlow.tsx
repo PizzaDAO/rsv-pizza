@@ -100,7 +100,10 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
     ? (seriesEvents?.events ?? []).find((e) => normalizeCity(e.city) === normalizeCity(form.cityName))
     : undefined;
 
-  const update = (patch: Partial<CreateFormState>) => setForm((prev) => ({ ...prev, ...patch }));
+  const update = (patch: Partial<CreateFormState>) => {
+    setError(null);
+    setForm((prev) => ({ ...prev, ...patch }));
+  };
 
   const submit = async (f: CreateFormState) => {
     setError(null);
@@ -174,7 +177,7 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-3" data-testid="series-create-form">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3" data-testid="series-create-form">
         <div className="text-center pb-2">
           <h1 className="text-2xl font-bold text-theme-text">{preset.copy.title}</h1>
           <p className="text-sm text-theme-text-secondary mt-1">{preset.copy.subtitle}</p>
@@ -240,8 +243,8 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
           </div>
         ) : (
           <div className="bg-theme-surface border border-theme-stroke rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
                 <IconInput
                   icon={Calendar}
                   type="date"
@@ -263,8 +266,8 @@ export function SeriesCreateFlow({ series, preset }: SeriesCreateFlowProps) {
               </div>
               <TimePickerInput value={form.startTime} onChange={(v) => update({ startTime: v })} placeholder="Start time" />
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
                 {preset.dateMode === 'range' ? (
                   <IconInput
                     icon={Calendar}

@@ -60,7 +60,7 @@ export function resolveEndDate(preset: CreatePreset, series: PublicSeries, form:
 /** First problem with the form, or null when it can be submitted. */
 export function validateCreateForm(preset: CreatePreset, series: PublicSeries, form: CreateFormState): string | null {
   const required = preset.requiredFields;
-  if (required.includes('location') && (!form.picked || !form.cityName)) {
+  if (required.includes('location') && (!form.picked || (preset.location === 'city' && !form.cityName))) {
     return preset.location === 'city' ? 'Pick your city from the list.' : 'Pick a place from the list.';
   }
   if (required.includes('name') && !resolveName(preset, series, form)) return 'Give your event a name.';
