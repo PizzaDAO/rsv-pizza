@@ -24,6 +24,8 @@ import { updateParty, proxyAvatarToStorage } from '../lib/supabase';
 import { uuid } from '../lib/utils';
 import { fetchXAvatarToSupabase } from '../utils/avatarUtils';
 import { CoHost } from '../types';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
+import { BRAND } from '../config/brand';
 import { AppsHub } from '../components/AppsHub';
 import { SponsorCRM, OneSheetEditor } from '../components/sponsors';
 import { VenueWidget } from '../components/venue';
@@ -319,6 +321,13 @@ function HostPageContent() {
     <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <PartyHeader />
+
+        {/* Brand builds: new events are listed publicly only after admin approval. */}
+        {IS_SERIES_SCOPED && party.underbossStatus === 'pending' && (
+          <div className="mb-4 px-4 py-3 rounded-lg border border-theme-stroke bg-theme-surface text-sm text-theme-text-secondary">
+            Your event will appear on the {BRAND.name} public listing once it's approved. Your event page and invite link work right away.
+          </div>
+        )}
 
         {/* arancini-58492: natural-language event assistant, above the tabs.
             Philadelphia-only test gate — isEventAssistantEnabled matches the

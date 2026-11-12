@@ -138,3 +138,34 @@ export async function fetchPublicSeriesEvents(slug: string): Promise<{ events: P
   return apiRequest<{ events: PublicSeriesEvent[] }>(`/api/series/${encodeURIComponent(slug)}/events`, { requireAuth: false });
 }
 
+
+// ---- Brand event approval (super-admin) ----
+export interface SeriesPendingEvent {
+  id: string;
+  name: string;
+  customUrl: string | null;
+  inviteCode: string;
+  city: string | null;
+  country: string | null;
+  date: string | null;
+  venueName: string | null;
+  address: string | null;
+  underbossStatus: string;
+  createdAt: string;
+  user: { email: string | null; name: string | null } | null;
+}
+
+export async function fetchSeriesEventsByStatus(seriesId: string, status = 'pending'): Promise<{ events: SeriesPendingEvent[] }> {
+  return apiRequest<{ events: SeriesPendingEvent[] }>(`/api/admin/series/${seriesId}/events?status=${encodeURIComponent(status)}`);
+}
+
+export async function setSeriesEventStatus(
+  seriesId: string,
+  partyId: string,
+  status: 'approved' | 'rejected' | 'hidden',
+): Promise<{ party: { id: string; underbossStatus: string } }> {
+  return apiRequest<{ party: { id: string; underbossStatus: string } }>(
+    `/api/admin/series/${seriesId}/events/${partyId}/status`,
+    { method: 'PATCH', body: { status } },
+  );
+}

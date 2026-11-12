@@ -14,6 +14,9 @@ import {
   fetchSeriesChecklist,
   addSeriesChecklistDefault,
   deleteSeriesChecklistDefault,
+  fetchSeriesEventsByStatus,
+  setSeriesEventStatus,
+  type SeriesPendingEvent,
   EventSeries,
   type SeriesChecklistDefault,
   type SeriesInput,
@@ -112,6 +115,7 @@ export function AdminSeriesPage() {
 
   const [checklist, setChecklist] = useState<SeriesChecklistDefault[]>([]);
   const [newItemName, setNewItemName] = useState('');
+  const [pendingEvents, setPendingEvents] = useState<SeriesPendingEvent[]>([]);
 
   const refreshSeries = useCallback(async () => {
     const res = await fetchEventSeriesList();
@@ -143,6 +147,7 @@ export function AdminSeriesPage() {
       setSelectedId(null);
       setForm(BLANK_FORM);
       setChecklist([]);
+      setPendingEvents([]);
       return;
     }
     setSelectedId(s.id);
@@ -152,6 +157,12 @@ export function AdminSeriesPage() {
       setChecklist(res.items);
     } catch {
       setChecklist([]);
+    }
+    try {
+      const res = await fetchSeriesEventsByStatus(s.id, 'pending');
+      setPendingEvents(res.events);
+    } catch {
+      setPendingEvents([]);
     }
   }, []);
 
@@ -187,6 +198,16 @@ export function AdminSeriesPage() {
       setNewItemName('');
     } catch (e: any) {
       setSaveMsg(e?.message || 'Failed to add item');
+    }
+  };
+
+  const handleEventStatus = async (partyId: string, status: 'approved' | 'rejected') => {
+    if (!selectedId) return;
+    try {
+      await setSeriesEventStatus(selectedId, partyId, status);
+      setPendingEvents((evs) => evs.filter((e) => e.id !== partyId));
+    } catch (e: any) {
+      setSaveMsg(e?.message || 'Failed to update event');
     }
   };
 
@@ -327,6 +348,40 @@ export function AdminSeriesPage() {
               </button>
               {saveMsg && <span className="text-sm text-theme-text-muted">{saveMsg}</span>}
             </div>
+
+            {/* Pending events awaiting approval */}
+            {selectedId && (
+              <div className="mt-6 border-t border-theme-stroke pt-4">
+                <div className="text-sm font-semibold text-theme-text mb-1">Pending events</div>
+                <p className="text-xs text-theme-text-muted mb-3">
+                  Events appear on the brand's public listing only once approved.
+                </p>
+                <div className="space-y-1">
+                  {pendingEvents.map((ev) => (
+                    <div key={ev.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-theme-surface">
+                      <div className="min-w-0">
+                        <a href={`/rsvp/${ev.customUrl || ev.inviteCode}`} target="_blank" rel="noopener noreferrer"
+                          className="text-sm text-theme-text hover:underline">{ev.name}</a>
+                        <div className="text-xs text-theme-text-muted truncate">
+                          {[ev.city, ev.country].filter(Boolean).join(', ')}
+                          {ev.date ? ` · ${new Date(ev.date).toLocaleDateString()}` : ''}
+                          {ev.user?.email ? ` · ${ev.user.email}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button type="button" onClick={() => handleEventStatus(ev.id, 'approved')}
+                          className="px-3 py-1 rounded-lg bg-[#E52828] text-white hover:bg-[#CC2020] text-xs">Approve</button>
+                        <button type="button" onClick={() => handleEventStatus(ev.id, 'rejected')}
+                          className="px-3 py-1 rounded-lg bg-theme-surface-hover text-theme-text text-xs">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                  {pendingEvents.length === 0 && (
+                    <p className="text-xs text-theme-text-muted">No events awaiting approval.</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Per-series checklist */}
             {selectedId && (

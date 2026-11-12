@@ -159,20 +159,20 @@ describe('branded call sites', () => {
     expect(body.html).toContain('https://team1.rsv.pizza/host-survey/host-tok');
   });
 
-  describe('GET /api/series/:slug/events listing rule (D5)', () => {
+  describe('GET /api/series/:slug/events listing rule (D5: admin approval)', () => {
     const rows: any[] = [];
     beforeEach(() => {
       mockPrisma.party.findMany.mockResolvedValue(rows);
     });
 
-    it('branded series (site_url set): lists everything except rejected/hidden, incl. pending, never password-protected', async () => {
+    it('branded series (site_url set): lists only approved/listed (not pending), never password-protected', async () => {
       mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza', isActive: true });
       const res = await request(app()).get('/api/series/team1/events');
       expect(res.status).toBe(200);
       const where = mockPrisma.party.findMany.mock.calls[0][0].where;
       expect(where).toEqual({
         eventSeriesId: 'series-team1',
-        underbossStatus: { notIn: ['rejected', 'hidden'] },
+        underbossStatus: { in: ['approved', 'listed'] },
         cancelledAt: null,
         password: null,
       });
@@ -203,8 +203,8 @@ describe('branded call sites', () => {
     it('branded series: selects and returns venueName/address/guestCount (hidden guests -> null)', async () => {
       mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza', isActive: true });
       mockPrisma.party.findMany.mockResolvedValue([
-        { id: 'a', name: 'A', customUrl: 'a', inviteCode: 'ia', city: 'X', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'pending', venueName: 'Bar', address: '1 Main St', hideGuests: false, _count: { guests: 7 } },
-        { id: 'b', name: 'B', customUrl: null, inviteCode: 'ib', city: 'Y', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'pending', venueName: null, address: null, hideGuests: true, _count: { guests: 3 } },
+        { id: 'a', name: 'A', customUrl: 'a', inviteCode: 'ia', city: 'X', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'approved', venueName: 'Bar', address: '1 Main St', hideGuests: false, _count: { guests: 7 } },
+        { id: 'b', name: 'B', customUrl: null, inviteCode: 'ib', city: 'Y', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'approved', venueName: null, address: null, hideGuests: true, _count: { guests: 3 } },
       ]);
       const res = await request(app()).get('/api/series/team1/events');
       const select = mockPrisma.party.findMany.mock.calls[0][0].select;
