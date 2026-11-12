@@ -1008,7 +1008,13 @@ export interface DbGuest {
   promoted_at?: string | null;
 }
 
-// Safe column list for parties table — excludes password
+// Safe column list for parties table — excludes password and every other host-only column.
+// INVARIANT (party-password-anon-exposure): every column here MUST be in the anon GRANT SELECT
+// allowlist (scripts/parties-anon-columns.json, mirrored in apply-lockdown-parties-columns.cjs),
+// and must never appear in SENSITIVE_PARTY_COLUMNS. After the column lockdown a column that is
+// selected here but not granted makes EVERY party read fail with 42501. Host-only fields
+// (host_telegram_*, cancelled_by, reimbursement_cap_appeal_note) are merged in from
+// GET /api/parties/:id in getPartyWithGuests. `password` is deliberately never sent to the client.
 export const SAFE_PARTY_COLUMNS = `
   id, name, invite_code, custom_url, date, duration, end_time, timezone,
   pizza_style, available_beverages, available_toppings, available_dietary_options, show_toppings_on_rsvp, max_guests, expected_guests, estimated_attendance, target_attendance, expected_attendance, hide_guests,
@@ -1034,18 +1040,38 @@ export const SAFE_PARTY_COLUMNS = `
   quiz_enabled,
   survey_enabled,
   telegram_group,
-  host_telegram_chat_id, host_telegram_link_token, receipts_reminder_sent_at,
+  receipts_reminder_sent_at,
   turtle_roles_enabled,
   reminders_enabled,
   underboss_status,
   flyer_config,
   poster_image_url, poster_generated_at,
   rollup_image_url, rollup_generated_at,
-  reimbursement_cap_usd, reimbursement_cap_appeal_note, reimbursement_cap_appealed_at,
+  reimbursement_cap_usd, reimbursement_cap_appealed_at,
   tax_form_required,
   one_sheet_config,
-  cancelled_at, cancelled_by, cancellation_reason
+  cancelled_at, cancellation_reason,
+  has_password
 `;
+
+/**
+ * Columns that anon/authenticated must NEVER be able to read from `parties`.
+ * Kept in sync with scripts/anon-sensitive-columns.json (enforced by tests).
+ */
+export const SENSITIVE_PARTY_COLUMNS: readonly string[] = [
+  'password', 'report_password', 'venue_report_password', 'co_hosts',
+  'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by',
+  'reimbursement_cap_appeal_note', 'admin_notes', 'underboss_notes',
+  'underboss_approved', 'host_status', 'host_tags', 'host_goals',
+  'venue_status', 'venue_capacity', 'venue_cost', 'venue_point_person',
+  'venue_contact_name', 'venue_contact_email', 'venue_contact_phone',
+  'venue_organization', 'venue_website', 'venue_notes', 'wifi_info',
+  'parking_notes', 'report_stats_config', 'flyer_artist_url',
+  'address_is_city_default', 'survey_sent_at', 'payments_closed_at',
+  'payments_approved_usd', 'payments_approved_at', 'payments_approved_by',
+  'agreement_accepted_at', 'agreement_version', 'wallet_reminder_sent_at',
+  'photo_reminder_sent_at', 'attendance_reminder_sent_at', 'host_survey_sent_at',
+];
 
 /**
  * Normalize a Supabase party row: copy co_hosts_public → co_hosts so the rest
@@ -1186,7 +1212,7 @@ export async function createParty(opts: CreatePartyOptions = {}): Promise<DbPart
   if (!partyName) {
     const { count } = await supabase
       .from('parties')
-      .select('*', { count: 'exact', head: true });
+      .select('id', { count: 'exact', head: true });
     const partyNumber = (count || 0) + 1;
     partyName = `Pizza Party ${partyNumber}`;
   }
@@ -1460,14 +1486,8 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   }
 
   if (party) {
-    // Check if password exists (without fetching it)
-    const { count } = await supabase
-      .from('parties')
-      .select('id', { count: 'exact', head: true })
-      .eq('id', party.id)
-      .not('password', 'is', null);
-
-    party.has_password = count === 1;
+    // has_password arrives with SAFE_PARTY_COLUMNS (generated column) — no password probe needed.
+    party.has_password = party.has_password === true;
     normalizePartyCoHosts(party);
     party.co_hosts = sanitizeCoHosts(party.co_hosts);
   }
@@ -1499,6 +1519,29 @@ async function fetchAllGuests(partyId: string): Promise<DbGuest[]> {
     if (data.length < CHUNK) break;
   }
   return all;
+}
+
+/**
+ * Merge the editor-only view of a party (GET /api/parties/:id, camelCase) into the
+ * anon-fetched row (snake_case). Only applied when the API says the caller can edit.
+ */
+export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
+  if (!apiParty) return;
+  if (apiParty.coHosts) {
+    party.co_hosts = apiParty.coHosts;
+  }
+  if (apiParty.canEdit !== undefined) {
+    party.can_edit = apiParty.canEdit;
+  }
+  if (apiParty.allowedTabs !== undefined) {
+    party.allowed_tabs = apiParty.allowedTabs;
+  }
+  if (apiParty.canEdit === true) {
+    if ('hostTelegramChatId' in apiParty) party.host_telegram_chat_id = apiParty.hostTelegramChatId ?? null;
+    if ('hostTelegramLinkToken' in apiParty) party.host_telegram_link_token = apiParty.hostTelegramLinkToken ?? null;
+    if ('reimbursementCapAppealNote' in apiParty) party.reimbursement_cap_appeal_note = apiParty.reimbursementCapAppealNote ?? null;
+    if ('cancelledBy' in apiParty) party.cancelled_by = apiParty.cancelledBy ?? null;
+  }
 }
 
 export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
@@ -1539,30 +1582,23 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
 
   // Run co-host enrichment and guest fetch in parallel
   const enrichPromise = (async () => {
-    if (party!.co_hosts && Array.isArray(party!.co_hosts) && party!.co_hosts.length > 0) {
-      try {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-          const response = await fetch(`${apiUrl}/api/parties/${party!.id}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.party?.coHosts) {
-              party!.co_hosts = data.party.coHosts;
-            }
-            if (data.party?.canEdit !== undefined) {
-              party!.can_edit = data.party.canEdit;
-            }
-            if (data.party?.allowedTabs !== undefined) {
-              party!.allowed_tabs = data.party.allowedTabs;
-            }
-          }
+    // Always ask the API when logged in: besides enriching co-hosts, it is the ONLY source of the
+    // host-only columns that anon can no longer read (telegram ids, appeal note, cancelled_by).
+    // Non-editors get a 403/404 here and keep the public SAFE row.
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+        const response = await fetch(`${apiUrl}/api/parties/${party!.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.party) mergeHostOnlyPartyFields(party!, data.party);
         }
-      } catch (err) {
-        console.warn('Could not enrich co-host profiles via API:', err);
       }
+    } catch (err) {
+      console.warn('Could not enrich party via API:', err);
     }
   })();
 

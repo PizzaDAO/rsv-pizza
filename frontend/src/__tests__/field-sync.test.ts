@@ -146,8 +146,10 @@ describe('Field Mapping Consistency', () => {
     // These are the core fields that MUST be in safe columns
     // We skip host_name (derived from API, not DB column), has_password (computed),
     // password (intentionally excluded for security), and host_profile (from join)
+    // Host-only columns (anon cannot read them) come from GET /api/parties/:id instead.
     const computedOrExcluded = new Set([
       'host_name', 'has_password', 'password', 'host_profile',
+      'host_telegram_chat_id', 'host_telegram_link_token', 'cancelled_by', 'reimbursement_cap_appeal_note',
     ]);
     const coreDbPartyFields = dbPartyFields.filter(
       f => !computedOrExcluded.has(f)
