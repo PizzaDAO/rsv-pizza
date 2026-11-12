@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import crypto from 'node:crypto';
-import { PizzaMcpClient, orderIdempotencyKey, problemToAppError } from './pizzaMcp.client.js';
+import { DISCOVERY_TIMEOUT_MS, PizzaMcpClient, orderIdempotencyKey, problemToAppError } from './pizzaMcp.client.js';
 import { AppError } from '../middleware/error.js';
 import { generateSigningKeyPem, makeFakePizzaMcp } from '../testutil/pizzaFakes.js';
 
@@ -42,6 +42,23 @@ describe('PizzaMcpClient', () => {
     expect(fake.calls[0].claims.sub).toBe('rsvpizza:u1');
     expect(fake.calls[1].headers['idempotency-key']).toBe('key-123456789');
     expect(fake.calls[1].claims.jti).not.toBe(fake.calls[0].claims.jti);
+  });
+
+  it('gives shop discovery 45 s and every other call the 20 s default', async () => {
+    const fake = makeFakePizzaMcp({
+      'GET /pizzerias': () => ({ json: { pizzerias: [] } }),
+      'GET /pizzerias/pzl_osm_n1': () => ({ json: { id: 'pzl_osm_n1' } }),
+    });
+    const spy = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const c = new PizzaMcpClient({ fetchImpl: fake.fetchImpl });
+      await c.findShops(actor, { near: 'Boston, MA' });
+      await c.getShop(actor, 'pzl_osm_n1');
+      expect(DISCOVERY_TIMEOUT_MS).toBe(45_000);
+      expect(spy.mock.calls.map((x) => x[0])).toEqual([45_000, 20_000]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('maps an OPOP problem to an AppError, keeping code and ask_user', async () => {
