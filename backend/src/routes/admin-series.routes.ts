@@ -11,12 +11,15 @@
  *   POST   /api/admin/series/:id/checklist         Add a checklist default to the series
  *   PATCH  /api/admin/series/checklist/:defaultId  Update a series checklist default
  *   DELETE /api/admin/series/checklist/:defaultId  Delete a series checklist default
+ *   GET    /api/admin/series/:id/events?status=pending  List the series' events by underboss status
+ *   PATCH  /api/admin/series/:id/events/:partyId/status  Approve/reject/hide a series event
  */
 import { Router, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { writeStatusAudit } from '../helpers/statusAudit.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -227,6 +230,62 @@ router.delete('/checklist/:defaultId', async (req: AuthRequest, res: Response, n
     }
     await prisma.checklistDefault.delete({ where: { id: req.params.defaultId } });
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- event approval (brand series need admin approval before public listing) ----------
+
+const APPROVAL_STATUSES = ['pending', 'approved', 'rejected', 'listed', 'hidden'];
+
+router.get('/:id/events', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const status = str(req.query.status) ?? 'pending';
+    if (!APPROVAL_STATUSES.includes(status)) {
+      throw new AppError(`status must be one of: ${APPROVAL_STATUSES.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+    const events = await prisma.party.findMany({
+      where: { eventSeriesId: req.params.id, underbossStatus: status, cancelledAt: null },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true, name: true, customUrl: true, inviteCode: true, city: true, country: true,
+        date: true, venueName: true, address: true, underbossStatus: true, createdAt: true,
+        user: { select: { email: true, name: true } },
+      },
+      take: 500,
+    });
+    res.json({ events });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:id/events/:partyId/status', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, partyId } = req.params;
+    const status = (req.body || {}).status;
+    if (!['approved', 'rejected', 'hidden'].includes(status)) {
+      throw new AppError('status must be one of: approved, rejected, hidden', 400, 'VALIDATION_ERROR');
+    }
+    const email = req.userEmail || 'unknown';
+    const party = await prisma.$transaction(async (tx) => {
+      const before = await tx.party.findUnique({
+        where: { id: partyId },
+        select: { eventSeriesId: true, underbossStatus: true },
+      });
+      if (!before || before.eventSeriesId !== id) {
+        throw new AppError('Party not found in this series', 404, 'NOT_FOUND');
+      }
+      const updated = await tx.party.update({
+        where: { id: partyId },
+        data: { underbossStatus: status },
+        select: { id: true, underbossStatus: true },
+      });
+      await writeStatusAudit(tx, partyId, before.underbossStatus, status, email, 'admin');
+      return updated;
+    });
+    res.json({ party });
   } catch (error) {
     next(error);
   }
