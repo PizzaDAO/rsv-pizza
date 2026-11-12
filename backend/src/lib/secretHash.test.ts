@@ -46,6 +46,8 @@ describe('secretHash', () => {
     expect(await secretForWrite(undefined)).toBeUndefined();
     expect(await secretForWrite(null)).toBeNull();
     expect(await secretForWrite('')).toBeNull();
+    expect(await secretForWrite(false)).toBeNull();
+    expect(await secretForWrite(0)).toBeNull();
     const h = await secretForWrite('pw');
     expect(isBcryptHash(h)).toBe(true);
     expect(await verifySecret(h as string, 'pw')).toBe(true);

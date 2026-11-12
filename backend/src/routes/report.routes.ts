@@ -424,7 +424,7 @@ router.get('/public/:publicSlug', optionalAuth, async (req: AuthRequest, res: Re
 
     // Sponsors tagged on this event bypass publish + password
     const sponsorBypass = check ? await isSponsorForReport(publicSlug, req.userEmail) : false;
-    if (check?.reportPassword && !sponsorBypass && !(await verifySecret(check.reportPassword, password ?? ''))) {
+    if (check?.reportPassword && !sponsorBypass && !(password && (await verifySecret(check.reportPassword, password)))) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 

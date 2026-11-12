@@ -108,6 +108,8 @@ export const EventAssistant: React.FC = () => {
     try {
       await updatePartyApi(party.id, camelPatch as any);
       // Merge into context in place — no refetch (avoids the page-reload feel).
+      // Passwords are write-only now: keep the hasPassword flag in sync instead.
+      if ('password' in camelPatch) camelPatch.hasPassword = !!camelPatch.password;
       mergeParty(camelPatch as Partial<Party>);
       setApplied(true);
       setProposed([]);

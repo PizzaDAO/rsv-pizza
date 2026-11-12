@@ -47,7 +47,9 @@ export async function verifySecret(stored: string | null | undefined, attempt: s
  */
 export async function secretForWrite(input: unknown): Promise<string | null | undefined> {
   if (input === undefined) return undefined;
-  if (input === null) return null;
+  // Falsy non-strings (false, 0) mean "no password", like the old `password || null`;
+  // they must never become the literal passwords "false" / "0".
+  if (input === null || input === false || input === 0) return null;
   const s = String(input);
   if (s === '') return null;
   return hashSecret(s);

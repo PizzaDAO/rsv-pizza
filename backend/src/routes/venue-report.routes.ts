@@ -230,7 +230,7 @@ router.get('/public/:slug/venue', async (req: AuthRequest, res: Response, next: 
       throw new AppError('Venue report not found', 404, 'NOT_FOUND');
     }
 
-    if (check.venueReportPassword && !(await verifySecret(check.venueReportPassword, password ?? ''))) {
+    if (check.venueReportPassword && !(password && (await verifySecret(check.venueReportPassword, password)))) {
       throw new AppError('Password required', 401, 'PASSWORD_REQUIRED');
     }
 
