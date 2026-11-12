@@ -165,8 +165,8 @@ describe('branded call sites', () => {
       mockPrisma.party.findMany.mockResolvedValue(rows);
     });
 
-    it('branded series (site_url set): lists everything except rejected/hidden, incl. pending', async () => {
-      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza' });
+    it('branded series (site_url set): lists everything except rejected/hidden, incl. pending, never password-protected', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza', isActive: true });
       const res = await request(app()).get('/api/series/team1/events');
       expect(res.status).toBe(200);
       const where = mockPrisma.party.findMany.mock.calls[0][0].where;
@@ -174,11 +174,23 @@ describe('branded call sites', () => {
         eventSeriesId: 'series-team1',
         underbossStatus: { notIn: ['rejected', 'hidden'] },
         cancelledAt: null,
+        password: null,
+      });
+    });
+
+    it('inactive branded series falls back to the curated filter', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza', isActive: false });
+      await request(app()).get('/api/series/team1/events');
+      const where = mockPrisma.party.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        eventSeriesId: 'series-team1',
+        underbossStatus: { in: ['approved', 'listed'] },
+        cancelledAt: null,
       });
     });
 
     it('GPP series (site_url NULL): filter is unchanged (approved/listed)', async () => {
-      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-gpp', siteUrl: null });
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-gpp', siteUrl: null, isActive: true });
       await request(app()).get('/api/series/gpp2026/events');
       const where = mockPrisma.party.findMany.mock.calls[0][0].where;
       expect(where).toEqual({
