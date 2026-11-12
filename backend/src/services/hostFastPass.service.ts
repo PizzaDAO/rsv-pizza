@@ -33,7 +33,7 @@ export const PAID_HAS_PROOF_WHERE = {
   ],
 };
 
-function paidRowHasProof(row: {
+export function paidRowHasProof(row: {
   payoutMethod: string | null;
   transactionHash: string | null;
   wireReference: string | null;
