@@ -134,6 +134,15 @@ describe('edge cases', () => {
     expect(toTelegramHtml('def __init__ and my_var_name')).toBe('def __init__ and my_var_name');
     expect(toTelegramHtml('__Big News__')).toBe('<i>Big News</i>');
   });
+  it('keeps dots, parentheses, emoji and underscores literal in a realistic template', () => {
+    const src = '🍕 **Pizza Night** (Fri. 7pm) at my_place.\nRSVP: https://rsv.pizza/e/my_party_1 (free!) v1.2';
+    expect(toTelegramHtml(src)).toBe(
+      '🍕 <b>Pizza Night</b> (Fri. 7pm) at my_place.\nRSVP: https://rsv.pizza/e/my_party_1 (free!) v1.2',
+    );
+  });
+  it('escapes HTML specials next to bold without breaking the tags', () => {
+    expect(toTelegramHtml('**Tom & Jerry <3**')).toBe('<b>Tom &amp; Jerry &lt;3</b>');
+  });
   it('strips NUL so user text cannot collide with placeholders', () => {
     expect(toTelegramHtml('x\u00000\u0000 https://a.com')).toBe('x0 https://a.com');
   });
