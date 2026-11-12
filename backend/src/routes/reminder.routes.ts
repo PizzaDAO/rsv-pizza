@@ -229,7 +229,7 @@ export function buildReminderText(params: {
     `See you there!`,
     '',
     `--`,
-    `You're receiving this because you RSVP'd to ${params.partyName} on ${params.siteName ?? 'RSV.Pizza'}.`,
+    `You're receiving this because you RSVP'd to ${params.partyName} on ${params.siteName ?? 'RSV.Pizza'}.`, // brand-check-ignore-line
     `Unsubscribe from reminders for this event: ${params.unsubUrl}`,
   ].join('\n');
 }

@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { isAllowedOrigin } from './cors.js';
 
-const ALLOWED = ['https://rsv.pizza'];
+const ALLOWED = ['https://rsv.pizza']; // brand-check-ignore-line
 
 describe('isAllowedOrigin', () => {
   it.each([
-    'https://rsv.pizza',
+    'https://rsv.pizza', // brand-check-ignore-line
     'https://rsvpizza-git-my-branch-pizza-dao.vercel.app',
     'https://rsvpizza-abc123xyz-pizza-dao.vercel.app',
     'https://rsvpizza-team1-git-wl-audit-fixes-pizza-dao.vercel.app',
