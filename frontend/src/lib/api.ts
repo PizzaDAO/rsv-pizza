@@ -147,6 +147,8 @@ export interface UserPartyListItem {
   role: 'host' | 'guest' | 'cohost';
   // porchetta-81402: HomePage renders a "Cancelled" pill on cancelled events.
   cancelledAt?: string | null;
+  // White-label: series the event belongs to (null for none).
+  eventSeriesId?: string | null;
 }
 
 export async function fetchMyEvents(): Promise<UserPartyListItem[]> {
@@ -4863,11 +4865,11 @@ export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
       city: e.city ?? '',
       slug: e.slug,
       date: e.date,
-      venueName: null,
-      address: null,
+      venueName: e.venueName ?? null,
+      address: e.address ?? null,
       country: e.country ?? null,
       region: e.region ?? null,
-      rsvpCount: 0,
+      rsvpCount: e.guestCount ?? 0,
       eventImageUrl: e.eventImageUrl ?? null,
     }));
   }

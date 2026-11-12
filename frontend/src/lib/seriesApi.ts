@@ -113,6 +113,10 @@ export interface PublicSeriesEvent {
   eventImageUrl: string | null;
   slug: string;
   community: boolean;
+  // Branded series only (absent for GPP).
+  venueName?: string | null;
+  address?: string | null;
+  guestCount?: number | null;
 }
 
 export interface PublicSeriesWithId extends PublicSeries {

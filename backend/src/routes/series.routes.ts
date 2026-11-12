@@ -117,6 +117,8 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
         id: true, name: true, customUrl: true, inviteCode: true, city: true,
         country: true, region: true, date: true, latitude: true, longitude: true,
         eventImageUrl: true, underbossStatus: true,
+        // Branded series only: venue/address/guest count, same fields a public event page shows.
+        ...(branded ? { venueName: true, address: true, hideGuests: true, _count: { select: { guests: true } } } : {}),
       },
       take: 2000,
     });
@@ -133,6 +135,12 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
       eventImageUrl: e.eventImageUrl,
       slug: e.customUrl || e.inviteCode,
       community: e.underbossStatus === 'listed',
+      ...(branded ? {
+        venueName: (e as any).venueName ?? null,
+        address: (e as any).address ?? null,
+        // Honors the host's hideGuests flag, like the public event page.
+        guestCount: (e as any).hideGuests ? null : ((e as any)._count?.guests ?? 0),
+      } : {}),
     }));
     res.json({ events });
   } catch (error) {

@@ -199,5 +199,30 @@ describe('branded call sites', () => {
         cancelledAt: null,
       });
     });
+
+    it('branded series: selects and returns venueName/address/guestCount (hidden guests -> null)', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-team1', siteUrl: 'https://team1.rsv.pizza', isActive: true });
+      mockPrisma.party.findMany.mockResolvedValue([
+        { id: 'a', name: 'A', customUrl: 'a', inviteCode: 'ia', city: 'X', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'pending', venueName: 'Bar', address: '1 Main St', hideGuests: false, _count: { guests: 7 } },
+        { id: 'b', name: 'B', customUrl: null, inviteCode: 'ib', city: 'Y', country: 'US', region: null, date: null, latitude: null, longitude: null, eventImageUrl: null, underbossStatus: 'pending', venueName: null, address: null, hideGuests: true, _count: { guests: 3 } },
+      ]);
+      const res = await request(app()).get('/api/series/team1/events');
+      const select = mockPrisma.party.findMany.mock.calls[0][0].select;
+      expect(select.venueName).toBe(true);
+      expect(select.address).toBe(true);
+      expect(res.body.events[0]).toMatchObject({ venueName: 'Bar', address: '1 Main St', guestCount: 7 });
+      expect(res.body.events[1]).toMatchObject({ venueName: null, address: null, guestCount: null });
+    });
+
+    it('GPP series: output has no venueName/address/guestCount keys and select is unchanged', async () => {
+      mockPrisma.eventSeries.findUnique.mockResolvedValue({ id: 'series-gpp', siteUrl: null, isActive: true });
+      mockPrisma.party.findMany.mockResolvedValue([
+        { id: 'g', name: 'G', customUrl: null, inviteCode: 'ig', city: 'X', country: 'US', region: 'na', date: null, latitude: 1, longitude: 2, eventImageUrl: null, underbossStatus: 'approved' },
+      ]);
+      const res = await request(app()).get('/api/series/gpp2026/events');
+      const select = mockPrisma.party.findMany.mock.calls[0][0].select;
+      expect(Object.keys(select).sort()).toEqual(['city','country','customUrl','date','eventImageUrl','id','inviteCode','latitude','longitude','name','region','underbossStatus']);
+      expect(Object.keys(res.body.events[0]).sort()).toEqual(['city','community','country','date','eventImageUrl','id','latitude','longitude','name','region','slug']);
+    });
   });
 });

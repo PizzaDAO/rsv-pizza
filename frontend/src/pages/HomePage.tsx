@@ -10,6 +10,7 @@ import { fetchMyEvents } from '../lib/api';
 import { BRAND } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { SeriesLandingPage } from './SeriesLandingPage';
+import { fetchPublicSeriesList } from '../lib/seriesApi';
 
 export function HomePage() {
   const { user, loading: authLoading } = useAuth();
@@ -18,12 +19,29 @@ export function HomePage() {
   const [eventFilter, setEventFilter] = useState<'upcoming' | 'past'>('upcoming');
 
   // Fetch all user events in a single API call with React Query caching
-  const { data: userParties = [], isLoading: partiesLoading } = useQuery({
+  const { data: allUserParties = [], isLoading: allPartiesLoading } = useQuery({
     queryKey: ['my-events'],
     queryFn: fetchMyEvents,
     enabled: !!user,
     staleTime: 30_000, // 30 seconds - instant back-navigation
   });
+
+  // White-label: resolve the brand series id so the list can be scoped to it.
+  const { data: brandSeriesId, isLoading: seriesLoading } = useQuery({
+    queryKey: ['brand-series-id', BRAND.seriesSlug],
+    queryFn: async () => {
+      const { series } = await fetchPublicSeriesList();
+      return series.find((s) => s.slug === BRAND.seriesSlug)?.id ?? null;
+    },
+    enabled: !!user && IS_SERIES_SCOPED,
+    staleTime: 5 * 60_000,
+  });
+
+  // On a series-scoped build only that brand's events are listed (no-op elsewhere).
+  const userParties = IS_SERIES_SCOPED
+    ? allUserParties.filter((p) => !!brandSeriesId && p.eventSeriesId === brandSeriesId)
+    : allUserParties;
+  const partiesLoading = allPartiesLoading || (IS_SERIES_SCOPED && !!user && seriesLoading);
 
   // Format party date for display
   const formatPartyDate = (dateStr: string | null) => {
