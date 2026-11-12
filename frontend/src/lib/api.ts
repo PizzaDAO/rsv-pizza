@@ -1,5 +1,7 @@
 import { Pizzeria, Donation, DonationPublicStats, Photo, PhotoStats, Sponsor, SponsorStats, SponsorStatus, SponsorshipType, VenueStatus, Venue, VenuePhoto, VenuePhotoCategory, VenueReport, Performer, PerformersResponse, EventReport, SocialPost, NotableAttendee, Staff, StaffStats, StaffStatus, Display, DisplayContentType, DisplayContentConfig, DisplayViewerData, Raffle, RafflePrize, RaffleEntry, RaffleWinner, BudgetOverview, BudgetItem, BudgetCategory, BudgetStatus, PartyKit, KitTier, ChecklistItem, ChecklistData, PageViewStats, LinkClickStats, UnderbossDashboardData, GPPRegion, AdminUser, UnderbossAdmin, ShippingKit, ShippingKitStats, ShippingCoordinator, ShippingMeResponse, SponsorUser, SponsorMeResponse, SponsorDashboardData, ConsolidatedReport, SponsorChecklistItem, UnifiedPartner, GraphicsAdmin, FakeDetectionResponse, Payout, AdminPayout, AdminPayoutDetail, AdminPayoutFilters, AdminPayoutsResponse, BankDetails, PayoutMethod, OcrPreviewResult, ExternalPaymentInput, HostGoals, OneSheetConfig, PrepayQueueRow, WalletPaidTotal, ReceiptLibraryEntry, PartyPayoutsResponse, ReceiptLineItem, PayoutDocument, PayoutStatus, TaxForm, TaxFormType, TaxFormStatus, Invoice, CreateInvoiceData, UpdateInvoiceData, Mou, CreateMouData, UpdateMouData, MercuryWireMatch, MercuryReconcileResult } from '../types';
 import type { SearchableEvent } from '../utils/eventSearch';
+import type { PublicSeriesEvent } from './seriesApi';
+import { BRAND } from '../config/brand';
 // pancetta-92103: region portal → underlying parties.region slug map. Used by
 // `buildPayoutQuery` to expand the /payments admin Regions multi-select into
 // the existing `?regions=` query the backend already accepts.
@@ -306,6 +308,9 @@ export async function createPartyApi(data: CreatePartyData) {
   return apiRequest<{ party: any }>('/api/parties', {
     method: 'POST',
     body: {
+      // White-label: stamp the event into this build's series (backend ignores
+      // it unless the series is enabled for self-serve). Omitted when unset.
+      ...(BRAND.seriesSlug ? { seriesSlug: BRAND.seriesSlug } : {}),
       name: data.name,
       hostName: data.hostName,
       date: data.date,
@@ -4846,6 +4851,26 @@ export async function fetchGppEventsForMap(force?: boolean, curated?: boolean, i
 // truffle-83044: public event search. Uses the curated (approved + listed,
 // non-cancelled) public GPP listing; filtering happens client-side.
 export async function fetchPublicEventsForSearch(): Promise<SearchableEvent[]> {
+  // White-label: a series-scoped build lists only its own series' events.
+  if (BRAND.seriesSlug) {
+    const { events } = await apiRequest<{ events: PublicSeriesEvent[] }>(
+      `/api/series/${encodeURIComponent(BRAND.seriesSlug)}/events`,
+      { requireAuth: false }
+    );
+    return events.map((e) => ({
+      id: e.id,
+      name: e.name,
+      city: e.city ?? '',
+      slug: e.slug,
+      date: e.date,
+      venueName: null,
+      address: null,
+      country: e.country ?? null,
+      region: e.region ?? null,
+      rsvpCount: 0,
+      eventImageUrl: e.eventImageUrl ?? null,
+    }));
+  }
   const data = await apiRequest<GPPEventsApiPayload>(
     '/api/gpp/events?limit=2000&curated=1',
     { requireAuth: false }

@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { useTheme } from '../contexts/ThemeContext';
 import { brandUrl } from '../config/brand';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
 
 /**
@@ -13,8 +14,16 @@ import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSe
  * Renders the series' own branding (name, description, OG image, theme class)
  * and its public events. Config comes from GET /api/series/:slug (+ /events).
  */
-export function SeriesLandingPage() {
-  const { slug = '' } = useParams<{ slug: string }>();
+interface SeriesLandingPageProps {
+  /** Use this series slug instead of the `:slug` route param (branded home). */
+  slugOverride?: string;
+  /** Show a "Create an event" call to action pointing at /new. */
+  showCreateCta?: boolean;
+}
+
+export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLandingPageProps = {}) {
+  const params = useParams<{ slug: string }>();
+  const slug = slugOverride || params.slug || '';
   const { themeClass, backgroundStyle } = useTheme();
   const [series, setSeries] = useState<PublicSeries | null>(null);
   const [events, setEvents] = useState<PublicSeriesEvent[]>([]);
@@ -100,6 +109,14 @@ export function SeriesLandingPage() {
           )}
         </header>
 
+        {showCreateCta && (
+          <div className="text-center mb-10">
+            <Link to="/new" className="btn-primary inline-flex items-center gap-2">
+              Create an event
+            </Link>
+          </div>
+        )}
+
         <section>
           <h2 className="text-lg font-semibold text-theme-text mb-4">
             {events.length > 0 ? `${events.length} event${events.length === 1 ? '' : 's'}` : 'Events'}
@@ -115,10 +132,11 @@ export function SeriesLandingPage() {
                   href={brandUrl(e.slug)}
                   className="block rounded-xl border border-theme-stroke hover:bg-theme-surface-hover p-4 transition-colors"
                 >
-                  <div className="font-medium text-theme-text">{e.city || e.name}</div>
+                  {/* Brand builds title cards by event name (several events can share a city); GPP keeps city titles. */}
+                  <div className="font-medium text-theme-text">{IS_SERIES_SCOPED ? e.name : (e.city || e.name)}</div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-theme-text-muted">
                     {e.country && (
-                      <span className="inline-flex items-center gap-1"><MapPin size={12} />{e.country}</span>
+                      <span className="inline-flex items-center gap-1"><MapPin size={12} />{IS_SERIES_SCOPED && e.city ? `${e.city}, ${e.country}` : e.country}</span>
                     )}
                     {e.date && (
                       <span className="inline-flex items-center gap-1">
@@ -134,11 +152,13 @@ export function SeriesLandingPage() {
           )}
         </section>
 
-        <div className="mt-10 text-center">
-          <Link to="/map" className="text-sm text-theme-accent underline underline-offset-2">
-            View all events on the map →
-          </Link>
-        </div>
+        {!IS_SERIES_SCOPED && (
+          <div className="mt-10 text-center">
+            <Link to="/map" className="text-sm text-theme-accent underline underline-offset-2">
+              View all events on the map →
+            </Link>
+          </div>
+        )}
       </main>
       <Footer />
     </div>

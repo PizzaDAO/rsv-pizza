@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { BRAND_FEATURES } from '../config/brandScope';
 import { Guest, PizzaRecommendation, Topping, PizzaStyle, PizzaSize, PizzaSettings, Party, Beverage, BeverageRecommendation, WaveRecommendation } from '../types';
 
 import { generateBeverageRecommendations } from '../utils/beverageAlgorithm';
@@ -142,10 +143,10 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
     shareToUnlock: dbParty.share_to_unlock || false,
     shareTweetText: dbParty.share_tweet_text || null,
     photoModeration: dbParty.photo_moderation || false,
-    nftEnabled: dbParty.nft_enabled || false,
+    nftEnabled: BRAND_FEATURES.nftMinting && (dbParty.nft_enabled || false),
     nftChain: dbParty.nft_chain || null,
     createdAt: dbParty.created_at,
-    donationEnabled: dbParty.donation_enabled || false,
+    donationEnabled: BRAND_FEATURES.donations && (dbParty.donation_enabled || false),
     donationGoal: dbParty.donation_goal || null,
     donationMessage: dbParty.donation_message || null,
     suggestedAmounts: dbParty.suggested_amounts || undefined,

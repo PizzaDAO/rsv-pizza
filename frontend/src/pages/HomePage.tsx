@@ -8,6 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Loader2, Users, Plus, MapPin, Crown } from 'lucide-react';
 import { fetchMyEvents } from '../lib/api';
 import { BRAND } from '../config/brand';
+import { IS_SERIES_SCOPED } from '../config/brandScope';
+import { SeriesLandingPage } from './SeriesLandingPage';
 
 export function HomePage() {
   const { user, loading: authLoading } = useAuth();
@@ -51,9 +53,11 @@ export function HomePage() {
   if (user && (userParties.length > 0 || partiesLoading)) {
     return (
       <Layout>
-        <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
-          {t('home.gppBanner')}
-        </Link>
+        {!IS_SERIES_SCOPED && (
+          <Link to="/gpp" className="block bg-gradient-to-r from-[#ff393a] to-[#ff5a5b] text-white text-center py-3 px-4 text-sm font-medium hover:opacity-90 transition-opacity">
+            {t('home.gppBanner')}
+          </Link>
+        )}
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('home.yourEvents')}</h1>
@@ -188,6 +192,12 @@ export function HomePage() {
         </div>
       </Layout>
     );
+  }
+
+  // White-label series build: logged-out visitors (and users with no events)
+  // see the series landing page, with a "Create an event" call to action.
+  if (IS_SERIES_SCOPED) {
+    return <SeriesLandingPage slugOverride={BRAND.seriesSlug} showCreateCta />;
   }
 
   // Default: Show event creation form (for non-signed-in users or users with no parties)

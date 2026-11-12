@@ -6,6 +6,7 @@ import { Pizzeria } from '../types';
 import { PublicEvent, trackRsvpFunnel } from '../lib/api';
 import { DbParty } from '../lib/supabase';
 import { uuid } from '../lib/utils';
+import { BRAND_FEATURES } from '../config/brandScope';
 import { findActiveRegion } from '../lib/optinAbRegions';
 import { getOrCreateVisitorSessionId } from '../lib/visitorSession';
 import { rankPizzerias } from '../lib/pizzeriaRank';
@@ -70,10 +71,10 @@ export function publicEventToRSVPData(event: PublicEvent): RSVPEventData {
     // paccheri-58541: belt-and-suspenders — the API already strips internal
     // tags, but re-filter so 'refund'/'paid' never reach the public RSVP form.
     eventTags: publicEventTags(event.eventTags),
-    nftEnabled: event.nftEnabled,
+    nftEnabled: BRAND_FEATURES.nftMinting && event.nftEnabled,
     nftChain: event.nftChain,
     eventImageUrl: event.eventImageUrl,
-    donationEnabled: event.donationEnabled,
+    donationEnabled: BRAND_FEATURES.donations && event.donationEnabled,
     donationRecipient: event.donationRecipient,
     donationRecipientUrl: event.donationRecipientUrl,
     availableBeverages: event.availableBeverages || [],
@@ -98,10 +99,10 @@ export function dbPartyToRSVPData(party: DbParty): RSVPEventData {
     // ('refund', 'paid', etc.) so they never reach the public RSVP form /
     // checkbox list. Tag-based row filtering only uses public taxonomy tags.
     eventTags: publicEventTags(party.event_tags),
-    nftEnabled: party.nft_enabled,
+    nftEnabled: BRAND_FEATURES.nftMinting && party.nft_enabled,
     nftChain: party.nft_chain,
     eventImageUrl: party.event_image_url,
-    donationEnabled: party.donation_enabled,
+    donationEnabled: BRAND_FEATURES.donations && party.donation_enabled,
     donationRecipient: party.donation_recipient,
     donationRecipientUrl: party.donation_recipient_url,
     availableBeverages: party.available_beverages || [],
