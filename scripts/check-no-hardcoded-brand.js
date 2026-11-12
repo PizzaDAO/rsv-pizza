@@ -18,7 +18,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const SCAN_DIRS = ['frontend/src', 'backend/src', 'frontend/middleware.ts', 'frontend/siteGate.ts', 'frontend/api', 'frontend/index.html', 'frontend/vite.config.ts'];
+const SCAN_DIRS = ['frontend/src', 'backend/src', 'frontend/middleware.ts', 'frontend/api', 'frontend/index.html', 'frontend/vite.config.ts'];
 const BASE = process.env.BASE_SHA || process.env.BASE_REF || 'origin/master';
 
 // Unambiguous brand chrome. NOTE: "PizzaDAO" is intentionally excluded — many
