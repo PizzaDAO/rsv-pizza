@@ -94,14 +94,23 @@ router.get('/:slug/events', async (req: Request, res: Response, next: NextFuncti
   try {
     const slug = req.params.slug?.trim();
     if (!slug) throw new AppError('slug is required', 400, 'VALIDATION_ERROR');
-    const series = await prisma.eventSeries.findUnique({ where: { slug }, select: { id: true } });
+    const series = await prisma.eventSeries.findUnique({ where: { slug }, select: { id: true, siteUrl: true, isActive: true } });
     if (!series) throw new AppError('Series not found', 404, 'NOT_FOUND');
+
+    // Active branded series (site_url set) list on creation, including pending events
+    // (D5), but never password-protected ones. Everything else (GPP, inactive) keeps
+    // the curated approved/listed filter.
+    const branded = !!series.siteUrl && series.isActive;
+    const underbossFilter = branded
+      ? { notIn: ['rejected', 'hidden'] }
+      : { in: ['approved', 'listed'] };
 
     const rows = await prisma.party.findMany({
       where: {
         eventSeriesId: series.id,
-        underbossStatus: { in: ['approved', 'listed'] },
+        underbossStatus: underbossFilter,
         cancelledAt: null,
+        ...(branded ? { password: null } : {}),
       },
       orderBy: [{ date: 'asc' }],
       select: {

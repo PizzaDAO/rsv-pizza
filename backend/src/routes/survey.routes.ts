@@ -20,7 +20,7 @@ import {
   validateSurveyAnswers,
 } from '../lib/surveyQuestions.js';
 import { sendHostSurveyEmail } from '../services/hostSurveyEmail.js';
-import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
 
 const SURVEY_TAB = 'survey';
 
@@ -30,9 +30,9 @@ const SURVEY_TAB = 'survey';
 export function buildSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   guest: { name: string; email: string },
-  token: string
+  token: string,
+  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
-  const baseUrl = 'https://rsv.pizza';
   const surveyUrl = `${baseUrl}/survey/${token}`;
 
   const escape = (s: string) =>
@@ -92,11 +92,12 @@ async function sendSurveyToParty(
 }> {
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    select: { id: true, name: true, eventImageUrl: true },
+    select: { id: true, name: true, eventImageUrl: true, eventSeriesId: true },
   });
   if (!party) {
     throw new AppError('Party not found', 404, 'NOT_FOUND');
   }
+  const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
 
   // Build the recipient filter from the chosen audience. We intentionally
   // ignore mailing_list_opt_in here.
@@ -162,7 +163,8 @@ async function sendSurveyToParty(
           const { subject, html } = buildSurveyEmail(
             { name: party.name, eventImageUrl: party.eventImageUrl },
             { name: g.name, email: g.email! },
-            token
+            token,
+            site.url
           );
 
           const resp = await fetch('https://api.resend.com/emails', {
@@ -172,7 +174,7 @@ async function sendSurveyToParty(
               Authorization: `Bearer ${resendApiKey}`,
             },
             body: JSON.stringify({
-              from: brand.fromEmail,
+              from: site.fromEmail,
               to: [g.email],
               subject,
               html,

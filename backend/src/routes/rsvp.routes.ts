@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { triggerWebhook } from '../services/webhook.service.js';
 import { createEmbeddedWalletForGuest } from '../services/privy.service.js';
-import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
 
 const router = Router();
 
@@ -353,6 +353,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
         address: true,
         customUrl: true,
         eventImageUrl: true,
+        eventSeriesId: true,
         rsvpClosedAt: true,
         // porchetta-81402: block RSVP submission on cancelled events.
         cancelledAt: true,
@@ -376,6 +377,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
           address: true,
           customUrl: true,
           eventImageUrl: true,
+          eventSeriesId: true,
           rsvpClosedAt: true,
           // porchetta-81402: block RSVP submission on cancelled events.
           cancelledAt: true,
@@ -405,6 +407,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             address: true,
             customUrl: true,
             eventImageUrl: true,
+            eventSeriesId: true,
             rsvpClosedAt: true,
             // porchetta-81402: block RSVP submission on cancelled events.
             cancelledAt: true,
@@ -649,6 +652,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             waitlistPosition: waitlistPosition!,
             inviteCode,
             customUrl: party.customUrl,
+            eventSeriesId: party.eventSeriesId,
           });
         } else {
           await sendRSVPConfirmationEmail({
@@ -663,6 +667,7 @@ router.post('/:inviteCode/guest', async (req: Request, res: Response, next: Next
             inviteCode,
             customUrl: party.customUrl,
             requireApproval: party.requireApproval,
+            eventSeriesId: party.eventSeriesId,
           });
         }
       } catch (emailError) {
@@ -721,6 +726,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
         address: true,
         customUrl: true,
         eventImageUrl: true,
+        eventSeriesId: true,
       },
     });
 
@@ -735,6 +741,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
           address: true,
           customUrl: true,
           eventImageUrl: true,
+          eventSeriesId: true,
         },
       });
     }
@@ -756,6 +763,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
             address: true,
             customUrl: true,
             eventImageUrl: true,
+            eventSeriesId: true,
           },
         });
       }
@@ -777,6 +785,7 @@ router.post('/:inviteCode/send-confirmation', async (req: Request, res: Response
       partyImageUrl: party.eventImageUrl,
       inviteCode,
       customUrl: party.customUrl,
+      eventSeriesId: party.eventSeriesId,
     });
 
     res.json({ success: true, message: 'Confirmation email sent' });
@@ -798,6 +807,7 @@ async function sendRSVPConfirmationEmail(params: {
   inviteCode: string;
   customUrl: string | null;
   requireApproval?: boolean;
+  eventSeriesId?: string | null;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -806,7 +816,8 @@ async function sendRSVPConfirmationEmail(params: {
     return;
   }
 
-  const baseUrl = 'https://rsv.pizza';
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
+  const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
     : `${baseUrl}/${params.inviteCode}`;
@@ -909,7 +920,7 @@ async function sendRSVPConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [params.guestEmail],
       subject: emailSubject,
       html: emailHtml,
@@ -937,6 +948,7 @@ export async function sendApprovalEmail(params: {
   venueName: string | null;
   inviteCode: string;
   customUrl: string | null;
+  eventSeriesId?: string | null;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -945,7 +957,8 @@ export async function sendApprovalEmail(params: {
     return;
   }
 
-  const baseUrl = 'https://rsv.pizza';
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
+  const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
     : `${baseUrl}/${params.inviteCode}`;
@@ -1029,7 +1042,7 @@ export async function sendApprovalEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [params.guestEmail],
       subject: `You're approved for ${params.partyName}! 🍕`,
       html: emailHtml,
@@ -1055,6 +1068,7 @@ async function sendWaitlistConfirmationEmail(params: {
   waitlistPosition: number;
   inviteCode: string;
   customUrl: string | null;
+  eventSeriesId?: string | null;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -1063,7 +1077,8 @@ async function sendWaitlistConfirmationEmail(params: {
     return;
   }
 
-  const baseUrl = 'https://rsv.pizza';
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
+  const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
     : `${baseUrl}/${params.inviteCode}`;
@@ -1132,7 +1147,7 @@ async function sendWaitlistConfirmationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [params.guestEmail],
       subject: `You're #${params.waitlistPosition} on the waitlist for ${params.partyName}`,
       html: emailHtml,
@@ -1159,6 +1174,7 @@ export async function sendPromotionEmail(params: {
   partyImageUrl?: string | null;
   inviteCode: string;
   customUrl: string | null;
+  eventSeriesId?: string | null;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -1167,7 +1183,8 @@ export async function sendPromotionEmail(params: {
     return;
   }
 
-  const baseUrl = 'https://rsv.pizza';
+  const site = await siteForParty(params, 'https://rsv.pizza'); // brand-check-ignore-line
+  const baseUrl = site.url;
   const eventUrl = params.customUrl
     ? `${baseUrl}/${params.customUrl}`
     : `${baseUrl}/${params.inviteCode}`;
@@ -1253,7 +1270,7 @@ export async function sendPromotionEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: brand.fromEmail,
+      from: site.fromEmail,
       to: [params.guestEmail],
       subject: `You're in! A spot opened up at ${params.partyName}`,
       html: emailHtml,

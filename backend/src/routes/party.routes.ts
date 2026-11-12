@@ -22,7 +22,7 @@ import { getReimbursementRules, getGppGlobalEditors, getOperationalLimits } from
 import { resolvePartyReimbursementOptions } from '../lib/reimbursementOptions.js';
 import { canonicalizeCountryName } from '../lib/canonicalCountryName.js';
 import { emailHostOfCapChange } from '../services/partyStatusEmailNotify.js';
-import { brand } from '../config/brand.js';
+import { siteForParty, brandedSeriesBySlug } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 
@@ -260,7 +260,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       availableBeverages, availableToppings, availableDietaryOptions, password, eventImageUrl, description,
       customUrl, timezone, hideGuests, requireApproval, coHosts,
       donationEnabled, donationGoal, donationMessage, suggestedAmounts, donationRecipient,
-      donationRecipientUrl, donationEthAddress, showToppingsOnRsvp
+      donationRecipientUrl, donationEthAddress, showToppingsOnRsvp, seriesSlug
     } = req.body;
 
     // Generate default party name if not provided
@@ -312,8 +312,13 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     }
     const finalCoHosts = baseCoHosts;
 
+    // White-label: honored only for an ACTIVE series with site_url set, so nobody can
+    // self-enroll into gpp2026/gpp2027 (site_url NULL). Unknown/inactive slugs are ignored.
+    const brandedSeries = await brandedSeriesBySlug(seriesSlug);
+
     const party = await prisma.party.create({
       data: {
+        ...(brandedSeries ? { eventSeriesId: brandedSeries.id } : {}),
         name: partyName,
         date: date ? new Date(date) : null,
         endTime: endTime ? new Date(endTime) : null,
@@ -1258,14 +1263,14 @@ router.get('/:id/invite-link', async (req: AuthRequest, res: Response, next: Nex
 
     const party = await prisma.party.findUnique({
       where: { id },
-      select: { inviteCode: true },
+      select: { inviteCode: true, eventSeriesId: true },
     });
 
     if (!party) {
       throw new AppError('Party not found', 404, 'NOT_FOUND');
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5176';
+    const baseUrl = (await siteForParty(party, process.env.FRONTEND_URL || 'http://localhost:5176')).url;
     const inviteLink = `${baseUrl}/rsvp/${party.inviteCode}`;
 
     res.json({ inviteCode: party.inviteCode, inviteLink });
@@ -1925,6 +1930,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             customUrl: true,
             eventImageUrl: true,
             venueName: true,
+            eventSeriesId: true,
           },
         });
 
@@ -1941,6 +1947,7 @@ router.patch('/:partyId/guests/:guestId/approve', async (req: AuthRequest, res: 
             venueName: party.venueName,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,
+            eventSeriesId: party.eventSeriesId,
           });
         }
       } catch (emailError) {
@@ -2067,6 +2074,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             inviteCode: true,
             customUrl: true,
             eventImageUrl: true,
+            eventSeriesId: true,
           },
         });
 
@@ -2082,6 +2090,7 @@ router.post('/:partyId/guests/:guestId/promote', async (req: AuthRequest, res: R
             partyImageUrl: party.eventImageUrl,
             inviteCode: party.inviteCode,
             customUrl: party.customUrl,
+            eventSeriesId: party.eventSeriesId,
           });
         }
       } catch (emailError) {
@@ -2221,6 +2230,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
         inviteCode: true,
         customUrl: true,
         hostTelegramChatId: true,
+        eventSeriesId: true,
       },
     });
     if (!party) {
@@ -2271,7 +2281,8 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
       if (!resendApiKey) {
         console.warn('[Day-of announce] RESEND_API_KEY not set, skipping email sends');
       } else {
-        const baseUrl = 'https://rsv.pizza';
+        const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
+        const baseUrl = site.url;
         const eventUrl = party.customUrl
           ? `${baseUrl}/${party.customUrl}`
           : `${baseUrl}/${party.inviteCode}`;
@@ -2307,7 +2318,7 @@ router.post('/:partyId/announce', async (req: AuthRequest, res: Response, next: 
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                from: brand.fromEmail,
+                from: site.fromEmail,
                 to: [recipient.email],
                 subject: subject || `Update from ${party.name}`,
                 html,

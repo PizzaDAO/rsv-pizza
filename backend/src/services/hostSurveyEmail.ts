@@ -10,10 +10,9 @@
 
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
-import { brand } from '../config/brand.js';
+import { siteForParty } from '../lib/siteBrand.js';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const FROM = brand.fromEmail;
 
 function escapeHtml(s: string): string {
   return s
@@ -32,9 +31,9 @@ function cityLabel(name: string): string {
 function buildHostSurveyEmail(
   party: { name: string; eventImageUrl?: string | null },
   hostName: string | null | undefined,
-  token: string
+  token: string,
+  baseUrl: string = 'https://rsv.pizza' // brand-check-ignore-line
 ): { subject: string; html: string } {
-  const baseUrl = 'https://rsv.pizza';
   const surveyUrl = `${baseUrl}/host-survey/${token}`;
 
   const greeting = hostName ? escapeHtml(hostName.trim().split(/\s+/)[0]) : 'there';
@@ -90,6 +89,7 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
         customUrl: true,
         inviteCode: true,
         eventImageUrl: true,
+        eventSeriesId: true,
         estimatedAttendance: true,
         userId: true,
         user: { select: { id: true, email: true, name: true } },
@@ -122,10 +122,12 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
       },
     });
 
+    const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
     const { subject, html } = buildHostSurveyEmail(
       { name: party.name, eventImageUrl: party.eventImageUrl },
       party.user.name,
-      token
+      token,
+      site.url
     );
 
     const resp = await fetch(RESEND_ENDPOINT, {
@@ -135,7 +137,7 @@ export async function sendHostSurveyEmail(partyId: string): Promise<boolean> {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: FROM,
+        from: site.fromEmail,
         to: [party.user.email],
         subject,
         html,
