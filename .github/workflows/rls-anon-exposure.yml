@@ -13,6 +13,9 @@ on:
       - 'backend/prisma/migrations/**'
       - 'scripts/check-rls-anon-exposure.js'
       - 'scripts/rls-anon-allowlist.json'
+      - 'scripts/anon-sensitive-columns.json'
+      - 'scripts/parties-anon-columns.json'
+      - 'frontend/src/lib/supabase.ts'
       - '.github/workflows/rls-anon-exposure.yml'
   workflow_dispatch:
 

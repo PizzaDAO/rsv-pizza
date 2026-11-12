@@ -43,6 +43,20 @@ describe('parties anon column allowlist', () => {
     expect(safe).not.toContain('password');
   });
 
+  it('the lockdown runner GRANT list is the JSON allowlist (no inline column list)', () => {
+    const src = read('backend/scripts/apply-lockdown-parties-columns.cjs');
+    expect(src).toMatch(/const allow = ALLOW_ALL\.filter\(/);
+    expect(src).toContain('GRANT SELECT (${allow.map(q).join');
+    // JSON allowlist == SAFE_PARTY_COLUMNS (so runner GRANT == SAFE_PARTY_COLUMNS)
+    const allow: string[] = JSON.parse(read('scripts/parties-anon-columns.json'));
+    expect(allow.length).toBe(safe.length);
+    expect(new Set(allow)).toEqual(new Set(safe));
+  });
+
+  it('the CI check script parses SAFE_PARTY_COLUMNS from supabase.ts', () => {
+    expect(read('scripts/check-rls-anon-exposure.js')).toContain('SAFE_PARTY_COLUMNS');
+  });
+
   it('the lockdown runner reads the same allowlist file', () => {
     const src = read('backend/scripts/apply-lockdown-parties-columns.cjs');
     expect(src).toContain('scripts/parties-anon-columns.json');
