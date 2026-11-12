@@ -26,6 +26,8 @@ import { siteForParty, brandedSeriesBySlug } from '../lib/siteBrand.js';
 import { mintNftOnApproval } from '../lib/mintOnApproval.js';
 import { changesGuardedTags } from '../lib/eventTags.js';
 import { secretForWrite, redactPartySecrets } from '../lib/secretHash.js';
+import { resolveCreatePreset } from '../lib/createPresets.js';
+import { applyCreatePreset, enforceBrandCreateLimit } from '../lib/brandCreate.js';
 
 // Helper function to get party with ownership check
 async function getPartyWithOwnershipCheck(partyId: string, userId?: string, userEmail?: string) {
@@ -266,20 +268,34 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       donationRecipientUrl, donationEthAddress, showToppingsOnRsvp, seriesSlug
     } = req.body;
 
+    // White-label: honored only for an ACTIVE series with site_url set, so nobody can
+    // self-enroll into gpp2026/gpp2027 (site_url NULL). Unknown/inactive slugs are ignored.
+    const brandedSeries = await brandedSeriesBySlug(seriesSlug);
+
+    // Streamlined create flow: only when the series has a known create_flow. NULL = the
+    // generic path below, unchanged.
+    const createPreset = brandedSeries ? resolveCreatePreset(brandedSeries.createFlow) : null;
+    let presetOut: Awaited<ReturnType<typeof applyCreatePreset>> | null = null;
+    if (brandedSeries && createPreset) {
+      await enforceBrandCreateLimit(req.userId!);
+      presetOut = await applyCreatePreset(brandedSeries, createPreset, req.body);
+    }
+
     // Generate default party name if not provided
-    let partyName = name?.trim();
+    let partyName = presetOut ? presetOut.name : name?.trim();
     if (!partyName) {
       const count = await prisma.party.count();
       partyName = `Pizza Party ${count + 1}`;
     }
 
     // Validate custom URL if provided
-    if (customUrl) {
+    const effectiveCustomUrl = presetOut ? presetOut.customUrl : customUrl;
+    if (effectiveCustomUrl) {
       // Only allow lowercase letters, numbers, and hyphens
-      if (!/^[a-z0-9-]+$/.test(customUrl)) {
+      if (!/^[a-z0-9-]+$/.test(effectiveCustomUrl)) {
         throw new AppError('Custom URL can only contain lowercase letters, numbers, and hyphens', 400, 'VALIDATION_ERROR');
       }
-      if (customUrl.length < 3 || customUrl.length > 50) {
+      if (effectiveCustomUrl.length < 3 || effectiveCustomUrl.length > 50) {
         throw new AppError('Custom URL must be between 3 and 50 characters', 400, 'VALIDATION_ERROR');
       }
     }
@@ -315,14 +331,10 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     }
     const finalCoHosts = baseCoHosts;
 
-    // White-label: honored only for an ACTIVE series with site_url set, so nobody can
-    // self-enroll into gpp2026/gpp2027 (site_url NULL). Unknown/inactive slugs are ignored.
-    const brandedSeries = await brandedSeriesBySlug(seriesSlug);
-
     // party-password-hash: store a bcrypt hash, never the plaintext.
     const passwordToWrite = (await secretForWrite(password)) ?? null;
 
-    const party = await prisma.party.create({
+    const createParty = (customUrlOverride?: string | null) => prisma.party.create({
       data: {
         ...(brandedSeries ? { eventSeriesId: brandedSeries.id } : {}),
         // Same as the GPP create path: the series' public tags become the party's eventTags.
@@ -362,11 +374,43 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
         donationRecipientUrl: donationRecipientUrl || null,
         donationEthAddress: donationEthAddress || null,
         showToppingsOnRsvp: showToppingsOnRsvp || false,
+        // Create-flow preset overrides (only when the series has a known create_flow).
+        ...(presetOut ? {
+          date: presetOut.date,
+          endTime: presetOut.endTime,
+          duration: presetOut.duration,
+          timezone: presetOut.timezone,
+          address: presetOut.address,
+          addressIsCityDefault: presetOut.addressIsCityDefault,
+          customUrl: customUrlOverride !== undefined ? customUrlOverride : presetOut.customUrl,
+          maxGuests: presetOut.maxGuests,
+          requireApproval: presetOut.requireApproval,
+          hideGuests: presetOut.hideGuests,
+          photosEnabled: presetOut.photosEnabled,
+          photosPublic: presetOut.photosPublic,
+          eventImageUrl: presetOut.eventImageUrl,
+          description: presetOut.description,
+          pinnedApps: presetOut.pinnedApps,
+          ...(presetOut.externalLinks ? { externalLinks: presetOut.externalLinks } : {}),
+        } : {}),
       },
       include: {
         user: { select: { name: true } },
       },
     });
+
+    // Generated custom URLs can lose a race (unique custom_url): retry with the next free
+    // suffix (bounded). A client-sent customUrl keeps today's behavior (error propagates).
+    const urlTries: Array<string | undefined> = presetOut?.urlGenerated ? [undefined, ...presetOut.urlRetry] : [undefined];
+    let party!: Awaited<ReturnType<typeof createParty>>;
+    for (let i = 0; ; i++) {
+      try {
+        party = await createParty(urlTries[i]);
+        break;
+      } catch (e: any) {
+        if (!(presetOut?.urlGenerated && e?.code === 'P2002' && i + 1 < urlTries.length)) throw e;
+      }
+    }
 
     // Add the host as a guest so they can bypass password protection
     if (req.userEmail) {
