@@ -20,7 +20,7 @@
  * Delivery proof (plan S2): subscribes with the PUBLIC key (env SUPABASE_ANON_KEY) to the
  * throwaway topic guests:<random uuid> as a plain (public, non-private) broadcast channel, calls
  * realtime.send with exactly the arguments the trigger uses, and requires the message to arrive
- * within 10s with payload keys ['op'] only. This proves "allow public channels" is on, the
+ * within 10s with payload keys ['id','op'] (id = realtime's random message id, checked not to be a guest id). This proves "allow public channels" is on, the
  * realtime.messages partition exists, and the public key can receive it. Skipped (with a clear
  * note) when SUPABASE_ANON_KEY is not set. The trigger's own code path is covered by the
  * function/trigger checks, not by writing to guests.
@@ -130,8 +130,8 @@ async function realtimeFacts(db) {
 async function deliveryProof() {
   const key = process.env.SUPABASE_ANON_KEY;
   if (!key) {
-    console.log('SKIP delivery proof: SUPABASE_ANON_KEY not set (export the public key and run --verify).');
-    return true;
+    console.log('SKIPPED delivery proof: SUPABASE_ANON_KEY not set (delivery NOT proven; export the public key and run --verify).');
+    return 'skipped';
   }
   const { createClient } = require('@supabase/supabase-js');
   const probeParty = crypto.randomUUID();
@@ -161,12 +161,20 @@ async function deliveryProof() {
   console.log(`realtime.messages rows for the probe topic: ${mrow[0].n}`);
   if (!msg) {
     console.log('FAIL delivery proof: no broadcast received within 10s (public channels disabled? missing partition? key rejected?)');
-    return false;
+    return 'fail';
   }
-  const keys = Object.keys((msg && msg.payload) || {}).sort();
-  const ok = JSON.stringify(keys) === JSON.stringify(['op']);
-  console.log(`${ok ? 'OK  ' : 'FAIL'} delivery proof: public-key subscriber received 'guests_changed'; payload keys = ${JSON.stringify(keys)}`);
-  return ok;
+  // Realtime's realtime.send injects a random message id into the payload, so the expected keys
+  // are ['id','op']. The id must be that random message id, never a guest id.
+  const payload = (msg && msg.payload) || {};
+  const keys = Object.keys(payload).sort();
+  let ok = JSON.stringify(keys) === JSON.stringify(['id', 'op']) || JSON.stringify(keys) === JSON.stringify(['op']);
+  if (ok && payload.id !== undefined) {
+    const isGuest = await prisma.$queryRawUnsafe(
+      `SELECT count(*)::int AS n FROM guests WHERE id::text = $1`, String(payload.id));
+    if (isGuest[0].n !== 0) { ok = false; console.log('payload id equals a guest id!'); }
+  }
+  console.log(`${ok ? 'OK  ' : 'FAIL'} delivery proof: public-key subscriber received 'guests_changed'; payload keys = ${JSON.stringify(keys)}${ok && keys.includes('id') ? ' (id is not a guest id)' : ''}`);
+  return ok ? 'ok' : 'fail';
 }
 
 async function main() {
@@ -190,7 +198,8 @@ async function main() {
     console.log(`trigger/function problems: ${problems.length}`);
     for (const p of problems) console.log('  - ' + p);
     const proof = await deliveryProof();
-    if (problems.length || !proof) process.exit(1);
+    if (problems.length || proof === 'fail') process.exit(1);
+    if (proof === 'skipped') { console.log('\nTriggers OK; delivery SKIPPED (not proven).'); process.exit(2); }
     console.log('\nOK   triggers present + delivery proven');
     return;
   }
@@ -218,8 +227,8 @@ async function main() {
   console.log(`applied ${stmts.length} statements; post-commit problems: ${problems.length}`);
   for (const p of problems) console.log('  - ' + p);
   const proof = await deliveryProof();
-  if (problems.length || !proof) { console.log('\nFAIL - consider --rollback'); process.exit(1); }
-  console.log('\nOK   3 statement-level triggers present, function is SECURITY DEFINER with no anon EXECUTE, delivery proven');
+  if (problems.length || proof === 'fail') { console.log('\nFAIL - consider --rollback'); process.exit(1); }
+  console.log(`\nOK   3 statement-level triggers present, function is SECURITY DEFINER with no anon EXECUTE; delivery ${proof === 'ok' ? 'proven' : 'SKIPPED (not proven: run --verify with SUPABASE_ANON_KEY)'}`);
 }
 
 main().catch((e) => { console.error('FAILED:', e.message); process.exitCode = 1; })

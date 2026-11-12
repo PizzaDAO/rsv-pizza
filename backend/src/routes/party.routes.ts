@@ -519,13 +519,14 @@ router.get('/:id/guests', async (req: AuthRequest, res: Response, next: NextFunc
 router.get('/:id/my-guest', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const email = req.userEmail?.toLowerCase();
+    const email = req.userEmail?.toLowerCase().trim();
     if (!email || !UUID_RE.test(id)) {
       return res.json({ guest: null });
     }
 
+    // Exact match: guest emails are stored lowercased (no ILIKE, so `_`/`%` can't act as wildcards).
     const guest = await prisma.guest.findFirst({
-      where: { partyId: id, email: { equals: email, mode: 'insensitive' } },
+      where: { partyId: id, email },
       select: {
         id: true,
         name: true,
@@ -1947,26 +1948,26 @@ router.post('/:id/guests/import', async (req: AuthRequest, res: Response, next: 
     // to bound the supabase_realtime WAL fan-out burst.
     for (let i = 0; i < toInsert.length; i += IMPORT_CHUNK_SIZE) {
       const chunk = toInsert.slice(i, i + IMPORT_CHUNK_SIZE);
-      const ops = chunk.map((g) =>
-        prisma.guest.create({
-          data: {
-            name: g.name,
-            email: g.email,
-            dietaryRestrictions: [],
-            likedToppings: [],
-            dislikedToppings: [],
-            likedBeverages: [],
-            dislikedBeverages: [],
-            submittedVia,
-            partyId: id,
-            status: g.status,
-            approved: g.approved,
-            checkedInAt: g.checkedInAt,
-            checkedInBy: g.checkedInBy,
-          },
-        })
-      );
-      const created = await prisma.$transaction(ops);
+      // One multi-row INSERT per chunk (a single statement-level broadcast trigger firing,
+      // instead of one per row). createManyAndReturn preserves insertion order and returns ids.
+      const created = await prisma.guest.createManyAndReturn({
+        data: chunk.map((g) => ({
+          name: g.name,
+          email: g.email,
+          dietaryRestrictions: [],
+          likedToppings: [],
+          dislikedToppings: [],
+          likedBeverages: [],
+          dislikedBeverages: [],
+          submittedVia,
+          partyId: id,
+          status: g.status,
+          approved: g.approved,
+          checkedInAt: g.checkedInAt,
+          checkedInBy: g.checkedInBy,
+        })),
+        select: { id: true },
+      });
       created.forEach((g) => createdGuestIds.push(g.id));
       if (i + IMPORT_CHUNK_SIZE < toInsert.length) {
         await new Promise((r) => setTimeout(r, IMPORT_CHUNK_GAP_MS));

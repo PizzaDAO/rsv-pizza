@@ -9,11 +9,15 @@
  * Event end = COALESCE(parties.end_time, parties.date). Parties with neither are skipped.
  *
  * Modes:
- *   (none)    dry run: read-only, prints COUNTS only (never tokens, emails or ids).
- *   --apply   rotates in batches. Every row is updated with an optimistic WHERE that re-checks
- *             the old token value, "no survey_responses row" and "event still ended > 30 days ago",
- *             so a guest who answers (or whose token was rotated) mid-run is skipped. New token =
- *             gen_random_uuid(). Prints counts only.
+ *   (none)    dry run: read-only, prints COUNTS only (never tokens, emails or ids). It also walks
+ *             the exact keyset pagination --apply uses and asserts every eligible row is visited
+ *             exactly once.
+ *   --apply   rotates in keyset-paged batches (ORDER BY id, id > last seen id; a rotated row
+ *             still matches the predicate, so offset-less "re-select the first N" would loop
+ *             forever). Every row is updated with an optimistic WHERE that re-checks the old
+ *             token value, "no survey_responses row" and "event still ended > threshold", so a
+ *             guest who answers (or whose token was rotated) mid-run is skipped. New token =
+ *             gen_random_uuid(). Hard pass cap as a safety net. Prints counts only.
  *   --days N  override the 30-day threshold (default 30, minimum 30).
  *
  *   node backend/scripts/rotate-stale-survey-tokens.cjs [--apply] [--days 30]
@@ -28,6 +32,7 @@ const di = process.argv.indexOf('--days');
 const DAYS = di > -1 ? Number(process.argv[di + 1]) : 30;
 if (!Number.isInteger(DAYS) || DAYS < 30) { console.error('--days must be an integer >= 30'); process.exit(2); }
 const BATCH = 500;
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const prisma = new PrismaClient();
 
 // Shared eligibility predicate (alias g = guests, p = parties). $1 = days.
@@ -53,6 +58,39 @@ async function counts() {
   return r[0];
 }
 
+/** One keyset page of eligible rows strictly after lastId, in id order. */
+function page(lastId) {
+  return prisma.$queryRawUnsafe(`
+    SELECT g.id::text AS id, g.survey_token::text AS tok
+    FROM guests g JOIN parties p ON p.id = g.party_id
+    WHERE ${ELIGIBLE} AND g.id > $2::uuid
+    ORDER BY g.id LIMIT ${BATCH}`, DAYS, lastId);
+}
+
+/**
+ * Walk every eligible row exactly once with a keyset cursor, calling visit(row) for each.
+ * Pass cap = ceil(expected / BATCH) + 5, a safety net against any future cursor bug.
+ */
+async function walk(expected, visit) {
+  const maxPasses = Math.ceil(expected / BATCH) + 5;
+  const seen = new Set();
+  let lastId = NIL_UUID;
+  let passes = 0;
+  for (;;) {
+    if (++passes > maxPasses) throw new Error(`pass cap (${maxPasses}) exceeded - aborting (cursor not advancing?)`);
+    const rows = await page(lastId);
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (seen.has(row.id)) throw new Error('row visited twice - cursor bug, aborting');
+      seen.add(row.id);
+      await visit(row);
+    }
+    lastId = rows[rows.length - 1].id;
+    if (rows.length < BATCH) break;
+  }
+  return { visited: seen.size, passes };
+}
+
 async function main() {
   console.log(`\n=== rotate stale survey tokens (${APPLY ? 'APPLY' : 'DRY RUN'}, threshold ${DAYS} days) ===\n`);
   const c = await counts();
@@ -61,32 +99,30 @@ async function main() {
   console.log(`  unanswered:                               ${c.unanswered}`);
   console.log(`    ...of which event date unknown (kept):  ${c.unanswered_no_event_date}`);
   console.log(`  WOULD ROTATE (unanswered + ended >${DAYS}d):  ${c.would_rotate}  across ${c.parties_affected} parties`);
-  if (!APPLY) { console.log('\nDry run only (read-only). Re-run with --apply.'); return; }
+
+  if (!APPLY) {
+    const w = await walk(c.would_rotate, async () => {});
+    const ok = w.visited === c.would_rotate;
+    console.log(`\nkeyset walk (read-only): visited ${w.visited} rows in ${w.passes} page(s); ${ok ? 'OK each eligible row visited exactly once' : `MISMATCH vs ${c.would_rotate} (data changed during the run?)`}`);
+    console.log('Dry run only (read-only). Re-run with --apply.');
+    if (!ok) process.exit(1);
+    return;
+  }
 
   let rotated = 0, skipped = 0;
-  for (;;) {
-    const batch = await prisma.$queryRawUnsafe(`
-      SELECT g.id::text AS id, g.survey_token::text AS tok
-      FROM guests g JOIN parties p ON p.id = g.party_id
-      WHERE ${ELIGIBLE}
-      ORDER BY g.id LIMIT ${BATCH}`, DAYS);
-    if (!batch.length) break;
-    let progressed = 0;
-    for (const row of batch) {
-      // Optimistic per-row update: re-check everything in the WHERE, so concurrent changes win.
-      const n = await prisma.$executeRawUnsafe(`
-        UPDATE guests g SET survey_token = gen_random_uuid()
-        FROM parties p
-        WHERE p.id = g.party_id AND g.id = $2::uuid AND g.survey_token = $3::uuid
-          AND ${ELIGIBLE}`, DAYS, row.id, row.tok);
-      if (n === 1) { rotated++; progressed++; } else skipped++;
-    }
-    console.log(`  rotated so far: ${rotated} (skipped by optimistic check: ${skipped})`);
-    if (!progressed) break; // nothing moved: avoid an infinite loop
-  }
-  const after = await counts();
-  console.log(`\nrotated ${rotated}, skipped ${skipped}; remaining eligible: ${after.would_rotate}`);
-  console.log(after.would_rotate === 0 ? 'OK' : 'NOTE: some rows remain (changed concurrently?) - re-run');
+  const w = await walk(c.would_rotate, async (row) => {
+    // Optimistic per-row update: re-check everything in the WHERE, so concurrent changes win.
+    const n = await prisma.$executeRawUnsafe(`
+      UPDATE guests g SET survey_token = gen_random_uuid()
+      FROM parties p
+      WHERE p.id = g.party_id AND g.id = $2::uuid AND g.survey_token = $3::uuid
+        AND ${ELIGIBLE}`, DAYS, row.id, row.tok);
+    if (n === 1) rotated++; else skipped++;
+    if ((rotated + skipped) % BATCH === 0) console.log(`  processed ${rotated + skipped} (rotated ${rotated}, skipped ${skipped})`);
+  });
+  console.log(`\nvisited ${w.visited} in ${w.passes} page(s); rotated ${rotated}; skipped by optimistic check ${skipped}`);
+  console.log(w.visited === c.would_rotate ? 'OK   every eligible row visited exactly once' : `NOTE: visited ${w.visited} vs ${c.would_rotate} counted at start (data changed during the run)`);
+  console.log('Note: rotated rows still match the predicate (fresh token, still unanswered), so a re-run rotates them again; run --apply once.');
 }
 
 main().catch((e) => { console.error('FAILED:', e.message); process.exit(1); }).finally(() => prisma.$disconnect());

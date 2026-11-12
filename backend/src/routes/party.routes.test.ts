@@ -17,6 +17,7 @@ const mockPrisma = vi.hoisted(() => ({
   },
   guest: {
     create: vi.fn(),
+    createManyAndReturn: vi.fn(async (args: any) => args.data.map((_: any, i: number) => ({ id: `g-bulk-${i}` }))),
     delete: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
@@ -644,7 +645,7 @@ describe('Party Routes', () => {
       expect(res.body.inserted).toBe(2);
       expect(res.body.skipped).toEqual([]);
       expect(res.body.errors).toEqual([]);
-      const createCalls = mockPrisma.guest.create.mock.calls;
+      const createCalls = mockPrisma.guest.createManyAndReturn.mock.calls.flatMap((c: any) => c[0].data.map((d: any) => [{ data: d }]));
       expect(createCalls).toHaveLength(2);
       expect(createCalls[0][0].data.submittedVia).toBe('import-luma');
       expect(createCalls[0][0].data.approved).toBe(true);
@@ -672,7 +673,7 @@ describe('Party Routes', () => {
           ],
         });
 
-      const calls = mockPrisma.guest.create.mock.calls;
+      const calls = mockPrisma.guest.createManyAndReturn.mock.calls.flatMap((c: any) => c[0].data.map((d: any) => [{ data: d }]));
       const pat = calls.find((c: any) => c[0].data.email === 'pat@x.com')?.[0].data;
       const wendy = calls.find((c: any) => c[0].data.email === 'wendy@x.com')?.[0].data;
       expect(pat.approved).toBeNull();
@@ -706,7 +707,7 @@ describe('Party Routes', () => {
       expect(res.body.inserted).toBe(1);
       expect(res.body.skipped).toHaveLength(1);
       expect(res.body.skipped[0].reason).toBe('duplicate');
-      expect(mockPrisma.guest.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.guest.createManyAndReturn.mock.calls.flatMap((c: any) => c[0].data)).toHaveLength(1);
     });
 
     it('dedups within the input batch (two rows with the same email → one insert)', async () => {
@@ -1051,8 +1052,18 @@ describe('Party Routes', () => {
       expect(res.body.guest).toMatchObject({ id: 'g1' });
       const arg = mockPrisma.guest.findFirst.mock.calls[0][0];
       expect(arg.where.partyId).toBe(PARTY_ID);
-      expect(arg.where.email.equals).toBe('other@example.com');
+      expect(arg.where.email).toBe('other@example.com');
       for (const k of ['surveyToken', 'privyUserId', 'visitorSessionId']) expect(arg.select).not.toHaveProperty(k);
+    });
+
+    it('my-guest matches the email exactly (no ILIKE wildcards: a_b@x.com must not match axb@x.com)', async () => {
+      mockPrisma.guest.findFirst.mockResolvedValueOnce(null);
+      await request(createTestApp())
+        .get(`/api/parties/${PARTY_ID}/my-guest`)
+        .set('Authorization', `Bearer ${makeToken(OTHER_USER_ID, ' a_b@x.com ')}`);
+      const where = mockPrisma.guest.findFirst.mock.calls[0][0].where;
+      expect(where.email).toBe('a_b@x.com'); // plain string = SQL equality, never LIKE/ILIKE
+      expect(where.email).not.toBe('axb@x.com');
     });
 
     it('my-guest returns null when no row, null for a malformed party id, 401 unauthenticated', async () => {
