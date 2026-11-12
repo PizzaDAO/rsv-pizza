@@ -78,7 +78,7 @@ const EventsMapSwcPage = React.lazy(() => import('./pages/EventsMapSwcPage').the
 const EventsMapAllPage = React.lazy(() => import('./pages/EventsMapAllPage').then(m => ({ default: m.EventsMapAllPage })));
 
 // White-label: on a series-scoped build, every route in GPP_ONLY_PATHS renders a
-// redirect to `/` instead of its page. Unset (rsv.pizza) => element untouched.
+// redirect to `/` instead of its page. Unset (default brand) => element untouched.
 // Plain function, not a hook, so rules-of-hooks is unaffected.
 function gppOnly(path: string, element: React.ReactElement): React.ReactElement {
   return IS_SERIES_SCOPED && GPP_ONLY_PATHS.includes(path) ? <Navigate to="/" replace /> : element;

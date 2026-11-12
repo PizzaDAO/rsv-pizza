@@ -1,7 +1,7 @@
 /**
  * White-label scoping (frontend). Everything here is inert unless the build is
  * scoped to an event series (`BRAND.seriesSlug`) or branded (`BRAND.isBranded`),
- * so rsv.pizza (no VITE_BRAND_* set) is unchanged. See
+ * so the default build (no VITE_BRAND_* set) is unchanged. See
  * plans/whitelabel-team1-monad.md section 4 and decision D8.
  */
 import { BRAND } from './brand';
