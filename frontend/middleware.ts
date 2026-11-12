@@ -280,9 +280,12 @@ export default async function middleware(request: Request) {
 export const config = {
   matcher: [
     /*
-     * Match all paths except static assets and internal routes.
+     * Match all paths except built assets and API functions.
      * The middleware itself further filters by bot user-agent.
+     * Prefixes end in "/" on purpose: vercel.json rewrites every other unknown
+     * path to index.html, so a looser prefix (e.g. "/apixyz", "/logo.pngx")
+     * would serve the app past the password gate.
      */
-    '/((?!api|_next/static|_next/image|assets|favicon.ico|logo.png|party.svg).*)',
+    '/((?!api/|assets/).*)',
   ],
 };
