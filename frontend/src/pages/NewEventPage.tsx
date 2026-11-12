@@ -62,7 +62,7 @@ function SeriesScopedNewEventPage() {
 }
 
 export function NewEventPage() {
-  // Default build (rsv.pizza): exactly the existing markup, no series fetch.
+  // Default (unbranded) build: exactly the existing markup, no series fetch.
   if (!IS_SERIES_SCOPED) return <GenericCreate />;
   return <SeriesScopedNewEventPage />;
 }
