@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
+import { createHash } from 'crypto';
 import { errorHandler, AppError } from './middleware/error.js';
 import { isAllowedOrigin } from './lib/cors.js';
 import { prisma } from './config/database.js';
@@ -169,8 +170,32 @@ const limiter = rateLimit({
   legacyHeaders: false,
   // Skip rate limit validation errors
   validate: false,
+  // Host guest-list refetches (live updates) get their own per-user limiter below, so they can
+  // neither starve nor be starved by check-in POSTs on shared venue Wi-Fi.
+  skip: (req) => isHostGuestListRead(req),
 });
 app.use('/api', limiter);
+
+// guests-anon-exposure: GET /api/parties/:id/guests is refetched on every realtime broadcast
+// (debounced client-side). Separate, higher, still-bounded limit keyed per bearer token
+// (hashed); unauthenticated callers fall back to a small per-IP bucket (they get 401 anyway).
+function isHostGuestListRead(req: express.Request): boolean {
+  return req.method === 'GET' && /^\/api\/parties\/[^/]+\/guests\/?$/.test(req.originalUrl.split('?')[0]);
+}
+const hostGuestListLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: (req) => (req.headers.authorization ? 900 : 60),
+  message: { error: 'You\'ve been rate limited. Please wait a few minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  skip: (req) => !isHostGuestListRead(req),
+  keyGenerator: (req) =>
+    req.headers.authorization
+      ? 'u:' + createHash('sha256').update(String(req.headers.authorization)).digest('hex').slice(0, 32)
+      : 'ip:' + ipKeyGenerator(req.ip ?? ''),
+});
+app.use('/api', hostGuestListLimiter);
 
 // Stricter rate limit for RSVP submissions (prevent spam)
 const rsvpLimiter = rateLimit({
