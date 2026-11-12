@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { siteGate, isOpenAsset, GATE_COOKIE } from './siteGate';
+import { siteGate, isOpenAsset, GATE_COOKIE } from './middleware';
 
 const PW = 'hunter2';
 const req = (path: string, init?: RequestInit) => new Request(`https://x.test${path}`, init);
