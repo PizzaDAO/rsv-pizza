@@ -1,4 +1,5 @@
 import React from 'react';
+import { BRAND } from '../config/brand';
 
 interface FooterProps {
   className?: string;
@@ -20,6 +21,16 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
             className="h-7"
           />
         </a>
+        {BRAND.isBranded && (
+          <a
+            href="https://rsv.pizza" // brand-check-ignore-line
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white/40 hover:text-white/60 transition-colors"
+          >
+            powered by RSV.Pizza {/* brand-check-ignore-line */}
+          </a>
+        )}
       </div>
     </footer>
   );

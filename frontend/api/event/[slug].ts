@@ -2,7 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!;
-const SITE_URL = 'https://www.rsv.pizza';
+// Default keeps today's www host; a brand deploy sets VITE_BRAND_DOMAIN.
+const BRAND_DOMAIN = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
+const SITE_URL = BRAND_DOMAIN ? `https://${BRAND_DOMAIN}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
+const BRAND_NAME = (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
+const BRAND_TAGLINE = (process.env.VITE_BRAND_TAGLINE || 'Pizza Party Planning').trim();
 
 // User agents for social media crawlers
 const CRAWLER_USER_AGENTS = [
@@ -113,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!party) {
       return res.status(200).setHeader('Content-Type', 'text/html').send(generateHTML({
-        title: 'Event Not Found | RSV.Pizza',
+        title: `Event Not Found | ${BRAND_NAME}`,
         description: 'This event could not be found.',
         image: `${SITE_URL}/logo.png`,
         url: `${SITE_URL}/${slug}`,
@@ -168,7 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : `${SITE_URL}/${party.invite_code}`;
 
     return res.status(200).setHeader('Content-Type', 'text/html').send(generateHTML({
-      title: `${title} | RSV.Pizza`,
+      title: `${title} | ${BRAND_NAME}`,
       description,
       image: imageUrl,
       url: pageUrl,
@@ -180,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('Error fetching party for OG tags:', error);
     return res.status(200).setHeader('Content-Type', 'text/html').send(generateHTML({
-      title: 'RSV.Pizza - Pizza Party Planning',
+      title: `${BRAND_NAME} - ${BRAND_TAGLINE}`,
       description: 'Plan the perfect pizza order for your party guests.',
       image: `${SITE_URL}/logo.png`,
       url: `${SITE_URL}/${slug}`,
@@ -227,7 +231,7 @@ function generateHTML(options: MetaTagsOptions): string {
   <meta property="og:image" content="${escapeHtml(image)}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name" content="RSV.Pizza">
+  <meta property="og:site_name" content="${escapeHtml(BRAND_NAME)}">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">

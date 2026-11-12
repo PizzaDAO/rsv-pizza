@@ -1,4 +1,5 @@
 import { next } from '@vercel/edge';
+import { siteGate } from './siteGate';
 
 // ---- Bot detection ----
 const CRAWLER_USER_AGENTS = [
@@ -74,10 +75,24 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+// Paths the original matcher excluded (kept for the gate-off case).
+const LEGACY_MATCHER_EXCLUDE = /^\/(api|_next\/static|_next\/image|assets|favicon\.ico|logo\.png|party\.svg)/;
+
 // ---- Main middleware ----
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
+
+  // Optional password gate (white-label previews). Inert unless SITE_PASSWORD is set.
+  const sitePassword = process.env.SITE_PASSWORD;
+  if (sitePassword) {
+    const gated = await siteGate(request, sitePassword);
+    if (gated) return gated;
+  } else if (LEGACY_MATCHER_EXCLUDE.test(pathname)) {
+    // The matcher below is broad (so the gate can cover every page); with no
+    // gate, keep the exact paths the old matcher excluded out of this middleware.
+    return next();
+  }
 
   // Skip home page
   if (pathname === '/') return next();
@@ -118,7 +133,10 @@ export default async function middleware(request: Request) {
     if (!event) return next();
 
     // ---- Build meta tag values (mirrors EventPage.tsx logic) ----
-    const baseUrl = 'https://www.rsv.pizza';
+    // Default keeps today's www host; a brand deploy sets VITE_BRAND_DOMAIN.
+    const brandDomain = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
+    const baseUrl = brandDomain ? `https://${brandDomain}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
+    const brandName = (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
     const pageUrl = `${baseUrl}/${slug}`;
 
     const ogImageUrl = (() => {
@@ -189,7 +207,7 @@ export default async function middleware(request: Request) {
     // Replace <title>
     html = html.replace(
       /<title>[^<]*<\/title>/,
-      `<title>${escapeHtml(metaTitle)} | RSV.Pizza</title>`
+      `<title>${escapeHtml(metaTitle)} | ${escapeHtml(brandName)}</title>`
     );
 
     // Replace meta name="title"
@@ -267,11 +285,8 @@ export default async function middleware(request: Request) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all paths except static assets and internal routes.
-     * The middleware itself further filters by bot user-agent.
-     */
-    '/((?!api|_next/static|_next/image|assets|favicon.ico|logo.png|party.svg).*)',
-  ],
+  // Broad on purpose: the optional password gate must cover every page route and
+  // static HTML. With no SITE_PASSWORD the handler returns next() for the paths
+  // the previous matcher excluded (LEGACY_MATCHER_EXCLUDE), so nothing changes.
+  matcher: ['/:path*'],
 };
