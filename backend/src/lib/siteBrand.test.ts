@@ -149,7 +149,7 @@ describe('siteBrand', () => {
     it('requires active + site_url in the query', async () => {
       mockPrisma.eventSeries.findFirst.mockResolvedValue({ id: 'series-team1' });
       expect(await brandedSeriesBySlug(' team1 ')).toEqual({ id: 'series-team1' });
-      expect(mockPrisma.eventSeries.findFirst.mock.calls[0][0].select).toEqual({ id: true, publicTags: true });
+      expect(mockPrisma.eventSeries.findFirst.mock.calls[0][0].select).toMatchObject({ id: true, publicTags: true, createFlow: true, nameTemplate: true });
       expect(mockPrisma.eventSeries.findFirst.mock.calls[0][0].where).toEqual({
         slug: 'team1',
         isActive: true,

@@ -38,6 +38,8 @@ const BLANK_FORM = {
   flyerTemplateKey: '',
   siteUrl: '',
   brandName: '',
+  createFlow: '',
+  nameTemplate: '',
   fundingWalletAddress: '',
   publicTags: '',
   eventDate: '',
@@ -63,6 +65,8 @@ function seriesToForm(s: EventSeries): FormState {
     flyerTemplateKey: s.flyerTemplateKey ?? '',
     siteUrl: s.siteUrl ?? '',
     brandName: s.brandName ?? '',
+    createFlow: s.createFlow ?? '',
+    nameTemplate: s.nameTemplate ?? '',
     fundingWalletAddress: s.fundingWalletAddress ?? '',
     publicTags: (s.publicTags ?? []).join(', '),
     eventDate: s.eventDate ? s.eventDate.slice(0, 10) : '',
@@ -88,6 +92,8 @@ function formToInput(f: FormState): SeriesInput {
     flyerTemplateKey: f.flyerTemplateKey.trim() || null,
     siteUrl: f.siteUrl.trim() || null,
     brandName: f.brandName.trim() || null,
+    createFlow: f.createFlow.trim() || null,
+    nameTemplate: f.nameTemplate.trim() || null,
     fundingWalletAddress: f.fundingWalletAddress.trim() || null,
     publicTags: f.publicTags.split(',').map((t) => t.trim()).filter(Boolean),
     eventDate: f.eventDate || null,
@@ -313,6 +319,10 @@ export function AdminSeriesPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('siteUrl', e.target.value)} />
               <IconInput icon={Type} placeholder="Brand name (e.g. Team1 Pizza)" value={form.brandName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('brandName', e.target.value)} />
+              <IconInput icon={Tag} placeholder="Create flow: global_day | meetup | hackathon (blank = generic form)" value={form.createFlow}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('createFlow', e.target.value)} />
+              <IconInput icon={Type} placeholder="Event name template (e.g. {series} {city}; blank = preset default)" value={form.nameTemplate}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('nameTemplate', e.target.value)} />
               <IconInput icon={Tag} placeholder="Public tags (comma-separated)" value={form.publicTags}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('publicTags', e.target.value)} />
               <IconInput icon={Wallet} placeholder="Reimbursement wallet (config only — no auto-send yet)" value={form.fundingWalletAddress}

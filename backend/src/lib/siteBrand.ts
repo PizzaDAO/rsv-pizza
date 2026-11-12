@@ -120,12 +120,38 @@ export async function siteForOrigin(origin: string | null | undefined, fallbackU
   return s ? brandedSite(s) : fallbackSite(fallbackUrl);
 }
 
+/** Series fields the create route needs (stamping + the optional create-flow preset). */
+export interface BrandedSeries {
+  id: string;
+  publicTags?: string[];
+  slug?: string;
+  displayName?: string;
+  brandName?: string | null;
+  createFlow?: string | null;
+  nameTemplate?: string | null;
+  requireApproval?: boolean;
+  hideGuests?: boolean;
+  photosEnabled?: boolean;
+  photosPublic?: boolean;
+  ogImageUrl?: string | null;
+  description?: string | null;
+  flyerTemplateKey?: string | null;
+  eventDate?: Date | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
+}
+
 /** Active series with a site_url, by slug (for party-creation stamping). Null otherwise. */
-export async function brandedSeriesBySlug(slug: unknown): Promise<{ id: string; publicTags?: string[] } | null> {
+export async function brandedSeriesBySlug(slug: unknown): Promise<BrandedSeries | null> {
   if (typeof slug !== 'string' || !slug.trim()) return null;
   const s = await prisma.eventSeries.findFirst({
     where: { slug: slug.trim(), isActive: true, siteUrl: { not: null } },
-    select: { id: true, publicTags: true },
+    select: {
+      id: true, publicTags: true, slug: true, displayName: true, brandName: true,
+      createFlow: true, nameTemplate: true, requireApproval: true, hideGuests: true,
+      photosEnabled: true, photosPublic: true, ogImageUrl: true, description: true,
+      flyerTemplateKey: true, eventDate: true, eventStartTime: true, eventEndTime: true,
+    },
   });
   return s ?? null;
 }
