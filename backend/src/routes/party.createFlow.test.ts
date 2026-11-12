@@ -39,7 +39,7 @@ app.use(errorHandler);
 const base = {
   id: 'series-x', publicTags: ['Tag'], displayName: 'Doge Day', brandName: 'Doge Day', nameTemplate: null,
   requireApproval: false, hideGuests: false, photosEnabled: true, photosPublic: true,
-  ogImageUrl: 'https://doge.rsv.pizza/brands/doge/og.png', description: 'Series description',
+  ogImageUrl: 'https://cdn.example.com/og.png', description: 'Series description',
   flyerTemplateKey: null, eventDate: null, eventStartTime: null, eventEndTime: null,
 };
 const DOGE = { ...base, slug: 'doge', createFlow: 'global_day', eventDate: new Date('2027-11-02T00:00:00.000Z') };
@@ -85,7 +85,7 @@ describe('POST /api/parties create-flow presets', () => {
       expect(d.customUrl).toBe('doge-austin');
       expect(d.eventSeriesId).toBe('series-x');
       expect(d.eventTags).toEqual(['Tag']);
-      expect(d.eventImageUrl).toBe('https://doge.rsv.pizza/brands/doge/og.png');
+      expect(d.eventImageUrl).toBe('https://cdn.example.com/og.png');
       expect(d.description).toBe('Series description');
       expect(d.requireApproval).toBe(false);
     });
