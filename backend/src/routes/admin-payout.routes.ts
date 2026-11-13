@@ -47,6 +47,25 @@ import { emailHostOfPaymentExecution } from '../services/payoutEmailNotify.js';
 import { notifyPaymentsTeam } from '../services/paymentsTeamNotify.js';
 import { payoutHasReceipt } from '../services/payout-receipts.js';
 import {
+  isPrivateReceiptPath,
+  partyIdFromPrivateReceiptPath,
+  resolveFetchableUrl,
+  uploadPrivateReceipt,
+} from '../services/payoutReceiptStorage.service.js';
+
+/** `payouts/...` object path from a legacy public event-images URL, or null. */
+function legacyEventImagesPayoutPath(url: string): string | null {
+  const marker = '/object/public/event-images/';
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  try {
+    const p = decodeURIComponent(url.slice(i + marker.length).split('?')[0]);
+    return p.startsWith('payouts/') ? p : null;
+  } catch {
+    return null;
+  }
+}
+import {
   requireAdminOrRegionalUnderboss,
   parseRegionsQuery,
   type RegionalAuthRequest,
@@ -1947,6 +1966,11 @@ router.post(
       const extProof = typeof body.externalProofUrl === 'string' && body.externalProofUrl.trim()
         ? body.externalProofUrl.trim()
         : null;
+      // payout-receipts-private: an uploaded proof file is a bare private
+      // path; it must belong to this party's folder.
+      if (extProof && isPrivateReceiptPath(extProof) && partyIdFromPrivateReceiptPath(extProof) !== partyId) {
+        throw new AppError(`externalProofUrl must be under payouts/${partyId}/`, 400, 'INVALID_IMAGE_URL_SCOPE');
+      }
 
       // prosciutto-92106: PROOF GATE on external-record path too. Same escape
       // hatch as mark-paid: full admins can set `proofless:true` with a note.
@@ -6637,8 +6661,9 @@ router.post(
         throw new AppError('Document not found', 404, 'NOT_FOUND');
       }
 
-      // Fetch the bytes (Node 18+ global fetch).
-      const resp = await fetch(existing.url);
+      // Fetch the bytes (Node 18+ global fetch). Private receipts (bare path)
+      // are fetched through a short-lived signed URL.
+      const resp = await fetch(await resolveFetchableUrl(existing.url));
       if (!resp.ok) {
         throw new AppError('Could not fetch the receipt image', 502, 'ROTATE_FETCH_FAILED');
       }
@@ -6669,6 +6694,31 @@ router.post(
 
       // Upload a NEW object (do NOT overwrite — a fresh path avoids CDN/browser
       // cache staleness). Mirror logoAudit.routes.ts's admin client pattern.
+      // payout-receipts-private: receipts (legacy public or already private)
+      // are written to the PRIVATE bucket and stored as a bare path; the
+      // rotated copy is a receipt image and must not land in a public bucket.
+      if (existing.kind === 'receipt') {
+        const basePath = isPrivateReceiptPath(existing.url)
+          ? existing.url
+          : (legacyEventImagesPayoutPath(existing.url) ?? `payouts/${existing.partyId}/${existing.id}.jpg`);
+        const dotIdx = basePath.lastIndexOf('.');
+        const slashIdx = basePath.lastIndexOf('/');
+        const hasExt = dotIdx > slashIdx;
+        const privatePath = `${hasExt ? basePath.slice(0, dotIdx) : basePath}-r${Date.now()}${hasExt ? basePath.slice(dotIdx) : '.jpg'}`;
+        try {
+          await uploadPrivateReceipt(privatePath, rotated, contentType || 'image/jpeg');
+        } catch {
+          throw new AppError('Failed to upload rotated image', 502, 'ROTATE_UPLOAD_FAILED');
+        }
+        await prisma.payoutDocument.update({
+          where: { id: docId },
+          data: { url: privatePath },
+        });
+        // The response middleware signs the bare path.
+        res.json({ document: { id: existing.id, url: privatePath } });
+        return;
+      }
+
       const supabaseAdmin = createClient(
         process.env.SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -6818,6 +6868,13 @@ function deriveAdminOcrUrl(doc: { url: string; mimeType?: string | null }): stri
 function assertSupabasePayoutDocUrl(imageUrl: unknown, partyId: string): string {
   if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
     throw new AppError('url is required', 400, 'INVALID_IMAGE_URL');
+  }
+  // payout-receipts-private: bare path in the PRIVATE payout-receipts bucket.
+  if (isPrivateReceiptPath(imageUrl)) {
+    if (partyIdFromPrivateReceiptPath(imageUrl) !== partyId) {
+      throw new AppError(`url must be under payouts/${partyId}/`, 400, 'INVALID_IMAGE_URL_SCOPE');
+    }
+    return imageUrl;
   }
   let url: URL;
   try {

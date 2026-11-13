@@ -24,6 +24,10 @@ const router = Router();
 // Pin server-side fetches to our own public storage objects only.
 const ALLOWED_ORIGIN = 'https://znpiwdvvsqaxuskpfleo.supabase.co';
 const ALLOWED_PATH_PREFIX = '/storage/v1/object/public/';
+// payout-receipts-private: legacy HEIC receipts moved to the private bucket are
+// handed to the browser as short-lived signed URLs; allow converting those too
+// (the signed URL is itself the access grant).
+const ALLOWED_SIGNED_PREFIX = '/storage/v1/object/sign/payout-receipts/';
 
 router.get(
   '/convert',
@@ -43,7 +47,7 @@ router.get(
       }
       if (
         parsed.origin !== ALLOWED_ORIGIN ||
-        !parsed.pathname.startsWith(ALLOWED_PATH_PREFIX)
+        !(parsed.pathname.startsWith(ALLOWED_PATH_PREFIX) || parsed.pathname.startsWith(ALLOWED_SIGNED_PREFIX))
       ) {
         throw new AppError('url not allowed', 400, 'URL_NOT_ALLOWED');
       }
@@ -78,7 +82,13 @@ router.get(
       res.set('Content-Type', 'image/jpeg');
       // Deterministic per source URL -- let the CDN + browser cache it so the
       // ~1-3 s decode happens once.
-      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      // A signed private receipt must not outlive its token in a shared cache.
+      res.set(
+        'Cache-Control',
+        parsed.pathname.startsWith(ALLOWED_SIGNED_PREFIX)
+          ? 'private, no-store'
+          : 'public, max-age=31536000, immutable',
+      );
       res.send(outJpeg);
     } catch (err) {
       next(err);

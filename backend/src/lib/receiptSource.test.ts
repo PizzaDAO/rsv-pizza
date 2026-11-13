@@ -72,7 +72,7 @@ describe('a pizza-order draft never counts as a receipt (basil-14648, reviewer s
     const allowedUnfiltered: Record<string, number> = {
       'routes/payout.routes.ts': 9, // 6 creates + the receipts library (shows drafts on purpose) + two by-id lookups of a doc the host names (receiptsChanged check, pizza-count patch): no gate or sum
       'routes/telegram-inbound.routes.ts': 1, // create
-      'routes/admin-payout.routes.ts': 1, // admin doc-kind validation list
+      'routes/admin-payout.routes.ts': 2, // admin doc-kind validation list + rotate routing receipt files to the private bucket (storage only, no gate or sum)
       'services/hostFastPass.service.ts': 2, // cross-party url/name reuse lookups (draft urls are unique per order)
       'services/hostTrust.service.ts': 2, // the same cross-party url/name reuse lookups as hostFastPass
       'services/pizzaOrderSync.ts': 1, // the draft create itself (source set on the next line)

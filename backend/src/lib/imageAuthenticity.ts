@@ -28,6 +28,12 @@
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import {
+  resolveFetchableUrl,
+  isPrivateReceiptPath,
+  partyIdFromPrivateReceiptPath,
+  uploadPrivateReceipt,
+} from '../services/payoutReceiptStorage.service.js';
+import {
   primaryVisionProvider,
   secondOpinionProviders,
   VisionResult,
@@ -395,8 +401,18 @@ export async function generateElaArtifact(
       .png()
       .toBuffer();
 
-    const supabase = createClient(supabaseUrl, serviceKey);
     const safe = imageUrl.replace(/[^a-zA-Z0-9]/g, '').slice(-24) || 'img';
+    // The ELA overlay is a derived image of the receipt (text is legible in
+    // it). For private payout receipts keep it in the private bucket next to
+    // the receipt and return the bare path (signed on read like the receipt).
+    const privatePartyId = isPrivateReceiptPath(imageUrl) ? partyIdFromPrivateReceiptPath(imageUrl) : null;
+    if (privatePartyId) {
+      const privatePath = `payouts/${privatePartyId}/authenticity/ela-${Date.now()}-${safe}.png`;
+      await uploadPrivateReceipt(privatePath, overlayPng, 'image/png');
+      return privatePath;
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
     const fileName = `image-authenticity/ela-${Date.now()}-${safe}.png`;
     const { error } = await supabase.storage
       .from(ELA_BUCKET)
@@ -415,10 +431,15 @@ export async function generateElaArtifact(
 // Helpers
 // ============================================
 
-/** Fetch an image from a public URL → base64 data URL (for vision providers). */
+/**
+ * Fetch an image → base64 data URL (for vision providers). Private payout
+ * receipts (bare bucket paths) are fetched through a short-lived signed URL.
+ */
 export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<{ dataUrl: string; buffer: Buffer }> {
-  const response = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
+  const fetchUrl = await resolveFetchableUrl(imageUrl);
+  const response = await fetch(fetchUrl, { signal: AbortSignal.timeout(15_000) });
   if (!response.ok) {
+    // Log the stored reference, never the signed URL (its token is a credential).
     throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${imageUrl}`);
   }
   const arrayBuf = await response.arrayBuffer();
@@ -476,9 +497,9 @@ export async function scoreImageAuthenticity(input: AuthenticityInput): Promise<
   for (const p of secondOpinionProviders) {
     if (!p.available()) continue;
     try {
-      // Sightengine needs a public URL; others take the data URL. Pass the URL
-      // for sightengine and the data URL otherwise.
-      const arg = p.id === 'sightengine' ? input.imageUrl : dataUrl;
+      // Sightengine needs a fetchable URL; others take the data URL. Private
+      // payout receipts get a short-lived signed URL.
+      const arg = p.id === 'sightengine' ? await resolveFetchableUrl(input.imageUrl) : dataUrl;
       const r = await p.analyze(arg, { sourceKind: input.sourceKind });
       secondOpinions.push(r);
     } catch {
