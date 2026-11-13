@@ -53,7 +53,7 @@ describe('isTaxFormRequestPublicPath', () => {
 });
 
 describe('isAllowedTaxFormOrigin', () => {
-  it.each([APP, ...PREVIEWS, 'https://rsv.pizza'])( // brand-check-ignore-line
+  it.each([APP, 'https://pizzadao.org', ...PREVIEWS, 'https://rsv.pizza'])( // brand-check-ignore-line
     'allows %s', (o) => expect(isAllowedTaxFormOrigin(o, ALLOWED)).toBe(true));
   it.each([
     'https://onboarding-git-x-otherteam.vercel.app',
@@ -61,6 +61,8 @@ describe('isAllowedTaxFormOrigin', () => {
     'https://evil.app.pizzadao.org',
     'http://app.pizzadao.org',
     'https://app.pizzadao.org/',
+    'https://pizzadao.org.evil.com',
+    'http://pizzadao.org',
     'https://onboarding-git-x-pizza-dao.vercel.app.evil.com',
     'https://evil-onboarding-git-x-pizza-dao.vercel.app',
     'https://other.example',
