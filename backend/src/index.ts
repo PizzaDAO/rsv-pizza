@@ -3,7 +3,7 @@ import cors from 'cors';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { createHash } from 'crypto';
 import { errorHandler, AppError } from './middleware/error.js';
-import { isAllowedOrigin } from './lib/cors.js';
+import { corsOptionsDelegate } from './lib/cors.js';
 import { prisma } from './config/database.js';
 import { assertSecretsConfigured, warnWeakOptionalSecrets } from './config/secrets.js';
 
@@ -129,21 +129,8 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
     ];
 
 // Middleware
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-
-    // Check against whitelist or Vercel preview URLs
-    if (isAllowedOrigin(origin, ALLOWED_ORIGINS)) {
-      return callback(null, true);
-    }
-
-    // AppError so the error handler answers 403 instead of 500.
-    callback(new AppError('Not allowed by CORS', 403, 'CORS_FORBIDDEN'));
-  },
-  credentials: true,
-}));
+// tax-form-cors: public /api/tax-form-requests/* additionally allows the pizzadao-org origins (no credentials).
+app.use(cors(corsOptionsDelegate(ALLOWED_ORIGINS)));
 // Resend webhook MUST be mounted BEFORE express.json() so its per-route
 // express.raw() handler sees the unparsed body bytes that Svix signed.
 // bounce-rate-heuristic.
