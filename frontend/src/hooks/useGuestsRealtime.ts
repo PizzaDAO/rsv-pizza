@@ -15,6 +15,11 @@ import type { Guest } from '../types';
  * `subscription` table and pinning WAL processing to ~89% of DB exec time,
  * which exhausted the connection pool and took the site down on 2026-05-19.
  * See `plans/calabrese-58204-pool-exhaustion-fix.md`.
+ *
+ * Transport: `guests` is no longer in `supabase_realtime`. A DB trigger broadcasts
+ * "guests changed" (op only, no guest data) on `guests:<partyId>`; the subscription is
+ * ref-counted per party and debounced, then refetches through the backend
+ * (`GET /api/parties/:id/guests`). See `plans/guests-anon-exposure.md`.
  */
 export function useGuestsRealtime(
   partyId: string | undefined,

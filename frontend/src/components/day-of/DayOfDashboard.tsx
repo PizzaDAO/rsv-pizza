@@ -36,7 +36,8 @@ export const DayOfDashboard: React.FC<DayOfDashboardProps> = ({ party, layout })
   // walk-in capture, in addition to the realtime subscription.
   const refreshGuests = React.useCallback(async () => {
     const dbGuests = await db.getGuestsByPartyId(party.id);
-    setGuests((dbGuests || []).map(dbGuestToGuest));
+    if (dbGuests === null) return; // transient error: keep the current list
+    setGuests(dbGuests.map(dbGuestToGuest));
   }, [party.id]);
 
   useEffect(() => {

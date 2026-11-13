@@ -13,6 +13,9 @@ interface PizzaContextType {
   // Party management
   party: Party | null;
   partyLoading: boolean;
+  // True when the initial guest-list fetch failed (not "0 guests"); retryGuests refetches it.
+  guestsLoadFailed: boolean;
+  retryGuests: () => Promise<void>;
   createParty: (name: string, hostName?: string, date?: string, expectedGuests?: number, address?: string, selectedBeverages?: string[], duration?: number, password?: string, eventImageUrl?: string, description?: string, customUrl?: string) => Promise<string | null>;
   loadParty: (inviteCode: string) => Promise<boolean>;
   mergeParty: (updates: Partial<Party>) => void;
@@ -227,6 +230,7 @@ export function dbPartyToParty(dbParty: db.DbParty, guests: Guest[]): Party {
 export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [party, setParty] = useState<Party | null>(null);
   const [partyLoading, setPartyLoading] = useState(false);
+  const [guestsLoadFailed, setGuestsLoadFailed] = useState(false);
   // `allGuests` is the raw list from the DB (includes rejected guests).
   // `guests` and `rejectedGuests` are derived below so downstream consumers
   // never see rejected guests unless they specifically opt in.
@@ -313,6 +317,7 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const loadedParty = dbPartyToParty(result.party, visibleGuests);
         setParty(loadedParty);
         setAllGuests(partyGuests);
+        setGuestsLoadFailed(result.guestsLoadFailed);
         localStorage.setItem('rsvpizza_currentPartyCode', inviteCode);
         return true;
       }
@@ -321,6 +326,16 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setPartyLoading(false);
     }
   }, []);
+
+  const retryGuests = React.useCallback(async () => {
+    if (!party?.id) return;
+    const dbGuests = await db.fetchAllGuestsWithRetry(party.id);
+    if (dbGuests === null) return;
+    const next = dbGuests.map(dbGuestToGuest);
+    setAllGuests(next);
+    setParty(prev => prev ? { ...prev, guests: next.filter(g => g.approved !== false) } : null);
+    setGuestsLoadFailed(false);
+  }, [party?.id]);
 
   const clearParty = () => {
     localStorage.removeItem('rsvpizza_currentPartyCode');
@@ -602,6 +617,8 @@ export const PizzaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <PizzaContext.Provider value={{
       party,
       partyLoading,
+      guestsLoadFailed,
+      retryGuests,
       createParty,
       loadParty,
       mergeParty,

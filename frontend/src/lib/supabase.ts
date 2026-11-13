@@ -1250,22 +1250,6 @@ export async function createParty(opts: CreatePartyOptions = {}): Promise<DbPart
     return null;
   }
 
-  if (hostEmail && data) {
-    await supabase
-      .from('guests')
-      .insert({
-        party_id: data.id,
-        name: hostName || 'Host',
-        email: hostEmail.toLowerCase(),
-        dietary_restrictions: [],
-        liked_toppings: [],
-        disliked_toppings: [],
-        liked_beverages: [],
-        disliked_beverages: [],
-        submitted_via: 'host',
-      });
-  }
-
   return data;
 }
 
@@ -1498,26 +1482,27 @@ export async function getPartyByInviteCodeOrCustomUrl(slug: string): Promise<DbP
   return party;
 }
 
-async function fetchAllGuests(partyId: string): Promise<DbGuest[]> {
-  const all: DbGuest[] = [];
-  const CHUNK = 1000;
-  for (let from = 0; ; from += CHUNK) {
-    const { data, error } = await supabase
-      .from('guests')
-      .select('*')
-      .eq('party_id', partyId)
-      .neq('status', 'INVITED')
-      .order('submitted_at', { ascending: true })
-      .range(from, from + CHUNK - 1);
-    if (error) {
-      console.error('Error fetching guests page:', error);
-      break;
-    }
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < CHUNK) break;
+// Host-only guest list via the backend (editor-gated). Anon can no longer read `guests`.
+// Returns [] when logged out or when the caller can't edit the party (401/403/404: a legit
+// "no list for you"). Returns null on a transient failure (429, 5xx, network, bad body) so
+// callers keep their previous state instead of blanking the list.
+export async function fetchAllGuests(partyId: string): Promise<DbGuest[] | null> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return [];
+  try {
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
+    const response = await fetch(`${apiUrl}/api/parties/${partyId}/guests`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (response.status === 401 || response.status === 403 || response.status === 404) return [];
+    if (!response.ok) return null;
+    const body = await response.json();
+    const list = Array.isArray(body) ? body : body?.guests;
+    return Array.isArray(list) ? (list as DbGuest[]) : null;
+  } catch (error) {
+    console.warn('Could not fetch guests via API:', error);
+    return null;
   }
-  return all;
 }
 
 /**
@@ -1543,7 +1528,19 @@ export function mergeHostOnlyPartyFields(party: DbParty, apiParty: any): void {
   }
 }
 
-export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[] } | null> {
+// Initial load: retry transient failures a couple of times before giving up (null).
+export async function fetchAllGuestsWithRetry(partyId: string): Promise<DbGuest[] | null> {
+  const delays = [400, 1200];
+  let result = await fetchAllGuests(partyId);
+  for (const d of delays) {
+    if (result !== null) break;
+    await new Promise((r) => setTimeout(r, d));
+    result = await fetchAllGuests(partyId);
+  }
+  return result;
+}
+
+export async function getPartyWithGuests(inviteCode: string): Promise<{ party: DbParty; guests: DbGuest[]; guestsLoadFailed: boolean } | null> {
   // Single query: match on custom_url OR invite_code
   const { data: partyData, error: partyError } = await supabase
     .from('parties')
@@ -1601,11 +1598,11 @@ export async function getPartyWithGuests(inviteCode: string): Promise<{ party: D
     }
   })();
 
-  const guestsPromise = fetchAllGuests(party.id);
+  const guestsPromise = fetchAllGuestsWithRetry(party.id);
 
   const [, guestsResult] = await Promise.all([enrichPromise, guestsPromise]);
 
-  return { party, guests: guestsResult };
+  return { party, guests: guestsResult ?? [], guestsLoadFailed: guestsResult === null };
 }
 
 export async function updatePartyBeverages(partyId: string, availableBeverages: string[]): Promise<DbParty | null> {
@@ -1813,6 +1810,28 @@ export interface ExistingGuestData {
   checkedInBy: string | null;
 }
 
+function mapExistingGuest(guest: any): ExistingGuestData {
+  return {
+    id: guest.id,
+    name: guest.name,
+    email: guest.email,
+    ethereumAddress: guest.ethereumAddress,
+    roles: guest.roles || [],
+    mailingListOptIn: guest.mailingListOptIn || false,
+    optinAbVariant: guest.optinAbVariant === 'control' || guest.optinAbVariant === 'variant' ? guest.optinAbVariant : null,
+    dietaryRestrictions: guest.dietaryRestrictions || [],
+    likedToppings: guest.likedToppings || [],
+    dislikedToppings: guest.dislikedToppings || [],
+    likedBeverages: guest.likedBeverages || [],
+    dislikedBeverages: guest.dislikedBeverages || [],
+    pizzeriaRankings: guest.pizzeriaRankings || [],
+    suggestedPizzerias: guest.suggestedPizzerias || [],
+    status: guest.status || 'CONFIRMED',
+    checkedInAt: guest.checkedInAt || null,
+    checkedInBy: guest.checkedInBy || null,
+  };
+}
+
 export async function getExistingGuest(
   inviteCode: string,
   email: string
@@ -1829,27 +1848,7 @@ export async function getExistingGuest(
     }
 
     const data = await response.json();
-    const guest = data.guest;
-
-    return {
-      id: guest.id,
-      name: guest.name,
-      email: guest.email,
-      ethereumAddress: guest.ethereumAddress,
-      roles: guest.roles || [],
-      mailingListOptIn: guest.mailingListOptIn || false,
-      optinAbVariant: guest.optinAbVariant === 'control' || guest.optinAbVariant === 'variant' ? guest.optinAbVariant : null,
-      dietaryRestrictions: guest.dietaryRestrictions || [],
-      likedToppings: guest.likedToppings || [],
-      dislikedToppings: guest.dislikedToppings || [],
-      likedBeverages: guest.likedBeverages || [],
-      dislikedBeverages: guest.dislikedBeverages || [],
-      pizzeriaRankings: guest.pizzeriaRankings || [],
-      suggestedPizzerias: guest.suggestedPizzerias || [],
-      status: guest.status || 'CONFIRMED',
-      checkedInAt: guest.checkedInAt || null,
-      checkedInBy: guest.checkedInBy || null,
-    };
+    return mapExistingGuest(data.guest);
   } catch (error) {
     console.error('Error fetching guest:', error);
     return null;
@@ -1899,28 +1898,8 @@ export async function addGuestByHost(
     }
   }
 
-  // Fallback to direct Supabase
-  const { data, error } = await supabase
-    .from('guests')
-    .insert({
-      party_id: partyId,
-      name,
-      email: email ? email.toLowerCase() : null,
-      dietary_restrictions: dietaryRestrictions,
-      liked_toppings: likedToppings,
-      disliked_toppings: dislikedToppings,
-      liked_beverages: likedBeverages,
-      disliked_beverages: dislikedBeverages,
-      submitted_via: 'host',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding guest:', error);
-    return null;
-  }
-  return data;
+  console.warn('addGuestByHost: must be authenticated');
+  return null;
 }
 
 export async function removeGuest(guestId: string, partyId?: string): Promise<boolean> {
@@ -1935,17 +1914,8 @@ export async function removeGuest(guestId: string, partyId?: string): Promise<bo
     }
   }
 
-  // Fallback to direct Supabase
-  const { error } = await supabase
-    .from('guests')
-    .delete()
-    .eq('id', guestId);
-
-  if (error) {
-    console.error('Error removing guest:', error);
-    return false;
-  }
-  return true;
+  console.warn('removeGuest: must be authenticated with a partyId');
+  return false;
 }
 
 export async function updateGuestApproval(guestId: string, approved: boolean | null, partyId?: string): Promise<boolean> {
@@ -1960,17 +1930,8 @@ export async function updateGuestApproval(guestId: string, approved: boolean | n
     }
   }
 
-  // Fallback to direct Supabase (will fail after RLS lockdown)
-  const { error } = await supabase
-    .from('guests')
-    .update({ approved })
-    .eq('id', guestId);
-
-  if (error) {
-    console.error('Error updating guest approval:', error);
-    return false;
-  }
-  return true;
+  console.warn('updateGuestApproval: must be authenticated with a partyId');
+  return false;
 }
 
 // Un-check-in a guest (host-side undo). Resolves invite code from party and calls
@@ -2005,25 +1966,25 @@ export async function promoteGuest(guestId: string, partyId: string): Promise<bo
   return false;
 }
 
-export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[]> {
+export async function getGuestsByPartyId(partyId: string): Promise<DbGuest[] | null> {
   return fetchAllGuests(partyId);
 }
 
-// Check if a user is already a guest at a party by email
-export async function isUserGuestAtParty(partyId: string, email: string): Promise<boolean> {
-  if (!email) return false;
-
-  const { count, error } = await supabase
-    .from('guests')
-    .select('*', { count: 'exact', head: true })
-    .eq('party_id', partyId)
-    .eq('email', email.toLowerCase());
-
-  if (error) {
-    console.error('Error checking guest status:', error);
-    return false;
+// The logged-in user's own guest row at a party (self only, via the backend), or null.
+export async function getMyGuest(partyId: string): Promise<ExistingGuestData | null> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  try {
+    const response = await fetch(`${API_URL}/api/parties/${partyId}/my-guest`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+    const { guest } = await response.json();
+    return guest ? mapExistingGuest(guest) : null;
+  } catch (error) {
+    console.error('Error fetching my guest:', error);
+    return null;
   }
-  return (count || 0) > 0;
 }
 
 // Check if a user is a host of a party (by checking co_hosts array)
@@ -2053,29 +2014,85 @@ export async function getAllParties(): Promise<DbParty[]> {
   });
 }
 
-// Subscribe to guest changes (real-time)
+// Subscribe to guest changes (real-time). Host-side pages only (see useGuestsRealtime).
+// A DB trigger broadcasts "guests changed" (op only, no guest data) on `guests:<partyId>`;
+// we then refetch through the backend. One ref-counted channel per party (supabase-js reuses
+// same-topic channels, which caused nduja-91384).
+// The topic is public (anyone with the key can SEND on it), so a broadcast is only a hint:
+// refetches are rate limited to one per GUESTS_MIN_INTERVAL_MS per party (first change after a
+// quiet period refetches immediately, later ones coalesce into one trailing refetch), and
+// payloads whose `op` isn't insert/update/delete are ignored. A failed refetch (null) keeps the
+// previous state.
+export const GUESTS_BROADCAST_EVENT = 'guests_changed';
+export const GUESTS_TOPIC_PREFIX = 'guests:';
+export const GUESTS_MIN_INTERVAL_MS = 10000;
+const GUESTS_VALID_OPS = new Set(['insert', 'update', 'delete']);
+
+interface GuestsChannelEntry {
+  channel: ReturnType<typeof supabase.channel> | null;
+  listeners: Set<(guests: DbGuest[]) => void>;
+  timer: ReturnType<typeof setTimeout> | null;
+  lastFetchAt: number;
+  disposed: boolean;
+  ready: Promise<void>;
+}
+const guestsChannels = new Map<string, GuestsChannelEntry>();
+// Removals still in flight, so a fast re-subscribe never reuses a channel that is `leaving`.
+const guestsRemovals = new Map<string, Promise<unknown>>();
+
 export function subscribeToGuests(partyId: string, callback: (guests: DbGuest[]) => void) {
-  const channel = supabase
-    // Unique channel name per subscription: HostPage and DayOfDashboard can both call this with the same partyId, and Supabase realtime throws "cannot add 'postgres_changes' callbacks after subscribe()" if the channel is reused. nduja-91384 prod incident 2026-05-20.
-    .channel(`guests:${partyId}:${crypto.randomUUID()}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'guests',
-        filter: `party_id=eq.${partyId}`,
-      },
-      async () => {
-        // Refetch all guests when any change occurs
-        const guests = await getGuestsByPartyId(partyId);
-        callback(guests);
-      }
-    )
-    .subscribe();
+  let entry = guestsChannels.get(partyId);
+  if (!entry) {
+    const created: GuestsChannelEntry = {
+      channel: null,
+      listeners: new Set(),
+      timer: null,
+      lastFetchAt: 0,
+      disposed: false,
+      ready: Promise.resolve(),
+    };
+    const run = async () => {
+      created.timer = null;
+      created.lastFetchAt = Date.now();
+      const guests = await getGuestsByPartyId(partyId);
+      if (guests === null || created.disposed) return; // keep previous state on error
+      created.listeners.forEach((l) => l(guests));
+    };
+    const fire = (msg?: { payload?: { op?: unknown } }) => {
+      const op = msg?.payload?.op;
+      if (typeof op !== 'string' || !GUESTS_VALID_OPS.has(op.toLowerCase())) return;
+      if (created.timer) return; // a refetch is already scheduled
+      const wait = created.lastFetchAt + GUESTS_MIN_INTERVAL_MS - Date.now();
+      if (wait <= 0) void run();
+      else created.timer = setTimeout(run, wait);
+    };
+    created.ready = (guestsRemovals.get(partyId) ?? Promise.resolve()).then(() => {
+      if (created.disposed) return;
+      created.channel = supabase
+        .channel(`${GUESTS_TOPIC_PREFIX}${partyId}`, { config: { private: false, broadcast: { self: false } } })
+        .on('broadcast', { event: GUESTS_BROADCAST_EVENT }, fire)
+        .subscribe();
+    });
+    guestsChannels.set(partyId, created);
+    entry = created;
+  }
+  entry.listeners.add(callback);
+  const mine = entry;
 
   return () => {
-    supabase.removeChannel(channel);
+    mine.listeners.delete(callback);
+    if (mine.listeners.size === 0 && !mine.disposed) {
+      mine.disposed = true;
+      if (mine.timer) clearTimeout(mine.timer);
+      if (guestsChannels.get(partyId) === mine) guestsChannels.delete(partyId);
+      const removal = mine.ready
+        .then(() => (mine.channel ? supabase.removeChannel(mine.channel) : undefined))
+        .catch(() => undefined)
+        .finally(() => {
+          if (guestsRemovals.get(partyId) === removal) guestsRemovals.delete(partyId);
+        });
+      guestsRemovals.set(partyId, removal);
+    }
   };
 }
 
@@ -2341,138 +2358,6 @@ export async function reinstateParty(partyId: string): Promise<boolean> {
   }
 }
 
-// Get parties for a user (RSVP'd or hosting)
-export interface UserParty extends DbParty {
-  userRole: 'host' | 'guest';
-  guestCount?: number;
-}
-
-export async function getUserParties(userEmail: string): Promise<UserParty[]> {
-  // First, get all parties where the user is a guest (via email)
-  const { data: guestEntries, error: guestError } = await supabase
-    .from('guests')
-    .select('party_id')
-    .eq('email', userEmail);
-
-  if (guestError) {
-    console.error('Error fetching guest entries:', guestError);
-  }
-
-  const partyIdsAsGuest = guestEntries?.map(g => g.party_id) || [];
-
-  // Get parties where user is a guest
-  let guestParties: DbParty[] = [];
-  if (partyIdsAsGuest.length > 0) {
-    const { data, error } = await supabase
-      .from('parties')
-      .select(SAFE_PARTY_COLUMNS)
-      .in('id', partyIdsAsGuest)
-      .order('date', { ascending: true, nullsFirst: false });
-
-    if (error) {
-      console.error('Error fetching guest parties:', error);
-    } else {
-      guestParties = (data || []).map(p => {
-        const party = normalizePartyCoHosts(p);
-        return { ...party, co_hosts: sanitizeCoHosts(party.co_hosts) };
-      });
-    }
-  }
-
-  // Get parties where user is a co-host via backend endpoint
-  // This replaces the old approach of downloading ALL parties and filtering client-side
-  let hostPartyIds: string[] = [];
-  try {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-      const resp = await fetch(`${apiUrl}/api/parties/by-cohost?email=${encodeURIComponent(userEmail)}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        hostPartyIds = data.partyIds || [];
-      }
-    }
-  } catch (err) {
-    console.warn('Could not fetch co-host parties from backend:', err);
-  }
-
-  let hostParties: DbParty[] = [];
-  if (hostPartyIds.length > 0) {
-    const { data, error: hostError } = await supabase
-      .from('parties')
-      .select(SAFE_PARTY_COLUMNS)
-      .in('id', hostPartyIds)
-      .order('date', { ascending: true, nullsFirst: false });
-
-    if (hostError) {
-      console.error('Error fetching host parties:', hostError);
-    } else {
-      hostParties = (data || []).map(p => {
-        const party = normalizePartyCoHosts(p);
-        return { ...party, co_hosts: sanitizeCoHosts(party.co_hosts) };
-      });
-    }
-  }
-
-  // Combine and deduplicate
-  const partyMap = new Map<string, UserParty>();
-
-  // Add host parties first (host role takes priority)
-  for (const party of hostParties || []) {
-    partyMap.set(party.id, { ...party, userRole: 'host' });
-  }
-
-  // Add guest parties (only if not already a host)
-  for (const party of guestParties) {
-    if (!partyMap.has(party.id)) {
-      partyMap.set(party.id, { ...party, userRole: 'guest' });
-    }
-  }
-
-  // Get guest counts for each party
-  const allPartyIds = Array.from(partyMap.keys());
-  if (allPartyIds.length > 0) {
-    for (const partyId of allPartyIds) {
-      const { count, error } = await supabase
-        .from('guests')
-        .select('*', { count: 'exact', head: true })
-        .eq('party_id', partyId);
-
-      if (!error && count !== null) {
-        const party = partyMap.get(partyId);
-        if (party) {
-          party.guestCount = count;
-        }
-      }
-    }
-  }
-
-  // Convert to array and sort by date
-  const parties = Array.from(partyMap.values());
-  parties.sort((a, b) => {
-    if (!a.date && !b.date) return 0;
-    if (!a.date) return 1;
-    if (!b.date) return -1;
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
-
-  return parties;
-}
-
-// Get upcoming parties (future or no date set) for a user
-export async function getUpcomingUserParties(userEmail: string): Promise<UserParty[]> {
-  const allParties = await getUserParties(userEmail);
-  const now = new Date();
-
-  // Filter to only upcoming parties (date is null or in the future)
-  return allParties.filter(party => {
-    if (!party.date) return true; // Include parties without a date
-    return new Date(party.date) >= now;
-  });
-}
-
 // User preferences types and functions
 export interface UserPreferences {
   dietary_restrictions: string[];
@@ -2485,7 +2370,10 @@ export interface UserPreferences {
 export async function getUserPreferences(email: string): Promise<UserPreferences | null> {
   try {
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
-    const response = await fetch(`${apiUrl}/api/preferences?email=${encodeURIComponent(email)}`);
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${apiUrl}/api/preferences?email=${encodeURIComponent(email)}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    });
 
     if (!response.ok) return null;
 
@@ -2513,7 +2401,10 @@ export async function saveUserPreferences(
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3006').trim();
     const response = await fetch(`${apiUrl}/api/preferences`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('authToken') ? { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` } : {}),
+      },
       body: JSON.stringify({ email, preferences }),
     });
 

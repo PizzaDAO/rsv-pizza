@@ -81,12 +81,12 @@ function setupHostPageMocks(page: import('@playwright/test').Page, partyOverride
       return route.fallback();
     }),
 
-    // Mock Supabase guests query
-    page.route('**/*.supabase.co/rest/v1/guests*', (route) => {
+    // Mock backend guests endpoint (anon can no longer read the guests table)
+    page.route('**/api/parties/*/guests', (route) => {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([]),
+        body: JSON.stringify({ guests: [] }),
       });
     }),
 
@@ -107,13 +107,6 @@ function setupHostPageMocks(page: import('@playwright/test').Page, partyOverride
       });
     }),
 
-    page.route('**/*.supabase.co/rest/v1/user_preferences*', (route) => {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      });
-    }),
 
     // Mock backend API endpoints used by host page
     page.route('**/api/parties/*/co-hosts/enrich', (route) => {

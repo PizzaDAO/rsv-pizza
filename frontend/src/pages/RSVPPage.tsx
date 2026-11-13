@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2, Lock, ChevronRight, Heart } from 'lucide-react';
-import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, isUserGuestAtParty, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
+import { getPartyByInviteCodeOrCustomUrl, verifyPartyPassword, getMyGuest, findApprovedGppPartyInCity, DbParty } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DonationForm } from '../components/DonationForm';
 import { PublicEvent, getDonationStats, trackRsvpFunnel } from '../lib/api';
@@ -124,7 +124,7 @@ export function RSVPPage() {
 
           // Check if party has password protection
           if (foundParty.has_password) {
-            const userIsGuest = user?.email && await isUserGuestAtParty(foundParty.id, user.email);
+            const userIsGuest = user?.email && !!(await getMyGuest(foundParty.id));
             let userIsHost = false;
             if (!userIsGuest && user?.email && inviteCode) {
               try {
