@@ -108,7 +108,10 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
 
   // Proof: either a URL or an uploaded file. The uploaded URL wins if both set.
   const [proofUrlInput, setProofUrlInput] = useState('');
+  // payout-receipts-private: the stored value is the bare private-bucket path;
+  // `uploadedProofPreview` is a local blob: URL so the admin can open it.
   const [uploadedProofUrl, setUploadedProofUrl] = useState<string | null>(null);
+  const [uploadedProofPreview, setUploadedProofPreview] = useState<{ href: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   // focaccia-58519: keep the last picked file so a transient upload failure can
@@ -275,6 +278,7 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
       const groupId = `external-${Date.now()}`;
       const result = await uploadPayoutPhoto(file, partyId.trim(), groupId, 'receipt');
       setUploadedProofUrl(result.url);
+      setUploadedProofPreview({ href: result.previewUrl, name: result.fileName });
     } catch (err: any) {
       setUploadError(err?.message || 'Upload failed');
     } finally {
@@ -744,18 +748,18 @@ export const ExternalPaymentModal: React.FC<ExternalPaymentModalProps> = ({
               <p className="text-xs text-emerald-500 break-all">
                 Uploaded:{' '}
                 <a
-                  href={uploadedProofUrl}
+                  href={uploadedProofPreview?.href ?? uploadedProofUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"
                 >
-                  {uploadedProofUrl}
+                  {uploadedProofPreview?.name ?? uploadedProofUrl}
                 </a>
                 {' '}
                 <button
                   type="button"
                   className="ml-1 underline text-theme-text-muted"
-                  onClick={() => setUploadedProofUrl(null)}
+                  onClick={() => { setUploadedProofUrl(null); setUploadedProofPreview(null); }}
                 >
                   clear
                 </button>

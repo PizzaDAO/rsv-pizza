@@ -228,7 +228,7 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
                        was first attached). If the thumbnail is missing (pre-
                        bocconcino rows, render failed), fall back to a generic
                        PDF icon via the broken-image swap. */
-                    <PdfThumb url={r.url} fileName={r.fileName} />
+                    <PdfThumb url={r.url} thumbUrl={r.thumbUrl} fileName={r.fileName} />
                   ) : (
                     <div className="w-12 h-12 bg-theme-surface-hover flex items-center justify-center">
                       <FileText size={20} className="text-theme-text-secondary" />
@@ -322,7 +322,7 @@ export const ReceiptsLibrary: React.FC<ReceiptsLibraryProps> = ({ partyId }) => 
  * predates bocconcino-92104), swaps to a generic PDF icon so the list
  * still renders cleanly.
  */
-const PdfThumb: React.FC<{ url: string; fileName: string }> = ({ url, fileName }) => {
+const PdfThumb: React.FC<{ url: string; thumbUrl?: string | null; fileName: string }> = ({ url, thumbUrl, fileName }) => {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -333,7 +333,7 @@ const PdfThumb: React.FC<{ url: string; fileName: string }> = ({ url, fileName }
   }
   return (
     <img
-      src={derivePdfThumbnailUrl(url)}
+      src={derivePdfThumbnailUrl(url, thumbUrl)}
       alt={fileName}
       className="w-12 h-12 object-cover block"
       loading="lazy"

@@ -43,13 +43,20 @@ export function isPdfFile(item: {
 }
 
 /**
- * Derive the thumbnail URL for a PDF receipt by appending `.thumb.png` to
- * the canonical URL. Mirrors the upload-site convention in `uploadPayoutPhoto`.
- * For non-PDF inputs, returns the input URL unchanged so callers can use this
- * as a generic "give me a thumbnail" helper.
+ * Thumbnail URL for a PDF receipt.
+ *
+ * payout-receipts-private: receipts are now served as short-lived SIGNED URLs
+ * (the token is bound to the object path), so the thumbnail can't be derived
+ * by string manipulation any more. The backend adds a signed `thumbUrl` next
+ * to every PDF `url` it returns; pass it as `thumbUrl` and it wins. Without
+ * one (legacy public URLs, bare paths), fall back to the `.thumb.png`
+ * convention, appended before any query string — for a signed URL that 404s
+ * and callers fall back to their PDF icon.
  */
-export function derivePdfThumbnailUrl(url: string): string {
-  return `${url}.thumb.png`;
+export function derivePdfThumbnailUrl(url: string, thumbUrl?: string | null): string {
+  if (thumbUrl) return thumbUrl;
+  const q = url.indexOf('?');
+  return q === -1 ? `${url}.thumb.png` : `${url.slice(0, q)}.thumb.png${url.slice(q)}`;
 }
 
 /**

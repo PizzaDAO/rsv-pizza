@@ -6962,6 +6962,26 @@ export async function previewReceiptOCR(
   );
 }
 
+// payout-receipts-private: receipts live in the PRIVATE payout-receipts bucket.
+// The backend mints a one-shot signed upload URL (it picks the object path,
+// always under payouts/{partyId}/) and the browser PUTs the file with
+// supabase-js `uploadToSignedUrl`. `thumb` is set for PDFs when requested.
+export interface ReceiptUploadTarget {
+  path: string;
+  token: string;
+  thumb: { path: string; token: string } | null;
+}
+
+export async function getReceiptUploadUrl(
+  partyId: string,
+  opts: { group: string; ext: string; withThumb?: boolean },
+): Promise<ReceiptUploadTarget> {
+  return apiRequest<ReceiptUploadTarget>(
+    `/api/parties/${partyId}/payouts/receipt-upload-url`,
+    { method: 'POST', body: opts, requireAuth: true }
+  );
+}
+
 // focaccia-89172: re-run the FX cascade for a host-supplied currency override.
 // OCR sometimes misreads `₹` as `$` (etc.) — the host picks the correct code
 // from a dropdown and we replace the row's USD amount + exchange rate in-place.

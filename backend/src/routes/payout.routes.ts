@@ -44,6 +44,13 @@ import {
 } from '../services/payout-recipients.js';
 import { recomputeRefundTags } from '../services/refundTag.js';
 import { isUploadedReceipt } from '../lib/receiptSource.js';
+import {
+  isPrivateReceiptPath,
+  partyIdFromPrivateReceiptPath,
+  buildReceiptUploadPath,
+  createReceiptUploadTarget,
+} from '../services/payoutReceiptStorage.service.js';
+import { canAccessPartyReceipts } from '../helpers/payoutReceiptAccess.js';
 
 const router = Router();
 
@@ -290,6 +297,19 @@ function deriveOcrUrl(doc: { url: string; mimeType?: string | null }): string {
 }
 
 function assertSupabasePayoutUrl(imageUrl: string, partyId: string): void {
+  // SECURITY (payout-receipts-private): receipts uploaded to the PRIVATE
+  // payout-receipts bucket are referenced by their bare object path. Same
+  // scope rule as the legacy public URLs: must sit under payouts/{partyId}/.
+  if (isPrivateReceiptPath(imageUrl)) {
+    if (partyIdFromPrivateReceiptPath(imageUrl) !== partyId) {
+      throw new AppError(
+        `imageUrl must be under payouts/${partyId}/`,
+        400,
+        'INVALID_IMAGE_URL_SCOPE'
+      );
+    }
+    return;
+  }
   let url: URL;
   try {
     url = new URL(imageUrl);
@@ -639,6 +659,68 @@ async function assertWithinPartyCap(
     );
   }
 }
+
+// ---------- POST /:partyId/payouts/receipt-upload-url ----------
+//
+// SECURITY (payout-receipts-private): receipts go to the PRIVATE
+// payout-receipts bucket, which has no anon/authenticated storage policies.
+// The browser asks here for a one-shot signed upload URL; the SERVER picks the
+// object path (always under payouts/{partyId}/) and the caller must be someone
+// who can file receipts for this party: a party editor (host/co-host/admin/
+// scoped underboss), an aggregator for the party, any admin/payment admin
+// (/payments attach + external payments), or an active shipping coordinator
+// (shipping receipts). That is the union of the POST /payouts gates.
+//
+// Body: { group?: string, ext: string, withThumb?: boolean }
+// Returns: { path, token, thumb?: { path, token } }
+const receiptUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+});
+
+function canUploadPayoutReceipt(req: AuthRequest, partyId: string): Promise<boolean> {
+  return canAccessPartyReceipts(
+    { userId: req.userId, userEmail: req.userEmail },
+    partyId,
+    { allowShippingCoordinator: true },
+  );
+}
+
+router.post(
+  '/:partyId/payouts/receipt-upload-url',
+  receiptUploadLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { partyId } = req.params;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(partyId)) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+      const { group, ext, withThumb } = (req.body || {}) as {
+        group?: unknown;
+        ext?: unknown;
+        withThumb?: unknown;
+      };
+      if (!(await canUploadPayoutReceipt(req, partyId))) {
+        throw new AppError('Party not found', 404, 'NOT_FOUND');
+      }
+      const path = buildReceiptUploadPath(
+        partyId,
+        typeof group === 'string' ? group : 'upload',
+        typeof ext === 'string' ? ext : 'jpg',
+      );
+      const main = await createReceiptUploadTarget(path);
+      const thumb = withThumb === true && path.toLowerCase().endsWith('.pdf')
+        ? await createReceiptUploadTarget(`${path}.thumb.png`)
+        : null;
+      res.json({ path: main.path, token: main.token, thumb });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ---------- POST /:partyId/payouts/ocr-preview ----------
 
@@ -3769,6 +3851,10 @@ router.get('/:partyId/reimbursement/event', async (req: AuthRequest, res: Respon
 // ---------- helpers (file name parsing) ----------
 
 function extractFileName(url: string): string {
+  // Bare private-bucket path (payout-receipts-private).
+  if (isPrivateReceiptPath(url)) {
+    return url.slice(url.lastIndexOf('/') + 1);
+  }
   try {
     const u = new URL(url);
     const path = decodeURIComponent(u.pathname);

@@ -2274,7 +2274,7 @@ export const PayoutReviewModal: React.FC<PayoutReviewModalProps> = ({
                               sibling `.thumb.png` (rendered client-side at upload).
                               Image receipts render via the canonical URL. */
                           <img
-                            src={isPdfFile(doc) ? derivePdfThumbnailUrl(doc.url) : doc.url}
+                            src={isPdfFile(doc) ? derivePdfThumbnailUrl(doc.url, doc.thumbUrl) : doc.url}
                             alt={doc.fileName}
                             className="w-full h-full object-cover"
                             loading="lazy"

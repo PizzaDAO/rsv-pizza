@@ -47,3 +47,6 @@ secrets.md
 
 # Per-developer Claude Code settings (may hold secrets)
 .claude/settings.local.json
+
+# payout-receipts-private backfill row backups (contain receipt object paths)
+payout-receipts-backfill-backup-*.json

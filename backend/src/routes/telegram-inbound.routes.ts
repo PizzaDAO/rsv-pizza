@@ -45,6 +45,7 @@ import { analyzeReceipt } from '../services/ocr.service.js';
 import { convertToUSD } from '../services/fx.service.js';
 import { sanitizePgString, sanitizeForPg } from '../lib/sanitizePg.js';
 import { rasterizePdfFirstPage } from '../services/pdfRasterize.js';
+import { uploadPrivateReceipt, removePrivateReceipt } from '../services/payoutReceiptStorage.service.js';
 import { pizzaAutofillColumns, receiptUsdTotal } from '../services/pizzaCountAutofill.js';
 import { resolveWalletInput, looksLikeEnsName } from '../services/ens.service.js';
 import { saveHostPayoutWallet } from '../services/payout-snapshot.js';
@@ -111,6 +112,24 @@ async function uploadPayoutBuffer(
   }
   const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
   return { url: data.publicUrl, path };
+}
+
+/**
+ * payout-receipts-private: a HOST image is uploaded to the PRIVATE
+ * payout-receipts bucket first, because it is only classified (receipt vs.
+ * event photo) after OCR and a receipt must never be publicly readable, even
+ * briefly. Returns the bare object path (stored as payout_documents.url).
+ */
+async function uploadPrivatePayoutBuffer(
+  buffer: Buffer,
+  partyId: string,
+  mimeType: string,
+): Promise<string> {
+  const ext = (mimeType.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
+  const uniqueName = `tg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `payouts/${partyId}/${uniqueName}`;
+  await uploadPrivateReceipt(path, buffer, mimeType);
+  return path;
 }
 
 /** Event year for photoYear: event date year ?? null (upload-time fallback handled by NULL). */
@@ -438,7 +457,10 @@ router.post(
         };
       }
 
-      const { url } = await uploadPayoutBuffer(downloaded.buffer, party.id, downloaded.mimeType);
+      // Private until classified (see uploadPrivatePayoutBuffer). OCR fetches
+      // it through a signed URL.
+      const privatePath = await uploadPrivatePayoutBuffer(downloaded.buffer, party.id, downloaded.mimeType);
+      const url = privatePath;
 
       // ---- OCR the image to decide receipt vs. event photo ----
       let ocr:
@@ -573,6 +595,10 @@ router.post(
       }
 
       // ---- EVENT PHOTO path: mirror photo.routes.ts:459-650 (host auto-approve) ----
+      // Not a receipt: event photos are public. Upload a public copy and drop
+      // the private one.
+      const { url: photoUrl } = await uploadPayoutBuffer(downloaded.buffer, party.id, downloaded.mimeType);
+      await removePrivateReceipt(privatePath);
       // payout_role stays NULL: 'group'/'box_stack'/'pizza' are the only designated
       // roles (partial unique index), and getPayoutSubmissionReadiness counts any
       // non-role photo dated >= party.date as an "additional" event photo. A photo
@@ -581,7 +607,7 @@ router.post(
       await prisma.photo.create({
         data: {
           partyId: party.id,
-          url,
+          url: photoUrl,
           fileName: sanitizePgString(downloaded.fileName),
           fileSize: downloaded.buffer.length,
           mimeType: downloaded.mimeType,

@@ -10,6 +10,7 @@ import {
   updateGuestApprovalApi,
   uncheckInGuestApi,
   promoteGuestApi,
+  getReceiptUploadUrl,
 } from './api';
 import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
@@ -343,10 +344,14 @@ export async function uploadReceipt(file: File, partyId: string): Promise<string
  * Path: `payouts/{partyId}/{payoutTempId}/{kind}/{timestamp}-{rand}.{ext}`.
  *
  * Used by the payouts host flow (arugula-38633). The backend `/ocr-preview`
- * and `POST /payouts` endpoints validate that uploaded image URLs match this
- * exact path shape under the `event-images` bucket — so don't change the path
- * structure without updating `assertSupabasePayoutUrl` in
+ * and `POST /payouts` endpoints validate that uploaded URLs sit under
+ * `payouts/{partyId}/` — see `assertSupabasePayoutUrl` in
  * `backend/src/routes/payout.routes.ts`.
+ *
+ * payout-receipts-private: RECEIPTS are uploaded to the PRIVATE
+ * `payout-receipts` bucket through a backend-minted signed upload URL and the
+ * returned `url` is the bare object path; API responses turn stored paths into
+ * short-lived signed URLs. Pizza/event photos stay in the public buckets.
  *
  * bocconcino-92104: receipts also accept `application/pdf`. On PDF upload we
  * render page 1 to a PNG client-side via pdfjs-dist and upload it as a
@@ -369,7 +374,16 @@ export async function uploadPayoutPhoto(
   payoutTempId: string,
   kind: 'pizza' | 'receipt' | 'event'
 ): Promise<{
+  /**
+   * What to persist / send to the backend. Pizza + event photos: the public
+   * URL. RECEIPTS: the bare object path in the PRIVATE payout-receipts bucket
+   * (`payouts/{partyId}/...`) — not loadable in <img>; use `previewUrl`.
+   */
   url: string;
+  /** Browser-loadable URL for showing the just-uploaded file (blob: URL for receipts). */
+  previewUrl: string;
+  /** PDF receipts only: blob: URL of the rendered page-1 thumbnail, if any. */
+  thumbPreviewUrl?: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -436,10 +450,31 @@ export async function uploadPayoutPhoto(
     const fileExt = uploadExt;
     const timestamp = Date.now();
     const rand = Math.random().toString(36).substring(7);
-    const path = `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
+    // payout-receipts-private: RECEIPTS go to the PRIVATE payout-receipts
+    // bucket via a backend-minted signed upload URL (the backend picks the
+    // path, always payouts/{partyId}/{group}/receipt/...). Pizza/event photos
+    // keep the public bucket + client-chosen path.
+    const isReceipt = kind === 'receipt';
+    const isPdfReceipt = isReceipt && uploadMime === 'application/pdf';
+    // Render the PDF thumbnail up front so we know whether to ask for a thumb slot.
+    let thumbBlob: Blob | null = null;
+    if (isPdfReceipt) {
+      try {
+        thumbBlob = await renderPdfPageOneToPng(file);
+        if (!thumbBlob) console.warn('PDF page-1 render returned null (continuing without thumbnail)');
+      } catch (thumbErr) {
+        console.warn('PDF thumbnail generation error (continuing without):', thumbErr);
+      }
+    }
+    const receiptTarget = isReceipt
+      ? await getReceiptUploadUrl(partyId, { group: payoutTempId, ext: fileExt, withThumb: !!thumbBlob })
+      : null;
+    const path = receiptTarget
+      ? receiptTarget.path
+      : `payouts/${partyId}/${payoutTempId}/${kind}/${timestamp}-${rand}.${fileExt}`;
     // mortadella-58546: video routes to the event-videos bucket (event-images
     // allowed_mime_types has no video). Same payout path scheme in either bucket.
-    const bucket = isVideo ? 'event-videos' : 'event-images';
+    const bucket = isReceipt ? 'payout-receipts' : isVideo ? 'event-videos' : 'event-images';
 
     // focaccia-58519: transient Supabase Storage blips (HTTP 520, network
     // hiccups) were surfacing to the host as a bare red error icon with no
@@ -452,9 +487,13 @@ export async function uploadPayoutPhoto(
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         let uploadError: any = null;
         try {
-          const { error } = await supabase.storage
-            .from(bucket)
-            .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
+          const { error } = receiptTarget
+            ? await supabase.storage
+                .from(bucket)
+                .uploadToSignedUrl(path, receiptTarget.token, uploadBlob, { cacheControl: '3600', contentType: uploadMime })
+            : await supabase.storage
+                .from(bucket)
+                .upload(path, uploadBlob, { cacheControl: '3600', upsert: false, contentType: uploadMime });
           uploadError = error;
         } catch (netErr) {
           // A thrown error (network/fetch failure) is treated like a transient
@@ -500,42 +539,45 @@ export async function uploadPayoutPhoto(
 
     await uploadWithRetry();
 
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(path);
-
-    // bocconcino-92104: for PDF receipts, also render page 1 to a PNG and
-    // upload it as a sibling at `<path>.thumb.png`. Convention-based path so
-    // the backend OCR pipeline + display sites can derive the thumbnail URL
-    // without a database column (avoids the 7-place field-add gauntlet).
-    // Failures here aren't fatal — we still return the PDF URL so the host's
-    // submit attempt isn't blocked. They'll see the PDF in the lightbox but
-    // OCR may fall back to "no thumbnail" on the server.
-    if (kind === 'receipt' && file.type === 'application/pdf') {
-      try {
-        const thumbBlob = await renderPdfPageOneToPng(file);
-        if (thumbBlob) {
-          const thumbPath = `${path}.thumb.png`;
+    if (receiptTarget) {
+      // bocconcino-92104: PDF receipts also get a page-1 PNG sibling at
+      // `<path>.thumb.png` (what OCR reads and what thumbnails render). Not
+      // fatal — the PDF itself is already stored.
+      let thumbPreviewUrl: string | undefined;
+      if (thumbBlob && receiptTarget.thumb) {
+        try {
           const { error: thumbErr } = await supabase.storage
-            .from('event-images')
-            .upload(thumbPath, thumbBlob, {
+            .from(bucket)
+            .uploadToSignedUrl(receiptTarget.thumb.path, receiptTarget.thumb.token, thumbBlob, {
               cacheControl: '3600',
-              upsert: false,
               contentType: 'image/png',
             });
           if (thumbErr) {
             console.warn('PDF thumbnail upload failed (continuing without):', thumbErr);
+          } else {
+            thumbPreviewUrl = URL.createObjectURL(thumbBlob);
           }
-        } else {
-          console.warn('PDF page-1 render returned null (continuing without thumbnail)');
+        } catch (thumbErr) {
+          console.warn('PDF thumbnail upload error (continuing without):', thumbErr);
         }
-      } catch (thumbErr) {
-        console.warn('PDF thumbnail generation error (continuing without):', thumbErr);
       }
+      return {
+        url: path,
+        previewUrl: URL.createObjectURL(uploadBlob),
+        thumbPreviewUrl,
+        fileName: uploadName,
+        fileSize: uploadBlob.size,
+        mimeType: uploadMime,
+      };
     }
+
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(path);
 
     return {
       url: urlData.publicUrl,
+      previewUrl: urlData.publicUrl,
       fileName: uploadName,
       fileSize: uploadBlob.size,
       mimeType: uploadMime,

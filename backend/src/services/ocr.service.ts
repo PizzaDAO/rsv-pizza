@@ -19,6 +19,7 @@ import { getOpenAI } from '../lib/openai.js';
 import { getCountryCode } from '../lib/countryCode.js';
 import { getLlmModels } from '../lib/privateConfig.js';
 import { sanitizePgString } from '../lib/sanitizePg.js';
+import { resolveFetchableUrl } from './payoutReceiptStorage.service.js';
 
 // formaggi-89172: allowed categories. Keep in sync with the system prompt
 // and the sanitizer below. `other` is the safe fallback for anything else.
@@ -243,9 +244,12 @@ function urlForLog(u: string): string {
 }
 
 export async function imageUrlToBase64DataUrl(imageUrl: string): Promise<string> {
-  const response = await fetch(imageUrl, { signal: AbortSignal.timeout(10_000) });
+  // Private payout receipts are stored as bare bucket paths; mint a short-lived
+  // signed URL for them. Public URLs pass through unchanged.
+  const fetchUrl = await resolveFetchableUrl(imageUrl);
+  const response = await fetch(fetchUrl, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
-    throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${urlForLog(imageUrl)}`);
+    throw new Error(`Failed to fetch image (HTTP ${response.status}) from ${urlForLog(fetchUrl)}`);
   }
   const arrayBuf = await response.arrayBuffer();
   const originalContentType = response.headers.get('content-type') || 'image/jpeg';

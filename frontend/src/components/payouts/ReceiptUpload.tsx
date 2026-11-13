@@ -12,6 +12,14 @@ export interface ReceiptItem {
   id: string;
   status: 'uploading' | 'ocring' | 'done' | 'error';
   url?: string;
+  /**
+   * payout-receipts-private: browser-loadable URL for the thumbnail. `url` is
+   * a bare private-bucket path for fresh receipt uploads (not loadable), so
+   * the upload hands back a local blob: URL here.
+   */
+  previewUrl?: string;
+  /** PDF receipts: browser-loadable page-1 thumbnail (blob: or signed URL). */
+  thumbUrl?: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -150,6 +158,8 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     patchItem(itemId, {
       status: 'ocring',
       url: uploaded.url,
+      previewUrl: uploaded.previewUrl,
+      thumbUrl: uploaded.thumbPreviewUrl,
       fileName: uploaded.fileName,
       fileSize: uploaded.fileSize,
       mimeType: uploaded.mimeType,
@@ -620,14 +630,14 @@ const ReceiptThumb: React.FC<{ item: ReceiptItem }> = ({ item }) => {
           <FileText size={20} className="text-theme-text-muted" aria-label="PDF receipt" />
         ) : (
           <img
-            src={derivePdfThumbnailUrl(item.url)}
+            src={derivePdfThumbnailUrl(item.previewUrl ?? item.url, item.thumbUrl)}
             alt=""
             className="w-full h-full object-cover"
             onError={() => setThumbFailed(true)}
           />
         )
       ) : (
-        <img src={item.url} alt="" className="w-full h-full object-cover" />
+        <img src={item.previewUrl ?? item.url} alt="" className="w-full h-full object-cover" />
       )}
     </div>
   );

@@ -1860,6 +1860,8 @@ export interface ReceiptLibraryEntry {
   /** agnolotti-58291: null when the parent payout has been hard-deleted. */
   payoutStatus: PayoutStatus | null;
   url: string;
+  /** payout-receipts-private: signed PDF thumbnail URL (see PayoutDocument.thumbUrl). */
+  thumbUrl?: string | null;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -1890,6 +1892,12 @@ export interface PayoutDocument {
   // payout documents and mirror to the gallery like 'pizza'.
   kind: 'pizza' | 'receipt' | 'event';
   url: string;
+  /**
+   * payout-receipts-private: signed URL of a private PDF receipt's page-1
+   * `.thumb.png` (null if it has none). Added by the backend next to `url`;
+   * absent for public/legacy URLs, where the `.thumb.png` convention applies.
+   */
+  thumbUrl?: string | null;
   fileName: string;
   fileSize: number;
   mimeType: string;
