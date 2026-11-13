@@ -18,7 +18,6 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { Client } = require('pg');
 
 function allowlist() {
   try {
@@ -34,6 +33,7 @@ async function main() {
     console.error('DATABASE_URL not set — cannot run RLS anon-exposure check.');
     process.exit(1);
   }
+  const { Client } = require('pg');
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   const { rows } = await client.query(`
@@ -60,9 +60,17 @@ async function main() {
   }
 
   if (await checkColumns(client)) failed = true;
+  const problems = await guestsClassChecks(pgQuery(client));
+  for (const line of problems.info) console.log(line);
+  if (problems.fail.length) {
+    failed = true;
+    for (const line of problems.fail) console.error(line);
+  }
   await client.end();
   if (failed) process.exit(1);
 }
+
+const pgQuery = (client) => async (sql, params = []) => (await client.query(sql, params)).rows;
 
 // Column-level checks (party-password-anon-exposure). Catalog SELECTs only.
 function safePartyColumns() {
@@ -110,4 +118,122 @@ async function checkColumns(client) {
   return failed;
 }
 
-main().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
+// ---------------------------------------------------------------------------------------------
+// guests-anon-exposure guards C1, C3, C4 (plans/guests-anon-exposure.md section 6, PR2).
+// C2 (parties exact column check) is checkColumns() above.
+// `query(sql, params) -> rows[]` so backend/scripts/apply-lockdown-guests.cjs can run the same
+// checks inside its --simulate transaction (post-lockdown state, then rolled back).
+// Catalog SELECTs only. Prints table/column names, never row values.
+// ---------------------------------------------------------------------------------------------
+const ROLES = ['anon', 'authenticated'];
+// Column names that must never be anon-readable on a table anon can actually read rows from.
+const SENSITIVE_NAME_RE = /(email|phone|wallet|ethereum|privy|token|secret|password|passcode|session|resend|ssn|ein|tax_id|iban|routing|bank|telegram|chat_id)/i;
+
+const readJson = (f) => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8'));
+
+/** C1: tables anon/authenticated must have NO privilege on (scripts/anon-no-access-tables.json). */
+async function checkNoAccessTables(query, tables = readJson('anon-no-access-tables.json').tables) {
+  const fail = [];
+  for (const t of tables) {
+    const [{ ok }] = await query(`SELECT to_regclass('public.' || quote_ident($1)) IS NOT NULL AS ok`, [t]);
+    if (!ok) { fail.push(`C1 ${t}: table does not exist (typo in scripts/anon-no-access-tables.json?)`); continue; }
+    for (const role of ROLES) {
+      const [p] = await query(
+        `WITH r AS (SELECT ('public.' || quote_ident($2))::regclass AS rel)
+         SELECT has_any_column_privilege($1, rel, 'SELECT') AS sel,
+                has_any_column_privilege($1, rel, 'INSERT') AS ins,
+                has_any_column_privilege($1, rel, 'UPDATE') AS upd,
+                has_table_privilege($1, rel, 'DELETE') AS del,
+                has_table_privilege($1, rel, 'TRUNCATE') AS trunc FROM r`, [role, t]);
+      const held = Object.entries({ SELECT: p.sel, INSERT: p.ins, UPDATE: p.upd, DELETE: p.del, TRUNCATE: p.trunc })
+        .filter(([, v]) => v).map(([k]) => k);
+      if (held.length) fail.push(`C1 ${role} still holds ${held.join('/')} on ${t}`);
+    }
+  }
+  return { fail, checked: tables.length };
+}
+
+/** anon-selectable columns of a table whose NAME looks sensitive, minus the allowlist. */
+async function sensitiveAnonColumns(query, table, allow) {
+  const rows = await query(
+    `SELECT a.attname AS col FROM pg_attribute a
+      WHERE a.attrelid = ('public.' || quote_ident($1))::regclass AND a.attnum > 0 AND NOT a.attisdropped
+        AND has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT')
+      ORDER BY a.attnum`, [table]);
+  return rows.map((r) => r.col).filter((c) => SENSITIVE_NAME_RE.test(c) && !(`${table}.${c}` in allow));
+}
+
+/**
+ * C3: permissive-policy sweep. RLS-on public tables with an anon/public SELECT or ALL policy whose
+ * qual is not `false` and does not call auth.uid()/auth.jwt()/auth.role(): anon can read rows, so
+ * no anon-selectable column may look sensitive unless allowlisted (scripts/anon-column-allowlist.json).
+ * Tables in anon-sensitive-columns.json (parties, experiment_flags) are covered exactly by C2.
+ */
+async function checkPermissivePolicies(query) {
+  const allow = readJson('anon-column-allowlist.json').allow || {};
+  const exact = new Set(Object.keys(readJson('anon-sensitive-columns.json')));
+  const rows = await query(`
+    SELECT DISTINCT p.tablename AS t
+      FROM pg_policies p
+      JOIN pg_class c ON c.relname = p.tablename
+      JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = p.schemaname
+     WHERE p.schemaname = 'public' AND c.relkind IN ('r', 'p') AND c.relrowsecurity
+       AND p.cmd IN ('SELECT', 'ALL')
+       AND p.permissive = 'PERMISSIVE'
+       AND (p.roles && ARRAY['anon', 'public']::name[])
+       AND coalesce(btrim(p.qual), 'true') NOT IN ('false', '(false)')
+       AND coalesce(p.qual, '') !~ 'auth\.(uid|jwt|role)\(\)'
+     ORDER BY 1`);
+  const tables = rows.map((r) => r.t).filter((t) => !exact.has(t));
+  const fail = [];
+  for (const t of tables) {
+    const bad = await sensitiveAnonColumns(query, t, allow);
+    if (bad.length) fail.push(`C3 ${t}: anon-readable rows (permissive policy) AND sensitive-looking columns: ${bad.join(', ')}`);
+  }
+  return { fail, tables };
+}
+
+/** C4: every table in supabase_realtime must be allowlisted; listed ones get C3's column rule. */
+async function checkRealtimePublication(query) {
+  const allowTables = new Set(readJson('realtime-publication-allowlist.json').tables || []);
+  const colAllow = readJson('anon-column-allowlist.json').allow || {};
+  const rows = await query(
+    `SELECT schemaname || '.' || tablename AS fq, schemaname AS s, tablename AS t
+       FROM pg_publication_tables WHERE pubname = 'supabase_realtime' ORDER BY 1`);
+  const fail = [];
+  for (const r of rows) {
+    if (!allowTables.has(r.t) && !allowTables.has(r.fq)) {
+      fail.push(`C4 ${r.fq} is in the supabase_realtime publication but not in scripts/realtime-publication-allowlist.json`);
+      continue;
+    }
+    if (r.s !== 'public') continue;
+    // Realtime change payloads follow column grants regardless of policies.
+    const bad = await sensitiveAnonColumns(query, r.t, colAllow);
+    if (bad.length) fail.push(`C4 ${r.fq}: published to realtime with anon-readable sensitive columns: ${bad.join(', ')}`);
+  }
+  return { fail, published: rows.map((r) => r.fq) };
+}
+
+/** Runs C1, C3, C4. Returns { fail: string[], info: string[] }. */
+async function guestsClassChecks(query) {
+  const c1 = await checkNoAccessTables(query);
+  const c3 = await checkPermissivePolicies(query);
+  const c4 = await checkRealtimePublication(query);
+  const info = [];
+  const fail = [...c1.fail, ...c3.fail, ...c4.fail];
+  if (!c1.fail.length) info.push(`✓ C1 no-access tables: anon/authenticated hold no privilege on ${c1.checked} table(s).`);
+  if (!c3.fail.length) info.push(`✓ C3 permissive-policy sweep: ${c3.tables.length} anon-readable table(s) (${c3.tables.join(', ') || 'none'}), no sensitive-looking columns outside the allowlist.`);
+  if (!c4.fail.length) info.push(`✓ C4 realtime publication: ${c4.published.length} table(s) published, all allowlisted.`);
+  if (fail.length) {
+    fail.unshift('\n✗ guests-anon-exposure guard FAILED (plans/guests-anon-exposure.md):');
+    fail.push('Fix: REVOKE the privilege / drop the permissive policy / remove the table from supabase_realtime,');
+    fail.push('or (only for genuinely public, non-sensitive data) add an entry with a reason to the allowlist JSON.');
+  }
+  return { fail, info };
+}
+
+module.exports = { guestsClassChecks, checkNoAccessTables, checkPermissivePolicies, checkRealtimePublication, SENSITIVE_NAME_RE };
+
+if (require.main === module) {
+  main().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
+}

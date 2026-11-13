@@ -1,0 +1,4 @@
+{
+  "_comment": "C4 (guests-anon-exposure): tables allowed in the supabase_realtime publication. postgres_changes payloads carry every column the subscriber role can SELECT, so a published table leaks whatever anon can read. EMPTY on purpose: guests left the publication in Migration B; host live updates use Broadcast-from-Database (topic guests:<partyId>, event guests_changed). Never add guests back.",
+  "tables": []
+}
