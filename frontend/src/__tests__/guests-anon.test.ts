@@ -102,8 +102,43 @@ describe('Migration B (guests anon lockdown)', () => {
     expect(runner).toContain('20261113_guests_anon_lockdown/migration.sql');
     const code = stripComments(runner);
     expect(code).not.toMatch(/\bSET\s+(?!LOCAL\b)(ROLE|lock_timeout|statement_timeout|search_path|session)/i);
+    expect(code).not.toMatch(/\bRESET\b/i);
+    expect(code).toMatch(/SET LOCAL statement_timeout/);
     expect(code).toMatch(/SET LOCAL lock_timeout/);
     expect(code).toMatch(/SET LOCAL ROLE \$\{role\}/);
+  });
+
+  const runnerMod = createRequire(import.meta.url)(path.join(REPO, RUNNER_B));
+
+  it('rollback GRANTs recreate MAINTAIN and the column-level grants (exact inverse)', () => {
+    const stmts: string[] = runnerMod.grantSql(runnerMod.BASELINE_ACL);
+    for (const role of ['anon', 'authenticated']) {
+      for (const t of ['guests', 'user_preferences']) {
+        const g = stmts.find((x) => x.startsWith('GRANT ') && !x.includes('(') && x.endsWith(`ON public.${t} TO ${role}`));
+        expect(g).toBeDefined();
+        for (const p of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) expect(g).toContain(p);
+      }
+      const col = stmts.find((x) => x.startsWith('GRANT SELECT (') && x.endsWith(`ON public.guests TO ${role}`));
+      expect(col).toBeDefined();
+      expect((col!.match(/"/g) || []).length / 2).toBe(12);
+      expect(col).toContain('"email_status"');
+      expect(stmts.find((x) => x.includes('(') && x.includes('user_preferences'))).toBeUndefined();
+    }
+  });
+
+  it('the probe DO block switches roles with SET LOCAL only and restores the original role', () => {
+    const block: string = runnerMod.probeBlock(['id', 'name'], 'postgres');
+    expect(block).not.toMatch(/\bRESET\b/i);
+    expect(block).toContain(`EXECUTE 'SET LOCAL ROLE anon'`);
+    expect(block).toContain(`EXECUTE 'SET LOCAL ROLE authenticated'`);
+    expect((block.match(/SET LOCAL ROLE "postgres"/g) || []).length).toBe(2);
+    expect(block).toMatch(/set_config\('lockdown_sim\.results', res, true\)/);
+    expect(block).not.toMatch(/\bSET\s+(?!LOCAL\b)ROLE/i);
+  });
+
+  it('parses probe results (denied = SQLSTATE 42501)', () => {
+    const r = runnerMod.parseProbeResults('anon\tx\tdenied\t42501\nanon\ty\tok\tok\nanon\tz\tdenied\t42P01\n');
+    expect(r.map((x: { pass: boolean }) => x.pass)).toEqual([true, true, false]);
   });
 
   it('does not re-lock experiment_flags (D9 is done by the parties lockdown runner)', () => {
@@ -146,7 +181,7 @@ describe('CI guards C1/C3/C4 logic (fake catalog)', () => {
         const v = opts.privs;
         return [{ sel: v, ins: v, upd: v, del: v, trunc: v }];
       }
-      if (sql.includes('FROM pg_policies')) return opts.permissive.map((t) => ({ t }));
+      if (sql.includes('FROM pg_policies')) return opts.permissive.map((t) => ({ t, qual: 'true' }));
       if (sql.includes('pg_publication_tables')) return opts.published.map((t) => ({ fq: `public.${t}`, s: 'public', t }));
       if (sql.includes('pg_attribute')) return (opts.anonCols[params[0] as string] || []).map((col) => ({ col }));
       throw new Error('unexpected query: ' + sql.slice(0, 80));
@@ -182,10 +217,22 @@ describe('CI guards C1/C3/C4 logic (fake catalog)', () => {
     expect(out.fail[0]).toMatch(/guestz: table does not exist/);
   });
 
-  it('the sensitive-name regex covers the guests leak columns', () => {
-    for (const c of ['email', 'ethereum_address', 'survey_token', 'privy_user_id', 'visitor_session_id', 'email_resend_id']) {
-      expect(guards.SENSITIVE_NAME_RE.test(c)).toBe(true);
+  it('the sensitive-name rule covers the guests leak columns, camelCase, and has no substring false positives', () => {
+    for (const c of ['email', 'ethereum_address', 'survey_token', 'privy_user_id', 'visitor_session_id', 'email_resend_id', 'userEmail', 'nft_token_id', 'tax_id']) {
+      expect(guards.isSensitiveColumn(c)).toBe(true);
     }
-    for (const c of ['id', 'name', 'party_id', 'old_slug', 'enabled']) expect(guards.SENSITIVE_NAME_RE.test(c)).toBe(false);
+    for (const c of ['id', 'name', 'party_id', 'old_slug', 'enabled', 'protein', 'tokenizer', 'beings', 'sessionize']) {
+      expect(guards.isSensitiveColumn(c)).toBe(false);
+    }
+  });
+
+  it('C3 only excludes quals that compare auth.uid()/auth.jwt() to a column', () => {
+    const scoped = ['(auth.uid() = "userId")', '((auth.uid())::text = user_id)', '(user_id = auth.uid())',
+      "((auth.jwt() ->> 'email'::text) = email)", '((auth.uid() = owner) AND (published = true))'];
+    const permissive = ['true', null, "(auth.role() = 'service_role'::text)", '(auth.uid() IS NULL)',
+      '((auth.uid())::text IN ( SELECT (g.id)::text AS id FROM guests g))', '((auth.uid() = owner) OR true)',
+      "(auth.uid() = 'abc'::uuid)", '(auth.uid() = true)'];
+    for (const q of scoped) expect(guards.isSelfScopedQual(q)).toBe(true);
+    for (const q of permissive) expect(guards.isSelfScopedQual(q)).toBe(false);
   });
 });

@@ -127,7 +127,30 @@ async function checkColumns(client) {
 // ---------------------------------------------------------------------------------------------
 const ROLES = ['anon', 'authenticated'];
 // Column names that must never be anon-readable on a table anon can actually read rows from.
-const SENSITIVE_NAME_RE = /(email|phone|wallet|ethereum|privy|token|secret|password|passcode|session|resend|ssn|ein|tax_id|iban|routing|bank|telegram|chat_id)/i;
+// Anchored to word/underscore boundaries (ein must not match protein); camelCase is split first
+// (userEmail -> user_email), so test with isSensitiveColumn(), not the bare regex.
+const SENSITIVE_NAME_RE = /(^|_)(emails?|phones?|wallets?|ethereum|privy|tokens?|secrets?|passwords?|passcodes?|sessions?|resend|ssn|ein|tax_id|iban|routing|bank|telegram|chat_id)(_|$)/;
+const isSensitiveColumn = (c) => SENSITIVE_NAME_RE.test(String(c).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase());
+
+/**
+ * True only when a policy qual restricts rows to the caller: (one AND-ed part of) the qual is
+ * `auth.uid() = <column>` or `auth.jwt() ->> 'claim' = <column>` (either order, casts ignored).
+ * Any OR, any other mention of auth.*() (auth.role(), auth.uid() IN (...), auth.uid() IS NULL),
+ * or no qual at all counts as permissive.
+ */
+function isSelfScopedQual(qual) {
+  if (qual === null || qual === undefined) return false;
+  const q = String(qual);
+  if (/\bOR\b/i.test(q)) return false;
+  const AUTH = String.raw`auth\.(?:uid|jwt)(?:->>?'[a-z_]+')?`;
+  const COL = String.raw`(?!auth\.)"?[A-Za-z_][A-Za-z0-9_]*"?(?:\."?[A-Za-z_][A-Za-z0-9_]*"?)?`;
+  const re = new RegExp(`^(?:${AUTH}=${COL}|${COL}=${AUTH})$`);
+  return q.split(/\bAND\b/i).some((part) => {
+    const s = part.replace(/\s+/g, '').replace(/::[a-z_]+(?:\[\])?/gi, '').replace(/[()]/g, '');
+    if (/^(true|false|null)$/i.test(s.split('=').find((x) => !/^auth\./.test(x)) || '')) return false;
+    return re.test(s);
+  });
+}
 
 const readJson = (f) => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 
@@ -160,20 +183,21 @@ async function sensitiveAnonColumns(query, table, allow) {
       WHERE a.attrelid = ('public.' || quote_ident($1))::regclass AND a.attnum > 0 AND NOT a.attisdropped
         AND has_column_privilege('anon', a.attrelid, a.attnum, 'SELECT')
       ORDER BY a.attnum`, [table]);
-  return rows.map((r) => r.col).filter((c) => SENSITIVE_NAME_RE.test(c) && !(`${table}.${c}` in allow));
+  return rows.map((r) => r.col).filter((c) => isSensitiveColumn(c) && !(`${table}.${c}` in allow));
 }
 
 /**
- * C3: permissive-policy sweep. RLS-on public tables with an anon/public SELECT or ALL policy whose
- * qual is not `false` and does not call auth.uid()/auth.jwt()/auth.role(): anon can read rows, so
- * no anon-selectable column may look sensitive unless allowlisted (scripts/anon-column-allowlist.json).
- * Tables in anon-sensitive-columns.json (parties, experiment_flags) are covered exactly by C2.
+ * C3: permissive-policy sweep. RLS-on public tables with an anon/public PERMISSIVE SELECT or ALL
+ * policy whose qual is not `false` and is not self-scoped (isSelfScopedQual: auth.uid()/auth.jwt()
+ * compared to a column): anon may read rows, so no anon-selectable column may look sensitive unless
+ * allowlisted (scripts/anon-column-allowlist.json). Tables in anon-sensitive-columns.json
+ * (parties, experiment_flags) are covered exactly by C2.
  */
 async function checkPermissivePolicies(query) {
   const allow = readJson('anon-column-allowlist.json').allow || {};
   const exact = new Set(Object.keys(readJson('anon-sensitive-columns.json')));
-  const rows = await query(`
-    SELECT DISTINCT p.tablename AS t
+  const pols = await query(`
+    SELECT p.tablename AS t, p.qual AS qual
       FROM pg_policies p
       JOIN pg_class c ON c.relname = p.tablename
       JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = p.schemaname
@@ -181,9 +205,11 @@ async function checkPermissivePolicies(query) {
        AND p.cmd IN ('SELECT', 'ALL')
        AND p.permissive = 'PERMISSIVE'
        AND (p.roles && ARRAY['anon', 'public']::name[])
-       AND coalesce(btrim(p.qual), 'true') NOT IN ('false', '(false)')
-       AND coalesce(p.qual, '') !~ 'auth\.(uid|jwt|role)\(\)'
      ORDER BY 1`);
+  const rows = [...new Set(pols
+    .filter((p) => !/^\(*false\)*$/i.test(String(p.qual ?? 'true').replace(/\s+/g, '')))
+    .filter((p) => !isSelfScopedQual(p.qual))
+    .map((p) => p.t))].map((t) => ({ t }));
   const tables = rows.map((r) => r.t).filter((t) => !exact.has(t));
   const fail = [];
   for (const t of tables) {
@@ -232,7 +258,7 @@ async function guestsClassChecks(query) {
   return { fail, info };
 }
 
-module.exports = { guestsClassChecks, checkNoAccessTables, checkPermissivePolicies, checkRealtimePublication, SENSITIVE_NAME_RE };
+module.exports = { guestsClassChecks, checkNoAccessTables, checkPermissivePolicies, checkRealtimePublication, SENSITIVE_NAME_RE, isSensitiveColumn, isSelfScopedQual };
 
 if (require.main === module) {
   main().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
