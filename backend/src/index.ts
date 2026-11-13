@@ -28,7 +28,7 @@ import nftRoutes from './routes/nft.routes.js';
 import photoRoutes from './routes/photo.routes.js';
 import { reelRouter, adminReelRouter } from './routes/reel.routes.js';
 import photoFeedRoutes from './routes/photo-feed.routes.js';
-import { payoutReceiptUrlsMiddleware } from './middleware/payoutReceiptUrls.js';
+import { mountPayoutReceiptUrlMiddleware } from './middleware/payoutReceiptUrls.js';
 import heicRoutes from './routes/heic.routes.js'; // taleggio-71042: server-side HEIC->JPEG convert
 import kitRoutes from './routes/kit.routes.js';
 import gppRoutes from './routes/gpp.routes.js';
@@ -149,10 +149,11 @@ app.use('/api/admin/logo-bg-audit', express.json({ limit: '8mb' }));
 
 app.use(express.json());
 
-// SECURITY: payout receipts live in the PRIVATE payout-receipts bucket. Sign
-// bare receipt object paths in every JSON response and un-sign round-tripped
-// signed URLs in requests (see middleware/payoutReceiptUrls.ts).
-app.use(payoutReceiptUrlsMiddleware);
+// SECURITY: payout receipts live in the PRIVATE payout-receipts bucket. On the
+// receipt routers only, sign bare receipt paths in JSON responses (per-caller
+// party check) and un-sign round-tripped signed URLs in requests
+// (see middleware/payoutReceiptUrls.ts).
+mountPayoutReceiptUrlMiddleware(app);
 
 // Rate limiting
 const limiter = rateLimit({

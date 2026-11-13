@@ -50,6 +50,7 @@ import {
   buildReceiptUploadPath,
   createReceiptUploadTarget,
 } from '../services/payoutReceiptStorage.service.js';
+import { canAccessPartyReceipts } from '../helpers/payoutReceiptAccess.js';
 
 const router = Router();
 
@@ -680,25 +681,12 @@ const receiptUploadLimiter = rateLimit({
   validate: false,
 });
 
-async function canUploadPayoutReceipt(req: AuthRequest, partyId: string): Promise<boolean> {
-  if (await canUserEditParty(partyId, req.userId, req.userEmail)) return true;
-  if (await isAnyAdmin(req.userEmail)) return true;
-  if (await isPaymentAdmin(req.userEmail)) return true;
-  const party = await prisma.party.findUnique({
-    where: { id: partyId },
-    select: { userId: true, region: true, name: true, city: true, eventType: true },
-  });
-  if (!party) return false;
-  if (await isAggregatorForParty(req.userEmail, party)) return true;
-  const email = req.userEmail?.toLowerCase();
-  if (email) {
-    const coord = await prisma.shippingCoordinator.findFirst({
-      where: { email, isActive: true },
-      select: { id: true },
-    });
-    if (coord) return true;
-  }
-  return false;
+function canUploadPayoutReceipt(req: AuthRequest, partyId: string): Promise<boolean> {
+  return canAccessPartyReceipts(
+    { userId: req.userId, userEmail: req.userEmail },
+    partyId,
+    { allowShippingCoordinator: true },
+  );
 }
 
 router.post(

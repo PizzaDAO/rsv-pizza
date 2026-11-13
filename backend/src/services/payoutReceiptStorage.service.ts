@@ -17,10 +17,11 @@
  *     moves the object and repoints the row)
  *   - anything else (e.g. `pizza-order://` draft markers) is passed through.
  *
- * Reads: `middleware/payoutReceiptUrls.ts` swaps every bare private path in a
- * JSON response for a signed URL (and normalises signed URLs that clients send
- * back into bare paths). Server-side fetches (OCR, authenticity check, rotate)
- * go through `resolveFetchableUrl`.
+ * Reads: `middleware/payoutReceiptUrls.ts`, mounted only on the receipt
+ * routers, swaps bare private paths under receipt keys for signed URLs after a
+ * per-caller party check (and normalises signed URLs that clients send back
+ * into bare paths). Server-side fetches (OCR, authenticity check, rotate) go
+ * through `resolveFetchableUrl`.
  */
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
@@ -95,22 +96,57 @@ function getSupabaseAdmin() {
   return _client;
 }
 
+/**
+ * Explicit MIME allowlist (no wildcard: `image/*` would admit SVG, which can
+ * carry script). Matches what uploadPayoutPhoto accepts for receipts after
+ * HEIC→JPEG conversion, plus HEIC/HEIF for legacy objects moved by the backfill.
+ */
+export const PAYOUT_RECEIPT_MIME_TYPES: readonly string[] = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+];
+const BUCKET_OPTIONS = {
+  public: false,
+  allowedMimeTypes: [...PAYOUT_RECEIPT_MIME_TYPES],
+  fileSizeLimit: '25MB',
+};
+
 let _bucketEnsured = false;
 /**
- * Idempotently ensure the private bucket exists (public: false, images + PDF,
- * 25MB — the same limits uploadPayoutPhoto enforces client-side). An
- * "already exists" error is success.
+ * Idempotently ensure the private bucket exists with the explicit MIME
+ * allowlist and 25MB cap. If it already exists it is VERIFIED: a bucket that
+ * somehow became public (or has a different allowlist) is updated back to the
+ * private config, and we throw if it is still public afterwards — receipts are
+ * never written to a public bucket.
  */
 export async function ensurePayoutReceiptsBucket(): Promise<void> {
   if (_bucketEnsured) return;
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage.createBucket(PAYOUT_RECEIPTS_BUCKET, {
-    public: false,
-    allowedMimeTypes: ['image/*', 'application/pdf'],
-    fileSizeLimit: '25MB',
-  });
-  if (error && !/already exists|resource already exists|duplicate/i.test(error.message)) {
-    throw new Error(`Failed to ensure private payout-receipts bucket: ${error.message}`);
+  const { error } = await supabase.storage.createBucket(PAYOUT_RECEIPTS_BUCKET, BUCKET_OPTIONS);
+  if (error) {
+    if (!/already exists|resource already exists|duplicate/i.test(error.message)) {
+      throw new Error(`Failed to ensure private payout-receipts bucket: ${error.message}`);
+    }
+    const { data: existing, error: getErr } = await supabase.storage.getBucket(PAYOUT_RECEIPTS_BUCKET);
+    if (getErr || !existing) {
+      throw new Error(`Could not verify payout-receipts bucket: ${getErr?.message || 'not found'}`);
+    }
+    const mimes = [...(existing.allowed_mime_types ?? [])].sort().join(',');
+    const wantMimes = [...PAYOUT_RECEIPT_MIME_TYPES].sort().join(',');
+    if (existing.public || mimes !== wantMimes) {
+      console.error(
+        `[payout-receipts] bucket config drift (public=${existing.public}, mimes=${mimes || 'any'}); resetting to private`,
+      );
+      const { error: updErr } = await supabase.storage.updateBucket(PAYOUT_RECEIPTS_BUCKET, BUCKET_OPTIONS);
+      const { data: after } = await supabase.storage.getBucket(PAYOUT_RECEIPTS_BUCKET);
+      if (updErr || !after || after.public) {
+        throw new Error('payout-receipts bucket is PUBLIC and could not be made private — refusing to use it');
+      }
+    }
   }
   _bucketEnsured = true;
 }
@@ -195,7 +231,7 @@ export async function removePrivateReceipt(path: string): Promise<void> {
 }
 
 const SAFE_SEGMENT_RE = /[^a-zA-Z0-9_-]/g;
-const ALLOWED_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'pdf']);
+const ALLOWED_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf']);
 
 /**
  * Build the object path for a browser receipt upload. The server picks the

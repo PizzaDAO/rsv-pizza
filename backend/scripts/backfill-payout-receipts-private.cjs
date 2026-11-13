@@ -16,7 +16,12 @@
  *      source_kind='receipt', event-images/image-authenticity/...) ->
  *      payout-receipts/payouts/<partyId>/authenticity/<file>
  *   4. with --orphans: receipt objects under event-images/payouts/<party>/<group>/receipt/
- *      that no DB row references (abandoned uploads, superseded rotations)
+ *      or event-images/payouts/<party>/tg-* (Telegram uploads) that no DB row
+ *      references (abandoned uploads, superseded rotations)
+ *   5. RESUME: rows that already hold a bare path (an interrupted earlier run,
+ *      or a row repointed by hand) whose public copy still exists: the private
+ *      copy is verified against the public one by sha256 (copied first if
+ *      missing), then the public copy (and PDF thumb) is deleted.
  *
  * DB columns rewritten (old public URL -> bare path):
  *   payout_documents.url               (kind='receipt' rows only)
@@ -71,7 +76,7 @@ const NEW_BUCKET = 'payout-receipts';
 const PUBLIC_MARKER = `/storage/v1/object/public/${OLD_BUCKET}/`;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const PAYOUT_PATH_RE = new RegExp(`^payouts/${UUID}/[^\\s?#]+$`, 'i');
-const ORPHAN_RECEIPT_RE = new RegExp(`^payouts/${UUID}/[^/]+/receipt/[^/]+$`, 'i');
+const ORPHAN_RECEIPT_RE = new RegExp(`^payouts/${UUID}/(?:[^/]+/receipt/[^/]+|tg-[^/]+)$`, 'i');
 const LIKE_PAYOUTS = `%${PUBLIC_MARKER}payouts/%`;
 const LIKE_ELA = `%${PUBLIC_MARKER}image-authenticity/%`;
 
@@ -108,12 +113,16 @@ function storage() {
   return supabase;
 }
 
+// Same config as backend/src/services/payoutReceiptStorage.service.ts (explicit
+// allowlist, no image/* wildcard so no SVG).
+const BUCKET_OPTIONS = {
+  public: false,
+  allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'],
+  fileSizeLimit: '25MB',
+};
+
 async function ensureBucket(sb) {
-  const { error } = await sb.storage.createBucket(NEW_BUCKET, {
-    public: false,
-    allowedMimeTypes: ['image/*', 'application/pdf'],
-    fileSizeLimit: '25MB',
-  });
+  const { error } = await sb.storage.createBucket(NEW_BUCKET, BUCKET_OPTIONS);
   if (error && !/already exists|resource already exists|duplicate/i.test(error.message)) {
     throw new Error(`ensureBucket failed: ${error.message}`);
   }
@@ -217,6 +226,25 @@ async function main() {
       else { g.hasThumb = null; thumbsUnknown++; }
     }
 
+    // RESUME: rows already on a bare path whose public copy still exists.
+    const barePaths = new Set();
+    for (const r of (await db.query(
+      `SELECT url AS u FROM payout_documents WHERE kind = 'receipt' AND url LIKE 'payouts/%'
+       UNION SELECT external_proof_url FROM payouts WHERE external_proof_url LIKE 'payouts/%'`)).rows) {
+      if (PAYOUT_PATH_RE.test(r.u) && !r.u.includes('..')) barePaths.add(r.u);
+    }
+    const resume = []; // { path, thumb: bool|null }
+    for (const p of barePaths) {
+      if (groups.has(p)) continue; // also referenced by a legacy URL: handled by the main pass
+      if (inventory) {
+        if (inventory.has(p) || inventory.has(`${p}.thumb.png`)) {
+          resume.push({ path: p, main: inventory.has(p), thumb: inventory.has(`${p}.thumb.png`) });
+        }
+      } else {
+        resume.push({ path: p, main: null, thumb: null }); // unknown: probed in --apply
+      }
+    }
+
     // Authenticity cache rows keyed by the old URLs (+ their .thumb.png variants).
     const allOldUrls = [];
     for (const g of groups.values()) for (const u of g.urls) { allOldUrls.push(u); allOldUrls.push(`${u}.thumb.png`); }
@@ -250,6 +278,7 @@ async function main() {
          UNION SELECT url FROM photos WHERE url LIKE $1
          UNION SELECT external_proof_url FROM payouts WHERE external_proof_url LIKE $1`, [LIKE_PAYOUTS])).rows;
       for (const r of anyRef) { const p = objectPathFromPublicUrl(r.u); if (p) referenced.add(p); }
+      for (const p of barePaths) referenced.add(p);
       for (const name of inventory) {
         if (!ORPHAN_RECEIPT_RE.test(name)) continue;
         const base = name.endsWith('.thumb.png') ? name.slice(0, -'.thumb.png'.length) : name;
@@ -266,6 +295,7 @@ async function main() {
         `  (PDFs: ${groupList.filter(([, g]) => g.isPdf).length}, with .thumb.png: ${inventory ? thumbsKnown : `unknown x${thumbsUnknown}`})`);
     log(`image_authenticity_checks.image_url to repoint: ${authRows.length}`);
     log(`receipt ELA overlays to move                  : ${elaPlan.length}`);
+    log(`RESUME: bare-path rows w/ public copy left     : ${inventory ? resume.length : `unknown (${resume.length} bare-path refs probed on --apply)`}`);
     log(`orphan receipt objects (unreferenced)          : ${inventory ? orphans.length : 'unknown (no inventory)'}${ORPHANS ? '' : '  (moved only with --orphans)'}`);
     log(`SKIPPED (also used as a public photo)         : ${skippedShared.length}`);
     for (const s of skippedShared) log(`  SKIP shared  ${s.path}`);
@@ -278,6 +308,7 @@ async function main() {
         log(`MOVE  ${OLD_BUCKET}/${p}  ->  ${NEW_BUCKET}/${p}  [docs:${g.docIds.length} proofs:${g.payoutIds.length}${g.isPdf ? ` thumb:${g.hasThumb == null ? '?' : g.hasThumb}` : ''}]`);
       }
       for (const e of elaPlan) log(`MOVE  ${OLD_BUCKET}/${e.from}  ->  ${NEW_BUCKET}/${e.to}  [ela ${e.id}]`);
+      if (inventory) for (const r of resume) log(`RESUME ${r.path}  [public main:${r.main} thumb:${r.thumb}]`);
       if (ORPHANS) for (const o of orphans) log(`MOVE  ${OLD_BUCKET}/${o}  ->  ${NEW_BUCKET}/${o}  [orphan]`);
       log('\nDry run only — nothing changed. Re-run with --apply to perform the migration.');
       return;
@@ -296,6 +327,7 @@ async function main() {
         [[...new Set([...authRows.map((r) => r.id), ...elaPlan.map((e) => e.id)])]])).rows,
       objects: groupList.map(([p, g]) => ({ path: p, isPdf: g.isPdf, urls: [...g.urls] })),
       ela: elaPlan,
+      resume,
       orphans: ORPHANS ? orphans : [],
     };
     fs.writeFileSync(BACKUP_PATH, JSON.stringify(backup, null, 2), { mode: 0o600 });
@@ -353,6 +385,38 @@ async function main() {
       }
     }
 
+    // ---- 4b. Resume: delete leftover public copies of already-repointed rows ----
+    let resumed = 0;
+    for (const r of resume) {
+      try {
+        const removed = [];
+        for (const p of [r.path, `${r.path}.thumb.png`]) {
+          const pub = await download(sb, OLD_BUCKET, p);
+          if (!pub) continue; // no public copy (or already deleted)
+          let priv = await download(sb, NEW_BUCKET, p);
+          if (!priv) {
+            await copyVerified(sb, p, p); // private copy missing: copy + verify first
+            priv = await download(sb, NEW_BUCKET, p);
+          }
+          if (!priv || sha256(priv.buf) !== sha256(pub.buf)) {
+            log(`  WARN  resume ${p}: private copy missing or differs from the public one — public copy KEPT`);
+            failed++;
+            continue;
+          }
+          removed.push(p);
+        }
+        if (removed.length) {
+          const rm = await sb.storage.from(OLD_BUCKET).remove(removed);
+          if (rm.error) { log(`  WARN  resume ${r.path}: delete failed: ${rm.error.message}`); failed++; continue; }
+          log(`  OK    resume ${removed.join(' + ')}`);
+          resumed++;
+        }
+      } catch (err) {
+        log(`  FAIL  resume ${r.path}: ${err.message}`);
+        failed++;
+      }
+    }
+
     // ---- 5. ELA overlays ----
     let elaMoved = 0;
     for (const e of elaPlan) {
@@ -386,7 +450,7 @@ async function main() {
       }
     }
 
-    log(`\n=== done: ${moved} receipt objects moved, ${elaMoved} ELA overlays moved, ${orphansMoved} orphans moved, ${failed} failed ===`);
+    log(`\n=== done: ${moved} receipt objects moved, ${resumed} resumed, ${elaMoved} ELA overlays moved, ${orphansMoved} orphans moved, ${failed} failed ===`);
     log(`backup: ${BACKUP_PATH}`);
     if (failed > 0) process.exitCode = 1;
   } finally {
