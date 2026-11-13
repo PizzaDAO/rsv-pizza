@@ -91,3 +91,6 @@ the deployed frontend bundle.
 - The `guests` table is the only app table in the `supabase_realtime` publication.
 - Realtime guest subscription is **opt-in per page** via `useGuestsRealtime(partyId, onChange)` from `frontend/src/hooks/useGuestsRealtime.ts`.
 - **Do NOT re-add the subscription to `PizzaContext`** — the global subscription caused a site-wide outage on 2026-05-19 (every public RSVPer opened a realtime channel, churning the realtime `subscription` table and pinning WAL processing). See `plans/calabrese-58204-pool-exhaustion-fix.md`.
+
+## Tax forms
+- Tax forms are also rendered by pizzadao-org `app/tax-form` (app.pizzadao.org), which calls the public `/api/tax-form-requests/*` routes cross-origin (CORS in `backend/src/lib/cors.ts`, hardcoded, no credentials). Update both when the forms or formData keys change.
