@@ -18,9 +18,9 @@ import {
 const PARTY = '0b6f3c2e-1d2a-4c5b-9e8f-7a6b5c4d3e2f';
 const PDF = `payouts/${PARTY}/tmp-1/receipt/1700000000000-abc.pdf`;
 const JPG = `payouts/${PARTY}/tmp-1/receipt/1700000000001-def.jpg`;
-const LEGACY = `https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/public/event-images/payouts/${PARTY}/x/receipt/1.jpg`;
+const LEGACY = `https://testproject.supabase.co/storage/v1/object/public/event-images/payouts/${PARTY}/x/receipt/1.jpg`;
 const signed = (p: string) =>
-  `https://znpiwdvvsqaxuskpfleo.supabase.co/storage/v1/object/sign/payout-receipts/${p}?token=abc.def`;
+  `https://testproject.supabase.co/storage/v1/object/sign/payout-receipts/${p}?token=abc.def`;
 
 describe('payout receipt path helpers', () => {
   it('recognises bare private paths only', () => {
