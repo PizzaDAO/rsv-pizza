@@ -93,4 +93,4 @@ the deployed frontend bundle.
 - **Do NOT re-add the subscription to `PizzaContext`** — the global subscription caused a site-wide outage on 2026-05-19 (every public RSVPer opened a realtime channel, churning the realtime `subscription` table and pinning WAL processing). See `plans/calabrese-58204-pool-exhaustion-fix.md`.
 
 ## Tax forms
-- Tax forms are also rendered by pizzadao-org `app/tax-form` (app.pizzadao.org), which calls the public `/api/tax-form-requests/*` routes cross-origin (CORS in `backend/src/lib/cors.ts`, hardcoded, no credentials). Update both when the forms or formData keys change.
+- Tax forms are also rendered by pizzadao-org `app/tax-form` (pizzadao.org, formerly app.pizzadao.org), which calls the public `/api/tax-form-requests/*` routes cross-origin (CORS in `backend/src/lib/cors.ts`, hardcoded, no credentials). Update both when the forms or formData keys change.

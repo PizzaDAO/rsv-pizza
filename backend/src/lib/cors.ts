@@ -20,7 +20,7 @@ export function isAllowedOrigin(origin: string, allowed: readonly string[]): boo
  * payee). Hardcoded here, NOT in ALLOWED_ORIGINS, so a prod env var can't drop them.
  * The preview suffix -pizza-dao.vercel.app is reserved for the pizza-dao Vercel team.
  */
-export const PIZZADAO_APP_ORIGIN = 'https://app.pizzadao.org';
+export const PIZZADAO_APP_ORIGINS: readonly string[] = ['https://pizzadao.org', 'https://app.pizzadao.org'];
 export const PIZZADAO_PREVIEW_ORIGIN = /^https:\/\/onboarding(-v7lj)?-[a-z0-9-]+-pizza-dao\.vercel\.app$/;
 
 /** Public token routes only. Must NOT match /api/admin/tax-form-requests. */
@@ -29,7 +29,7 @@ export function isTaxFormRequestPublicPath(path: string): boolean {
 }
 
 export function isAllowedTaxFormOrigin(origin: string, allowed: readonly string[]): boolean {
-  return isAllowedOrigin(origin, allowed) || origin === PIZZADAO_APP_ORIGIN || PIZZADAO_PREVIEW_ORIGIN.test(origin);
+  return isAllowedOrigin(origin, allowed) || PIZZADAO_APP_ORIGINS.includes(origin) || PIZZADAO_PREVIEW_ORIGIN.test(origin);
 }
 
 /**
