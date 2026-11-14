@@ -147,6 +147,8 @@ export function ParticipantPanel({ partyId, hackathon }: { partyId: string; hack
   const closed = me.deadlinePassed;
 
   // ------------------------------------------------------------ no team yet
+  // After the reveal there's nothing left to join: the winners strip says it all.
+  if (!team && hackathon.resultsRevealedAt) return null;
   if (!team) {
     let body: ReactNode;
     if (!me.loggedIn) {

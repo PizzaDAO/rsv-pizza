@@ -174,8 +174,8 @@ function PayoutEditor({ award, candidate, busy, onSave, onRemove }: {
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IconInput icon={Wallet} value={wallet} maxLength={200} placeholder="Wallet address or payment handle" aria-label="Wallet or handle" onChange={(e) => setWallet(e.target.value)} />
-        <IconInput icon={Hash} value={reference} maxLength={500} placeholder="Reference or tx hash" aria-label="Reference or tx hash" onChange={(e) => setReference(e.target.value)} />
+        <IconInput icon={Wallet} type="text" value={wallet} maxLength={200} placeholder="Wallet address or payment handle" aria-label="Wallet or handle" onChange={(e) => setWallet(e.target.value)} />
+        <IconInput icon={Hash} type="text" value={reference} maxLength={500} placeholder="Reference or tx hash" aria-label="Reference or tx hash" onChange={(e) => setReference(e.target.value)} />
       </div>
       {status === 'paid' && (
         <div>
