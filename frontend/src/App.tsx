@@ -107,9 +107,18 @@ function App() {
       fontLink.href = fontHref;
       document.head.appendChild(fontLink);
     }
+    // Team1's Kanit type (team1.network); only fetched for that brand.
+    let team1FontLink: HTMLLinkElement | null = null;
+    if (cls === 'team1-theme') {
+      team1FontLink = document.createElement('link');
+      team1FontLink.rel = 'stylesheet';
+      team1FontLink.href = 'https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&display=swap';
+      document.head.appendChild(team1FontLink);
+    }
     return () => {
       document.documentElement.classList.remove(cls);
       fontLink?.remove();
+      team1FontLink?.remove();
     };
   }, []);
 
