@@ -792,6 +792,8 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
 }
 .doge-theme h1 { line-height: 1.05; }
 .doge-theme h1, .doge-theme h2 { text-wrap: balance; }
+/* The header already carries the wordmark; hide the landing hero's repeat of it. */
+.doge-theme main > header > img:first-child { display: none; }
 /* Header: cream bar, thin dark border, wordmark in heavy rounded type. */
 .doge-theme .site-header {
   background: var(--doge-cream) !important;
