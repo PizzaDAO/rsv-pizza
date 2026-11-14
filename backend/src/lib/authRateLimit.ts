@@ -15,7 +15,11 @@
  * every row committed by whoever held the lock before. Parallel requests on different
  * instances therefore serialize per key and can't all pass.
  * The locks are transaction-scoped (released at COMMIT), which is safe on the 6543
- * transaction pooler. Never use session-level locks or SET here.
+ * transaction pooler. Never use session-level locks or SET here; the transaction starts with
+ * SET LOCAL lock_timeout / statement_timeout so a stalled lock holder can't pin pool
+ * connections (the array form of $transaction ignores Prisma's transactionOptions timeout;
+ * cf. the 2026-05-19 pool outage). A timeout makes reserve() throw, which the callers treat as
+ * "store unavailable" (verify: 503, send: per-instance fallback).
  *
  * Privacy: rows hold HMAC-SHA256 digests of the IP / email+IP (key derived from JWT_SECRET
  * with a domain label), never plaintext.
@@ -38,6 +42,11 @@ export interface Reservation {
   counts: number[];
   /** Ids of the inserted rows, or null when some bucket was at its limit (nothing inserted). */
   ids: string[] | null;
+  /**
+   * Per bucket: ms until its oldest in-window event expires (a slot frees up by ageing), or
+   * null when the bucket has no events. Lets callers cache a refusal briefly.
+   */
+  retryAfterMs: Array<number | null>;
 }
 
 export interface RateStore {
@@ -51,6 +60,9 @@ export interface RateStore {
 
 /** Rows older than this are never counted (every window is 15 min); delete them. */
 export const RATE_EVENT_RETENTION_MS = 60 * 60 * 1000;
+/** Bounds on how long a reservation may wait for / hold the lock (SET LOCAL, per transaction). */
+export const RESERVE_LOCK_TIMEOUT = '2s';
+export const RESERVE_STATEMENT_TIMEOUT = '5s';
 /** Fraction of reservations that also run the cleanup DELETE. */
 export const CLEANUP_CHANCE = 0.01;
 
@@ -70,20 +82,21 @@ function lockKeys(buckets: RateBucket[]): string[] {
   return [...new Set(buckets.map((b) => `${b.bucket}:${b.key}`))].sort();
 }
 
-type RawClient = Pick<PrismaClient, '$transaction' | '$executeRaw' | '$queryRaw'>;
+type RawClient = Pick<PrismaClient, '$transaction' | '$executeRaw' | '$executeRawUnsafe' | '$queryRaw'>;
+type ReserveRow = { counts: number[]; retry: Array<number | null> | null; ids: string[] | null };
 
 /** The production store: `auth_rate_events` via Prisma. */
 export function prismaRateStore(client: RawClient): RateStore {
   return {
     async reserve(buckets, windowMs) {
-      if (buckets.length === 0) return { counts: [], ids: [] };
+      if (buckets.length === 0) return { counts: [], ids: [], retryAfterMs: [] };
       const names = buckets.map((b) => b.bucket);
       const keys = buckets.map((b) => b.key);
       const limits = buckets.map((b) => b.limit);
       const locks = lockKeys(buckets).map(
         (k) => client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${k}, 0))`,
       );
-      const query = client.$queryRaw<Array<{ counts: number[]; ids: string[] | null }>>(Prisma.sql`
+      const query = client.$queryRaw<ReserveRow[]>(Prisma.sql`
         WITH want AS (
           SELECT w.bucket, w.key, w.lim, w.ord
             FROM unnest(${names}::text[], ${keys}::text[], ${limits}::int[]) WITH ORDINALITY AS w(bucket, key, lim, ord)
@@ -91,7 +104,11 @@ export function prismaRateStore(client: RawClient): RateStore {
           SELECT want.*,
                  (SELECT count(*) FROM auth_rate_events e
                    WHERE e.bucket = want.bucket AND e.key = want.key
-                     AND e.created_at > now() - (${windowMs}::int * interval '1 millisecond'))::int AS n
+                     AND e.created_at > now() - (${windowMs}::int * interval '1 millisecond'))::int AS n,
+                 (SELECT extract(epoch FROM (min(e.created_at) + (${windowMs}::int * interval '1 millisecond') - now())) * 1000
+                    FROM auth_rate_events e
+                   WHERE e.bucket = want.bucket AND e.key = want.key
+                     AND e.created_at > now() - (${windowMs}::int * interval '1 millisecond'))::float8 AS retry
             FROM want
         ), ok AS (
           SELECT bool_and(n < lim) AS ok FROM c
@@ -101,12 +118,28 @@ export function prismaRateStore(client: RawClient): RateStore {
           RETURNING id
         )
         SELECT (SELECT json_agg(n ORDER BY ord) FROM c) AS counts,
+               (SELECT json_agg(retry ORDER BY ord) FROM c) AS retry,
                (SELECT array_agg(id::text) FROM ins) AS ids`);
-      const results = await client.$transaction([...locks, query]);
-      const row = (results[results.length - 1] as Array<{ counts: number[]; ids: string[] | null }>)[0];
+      // First statements: bound the lock wait and every statement (SET LOCAL takes no bind
+      // parameters; these are constants). Scoped to this transaction, so nothing leaks to the
+      // pooled connection.
+      const timeouts = [
+        client.$executeRawUnsafe(`SET LOCAL lock_timeout = '${RESERVE_LOCK_TIMEOUT}'`),
+        client.$executeRawUnsafe(`SET LOCAL statement_timeout = '${RESERVE_STATEMENT_TIMEOUT}'`),
+      ];
+      // READ COMMITTED explicitly (it's the default, but correctness depends on it): the
+      // counting statement must take a NEW snapshot after the lock is granted. Under
+      // REPEATABLE READ / SERIALIZABLE the snapshot is fixed at the transaction's first
+      // statement, before the lock wait, so it would miss rows the previous lock holder
+      // committed and parallel requests could all pass.
+      const results = await client.$transaction([...timeouts, ...locks, query], {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      });
+      const row = (results[results.length - 1] as ReserveRow[])[0];
       const counts = row.counts.map(Number);
+      const retryAfterMs = (row.retry ?? []).map((r) => (r === null ? null : Math.max(0, Number(r))));
       const ok = counts.every((n, i) => n < limits[i]);
-      return { counts, ids: ok ? row.ids ?? [] : null };
+      return { counts, ids: ok ? row.ids ?? [] : null, retryAfterMs };
     },
     async release(ids) {
       if (ids.length === 0) return;
@@ -146,13 +179,19 @@ export function memoryRateStore(opts: { latencyMs?: number } = {}) {
         const counts = buckets.map(
           (b) => rows.filter((r) => r.bucket === b.bucket && r.key === b.key && now - r.createdAt < windowMs).length,
         );
-        if (!counts.every((n, i) => n < buckets[i].limit)) return { counts, ids: null };
+        const retryAfterMs = buckets.map((b) => {
+          const ts = rows
+            .filter((r) => r.bucket === b.bucket && r.key === b.key && now - r.createdAt < windowMs)
+            .map((r) => r.createdAt);
+          return ts.length ? Math.min(...ts) + windowMs - now : null;
+        });
+        if (!counts.every((n, i) => n < buckets[i].limit)) return { counts, ids: null, retryAfterMs };
         const ids = buckets.map((b) => {
           const id = String(nextId++);
           rows.push({ id, bucket: b.bucket, key: b.key, createdAt: now });
           return id;
         });
-        return { counts, ids };
+        return { counts, ids, retryAfterMs };
       });
     },
     release(ids) {

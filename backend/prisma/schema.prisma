@@ -3124,5 +3124,6 @@ model AuthRateEvent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([bucket, key, createdAt])
+  @@index([createdAt])
   @@map("auth_rate_events")
 }

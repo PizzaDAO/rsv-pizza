@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS "auth_rate_events" (
 );
 CREATE INDEX IF NOT EXISTS "auth_rate_events_bucket_key_created_at_idx"
   ON "auth_rate_events" ("bucket", "key", "created_at");
+-- For the opportunistic cleanup DELETE ... WHERE created_at < now() - interval '1 hour'.
+CREATE INDEX IF NOT EXISTS "auth_rate_events_created_at_idx"
+  ON "auth_rate_events" ("created_at");
 ALTER TABLE "auth_rate_events" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "auth_rate_events" FROM anon;
 REVOKE ALL ON "auth_rate_events" FROM authenticated;

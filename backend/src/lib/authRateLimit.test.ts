@@ -133,10 +133,74 @@ describe('budgets are global across instances (shared store)', () => {
     const b = await instance(store);
     const held = [];
     for (let i = 0; i < 5; i++) held.push(await a.reserveVerifyAttempt('2.2.2.4', 'ivy@example.com'));
-    expect(await b.reserveVerifyAttempt('2.2.2.4', 'ivy@example.com')).toBeNull();
     await held[0]!.release();
     expect(await b.reserveVerifyAttempt('2.2.2.4', 'ivy@example.com')).not.toBeNull();
     expect(await b.reserveVerifyAttempt('2.2.2.4', 'ivy@example.com')).toBeNull();
+  });
+
+  describe('refusal cache: an over-budget burst hits the DB once, not per request', () => {
+    it('after a DB refusal, the same key is refused locally (no store call) until the cap, then asks again', async () => {
+      const store = memoryRateStore();
+      const a = await instance(store);
+      const b = await instance(store);
+      for (let i = 0; i < 5; i++) await a.reserveVerifyAttempt('2.2.2.6', 'ivy@example.com');
+      const reserve = vi.spyOn(store, 'reserve');
+      expect(await b.reserveVerifyAttempt('2.2.2.6', 'ivy@example.com')).toBeNull(); // DB refuses
+      expect(reserve).toHaveBeenCalledTimes(1);
+      for (let i = 0; i < 20; i++) expect(await b.reserveVerifyAttempt('2.2.2.6', 'ivy@example.com')).toBeNull();
+      expect(reserve).toHaveBeenCalledTimes(1);
+      // Only the full key is cached: another email from the same IP still goes to the DB.
+      expect(await b.reserveVerifyAttempt('2.2.2.6', 'other@example.com')).not.toBeNull();
+      expect(reserve).toHaveBeenCalledTimes(2);
+      // Past the cap the DB is asked again.
+      const t = Date.now() + b.REFUSAL_CACHE_MAX_MS + 1;
+      const now = vi.spyOn(Date, 'now').mockReturnValue(t);
+      try {
+        expect(await b.reserveVerifyAttempt('2.2.2.6', 'ivy@example.com')).toBeNull();
+        expect(reserve).toHaveBeenCalledTimes(3);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it('sends: a refused (email, IP) is cached too', async () => {
+      const store = memoryRateStore();
+      const a = await instance(store);
+      const b = await instance(store);
+      for (let i = 0; i < 3; i++) expect(await a.takeCodeSend('c@example.com', '1.1.1.9')).toBe(true);
+      const reserve = vi.spyOn(store, 'reserve');
+      for (let i = 0; i < 10; i++) expect(await b.takeCodeSend('c@example.com', '1.1.1.9')).toBe(false);
+      expect(reserve).toHaveBeenCalledTimes(1);
+    });
+
+    it('the cache never outlives the oldest row: a short retry-after is honoured', async () => {
+      const store = memoryRateStore();
+      const lc = await instance(store);
+      for (let i = 0; i < 3; i++) await lc.takeCodeSend('d@example.com', '1.1.1.8');
+      // Age the rows so the oldest expires in 1 s.
+      const base = Date.now();
+      store.rows.forEach((r, i) => { r.createdAt = base - lc.LIMIT_WINDOW_MS + 1000 + i * 60_000; });
+      lc.resetCodeLimits({ store, random: () => 1 }); // fresh local counts, same shared rows
+      expect(await lc.takeCodeSend('d@example.com', '1.1.1.8')).toBe(false);
+      const now = vi.spyOn(Date, 'now').mockReturnValue(base + 1500);
+      try {
+        expect(await lc.takeCodeSend('d@example.com', '1.1.1.8')).toBe(true);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it('a right code clears the cache for its keys on that instance', async () => {
+      const store = memoryRateStore();
+      const lc = await instance(store);
+      const held = [];
+      for (let i = 0; i < 5; i++) held.push(await lc.reserveVerifyAttempt('2.2.2.7', 'ivy@example.com'));
+      lc.resetCodeLimits({ store, random: () => 1 }); // drop local counts so the DB refuses + caches
+      expect(await lc.reserveVerifyAttempt('2.2.2.7', 'ivy@example.com')).toBeNull();
+      // Same module's release (a right code) frees a slot and clears the cached refusal.
+      await held[0]!.release();
+      expect(await lc.reserveVerifyAttempt('2.2.2.7', 'ivy@example.com')).not.toBeNull();
+    });
   });
 
   it('the under-attack squeeze uses the GLOBAL (email, IP) count: one wrong try per (email, IP) across instances', async () => {
@@ -298,6 +362,76 @@ describe.skipIf(!PG_URL)('real Postgres: prismaRateStore is atomic across connec
     await s.cleanup(RATE_EVENT_RETENTION_MS);
     const [{ n }] = await c1.$queryRawUnsafe('SELECT count(*)::int AS n FROM auth_rate_events');
     expect(n).toBe(2); // the 20-minute-old row and the new one; the 2-hour one is gone
+  });
+
+  it('the migration creates the created_at index used by the cleanup DELETE', async () => {
+    const idx: Array<{ indexname: string }> = await c1.$queryRawUnsafe(
+      `SELECT indexname FROM pg_indexes WHERE tablename = 'auth_rate_events' ORDER BY 1`);
+    expect(idx.map((r) => r.indexname)).toEqual([
+      'auth_rate_events_bucket_key_created_at_idx',
+      'auth_rate_events_created_at_idx',
+      'auth_rate_events_pkey',
+    ]);
+  });
+
+  it('reserve runs at READ COMMITTED with SET LOCAL timeouts that do not leak to the connection', async () => {
+    const s = prismaRateStore(c1);
+    await s.reserve([{ bucket: 'send', key: 'leak', limit: 3 }], 900_000);
+    const [{ lt, st }] = await c1.$queryRawUnsafe(`SELECT current_setting('lock_timeout') AS lt, current_setting('statement_timeout') AS st`);
+    expect(lt).toBe('0');
+    expect(st).toBe('0');
+  });
+
+  describe('a stalled lock holder cannot pin connections (lock_timeout 2s)', () => {
+    /** Hold the advisory lock for `key` in an open transaction on c2 until `release()`. */
+    async function holdLock(lockKey: string) {
+      let release!: () => void;
+      const done = new Promise<void>((r) => { release = r; });
+      let locked!: () => void;
+      const isLocked = new Promise<void>((r) => { locked = r; });
+      const tx = c2.$transaction(async (t: any) => {
+        await t.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey);
+        locked();
+        await done;
+      }, { timeout: 20_000 });
+      await isLocked;
+      return async () => { release(); await tx; };
+    }
+
+    it('reserve() rejects after ~2 s instead of waiting', async () => {
+      const unlock = await holdLock('send:stalled');
+      const t0 = Date.now();
+      try {
+        await expect(prismaRateStore(c1).reserve([{ bucket: 'send', key: 'stalled', limit: 3 }], 900_000)).rejects.toThrow(/lock timeout/i);
+        const ms = Date.now() - t0;
+        expect(ms).toBeGreaterThanOrEqual(1800);
+        expect(ms).toBeLessThan(4500);
+      } finally {
+        await unlock();
+      }
+      // Nothing was inserted, and the key works again once the holder is gone.
+      expect((await prismaRateStore(c1).reserve([{ bucket: 'send', key: 'stalled', limit: 3 }], 900_000)).counts).toEqual([0]);
+    }, 15_000);
+
+    it('through loginCode: verify answers 503 (fail closed), a send fails open', async () => {
+      const lc = await instance(prismaRateStore(c1));
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const ipLock = `verify_ip:${hashRateKey('verify_ip', '6.6.6.1')}`;
+      const sendLock = `send:${hashRateKey('send', 'ivy@example.com|6.6.6.1')}`;
+      let unlock = await holdLock(ipLock);
+      try {
+        await expect(lc.reserveVerifyAttempt('6.6.6.1', 'ivy@example.com')).rejects.toMatchObject({ statusCode: 503 });
+      } finally {
+        await unlock();
+      }
+      unlock = await holdLock(sendLock);
+      try {
+        expect(await lc.takeCodeSend('ivy@example.com', '6.6.6.1')).toBe(true);
+      } finally {
+        await unlock();
+        err.mockRestore();
+      }
+    }, 20_000);
   });
 
   it('end to end: two loginCode instances on two clients share one budget', async () => {

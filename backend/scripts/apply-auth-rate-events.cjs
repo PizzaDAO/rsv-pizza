@@ -30,7 +30,7 @@ const ARGS = process.argv.slice(2);
 const MODE = ARGS.includes('--apply') ? 'apply' : ARGS.includes('--rollback') ? 'rollback' : 'dry';
 const FORCE = ARGS.includes('--force');
 const TABLE = 'auth_rate_events';
-const INDEX = 'auth_rate_events_bucket_key_created_at_idx';
+const INDEXES = ['auth_rate_events_bucket_key_created_at_idx', 'auth_rate_events_created_at_idx'];
 const ROLES = ['anon', 'authenticated'];
 const MIGRATION = path.join(__dirname, '../prisma/migrations/20261114_auth_rate_events/migration.sql');
 const EXPECTED_COLUMNS = { id: 'bigint', bucket: 'text', key: 'text', created_at: 'timestamp with time zone' };
@@ -55,7 +55,11 @@ async function state(db) {
       WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`, TABLE);
   const [{ rls }] = await db.$queryRawUnsafe(
     `SELECT c.relrowsecurity AS rls FROM pg_class c WHERE c.oid = ('public.' || $1)::regclass`, TABLE);
-  const [{ idx }] = await db.$queryRawUnsafe(`SELECT to_regclass('public.${INDEX}') IS NOT NULL AS idx`);
+  const idx = {};
+  for (const name of INDEXES) {
+    const [{ ok }] = await db.$queryRawUnsafe(`SELECT to_regclass('public.' || $1) IS NOT NULL AS ok`, name);
+    idx[name] = ok;
+  }
   const privs = {};
   for (const role of ROLES) {
     const [{ has_role }] = await db.$queryRawUnsafe(`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1) AS has_role`, role);
@@ -67,8 +71,13 @@ async function state(db) {
               has_any_column_privilege($1, rel, 'UPDATE') AS upd,
               has_table_privilege($1, rel, 'DELETE') AS del,
               has_table_privilege($1, rel, 'TRUNCATE') AS trunc,
-              has_sequence_privilege($1, ('public.' || $2 || '_id_seq')::regclass, 'USAGE') AS seq FROM r`, role, TABLE);
-    privs[role] = Object.entries({ SELECT: p.sel, INSERT: p.ins, UPDATE: p.upd, DELETE: p.del, TRUNCATE: p.trunc, 'SEQUENCE USAGE': p.seq })
+              has_sequence_privilege($1, ('public.' || $2 || '_id_seq')::regclass, 'USAGE') AS seq_usage,
+              has_sequence_privilege($1, ('public.' || $2 || '_id_seq')::regclass, 'SELECT') AS seq_select,
+              has_sequence_privilege($1, ('public.' || $2 || '_id_seq')::regclass, 'UPDATE') AS seq_update FROM r`, role, TABLE);
+    privs[role] = Object.entries({
+      SELECT: p.sel, INSERT: p.ins, UPDATE: p.upd, DELETE: p.del, TRUNCATE: p.trunc,
+      'SEQUENCE USAGE': p.seq_usage, 'SEQUENCE SELECT': p.seq_select, 'SEQUENCE UPDATE': p.seq_update,
+    })
       .filter(([, v]) => v).map(([k]) => k);
   }
   const policies = await db.$queryRawUnsafe(`SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`, TABLE);
@@ -85,7 +94,7 @@ function problems(s) {
     if (got[c] !== t) out.push(`column ${c}: expected ${t}, got ${got[c] ?? 'missing'}`);
   }
   for (const c of s.cols) if (c.is_nullable !== 'NO') out.push(`column ${c.column_name} is nullable`);
-  if (!s.idx) out.push(`index ${INDEX} missing`);
+  for (const name of INDEXES) if (!s.idx[name]) out.push(`index ${name} missing`);
   if (!s.rls) out.push('row level security is OFF');
   for (const role of ROLES) if (s.privs[role].length) out.push(`${role} holds ${s.privs[role].join('/')}`);
   if (s.policies.length) out.push(`unexpected policies: ${s.policies.join(', ')}`);
@@ -96,7 +105,7 @@ function print(s) {
   if (!s.exists) { console.log(`  ${TABLE}: does not exist`); return; }
   console.log(`  ${TABLE}: exists, ${s.rows} row(s), ${s.recent} in the last 15 min`);
   console.log(`  columns: ${s.cols.map((c) => `${c.column_name} ${c.data_type}${c.is_nullable === 'NO' ? ' not null' : ''}`).join(', ')}`);
-  console.log(`  index ${INDEX}: ${s.idx ? 'present' : 'MISSING'}`);
+  for (const name of INDEXES) console.log(`  index ${name}: ${s.idx[name] ? 'present' : 'MISSING'}`);
   console.log(`  RLS: ${s.rls ? 'on' : 'OFF'}; policies: ${s.policies.length ? s.policies.join(', ') : 'none'}`);
   for (const role of ROLES) console.log(`  ${role}: ${s.privs[role].length ? s.privs[role].join('/') : 'no privileges'}`);
 }

@@ -232,12 +232,48 @@ const sendLog = new Map<string, number[]>(); // `${email}|${ip}` -> this instanc
 const failLog = new Map<string, number[]>(); // `ip|${ip}`, `ipc|${ip}`, `${email}|${ip}` -> failure times
 
 /**
+ * Refusal cache: after the DB refuses a key (bucket full), this instance refuses that key
+ * locally until the bucket's oldest event ages out, capped at REFUSAL_CACHE_MAX_MS, so an
+ * over-budget burst doesn't hit the DB on every request. Strictly an extra limit: the only
+ * way it is stricter than the DB is when a slot is RELEASED (a right code) on another
+ * instance meanwhile; the cap bounds that to 30 s, and only for a caller already at its limit.
+ * Keys: `s|${email}|${ip}` (send) and the failLog keys.
+ */
+export const REFUSAL_CACHE_MAX_MS = 30_000;
+const refusedUntil = new Map<string, number>();
+
+function isRefused(key: string, now: number): boolean {
+  const until = refusedUntil.get(key);
+  if (until === undefined) return false;
+  if (until > now) return true;
+  refusedUntil.delete(key);
+  return false;
+}
+
+function cacheRefusal(key: string, retryAfterMs: number | null | undefined, now: number): void {
+  const ms = Math.min(retryAfterMs ?? REFUSAL_CACHE_MAX_MS, REFUSAL_CACHE_MAX_MS);
+  if (ms <= 0) return;
+  if (refusedUntil.size > 20_000) {
+    for (const [k, v] of refusedUntil) if (v <= now) refusedUntil.delete(k);
+  }
+  refusedUntil.set(key, now + ms);
+}
+
+/** Cache a refusal for each bucket that was at its limit. `localKeys[i]` matches `buckets[i]`. */
+function cacheFullBuckets(res: Reservation, buckets: RateBucket[], localKeys: string[], now: number): void {
+  buckets.forEach((b, i) => {
+    if (res.counts[i] >= b.limit) cacheRefusal(localKeys[i], res.retryAfterMs?.[i], now);
+  });
+}
+
+/**
  * Test hook: clear this instance's in-memory counters and use `opts.store` (default: a fresh
  * in-process store) instead of the database. Production never calls it.
  */
 export function resetCodeLimits(opts: { store?: RateStore; random?: () => number } = {}): void {
   sendLog.clear();
   failLog.clear();
+  refusedUntil.clear();
   store = opts.store ?? memoryRateStore();
   random = opts.random ?? Math.random;
 }
@@ -299,17 +335,19 @@ export async function takeCodeSend(email: string, ip: string | undefined): Promi
   const raw = `${email}|${ip ?? '?'}`;
   const ts = recent(sendLog, raw, now);
   if (ts.length >= SEND_PER_EMAIL_IP) return false; // fast path: this instance alone is over
+  const refusalKey = `s|${raw}`;
+  if (isRefused(refusalKey, now)) return false; // fast path: the DB refused this key recently
   const localCount = ts.length;
   ts.push(now); // reserve locally before awaiting
 
   let ids: string[] | null = null;
   let mine = localCount;
   try {
-    const res = await reserveGlobal([
-      { bucket: RATE_BUCKETS.send, key: hashRateKey(RATE_BUCKETS.send, raw), limit: SEND_PER_EMAIL_IP },
-    ]);
+    const buckets = [{ bucket: RATE_BUCKETS.send, key: hashRateKey(RATE_BUCKETS.send, raw), limit: SEND_PER_EMAIL_IP }];
+    const res = await reserveGlobal(buckets);
     if (!res.ids) {
       rollback(sendLog, raw, now);
+      cacheFullBuckets(res, buckets, [refusalKey], now);
       return false;
     }
     ids = res.ids;
@@ -373,6 +411,7 @@ export async function reserveVerifyAttempt(ip: string | undefined, email?: strin
   const ipTs = recent(failLog, ipKey, now);
   if (ipTs.length >= ipLimit) return null;
   if (emailKey && recent(failLog, emailKey, now).length >= FAIL_PER_EMAIL_IP) return null;
+  if (isRefused(ipKey, now) || (emailKey && isRefused(emailKey, now))) return null; // DB refused recently
   ipTs.push(now);
   if (emailKey) recent(failLog, emailKey, now).push(now);
   const releaseLocal = () => {
@@ -399,12 +438,16 @@ export async function reserveVerifyAttempt(ip: string | undefined, email?: strin
   }
   if (!res.ids) {
     releaseLocal();
+    cacheFullBuckets(res, buckets, emailKey ? [ipKey, emailKey] : [ipKey], now);
     return null;
   }
   const ids = res.ids;
   const release = async () => {
     releaseLocal();
     await releaseGlobal(ids);
+    // A slot just freed up: don't keep refusing these keys from the cache.
+    refusedUntil.delete(ipKey);
+    if (emailKey) refusedUntil.delete(emailKey);
   };
 
   const mine = email ? res.counts[1] : 0; // this (email, IP)'s failures, all instances
