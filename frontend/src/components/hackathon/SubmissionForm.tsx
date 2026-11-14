@@ -43,6 +43,23 @@ export function imageProblem(file: File): string | null {
   return null;
 }
 
+function Thumb({ img, label, busy, onRemove }: { img: HackathonImage; label: string; busy: boolean; onRemove: (path: string) => void }) {
+  return (
+    <div className="relative w-24 h-16 sm:w-28 sm:h-20 rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface shrink-0">
+      {img.url ? <img src={img.url} alt={label} className="w-full h-full object-cover" /> : <span className="text-xs text-theme-text-muted p-1">{label}</span>}
+      <button
+        type="button"
+        aria-label={`Remove ${label}`}
+        disabled={busy}
+        onClick={() => onRemove(img.path)}
+        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 /** Project editor (plans/hackathon-platform.md §8). Saving keeps it a draft; Submit is separate. */
 export function SubmissionForm({ submission, tracks, maxTracks, busy, onSave, onUpload, onRemoveImage, onCancel }: Props) {
   const [form, setForm] = useState(() => formFrom(submission));
@@ -96,20 +113,6 @@ export function SubmissionForm({ submission, tracks, maxTracks, busy, onSave, on
   const nameOk = form.name.trim().length > 0;
   const shots = submission?.screenshots ?? [];
 
-  const Thumb = ({ img, label }: { img: HackathonImage; label: string }) => (
-    <div className="relative w-24 h-16 sm:w-28 sm:h-20 rounded-lg overflow-hidden border border-theme-stroke bg-theme-surface shrink-0">
-      {img.url ? <img src={img.url} alt={label} className="w-full h-full object-cover" /> : <span className="text-xs text-theme-text-muted p-1">{label}</span>}
-      <button
-        type="button"
-        aria-label={`Remove ${label}`}
-        disabled={busy}
-        onClick={() => void onRemoveImage(img.path)}
-        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
-      >
-        <X size={14} />
-      </button>
-    </div>
-  );
 
   return (
     <div className="space-y-3" data-testid="hackathon-submission-form">
@@ -121,7 +124,7 @@ export function SubmissionForm({ submission, tracks, maxTracks, busy, onSave, on
         rows={6}
         value={form.description}
         maxLength={10000}
-        placeholder="What did you build, how does it work, and what's next? (Markdown works)"
+        placeholder="What did you build, how does it work, and what's next?"
         onChange={(e) => set('description', e.target.value)}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -161,8 +164,8 @@ export function SubmissionForm({ submission, tracks, maxTracks, busy, onSave, on
       {submission ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            {submission.cover && <Thumb img={submission.cover} label="Cover image" />}
-            {shots.map((s, i) => <Thumb key={s.path} img={s} label={`Screenshot ${i + 1}`} />)}
+            {submission.cover && <Thumb img={submission.cover} label="Cover image" busy={busy} onRemove={(p) => void onRemoveImage(p)} />}
+            {shots.map((s, i) => <Thumb key={s.path} img={s} label={`Screenshot ${i + 1}`} busy={busy} onRemove={(p) => void onRemoveImage(p)} />)}
           </div>
           <div className="flex flex-wrap gap-2">
             <input ref={coverInput} type="file" accept={HACKATHON_IMAGE_TYPES.join(',')} className="hidden" onChange={(e) => { void pick('cover', e.target.files); e.target.value = ''; }} />

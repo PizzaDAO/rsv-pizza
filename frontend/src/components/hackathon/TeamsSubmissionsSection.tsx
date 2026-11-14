@@ -11,7 +11,7 @@ import {
   type HostSubmissionsResponse,
 } from '../../lib/hackathonApi';
 
-const POLL_MS = 30_000;
+const POLL_MS = 60_000;
 type Filter = 'all' | 'submitted' | 'draft' | 'none' | 'disqualified';
 
 export function filterTeams(teams: HostHackathonTeam[], filter: Filter, q: string): HostHackathonTeam[] {
@@ -81,9 +81,12 @@ function TeamRow({ team, hackathon, busy, onModerate }: {
               )}
               {(s.cover || s.screenshots.length > 0) && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {[s.cover, ...s.screenshots].filter(Boolean).map((img, i) => img!.url && (
-                    <a key={img!.path} href={img!.url} target="_blank" rel="noopener noreferrer">
-                      <img src={img!.url} alt={i === 0 && s.cover ? 'Cover' : `Screenshot ${i}`} className="h-16 w-24 object-cover rounded-md border border-theme-stroke shrink-0" />
+                  {[
+                    ...(s.cover ? [{ img: s.cover, alt: 'Cover image' }] : []),
+                    ...s.screenshots.map((img, i) => ({ img, alt: `Screenshot ${i + 1}` })),
+                  ].map(({ img, alt }) => img.url && (
+                    <a key={img.path} href={img.url} target="_blank" rel="noopener noreferrer">
+                      <img src={img.url} alt={alt} className="h-16 w-24 object-cover rounded-md border border-theme-stroke shrink-0" />
                     </a>
                   ))}
                 </div>

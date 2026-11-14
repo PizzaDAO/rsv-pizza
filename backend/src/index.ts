@@ -39,7 +39,8 @@ import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
 import hackathonPublicRoutes from './routes/hackathon-public.routes.js';
-import hackathonParticipantRoutes from './routes/hackathon-participant.routes.js';
+import hackathonParticipantRoutes, { hackathonCronRouter } from './routes/hackathon-participant.routes.js';
+import { hackathonPollLimiter, isHackathonPollRead } from './lib/hackathon/pollLimit.js';
 import hackathonRoutes from './routes/hackathon.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import performerRoutes from './routes/performer.routes.js';
@@ -169,7 +170,9 @@ const limiter = rateLimit({
   validate: false,
   // Host guest-list refetches (live updates) get their own per-user limiter below, so they can
   // neither starve nor be starved by check-in POSTs on shared venue Wi-Fi.
-  skip: (req) => isHostGuestListRead(req),
+  // Authenticated hackathon polls (GET /hackathon/me, /hackathon/submissions) likewise get a
+  // per-user limiter (lib/hackathon/pollLimit.ts).
+  skip: (req) => isHostGuestListRead(req) || isHackathonPollRead(req),
 });
 app.use('/api', limiter);
 
@@ -193,6 +196,7 @@ const hostGuestListLimiter = rateLimit({
       : 'ip:' + ipKeyGenerator(req.ip ?? ''),
 });
 app.use('/api', hostGuestListLimiter);
+app.use('/api', hackathonPollLimiter);
 
 // Stricter rate limit for RSVP submissions (prevent spam)
 const rsvpLimiter = rateLimit({
@@ -302,6 +306,7 @@ app.use('/api/checkin', checkinRoutes);
 app.use('/api/survey', surveyPublicRouter); // romana-61204: public token-based survey (no auth)
 app.use('/api/host-survey', hostSurveyPublicRouter); // panzerotti-58527: public token-based host survey (no auth)
 app.use('/api/cron', pizzaSubmissionCronRouter); // sfincione-40417: orphaned submission upload cleanup (CRON_SECRET)
+app.use('/api/cron', hackathonCronRouter); // hackathon PR 3: abandoned tmp upload cleanup in hackathon-media (CRON_SECRET)
 app.use('/api/cron', cronRouter); // romana-61204: cron-only survey auto-send (CRON_SECRET gate)
 app.use('/api/scorecard', scorecardRoutes);
 app.use('/api/bizdev', bizdevRoutes); // soppressata-72251: per-partner BizDev industry report (auth-gated per-route)

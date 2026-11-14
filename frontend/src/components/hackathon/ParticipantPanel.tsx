@@ -19,7 +19,7 @@ import {
   type SubmissionStatus,
 } from '../../lib/hackathonApi';
 
-const POLL_MS = 30_000;
+const POLL_MS = 60_000;
 
 /** `?hackJoin=CODE` on the event URL opens the join form prefilled (the invite link). */
 export const JOIN_PARAM = 'hackJoin';
@@ -95,15 +95,19 @@ export function ParticipantPanel({ partyId, hackathon }: { partyId: string; hack
   // Reload on login/logout.
   useEffect(() => { void load(); }, [load, user?.id]);
 
-  // Teammates joining / the captain editing: poll while a team is shown and the tab is visible.
-  const hasTeam = !!me?.team;
+  // Teammates joining / editing: poll only while a team is shown, the tab is visible, and the
+  // deadline hasn't passed (nothing changes after it). Not while this form is open (our own
+  // saves already refresh it). Catch up once when the tab becomes visible again.
+  const shouldPoll = !!me?.team && !me.deadlinePassed && !editing;
   useEffect(() => {
-    if (!hasTeam || editing) return;
+    if (!shouldPoll) return;
     const t = setInterval(() => {
       if (document.visibilityState === 'visible') void load();
     }, POLL_MS);
-    return () => clearInterval(t);
-  }, [hasTeam, editing, load]);
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
+  }, [shouldPoll, load]);
 
   const setTeam = (team: MyHackathonTeam | null) => setMe((m) => (m ? { ...m, team } : m));
 

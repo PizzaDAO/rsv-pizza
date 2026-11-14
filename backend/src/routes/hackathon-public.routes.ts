@@ -20,6 +20,7 @@ import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
 import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { isHackathonHost } from '../lib/hackathon/access.js';
+import { findGuestsByEmail } from '../lib/hackathon/eligibility.js';
 import { HACKATHON_INCLUDE, hostHackathon, isPubliclyVisible, publicHackathon } from '../lib/hackathon/serialize.js';
 
 const router = Router();
@@ -34,11 +35,9 @@ async function viewerCanSeeEvent(partyId: string, viewerEmail: string | undefine
   if (await isEventHiddenFrom(party, viewerEmail)) return false;
   if (party.password) {
     if (!viewerEmail) return false;
-    const guest = await prisma.guest.findFirst({
-      where: { partyId, email: { equals: viewerEmail, mode: 'insensitive' }, NOT: { approved: false } },
-      select: { id: true },
-    });
-    return !!guest;
+    // Exact case-insensitive match (no ILIKE wildcards), non-declined RSVP.
+    const guests = await findGuestsByEmail(partyId, viewerEmail);
+    return guests.some((g) => g.approved !== false);
   }
   return true;
 }

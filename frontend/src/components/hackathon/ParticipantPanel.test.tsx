@@ -79,7 +79,7 @@ describe('ParticipantPanel', () => {
 
 describe('helpers', () => {
   it('inviteLink keeps the event path and drops other params', () => {
-    expect(inviteLink('abcdefgh23', 'https://monad.rsv.pizza/blitz?x=1#y')).toBe('https://monad.rsv.pizza/blitz?hackJoin=abcdefgh23');
+    expect(inviteLink('abcdefgh23', 'https://brand.example.com/blitz?x=1#y')).toBe('https://brand.example.com/blitz?hackJoin=abcdefgh23');
   });
   it('imageProblem', () => {
     expect(imageProblem(new File(['x'], 'a.png', { type: 'image/png' }))).toBeNull();

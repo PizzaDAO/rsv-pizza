@@ -82,6 +82,20 @@ export async function isActiveJudge(hackathonId: string, email: string | undefin
   return !!j;
 }
 
+/**
+ * Guest rows of a party whose email equals `email` case-insensitively. Exact lower() = lower()
+ * on purpose: Prisma's `mode: 'insensitive'` compiles to ILIKE, where `_` and `%` in the
+ * caller's email are wildcards (a_b@x.com would match a.b@x.com).
+ */
+export async function findGuestsByEmail(partyId: string, email: string, limit = 10): Promise<GuestLike[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string; approved: boolean | null; status: string | null; checked_in_at: Date | null }>>`
+    SELECT id, approved, status, checked_in_at
+      FROM guests
+     WHERE party_id = ${partyId}::uuid AND lower(email) = lower(${email.trim()})
+     LIMIT ${limit}`;
+  return rows.map((r) => ({ id: r.id, approved: r.approved, status: r.status, checkedInAt: r.checked_in_at }));
+}
+
 /** DB-backed eligibility for the caller. */
 export async function checkEligibility(
   partyId: string,
@@ -94,11 +108,7 @@ export async function checkEligibility(
   const [isJudge, party, guests] = await Promise.all([
     isActiveJudge(h.id, email),
     prisma.party.findUnique({ where: { id: partyId }, select: { requireApproval: true } }),
-    prisma.guest.findMany({
-      where: { partyId, email: { equals: email.trim(), mode: 'insensitive' } },
-      select: { id: true, approved: true, status: true, checkedInAt: true },
-      take: 10,
-    }),
+    findGuestsByEmail(partyId, email),
   ]);
   return {
     ...decideEligibility(h, guests, { loggedIn: true, isJudge, requireApproval: !!party?.requireApproval }),

@@ -31,7 +31,7 @@ const media = vi.hoisted(() => ({
 vi.mock('../lib/hackathon/media.js', async (orig) => ({ ...(await orig<typeof import('../lib/hackathon/media.js')>()), ...media }));
 
 import hackathonPublicRoutes from './hackathon-public.routes.js';
-import participantRoutes, { teamJoinLimiter, teamWriteLimiter, uploadIpLimiter, uploadUserLimiter } from './hackathon-participant.routes.js';
+import participantRoutes, { attachUserLimiter, teamJoinLimiter, teamWriteLimiter, uploadUserLimiter } from './hackathon-participant.routes.js';
 import hackathonRoutes from './hackathon.routes.js';
 import { errorHandler } from '../middleware/error.js';
 
@@ -255,7 +255,21 @@ beforeEach(() => {
   }));
   mockPrisma.hackathonSubmissionTrack = fakeModel('hackathonSubmissionTrack', () => ({ createdAt: new Date() }));
   mockPrisma.$transaction = vi.fn(async (arg: any) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)));
-  mockPrisma.$queryRaw = vi.fn(async () => []);
+  mockPrisma.$queryRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
+    const sql = strings.join('?');
+    if (sql.includes('FOR UPDATE')) {
+      const [teamId, hackathonId] = vals;
+      return db.hackathonTeam.filter((t) => t.id === teamId && t.hackathonId === hackathonId).map((t) => ({ id: t.id }));
+    }
+    if (sql.includes('FROM guests')) {
+      // Mirrors `lower(email) = lower($)`: exact, case-insensitive, no wildcards.
+      const [partyId, email] = vals;
+      return db.guest
+        .filter((g) => g.partyId === partyId && String(g.email ?? '').toLowerCase() === String(email).toLowerCase())
+        .map((g) => ({ id: g.id, approved: g.approved, status: g.status, checked_in_at: g.checkedInAt }));
+    }
+    throw new Error('unexpected raw query: ' + sql);
+  });
   mockPrisma.$executeRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
     const sql = strings.join('?');
     if (sql.includes('array_append')) {
@@ -281,7 +295,7 @@ beforeEach(() => {
   media.createImageUploadUrl.mockImplementation(async (h: string, s: string, ext: string) => ({ path: `${h}/${s}/tmp/${crypto.randomUUID()}.${ext}`, token: 'upload-token' }));
   media.finalizeImage.mockImplementation(async (_tmp: string, h: string, s: string) => `${h}/${s}/${crypto.randomUUID()}.png`);
 
-  for (const l of [teamJoinLimiter, teamWriteLimiter, uploadUserLimiter, uploadIpLimiter]) {
+  for (const l of [teamJoinLimiter, teamWriteLimiter, uploadUserLimiter, attachUserLimiter]) {
     for (const u of Object.values(USERS)) l.resetKey(u.id);
     for (const ip of ['::ffff:127.0.0.1', '127.0.0.1', '::1']) l.resetKey(ip);
   }
@@ -767,5 +781,154 @@ describe('public GET /hackathon never exposes teams or projects', () => {
         expect(body).not.toContain(s);
       }
     }
+  });
+});
+
+// ------------------------------------------------------------------ review fixes
+
+describe('review fixes', () => {
+  it('a host who is ON the team gets participant rules (deadline, captain, disqualified lock)', async () => {
+    // Make the host an approved guest so they can join a team like anyone else.
+    db.guest.push({ id: 'g-host', partyId: PARTY, email: 'host@example.com', approved: true, status: 'CONFIRMED', checkedInAt: null });
+    const team = await createTeam('alice');
+    expect((await joinTeam('host', team.inviteCode)).status).toBe(201);
+    // Not captain: can't rename even though they host.
+    const rename = await api().patch(`${base}/teams/${team.id}`).set('Authorization', auth('host')).send({ name: 'Mine' });
+    expect(rename.status).toBe(403);
+    expect(rename.body.error.code).toBe('NOT_CAPTAIN');
+    // Member shape (no emails), not the host shape.
+    const save = await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('host')).send({ name: 'App', trackIds: [TRACK] });
+    expect(save.status).toBe(201);
+    expect(JSON.stringify(save.body)).not.toContain('alice@example.com');
+    // Disqualified lock applies to them as a member.
+    const sid = db.hackathonSubmission[0].id;
+    db.hackathonSubmission[0].status = 'disqualified';
+    expect((await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('host')).send({ name: 'x' })).body.error.code).toBe('DISQUALIFIED');
+    db.hackathonSubmission[0].status = 'draft';
+    // Deadline applies too.
+    setHackathon({ submissionDeadline: new Date(Date.now() - 1000) });
+    expect((await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('host')).send({ name: 'Late' })).body.error.code).toBe('DEADLINE_PASSED');
+    // ...but they can still moderate through the host routes.
+    expect((await api().patch(`${base}/submissions/${sid}`).set('Authorization', auth('host')).send({ tableNumber: 'A1' })).status).toBe(200);
+  });
+
+  it('submissionsOpenAt applies to a host-member', async () => {
+    db.guest.push({ id: 'g-host', partyId: PARTY, email: 'host@example.com', approved: true, status: 'CONFIRMED', checkedInAt: null });
+    setHackathon({ submissionsOpenAt: new Date(Date.now() + 3600_000) });
+    const team = await createTeam('host');
+    await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('host')).send({ name: 'App', trackIds: [TRACK] });
+    expect((await api().post(`${base}/teams/${team.id}/submission/submit`).set('Authorization', auth('host'))).body.error.code).toBe('NOT_OPEN_YET');
+  });
+
+  it('a member who lost eligibility stays listed but cannot write; can still leave', async () => {
+    const team = await createTeam('alice');
+    await joinTeam('bob', team.inviteCode);
+    await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'App', trackIds: [TRACK] });
+    db.guest.find((g) => g.id === 'g-bob')!.approved = false; // host declined Bob after he joined
+    for (const [m, sfx, body] of [
+      ['put', 'submission', { name: 'x' }], ['post', 'submission/submit'],
+      ['post', 'submission/upload-url', { mimeType: 'image/png', fileSize: 1 }],
+    ] as Array<[string, string, Row?]>) {
+      const r = await (api() as any)[m](`${base}/teams/${team.id}/${sfx}`).set('Authorization', auth('bob')).send(body ?? {});
+      expect([sfx, r.status, r.body.error?.code]).toEqual([sfx, 403, 'NOT_ELIGIBLE']);
+      expect(r.body.error.message).toMatch(/wasn't approved/);
+    }
+    expect(db.hackathonSubmission[0].name).toBe('App');
+    const me = await api().get(`${base}/me`).set('Authorization', auth('alice'));
+    expect(me.body.team.members.map((m: Row) => m.name)).toContain('Bob');
+    expect((await api().post(`${base}/teams/${team.id}/leave`).set('Authorization', auth('bob'))).status).toBe(200);
+  });
+
+  it('a member who became a judge cannot write', async () => {
+    const team = await createTeam('alice');
+    db.hackathonJudge.push({ id: 'j2', hackathonId: HID, email: 'alice@example.com', status: 'active' });
+    const r = await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'x' });
+    expect(r.status).toBe(403);
+    expect(r.body.error.message).toMatch(/Judges/);
+  });
+
+  it('email match is exact (no ILIKE wildcards): a_b@ does not match a.b@', async () => {
+    db.guest.push({ id: 'g-dot', partyId: PARTY, email: 'A.B@example.com', approved: true, status: 'CONFIRMED', checkedInAt: null });
+    db.user.push({ id: 'u-us', email: 'a_b@example.com', name: 'Under', profilePictureUrl: null }, { id: 'u-dot', email: 'a.b@example.com', name: 'Dot', profilePictureUrl: null });
+    const tok = (id: string, email: string) => `Bearer ${jwt.sign({ userId: id, email }, JWT_SECRET, { expiresIn: '1h' })}`;
+    const under = await api().get(`${base}/me`).set('Authorization', tok('u-us', 'a_b@example.com'));
+    expect(under.body.eligibility).toEqual({ eligible: false, reason: 'no_rsvp' });
+    const pct = await api().get(`${base}/me`).set('Authorization', tok('u-us', '%@example.com'));
+    expect(pct.body.eligibility.reason).toBe('no_rsvp');
+    const dot = await api().get(`${base}/me`).set('Authorization', tok('u-dot', 'a.b@EXAMPLE.com'));
+    expect(dot.body.eligibility.eligible).toBe(true);
+    const guestQueries = mockPrisma.$queryRaw.mock.calls.map((c: any[]) => c[0].join('?')).filter((s: string) => s.includes('FROM guests'));
+    expect(guestQueries.length).toBeGreaterThan(0);
+    for (const s of guestQueries) {
+      expect(s).toContain('lower(email) = lower(');
+      expect(s).not.toMatch(/ILIKE/i);
+    }
+  });
+
+  it('team deleted under the lock: join / submit / save answer 404, not 500', async () => {
+    const team = await createTeam('alice');
+    await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'App', trackIds: [TRACK] });
+    // Simulate the last member's leave committing between our pre-checks and our lock.
+    const realRaw = mockPrisma.$queryRaw.getMockImplementation()!;
+    mockPrisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...vals: any[]) =>
+      strings.join('?').includes('FOR UPDATE') ? [] : realRaw(strings, ...vals));
+    const join = await joinTeam('bob', team.inviteCode);
+    expect(join.status).toBe(404);
+    const submit = await api().post(`${base}/teams/${team.id}/submission/submit`).set('Authorization', auth('alice'));
+    expect(submit.status).toBe(404);
+    const save = await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'x' });
+    expect(save.status).toBe(404);
+    expect(db.hackathonSubmission[0].status).toBe('draft');
+    expect(db.hackathonTeamMember).toHaveLength(1);
+  });
+
+  it('submit and save take the team lock', async () => {
+    const team = await createTeam('alice');
+    mockPrisma.$queryRaw.mockClear();
+    await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'App', trackIds: [TRACK] });
+    await api().post(`${base}/teams/${team.id}/submission/submit`).set('Authorization', auth('alice'));
+    const locks = mockPrisma.$queryRaw.mock.calls.filter((c: any[]) => c[0].join('?').includes('FOR UPDATE'));
+    expect(locks).toHaveLength(2);
+  });
+
+  it('regenerate-code respects the deadline for participants, not for hosts', async () => {
+    const team = await createTeam('alice');
+    setHackathon({ submissionDeadline: new Date(Date.now() - 1000) });
+    expect((await api().post(`${base}/teams/${team.id}/regenerate-code`).set('Authorization', auth('alice'))).body.error.code).toBe('DEADLINE_PASSED');
+    expect((await api().post(`${base}/teams/${team.id}/regenerate-code`).set('Authorization', auth('host'))).status).toBe(200);
+  });
+
+  it('restore returns the exact pre-disqualification status; withdrawn cannot be disqualified', async () => {
+    const t1 = await createTeam('alice', 'A');
+    const t2 = await createTeam('bob', 'B');
+    await api().put(`${base}/teams/${t1.id}/submission`).set('Authorization', auth('alice')).send({ name: 'Draft One' });
+    await api().put(`${base}/teams/${t2.id}/submission`).set('Authorization', auth('bob')).send({ name: 'Sub Two', trackIds: [TRACK] });
+    await api().post(`${base}/teams/${t2.id}/submission/submit`).set('Authorization', auth('bob'));
+    const [draft, sub] = db.hackathonSubmission;
+    const mod = (id: string, body: Row) => api().patch(`${base}/submissions/${id}`).set('Authorization', auth('host')).send(body);
+
+    await mod(draft.id, { action: 'disqualify', reason: 'spam' });
+    expect((await mod(draft.id, { action: 'restore' })).body.team.submission.status).toBe('draft');
+    await mod(sub.id, { action: 'disqualify', reason: 'copied' });
+    expect((await mod(sub.id, { action: 'disqualify', reason: 'copied, confirmed' })).body.team.submission.disqualifiedReason).toBe('copied, confirmed');
+    expect((await mod(sub.id, { action: 'restore' })).body.team.submission.status).toBe('submitted');
+
+    await api().post(`${base}/teams/${t2.id}/submission/withdraw`).set('Authorization', auth('bob'));
+    const dqWithdrawn = await mod(sub.id, { action: 'disqualify', reason: 'x' });
+    expect(dqWithdrawn.status).toBe(409);
+    expect(dqWithdrawn.body.error.code).toBe('WITHDRAWN');
+    expect(db.hackathonSubmission[1].status).toBe('withdrawn');
+  });
+
+  it('attach has its own limiter, separate from upload-url', async () => {
+    const team = await createTeam('alice');
+    await api().put(`${base}/teams/${team.id}/submission`).set('Authorization', auth('alice')).send({ name: 'App' });
+    for (let i = 0; i < 30; i++) {
+      await api().post(`${base}/teams/${team.id}/submission/upload-url`).set('Authorization', auth('alice')).send({ mimeType: 'image/png', fileSize: 1 });
+    }
+    // upload-url quota is spent, attach still works.
+    const sid = db.hackathonSubmission[0].id;
+    const r = await api().post(`${base}/teams/${team.id}/submission/images`).set('Authorization', auth('alice')).send({ path: `${HID}/${sid}/tmp/${crypto.randomUUID()}.png`, kind: 'cover' });
+    expect(r.status).toBe(200);
   });
 });

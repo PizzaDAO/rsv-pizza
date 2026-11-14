@@ -23,7 +23,11 @@
  *     eligibility = checked_in; never an active judge), before the deadline.
  *   - team routes: the team must belong to THIS hackathon (404 otherwise, also for a team the
  *     caller isn't on, so ids from another team / party reveal nothing). Hosts (canUserEditParty
- *     + hackathon tab) may act on any team at any time; participants only before the deadline.
+ *     + hackathon tab) may act on any team they are NOT on at any time; members (hosts on
+ *     their own team included) follow participant rules: before the deadline, eligibility
+ *     re-checked on every write except leave.
+ *   - team writes (create/join, leave, saves, submit) take a row lock on the team, so a
+ *     last-member leave can't race a save or submit.
  *   - team size: joins lock the team row (SELECT ... FOR UPDATE) and count inside the same
  *     transaction, so two concurrent joins can't overshoot team_max_size; submit needs
  *     team_min_size members. One team per person: UNIQUE (hackathon_id, user_id).
@@ -42,6 +46,7 @@ import { normalizeProjectUrl } from '../lib/hackathon/urls.js';
 import { parseSubmission, parseTeamName } from '../lib/hackathon/validate.js';
 import {
   MAX_SCREENSHOTS,
+  cleanupAbandonedUploads,
   createImageUploadUrl,
   finalizeImage,
   isFinalPathFor,
@@ -75,16 +80,18 @@ export const teamWriteLimiter = rateLimit({
   keyGenerator: byUser,
   message: { error: { message: 'Too many changes, try again later.', code: 'RATE_LIMITED' } },
 });
+// Per user only (auth required): a per-IP cap would block a whole venue on shared Wi-Fi.
 export const uploadUserLimiter = rateLimit({
   ...limiterOpts,
   max: 30,
   keyGenerator: byUser,
   message: { error: { message: 'Too many uploads, try again later.', code: 'RATE_LIMITED' } },
 });
-export const uploadIpLimiter = rateLimit({
+// Attach (verify + move) has its own bucket so a failed attach retry never eats upload-url quota.
+export const attachUserLimiter = rateLimit({
   ...limiterOpts,
-  max: 30,
-  keyGenerator: (req) => req.ip || 'anon',
+  max: 60,
+  keyGenerator: byUser,
   message: { error: { message: 'Too many uploads, try again later.', code: 'RATE_LIMITED' } },
 });
 
@@ -142,8 +149,14 @@ interface TeamCtx extends Ctx {
 /**
  * The team must belong to this hackathon, and the caller must be on it (or be a host).
  * Anything else is a 404 so team ids from elsewhere reveal nothing.
+ *
+ * A caller who is ON the team always gets participant rules, even if they also host
+ * (isHost = false here): deadline, submissions-open, disqualified lock and captain checks
+ * all apply. Hosts moderate their own team through the host routes. Non-host members are
+ * also re-checked for eligibility on every write (a declined RSVP or a member who has since
+ * become a judge stays listed but can't change anything); `allowIneligible` is for leave.
  */
-async function loadTeamCtx(req: AuthRequest, opts: { captain?: boolean } = {}): Promise<TeamCtx> {
+async function loadTeamCtx(req: AuthRequest, opts: { captain?: boolean; allowIneligible?: boolean } = {}): Promise<TeamCtx> {
   const ctx = await loadCtx(req);
   const { teamId } = req.params;
   if (!isUuid(teamId)) throw notFound('Team not found');
@@ -156,10 +169,12 @@ async function loadTeamCtx(req: AuthRequest, opts: { captain?: boolean } = {}): 
       })
     : null;
   if (!member && !ctx.isHost) throw notFound('Team not found');
-  if (opts.captain && !ctx.isHost && member?.role !== 'captain') {
+  const isHost = ctx.isHost && !member;
+  if (opts.captain && !isHost && member?.role !== 'captain') {
     throw forbidden('Only the team captain can do that', 'NOT_CAPTAIN');
   }
-  return { ...ctx, teamId, member };
+  if (!isHost && !opts.allowIneligible) await requireEligible(req, ctx);
+  return { ...ctx, isHost, teamId, member };
 }
 
 async function teamPayload(hackathonId: string, teamId: string, viewer: { userId?: string; isMember: boolean }) {
@@ -174,9 +189,13 @@ async function sendTeam(res: Response, tc: TeamCtx, userId: string | undefined, 
   res.status(status).json({ team: await teamPayload(tc.h.id, tc.teamId, { userId, isMember: !!tc.member }) });
 }
 
-/** Row-lock the team for the rest of the transaction (serializes joins / leaves). */
-async function lockTeam(tx: any, teamId: string) {
-  await tx.$queryRaw`SELECT id FROM hackathon_teams WHERE id = ${teamId}::uuid FOR UPDATE`;
+/**
+ * Row-lock the team for the rest of the transaction (serializes joins, leaves, project saves
+ * and submits). 404 when the team was deleted meanwhile (last member left).
+ */
+async function lockTeam(tx: any, teamId: string, hackathonId: string) {
+  const rows = await tx.$queryRaw`SELECT id FROM hackathon_teams WHERE id = ${teamId}::uuid AND hackathon_id = ${hackathonId}::uuid FOR UPDATE`;
+  if (!Array.isArray(rows) || rows.length === 0) throw notFound('Team not found');
 }
 
 const isUniqueOn = (e: any, field: string) =>
@@ -291,7 +310,7 @@ router.post('/:partyId/hackathon/teams/join', requireAuth, teamJoinLimiter, asyn
     if (!team) throw invalid();
 
     await prisma.$transaction(async (tx) => {
-      await lockTeam(tx, team.id);
+      await lockTeam(tx, team.id, ctx.h.id);
       const mine = await tx.hackathonTeamMember.findFirst({ where: { hackathonId: ctx.h.id, userId: req.userId! }, select: { teamId: true } });
       if (mine) {
         throw conflict(mine.teamId === team.id ? "You're already on this team." : "You're already on a team for this hackathon. Leave it first.", 'ALREADY_ON_TEAM');
@@ -322,7 +341,7 @@ router.post('/:partyId/hackathon/teams/join', requireAuth, teamJoinLimiter, asyn
 async function removeMember(hackathonId: string, teamId: string, memberId: string): Promise<{ teamDeleted: boolean }> {
   let removedPaths: string[] = [];
   const out = await prisma.$transaction(async (tx) => {
-    await lockTeam(tx, teamId);
+    await lockTeam(tx, teamId, hackathonId);
     const members = await tx.hackathonTeamMember.findMany({
       where: { teamId, hackathonId },
       orderBy: { joinedAt: 'asc' },
@@ -354,9 +373,10 @@ async function removeMember(hackathonId: string, teamId: string, memberId: strin
 
 router.post('/:partyId/hackathon/teams/:teamId/leave', requireAuth, teamWriteLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const tc = await loadTeamCtx(req);
+    // Leaving is always allowed for a member who lost eligibility (it only removes themselves).
+    const tc = await loadTeamCtx(req, { allowIneligible: true });
     if (!tc.member) throw notFound('Team not found'); // a host who isn't on the team uses remove
-    assertBeforeDeadline({ ...tc, isHost: false }, 'leave your team');
+    assertBeforeDeadline(tc, 'leave your team');
     await removeMember(tc.h.id, tc.teamId, tc.member.id);
     res.set('Cache-Control', 'private, no-store');
     res.json({ team: null });
@@ -398,6 +418,7 @@ router.patch('/:partyId/hackathon/teams/:teamId', requireAuth, teamWriteLimiter,
 router.post('/:partyId/hackathon/teams/:teamId/regenerate-code', requireAuth, teamWriteLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const tc = await loadTeamCtx(req, { captain: true });
+    assertBeforeDeadline(tc, 'change the invite link');
     for (let attempt = 0; ; attempt++) {
       try {
         await prisma.hackathonTeam.updateMany({ where: { id: tc.teamId, hackathonId: tc.h.id }, data: { inviteCode: generateInviteCode() } });
@@ -455,41 +476,46 @@ router.put('/:partyId/hackathon/teams/:teamId/submission', requireAuth, teamWrit
   try {
     const tc = await loadTeamCtx(req);
     assertBeforeDeadline(tc, 'edit your project');
-    const existing = await loadSubmission(tc.h.id, tc.teamId);
-    assertEditable(tc, existing?.status);
-    const { data, trackIds } = parseSubmission((req.body ?? {}) as Record<string, unknown>, !existing, normalizeProjectUrl);
+    const pre = await loadSubmission(tc.h.id, tc.teamId);
+    assertEditable(tc, pre?.status);
+    const { data, trackIds } = parseSubmission((req.body ?? {}) as Record<string, unknown>, !pre, normalizeProjectUrl);
     if (trackIds) await assertTrackChoice(tc.h, trackIds);
-
-    const setTracks = (tx: any, submissionId: string) =>
-      trackIds === undefined
-        ? Promise.resolve()
-        : tx.hackathonSubmissionTrack.deleteMany({ where: { submissionId } }).then(() =>
-            trackIds.length
-              ? tx.hackathonSubmissionTrack.createMany({ data: trackIds.map((trackId) => ({ submissionId, trackId, hackathonId: tc.h.id })) })
-              : undefined,
-          );
+    // The slug follows the name until the project is first submitted, then stays put
+    // (the gallery link, PR 6, must not break).
+    const renamed = !!pre && typeof data.name === 'string' && data.name !== pre.name && !pre.submittedAt;
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        if (!existing) {
-          const slug = await freeSlug(tc.h.id, data.name as string);
-          await prisma.$transaction(async (tx) => {
+        const slug = !pre
+          ? await freeSlug(tc.h.id, data.name as string)
+          : renamed ? await freeSlug(tc.h.id, data.name as string, pre.id) : undefined;
+        // Locked against leave / submit / a teammate's save: the team and project we
+        // validated above must still be the ones we write.
+        await prisma.$transaction(async (tx) => {
+          await lockTeam(tx, tc.teamId, tc.h.id);
+          const cur = await tx.hackathonSubmission.findFirst({ where: { teamId: tc.teamId, hackathonId: tc.h.id }, select: { id: true, status: true } });
+          if ((cur?.id ?? null) !== (pre?.id ?? null)) {
+            throw conflict('Your project changed meanwhile. Reload the page and try again.', 'SUBMISSION_CHANGED');
+          }
+          assertEditable(tc, cur?.status);
+          let id: string;
+          if (!cur) {
             const s = await tx.hackathonSubmission.create({
               data: { ...(data as any), slug, hackathonId: tc.h.id, teamId: tc.teamId, status: 'draft' },
               select: { id: true },
             });
-            await setTracks(tx, s.id);
-          });
-        } else {
-          // The slug follows the name until the project is first submitted, then stays put
-          // (the gallery link, PR 6, must not break).
-          const renamed = typeof data.name === 'string' && data.name !== existing.name;
-          const slug = renamed && !existing.submittedAt ? await freeSlug(tc.h.id, data.name as string, existing.id) : undefined;
-          await prisma.$transaction(async (tx) => {
-            await tx.hackathonSubmission.update({ where: { id: existing.id }, data: { ...(data as any), ...(slug ? { slug } : {}) } });
-            await setTracks(tx, existing.id);
-          });
-        }
+            id = s.id;
+          } else {
+            id = cur.id;
+            await tx.hackathonSubmission.update({ where: { id }, data: { ...(data as any), ...(slug ? { slug } : {}) } });
+          }
+          if (trackIds !== undefined) {
+            await tx.hackathonSubmissionTrack.deleteMany({ where: { submissionId: id } });
+            if (trackIds.length) {
+              await tx.hackathonSubmissionTrack.createMany({ data: trackIds.map((trackId) => ({ submissionId: id, trackId, hackathonId: tc.h.id })) });
+            }
+          }
+        });
         break;
       } catch (e: any) {
         if (isUniqueOn(e, 'team_id')) throw conflict('Your team already has a project. Reload the page.', 'SUBMISSION_EXISTS');
@@ -497,7 +523,7 @@ router.put('/:partyId/hackathon/teams/:teamId/submission', requireAuth, teamWrit
         throw e;
       }
     }
-    await sendTeam(res, tc, req.userId, existing ? 200 : 201);
+    await sendTeam(res, tc, req.userId, pre ? 200 : 201);
   } catch (error) {
     next(error);
   }
@@ -510,22 +536,26 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/submit', requireAuth, 
     if (!tc.isHost && tc.h.submissionsOpenAt && Date.now() < tc.h.submissionsOpenAt.getTime()) {
       throw conflict('Submissions are not open yet.', 'NOT_OPEN_YET');
     }
-    const sub = await loadSubmission(tc.h.id, tc.teamId);
-    if (!sub) throw new AppError('Save your project first.', 400, 'NO_SUBMISSION');
-    assertEditable(tc, sub.status);
-    if (sub.status === 'disqualified') throw conflict('Restore the project before submitting it.', 'DISQUALIFIED');
-    if (sub.status !== 'submitted') {
+    // Locked so the last member can't leave (deleting the draft) while it's being submitted,
+    // and the member count can't change under the min-size check.
+    await prisma.$transaction(async (tx) => {
+      await lockTeam(tx, tc.teamId, tc.h.id);
+      const sub = await tx.hackathonSubmission.findFirst({ where: { teamId: tc.teamId, hackathonId: tc.h.id }, select: { id: true, status: true } });
+      if (!sub) throw new AppError('Save your project first.', 400, 'NO_SUBMISSION');
+      assertEditable(tc, sub.status);
+      if (sub.status === 'disqualified') throw conflict('Restore the project before submitting it.', 'DISQUALIFIED');
+      if (sub.status === 'submitted') return;
       const [members, tracks, picked] = await Promise.all([
-        prisma.hackathonTeamMember.count({ where: { teamId: tc.teamId } }),
-        prisma.hackathonTrack.count({ where: { hackathonId: tc.h.id } }),
-        prisma.hackathonSubmissionTrack.count({ where: { submissionId: sub.id } }),
+        tx.hackathonTeamMember.count({ where: { teamId: tc.teamId } }),
+        tx.hackathonTrack.count({ where: { hackathonId: tc.h.id } }),
+        tx.hackathonSubmissionTrack.count({ where: { submissionId: sub.id } }),
       ]);
       if (members < tc.h.teamMinSize) {
         throw conflict(`Your team needs at least ${tc.h.teamMinSize} members to submit.`, 'TEAM_TOO_SMALL');
       }
       if (tracks > 0 && picked === 0) throw new AppError('Pick a track before submitting.', 400, 'TRACK_REQUIRED');
-      await prisma.hackathonSubmission.update({ where: { id: sub.id }, data: { status: 'submitted', submittedAt: new Date() } });
-    }
+      await tx.hackathonSubmission.update({ where: { id: sub.id }, data: { status: 'submitted', submittedAt: new Date() } });
+    });
     await sendTeam(res, tc, req.userId);
   } catch (error) {
     next(error);
@@ -536,11 +566,14 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/withdraw', requireAuth
   try {
     const tc = await loadTeamCtx(req);
     assertBeforeDeadline(tc, 'withdraw');
-    const sub = await loadSubmission(tc.h.id, tc.teamId);
-    if (!sub) throw notFound('No project yet');
-    assertEditable(tc, sub.status);
-    if (sub.status !== 'submitted') throw conflict('Only a submitted project can be withdrawn.', 'NOT_SUBMITTED');
-    await prisma.hackathonSubmission.update({ where: { id: sub.id }, data: { status: 'withdrawn' } });
+    await prisma.$transaction(async (tx) => {
+      await lockTeam(tx, tc.teamId, tc.h.id);
+      const sub = await tx.hackathonSubmission.findFirst({ where: { teamId: tc.teamId, hackathonId: tc.h.id }, select: { id: true, status: true } });
+      if (!sub) throw notFound('No project yet');
+      assertEditable(tc, sub.status);
+      if (sub.status !== 'submitted') throw conflict('Only a submitted project can be withdrawn.', 'NOT_SUBMITTED');
+      await tx.hackathonSubmission.update({ where: { id: sub.id }, data: { status: 'withdrawn' } });
+    });
     await sendTeam(res, tc, req.userId);
   } catch (error) {
     next(error);
@@ -555,7 +588,6 @@ const parseKind = (v: unknown): Kind => (v === 'cover' ? 'cover' : 'screenshot')
 router.post(
   '/:partyId/hackathon/teams/:teamId/submission/upload-url',
   requireAuth,
-  uploadIpLimiter,
   uploadUserLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -578,7 +610,7 @@ router.post(
   },
 );
 
-router.post('/:partyId/hackathon/teams/:teamId/submission/images', requireAuth, uploadUserLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/:partyId/hackathon/teams/:teamId/submission/images', requireAuth, attachUserLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const tc = await loadTeamCtx(req);
     assertBeforeDeadline(tc, 'add images');
@@ -594,7 +626,12 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/images', requireAuth, 
     }
     const finalPath = await finalizeImage(body.path, tc.h.id, sub.id);
     if (kind === 'cover') {
-      await prisma.hackathonSubmission.update({ where: { id: sub.id }, data: { coverPath: finalPath } });
+      // updateMany: the project may have been deleted meanwhile (last member left) -> 404, not 500.
+      const r = await prisma.hackathonSubmission.updateMany({ where: { id: sub.id, hackathonId: tc.h.id }, data: { coverPath: finalPath } });
+      if (!r.count) {
+        await removeImages([finalPath]);
+        throw notFound('No project yet');
+      }
       if (sub.coverPath) await removeImages([sub.coverPath]);
     } else {
       // Conditional append: the cap holds under concurrent attaches (DB CHECK backs it up).
@@ -604,6 +641,8 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/images', requireAuth, 
          WHERE id = ${sub.id}::uuid AND cardinality(screenshot_paths) < ${MAX_SCREENSHOTS}`;
       if (!n) {
         await removeImages([finalPath]);
+        const still = await prisma.hackathonSubmission.count({ where: { id: sub.id } });
+        if (!still) throw notFound('No project yet');
         throw new AppError(`You can add up to ${MAX_SCREENSHOTS} screenshots.`, 400, 'LIMIT_REACHED');
       }
     }
@@ -638,5 +677,24 @@ router.delete('/:partyId/hackathon/teams/:teamId/submission/images', requireAuth
     next(error);
   }
 });
+
+// ---------------------------------------------------------------- cron: abandoned tmp uploads
+// Mounted at /api/cron (CRON_SECRET, same as the other crons). Scheduled daily in
+// backend/vercel.json; Vercel crons call with GET, POST is for manual runs.
+export const hackathonCronRouter = Router();
+
+async function runUploadCleanup(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || (req.headers.authorization || '') !== `Bearer ${cronSecret}`) {
+      throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+    res.json(await cleanupAbandonedUploads());
+  } catch (err) {
+    next(err);
+  }
+}
+hackathonCronRouter.get('/cleanup-hackathon-uploads', runUploadCleanup);
+hackathonCronRouter.post('/cleanup-hackathon-uploads', runUploadCleanup);
 
 export default router;

@@ -1,7 +1,9 @@
 /**
  * Project images in the PRIVATE `hackathon-media` bucket (plans/hackathon-platform.md §5, §11).
  * Created in the Supabase dashboard (images only, 10 MB). Same signed-upload pattern as
- * services/pizzaSubmission.service.ts: bytes never pass through Express.
+ * services/pizzaSubmission.service.ts: the browser uploads straight to storage, so image
+ * bytes never travel in an Express request body (Vercel's 4.5 MB limit). The backend does
+ * download each upload once, server-side, in step 3 to verify it.
  *
  *   1. upload-url: the backend mints a signed upload token for
  *        {hackathonId}/{submissionId}/tmp/{uuid}.{ext}
@@ -120,6 +122,48 @@ export async function removeImages(paths: string[]): Promise<void> {
   } catch {
     /* ignore */
   }
+}
+
+const ABANDONED_AGE_MS = 24 * 3600_000;
+const CLEANUP_MAX_DELETES = 1000;
+const CLEANUP_MAX_LISTS = 2000;
+
+type StoreLike = {
+  list: (prefix: string, opts: { limit: number; offset?: number }) => Promise<{ data: Array<{ id: string | null; name: string; created_at?: string | null }> | null }>;
+  remove: (paths: string[]) => Promise<unknown>;
+};
+
+/**
+ * Daily cron (/api/cron/cleanup-hackathon-uploads): delete `{hackathonId}/{submissionId}/tmp/*`
+ * objects older than 24h. A tmp object only exists between upload-url and attach (attach
+ * moves it to a final path and deletes it), so anything older is an abandoned upload. Final
+ * paths are never touched. Mirrors pizzaSubmission.service cleanupOrphanedUploads.
+ */
+export async function cleanupAbandonedUploads(now: Date = new Date(), store: StoreLike = bucket() as unknown as StoreLike): Promise<{ scanned: number; deleted: number }> {
+  const cutoff = now.getTime() - ABANDONED_AGE_MS;
+  const isFolder = (e: { id: string | null; name: string }) => !e.id && !!e.name;
+  const uuidRe = new RegExp(`^${UUID}$`);
+  let lists = 0;
+  let scanned = 0;
+  const doomed: string[] = [];
+  const list = async (prefix: string) => {
+    lists++;
+    const { data } = await store.list(prefix, { limit: 1000 });
+    return data ?? [];
+  };
+  outer: for (const h of (await list('')).filter((e) => isFolder(e) && uuidRe.test(e.name))) {
+    for (const s of (await list(h.name)).filter((e) => isFolder(e) && uuidRe.test(e.name))) {
+      if (lists >= CLEANUP_MAX_LISTS || doomed.length >= CLEANUP_MAX_DELETES) break outer;
+      const files = await list(`${h.name}/${s.name}/tmp`);
+      scanned += files.length;
+      for (const f of files) {
+        if (f.id && f.created_at && new Date(f.created_at).getTime() < cutoff) doomed.push(`${h.name}/${s.name}/tmp/${f.name}`);
+      }
+    }
+  }
+  const batch = doomed.slice(0, CLEANUP_MAX_DELETES);
+  if (batch.length) await store.remove(batch);
+  return { scanned, deleted: batch.length };
 }
 
 /** path -> short-lived signed URL (missing on failure; callers render without the image). */

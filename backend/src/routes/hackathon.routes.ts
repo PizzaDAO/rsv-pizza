@@ -445,7 +445,14 @@ router.patch('/:partyId/hackathon/submissions/:submissionId', ...guard, async (r
     if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
     const m = parseModeration((req.body ?? {}) as Record<string, unknown>);
     const data: Record<string, unknown> = {};
+    // Restore must return the exact pre-disqualification status without a new column. The
+    // status machine makes that derivable: draft never has submittedAt; submitted always does;
+    // withdrawn also does, so withdrawn projects can't be disqualified (they're out of judging
+    // anyway). Hence restore = submittedAt ? 'submitted' : 'draft' is exact.
     if (m.action === 'disqualify') {
+      if (sub.status === 'withdrawn') {
+        throw conflict("A withdrawn project isn't judged, so there's nothing to disqualify.", 'WITHDRAWN');
+      }
       data.status = 'disqualified';
       data.disqualifiedReason = m.reason;
     } else if (m.action === 'restore') {

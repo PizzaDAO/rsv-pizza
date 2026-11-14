@@ -105,6 +105,7 @@ beforeEach(() => {
   eventHidden.mockResolvedValue(false);
   mockPrisma.party.findUnique.mockResolvedValue({ eventType: null, eventTags: [], date: null, region: null, city: null, password: null });
   mockPrisma.guest.findFirst.mockResolvedValue(null);
+  mockPrisma.$queryRaw = vi.fn(async () => []);
   mockPrisma.hackathonTrack.aggregate.mockResolvedValue({ _max: { sortOrder: 2 } });
   for (const k of ['hackathonTrack', 'hackathonPrize', 'hackathonCriterion', 'hackathonJudge', 'hackathonAward', 'hackathonScore', 'hackathonSubmission', 'hackathonSubmissionTrack']) {
     mockPrisma[k].count.mockResolvedValue(0);
@@ -195,11 +196,15 @@ describe('GET /:partyId/hackathon (public read)', () => {
 
     const stranger = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('rando@example.com', 'u-x'));
     expect(stranger.body.hackathon).toBeNull();
-    expect(mockPrisma.guest.findFirst.mock.calls[0][0].where).toEqual({
-      partyId: PARTY, email: { equals: 'rando@example.com', mode: 'insensitive' }, NOT: { approved: false },
-    });
+    // Exact lower(email) = lower($) (no ILIKE wildcards), scoped to the party.
+    const [strings, ...vals] = mockPrisma.$queryRaw.mock.calls[0];
+    expect(strings.join('?')).toContain('lower(email) = lower(');
+    expect(strings.join('?')).not.toMatch(/ILIKE/i);
+    expect(vals.slice(0, 2)).toEqual([PARTY, 'rando@example.com']);
 
-    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1' });
+    mockPrisma.$queryRaw.mockResolvedValue([{ id: 'g0', approved: false, status: 'CONFIRMED', checked_in_at: null }]);
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('Guest@Example.com', 'u-g'))).body.hackathon).toBeNull();
+    mockPrisma.$queryRaw.mockResolvedValue([{ id: 'g1', approved: null, status: 'CONFIRMED', checked_in_at: null }]);
     const guest = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('Guest@Example.com', 'u-g'));
     expect(guest.body.hackathon.tracks).toHaveLength(1);
     expect(JSON.stringify(guest.body)).not.toContain('judge@secret.example');

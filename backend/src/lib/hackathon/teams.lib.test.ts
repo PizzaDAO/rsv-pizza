@@ -157,6 +157,29 @@ describe('media paths + sniffing', () => {
   });
 });
 
+describe('cleanupAbandonedUploads', () => {
+  it('deletes only tmp objects older than 24h; never final images', async () => {
+    const H1 = '22222222-2222-4222-8222-222222222222';
+    const S1 = '33333333-3333-4333-8333-333333333333';
+    const now = new Date('2027-03-10T12:00:00Z');
+    const old = '2027-03-08T00:00:00Z';
+    const fresh = '2027-03-10T11:00:00Z';
+    const tree: Record<string, Array<{ id: string | null; name: string; created_at?: string }>> = {
+      '': [{ id: null, name: H1 }, { id: null, name: 'not-a-uuid' }],
+      [H1]: [{ id: null, name: S1 }],
+      [`${H1}/${S1}/tmp`]: [{ id: 'f1', name: 'old.png', created_at: old }, { id: 'f2', name: 'new.png', created_at: fresh }],
+    };
+    const removed: string[][] = [];
+    const store = {
+      list: async (prefix: string) => ({ data: tree[prefix] ?? [] }),
+      remove: async (p: string[]) => { removed.push(p); },
+    };
+    const { cleanupAbandonedUploads } = await import('./media.js');
+    expect(await cleanupAbandonedUploads(now, store)).toEqual({ scanned: 2, deleted: 1 });
+    expect(removed).toEqual([[`${H1}/${S1}/tmp/old.png`]]);
+  });
+});
+
 describe('validate: submissions + moderation', () => {
   const url = (v: unknown) => normalizeProjectUrl(v, 'x');
   it('name required on create; caps per DB CHECKs; NUL rejected', () => {
