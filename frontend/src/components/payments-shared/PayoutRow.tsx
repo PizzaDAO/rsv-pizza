@@ -8,6 +8,7 @@ import { SubmittedForReviewBadge } from './SubmittedForReviewBadge';
 import { PayoutMethodIcon } from './PayoutMethodIcon';
 import { formatPayoutAmount, formatOriginalCurrency } from './formatPayoutAmount';
 import { CapInlineEditor } from './CapInlineEditor';
+import { isPdfFile, derivePdfThumbnailUrl } from '../../lib/pdfUtils';
 
 /**
  * bruschetta-58291: strip the "Global Pizza Party " prefix from event names so
@@ -72,7 +73,10 @@ export const PayoutRow: React.FC<PayoutRowProps> = ({
     (payout.documents || []).find((d) => d.kind === 'pizza')
     ?? (payout.documents || []).find((d) => d.kind === 'event')
     ?? (payout.documents || []).find((d) => d.kind === 'receipt');
-  const thumbUrl = firstThumbDoc?.url || null;
+  // PDFs can't render in <img>: use the PDF's thumbnail PNG instead.
+  const thumbUrl = firstThumbDoc
+    ? (isPdfFile(firstThumbDoc) ? derivePdfThumbnailUrl(firstThumbDoc.url, firstThumbDoc.thumbUrl) : firstThumbDoc.url) || null
+    : null;
 
   const submittedAbs = new Date(payout.createdAt).toLocaleString();
   const submittedRel = relativeTime(new Date(payout.createdAt));
