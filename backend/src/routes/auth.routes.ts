@@ -6,6 +6,7 @@ import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
 import { siteForOrigin, type SiteBrand } from '../lib/siteBrand.js';
 import { getJwtSecret } from '../config/secrets.js';
+import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -219,11 +220,15 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
       throw new AppError('Magic link expired', 401, 'TOKEN_EXPIRED');
     }
 
-    // Mark as used
-    await prisma.magicLink.update({
-      where: { id: magicLink.id },
+    // Atomic single-use spend: only one concurrent request can flip used false -> true.
+    // (A read-then-update here would let two simultaneous redemptions both succeed.)
+    const spent = await prisma.magicLink.updateMany({
+      where: { id: magicLink.id, used: false, expiresAt: { gt: new Date() } },
       data: { used: true },
     });
+    if (spent.count !== 1) {
+      throw new AppError('Magic link already used', 401, 'TOKEN_USED');
+    }
 
     // Create user if doesn't exist
     let user = magicLink.user;
@@ -252,6 +257,46 @@ router.post('/verify-token', async (req: Request, res: Response, next: NextFunct
         name: user.name,
       },
       accessToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/handoff - Mint a short-lived single-use sign-in link so a signed-in
+// user can carry their session into a wallet's in-app browser (a different cookie/
+// localStorage jar). Reuses the MagicLink table: redeemed through POST /verify-token.
+// Controls: requires a valid Bearer JWT, 2-minute TTL, single use (atomic spend in
+// /verify-token), and the row's `code` is not 6 digits so /verify-code can never match it.
+export const HANDOFF_TTL_MS = 2 * 60 * 1000;
+router.post('/handoff', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+    if (!user) {
+      throw new AppError('User not found', 401, 'UNAUTHORIZED');
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const code = `ho${randomBytes(12).toString('hex')}`;
+    const expiresAt = new Date(Date.now() + HANDOFF_TTL_MS);
+
+    await prisma.magicLink.create({
+      data: { token, code, email: user.email, expiresAt, userId: user.id },
+    });
+
+    const site = await siteForOrigin(req.get('origin'), process.env.FRONTEND_URL || 'http://localhost:5176');
+    const rawNext = typeof req.body?.next === 'string' ? req.body.next : '';
+    // Only local paths; anything else is dropped (the frontend re-validates too).
+    const next_ = /^\/(?![/\\])[^\s]*$/.test(rawNext) ? rawNext : '';
+    const params = new URLSearchParams({ token });
+    if (next_) params.set('next', next_);
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      token,
+      url: `${site.url}/auth/verify?${params.toString()}`,
+      expiresAt: expiresAt.toISOString(),
     });
   } catch (error) {
     next(error);

@@ -5,12 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { IconInput } from '../components/IconInput';
 import { Layout } from '../components/Layout';
+import { sanitizeNextPath } from '../lib/wallet/handoff';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
 
 export function AuthVerifyPage() {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { setUser, signOut } = useAuth();
   const { t } = useTranslation('auth');
   const [status, setStatus] = useState<'idle' | 'verifying' | 'name_prompt' | 'saving_name' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,45 @@ export function AuthVerifyPage() {
   const [pendingAuthData, setPendingAuthData] = useState<any>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  // Captured once at first render: the sign-in token (email link / wallet hand-off) and the
+  // local `next` path. The token is stripped from the address bar immediately (see effect).
+  const initialParams = useRef(typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams());
+  const tokenRedeemStarted = useRef(false);
+  const redirectTimer = useRef<number | null>(null);
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
+  const signedInAsRef = useRef<string | null>(null);
+
+  // Redeem a single-use token from the URL (wallet hand-off or emailed magic link).
+  useEffect(() => {
+    const token = initialParams.current.get('token');
+    if (!token || tokenRedeemStarted.current) return;
+    tokenRedeemStarted.current = true;
+    // Remove the token from the URL/history right away so it can't leak via the address bar.
+    window.history.replaceState(null, '', window.location.pathname);
+    setStatus('verifying');
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        if (!response.ok) {
+          throw new Error(t('verifyPage.linkExpired', {
+            defaultValue: 'This sign-in link has expired or was already used. Enter a code from your email, or request a new one.',
+          }));
+        }
+        const data = await response.json();
+        signedInAsRef.current = data.user?.name || data.user?.email || null;
+        setSignedInAs(signedInAsRef.current);
+        handleSuccess(data);
+      } catch (err: any) {
+        setStatus('error');
+        setError(err.message || 'Failed to verify link');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check if this is a new user on mount
   useEffect(() => {
@@ -93,12 +133,13 @@ export function AuthVerifyPage() {
 
     setStatus('success');
 
-    // Redirect to stored return URL or /host/ after 2 seconds
-    setTimeout(() => {
+    // Redirect to ?next= (local paths only), else the stored return URL, else home.
+    redirectTimer.current = window.setTimeout(() => {
+      const nextParam = sanitizeNextPath(initialParams.current.get('next'));
       const returnUrl = sessionStorage.getItem('authReturnUrl');
       sessionStorage.removeItem('authReturnUrl');
-      navigate(returnUrl || '/');
-    }, 2000);
+      navigate(nextParam || returnUrl || '/');
+    }, signedInAsRef.current ? 2500 : 2000);
   }
 
   function handleCodeChange(index: number, value: string) {
@@ -239,6 +280,25 @@ export function AuthVerifyPage() {
             </div>
             <h1 className="text-2xl font-bold text-theme-text mb-2">{t('verifyPage.welcomeBack')}</h1>
             <p className="text-theme-text-secondary">{t('verifyPage.redirecting')}</p>
+            {signedInAs && (
+              <p className="text-theme-text-muted text-sm mt-4">
+                {t('verifyPage.signedInAs', { defaultValue: 'Signed in as' })} {signedInAs}
+                {' \u2014 '}
+                <button
+                  type="button"
+                  className="text-[#ff393a] hover:underline"
+                  onClick={() => {
+                    if (redirectTimer.current) window.clearTimeout(redirectTimer.current);
+                    signOut();
+                    setSignedInAs(null);
+                    signedInAsRef.current = null;
+                    navigate('/login');
+                  }}
+                >
+                  {t('verifyPage.notYou', { defaultValue: 'not you? Sign out' })}
+                </button>
+              </p>
+            )}
           </>
         )}
 

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSwitchChain, useEnsAddress } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
+import { OpenInWallet } from './OpenInWallet';
 import { Address, isAddress } from 'viem';
 import { Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
 import { useTokenBalances, type TokenBalance } from '../hooks/useTokenBalances';
@@ -212,6 +213,8 @@ export const CryptoDonationWidget: React.FC<CryptoDonationWidgetProps> = ({
               )}
             </ConnectKitButton.Custom>
           </div>
+
+          <OpenInWallet />
 
           {/* Copy address fallback */}
           <div className="bg-theme-surface rounded-xl p-4 border border-theme-stroke">
