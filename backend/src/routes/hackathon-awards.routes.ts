@@ -17,6 +17,9 @@
  * un-reveal and the judging toggle are serialized: two hosts can't overfill a prize, and
  * "mark paid" can't race "un-reveal".
  *
+ * Payout: moving to pending / paid needs a recipient who is a current member of the winning
+ * team (409 RECIPIENT_NOT_MEMBER).
+ *
  * Award rules (lib/hackathon/awards.ts): only `submitted` projects; a track prize only to a
  * project in that track; at most `quantity` awards per prize; one award per (prize, project).
  * People's Choice prizes are awarded by hand for now (voting decides them in PR 7).
@@ -241,7 +244,7 @@ router.patch('/:partyId/hackathon/awards/:awardId/payout', ...guard, async (req:
       await lockHackathon(tx, hackathonId);
       const award = await tx.hackathonAward.findFirst({
         where: { id, hackathonId },
-        select: { id: true, payoutStatus: true, paidAt: true, submission: { select: { teamId: true } } },
+        select: { id: true, payoutStatus: true, paidAt: true, recipientUserId: true, submission: { select: { teamId: true } } },
       });
       if (!award) throw notFound('Award not found');
       const data = payoutData(input, award);
@@ -256,6 +259,22 @@ router.patch('/:partyId/hackathon/awards/:awardId/payout', ...guard, async (req:
           });
           if (!m) throw new AppError('The recipient must be a member of the winning team', 400, 'VALIDATION_ERROR');
           data.recipientUserId = m.userId;
+        }
+      }
+      // Moving to pending / paid needs a recipient who is still on the winning team (a member
+      // who left keeps their user id on the award, but money shouldn't go out to them unseen).
+      if ((input.status === 'pending' || input.status === 'paid') && input.status !== award.payoutStatus) {
+        const recipientUserId = 'recipientUserId' in data ? (data.recipientUserId as string | null) : award.recipientUserId;
+        const onTeam = recipientUserId
+          ? await tx.hackathonTeamMember.count({ where: { hackathonId, teamId: award.submission?.teamId ?? '', userId: recipientUserId } })
+          : 0;
+        if (!onTeam) {
+          throw conflict(
+            recipientUserId
+              ? 'The recipient is no longer on the winning team. Pick a current team member before marking the payout pending or paid.'
+              : 'Pick a recipient from the winning team before marking the payout pending or paid.',
+            'RECIPIENT_NOT_MEMBER',
+          );
         }
       }
       await tx.hackathonAward.update({ where: { id: award.id }, data });

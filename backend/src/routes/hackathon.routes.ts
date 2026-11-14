@@ -276,23 +276,28 @@ router.patch('/:partyId/hackathon/prizes/:prizeId', ...guard, async (req: AuthRe
     const h = await getHackathon(partyId);
     const data = parsePrize(req.body ?? {}, true);
     if (data.trackId) await assertTracks(h.id, [data.trackId as string]);
-    // PR 5: once awarded, a prize can't move tracks or drop below its awarded count.
-    if ('trackId' in data || data.quantity !== undefined) {
-      const [cur, awarded] = await Promise.all([
-        prisma.hackathonPrize.findFirst({ where: { id, hackathonId: h.id }, select: { trackId: true } }),
-        prisma.hackathonAward.count({ where: { prizeId: id } }),
-      ]);
-      if (cur && awarded > 0) {
-        if ('trackId' in data && (data.trackId ?? null) !== (cur.trackId ?? null)) {
-          throw conflict('This prize has been awarded, so its track can no longer change. Remove the awards first.', 'PRIZE_AWARDED');
-        }
-        if (data.quantity !== undefined && (data.quantity as number) < awarded) {
-          throw conflict(`This prize has been awarded ${awarded} time(s), so its quantity can't go below ${awarded}.`, 'PRIZE_AWARDED');
+    // PR 5: once awarded, a prize can't move tracks or drop below its awarded count. Checked
+    // and written under the hackathon-row lock that award creation also takes
+    // (hackathon-awards.routes.ts), so an award can't slip in between check and write.
+    await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      if ('trackId' in data || data.quantity !== undefined) {
+        const [cur, awarded] = await Promise.all([
+          tx.hackathonPrize.findFirst({ where: { id, hackathonId: h.id }, select: { trackId: true } }),
+          tx.hackathonAward.count({ where: { prizeId: id } }),
+        ]);
+        if (cur && awarded > 0) {
+          if ('trackId' in data && (data.trackId ?? null) !== (cur.trackId ?? null)) {
+            throw conflict('This prize has been awarded, so its track can no longer change. Remove the awards first.', 'PRIZE_AWARDED');
+          }
+          if (data.quantity !== undefined && (data.quantity as number) < awarded) {
+            throw conflict(`This prize has been awarded ${awarded} time(s), so its quantity can't go below ${awarded}.`, 'PRIZE_AWARDED');
+          }
         }
       }
-    }
-    const r = await prisma.hackathonPrize.updateMany({ where: { id, hackathonId: h.id }, data });
-    if (!r.count) throw new AppError('Prize not found', 404, 'NOT_FOUND');
+      const r = await tx.hackathonPrize.updateMany({ where: { id, hackathonId: h.id }, data });
+      if (!r.count) throw new AppError('Prize not found', 404, 'NOT_FOUND');
+    });
     return respond(res, partyId);
   } catch (error) {
     next(error);
@@ -536,32 +541,38 @@ router.patch('/:partyId/hackathon/submissions/:submissionId', ...guard, async (r
     const { partyId } = req.params;
     const id = childId(req.params.submissionId);
     const h = await getHackathon(partyId);
-    const sub = await prisma.hackathonSubmission.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, status: true, submittedAt: true } });
-    if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
     const m = parseModeration((req.body ?? {}) as Record<string, unknown>);
-    const data: Record<string, unknown> = {};
-    // Restore must return the exact pre-disqualification status without a new column. The
-    // status machine makes that derivable: draft never has submittedAt; submitted always does;
-    // withdrawn also does, so withdrawn projects can't be disqualified (they're out of judging
-    // anyway). Hence restore = submittedAt ? 'submitted' : 'draft' is exact.
-    if (m.action === 'disqualify') {
-      if (sub.status === 'withdrawn') {
-        throw conflict("A withdrawn project isn't judged, so there's nothing to disqualify.", 'WITHDRAWN');
+    // PR 5: read + check + write under the hackathon-row lock (award creation takes the same
+    // lock), so a project can't be disqualified while an award is being created for it.
+    const sub = await prisma.$transaction(async (tx: any) => {
+      await lockHackathon(tx, h.id);
+      const sub = await tx.hackathonSubmission.findFirst({ where: { id, hackathonId: h.id }, select: { id: true, status: true, submittedAt: true } });
+      if (!sub) throw new AppError('Project not found', 404, 'NOT_FOUND');
+      const data: Record<string, unknown> = {};
+      // Restore must return the exact pre-disqualification status without a new column. The
+      // status machine makes that derivable: draft never has submittedAt; submitted always does;
+      // withdrawn also does, so withdrawn projects can't be disqualified (they're out of judging
+      // anyway). Hence restore = submittedAt ? 'submitted' : 'draft' is exact.
+      if (m.action === 'disqualify') {
+        if (sub.status === 'withdrawn') {
+          throw conflict("A withdrawn project isn't judged, so there's nothing to disqualify.", 'WITHDRAWN');
+        }
+        // PR 5: a winner must lose its awards first (awards.submission_id is RESTRICT, and the
+        // public winners list would otherwise silently drop it).
+        if ((await tx.hackathonAward.count({ where: { submissionId: sub.id } })) > 0) {
+          throw conflict('This project has won a prize. Remove its awards in Winners & Payouts before disqualifying it.', 'HAS_AWARDS');
+        }
+        data.status = 'disqualified';
+        data.disqualifiedReason = m.reason;
+      } else if (m.action === 'restore') {
+        if (sub.status !== 'disqualified') throw conflict('Only a disqualified project can be restored.', 'NOT_DISQUALIFIED');
+        data.status = sub.submittedAt ? 'submitted' : 'draft';
+        data.disqualifiedReason = null;
       }
-      // PR 5: a winner must lose its awards first (awards.submission_id is RESTRICT, and the
-      // public winners list would otherwise silently drop it).
-      if ((await prisma.hackathonAward.count({ where: { submissionId: sub.id } })) > 0) {
-        throw conflict('This project has won a prize. Remove its awards in Winners & Payouts before disqualifying it.', 'HAS_AWARDS');
-      }
-      data.status = 'disqualified';
-      data.disqualifiedReason = m.reason;
-    } else if (m.action === 'restore') {
-      if (sub.status !== 'disqualified') throw conflict('Only a disqualified project can be restored.', 'NOT_DISQUALIFIED');
-      data.status = sub.submittedAt ? 'submitted' : 'draft';
-      data.disqualifiedReason = null;
-    }
-    if (m.tableNumber !== undefined) data.tableNumber = m.tableNumber;
-    await prisma.hackathonSubmission.update({ where: { id: sub.id }, data });
+      if (m.tableNumber !== undefined) data.tableNumber = m.tableNumber;
+      await tx.hackathonSubmission.update({ where: { id: sub.id }, data });
+      return sub;
+    });
     const team = await prisma.hackathonTeam.findFirst({ where: { hackathonId: h.id, submissions: { some: { id: sub.id } } }, include: TEAM_INCLUDE });
     const urls = await signImagePaths(submissionImagePaths((team as any)?.submissions?.[0]));
     res.set('Cache-Control', 'private, no-store');

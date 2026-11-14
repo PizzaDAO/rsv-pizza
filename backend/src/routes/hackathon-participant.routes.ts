@@ -607,6 +607,9 @@ router.post('/:partyId/hackathon/teams/:teamId/submission/withdraw', requireAuth
     const tc = await loadTeamCtx(req);
     assertBeforeDeadline(tc, 'withdraw');
     await prisma.$transaction(async (tx) => {
+      // PR 5: FOR SHARE on the hackathon row first (same order as the track-edit path), so the
+      // HAS_AWARDS check below can't race award creation (FOR UPDATE on the same row).
+      await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${tc.h.id}::uuid FOR SHARE`;
       await lockTeam(tx, tc.teamId, tc.h.id);
       const sub = await tx.hackathonSubmission.findFirst({ where: { teamId: tc.teamId, hackathonId: tc.h.id }, select: { id: true, status: true } });
       if (!sub) throw notFound('No project yet');

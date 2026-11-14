@@ -576,6 +576,102 @@ describe('team results on /me', () => {
   });
 });
 
+// ------------------------------------------------------------------ security-review follow-ups
+
+/** Raw SQL statements issued so far, in order. */
+const rawSql = () => mockPrisma.$queryRaw.mock.calls.map((c: any[]) => c[0].join('?')) as string[];
+const isHkLock = (s: string, mode: string) => s.includes('FROM hackathons') && s.includes(mode);
+
+describe('locks around award-sensitive writes', () => {
+  it('disqualify: checks awards and writes under the hackathon row lock (inside one transaction)', async () => {
+    mockPrisma.$queryRaw.mockClear();
+    mockPrisma.$transaction.mockClear();
+    mockPrisma.hackathonAward.count.mockClear();
+    const r = await api().patch(`${base}/submissions/${S_B}`).set('Authorization', auth('host')).send({ action: 'disqualify', reason: 'late' });
+    expect(r.status).toBe(200);
+    expect(rawSql().some((s) => isHkLock(s, 'FOR UPDATE'))).toBe(true);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    // The lock comes before the award count and the update.
+    const lockOrder = mockPrisma.$queryRaw.mock.invocationCallOrder[0];
+    expect(mockPrisma.hackathonAward.count.mock.invocationCallOrder[0]).toBeGreaterThan(lockOrder);
+    expect(mockPrisma.hackathonSubmission.update.mock.invocationCallOrder[0]).toBeGreaterThan(lockOrder);
+    expect(db.hackathonSubmission.find((s) => s.id === S_B)!.status).toBe('disqualified');
+  });
+
+  it('disqualify re-reads the project inside the lock (a project gone meanwhile is a 404)', async () => {
+    const r = await api().patch(`${base}/submissions/${crypto.randomUUID()}`).set('Authorization', auth('host')).send({ action: 'disqualify', reason: 'x' });
+    expect(r.status).toBe(404);
+  });
+
+  it('withdraw: FOR SHARE on the hackathon row before the team lock and the award count', async () => {
+    mockPrisma.$queryRaw.mockClear();
+    const r = await api().post(`${base}/teams/77777777-7777-4777-8777-00000000000b/submission/withdraw`).set('Authorization', auth('carol'));
+    expect(r.status).toBe(200);
+    const sqls = rawSql();
+    const share = sqls.findIndex((s) => isHkLock(s, 'FOR SHARE'));
+    const team = sqls.findIndex((s) => s.includes('FROM hackathon_teams') && s.includes('FOR UPDATE'));
+    expect(share).toBeGreaterThanOrEqual(0);
+    expect(team).toBeGreaterThan(share);
+  });
+
+  it('prize edit: PRIZE_AWARDED check and the update run under the hackathon row lock', async () => {
+    await award(P_HM, S_A);
+    mockPrisma.$queryRaw.mockClear();
+    mockPrisma.hackathonPrize.updateMany.mockClear();
+    const r = await api().patch(`${base}/prizes/${P_HM}`).set('Authorization', auth('host')).send({ quantity: 2 });
+    expect(r.status).toBe(200);
+    expect(rawSql().some((s) => isHkLock(s, 'FOR UPDATE'))).toBe(true);
+    expect(mockPrisma.hackathonPrize.updateMany.mock.invocationCallOrder[0]).toBeGreaterThan(mockPrisma.$queryRaw.mock.invocationCallOrder[0]);
+    const bad = await api().patch(`${base}/prizes/${P_HM}`).set('Authorization', auth('host')).send({ quantity: 0 });
+    expect(bad.status).toBe(400); // validation still first
+  });
+});
+
+describe('payout recipient must be on the team for pending / paid', () => {
+  const patch = (id: string, body: Row) => api().patch(`${base}/awards/${id}/payout`).set('Authorization', auth('host')).send(body);
+
+  it('recipient who left the team: 409 RECIPIENT_NOT_MEMBER; picking a current member fixes it', async () => {
+    await award(P_GRAND, S_A); // recipient = captain alice
+    const id = awardIdFor(P_GRAND, S_A);
+    db.hackathonTeamMember = db.hackathonTeamMember.filter((m) => m.id !== M_ALICE); // alice left
+    const gone = await api().get(`${base}/awards`).set('Authorization', auth('host'));
+    expect(gone.body.awards[0]).toMatchObject({ recipient: { name: 'Alice' }, recipientMemberId: null }); // UI shows "left the team"
+    for (const status of ['pending', 'paid']) {
+      const r = await patch(id, { status });
+      expect(r.status).toBe(409);
+      expect(r.body.error.code).toBe('RECIPIENT_NOT_MEMBER');
+      expect(r.body.error.message).toMatch(/no longer on the winning team/);
+    }
+    expect(db.hackathonAward[0].payoutStatus).toBe('unpaid');
+    // Other edits still work, and so does not_applicable.
+    expect((await patch(id, { payoutNotes: 'chasing a new wallet' })).status).toBe(200);
+    expect((await patch(id, { status: 'not_applicable' })).status).toBe(200);
+    // Switching recipient in the same request is enough.
+    const ok = await patch(id, { status: 'paid', recipientMemberId: M_BOB });
+    expect(ok.status).toBe(200);
+    expect(db.hackathonAward[0]).toMatchObject({ payoutStatus: 'paid', recipientUserId: 'u-b' });
+  });
+
+  it('no recipient at all: 409 with a "pick a recipient" message', async () => {
+    await award(P_GRAND, S_A);
+    const id = awardIdFor(P_GRAND, S_A);
+    await patch(id, { recipientMemberId: null });
+    const r = await patch(id, { status: 'pending' });
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('RECIPIENT_NOT_MEMBER');
+    expect(r.body.error.message).toMatch(/Pick a recipient/);
+  });
+
+  it('a payout already pending can still be edited after the recipient leaves (only the move is gated)', async () => {
+    await award(P_GRAND, S_A);
+    const id = awardIdFor(P_GRAND, S_A);
+    expect((await patch(id, { status: 'pending' })).status).toBe(200);
+    db.hackathonTeamMember = db.hackathonTeamMember.filter((m) => m.id !== M_ALICE);
+    expect((await patch(id, { payoutReference: 'ref-9' })).status).toBe(200);
+    expect((await patch(id, { status: 'paid' })).status).toBe(409);
+  });
+});
+
 // ------------------------------------------------------------------ track edits on awarded projects
 
 describe('track edits on a project holding a track prize', () => {

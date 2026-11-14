@@ -38,6 +38,22 @@ export function PayoutBadge({ status }: { status: PayoutStatus }) {
   );
 }
 
+/** PATCH body with only the fields that differ from the award as last loaded. */
+export function payoutChanges(
+  award: Pick<HostAward, 'payoutStatus' | 'recipientMemberId' | 'recipientWallet' | 'payoutReference' | 'paidAt' | 'payoutNotes'>,
+  form: { status: PayoutStatus; memberId: string; wallet: string; reference: string; paidAt: string; notes: string },
+): PayoutInput {
+  const body: PayoutInput = {};
+  const norm = (v: string) => v.trim() || null;
+  if (form.status !== award.payoutStatus) body.status = form.status;
+  if (form.memberId !== (award.recipientMemberId ?? '')) body.recipientMemberId = form.memberId || null;
+  if (norm(form.wallet) !== (award.recipientWallet ?? null)) body.recipientWallet = norm(form.wallet);
+  if (norm(form.reference) !== (award.payoutReference ?? null)) body.payoutReference = norm(form.reference);
+  if (norm(form.notes) !== (award.payoutNotes ?? null)) body.payoutNotes = norm(form.notes);
+  if (form.status === 'paid' && form.paidAt && form.paidAt !== isoToLocalInput(award.paidAt)) body.paidAt = localInputToIso(form.paidAt);
+  return body;
+}
+
 const fmt = (n: number | null) => (n === null ? '-' : Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** Ranked candidates for a prize's scope (track prize: that track's board; else overall). */
@@ -127,12 +143,13 @@ function AwardPicker({ prize, data, busy, onAward }: {
   );
 }
 
-function PayoutEditor({ award, candidate, busy, onSave, onRemove }: {
+function PayoutEditor({ award, candidate, busy, onSave, onRemove, onClose }: {
   award: HostAward;
   candidate: AwardCandidate | undefined;
   busy: boolean;
   onSave: (body: PayoutInput) => Promise<boolean>;
   onRemove: () => void;
+  onClose: () => void;
 }) {
   const [status, setStatus] = useState<PayoutStatus>(award.payoutStatus);
   const [memberId, setMemberId] = useState<string>(award.recipientMemberId ?? '');
@@ -142,15 +159,12 @@ function PayoutEditor({ award, candidate, busy, onSave, onRemove }: {
   const [notes, setNotes] = useState(award.payoutNotes ?? '');
   const locked = hasRecordedPayout(award);
 
+  const recipientLeft = !!award.recipient && !award.recipientMemberId;
+
+  /** Only the fields this host changed, so a concurrent edit by another host isn't clobbered. */
   const save = () => {
-    const body: PayoutInput = {
-      status,
-      recipientWallet: wallet.trim() || null,
-      payoutReference: reference.trim() || null,
-      payoutNotes: notes.trim() || null,
-    };
-    if (memberId !== (award.recipientMemberId ?? '')) body.recipientMemberId = memberId || null;
-    if (status === 'paid' && paidAt) body.paidAt = localInputToIso(paidAt);
+    const body = payoutChanges(award, { status, memberId, wallet, reference, paidAt, notes });
+    if (!Object.keys(body).length) return onClose();
     void onSave(body);
   };
 
@@ -162,6 +176,11 @@ function PayoutEditor({ award, candidate, busy, onSave, onRemove }: {
         onChange={setStatus}
         options={(['unpaid', 'pending', 'paid', 'not_applicable'] as const).map((s) => ({ value: s, label: PAYOUT_LABEL[s] }))}
       />
+      {recipientLeft && (
+        <p className="text-sm text-theme-error" data-testid="hackathon-recipient-left">
+          {award.recipient?.name || 'The recipient'} left the team. Pick another recipient before marking this pending or paid.
+        </p>
+      )}
       {candidate && candidate.members.length > 0 && (
         <div>
           <ChoicePills<string>
@@ -230,12 +249,13 @@ function AwardRow({ award, prize, candidate, busy, onSave, onRemove }: {
       </button>
       {open && (
         <PayoutEditor
-          key={award.updatedAt ?? award.id}
+          key={`${award.id}:${award.updatedAt ?? ''}`}
           award={award}
           candidate={candidate}
           busy={busy}
           onSave={async (b) => { const ok = await onSave(b); if (ok) setOpen(false); return ok; }}
           onRemove={onRemove}
+          onClose={() => setOpen(false)}
         />
       )}
     </li>

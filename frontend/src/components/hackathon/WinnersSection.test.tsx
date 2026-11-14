@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { hasRecordedPayout, ordinal, type AwardsResponse, type PublicWinner } from '../../lib/hackathonApi';
-import { rankedCandidates } from './WinnersSection';
+import { payoutChanges, rankedCandidates } from './WinnersSection';
 import { WinnersStrip } from './WinnersStrip';
 import { TeamResults } from './TeamResults';
 
@@ -34,6 +34,26 @@ describe('hackathon winners helpers (PR 5)', () => {
     };
     expect(rankedCandidates({ trackId: null }, data).map((o) => o.c.id)).toEqual(['b', 'c', 'a']);
     expect(rankedCandidates({ trackId: 't1' }, data).map((o) => o.c.id)).toEqual(['c', 'a']);
+  });
+});
+
+describe('payoutChanges (only send what this host changed)', () => {
+  const award = { payoutStatus: 'pending' as const, recipientMemberId: 'm1', recipientWallet: '0xabc', payoutReference: null, paidAt: null, payoutNotes: 'note' };
+  const form = { status: 'pending' as const, memberId: 'm1', wallet: '0xabc', reference: '', paidAt: '', notes: 'note' };
+  it('no edits: empty body', () => {
+    expect(payoutChanges(award, form)).toEqual({});
+    expect(payoutChanges(award, { ...form, wallet: ' 0xabc ' })).toEqual({});
+  });
+  it('one field changed: just that field', () => {
+    expect(payoutChanges(award, { ...form, reference: '0xtx' })).toEqual({ payoutReference: '0xtx' });
+    expect(payoutChanges(award, { ...form, notes: '' })).toEqual({ payoutNotes: null });
+    expect(payoutChanges(award, { ...form, memberId: 'm2' })).toEqual({ recipientMemberId: 'm2' });
+  });
+  it('status -> paid with a date sends both; an unchanged date is not resent', () => {
+    const body = payoutChanges(award, { ...form, status: 'paid', paidAt: '2027-03-08T10:00' });
+    expect(body.status).toBe('paid');
+    expect(typeof body.paidAt).toBe('string');
+    expect(payoutChanges(award, { ...form, status: 'paid' })).toEqual({ status: 'paid' });
   });
 });
 
