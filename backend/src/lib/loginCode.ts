@@ -10,6 +10,17 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '../config/database.js';
 import type { SiteBrand } from './siteBrand.js';
+import { AppError } from '../middleware/error.js';
+import {
+  CLEANUP_CHANCE,
+  RATE_EVENT_RETENTION_MS,
+  hashRateKey,
+  memoryRateStore,
+  prismaRateStore,
+  type RateBucket,
+  type RateStore,
+  type Reservation,
+} from './authRateLimit.js';
 
 // Helper function to send magic link email (moved verbatim from auth.routes.ts)
 export async function sendMagicLinkEmail(email: string, magicLinkUrl: string, code: string, resendApiKey: string, site: SiteBrand) {
@@ -168,9 +179,22 @@ export async function issueLoginCode(
 // (email + IP, or IP), never to the stored code rows. Per-email budgets only tighten what
 // each caller gets; they never refuse a caller who hasn't used their own share.
 //
-// Counters keyed by IP live in memory (like the express-rate-limit limiters in index.ts),
-// so on a serverless deploy each warm instance keeps its own; per-email signals are counted
-// from magic_links, so they hold across instances.
+// durable-rate-limits: the per-IP and per-(email, IP) counters live in Postgres
+// (`auth_rate_events`, lib/authRateLimit.ts), so they are GLOBAL across serverless instances;
+// keys are HMAC digests, never plaintext. Per-email signals are counted from magic_links, as
+// before. Each instance also keeps an in-memory copy of its OWN reservations as a fast path:
+// its counts are a subset of the global ones, so it only ever refuses requests the DB would
+// refuse too (it saves a round trip on a burst, and is the floor sends fall back to).
+//
+// If the rate-limit query itself fails:
+//   - sends FAIL OPEN to the in-memory per-instance budget (the #1253 behaviour) and log.
+//     A send is not a guess: the number of live codes per email is capped durably by the mint
+//     cap (magic_links), and every guess is still charged to the verify budget below. Failing
+//     closed would stop every sign-in email (a full login outage) over a counter table.
+//   - verify FAILS CLOSED (503, nothing looked up). This is the brute-force surface: failing
+//     open would quietly give every instance its own budget again, exactly what this change
+//     removes, and nobody would notice. Verify needs the same database for the code lookup,
+//     so an outage that breaks the counter mostly breaks verify anyway.
 
 export const LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
@@ -193,13 +217,65 @@ export const FAIL_PER_EMAIL_IP = 5; // per (email, IP) per 15 min, email-bound c
 export const EMAIL_UNDER_ATTACK_FAILS = 25; // wrong codes on an email's live codes, any IP
 export const FAIL_PER_EMAIL_IP_UNDER_ATTACK = 1; // per (email, IP) once the email is under attack
 
-const sendLog = new Map<string, number[]>(); // `${email}|${ip}` -> send times
-const failLog = new Map<string, number[]>(); // `ip|${ip}` and `${email}|${ip}` -> failure times
+/** `auth_rate_events.bucket` values. */
+export const RATE_BUCKETS = {
+  send: 'send', // key: email|ip
+  verifyIp: 'verify_ip', // key: ip (email-bound checks)
+  verifyIpCodeOnly: 'verify_ip_code_only', // key: ip (legacy code-only checks)
+  verifyEmailIp: 'verify_email_ip', // key: email|ip
+} as const;
 
-/** Test hook. */
-export function resetCodeLimits(): void {
+let store: RateStore = prismaRateStore(prisma);
+let random: () => number = Math.random;
+
+const sendLog = new Map<string, number[]>(); // `${email}|${ip}` -> this instance's send times
+const failLog = new Map<string, number[]>(); // `ip|${ip}`, `ipc|${ip}`, `${email}|${ip}` -> failure times
+
+/**
+ * Refusal cache: after the DB refuses a key (bucket full), this instance refuses that key
+ * locally until the bucket's oldest event ages out, capped at REFUSAL_CACHE_MAX_MS, so an
+ * over-budget burst doesn't hit the DB on every request. Strictly an extra limit: the only
+ * way it is stricter than the DB is when a slot is RELEASED (a right code) on another
+ * instance meanwhile; the cap bounds that to 30 s, and only for a caller already at its limit.
+ * Keys: `s|${email}|${ip}` (send) and the failLog keys.
+ */
+export const REFUSAL_CACHE_MAX_MS = 30_000;
+const refusedUntil = new Map<string, number>();
+
+function isRefused(key: string, now: number): boolean {
+  const until = refusedUntil.get(key);
+  if (until === undefined) return false;
+  if (until > now) return true;
+  refusedUntil.delete(key);
+  return false;
+}
+
+function cacheRefusal(key: string, retryAfterMs: number | null | undefined, now: number): void {
+  const ms = Math.min(retryAfterMs ?? REFUSAL_CACHE_MAX_MS, REFUSAL_CACHE_MAX_MS);
+  if (ms <= 0) return;
+  if (refusedUntil.size > 20_000) {
+    for (const [k, v] of refusedUntil) if (v <= now) refusedUntil.delete(k);
+  }
+  refusedUntil.set(key, now + ms);
+}
+
+/** Cache a refusal for each bucket that was at its limit. `localKeys[i]` matches `buckets[i]`. */
+function cacheFullBuckets(res: Reservation, buckets: RateBucket[], localKeys: string[], now: number): void {
+  buckets.forEach((b, i) => {
+    if (res.counts[i] >= b.limit) cacheRefusal(localKeys[i], res.retryAfterMs?.[i], now);
+  });
+}
+
+/**
+ * Test hook: clear this instance's in-memory counters and use `opts.store` (default: a fresh
+ * in-process store) instead of the database. Production never calls it.
+ */
+export function resetCodeLimits(opts: { store?: RateStore; random?: () => number } = {}): void {
   sendLog.clear();
   failLog.clear();
+  refusedUntil.clear();
+  store = opts.store ?? memoryRateStore();
+  random = opts.random ?? Math.random;
 }
 
 function recent(map: Map<string, number[]>, key: string, now: number): number[] {
@@ -211,46 +287,91 @@ function recent(map: Map<string, number[]>, key: string, now: number): number[] 
   return ts;
 }
 
+function rollback(map: Map<string, number[]>, key: string, stamp: number) {
+  const ts = map.get(key);
+  if (!ts) return;
+  const i = ts.lastIndexOf(stamp);
+  if (i >= 0) ts.splice(i, 1);
+}
+
+/** Global reservation; on ~1% of calls also delete events past retention (cheap, small table). */
+async function reserveGlobal(buckets: RateBucket[]): Promise<Reservation> {
+  const res = await store.reserve(buckets, LIMIT_WINDOW_MS);
+  if (random() < CLEANUP_CHANCE) {
+    try {
+      await store.cleanup(RATE_EVENT_RETENTION_MS);
+    } catch (err) {
+      console.error('[auth-rate] cleanup failed:', err);
+    }
+  }
+  return res;
+}
+
+async function releaseGlobal(ids: string[] | null): Promise<void> {
+  if (!ids?.length) return;
+  try {
+    await store.release(ids);
+  } catch (err) {
+    // The slot just stays charged until it ages out: conservative, never a bypass.
+    console.error('[auth-rate] release failed:', err);
+  }
+}
+
 /**
  * Reserve one sign-in code send to `email` for a caller at `ip`. Returns false (nothing
  * reserved) when this caller is over budget:
- *   - SEND_PER_EMAIL_IP per 15 min for this (email, IP);
+ *   - SEND_PER_EMAIL_IP per 15 min for this (email, IP), counted across all instances;
  *   - when the email already had SEND_PER_EMAIL_HOUR codes in the last hour (anyone's
  *     requests, from magic_links), only a caller with NO send in the last 15 min gets one.
  * So an attacker spamming the address from a few IPs is capped at about one email per IP
  * per 15 min, and the real owner (whose IP hasn't asked) still gets their code.
  *
- * The reservation is taken synchronously before the DB await and rolled back if the DB
- * check refuses, so concurrent requests can't all pass the in-memory check at once.
+ * The reservation is taken atomically before the magic_links check and rolled back if that
+ * check refuses. If the rate-limit table can't be reached this fails open to the in-memory
+ * per-instance budget (see the note above).
  */
 export async function takeCodeSend(email: string, ip: string | undefined): Promise<boolean> {
   const now = Date.now();
-  const key = `${email}|${ip ?? '?'}`;
-  const ts = recent(sendLog, key, now);
-  if (ts.length >= SEND_PER_EMAIL_IP) return false;
-  const hadRecentSend = ts.length > 0;
-  ts.push(now); // reserve before awaiting
+  const raw = `${email}|${ip ?? '?'}`;
+  const ts = recent(sendLog, raw, now);
+  if (ts.length >= SEND_PER_EMAIL_IP) return false; // fast path: this instance alone is over
+  const refusalKey = `s|${raw}`;
+  if (isRefused(refusalKey, now)) return false; // fast path: the DB refused this key recently
+  const localCount = ts.length;
+  ts.push(now); // reserve locally before awaiting
+
+  let ids: string[] | null = null;
+  let mine = localCount;
+  try {
+    const buckets = [{ bucket: RATE_BUCKETS.send, key: hashRateKey(RATE_BUCKETS.send, raw), limit: SEND_PER_EMAIL_IP }];
+    const res = await reserveGlobal(buckets);
+    if (!res.ids) {
+      rollback(sendLog, raw, now);
+      cacheFullBuckets(res, buckets, [refusalKey], now);
+      return false;
+    }
+    ids = res.ids;
+    mine = Math.max(res.counts[0], localCount);
+  } catch (err) {
+    console.error('[auth-rate] send limit check failed; falling back to the per-instance limit:', err);
+  }
+
   let lastHour: number;
   try {
     lastHour = await prisma.magicLink.count({
       where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) }, ...NOT_HANDOFF },
     });
   } catch (err) {
-    rollback(sendLog, key, now);
+    rollback(sendLog, raw, now);
+    await releaseGlobal(ids);
     throw err;
   }
-  if (lastHour >= SEND_PER_EMAIL_HOUR && hadRecentSend) {
-    rollback(sendLog, key, now);
+  if (lastHour >= SEND_PER_EMAIL_HOUR && mine > 0) {
+    rollback(sendLog, raw, now);
+    await releaseGlobal(ids);
     return false;
   }
   return true;
-}
-
-function rollback(map: Map<string, number[]>, key: string, stamp: number) {
-  const ts = map.get(key);
-  if (!ts) return;
-  const i = ts.lastIndexOf(stamp);
-  if (i >= 0) ts.splice(i, 1);
 }
 
 /**
@@ -262,39 +383,74 @@ function rollback(map: Map<string, number[]>, key: string, stamp: number) {
  *     just FAIL_PER_EMAIL_IP_UNDER_ATTACK once the email's live codes have collected
  *     EMAIL_UNDER_ATTACK_FAILS wrong guesses from anyone. A caller with no failures of
  *     their own (e.g. the real owner, from their own IP) is never refused by that.
+ * All of these count across every instance (auth_rate_events).
  */
 export interface VerifyAttempt {
   /** The code was right (or the failure shouldn't count): give the reserved slot back. */
-  release(): void;
+  release(): Promise<void>;
   /** The code was wrong: the reserved slot stays as the failure; bump the durable signal. */
   fail(): Promise<void>;
 }
 
 /**
  * Reserve one code check for this caller, or null when they're over budget. The slot is
- * taken SYNCHRONOUSLY (before any await) under both `ip|…` and `email|ip` keys, so a burst
- * of parallel requests can't all pass the check before any failure is recorded. A wrong
- * code keeps the slot (it IS the failure); a right code releases it.
+ * reserved atomically across instances under the IP bucket and (email-bound) the
+ * email+IP bucket, so a burst of parallel requests, on any number of instances, can't all
+ * pass the check before any failure is recorded. A wrong code keeps the slot (it IS the
+ * failure); a right code releases it. Throws a 503 AppError (fails closed) when the
+ * rate-limit table can't be reached.
  */
 export async function reserveVerifyAttempt(ip: string | undefined, email?: string | null): Promise<VerifyAttempt | null> {
   const now = Date.now();
-  const ipKey = email ? `ip|${ip ?? '?'}` : `ipc|${ip ?? '?'}`; // code-only: own bucket
-  const emailKey = email ? `${email}|${ip ?? '?'}` : null;
+  const ipRaw = ip ?? '?';
+  const ipKey = email ? `ip|${ipRaw}` : `ipc|${ipRaw}`; // code-only: own bucket
+  const emailKey = email ? `${email}|${ipRaw}` : null;
+  const ipLimit = email ? FAIL_PER_IP : FAIL_PER_IP_CODE_ONLY;
+
+  // Fast path: this instance's own reservations already exceed a budget.
   const ipTs = recent(failLog, ipKey, now);
-  if (ipTs.length >= (email ? FAIL_PER_IP : FAIL_PER_IP_CODE_ONLY)) return null;
-  let mine = 0;
-  if (emailKey) {
-    const ts = recent(failLog, emailKey, now);
-    mine = ts.length;
-    if (mine >= FAIL_PER_EMAIL_IP) return null;
-    ts.push(now);
-  }
+  if (ipTs.length >= ipLimit) return null;
+  if (emailKey && recent(failLog, emailKey, now).length >= FAIL_PER_EMAIL_IP) return null;
+  if (isRefused(ipKey, now) || (emailKey && isRefused(emailKey, now))) return null; // DB refused recently
   ipTs.push(now);
-  const release = () => {
+  if (emailKey) recent(failLog, emailKey, now).push(now);
+  const releaseLocal = () => {
     rollback(failLog, ipKey, now);
     if (emailKey) rollback(failLog, emailKey, now);
   };
 
+  const ipBucket = email ? RATE_BUCKETS.verifyIp : RATE_BUCKETS.verifyIpCodeOnly;
+  const buckets: RateBucket[] = [{ bucket: ipBucket, key: hashRateKey(ipBucket, ipRaw), limit: ipLimit }];
+  if (email) {
+    buckets.push({
+      bucket: RATE_BUCKETS.verifyEmailIp,
+      key: hashRateKey(RATE_BUCKETS.verifyEmailIp, `${email}|${ipRaw}`),
+      limit: FAIL_PER_EMAIL_IP,
+    });
+  }
+  let res: Reservation;
+  try {
+    res = await reserveGlobal(buckets);
+  } catch (err) {
+    releaseLocal();
+    console.error('[auth-rate] verify limit check failed; refusing (fail closed):', err);
+    throw new AppError('Sign-in is temporarily unavailable. Try again in a minute.', 503, 'RATE_LIMIT_UNAVAILABLE');
+  }
+  if (!res.ids) {
+    releaseLocal();
+    cacheFullBuckets(res, buckets, emailKey ? [ipKey, emailKey] : [ipKey], now);
+    return null;
+  }
+  const ids = res.ids;
+  const release = async () => {
+    releaseLocal();
+    await releaseGlobal(ids);
+    // A slot just freed up: don't keep refusing these keys from the cache.
+    refusedUntil.delete(ipKey);
+    if (emailKey) refusedUntil.delete(emailKey);
+  };
+
+  const mine = email ? res.counts[1] : 0; // this (email, IP)'s failures, all instances
   if (email && mine >= FAIL_PER_EMAIL_IP_UNDER_ATTACK) {
     let underAttack = 0;
     try {
@@ -308,11 +464,11 @@ export async function reserveVerifyAttempt(ip: string | undefined, email?: strin
         },
       });
     } catch (err) {
-      release();
+      await release();
       throw err;
     }
     if (underAttack > 0) {
-      release();
+      await release();
       return null;
     }
   }
