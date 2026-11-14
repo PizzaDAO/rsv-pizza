@@ -1754,8 +1754,8 @@ export async function verifyRsvpEmailCode(
     if (errCode === 'CODE_EXPIRED' || errCode === 'CODE_USED') {
       throw new Error('That code has expired. Tap "Send a new code" to get another.');
     }
-    if (errCode === 'CODE_LOCKED' || response.status === 429) {
-      throw new Error('Too many wrong codes. Tap "Send a new code" to get another.');
+    if (errCode === 'VERIFY_RATE_LIMITED' || response.status === 429) {
+      throw new Error('Too many wrong codes. Try again in a few minutes.');
     }
     throw new Error("That code didn't work. Check it and try again.");
   }

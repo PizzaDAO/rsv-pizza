@@ -501,7 +501,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setStep(2);
   }, [name, email, eventData.customUrl, eventData.inviteCode]);
 
-  const submitRsvp = useCallback(async () => {
+  const submitRsvp = useCallback(async (verifiedEmail?: string) => {
     const inviteCode = eventData.customUrl || eventData.inviteCode;
     if (!inviteCode) {
       setError('Invalid invite code');
@@ -553,9 +553,12 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       if (result) {
         // Save preferences to the logged-in user's profile. /api/preferences is
         // self-only (guest-oracles), so only when the RSVP email is the user's own.
+        // invite-verify: right after the inline code step `user` in this closure is still
+        // the pre-login value, so the caller passes the just-verified email explicitly.
+        const ownerEmail = verifiedEmail ?? user?.email;
         if (
-          user?.email &&
-          email.trim().toLowerCase() === user.email.trim().toLowerCase() &&
+          ownerEmail &&
+          email.trim().toLowerCase() === ownerEmail.trim().toLowerCase() &&
           !result.alreadyRegistered
         ) {
           await saveUserPreferences(email.trim(), {
@@ -593,7 +596,11 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
         setVerificationEmail(err.email || email.trim().toLowerCase());
         setCodeError(null);
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to submit. Please try again.');
+        const msg = err instanceof Error ? err.message : 'Failed to submit. Please try again.';
+        setError(msg);
+        // If this was "Send a new code" from the code step (e.g. 429 "try again in a few
+        // minutes"), show it there too.
+        setCodeError(msg);
       }
     }
 
@@ -628,8 +635,9 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     }
     setVerifyingCode(true);
     setCodeError(null);
+    let signedIn: { id: string; email: string; name?: string | null };
     try {
-      const signedIn = await verifyRsvpEmailCode(verificationEmail, trimmed, name.trim() || undefined);
+      signedIn = await verifyRsvpEmailCode(verificationEmail, trimmed, name.trim() || undefined);
       onSignedIn?.(signedIn);
     } catch (err) {
       setCodeError(err instanceof Error ? err.message : "That code didn't work. Try again.");
@@ -638,7 +646,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     }
     setVerificationEmail(null);
     setVerifyingCode(false);
-    await submitRsvp();
+    await submitRsvp(signedIn.email);
     return true;
   }, [verificationEmail, name, submitRsvp]);
 

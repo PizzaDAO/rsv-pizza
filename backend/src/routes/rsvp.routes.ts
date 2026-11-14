@@ -8,7 +8,7 @@ import { verifySecret } from '../lib/secretHash.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
 import { signGuestToken, verifyGuestToken, guestTokenFromRequest, callerOwnsGuest } from '../lib/guestToken.js';
-import { issueLoginCode, takeRsvpCodeSend } from '../lib/loginCode.js';
+import { issueLoginCode, takeCodeSend } from '../lib/loginCode.js';
 
 /**
  * invite-verify: the RSVP endpoint's answer when the submitted email is already on the
@@ -552,6 +552,67 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       message,
     });
 
+    // Side effects of a FIRST RSVP: a brand-new guest, and (invite-verify) a host invite
+    // completed by its invitee. Both paths call these, so they get the same wallet and the
+    // same confirmation / pending-approval / waitlist email (template, sender, site brand).
+    const provisionWalletIfNeeded = async (guestId: string) => {
+      if (normalizedAddress || !email?.trim()) return;
+      try {
+        const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
+        if (walletResult) {
+          await prisma.guest.update({
+            where: { id: guestId },
+            data: {
+              ethereumAddress: walletResult.walletAddress.toLowerCase(),
+              privyUserId: walletResult.privyUserId,
+              walletSource: 'privy-embedded',
+            },
+          });
+          console.log(`Privy embedded wallet provisioned for guest ${guestId}: ${walletResult.walletAddress.toLowerCase()}`);
+        }
+      } catch (privyError) {
+        // Non-fatal: RSVP succeeds even if Privy provisioning fails
+        console.error('Privy wallet provisioning failed (non-fatal):', privyError);
+      }
+    };
+    const sendNewRsvpEmail = async (guestId: string) => {
+      if (!email?.trim()) return;
+      try {
+        if (isAtCapacity) {
+          await sendWaitlistConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            guestId,
+            partyName: party.name,
+            partyDate: party.date,
+            partyTimezone: party.timezone,
+            waitlistPosition: waitlistPosition!,
+            inviteCode,
+            customUrl: party.customUrl,
+            eventSeriesId: party.eventSeriesId,
+          });
+        } else {
+          await sendRSVPConfirmationEmail({
+            guestEmail: email.trim(),
+            guestName: name.trim(),
+            guestId,
+            partyName: party.name,
+            partyDate: party.date,
+            partyTimezone: party.timezone,
+            partyAddress: party.address,
+            partyImageUrl: party.eventImageUrl,
+            inviteCode,
+            customUrl: party.customUrl,
+            requireApproval: party.requireApproval,
+            eventSeriesId: party.eventSeriesId,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the RSVP if email fails
+      }
+    };
+
     const updateData = (existing: { status: string; submittedVia: string }) => ({
       name: name.trim(),
       ethereumAddress: normalizedAddress || null,
@@ -618,6 +679,30 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
             });
           }
 
+          // A host invite (INVITED, never RSVP'd) completed by its invitee is their first
+          // RSVP. The update is conditional on the row still being INVITED, so exactly one
+          // request completes it (a concurrent duplicate falls through to a plain update).
+          // That one gets everything a brand-new RSVP gets: the same wallet provisioning and
+          // confirmation / pending / waitlist email, and the new-RSVP response shape.
+          if (existingGuest.status === 'INVITED') {
+            let completed: Awaited<ReturnType<typeof prisma.guest.update>> | null = null;
+            try {
+              completed = await prisma.guest.update({
+                where: { id: existingGuest.id, status: 'INVITED' },
+                data: updateData(existingGuest),
+              });
+            } catch (e) {
+              if ((e as { code?: string } | null)?.code !== 'P2025') throw e;
+            }
+            if (completed) {
+              await provisionWalletIfNeeded(completed.id);
+              await triggerWebhook('guest.updated', { guest: completed, partyId: party.id }, party.userId!);
+              await sendNewRsvpEmail(completed.id);
+              return res.status(201).json(newRsvpResponse(completed.id));
+            }
+            existingGuest.status = 'CONFIRMED'; // lost the race: someone else completed it
+          }
+
           const updatedGuest = await prisma.guest.update({
             where: { id: existingGuest.id },
             data: updateData(existingGuest),
@@ -625,12 +710,6 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
 
           // Trigger webhook for guest update (using party owner's webhooks)
           await triggerWebhook('guest.updated', { guest: updatedGuest, partyId: party.id }, party.userId!);
-
-          // A host invite (INVITED, never RSVP'd) completed by its invitee is their first
-          // RSVP: answer like a new RSVP (status, waitlist position, message).
-          if (existingGuest.status === 'INVITED') {
-            return res.status(201).json(newRsvpResponse(updatedGuest.id));
-          }
 
           return res.status(200).json({
             success: true,
@@ -656,15 +735,18 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
         // kind the email has. It does say "this email is on the party" (a new email gets an
         // instant 201); see the PR notes for why that is accepted: the same fact already
         // leaks through the public guest count, and every probe now emails the address
-        // owner. Sends are rate-limited per email+IP and per email; a limited request gets
-        // the same 202 and no email (an earlier code stays valid for 15 minutes).
+        // owner. Sends share /api/auth/magic-link's budget, charged to the requester
+        // (email + IP; see lib/loginCode.ts takeCodeSend). An over-budget requester gets 429
+        // "try again in a few minutes": that only follows a 202 this caller could already
+        // get, so it adds no membership information, and it's the same for every row kind.
         if (req.body?.codeStep === true) {
+          if (!(await takeCodeSend(normalizedEmail, req.ip))) {
+            throw new AppError('Too many codes requested for this email. Try again in a few minutes.', 429, 'CODE_SEND_LIMIT');
+          }
           try {
-            if (await takeRsvpCodeSend(normalizedEmail, req.ip)) {
-              const codeUser = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
-              const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
-              await issueLoginCode(normalizedEmail, site, codeUser?.id);
-            }
+            const codeUser = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+            const site = await siteForParty(party, 'https://rsv.pizza'); // brand-check-ignore-line
+            await issueLoginCode(normalizedEmail, site, codeUser?.id);
           } catch (codeErr) {
             console.error('RSVP code step: failed to issue sign-in code:', codeErr);
           }
@@ -713,25 +795,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     });
 
     // Auto-provision Privy embedded wallet if no wallet address was provided and email exists
-    if (!normalizedAddress && email?.trim()) {
-      try {
-        const walletResult = await createEmbeddedWalletForGuest(email.trim().toLowerCase(), name.trim());
-        if (walletResult) {
-          await prisma.guest.update({
-            where: { id: guest.id },
-            data: {
-              ethereumAddress: walletResult.walletAddress.toLowerCase(),
-              privyUserId: walletResult.privyUserId,
-              walletSource: 'privy-embedded',
-            },
-          });
-          console.log(`Privy embedded wallet provisioned for guest ${guest.id}: ${walletResult.walletAddress.toLowerCase()}`);
-        }
-      } catch (privyError) {
-        // Non-fatal: RSVP succeeds even if Privy provisioning fails
-        console.error('Privy wallet provisioning failed (non-fatal):', privyError);
-      }
-    }
+    await provisionWalletIfNeeded(guest.id);
 
     // Trigger webhook for guest registration or waitlist (using party owner's webhooks)
     if (isAtCapacity) {
@@ -741,42 +805,7 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
     }
 
     // Send appropriate email if email provided
-    if (email?.trim()) {
-      try {
-        if (isAtCapacity) {
-          await sendWaitlistConfirmationEmail({
-            guestEmail: email.trim(),
-            guestName: name.trim(),
-            guestId: guest.id,
-            partyName: party.name,
-            partyDate: party.date,
-            partyTimezone: party.timezone,
-            waitlistPosition: waitlistPosition!,
-            inviteCode,
-            customUrl: party.customUrl,
-            eventSeriesId: party.eventSeriesId,
-          });
-        } else {
-          await sendRSVPConfirmationEmail({
-            guestEmail: email.trim(),
-            guestName: name.trim(),
-            guestId: guest.id,
-            partyName: party.name,
-            partyDate: party.date,
-            partyTimezone: party.timezone,
-            partyAddress: party.address,
-            partyImageUrl: party.eventImageUrl,
-            inviteCode,
-            customUrl: party.customUrl,
-            requireApproval: party.requireApproval,
-            eventSeriesId: party.eventSeriesId,
-          });
-        }
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the RSVP if email fails
-      }
-    }
+    await sendNewRsvpEmail(guest.id);
 
     res.status(201).json(newRsvpResponse(guest.id));
   } catch (error) {

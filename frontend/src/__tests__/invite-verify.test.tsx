@@ -129,7 +129,7 @@ describe('addGuestToParty / verifyRsvpEmailCode', () => {
   it.each([
     ['INVALID_CODE', 401, /didn't work/],
     ['CODE_EXPIRED', 401, /expired/],
-    ['CODE_LOCKED', 429, /Too many wrong codes/],
+    ['VERIFY_RATE_LIMITED', 429, /Try again in a few minutes/],
   ])('%s: friendly error, no session stored', async (code, status, msg) => {
     fetchMock.mockResolvedValueOnce(json(status, { error: { code } }));
     await expect(verifyRsvpEmailCode('ivy@example.com', '000000')).rejects.toThrow(msg);
@@ -186,6 +186,21 @@ describe('inline code step in the RSVP form', () => {
     expect(((calls[1][1] as RequestInit).headers as Record<string, string>).Authorization).toBe('Bearer jwt-ivy');
     expect(bodyOf(calls[1])).toEqual(bodyOf(calls[0]));
     expect(formRef.guestToken).toBe('tok-ivy');
+    // Stale-closure fix: the re-submit knows the just-verified email, so the
+    // save-preferences-to-profile step runs as the new login.
+    const prefs = fetchMock.mock.calls.find(([url]) => String(url).includes('/api/preferences'));
+    expect(prefs).toBeTruthy();
+    expect(((prefs![1] as RequestInit).headers as Record<string, string>).Authorization).toBe('Bearer jwt-ivy');
+    expect(bodyOf(prefs!).email).toBe('Ivy@Example.com');
+  });
+
+  it('a 429 on "Send a new code" shows "try again in a few minutes" in the code step', async () => {
+    await submitForm();
+    fetchMock.mockResolvedValueOnce(json(429, { error: { code: 'CODE_SEND_LIMIT', message: 'Too many codes requested for this email. Try again in a few minutes.' } }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Send a new code' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Try again in a few minutes/));
+    expect(screen.getByTestId('rsvp-code-step')).toBeInTheDocument();
   });
 
   it('a wrong code shows an error, keeps the code step, and does not re-submit', async () => {

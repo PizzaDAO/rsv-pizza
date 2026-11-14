@@ -5,7 +5,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
 import { siteForOrigin } from '../lib/siteBrand.js';
-import { issueLoginCode, recordFailedCodeAttempt } from '../lib/loginCode.js';
+import { issueLoginCode, takeCodeSend, verifyAllowed, recordFailedCode } from '../lib/loginCode.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
@@ -40,6 +40,12 @@ router.post('/magic-link', async (req: Request, res: Response, next: NextFunctio
     const site = await siteForOrigin(req.get('origin'), process.env.FRONTEND_URL || 'http://localhost:5176');
     // invite-verify: code creation + the sign-in email live in lib/loginCode.ts so the RSVP
     // form's inline code step sends exactly this email (no new email type).
+    // invite-verify (security review): per-email send limit, shared with the RSVP code step
+    // and charged to the requester (email + IP), so someone spamming this address can't use
+    // up the owner's own allowance. Not an oracle: any address can request a code.
+    if (!(await takeCodeSend(normalized, req.ip))) {
+      throw new AppError('Too many codes requested for this email. Try again in a few minutes.', 429, 'CODE_SEND_LIMIT');
+    }
     const { magicLinkUrl } = await issueLoginCode(normalized, site, user?.id);
 
     // Check if user is new (no name set)
@@ -242,46 +248,52 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       throw new AppError('Invalid code format', 400, 'INVALID_FORMAT');
     }
 
+    // invite-verify: callers that know which email the code was sent to (the RSVP form's
+    // inline code step) pass `email`. The code must then belong to that email; a code that
+    // exists for some OTHER email gets the same INVALID_CODE as a code that doesn't exist.
+    let boundEmail: string | null = null;
+    if (req.body?.email !== undefined) {
+      boundEmail = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : null;
+      if (!boundEmail) {
+        throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    // invite-verify (security review): brute-force budget, charged to the CALLER (IP, and
+    // email+IP when bound), checked before the lookup so a refused caller learns nothing.
+    // Wrong guesses never lock the stored codes, so nobody can lock the owner out.
+    // See lib/loginCode.ts for the limits and the PR for the math.
+    if (!(await verifyAllowed(req.ip, boundEmail))) {
+      throw new AppError('Too many wrong codes. Try again in a few minutes.', 429, 'VERIFY_RATE_LIMITED');
+    }
+    const fail = async (message: string, status: number, errCode: string): Promise<never> => {
+      await recordFailedCode(req.ip, boundEmail);
+      throw new AppError(message, status, errCode);
+    };
+
     // Find magic link by code
     const magicLink = await prisma.magicLink.findUnique({
       where: { code },
       include: { user: true },
     });
 
-    // invite-verify: callers that know which email the code was sent to (the RSVP form's
-    // inline code step) pass `email`. The code must then belong to that email; a code that
-    // exists for some OTHER email gets the same INVALID_CODE as a code that doesn't exist.
-    // Wrong guesses count against that email's live codes and lock them after
-    // MAX_CODE_ATTEMPTS (existing attempts/locked_at columns), so a code sent to a known
-    // email can't be brute-forced. Callers that send only `code` behave exactly as before.
-    if (req.body?.email !== undefined) {
-      const boundEmail = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : null;
-      if (!boundEmail) {
-        throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
-      }
-      if (!magicLink || normalizeEmail(magicLink.email) !== boundEmail) {
-        await recordFailedCodeAttempt(boundEmail);
-        throw new AppError('Invalid code', 401, 'INVALID_CODE');
-      }
+    if (!magicLink || (boundEmail && normalizeEmail(magicLink.email) !== boundEmail)) {
+      return await fail('Invalid code', 401, 'INVALID_CODE');
     }
 
-    if (!magicLink) {
-      throw new AppError('Invalid code', 401, 'INVALID_CODE');
-    }
-
-    // Check if locked due to too many attempts
+    // Legacy: rows locked by an older build. Nothing sets locked_at any more.
     if (magicLink.lockedAt) {
-      throw new AppError('Code locked due to too many failed attempts', 429, 'CODE_LOCKED');
+      return await fail('Code locked due to too many failed attempts', 429, 'CODE_LOCKED');
     }
 
     // Check if expired
     if (magicLink.expiresAt < new Date()) {
-      throw new AppError('Code expired', 401, 'CODE_EXPIRED');
+      return await fail('Code expired', 401, 'CODE_EXPIRED');
     }
 
     // Check if already used
     if (magicLink.used) {
-      throw new AppError('Code already used', 401, 'CODE_USED');
+      return await fail('Code already used', 401, 'CODE_USED');
     }
 
     // Mark as used

@@ -74,6 +74,34 @@ export async function issueLoginCode(
   site: SiteBrand,
   userId?: string | null,
 ): Promise<{ magicLinkUrl: string }> {
+  // Security review: cap how many DIFFERENT codes can be live for one email. Every live code
+  // is another target for a guesser, so once MINT_PER_EMAIL_WINDOW codes were created for this
+  // email in the last 15 minutes, re-send the newest still-usable one instead of minting a
+  // new one. The requester still gets a working code (no denial of service), but an attacker
+  // can't multiply the victim's live codes by requesting from many IPs.
+  const now = new Date();
+  const recentMints = await prisma.magicLink.count({
+    where: { email, createdAt: { gte: new Date(now.getTime() - LIMIT_WINDOW_MS) } },
+  });
+  if (recentMints >= MINT_PER_EMAIL_WINDOW) {
+    const live = await prisma.magicLink.findFirst({
+      where: { email, used: false, lockedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (live) {
+      const liveUrl = `${site.url}/auth/verify?token=${live.token}`;
+      const key = process.env.RESEND_API_KEY;
+      if (key) {
+        try {
+          await sendMagicLinkEmail(email, liveUrl, live.code, key, site);
+        } catch (emailError) {
+          console.error('Failed to send magic link email:', emailError);
+        }
+      }
+      return { magicLinkUrl: liveUrl };
+    }
+  }
+
   // Generate secure token
   const token = randomBytes(32).toString('hex');
 
@@ -124,75 +152,134 @@ export async function issueLoginCode(
   return { magicLinkUrl };
 }
 
-// ---- RSVP code-step send limits -------------------------------------------------------
+// ---- Limits ---------------------------------------------------------------------------
 //
-// The RSVP code step emails an address the CALLER typed, so it must not become a way to
-// spam someone's inbox. Two limits, both silent (the RSVP response is the same whether or
-// not a code went out; an earlier code stays valid for 15 minutes):
-//   - per email + IP: RSVP_CODE_PER_EMAIL_IP sends per RSVP_CODE_WINDOW_MS (in memory,
-//     like the express-rate-limit limiters in index.ts);
-//   - per email, any IP: no send when RSVP_CODE_PER_EMAIL_HOUR or more sign-in codes (of
-//     any origin) were created for it in the last hour. Counted from magic_links, so it
-//     holds across instances and restarts.
+// Design rule (security review of #1253): nothing an attacker does may lock or exhaust the
+// VICTIM's own ability to get or use a code. So every budget is charged to the CALLER
+// (email + IP, or IP), never to the stored code rows. Per-email budgets only tighten what
+// each caller gets; they never refuse a caller who hasn't used their own share.
+//
+// Counters keyed by IP live in memory (like the express-rate-limit limiters in index.ts),
+// so on a serverless deploy each warm instance keeps its own; per-email signals are counted
+// from magic_links, so they hold across instances.
 
-export const RSVP_CODE_PER_EMAIL_IP = 3;
-export const RSVP_CODE_WINDOW_MS = 15 * 60 * 1000;
-export const RSVP_CODE_PER_EMAIL_HOUR = 6;
+export const LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
-const emailIpSends = new Map<string, number[]>();
+/** At most this many distinct codes minted per email per 15 min (= code lifetime); then re-send. */
+export const MINT_PER_EMAIL_WINDOW = 3;
+
+/** Sign-in code sends (POST /api/auth/magic-link and the RSVP code step share these). */
+export const SEND_PER_EMAIL_IP = 3; // per (email, IP) per 15 min
+export const SEND_PER_EMAIL_HOUR = 10; // per email, any IP; above it each (email, IP) gets 1 per 15 min
+
+/** Wrong codes at POST /api/auth/verify-code. */
+export const FAIL_PER_IP = 10; // per IP per 15 min, both code-only and email-bound checks
+export const FAIL_PER_EMAIL_IP = 5; // per (email, IP) per 15 min, email-bound checks
+export const EMAIL_UNDER_ATTACK_FAILS = 25; // wrong codes on an email's live codes, any IP
+export const FAIL_PER_EMAIL_IP_UNDER_ATTACK = 1; // per (email, IP) once the email is under attack
+
+const sendLog = new Map<string, number[]>(); // `${email}|${ip}` -> send times
+const failLog = new Map<string, number[]>(); // `ip|${ip}` and `${email}|${ip}` -> failure times
 
 /** Test hook. */
-export function resetRsvpCodeLimits(): void {
-  emailIpSends.clear();
+export function resetCodeLimits(): void {
+  sendLog.clear();
+  failLog.clear();
+}
+
+function recent(map: Map<string, number[]>, key: string, now: number): number[] {
+  const ts = (map.get(key) ?? []).filter((t) => now - t < LIMIT_WINDOW_MS);
+  map.set(key, ts);
+  if (map.size > 20_000) {
+    for (const [k, v] of map) if (!v.some((t) => now - t < LIMIT_WINDOW_MS)) map.delete(k);
+  }
+  return ts;
 }
 
 /**
- * True (and the send is counted) when another RSVP code may be sent to `email` for a
- * request from `ip`. False means: send nothing, but answer exactly as if one was sent.
+ * Reserve one sign-in code send to `email` for a caller at `ip`. Returns false (nothing
+ * reserved) when this caller is over budget:
+ *   - SEND_PER_EMAIL_IP per 15 min for this (email, IP);
+ *   - when the email already had SEND_PER_EMAIL_HOUR codes in the last hour (anyone's
+ *     requests, from magic_links), only a caller with NO send in the last 15 min gets one.
+ * So an attacker spamming the address from a few IPs is capped at about one email per IP
+ * per 15 min, and the real owner (whose IP hasn't asked) still gets their code.
+ *
+ * The reservation is taken synchronously before the DB await and rolled back if the DB
+ * check refuses, so concurrent requests can't all pass the in-memory check at once.
  */
-export async function takeRsvpCodeSend(email: string, ip: string | undefined): Promise<boolean> {
+export async function takeCodeSend(email: string, ip: string | undefined): Promise<boolean> {
   const now = Date.now();
   const key = `${email}|${ip ?? '?'}`;
-  const recent = (emailIpSends.get(key) ?? []).filter((t) => now - t < RSVP_CODE_WINDOW_MS);
-  if (recent.length >= RSVP_CODE_PER_EMAIL_IP) {
-    emailIpSends.set(key, recent);
-    return false;
+  const ts = recent(sendLog, key, now);
+  if (ts.length >= SEND_PER_EMAIL_IP) return false;
+  const hadRecentSend = ts.length > 0;
+  ts.push(now); // reserve before awaiting
+  let lastHour: number;
+  try {
+    lastHour = await prisma.magicLink.count({
+      where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) } },
+    });
+  } catch (err) {
+    rollback(sendLog, key, now);
+    throw err;
   }
-  const lastHour = await prisma.magicLink.count({
-    where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) } },
-  });
-  if (lastHour >= RSVP_CODE_PER_EMAIL_HOUR) {
-    emailIpSends.set(key, recent);
+  if (lastHour >= SEND_PER_EMAIL_HOUR && hadRecentSend) {
+    rollback(sendLog, key, now);
     return false;
-  }
-  recent.push(now);
-  emailIpSends.set(key, recent);
-  // Keep the map bounded: drop stale keys now and then.
-  if (emailIpSends.size > 10_000) {
-    for (const [k, ts] of emailIpSends) {
-      if (!ts.some((t) => now - t < RSVP_CODE_WINDOW_MS)) emailIpSends.delete(k);
-    }
   }
   return true;
 }
 
-// ---- Email-bound verification lockout -------------------------------------------------
-
-/** Wrong codes allowed for one email before its outstanding codes lock. */
-export const MAX_CODE_ATTEMPTS = 5;
+function rollback(map: Map<string, number[]>, key: string, stamp: number) {
+  const ts = map.get(key);
+  if (!ts) return;
+  const i = ts.lastIndexOf(stamp);
+  if (i >= 0) ts.splice(i, 1);
+}
 
 /**
- * A wrong code was entered for `email` (email-bound /verify-code). Count it on that email's
- * live codes and lock them at MAX_CODE_ATTEMPTS, using the existing magic_links
- * `attempts` / `locked_at` columns (no migration). Without this, a 6-digit code for a known
- * email could be brute-forced in its 15 minutes. Requesting a new code starts fresh.
+ * May this caller try a code now? Checked BEFORE the code is looked up, so a refused
+ * caller learns nothing about whether their guess was right. Refuses only this caller:
+ *   - FAIL_PER_IP wrong codes from this IP in 15 min (any email, either path);
+ *   - for an email-bound check, FAIL_PER_EMAIL_IP wrong codes for this (email, IP), or
+ *     just FAIL_PER_EMAIL_IP_UNDER_ATTACK once the email's live codes have collected
+ *     EMAIL_UNDER_ATTACK_FAILS wrong guesses from anyone. A caller with no failures of
+ *     their own (e.g. the real owner, from their own IP) is never refused by that.
  */
-export async function recordFailedCodeAttempt(email: string): Promise<void> {
-  const now = new Date();
-  const live = { email, used: false, lockedAt: null, expiresAt: { gt: now } };
-  await prisma.magicLink.updateMany({ where: live, data: { attempts: { increment: 1 } } });
+export async function verifyAllowed(ip: string | undefined, email?: string | null): Promise<boolean> {
+  const now = Date.now();
+  if (recent(failLog, `ip|${ip ?? '?'}`, now).length >= FAIL_PER_IP) return false;
+  if (!email) return true;
+  const mine = recent(failLog, `${email}|${ip ?? '?'}`, now).length;
+  if (mine >= FAIL_PER_EMAIL_IP) return false;
+  if (mine >= FAIL_PER_EMAIL_IP_UNDER_ATTACK) {
+    const underAttack = await prisma.magicLink.count({
+      where: {
+        email,
+        used: false,
+        expiresAt: { gt: new Date(now) },
+        attempts: { gte: EMAIL_UNDER_ATTACK_FAILS },
+      },
+    });
+    if (underAttack > 0) return false;
+  }
+  return true;
+}
+
+/**
+ * A wrong code was entered. Charged to the caller (IP, and email+IP when bound). For an
+ * email-bound check it also bumps `attempts` on that email's live codes as a cross-instance
+ * "under attack" signal. It NEVER sets locked_at or otherwise disables the codes, so wrong
+ * guesses can't lock the owner out.
+ */
+export async function recordFailedCode(ip: string | undefined, email?: string | null): Promise<void> {
+  const now = Date.now();
+  recent(failLog, `ip|${ip ?? '?'}`, now).push(now);
+  if (!email) return;
+  recent(failLog, `${email}|${ip ?? '?'}`, now).push(now);
   await prisma.magicLink.updateMany({
-    where: { ...live, attempts: { gte: MAX_CODE_ATTEMPTS } },
-    data: { lockedAt: now },
+    where: { email, used: false, expiresAt: { gt: new Date(now) } },
+    data: { attempts: { increment: 1 } },
   });
 }
