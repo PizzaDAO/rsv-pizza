@@ -7,23 +7,14 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P1 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment |
-| diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | doing | P2 |  |  |  |  |  |  |
-| napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | doing | P2 |  |  |  |  |  |  |
-| sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | doing | P2 |  |  |  |  |  |  |
+| pepperoni-71203 | Upgrade wallet stack: wagmi 2→3 + @wagmi/connectors 5→8 (security advisories) | todo | P3 |  |  | security, deps | plans/pepperoni-71203-wagmi-3-migration.md |  | Replaces closed Dependabot #1127; see #1131 deferred-majors comment 2026-11-14: plan rewritten after #1252/#1255 — advisories unreachable in prod; replace ConnectKit with own picker (approved), then wagmi 3; wait a few days for wallet changes to settle |
 | artichoke-46566 | Dedupe co-host entries in HostsList by name to prevent duplicate render | doing | P2 |  |  |  |  |  |  |
-| blackolive-76568 | Add Google Maps geocoding fallback in VenueMap when Nominatim returns no results (e.g. Chinese addresses like Shenzhen) | doing | P2 |  |  |  |  |  |  |
-| deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | stuck | P1 |  |  |  |  |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that |
-| sicilian-47246 | Partner timeseries chart visible to all partners (not just admin) | stuck | P2 |  |  |  |  |  | 2026-05-17: PR #363 merged (89d55344). Backend deploy from master-deploy worktree. |
-| sausage-24183 | Bulk-DM hosts via Telegram bot in TelegramBroadcast modal (add Recipients: Groups \| Hosts \| Both toggle; hosts opt-in via /start deeplink stored on parties.host_telegram_chat_id; new webhook route + host-broadcast route) | todo | P1 |  |  |  |  |  | 2026-05-17: PR 336 (backend) + PR 341 (frontend) merged. Backend deployed to api.rsv.pizza. Telegram webhook live on @MoltoBeneBot. Smoke tests passed. |
 | capers-35682 | Global Pizza Party Tech | todo | P1 |  |  |  |  |  |  |
-| basil-14648 | AI ordering | todo | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md |
+| basil-14648 | AI ordering | doing | P1 |  |  |  |  |  | 2026-10-29: plan approved — order via pizza-mcp (OPOP) + Bland outbound calls for non-Open-Pizza shops; see openpizza/plans/rsv-pizza-ordering.md P1 shipped in #1172 (behind flag); Bland calls outstanding |
 | spinach-56405 | X/Twitter social proof — cache rsv.pizza tweets, display oEmbeds, OCR impression counts for sponsor reports | todo | P2 |  |  |  |  |  |  |
 | neapolitan-48814 | Create Invoice, Receipt, and Media tabs on RSV.Pizza Profiles (could make specific host ones or make this available for the general public) | todo | P2 |  |  |  |  |  |  |
-| onion-42535 | iphone 8 couldn't load page | todo | P2 |  |  |  |  |  |  |
 | basil-48766 | Create template for gpp hosts | todo | P2 |  |  |  |  |  |  |
-| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  |  |  |  |
-| crust-36834 | Checklist Widget | todo | P2 |  |  |  |  |  |  |
+| neapolitan-93690 | Print Widget: Nametag Widget, Table Tent Widget | todo | P2 |  |  |  |  |  | print/stickers app shipped in #228; nametag/table-tent widgets not built |
 | blackolive-70521 | add event tags | todo | P2 |  |  |  |  |  |  |
 | brick-oven-18875 | square image doesn't accept other kinds of images | todo | P2 |  |  |  |  |  |  |
 | sicilian-41954 | expanding the description field is laggy feeling | todo | P2 |  |  |  |  |  |  |
@@ -41,7 +32,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | romana-81700 | add merch checkout to rsvp | todo | P3 |  |  |  |  |  |  |
 | slice-73229 | add bitcoin donation support | todo | P3 |  |  |  |  |  |  |
 | stuffed-crust-59974 | https://cerebralvalley.com/who-attends | todo | P3 |  |  |  |  |  |  |
-| stromboli-75934 | Selecting vegetarian or vegan should not allow to select meat options | todo | P3 |  |  |  |  |  |  |
 | garlic-68655 | https://cerebralvalley.ai/e/nano-banana?tab=guest-list | todo | P3 |  |  |  |  |  |  |
 | artichoke-64688 | privy wallet for users | todo | P3 |  |  |  |  |  |  |
 | prosciutto-51652 | pay out on attendance to promoters | todo | P3 |  |  |  |  |  |  |
@@ -83,6 +73,16 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 ## Done
 
 | ID | Task | Priority | Done | PR | Notes |
+| deep-dish-99851 | 3D Secure + Stablecoin Payments - enforce 3DS on card payments and add crypto payment option to reduce chargeback risk | P1 | 2026-11-14 |  | 2026-10-29: superseded for ordering by openpizza/plans/rsv-pizza-ordering.md (host pays at pickup, reimbursed); PR #164 not needed for that skipped: superseded by openpizza/plans/rsv-pizza-ordering.md (2026-10-29); PR #164 closed |
+| blackolive-76568 | Add Google Maps geocoding fallback in VenueMap when Nominatim returns no results (e.g. Chinese addresses like Shenzhen) | P2 | 2026-11-14 |  | skipped: Nominatim already resolves 203/204 venues; PR #273 closed |
+| onion-42535 | iphone 8 couldn't load page | P2 | 2026-10-29 |  | duplicate of forno-81402 (#1164) |
+| stromboli-75934 | Selecting vegetarian or vegan should not allow to select meat options | P3 | 2026-03-18 | #76 |  |
+| crust-36834 | Checklist Widget | P2 | 2026-03-05 | #42 |  |
+| sicilian-47246 | Partner timeseries chart visible to all partners (not just admin) | P2 | 2026-05-17 | #363 | 2026-05-17: PR #363 merged (89d55344). Backend deploy from master-deploy worktree. |
+| sausage-24183 | Bulk-DM hosts via Telegram bot in TelegramBroadcast modal (add Recipients: Groups \| Hosts \| Both toggle; hosts opt-in via /start deeplink stored on parties.host_telegram_chat_id; new webhook route + host-broadcast route) | P1 | 2026-05-17 | #336, #341 | 2026-05-17: PR 336 (backend) + PR 341 (frontend) merged. Backend deployed to api.rsv.pizza. Telegram webhook live on @MoltoBeneBot. Smoke tests passed. |
+| napoletana-31578 | Backfill missing lat/lng on 203 GPP events (Nominatim + Google fallback) | P2 | 2026-05-15 |  | geocode backfill run directly 2026-05-15 (203/204), see closed PR #273 |
+| sausage-94261 | GPP 2026 events map at /map (public, like /pizzerias but for events; Molto Benny BTC pins) | P2 | 2026-05-16 | #280, #314, #319 | /map made public via #325 |
+| diavola-10148 | Replace cohost avatar URL field with file upload, switch X auto-fill to fxtwitter+Supabase | P2 | 2026-05-17 | #286, #303, #375 | follow-ups #303, #375 |
 |----|------|----------|------|----|-------|
 | bellpepper-36121 | Create a verification tool for approved gpp cities rsvp page | P1 | 2026-10-30 | #1166 | Verification tab on /underboss; daily failure email is a follow-up |
 | funghi-91314 | Pull photos from Rsv.pizza host pages and upload it to Sauce to be played during the livestream. | P1 | 2026-10-29 | #1163 | 2026-10-29: back/pause/next on /photos/play; Sauce integration still open (need repo) |
@@ -103,15 +103,15 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | mushroom-35437 | Mandatory wallet address on RSVP with MetaMask setup modal | P1 | 2026-10-07 |  | Archived: draft #187 stale vs current RSVPModal flow |
 | funghi-72623 | Geolocation check-in button on event page | P1 | 2026-10-07 | #175 | Shipped as QR peer-attestation check-in instead of GPS |
 | stuffed-crust-61855 | Best Version, Best Version Code | P1 |  |  |  |
-| 1710 | First Bolt Version | P2 |  |  |  |
-| truffle-90229 | Rejected-event dashboard button: rename 'List My Event' to 'List My Event Without Funding' | P3 |  |  | skipped. asdasd |
+| 1710 | First Bolt Version | P2 |  |  | legacy import, no task id |
+| truffle-90229 | Rejected-event dashboard button: rename 'List My Event' to 'List My Event Without Funding' | P3 |  |  | skipped |
 | romana-27987 | Hotfix: commit missing sponsor translations (ownTheDoge, swcEu) for all 6 locales | P3 |  |  | 2026-05-13: Direct push to master (commit 98e0502). Adds ownTheDoge + swcEu translation keys to all 6 event.json locales. Waiting on Vercel auto-deploy to verify. |
-| ricotta-47513 | rollup download: sponsor logos sized larger than preview | P1 |  |  | 2026-05-17: Merged in PR #379 (master @ 45780d02). |
-| deep-dish-56614 | Strip form defaults from field signatures in fake-detection sig_collapse heuristic (anchovies-default bug inflates current scores) | P1 |  |  | 2026-05-17: Phase 1 merged via #380. Migration applied. Phase 2 (useRSVPForm.ts gate on parmesan branch) in flight.<br>2026-05-18: Cancelled: superseded by calzone-75655 replacing sig_collapse with LSH (LSH tolerates 1-2 bit Hamming diffs, so anchovies-default no longer inflates scores) |
+| ricotta-47513 | rollup download: sponsor logos sized larger than preview | P1 | 2026-05-17 | #379 | 2026-05-17: Merged in PR #379 (master @ 45780d02). |
+| deep-dish-56614 | Strip form defaults from field signatures in fake-detection sig_collapse heuristic (anchovies-default bug inflates current scores) | P1 | 2026-05-18 | #380 | 2026-05-17: Phase 1 merged via #380. Migration applied. Phase 2 (useRSVPForm.ts gate on parmesan branch) in flight.<br>2026-05-18: Cancelled: superseded by calzone-75655 replacing sig_collapse with LSH (LSH tolerates 1-2 bit Hamming diffs, so anchovies-default no longer inflates scores) |
 | basil-43499 | Add Twitter-handle existence fake-detection heuristic (#17): verify co_hosts twitter handles resolve via fxtwitter; flag events with non-existent handles | P1 |  |  |  |
 | calzone-75655 | Add 4 statistical fake-detection heuristics: opt-in extremes (#3), name-token frequency z-score (#9), LSH field-signature clusters (#21), Benford's Law on email digit suffixes (#22) | P1 |  |  |  |
 | stromboli-14555 | Add funnel-coverage + per-visitor saturation heuristics to fake-detection scorer (uses existing visitor_hash on rsvp_funnel_events; catches Naivasha/Ilemela-class evasion of the public form) | P1 |  |  |  |
-| woodfired-98150 | rollup banner download fails (canvas too large) | P1 |  |  | 2026-05-17: Merged in PR #370 (master @ 79290294). |
+| woodfired-98150 | rollup banner download fails (canvas too large) | P1 | 2026-05-17 | #370 | 2026-05-17: Merged in PR #370 (master @ 79290294). |
 | arugula-94548 | Inline approve/reject actions in /underboss Fake Detection table (currently read-only) | P1 |  |  |  |
 | deep-dish-19925 | Restrict /underboss Fake Detection tab + endpoint to admins only (currently accessible to all underbosses) | P1 |  |  |  |
 | mozzarella-36112 | Partner dashboard: 'All tags' shows 624 events instead of GPP-only - add eventType filter to admin no-tag branch in sponsor /events route | P1 |  |  | 2026-05-17: Merged PR #353. Backend deployed to prod (api.rsv.pizza). Admin 'All tags' on /partner now scopes to GPP events only. |
