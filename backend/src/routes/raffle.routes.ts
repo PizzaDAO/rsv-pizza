@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
-import { callerOwnsGuest } from '../lib/guestToken.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 import { AppError } from '../middleware/error.js';
 import { canUserEditParty, canUserAccessTab } from '../helpers/partyAccess.js';
 
@@ -351,6 +351,10 @@ router.post('/:partyId/raffles/:raffleId/enter', optionalAuth, async (req: AuthR
 
     if (!guestId) {
       throw new AppError('Guest ID is required', 400, 'VALIDATION_ERROR');
+    }
+    // Malformed ids get the same 404 as an unknown guest (not a Prisma 500).
+    if (!isUuid(guestId) || !isUuid(partyId) || !isUuid(raffleId)) {
+      throw new AppError('Guest not found for this party', 404, 'GUEST_NOT_FOUND');
     }
 
     // porchetta-81402: cancelled events are read-only.

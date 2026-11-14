@@ -86,6 +86,15 @@ export function RSVPModal({ isOpen, onClose, event, existingGuest, onRSVPSuccess
           }
         }
       } catch (err) {
+        // rsvp-overwrite-fix: a 404 means "no mint for this RSVP" (e.g. the email was already
+        // on the list and the backend answered with a stand-in id, or the event has no NFT).
+        // Show the normal success screen with no NFT error, so the UI reveals nothing more
+        // than the RSVP response did.
+        if ((err as { status?: number } | null)?.status === 404) {
+          setMintResult({});
+          setMintStatus('idle');
+          return;
+        }
         setMintResult({ error: err instanceof Error ? err.message : 'Minting failed' });
         setMintStatus('error');
       }

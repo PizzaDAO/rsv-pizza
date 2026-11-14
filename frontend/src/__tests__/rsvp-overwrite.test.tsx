@@ -19,7 +19,7 @@ vi.mock('../components/ShareRSVP', () => ({ ShareRSVP: () => null }));
 vi.mock('../lib/nftContract', () => ({ getNFTViewUrl: () => '', getChainConfig: () => ({ explorerUrl: '' }) }));
 
 import { addGuestToParty } from '../lib/supabase';
-import { getDiscountStatus, claimDiscount } from '../lib/api';
+import { getDiscountStatus, claimDiscount, AUTH_EXPIRED_EVENT } from '../lib/api';
 import { RSVPFlowContent } from '../components/RSVPFlowContent';
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -65,6 +65,19 @@ describe('addGuestToParty', () => {
     await submit();
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer jwt-1');
+  });
+
+  it('expired login (401): clears the session, signals AuthContext, and does not report success', async () => {
+    localStorage.setItem('authToken', 'stale');
+    localStorage.setItem('user', '{"email":"al@example.com"}');
+    fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { code: 'INVALID_TOKEN' } }) });
+    const onExpired = vi.fn();
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    await expect(submit()).rejects.toThrow(/login has expired/i);
+    window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    expect(onExpired).toHaveBeenCalled();
+    expect(localStorage.getItem('authToken')).toBeNull();
+    expect(localStorage.getItem('user')).toBeNull();
   });
 
   it('returns the guest token and drops any walletShared name', async () => {

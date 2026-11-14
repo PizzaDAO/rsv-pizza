@@ -87,13 +87,27 @@ interface MintRequest {
 // wallet stored on that guest row (what the RSVP saved, or what mintOnApproval sends), so a
 // leaked id can at most deliver the guest's own NFT to the guest's own wallet (once; the
 // hasToken check below makes repeats a no-op).
-// Returns an error message when minting must be refused, or null when allowed.
-async function checkMintAllowed(partyId: string, guestId: string, recipient: string): Promise<{ status: number; error: string } | null> {
+// The event must also have NFTs on (nft_enabled + an image), and the chain is the event's own
+// nft_chain: a caller-supplied chain that differs is refused, so a leaked id can't make us pay
+// gas on events without NFTs or on another chain.
+// Returns { denied } when minting must be refused, or { chain } (the event's chain) when allowed.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NOT_FOUND = { status: 404, error: 'Guest or event not found' };
+
+async function checkMintAllowed(
+  partyId: string,
+  guestId: string,
+  recipient: string,
+  requestedChain: string | undefined,
+): Promise<{ denied: { status: number; error: string } } | { chain: SupportedChain }> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return { status: 500, error: 'NFT minting not configured (missing database credentials)' };
+    return { denied: { status: 500, error: 'NFT minting not configured (missing database credentials)' } };
   }
   if (!guestId) {
-    return { status: 400, error: 'guestId is required' };
+    return { denied: { status: 400, error: 'guestId is required' } };
+  }
+  if (!UUID_RE.test(String(guestId)) || !UUID_RE.test(String(partyId || ''))) {
+    return { denied: NOT_FOUND };
   }
   const headers = {
     apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -109,17 +123,25 @@ async function checkMintAllowed(partyId: string, guestId: string, recipient: str
   const guest = guests?.[0];
   const party = parties?.[0];
   if (!guest || !party) {
-    return { status: 404, error: 'Guest or event not found' };
+    return { denied: NOT_FOUND };
+  }
+  // Events without NFTs: same answer as an unknown guest.
+  if (party.nft_enabled !== true || !party.event_image_url) {
+    return { denied: NOT_FOUND };
+  }
+  const partyChain = String(party.nft_chain || 'base') as SupportedChain;
+  if ((requestedChain && requestedChain !== partyChain) || !CHAIN_CONFIG[partyChain]) {
+    return { denied: NOT_FOUND };
   }
   if (party.require_approval && guest.approved !== true) {
-    return { status: 403, error: 'Guest has not been approved by the host yet' };
+    return { denied: { status: 403, error: 'Guest has not been approved by the host yet' } };
   }
   const stored = typeof guest.ethereum_address === 'string' ? guest.ethereum_address.trim().toLowerCase() : '';
   if (!stored || stored !== String(recipient || '').trim().toLowerCase()) {
     // Same answer as an unknown guest, so this can't be used to test a guest's wallet.
-    return { status: 404, error: 'Guest or event not found' };
+    return { denied: NOT_FOUND };
   }
-  return null;
+  return { chain: partyChain };
 }
 
 serve(async (req) => {
@@ -142,16 +164,16 @@ serve(async (req) => {
     const request: MintRequest = await req.json();
     const { recipient, partyId } = request;
 
-    const denied = await checkMintAllowed(partyId, request.guestId, recipient);
-    if (denied) {
+    const allowed = await checkMintAllowed(partyId, request.guestId, recipient, request.chain);
+    if ('denied' in allowed) {
       return new Response(
-        JSON.stringify({ error: denied.error }),
-        { status: denied.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: allowed.denied.error }),
+        { status: allowed.denied.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Select chain config (default to base for backwards compatibility)
-    const selectedChain: SupportedChain = request.chain || 'base';
+    // The event's own chain (checkMintAllowed refused any other)
+    const selectedChain: SupportedChain = allowed.chain;
     if (!CHAIN_CONFIG[selectedChain]) {
       return new Response(
         JSON.stringify({ error: `Unsupported chain: ${selectedChain}. Supported: ${Object.keys(CHAIN_CONFIG).join(', ')}` }),

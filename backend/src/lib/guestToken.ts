@@ -19,6 +19,12 @@ import type { Request } from 'express';
 import { getJwtSecret } from '../config/secrets.js';
 
 const DOMAIN = 'rsvp-guest-capability:v1:';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Guest/party ids are Postgres uuids; anything else would make Prisma throw (a 500). */
+export function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v);
+}
 /** 24 bytes of HMAC, base64url (32 chars). Unguessable; short enough for a URL. */
 const TOKEN_BYTES = 24;
 

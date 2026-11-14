@@ -201,6 +201,66 @@ describe('RSVPModal', () => {
     });
   });
 
+  // rsvp-overwrite-fix: a 404 from mint-nft (e.g. the stand-in id the backend returns when
+  // the email was already on the list) must not show an NFT error.
+  it('shows no NFT error when the mint answers 404', async () => {
+    const user = userEvent.setup();
+    const { addGuestToParty } = await import('../lib/supabase');
+    vi.mocked(addGuestToParty).mockResolvedValue({
+      guest: { id: 'guest-1', party_id: 'party-1', name: 'Test User' } as any,
+      guestToken: 'tok',
+      alreadyRegistered: false,
+      requireApproval: false,
+      updated: false,
+      waitlisted: false,
+      waitlistPosition: null,
+    });
+    mockMint.mockRejectedValue(Object.assign(new Error('Guest or event not found'), { status: 404 }));
+
+    render(
+      <RSVPModal
+        isOpen={true}
+        onClose={vi.fn()}
+        event={makeEvent({ nftEnabled: true, eventImageUrl: 'http://img/x.png' })}
+        existingGuest={makeExistingGuest({ ethereumAddress: '0x' + 'a'.repeat(40) })}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await user.click(screen.getByRole('button', { name: /edit rsvp/i }));
+
+    await waitFor(() => expect(mockMint).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/Minting your NFT/i)).not.toBeInTheDocument());
+    expect(screen.queryByText(/Guest or event not found/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NFT minting failed/i)).not.toBeInTheDocument();
+  });
+
+  it('still shows a real mint failure (non-404)', async () => {
+    const user = userEvent.setup();
+    const { addGuestToParty } = await import('../lib/supabase');
+    vi.mocked(addGuestToParty).mockResolvedValue({
+      guest: { id: 'guest-1', party_id: 'party-1', name: 'Test User' } as any,
+      guestToken: 'tok',
+      alreadyRegistered: false,
+      requireApproval: false,
+      updated: false,
+      waitlisted: false,
+      waitlistPosition: null,
+    });
+    mockMint.mockRejectedValue(Object.assign(new Error('RPC down'), { status: 500 }));
+
+    render(
+      <RSVPModal
+        isOpen={true}
+        onClose={vi.fn()}
+        event={makeEvent({ nftEnabled: true, eventImageUrl: 'http://img/x.png' })}
+        existingGuest={makeExistingGuest({ ethereumAddress: '0x' + 'a'.repeat(40) })}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await user.click(screen.getByRole('button', { name: /edit rsvp/i }));
+    await waitFor(() => expect(screen.getByText('RPC down')).toBeInTheDocument());
+  });
+
   // rsvp-overwrite-fix: NFT bookkeeping is authorized by the guest token, not id + email.
   it('saves the minted NFT with the guest token header and no email', async () => {
     const user = userEvent.setup();

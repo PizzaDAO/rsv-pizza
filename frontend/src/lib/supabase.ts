@@ -12,6 +12,7 @@ import {
   promoteGuestApi,
   getReceiptUploadUrl,
   getBudgetReceiptUploadUrl,
+  AUTH_EXPIRED_EVENT,
 } from './api';
 import type { OneSheetConfig } from './api';
 import { uuid } from './utils';
@@ -1782,6 +1783,16 @@ export async function addGuestToParty(
         visitorSessionId: visitorSessionId ?? null,
       }),
     });
+
+    // rsvp-overwrite-fix: the stored login didn't verify (expired). Don't let the RSVP fall
+    // back to anonymous behind the user's back (an owner edit would be a silent no-op while
+    // the UI still shows them logged in): clear the session and ask them to try again.
+    if (response.status === 401 && authToken) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      throw new Error('Your login has expired. Log in again to edit your RSVP, or submit again to RSVP without logging in.');
+    }
 
     if (!response.ok) {
       let errorData: any = null;

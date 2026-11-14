@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
-import { callerOwnsGuest } from '../lib/guestToken.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -99,6 +99,9 @@ router.get('/metadata/:partyId/:address', async (req, res) => {
 router.patch('/guest/:guestId', optionalAuth, async (req: AuthRequest, res) => {
   try {
     const { guestId } = req.params;
+    if (!isUuid(guestId)) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
     const { tokenId, transactionHash } = req.body;
 
     // Validate required fields
@@ -157,6 +160,9 @@ router.patch('/guest/:guestId', optionalAuth, async (req: AuthRequest, res) => {
 router.get('/guest/:guestId', async (req, res) => {
   try {
     const { guestId } = req.params;
+    if (!isUuid(guestId)) {
+      return res.status(404).json({ error: 'Guest not found' });
+    }
 
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },

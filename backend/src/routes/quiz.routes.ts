@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.js';
-import { callerOwnsGuest } from '../lib/guestToken.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 import { canUserEditParty } from '../helpers/partyAccess.js';
 import { AppError } from '../middleware/error.js';
 
@@ -334,6 +334,9 @@ quizPublicRouter.post('/:slug/quiz/answers', optionalAuth, async (req: AuthReque
 
     if (!guestId || !Array.isArray(answers) || answers.length === 0) {
       throw new AppError('guestId and answers array are required', 400, 'VALIDATION_ERROR');
+    }
+    if (!isUuid(guestId)) {
+      throw new AppError('Guest not found for this event', 404, 'GUEST_NOT_FOUND');
     }
 
     // Find party

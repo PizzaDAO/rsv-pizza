@@ -327,6 +327,15 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
       visitorSessionId,
     } = req.body;
 
+    // rsvp-overwrite-fix: a login that was sent but didn't verify (expired/forged) must not
+    // silently fall back to anonymous: the owner would get the no-op decoy while their UI
+    // still shows them logged in. This says nothing about the submitted email, only about
+    // the caller's own token, so it isn't an oracle.
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ') && !req.userEmail) {
+      throw new AppError('Your login has expired. Please log in again.', 401, 'INVALID_TOKEN');
+    }
+
     const safeOptinAbVariant: 'control' | 'variant' | null =
       optinAbVariant === 'control' || optinAbVariant === 'variant' ? optinAbVariant : null;
 

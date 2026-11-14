@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { requireAuth, optionalAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
-import { callerOwnsGuest } from '../lib/guestToken.js';
+import { callerOwnsGuest, isUuid } from '../lib/guestToken.js';
 import { AppError } from '../middleware/error.js';
 import { autoCompleteScorecardItem } from './scorecard.routes.js';
 import { triggerWebhook } from '../services/webhook.service.js';
@@ -629,6 +629,9 @@ router.get('/:inviteCode/:guestId', requireAuth, async (req: AuthRequest, res: R
 router.get('/:inviteCode/:guestId/discount', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, guestId } = req.params;
+    if (!isUuid(guestId)) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
 
     const party = await findPartyByCode(inviteCode);
     if (!party) {
@@ -686,6 +689,9 @@ router.get('/:inviteCode/:guestId/discount', optionalAuth, async (req: AuthReque
 router.post('/:inviteCode/:guestId/discount', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { inviteCode, guestId } = req.params;
+    if (!isUuid(guestId)) {
+      throw new AppError('Guest not found', 404, 'GUEST_NOT_FOUND');
+    }
 
     const party = await findPartyByCode(inviteCode);
     if (!party) {

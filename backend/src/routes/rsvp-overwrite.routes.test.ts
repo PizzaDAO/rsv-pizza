@@ -183,14 +183,30 @@ describe('POST /api/rsvp/:inviteCode/guest: duplicate email', () => {
     expect(res.body.guest.id).not.toBe(EXISTING_ID);
   });
 
-  it('a forged/invalid JWT counts as logged out', async () => {
+  it.each([
+    ['forged', () => jwt.sign({ userId: 'x', email: 'alice@example.com' }, 'wrong-secret')],
+    ['expired', () => jwt.sign({ userId: 'x', email: 'alice@example.com', exp: Math.floor(Date.now() / 1000) - 60 }, JWT_SECRET)],
+  ])('a %s JWT gets 401 (not a silent anonymous decoy) and nothing is read or written', async (_l, tok) => {
     setup();
     const res = await request(app())
       .post('/api/rsvp/abc123/guest')
-      .set({ Authorization: `Bearer ${jwt.sign({ userId: 'x', email: 'alice@example.com' }, 'wrong-secret')}` })
+      .set({ Authorization: `Bearer ${tok()}` })
       .send(BODY);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('INVALID_TOKEN');
+    expect(mockPrisma.guest.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.guest.update).not.toHaveBeenCalled();
+    expect(mockPrisma.guest.create).not.toHaveBeenCalled();
+  });
+
+  it('the 401 is the same whether or not the email is on the list (no oracle)', async () => {
+    const bad = { Authorization: `Bearer ${jwt.sign({ userId: 'x', email: 'a@b.c' }, 'wrong-secret')}` };
+    setup({ existing: null });
+    const a = await request(app()).post('/api/rsvp/abc123/guest').set(bad).send(BODY);
+    setup();
+    const b = await request(app()).post('/api/rsvp/abc123/guest').set(bad).send(BODY);
+    expect(a.status).toBe(b.status);
+    expect(a.body).toEqual(b.body);
   });
 
   it('logged in as the owner (case-insensitive): updates as before and returns the real id + token', async () => {
@@ -260,7 +276,7 @@ describe('guest-scoped endpoints need the guest token or a login as the guest', 
       mockPrisma.raffleEntry.create.mockResolvedValue({ id: 'e1' });
     });
     const enter = (body: object, headers: Record<string, string> = {}) =>
-      request(app()).post(`/api/parties/${PARTY_ID}/raffles/r1/enter`).set(headers).send(body);
+      request(app()).post(`/api/parties/${PARTY_ID}/raffles/${NEW_ID}/enter`).set(headers).send(body);
 
     it('rejects a bare guest id (404, no entry)', async () => {
       const res = await enter({ guestId: EXISTING_ID });
@@ -387,5 +403,25 @@ describe('guest-scoped endpoints need the guest token or a login as the guest', 
       const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sent.to).toEqual(['alice@example.com']);
     });
+  });
+});
+
+describe('malformed guest ids get the uniform 404, never a 500', () => {
+  const tok = { 'X-Guest-Token': signGuestToken('not-a-uuid') };
+  beforeEach(() => {
+    mockPrisma.party.findUnique.mockResolvedValue({ id: PARTY_ID, quizEnabled: true, cancelledAt: null, name: 'P', userId: 'h', coHosts: [] });
+  });
+  it.each([
+    ['raffle enter', () => request(app()).post(`/api/parties/${PARTY_ID}/raffles/${PARTY_ID}/enter`).set(tok).send({ guestId: 'not-a-uuid' })],
+    ['quiz answers', () => request(app()).post('/api/events/abc123/quiz/answers').set(tok).send({ guestId: 'not-a-uuid', answers: [{ questionId: 'q', selectedIndex: 0 }] })],
+    ['discount GET', () => request(app()).get('/api/checkin/abc123/not-a-uuid/discount').set(tok)],
+    ['discount POST', () => request(app()).post('/api/checkin/abc123/not-a-uuid/discount').set(tok)],
+    ['nft PATCH', () => request(app()).patch('/api/nft/guest/not-a-uuid').set(tok).send({ tokenId: 1, transactionHash: '0x' + 'a'.repeat(64) })],
+    ['nft GET', () => request(app()).get('/api/nft/guest/not-a-uuid')],
+  ])('%s', async (_l, call) => {
+    const res = await call();
+    expect(res.status).toBe(404);
+    expect(mockPrisma.guest.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.guest.findUnique).not.toHaveBeenCalled();
   });
 });

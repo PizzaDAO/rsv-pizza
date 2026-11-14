@@ -70,7 +70,9 @@ export function useMintNFT() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Minting failed');
+        // rsvp-overwrite-fix: keep the HTTP status so callers can tell "not eligible" (404)
+        // from a real failure.
+        throw Object.assign(new Error(data.error || 'Minting failed'), { status: response.status });
       }
 
       const mintResult: MintResult = {
