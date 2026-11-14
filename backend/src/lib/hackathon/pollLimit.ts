@@ -15,13 +15,14 @@ import { rateLimit } from 'express-rate-limit';
 import { getJwtSecret } from '../../config/secrets.js';
 
 // /me (participant panel), /submissions + /leaderboard (host, PR 3-4), judge queue (PR 4),
-// /voting (voter state on gallery / project pages) + /voting/host (host vote count poll, PR 7).
-const POLL_PATH = /^\/api\/(parties\/[0-9a-fA-F-]{36}\/hackathon\/(me|submissions|leaderboard|voting|voting\/host)|hackathon-judge\/[0-9a-fA-F-]{36}\/queue)\/?$/;
+// /voting (voter state on gallery / project pages) + /voting/host (host vote count poll, PR 7),
+// /gallery + /projects/:slug (logged-in voters browsing the gallery on venue Wi-Fi, PR 7).
+const POLL_PATH = /^\/api\/(parties\/[0-9a-fA-F-]{36}\/hackathon\/(me|submissions|leaderboard|voting|voting\/host|gallery|projects\/[a-z0-9-]{1,120})|hackathon-judge\/[0-9a-fA-F-]{36}\/queue)\/?$/;
 // PR 7 vote writes: authenticated, with their own per-user limiter (20 / hour, voting routes).
 const VOTE_PATH = /^\/api\/parties\/[0-9a-fA-F-]{36}\/hackathon\/votes\/?$/;
 
 /** Verified user id from the bearer token, cached on the request. null when absent/invalid. */
-function verifiedUserId(req: Request): string | null {
+export function verifiedUserId(req: Request): string | null {
   const r = req as Request & { _hkPollUser?: string | null };
   if (r._hkPollUser !== undefined) return r._hkPollUser;
   let id: string | null = null;

@@ -20,9 +20,11 @@
  *   PUT    /:partyId/hackathon/voting           {enabled, scope, eligibility, opensAt, closesAt}
  *   POST   /:partyId/hackathon/voting/open      open now
  *   POST   /:partyId/hackathon/voting/close     close now
- *   Host writes hold FOR UPDATE on the hackathon row and update the settings row; votes hold
- *   FOR SHARE on the settings row and re-check the window inside, so a vote can't land after a
- *   close commits.
+ *   Host writes hold FOR UPDATE on the hackathon row, then FOR UPDATE on the settings row (so
+ *   in-flight votes, which hold FOR SHARE on it, commit before the vote count used by the scope
+ *   lock), then update it; votes re-check the window under their FOR SHARE, so a vote can't
+ *   land after a close commits. Re-opening a closed vote is refused (409
+ *   PEOPLES_CHOICE_AWARDED) while a People's Choice award exists.
  *
  * No emails, no realtime (the host view polls every 60s).
  */
@@ -308,9 +310,20 @@ async function hostWrite(partyId: string, next: (current: VotingSettings, voteCo
   const h = await hostHackathon(partyId);
   await prisma.$transaction(async (tx) => {
     await store.lockHackathonRow(tx, h.id);
+    // Wait for in-flight votes (they hold FOR SHARE on this row) before counting, so the scope
+    // lock can't be raced by a vote that commits after our count.
+    await store.lockVotingForUpdate(tx, h.id);
     const current = (await store.loadVoting(h.id, tx)) ?? DEFAULT_VOTING;
     const voteCount = await tx.hackathonVote.count({ where: { hackathonId: h.id } });
-    await store.saveVoting(tx, h.id, next(current, voteCount, new Date()));
+    const now = new Date();
+    const updated = next(current, voteCount, now);
+    // Re-opening a closed vote (open now, or a PUT that moves closes_at) is allowed and hides
+    // the tallies again, unless a People's Choice award already exists (owner decision).
+    if (votingStatus(current, now) === 'closed' && votingStatus(updated, now) !== 'closed'
+      && (await store.peoplesChoiceAwardCount(tx, h.id)) > 0) {
+      throw conflict('Remove the People\'s Choice award before reopening voting.', 'PEOPLES_CHOICE_AWARDED');
+    }
+    await store.saveVoting(tx, h.id, updated);
   }, { timeout: 10000, maxWait: 5000 });
 }
 

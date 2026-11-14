@@ -78,6 +78,8 @@ let state: {
   members: Row[];
   guests: Row[];
   votes: Row[];
+  pcAwards: number;
+  order: string[];
 };
 
 const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -116,6 +118,8 @@ function seed() {
       { email: 'host@example.com', approved: true, status: 'CONFIRMED', checkedInAt: ago(100) },
     ],
     votes: [],
+    pcAwards: 0,
+    order: [],
   };
 }
 
@@ -128,7 +132,9 @@ function installStore() {
     loadVotingHackathon: vi.fn(async (partyId: string) => (partyId === PARTY ? { ...state.h, voting: state.voting ? { ...state.voting } : null } : null)),
     loadVoting: vi.fn(async () => (state.voting ? { ...state.voting } : null)),
     lockVotingShared: vi.fn(async () => (state.voting ? { ...state.voting } : null)),
-    lockHackathonRow: vi.fn(async () => undefined),
+    lockHackathonRow: vi.fn(async () => { state.order.push('lockHackathon'); }),
+    lockVotingForUpdate: vi.fn(async () => { state.order.push('lockVoting'); }),
+    peoplesChoiceAwardCount: vi.fn(async () => state.pcAwards),
     saveVoting: vi.fn(async (_tx: unknown, _id: string, v: Row) => { state.voting = { ...v }; }),
     voterEligibility: vi.fn(async (_p: string, h: Row, eligibility: string, email?: string) => {
       const guests = state.guests.filter((g) => !!email && g.email === low(email)).map((g, i) => ({ id: `g${i}`, approved: g.approved, status: g.status, checkedInAt: g.checkedInAt }));
@@ -176,7 +182,7 @@ beforeEach(() => {
   seed();
   installStore();
   server = app();
-  const tx = { hackathonVote: { count: vi.fn(async () => state.votes.length) } };
+  const tx = { hackathonVote: { count: vi.fn(async () => { state.order.push('count'); return state.votes.length; }) } };
   mockPrisma.$transaction = vi.fn(async (fn: any) => fn(tx));
   // hosts: host (tab) and cohost (no tab)
   canEdit.mockImplementation(async (_p: string, _u?: string, email?: string) => email === 'host@example.com' || email === 'cohost@example.com');
@@ -422,5 +428,35 @@ describe('host voting routes', () => {
     expect(r.body.settings.status).toBe('open');
     expect(r.body.results).toBeNull(); // re-opened: tallies hidden again
     expect((await host('put', '/voting').send({ scope: 'bogus' })).status).toBe(400);
+  });
+
+  it('host writes take the settings row lock before counting votes (in-flight votes land first)', async () => {
+    state.voting = { enabled: true, scope: 'event', eligibility: 'checked_in', opensAt: ago(10), closesAt: null };
+    // A vote that was in flight when the host saved: it commits while we wait for the row lock.
+    store.lockVotingForUpdate.mockImplementationOnce(async () => {
+      state.order.push('lockVoting');
+      state.votes.push({ hackathonId: HID, trackId: null, submissionId: S_A, voterUserId: users.carol.id, ipHash: null });
+    });
+    const r = await host('put', '/voting').send({ scope: 'track' });
+    expect([r.status, r.body.error.code]).toEqual([409, 'VOTING_SCOPE_LOCKED']);
+    expect(state.order).toEqual(['lockHackathon', 'lockVoting', 'count']);
+    expect(state.voting!.scope).toBe('event');
+  });
+
+  it("re-opening a closed vote is refused once a People's Choice award exists (409), allowed otherwise", async () => {
+    await host('post', '/voting/close');
+    state.pcAwards = 1;
+    let r = await host('post', '/voting/open');
+    expect([r.status, r.body.error.code]).toEqual([409, 'PEOPLES_CHOICE_AWARDED']);
+    expect(r.body.error.message).toBe("Remove the People's Choice award before reopening voting.");
+    r = await host('put', '/voting').send({ closesAt: later(60).toISOString() });
+    expect([r.status, r.body.error.code]).toEqual([409, 'PEOPLES_CHOICE_AWARDED']);
+    expect((await host('get', '/voting/host')).body.settings.status).toBe('closed');
+    // other edits of a closed vote still work (it stays closed)
+    expect((await host('put', '/voting').send({ eligibility: 'registered' })).status).toBe(200);
+    state.pcAwards = 0;
+    r = await host('post', '/voting/open');
+    expect(r.status).toBe(200);
+    expect(r.body.settings.status).toBe('open');
   });
 });

@@ -15,6 +15,10 @@
  *     (eligibility.ts). Judges, hosts and co-hosts may vote if they qualify like anyone else.
  *   - Window: open while enabled AND opens_at <= now AND (closes_at IS NULL OR now < closes_at)
  *     (server time). Manual open / close only set these timestamps.
+ *   - Re-opening a closed vote (open now, or new times that put now inside the window) is
+ *     allowed and hides the tallies again, EXCEPT when a People's Choice award already exists
+ *     for this hackathon: 409 PEOPLES_CHOICE_AWARDED, "Remove the People's Choice award before
+ *     reopening voting." (owner decision). The host confirms a re-open in the UI.
  *   - Only projects of an OPEN gallery (galleryRules.isGalleryOpen) with status 'submitted'.
  *   - No voting for your own team's project: the voter is a member of the project's team by
  *     user id, or their email matches a member's account email or RSVP (guest) email.

@@ -32,9 +32,16 @@ export async function loadVoting(hackathonId: string, tx: Tx = prisma): Promise<
 
 /**
  * Inside a vote transaction: FOR SHARE on the settings row, so a host's open / close / settings
- * write (which updates this row) waits for in-flight votes and vice versa. null = no row.
+ * write (which locks / updates this row) waits for in-flight votes and vice versa. null = no row.
+ *
+ * Lock ORDER matters: the vote INSERT's FK check takes FOR KEY SHARE on the hackathons row, and
+ * host writes take FOR UPDATE on that row and then the settings row. If a vote locked the
+ * settings row first and the hackathons row only at INSERT time, a concurrent host write would
+ * deadlock with it (40P01, seen on a real Postgres in votingStore.db.test.ts). So the vote takes
+ * FOR KEY SHARE on the hackathons row FIRST: both sides lock hackathons -> hackathon_voting.
  */
 export async function lockVotingShared(tx: Prisma.TransactionClient, hackathonId: string): Promise<VotingSettings | null> {
+  await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${hackathonId}::uuid FOR KEY SHARE`;
   const rows = await tx.$queryRaw<Array<{ enabled: boolean; scope: string; eligibility: string; opens_at: Date | null; closes_at: Date | null }>>`
     SELECT enabled, scope, eligibility, opens_at, closes_at FROM hackathon_voting WHERE hackathon_id = ${hackathonId}::uuid FOR SHARE`;
   const r = rows[0];
@@ -44,6 +51,20 @@ export async function lockVotingShared(tx: Prisma.TransactionClient, hackathonId
 /** Host writes: the hackathon row FOR UPDATE (same lock as the PR 4-5 host writes). */
 export async function lockHackathonRow(tx: Prisma.TransactionClient, hackathonId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${hackathonId}::uuid FOR UPDATE`;
+}
+
+/**
+ * Host writes, after lockHackathonRow: FOR UPDATE on the settings row. Votes hold FOR SHARE on
+ * it for their whole transaction, so this waits until in-flight votes commit, and the vote count
+ * read next (scope lock) can't miss one. No row = no votes can exist (voting was never on).
+ */
+export async function lockVotingForUpdate(tx: Prisma.TransactionClient, hackathonId: string): Promise<void> {
+  await tx.$queryRaw`SELECT hackathon_id FROM hackathon_voting WHERE hackathon_id = ${hackathonId}::uuid FOR UPDATE`;
+}
+
+/** People's Choice awards of this hackathon (they block re-opening a closed vote). */
+export async function peoplesChoiceAwardCount(tx: Prisma.TransactionClient, hackathonId: string): Promise<number> {
+  return tx.hackathonAward.count({ where: { hackathonId, prize: { kind: 'peoples_choice' } } });
 }
 
 export async function saveVoting(tx: Prisma.TransactionClient, hackathonId: string, v: VotingSettings): Promise<void> {

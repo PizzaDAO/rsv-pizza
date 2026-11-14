@@ -595,6 +595,15 @@ configurable (default 1-5), blind judging optional and default off.
 - Voting eligibility: `registered` | `checked_in` (default). No `logged_in` option (§16 Q3: the
   MVP stays RSVP-gated). Judges, hosts and co-hosts may vote when they qualify.
 - Voters may change or retract their vote until close; after close votes are final.
+- Re-opening a closed vote (open now, or new times that put now back inside the window) is
+  allowed behind a confirm and hides the tallies again, EXCEPT when a People's Choice award
+  already exists for the hackathon: 409 `PEOPLES_CHOICE_AWARDED`, "Remove the People's Choice
+  award before reopening voting." (owner decision).
+- Locking: both sides lock in the same order, hackathons row -> hackathon_voting row. A vote
+  takes FOR KEY SHARE on the hackathon then FOR SHARE on the settings row and re-checks the
+  window; host writes take FOR UPDATE on both before counting votes (scope lock), so in-flight
+  votes commit first. (Locking the settings row before the hackathon row deadlocks against the
+  vote INSERT's FK key-share lock: 40P01, reproduced on Postgres 17.)
 - Votes only for `submitted` projects while the gallery is open (`gallery_visibility`): with the
   default `after_reveal`, voting starts after the reveal (a People's Choice award added after the
   reveal shows up automatically). The host Voting section explains this.
@@ -604,8 +613,12 @@ configurable (default 1-5), blind judging optional and default off.
   email or RSVP email) are rejected on write and dropped again when counting.
 - People's Choice: after close the tally suggests the winner(s) in Winners & Payouts; the host
   awards it. A `peoples_choice` prize can't be awarded while voting is scheduled or open (409).
-- Rate limits: 20 vote writes / hour / user; authenticated vote writes and the voting reads skip
-  the global per-IP limiter (venue Wi-Fi) and use per-user buckets.
+- Rate limits: 20 vote writes / hour / user. Authenticated (verified JWT) vote writes, voting
+  reads and gallery / project page reads skip the per-IP limiters (global and gallery; venue
+  Wi-Fi) and use per-user buckets; anonymous reads stay per-IP. The TV display stays per-IP.
+- Pending owner decision (not implemented): when a host enables voting while
+  `gallery_visibility = 'after_reveal'`, auto-switch the gallery to `after_deadline` with a
+  notice. Today the Voting section only warns.
 
 ## Sources (competitor scan)
 

@@ -53,6 +53,8 @@ const IP = 'a'.repeat(64);
   async function wipe() {
     await exec(`DELETE FROM hackathon_votes WHERE hackathon_id = '${HID}'`);
     await exec(`DELETE FROM hackathon_voting WHERE hackathon_id = '${HID}'`);
+    await exec(`DELETE FROM hackathon_awards WHERE hackathon_id = '${HID}'`);
+    await exec(`DELETE FROM hackathon_prizes WHERE hackathon_id = '${HID}'`);
     await exec(`DELETE FROM hackathon_submission_tracks WHERE hackathon_id = '${HID}'`);
     await exec(`DELETE FROM hackathon_submissions WHERE hackathon_id = '${HID}'`);
     await exec(`DELETE FROM hackathons WHERE id = '${HID}'`);
@@ -138,6 +140,31 @@ const IP = 'a'.repeat(64);
     await hostTx;
     expect(await voteTx).toBe('closed');
     release?.();
+  });
+
+  it('host FOR UPDATE on the settings row waits for an in-flight vote, so its count includes it', async () => {
+    await db.$transaction((tx) => store.saveVoting(tx, HID, { enabled: true, scope: 'event', eligibility: 'checked_in', opensAt: new Date(Date.now() - 60_000), closesAt: null }));
+    const voteTx = db.$transaction(async (tx) => {
+      await store.lockVotingShared(tx, HID);
+      await new Promise((r) => setTimeout(r, 200)); // vote still in flight
+      return store.upsertVote(tx, { hackathonId: HID, trackId: null, submissionId: S_A, voterUserId: 'vt-voter', ipHash: IP });
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    const count = await db.$transaction(async (tx) => {
+      await store.lockHackathonRow(tx, HID);
+      await store.lockVotingForUpdate(tx, HID);
+      return tx.hackathonVote.count({ where: { hackathonId: HID } });
+    });
+    await voteTx;
+    expect(count).toBe(1);
+  });
+
+  it("peoplesChoiceAwardCount counts only People's Choice awards", async () => {
+    await exec(`INSERT INTO hackathon_prizes(id, hackathon_id, name, kind) VALUES ('77777777-0000-4000-8000-0000000000a1', '${HID}', 'PC', 'peoples_choice'), ('77777777-0000-4000-8000-0000000000a2', '${HID}', 'Grand', 'judged')`);
+    await exec(`INSERT INTO hackathon_awards(hackathon_id, prize_id, submission_id) VALUES ('${HID}', '77777777-0000-4000-8000-0000000000a2', '${S_A}')`);
+    expect(await db.$transaction((tx) => store.peoplesChoiceAwardCount(tx, HID))).toBe(0);
+    await exec(`INSERT INTO hackathon_awards(hackathon_id, prize_id, submission_id) VALUES ('${HID}', '77777777-0000-4000-8000-0000000000a1', '${S_B}')`);
+    expect(await db.$transaction((tx) => store.peoplesChoiceAwardCount(tx, HID))).toBe(1);
   });
 
   it('cascade: deleting a project removes its votes', async () => {

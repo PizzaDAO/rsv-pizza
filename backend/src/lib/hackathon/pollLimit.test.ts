@@ -62,6 +62,11 @@ describe('PR 7 voting', () => {
     expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/voting/host`, tok('u1')))).toBe(true);
     expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/voting`))).toBe(false);
     expect(isHackathonPollRead(req('PUT', `/api/parties/${PARTY}/hackathon/voting`, tok('u1')))).toBe(false);
+    // gallery + project pages: logged-in readers skip the global per-IP limiter too
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/gallery`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/projects/slice-router`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/gallery`))).toBe(false);
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/projects/a/b`, tok('u1')))).toBe(false);
   });
   it('authenticated vote writes skip the per-IP limiter (they have a per-user one); nothing else does', () => {
     expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/votes`, tok('u1')))).toBe(true);

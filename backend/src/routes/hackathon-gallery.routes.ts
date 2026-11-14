@@ -25,6 +25,7 @@ import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
 import { isHackathonHost } from '../lib/hackathon/access.js';
+import { verifiedUserId } from '../lib/hackathon/pollLimit.js';
 import { buildGallery, buildProject, galleryMeta, isGalleryOpen, loadGalleryHackathon, loadProject, PUBLIC_STATUS, viewerCanSeeEvent, viewerEventAccess } from '../lib/hackathon/gallery.js';
 
 const router = Router();
@@ -40,6 +41,34 @@ export const galleryLimiter = rateLimit({
   keyGenerator: (req) => 'hkg:' + ipKeyGenerator(req.ip ?? ''),
 });
 
+/**
+ * Gallery / project page reads (PR 7, venue Wi-Fi): a room of logged-in voters shares one IP, so
+ * a request with a VERIFIED JWT (same check as lib/hackathon/pollLimit.ts; a forged header buys
+ * nothing) skips the per-IP limiter and gets a per-user bucket instead. Anonymous reads stay
+ * per-IP. (The TV display keeps galleryLimiter, per IP.)
+ */
+const galleryIpLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 300,
+  message: { error: 'You\'ve been rate limited. Please wait a few minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  skip: (req) => verifiedUserId(req) !== null,
+  keyGenerator: (req) => 'hkg:' + ipKeyGenerator(req.ip ?? ''),
+});
+const galleryUserLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 300,
+  message: { error: 'You\'ve been rate limited. Please wait a few minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  skip: (req) => verifiedUserId(req) === null,
+  keyGenerator: (req) => 'hkgu:' + (verifiedUserId(req) ?? 'none'),
+});
+const galleryReadLimiters = [galleryIpLimiter, galleryUserLimiter];
+
 const PUBLIC_CACHE = 'private, max-age=60';
 const NO_STORE = 'private, no-store';
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -50,7 +79,7 @@ router.use('/:partyId/hackathon', (_req, res, next) => {
   next();
 });
 
-router.get('/:partyId/hackathon/gallery', galleryLimiter, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/hackathon/gallery', ...galleryReadLimiters, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId } = req.params;
     if (!isUuid(partyId)) throw new AppError('Party not found', 404, 'NOT_FOUND');
@@ -84,7 +113,7 @@ router.get('/:partyId/hackathon/gallery', galleryLimiter, optionalAuth, async (r
   }
 });
 
-router.get('/:partyId/hackathon/projects/:projectSlug', galleryLimiter, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:partyId/hackathon/projects/:projectSlug', ...galleryReadLimiters, optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { partyId, projectSlug } = req.params;
     const notFound = () => new AppError('Project not found', 404, 'NOT_FOUND');
