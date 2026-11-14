@@ -8,7 +8,8 @@ import { MarkdownBoundary } from '../components/ErrorBoundary';
 import { STATUS_LABEL } from '../lib/hackathonApi';
 import { awardLabel, getProject, linkHost, videoEmbedUrl, type ProjectResponse } from '../lib/hackathonGalleryApi';
 import { BRAND } from '../config/brand';
-import { AwardBadge, GalleryMessage, GalleryShell, PreviewBanner, closedCopy, useGalleryEvent } from './HackathonGalleryPage';
+import { AwardBadge, CardVotes, GalleryMessage, GalleryShell, PreviewBanner, closedCopy, useGalleryEvent } from './HackathonGalleryPage';
+import { VotingBanner, useVoting } from '../components/hackathon/VoteControls';
 
 const REL = 'noopener noreferrer nofollow ugc';
 
@@ -40,6 +41,7 @@ export function HackathonProjectPage() {
   const [data, setData] = useState<ProjectResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [shot, setShot] = useState(0);
+  const voting = useVoting(event?.id);
 
   useEffect(() => {
     if (!event || !projectSlug) return;
@@ -91,6 +93,15 @@ export function HackathonProjectPage() {
           )}
           <h1 className="text-2xl sm:text-4xl font-bold text-theme-text break-words">{p.name}</h1>
           {p.tagline && <p className="text-base sm:text-lg text-theme-text-secondary mt-2 break-words">{p.tagline}</p>}
+
+          {!data!.preview && (
+            <div className="mt-4" data-testid="project-voting">
+              <VotingBanner v={voting} />
+              <div className="flex flex-wrap gap-2 -mt-1 empty:hidden">
+                <CardVotes v={voting} p={p} filterTrackId={null} trackName={trackName} />
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-sm text-theme-text-muted">
             {p.teamName && <span className="inline-flex items-center gap-1.5 min-w-0"><Users size={14} className="shrink-0" /><span className="break-words">{p.teamName}</span></span>}

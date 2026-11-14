@@ -17,7 +17,7 @@ afterAll(() => {
   else process.env.JWT_SECRET = saved;
 });
 
-import { hackathonPollLimiter, isHackathonPollRead } from './pollLimit.js';
+import { hackathonPollLimiter, isHackathonPollRead, isHackathonVoteWrite } from './pollLimit.js';
 
 const PARTY = '11111111-1111-4111-8111-111111111111';
 const tok = (userId: string) => `Bearer ${jwt.sign({ userId, email: `${userId}@x.com` }, SECRET, { expiresIn: '1h' })}`;
@@ -52,6 +52,25 @@ describe('isHackathonPollRead', () => {
     expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/${PARTY}/submissions/${PARTY}`, tok('u1')))).toBe(false);
     expect(isHackathonPollRead(req('PUT', `/api/hackathon-judge/${PARTY}/submissions/${PARTY}/score`, tok('u1')))).toBe(false);
     expect(isHackathonPollRead(req('GET', `/api/hackathon-judge/not-a-uuid/queue`, tok('u1')))).toBe(false);
+  });
+});
+
+describe('PR 7 voting', () => {
+  const req = (method: string, url: string, auth?: string) => ({ method, originalUrl: url, url, headers: auth ? { authorization: auth } : {} }) as any;
+  it('voter state + host vote-count polls are poll reads when authenticated', () => {
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/voting`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/voting/host`, tok('u1')))).toBe(true);
+    expect(isHackathonPollRead(req('GET', `/api/parties/${PARTY}/hackathon/voting`))).toBe(false);
+    expect(isHackathonPollRead(req('PUT', `/api/parties/${PARTY}/hackathon/voting`, tok('u1')))).toBe(false);
+  });
+  it('authenticated vote writes skip the per-IP limiter (they have a per-user one); nothing else does', () => {
+    expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/votes`, tok('u1')))).toBe(true);
+    expect(isHackathonVoteWrite(req('DELETE', `/api/parties/${PARTY}/hackathon/votes?trackId=x`, tok('u1')))).toBe(true);
+    expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/votes`))).toBe(false);
+    expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/votes`, 'Bearer forged.token.here'))).toBe(false);
+    expect(isHackathonVoteWrite(req('GET', `/api/parties/${PARTY}/hackathon/votes`, tok('u1')))).toBe(false);
+    expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/voting/open`, tok('u1')))).toBe(false);
+    expect(isHackathonVoteWrite(req('POST', `/api/parties/${PARTY}/hackathon/teams`, tok('u1')))).toBe(false);
   });
 });
 

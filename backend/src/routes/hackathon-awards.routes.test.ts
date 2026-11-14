@@ -191,7 +191,7 @@ function fakeModel(table: string, defaults: () => Row = () => ({})) {
 }
 
 const TABLES = ['hackathon', 'party', 'guest', 'user', 'hackathonTrack', 'hackathonPrize', 'hackathonCriterion', 'hackathonJudge', 'hackathonJudgeTrack',
-  'hackathonTeam', 'hackathonTeamMember', 'hackathonSubmission', 'hackathonSubmissionTrack', 'hackathonScore', 'hackathonAward'];
+  'hackathonTeam', 'hackathonTeamMember', 'hackathonSubmission', 'hackathonSubmissionTrack', 'hackathonScore', 'hackathonAward', 'hackathonVoting'];
 
 const prizeRow = (id: string, over: Row) => ({ id, hackathonId: HID, trackId: null, description: null, rank: null, amountText: null, amountValue: null, currency: null, quantity: 1, kind: 'judged', sortOrder: 0, createdAt: new Date(), ...over });
 const subRow = (id: string, teamId: string, status: string, name: string) => ({
@@ -247,6 +247,7 @@ function seed() {
       { id: 'sc3', hackathonId: HID, judgeId: 'j2', submissionId: S_A, criterionScores: { c1: 1 }, total: 20, privateComment: null, teamFeedback: 'REMOVED JUDGE FEEDBACK', updatedAt: new Date() },
     ],
     hackathonAward: [],
+    hackathonVoting: [],
   };
 }
 
@@ -766,5 +767,55 @@ describe('awarded prizes and the awards CSV', () => {
     expect(line).toContain('"a, ""b"""');
     expect(line).toContain('alice@example.com');
     expect(line).toContain(',Pending,');
+  });
+});
+
+// ------------------------------------------------------------------ People's Choice (PR 7)
+
+describe("People's Choice prizes and public voting (PR 7)", () => {
+  const votingRow = (over: Row = {}) => ({ hackathonId: HID, enabled: true, scope: 'event', eligibility: 'checked_in', opensAt: new Date(Date.now() - 3600_000), closesAt: null, ...over });
+  /** countedVotes' raw query: votes for submitted projects (self-votes are covered by the DB test). */
+  function withVotes(votes: Array<{ submissionId: string; trackId?: string | null }>) {
+    const orig = mockPrisma.$queryRaw;
+    mockPrisma.$queryRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
+      if (strings.join('?').includes('FROM hackathon_votes v')) {
+        return votes
+          .filter((v) => db.hackathonSubmission.find((s) => s.id === v.submissionId)?.status === 'submitted')
+          .map((v) => ({ submission_id: v.submissionId, track_id: v.trackId ?? null }));
+      }
+      return orig(strings, ...vals);
+    });
+  }
+
+  it('cannot be awarded while voting is scheduled or open (409), nothing written', async () => {
+    db.hackathonVoting.push(votingRow());
+    let r = await award(P_PC, S_B);
+    expect([r.status, r.body.error.code]).toEqual([409, 'VOTING_NOT_CLOSED']);
+    db.hackathonVoting[0].opensAt = new Date(Date.now() + 3600_000);
+    r = await award(P_PC, S_B);
+    expect(r.status).toBe(409);
+    expect(db.hackathonAward).toHaveLength(0);
+    // judged prizes are unaffected
+    expect((await award(P_GRAND, S_A)).status).toBe(201);
+  });
+
+  it('while open: no vote-based suggestion or ranking for the host', async () => {
+    db.hackathonVoting.push(votingRow());
+    withVotes([{ submissionId: S_B }, { submissionId: S_B }]);
+    const r = await api().get(`${base}/awards`).set('Authorization', auth('host'));
+    expect(r.body.voting).toEqual({ status: 'open', ranking: null });
+    expect(r.body.suggestions[P_PC]).toBeUndefined();
+  });
+
+  it('after close: the vote tally suggests the winner (host still awards it); disqualified projects never count', async () => {
+    db.hackathonVoting.push(votingRow({ closesAt: new Date(Date.now() - 60_000) }));
+    withVotes([{ submissionId: S_B }, { submissionId: S_B }, { submissionId: S_A }, { submissionId: S_DQ }, { submissionId: S_DQ }, { submissionId: S_DQ }]);
+    const r = await api().get(`${base}/awards`).set('Authorization', auth('host'));
+    expect(r.body.voting.status).toBe('closed');
+    expect(r.body.suggestions[P_PC]).toEqual([S_B]);
+    expect(r.body.suggestions[P_GRAND]).toEqual([S_A]); // judged suggestions unchanged
+    expect(r.body.voting.ranking.overall.map((x: Row) => [x.submissionId, x.votes, x.rank])).toEqual([[S_B, 2, 1], [S_A, 1, 2]]);
+    expect(db.hackathonAward).toHaveLength(0); // not awarded automatically
+    expect((await award(P_PC, S_B)).status).toBe(201);
   });
 });

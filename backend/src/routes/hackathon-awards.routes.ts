@@ -22,7 +22,10 @@
  *
  * Award rules (lib/hackathon/awards.ts): only `submitted` projects; a track prize only to a
  * project in that track; at most `quantity` awards per prize; one award per (prize, project).
- * People's Choice prizes are awarded by hand for now (voting decides them in PR 7).
+ * People's Choice prizes (PR 7): once public voting is closed, the vote tally suggests the winner(s)
+ * (suggestions + `voting.ranking`); the host still awards them here. They can't be awarded
+ * while voting is scheduled or open (409 VOTING_NOT_CLOSED). With voting never set up they are
+ * awarded by hand, as before.
  * Tracking only: no money moves, no tax forms / KYC (§16 Q4).
  */
 import { Router, Response, NextFunction } from 'express';
@@ -47,6 +50,8 @@ import {
   pickPlace,
   suggestWinners,
 } from '../lib/hackathon/awards.js';
+import { assertPeoplesChoiceAwardable, buildTally, suggestPeoplesChoice, talliesVisible, votingStatus } from '../lib/hackathon/voting.js';
+import { countedVotes, loadVoting } from '../lib/hackathon/votingStore.js';
 
 const router = Router();
 
@@ -110,7 +115,7 @@ const memberName = (m: any): string => String(m.user?.name || '').trim() || Stri
 
 /** Everything the Winners & Payouts section needs, in one shape (every write answers with it). */
 async function awardsPayload(hackathonId: string) {
-  const [h, awards, subs, scores] = await Promise.all([
+  const [h, awards, subs, scores, voting] = await Promise.all([
     prisma.hackathon.findUnique({ where: { id: hackathonId }, include: HACKATHON_INCLUDE }),
     prisma.hackathonAward.findMany({ where: { hackathonId }, include: AWARD_INCLUDE, orderBy: [{ awardedAt: 'asc' }], take: 1000 }),
     prisma.hackathonSubmission.findMany({
@@ -124,6 +129,7 @@ async function awardsPayload(hackathonId: string) {
       select: { judgeId: true, submissionId: true, criterionScores: true },
       take: 50000,
     }),
+    loadVoting(hackathonId),
   ]);
   if (!h) throw new AppError('The hackathon app is not enabled for this event', 404, 'HACKATHON_NOT_ENABLED');
 
@@ -147,6 +153,23 @@ async function awardsPayload(hackathonId: string) {
   );
   const slim = (rows: typeof board.overall) => rows.map((r) => ({ submissionId: r.submissionId, rank: r.rank, tied: r.tied, average: r.average, scoreCount: r.scoreCount }));
 
+  // People's Choice (PR 7): ranked by the vote tally, only once voting is closed (tallies are
+  // hidden from the host too until then).
+  const vStatus = votingStatus(voting);
+  const hasPc = (h.prizes as any[]).some((p) => p.kind === 'peoples_choice');
+  let voteRanking: { overall: unknown[]; byTrack: unknown[] } | null = null;
+  let pcSuggestions: Record<string, string[]> = {};
+  if (hasPc && talliesVisible(vStatus)) {
+    const tally = buildTally(
+      await countedVotes(hackathonId),
+      subs.map((s) => ({ id: s.id, trackIds: s.tracks.map((t) => t.trackId) })),
+      h.tracks.map((t) => t.id),
+      voting?.scope ?? 'event',
+    );
+    pcSuggestions = suggestPeoplesChoice(h.prizes as any, tally);
+    voteRanking = { overall: tally.overall, byTrack: tally.tracks.map((t) => ({ trackId: t.trackId, rows: t.rows })) };
+  }
+
   const membersBySub = new Map(subs.map((s) => [s.id, s.team?.members ?? []]));
   const rows = awards.map((a) => {
     const member = (membersBySub.get(a.submissionId) ?? []).find((m) => !!a.recipientUserId && m.userId === a.recipientUserId);
@@ -167,7 +190,8 @@ async function awardsPayload(hackathonId: string) {
       trackIds: s.tracks.map((t) => t.trackId),
       members: (s.team?.members ?? []).map((m) => ({ id: m.id, name: memberName(m), email: m.user?.email ?? null, role: m.role })),
     })),
-    suggestions: suggestWinners(h.prizes as any, board),
+    suggestions: { ...suggestWinners(h.prizes as any, board), ...pcSuggestions },
+    voting: { status: vStatus, ranking: voteRanking },
     ranking: { overall: slim(board.overall), byTrack: board.tracks.map((t) => ({ trackId: t.trackId, rows: slim(t.rows) })) },
   };
 }
@@ -212,6 +236,9 @@ router.post('/:partyId/hackathon/awards', ...guard, async (req: AuthRequest, res
       ]);
       if (!prize) throw notFound('Prize not found');
       if (!sub) throw notFound('Project not found');
+      if (prize.kind === 'peoples_choice') {
+        assertPeoplesChoiceAwardable(prize, votingStatus(await tx.hackathonVoting.findUnique({ where: { hackathonId } })));
+      }
       assertAwardable(prize, { id: sub.id, status: sub.status, trackIds: sub.tracks.map((t: any) => t.trackId) }, existing.map((a: any) => a.submissionId));
       const place = pickPlace(prize, existing.map((a: any) => a.place), input.place);
       await tx.hackathonAward.create({

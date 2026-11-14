@@ -57,13 +57,28 @@ export function payoutChanges(
 const fmt = (n: number | null) => (n === null ? '-' : Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** Ranked candidates for a prize's scope (track prize: that track's board; else overall). */
-export function rankedCandidates(prize: Pick<HackathonPrize, 'trackId'>, data: Pick<AwardsResponse, 'candidates' | 'ranking'>): Array<{ c: AwardCandidate; r: RankEntry | null }> {
-  const rows = prize.trackId ? data.ranking.byTrack.find((t) => t.trackId === prize.trackId)?.rows ?? [] : data.ranking.overall;
+export function rankedCandidates(prize: Pick<HackathonPrize, 'trackId'> & { kind?: HackathonPrize['kind'] }, data: Pick<AwardsResponse, 'candidates' | 'ranking' | 'voting'>): Array<{ c: AwardCandidate; r: RankEntry | null }> {
+  // People's Choice (PR 7): ranked by the closed vote; `average` / `scoreCount` carry the votes.
+  const vr = prize.kind === 'peoples_choice' ? data.voting?.ranking : null;
+  const ranking = vr
+    ? {
+      overall: vr.overall.map((x) => ({ submissionId: x.submissionId, rank: x.rank, tied: x.tied, average: x.votes, scoreCount: x.votes })),
+      byTrack: vr.byTrack.map((t) => ({ trackId: t.trackId, rows: t.rows.map((x) => ({ submissionId: x.submissionId, rank: x.rank, tied: x.tied, average: x.votes, scoreCount: x.votes })) })),
+    }
+    : data.ranking;
+  const rows = prize.trackId ? ranking.byTrack.find((t) => t.trackId === prize.trackId)?.rows ?? [] : ranking.overall;
   const byId = new Map(rows.map((r) => [r.submissionId, r]));
   return data.candidates
     .filter((c) => !prize.trackId || c.trackIds.includes(prize.trackId))
     .map((c) => ({ c, r: byId.get(c.id) ?? null }))
     .sort((a, b) => (a.r?.rank ?? 1e9) - (b.r?.rank ?? 1e9) || a.c.name.localeCompare(b.c.name));
+}
+
+/** People's Choice hint under the picker, per voting status (PR 7). */
+export function peoplesChoiceHint(status: string | undefined): string {
+  if (status === 'open' || status === 'scheduled') return "People's Choice: voting decides this prize. Close voting (Voting section) to see the results and award it.";
+  if (status === 'closed') return "People's Choice: ranked by the public vote. The top project is pre-selected; you confirm it.";
+  return "People's Choice: pick the winner yourself, or turn on public voting in the Voting section.";
 }
 
 function AwardPicker({ prize, data, busy, onAward }: {
@@ -73,6 +88,8 @@ function AwardPicker({ prize, data, busy, onAward }: {
   onAward: (submissionId: string) => void;
 }) {
   const taken = new Set(data.awards.filter((a) => a.prizeId === prize.id).map((a) => a.submissionId));
+  const byVotes = prize.kind === 'peoples_choice' && !!data.voting?.ranking;
+  const votingPending = prize.kind === 'peoples_choice' && (data.voting?.status === 'open' || data.voting?.status === 'scheduled');
   const options = rankedCandidates(prize, data).filter((o) => !taken.has(o.c.id));
   const suggested = (data.suggestions[prize.id] ?? []).filter((id) => !taken.has(id));
   const [selected, setSelected] = useState<string | null>(suggested[0] ?? null);
@@ -117,7 +134,9 @@ function AwardPicker({ prize, data, busy, onAward }: {
                 {suggested.includes(c.id) && (
                   <span className="hidden sm:inline-flex items-center gap-1 text-xs text-theme-accent shrink-0"><Sparkles size={12} /> Suggested</span>
                 )}
-                <span className="text-sm font-semibold text-theme-text tabular-nums shrink-0">{fmt(r?.average ?? null)}</span>
+                <span className="text-sm font-semibold text-theme-text tabular-nums shrink-0">
+                  {byVotes ? `${r?.average ?? 0} vote${r?.average === 1 ? '' : 's'}` : fmt(r?.average ?? null)}
+                </span>
               </button>
             </li>
           );
@@ -131,14 +150,14 @@ function AwardPicker({ prize, data, busy, onAward }: {
       <button
         type="button"
         className="btn-primary inline-flex items-center gap-2 text-sm"
-        disabled={busy || !pick}
+        disabled={busy || !pick || votingPending}
         onClick={() => pick && onAward(pick.c.id)}
         data-testid="hackathon-award-button"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Medal size={14} />}
         {pick ? `Award to ${pick.c.name}` : 'Pick a project'}
       </button>
-      {prize.kind === 'peoples_choice' && <Hint>People&apos;s Choice: pick the winner yourself for now. Voting comes later.</Hint>}
+      {prize.kind === 'peoples_choice' && <Hint>{peoplesChoiceHint(data.voting?.status)}</Hint>}
     </div>
   );
 }

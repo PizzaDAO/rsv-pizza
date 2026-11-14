@@ -9,14 +9,16 @@ import { JudgingSection } from './JudgingSection';
 import { TeamsSubmissionsSection } from './TeamsSubmissionsSection';
 import { LeaderboardSection } from './LeaderboardSection';
 import { WinnersSection } from './WinnersSection';
+import { VotingSection } from './VotingSection';
 
-export type HackathonSection = 'setup' | 'tracks' | 'judging' | 'submissions' | 'leaderboard' | 'winners';
+export type HackathonSection = 'setup' | 'tracks' | 'judging' | 'submissions' | 'leaderboard' | 'voting' | 'winners';
 const SECTIONS: Array<{ id: HackathonSection; label: string }> = [
   { id: 'setup', label: 'Setup' },
   { id: 'tracks', label: 'Tracks & Prizes' },
   { id: 'judging', label: 'Judging' },
   { id: 'submissions', label: 'Teams & Submissions' },
   { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'voting', label: 'Voting' },
   { id: 'winners', label: 'Winners & Payouts' },
 ];
 
@@ -227,6 +229,9 @@ export function HackathonTab({ partyId, inviteCode }: { partyId: string; inviteC
       )}
       {section === 'submissions' && <TeamsSubmissionsSection partyId={partyId} hackathon={hackathon} />}
       {section === 'leaderboard' && <LeaderboardSection partyId={partyId} hackathon={hackathon} onJudgingChanged={(h) => setHackathon(h)} />}
+      {section === 'voting' && (
+        <VotingSection partyId={partyId} onOpenWinners={() => setSection('winners')} onOpenSetup={() => setSection('setup')} />
+      )}
       {section === 'winners' && (
         <WinnersSection
           partyId={partyId}

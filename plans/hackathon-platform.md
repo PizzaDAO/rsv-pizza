@@ -577,6 +577,36 @@ configurable (default 1-5), blind judging optional and default off.
   instead of queueing writers behind it), runs one aggregated check inside the transaction,
   verifies fully after COMMIT, and prints the elapsed time.
 
+### PR 7 implementation notes (`hackathon-voting`)
+
+- Migration `backend/prisma/migrations/hackathon-2-voting.sql`; runner
+  `backend/scripts/apply-hackathon-voting.cjs` (same contract as PR 1: dry run default, `--apply`
+  in one short transaction, guarded `--rollback`). **Apply to prod before merging.**
+- **Settings are a new 1:1 table `hackathon_voting`, not `hackathons.voting_*` columns** (changes
+  §5). Prisma SELECTs every declared field, so new columns on the hot `Hackathon` model would 500
+  every hackathon read if the deploy beat the migration; a separate table limits that to the
+  voting routes, and `hackathons` takes no ALTER. No row = voting off.
+- `hackathon_votes`: one row per (hackathon, scope, voter), unique expression index
+  `hackathon_votes_one_per_scope` on `(hackathon_id, COALESCE(track_id, nil-uuid), voter_user_id)`;
+  writes are `INSERT ... ON CONFLICT` on that expression (the nil uuid must be a literal, not a bind
+  parameter, or Postgres can't infer the index once the statement goes generic). Composite FKs to
+  submission / track of the same hackathon; CASCADE from hackathon, submission, track and voter.
+  `ip_hash` is a 64-hex HMAC (CHECKed), never an IP.
+- Voting eligibility: `registered` | `checked_in` (default). No `logged_in` option (§16 Q3: the
+  MVP stays RSVP-gated). Judges, hosts and co-hosts may vote when they qualify.
+- Voters may change or retract their vote until close; after close votes are final.
+- Votes only for `submitted` projects while the gallery is open (`gallery_visibility`): with the
+  default `after_reveal`, voting starts after the reveal (a People's Choice award added after the
+  reveal shows up automatically). The host Voting section explains this.
+- Tallies: hidden from everyone (host included) until `closes_at` passes; the host sees only total
+  votes / voters and votes per ip_hash bucket while open. The public never gets counts; People's
+  Choice winners reach the public only through the awards reveal. Self-votes (by user id, account
+  email or RSVP email) are rejected on write and dropped again when counting.
+- People's Choice: after close the tally suggests the winner(s) in Winners & Payouts; the host
+  awards it. A `peoples_choice` prize can't be awarded while voting is scheduled or open (409).
+- Rate limits: 20 vote writes / hour / user; authenticated vote writes and the voting reads skip
+  the global per-IP limiter (venue Wi-Fi) and use per-user buckets.
+
 ## Sources (competitor scan)
 
 - [DoraHacks: external judges](https://dev.to/dorahacks/new-feature-hackathon-judging-made-easier-with-external-judges-1k97)

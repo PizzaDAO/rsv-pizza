@@ -53,6 +53,7 @@ model User {
   hackathonTeamMemberships         HackathonTeamMember[]    @relation("HackathonTeamMemberUser")
   hackathonJudgeRoles              HackathonJudge[]         @relation("HackathonJudgeUser")
   hackathonAwardsReceived          HackathonAward[]         @relation("HackathonAwardRecipient")
+  hackathonVotes                   HackathonVote[]          @relation("HackathonVoteVoter")
 }
 
 model Party {
@@ -3179,6 +3180,8 @@ model Hackathon {
   members     HackathonTeamMember[]
   submissions HackathonSubmission[]
   judges      HackathonJudge[]
+  voting      HackathonVoting?
+  votes       HackathonVote[]
 
   @@map("hackathons")
 }
@@ -3197,6 +3200,7 @@ model HackathonTrack {
   prizes      HackathonPrize[]
   submissions HackathonSubmissionTrack[]
   judges      HackathonJudgeTrack[]
+  votes       HackathonVote[]
 
   @@unique([id, hackathonId])
   @@index([hackathonId, sortOrder])
@@ -3318,6 +3322,7 @@ model HackathonSubmission {
   tracks HackathonSubmissionTrack[]
   scores HackathonScore[]
   awards HackathonAward[]
+  votes  HackathonVote[]
 
   @@unique([id, hackathonId])
   @@unique([hackathonId, slug])
@@ -3420,4 +3425,47 @@ model HackathonAward {
   @@index([submissionId])
   @@index([recipientUserId])
   @@map("hackathon_awards")
+}
+
+// hackathon-2-voting.sql (PR 7): public (People's Choice) voting. Settings live in their own
+// 1:1 table (not hackathons columns) so a mis-ordered deploy can only break the voting routes.
+// No row = voting off. Window: open while enabled AND opensAt <= now AND (closesAt null or
+// now < closesAt); manual open / close just set these timestamps.
+model HackathonVoting {
+  hackathonId String    @id @map("hackathon_id") @db.Uuid
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  enabled     Boolean   @default(false)
+  scope       String    @default("event") // event | track
+  eligibility String    @default("checked_in") // registered | checked_in
+  opensAt     DateTime? @map("opens_at") @db.Timestamptz
+  closesAt    DateTime? @map("closes_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("hackathon_voting")
+}
+
+// One vote per voter per scope: trackId null = the event-wide vote. Enforced by the raw-SQL
+// expression index hackathon_votes_one_per_scope on (hackathon_id, COALESCE(track_id, 0-uuid),
+// voter_user_id), which Prisma can't express: writes go through INSERT ... ON CONFLICT on it
+// (lib/hackathon/voting.ts). ipHash = HMAC-SHA256 of the normalized IP, never the raw IP.
+model HackathonVote {
+  id           String              @id @default(uuid()) @db.Uuid
+  hackathonId  String              @map("hackathon_id") @db.Uuid
+  hackathon    Hackathon           @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  trackId      String?             @map("track_id") @db.Uuid
+  track        HackathonTrack?     @relation(fields: [trackId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
+  submissionId String              @map("submission_id") @db.Uuid
+  submission   HackathonSubmission @relation(fields: [submissionId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
+  voterUserId  String              @map("voter_user_id")
+  voter        User                @relation("HackathonVoteVoter", fields: [voterUserId], references: [id], onDelete: Cascade)
+  ipHash       String?             @map("ip_hash")
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([hackathonId, submissionId])
+  @@index([hackathonId, ipHash])
+  @@index([trackId])
+  @@index([voterUserId])
+  @@map("hackathon_votes")
 }
