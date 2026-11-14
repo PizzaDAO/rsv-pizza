@@ -23,9 +23,9 @@ import { prisma } from '../config/database.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { isUuid } from '../lib/guestToken.js';
-import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { isHackathonHost } from '../lib/hackathon/access.js';
-import { findGuestsByEmail } from '../lib/hackathon/eligibility.js';
+// Event-page gates (pre-launch GPP27 / side) + password rule, shared with the gallery (PR 6).
+import { viewerCanSeeEvent } from '../lib/hackathon/gallery.js';
 import { HACKATHON_INCLUDE, hostHackathon, isPubliclyVisible, publicHackathon } from '../lib/hackathon/serialize.js';
 import { AWARD_INCLUDE, publicWinners } from '../lib/hackathon/awards.js';
 
@@ -36,23 +36,6 @@ async function winnersBlock(h: { id: string; resultsRevealedAt: Date | null; tra
   if (!h.resultsRevealedAt) return { resultsRevealedAt: null, winners: [] };
   const awards = await prisma.hackathonAward.findMany({ where: { hackathonId: h.id }, include: AWARD_INCLUDE, take: 1000 });
   return { resultsRevealedAt: h.resultsRevealedAt.toISOString(), winners: publicWinners(awards, h.tracks ?? []) };
-}
-
-/** Non-host viewer: the event-page gates (pre-launch GPP27 / side) + password protection. */
-async function viewerCanSeeEvent(partyId: string, viewerEmail: string | undefined): Promise<boolean> {
-  const party = await prisma.party.findUnique({
-    where: { id: partyId },
-    select: { eventType: true, eventTags: true, date: true, region: true, city: true, password: true },
-  });
-  if (!party) return false;
-  if (await isEventHiddenFrom(party, viewerEmail)) return false;
-  if (party.password) {
-    if (!viewerEmail) return false;
-    // Exact case-insensitive match (no ILIKE wildcards), non-declined RSVP.
-    const guests = await findGuestsByEmail(partyId, viewerEmail);
-    return guests.some((g) => g.approved !== false);
-  }
-  return true;
 }
 
 router.get('/:partyId/hackathon', optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {

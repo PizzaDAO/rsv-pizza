@@ -197,7 +197,7 @@ const award = (over: Record<string, any> = {}) => ({
 describe('publicWinners', () => {
   it('allowlisted fields only; never recipient, wallet, payout, notes, emails or ids', () => {
     const [w] = publicWinners([award()], [{ id: T1, name: 'DeFi' }]);
-    expect(Object.keys(w).sort()).toEqual(['place', 'prizeAmount', 'prizeId', 'prizeKind', 'prizeName', 'projectName', 'projectTagline', 'teamName', 'trackId', 'trackName']);
+    expect(Object.keys(w).sort()).toEqual(['place', 'prizeAmount', 'prizeId', 'prizeKind', 'prizeName', 'projectName', 'projectSlug', 'projectTagline', 'teamName', 'trackId', 'trackName']);
     expect(w).toMatchObject({ prizeName: 'Grand prize', prizeAmount: '$5,000', trackName: 'DeFi', projectName: 'Slice Router', teamName: 'Crust Coders', place: 1 });
     const json = JSON.stringify(publicWinners([award()], []));
     for (const secret of ['0xALICE', '0xTX', 'multisig', 'alice@secret', 'u-alice', 'u-host', 'paid']) expect(json).not.toContain(secret);

@@ -5,6 +5,8 @@
  * only: no emails, user ids, judges, judging config or drafts).
  */
 
+import { isGalleryOpen } from './galleryRules.js';
+
 type Row = Record<string, any>;
 
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(String(v)));
@@ -62,6 +64,8 @@ export function publicHackathon(h: Row) {
     maxTracksPerSubmission: h.maxTracksPerSubmission,
     eligibility: h.eligibility,
     publishedAt: iso(h.publishedAt),
+    /** PR 6: the public gallery (/:slug/projects) is open (lib/hackathon/galleryRules.ts). */
+    galleryOpen: isGalleryOpen(h as any),
     tracks: [...(h.tracks ?? [])].sort(bySort).map(publicTrack),
     prizes: [...(h.prizes ?? [])].sort(bySort).map(publicPrize),
     criteria: [...(h.criteria ?? [])].sort(bySort).map(publicCriterion),
@@ -98,6 +102,7 @@ export function hostHackathon(h: Row) {
     blindJudging: !!h.blindJudging,
     judgingStatus: h.judgingStatus,
     galleryVisibility: h.galleryVisibility,
+    galleryOpen: isGalleryOpen(h as any),
     publishedAt: iso(h.publishedAt),
     resultsRevealedAt: iso(h.resultsRevealedAt),
     createdAt: iso(h.createdAt),
