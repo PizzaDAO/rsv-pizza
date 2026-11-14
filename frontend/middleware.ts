@@ -37,6 +37,7 @@ export const OPEN_FILES = new Set([
   '/brands/team1/favicon.png',
   '/brands/team1/og.png',
   '/brands/monad/logo.png',
+  '/brands/monad/logo-dark.png',
   '/brands/monad/favicon.png',
   '/brands/monad/og.png',
   '/brands/doge/logo.png',
