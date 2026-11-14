@@ -21,8 +21,8 @@
     "check:schema-drift": "node ../scripts/check-schema-drift.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
-    "@aws-sdk/client-s3": "^3.1166.0",
+    "@anthropic-ai/sdk": "^0.137.0",
+    "@aws-sdk/client-s3": "^3.1167.0",
     "@napi-rs/canvas": "^0.1.100",
     "@prisma/client": "^6.8.2",
     "@privy-io/server-auth": "^1.32.5",
