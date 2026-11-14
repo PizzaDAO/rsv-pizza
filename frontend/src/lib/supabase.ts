@@ -1726,10 +1726,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3006';
  */
 export class RsvpVerificationRequiredError extends Error {
   readonly email: string;
-  constructor(email: string) {
+  /** No new code went out (send budget used); a code sent in the last 15 min still works. */
+  readonly recentlySent: boolean;
+  constructor(email: string, recentlySent = false) {
     super(`We sent a code to ${email}.`);
     this.name = 'RsvpVerificationRequiredError';
     this.email = email;
+    this.recentlySent = recentlySent;
   }
 }
 
@@ -1843,7 +1846,10 @@ export async function addGuestToParty(
     if (response.status === 202) {
       const data = await response.json().catch(() => null);
       if (data?.verificationRequired) {
-        throw new RsvpVerificationRequiredError(typeof data.email === 'string' ? data.email : (email || ''));
+        throw new RsvpVerificationRequiredError(
+          typeof data.email === 'string' ? data.email : (email || ''),
+          data.recentlySent === true,
+        );
       }
     }
 

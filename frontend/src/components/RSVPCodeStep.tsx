@@ -52,6 +52,11 @@ export function RSVPCodeStep({ form, onClose }: RSVPCodeStepProps) {
       <p className="text-xs text-theme-text-muted mb-5">
         Enter it to confirm it&apos;s you and save your RSVP.
       </p>
+      {form.codeRecentlySent && (
+        <p className="text-xs text-theme-text-muted -mt-3 mb-5" data-testid="rsvp-code-recently-sent">
+          We recently sent a code. Check your inbox; codes last 15 minutes.
+        </p>
+      )}
 
       <form onSubmit={submit} className="space-y-3">
         <IconInput
@@ -103,9 +108,9 @@ export function RSVPCodeStep({ form, onClose }: RSVPCodeStepProps) {
           Use a different email
         </button>
       </div>
-      {resent && (
+      {resent && !form.codeRecentlySent && !form.codeError && (
         <p className="text-xs text-theme-text-muted mt-2">
-          A new code is on its way unless one was sent just now. Codes last 15 minutes.
+          A new code is on its way. Codes last 15 minutes.
         </p>
       )}
     </div>

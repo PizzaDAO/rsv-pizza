@@ -173,7 +173,7 @@ export const SEND_PER_EMAIL_IP = 3; // per (email, IP) per 15 min
 export const SEND_PER_EMAIL_HOUR = 10; // per email, any IP; above it each (email, IP) gets 1 per 15 min
 
 /** Wrong codes at POST /api/auth/verify-code. */
-export const FAIL_PER_IP = 10; // per IP per 15 min, both code-only and email-bound checks
+export const FAIL_PER_IP = 40; // per IP per 15 min, both paths (generous for shared NAT, e.g. venue wifi)
 export const FAIL_PER_EMAIL_IP = 5; // per (email, IP) per 15 min, email-bound checks
 export const EMAIL_UNDER_ATTACK_FAILS = 25; // wrong codes on an email's live codes, any IP
 export const FAIL_PER_EMAIL_IP_UNDER_ATTACK = 1; // per (email, IP) once the email is under attack
@@ -239,7 +239,7 @@ function rollback(map: Map<string, number[]>, key: string, stamp: number) {
 }
 
 /**
- * May this caller try a code now? Checked BEFORE the code is looked up, so a refused
+ * Wrong-code budget (reserveVerifyAttempt below). Checked BEFORE the code is looked up, so a refused
  * caller learns nothing about whether their guess was right. Refuses only this caller:
  *   - FAIL_PER_IP wrong codes from this IP in 15 min (any email, either path);
  *   - for an email-bound check, FAIL_PER_EMAIL_IP wrong codes for this (email, IP), or
@@ -247,39 +247,70 @@ function rollback(map: Map<string, number[]>, key: string, stamp: number) {
  *     EMAIL_UNDER_ATTACK_FAILS wrong guesses from anyone. A caller with no failures of
  *     their own (e.g. the real owner, from their own IP) is never refused by that.
  */
-export async function verifyAllowed(ip: string | undefined, email?: string | null): Promise<boolean> {
-  const now = Date.now();
-  if (recent(failLog, `ip|${ip ?? '?'}`, now).length >= FAIL_PER_IP) return false;
-  if (!email) return true;
-  const mine = recent(failLog, `${email}|${ip ?? '?'}`, now).length;
-  if (mine >= FAIL_PER_EMAIL_IP) return false;
-  if (mine >= FAIL_PER_EMAIL_IP_UNDER_ATTACK) {
-    const underAttack = await prisma.magicLink.count({
-      where: {
-        email,
-        used: false,
-        expiresAt: { gt: new Date(now) },
-        attempts: { gte: EMAIL_UNDER_ATTACK_FAILS },
-      },
-    });
-    if (underAttack > 0) return false;
-  }
-  return true;
+export interface VerifyAttempt {
+  /** The code was right (or the failure shouldn't count): give the reserved slot back. */
+  release(): void;
+  /** The code was wrong: the reserved slot stays as the failure; bump the durable signal. */
+  fail(): Promise<void>;
 }
 
 /**
- * A wrong code was entered. Charged to the caller (IP, and email+IP when bound). For an
- * email-bound check it also bumps `attempts` on that email's live codes as a cross-instance
- * "under attack" signal. It NEVER sets locked_at or otherwise disables the codes, so wrong
- * guesses can't lock the owner out.
+ * Reserve one code check for this caller, or null when they're over budget. The slot is
+ * taken SYNCHRONOUSLY (before any await) under both `ip|…` and `email|ip` keys, so a burst
+ * of parallel requests can't all pass the check before any failure is recorded. A wrong
+ * code keeps the slot (it IS the failure); a right code releases it.
  */
-export async function recordFailedCode(ip: string | undefined, email?: string | null): Promise<void> {
+export async function reserveVerifyAttempt(ip: string | undefined, email?: string | null): Promise<VerifyAttempt | null> {
   const now = Date.now();
-  recent(failLog, `ip|${ip ?? '?'}`, now).push(now);
-  if (!email) return;
-  recent(failLog, `${email}|${ip ?? '?'}`, now).push(now);
-  await prisma.magicLink.updateMany({
-    where: { email, used: false, expiresAt: { gt: new Date(now) } },
-    data: { attempts: { increment: 1 } },
-  });
+  const ipKey = `ip|${ip ?? '?'}`;
+  const emailKey = email ? `${email}|${ip ?? '?'}` : null;
+  const ipTs = recent(failLog, ipKey, now);
+  if (ipTs.length >= FAIL_PER_IP) return null;
+  let mine = 0;
+  if (emailKey) {
+    const ts = recent(failLog, emailKey, now);
+    mine = ts.length;
+    if (mine >= FAIL_PER_EMAIL_IP) return null;
+    ts.push(now);
+  }
+  ipTs.push(now);
+  const release = () => {
+    rollback(failLog, ipKey, now);
+    if (emailKey) rollback(failLog, emailKey, now);
+  };
+
+  if (email && mine >= FAIL_PER_EMAIL_IP_UNDER_ATTACK) {
+    let underAttack = 0;
+    try {
+      underAttack = await prisma.magicLink.count({
+        where: {
+          email,
+          used: false,
+          expiresAt: { gt: new Date(now) },
+          attempts: { gte: EMAIL_UNDER_ATTACK_FAILS },
+        },
+      });
+    } catch (err) {
+      release();
+      throw err;
+    }
+    if (underAttack > 0) {
+      release();
+      return null;
+    }
+  }
+
+  return {
+    release,
+    // For an email-bound check also bump `attempts` on that email's live codes as the
+    // cross-instance "under attack" signal. Never sets locked_at or disables codes, so
+    // wrong guesses can't lock the owner out.
+    fail: async () => {
+      if (!email) return;
+      await prisma.magicLink.updateMany({
+        where: { email, used: false, expiresAt: { gt: new Date(now) } },
+        data: { attempts: { increment: 1 } },
+      });
+    },
+  };
 }

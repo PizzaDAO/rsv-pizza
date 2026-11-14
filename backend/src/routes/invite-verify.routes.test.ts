@@ -315,6 +315,11 @@ describe('POST /api/rsvp/:inviteCode/guest: completing a host invite', () => {
       expect(b.status).toBe(200);
       expect(b.body.updated).toBe(true);
       expect(resendSends()).toHaveLength(0);
+      // The loser's plain update must not write back the stale host-invite submittedVia.
+      const last = mockPrisma.guest.update.mock.calls[mockPrisma.guest.update.mock.calls.length - 1][0];
+      expect(last.where).toEqual({ id: EXISTING_ID });
+      expect(last.data.submittedVia).toBe('rsvp');
+      expect(last.data).not.toHaveProperty('status');
     });
 
     it('a non-owner (no token) gets only the sign-in code email: no confirmation, no wallet', async () => {
@@ -421,18 +426,21 @@ describe('the code step does not say WHICH kind of row the email has', () => {
     expect(mockPrisma.guest.update).not.toHaveBeenCalled();
   });
 
-  it('an over-budget requester gets the same 429 for every kind of row (no extra information)', async () => {
+  it('an over-budget requester still gets the code step (202 + recentlySent hint, no send), the same for every kind of row', async () => {
     const bodies: string[] = [];
     for (const [, existing] of kinds) {
       setup({ existing });
       resetRsvpCodeLimits();
       for (let i = 0; i < RSVP_CODE_PER_EMAIL_IP; i++) await request(app()).post('/api/rsvp/abc123/guest').send(CODE_BODY);
+      mockFetch.mockClear();
       const limited = await request(app()).post('/api/rsvp/abc123/guest').send(CODE_BODY);
-      expect(limited.status).toBe(429);
-      expect(limited.body.error.code).toBe('CODE_SEND_LIMIT');
+      expect(limited.status).toBe(202);
+      expect(limited.body).toEqual({ ...verificationRequiredResponse('ivy@example.com'), recentlySent: true });
+      expect(resendSends()).toHaveLength(0);
       bodies.push(JSON.stringify(limited.body));
     }
     expect(new Set(bodies).size).toBe(1);
+    expect(mockPrisma.guest.update).not.toHaveBeenCalled();
   });
 
   it('legacy clients (no codeStep flag) keep the #1240 decoy for every kind of row, nothing written', async () => {
@@ -453,12 +461,19 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
   const magicFrom = (ip: string, email = 'ivy@example.com') =>
     request(app()).post('/api/auth/magic-link').set('X-Forwarded-For', ip).send({ email });
 
-  it(`at most ${RSVP_CODE_PER_EMAIL_IP} codes per email + IP per window; then 429 "try again in a few minutes"`, async () => {
+  it(`at most ${RSVP_CODE_PER_EMAIL_IP} codes per email + IP per window; then /magic-link says 429 "try again in a few minutes" and the RSVP step stays up without a send`, async () => {
     setup();
-    for (let i = 0; i < RSVP_CODE_PER_EMAIL_IP; i++) expect((await rsvpFrom('1.2.3.4')).status).toBe(202);
+    for (let i = 0; i < RSVP_CODE_PER_EMAIL_IP; i++) {
+      const r = await rsvpFrom('1.2.3.4');
+      expect(r.status).toBe(202);
+      expect(r.body.recentlySent).toBeUndefined();
+    }
     const limited = await rsvpFrom('1.2.3.4');
-    expect(limited.status).toBe(429);
-    expect(limited.body.error.message).toMatch(/Try again in a few minutes/);
+    expect(limited.status).toBe(202);
+    expect(limited.body.recentlySent).toBe(true);
+    const magic = await magicFrom('1.2.3.4');
+    expect(magic.status).toBe(429);
+    expect(magic.body.error.message).toMatch(/Try again in a few minutes/);
     expect(mockPrisma.magicLink.create).toHaveBeenCalledTimes(RSVP_CODE_PER_EMAIL_IP);
     expect(resendSends()).toHaveLength(RSVP_CODE_PER_EMAIL_IP);
   });
@@ -466,7 +481,7 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
   it('/magic-link and the RSVP code step share the (email, IP) budget', async () => {
     setup();
     for (let i = 0; i < RSVP_CODE_PER_EMAIL_IP; i++) expect((await magicFrom('1.2.3.4')).status).toBe(200);
-    expect((await rsvpFrom('1.2.3.4')).status).toBe(429);
+    expect((await rsvpFrom('1.2.3.4')).body.recentlySent).toBe(true);
     expect((await magicFrom('1.2.3.4')).status).toBe(429);
     // Another address from the same IP is its own budget.
     expect((await magicFrom('1.2.3.4', 'other@example.com')).status).toBe(200);
@@ -486,8 +501,8 @@ describe('code send limits (shared by /magic-link and the RSVP code step, charge
   it(`over ${SEND_PER_EMAIL_HOUR}/hour for the email, each (email, IP) gets just one per window`, async () => {
     setup();
     mockPrisma.magicLink.count.mockResolvedValue(SEND_PER_EMAIL_HOUR);
-    expect((await rsvpFrom('9.9.9.9')).status).toBe(202);
-    expect((await rsvpFrom('9.9.9.9')).status).toBe(429);
+    expect((await rsvpFrom('9.9.9.9')).body.recentlySent).toBeUndefined();
+    expect((await rsvpFrom('9.9.9.9')).body.recentlySent).toBe(true);
     expect(mockPrisma.magicLink.create).toHaveBeenCalledTimes(1);
     expect(mockPrisma.magicLink.count).toHaveBeenCalledWith({
       where: { email: 'ivy@example.com', createdAt: { gte: expect.any(Date) } },
@@ -643,6 +658,58 @@ describe('POST /api/auth/verify-code bound to an email', () => {
     expect(mockPrisma.magicLink.updateMany).not.toHaveBeenCalled();
     // Another IP is unaffected.
     expect((await verify('4.4.4.5', { code })).status).toBe(200);
+  });
+
+  describe('parallel bursts cannot bypass the budget (slots are reserved before any await)', () => {
+    async function burst(n: number, body: (i: number) => Record<string, unknown>, ip: string) {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      const base = mockPrisma.magicLink.findUnique.getMockImplementation()!;
+      mockPrisma.magicLink.findUnique.mockClear();
+      mockPrisma.magicLink.findUnique.mockImplementation(async (args: any) => { await gate; return base(args); });
+      const pending = Array.from({ length: n }, (_, i) => verify(ip, body(i)));
+      // Let every request reach the gate (supertest needs a few ticks to dispatch).
+      await new Promise((r) => setTimeout(r, 50));
+      release();
+      const res = await Promise.all(pending);
+      return {
+        evaluated: mockPrisma.magicLink.findUnique.mock.calls.length,
+        statuses: res.map((r) => r.status),
+      };
+    }
+
+    it(`code-only: ${FAIL_PER_IP + 20} parallel wrong guesses from one IP → only ${FAIL_PER_IP} are looked up, the rest 429`, async () => {
+      const code = await getCode();
+      const { evaluated, statuses } = await burst(FAIL_PER_IP + 20, (i) => ({ code: String(200000 + i) === code ? '999998' : String(200000 + i) }), '2.2.2.2');
+      expect(evaluated).toBe(FAIL_PER_IP);
+      expect(statuses.filter((s) => s === 401)).toHaveLength(FAIL_PER_IP);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(20);
+    });
+
+    it(`email-bound: 12 parallel wrong guesses from one IP → only ${FAIL_PER_EMAIL_IP} are looked up`, async () => {
+      const code = await getCode();
+      const { evaluated, statuses } = await burst(12, () => ({ code: wrongOf(code), email: 'ivy@example.com' }), '2.2.2.3');
+      expect(evaluated).toBe(FAIL_PER_EMAIL_IP);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(12 - FAIL_PER_EMAIL_IP);
+    });
+
+    it('a right code gives its slot back (a correct login is not counted as a failure)', async () => {
+      const code = await getCode();
+      for (let i = 0; i < FAIL_PER_EMAIL_IP - 1; i++) await verify('2.2.2.4', { code: wrongOf(code), email: 'ivy@example.com' });
+      expect((await verify('2.2.2.4', { code, email: 'ivy@example.com' })).status).toBe(200);
+      // Still one wrong try left for this (email, IP): the success didn't use it up.
+      expect((await verify('2.2.2.4', { code: wrongOf(code), email: 'ivy@example.com' })).status).toBe(401);
+      expect((await verify('2.2.2.4', { code: wrongOf(code), email: 'ivy@example.com' })).status).toBe(429);
+    });
+  });
+
+  it("email-bound: re-entering your own expired/used code is not charged as a failed guess", async () => {
+    const code = await getCode();
+    links.get(code).used = true;
+    for (let i = 0; i < FAIL_PER_EMAIL_IP + 2; i++) {
+      expect((await verify('2.2.2.5', { code, email: 'ivy@example.com' })).body.error.code).toBe('CODE_USED');
+    }
+    expect(mockPrisma.magicLink.updateMany).not.toHaveBeenCalled();
   });
 
   it('the per-IP budget is shared across emails (one IP cannot spray many victims)', async () => {

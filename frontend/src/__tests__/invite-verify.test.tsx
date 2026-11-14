@@ -194,6 +194,21 @@ describe('inline code step in the RSVP form', () => {
     expect(bodyOf(prefs!).email).toBe('Ivy@Example.com');
   });
 
+  it('send budget used: the 202 carries recentlySent, so the code box still shows with a "check your inbox" hint', async () => {
+    fetchMock.mockImplementationOnce(async () =>
+      json(202, { success: false, verificationRequired: true, email: 'ivy@example.com', recentlySent: true, message: 'x' }),
+    );
+    await submitForm();
+    expect(screen.getByTestId('rsvp-code-step')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('6-digit code')).toBeInTheDocument();
+    expect(screen.getByTestId('rsvp-code-recently-sent')).toHaveTextContent(/We recently sent a code/);
+  });
+
+  it('a normal 202 shows no "recently sent" hint', async () => {
+    await submitForm();
+    expect(screen.queryByTestId('rsvp-code-recently-sent')).not.toBeInTheDocument();
+  });
+
   it('a 429 on "Send a new code" shows "try again in a few minutes" in the code step', async () => {
     await submitForm();
     fetchMock.mockResolvedValueOnce(json(429, { error: { code: 'CODE_SEND_LIMIT', message: 'Too many codes requested for this email. Try again in a few minutes.' } }));

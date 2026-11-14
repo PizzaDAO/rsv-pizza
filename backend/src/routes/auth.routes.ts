@@ -5,7 +5,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/error.js';
 import { normalizeEmail } from '../helpers/email.js';
 import { siteForOrigin } from '../lib/siteBrand.js';
-import { issueLoginCode, takeCodeSend, verifyAllowed, recordFailedCode } from '../lib/loginCode.js';
+import { issueLoginCode, takeCodeSend, reserveVerifyAttempt } from '../lib/loginCode.js';
 import { getJwtSecret } from '../config/secrets.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
@@ -262,20 +262,33 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
     // invite-verify (security review): brute-force budget, charged to the CALLER (IP, and
     // email+IP when bound), checked before the lookup so a refused caller learns nothing.
     // Wrong guesses never lock the stored codes, so nobody can lock the owner out.
-    // See lib/loginCode.ts for the limits and the PR for the math.
-    if (!(await verifyAllowed(req.ip, boundEmail))) {
+    // See lib/loginCode.ts for the limits and the PR for the math. The attempt slot is
+    // reserved synchronously, so parallel bursts can't all slip past the budget.
+    const attempt = await reserveVerifyAttempt(req.ip, boundEmail);
+    if (!attempt) {
       throw new AppError('Too many wrong codes. Try again in a few minutes.', 429, 'VERIFY_RATE_LIMITED');
     }
     const fail = async (message: string, status: number, errCode: string): Promise<never> => {
-      await recordFailedCode(req.ip, boundEmail);
+      await attempt.fail();
       throw new AppError(message, status, errCode);
+    };
+    /** A stale code that DID belong to the submitted email: not a guess, don't charge it. */
+    const staleOwnCode = (message: string, errCode: string): never => {
+      attempt.release();
+      throw new AppError(message, 401, errCode);
     };
 
     // Find magic link by code
-    const magicLink = await prisma.magicLink.findUnique({
-      where: { code },
-      include: { user: true },
-    });
+    let magicLink;
+    try {
+      magicLink = await prisma.magicLink.findUnique({
+        where: { code },
+        include: { user: true },
+      });
+    } catch (err) {
+      attempt.release();
+      throw err;
+    }
 
     if (!magicLink || (boundEmail && normalizeEmail(magicLink.email) !== boundEmail)) {
       return await fail('Invalid code', 401, 'INVALID_CODE');
@@ -288,13 +301,18 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
 
     // Check if expired
     if (magicLink.expiresAt < new Date()) {
+      if (boundEmail) staleOwnCode('Code expired', 'CODE_EXPIRED');
       return await fail('Code expired', 401, 'CODE_EXPIRED');
     }
 
     // Check if already used
     if (magicLink.used) {
+      if (boundEmail) staleOwnCode('Code already used', 'CODE_USED');
       return await fail('Code already used', 401, 'CODE_USED');
     }
+
+    // The code is right: give the reserved slot back.
+    attempt.release();
 
     // Mark as used
     await prisma.magicLink.update({

@@ -181,6 +181,8 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // True when the server didn't send a new code (send budget used); an earlier one still works.
+  const [codeRecentlySent, setCodeRecentlySent] = useState(false);
 
   // Pizzeria state
   const [nearbyPizzerias, setNearbyPizzerias] = useState<Pizzeria[]>([]);
@@ -295,6 +297,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     setVerificationEmail(null);
     setVerifyingCode(false);
     setCodeError(null);
+    setCodeRecentlySent(false);
     setStep(1);
     setError(null);
     setSwcOptIn(false);
@@ -594,6 +597,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
       if (isVerificationRequired(err)) {
         // invite-verify: show the inline code step; the answers stay in the form.
         setVerificationEmail(err.email || email.trim().toLowerCase());
+        setCodeRecentlySent(err.recentlySent === true);
         setCodeError(null);
       } else {
         const msg = err instanceof Error ? err.message : 'Failed to submit. Please try again.';
@@ -761,6 +765,7 @@ export function useRSVPForm(options: UseRSVPFormOptions) {
     verificationEmail,
     verifyingCode,
     codeError,
+    codeRecentlySent,
     verifyCode,
     resendCode,
     cancelCodeStep,

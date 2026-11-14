@@ -132,8 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to send magic link');
+      const error = await response.json().catch(() => null);
+      // The API puts the message under error.error (e.g. the 429 "Try again in a few minutes").
+      throw new Error(error?.error?.message ?? error?.message ?? 'Failed to send magic link');
     }
 
     return response.json();

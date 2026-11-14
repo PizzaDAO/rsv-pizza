@@ -700,7 +700,10 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
               await sendNewRsvpEmail(completed.id);
               return res.status(201).json(newRsvpResponse(completed.id));
             }
-            existingGuest.status = 'CONFIRMED'; // lost the race: someone else completed it
+            // Lost the race: someone else completed it. Don't let updateData keep the stale
+            // host-invite submittedVia.
+            existingGuest.status = 'CONFIRMED';
+            existingGuest.submittedVia = 'rsvp';
           }
 
           const updatedGuest = await prisma.guest.update({
@@ -736,12 +739,14 @@ router.post('/:inviteCode/guest', optionalAuth, async (req: AuthRequest, res: Re
         // instant 201); see the PR notes for why that is accepted: the same fact already
         // leaks through the public guest count, and every probe now emails the address
         // owner. Sends share /api/auth/magic-link's budget, charged to the requester
-        // (email + IP; see lib/loginCode.ts takeCodeSend). An over-budget requester gets 429
-        // "try again in a few minutes": that only follows a 202 this caller could already
-        // get, so it adds no membership information, and it's the same for every row kind.
+        // (email + IP; see lib/loginCode.ts takeCodeSend). An over-budget requester gets the
+        // same 202 (no new email) plus `recentlySent: true`.
         if (req.body?.codeStep === true) {
+          // Over the send budget: still show the code step (a recent code stays valid for
+          // 15 minutes), just don't send another. `recentlySent` is a hint for the UI; it only
+          // follows a 202 this caller already gets, and is the same for every kind of row.
           if (!(await takeCodeSend(normalizedEmail, req.ip))) {
-            throw new AppError('Too many codes requested for this email. Try again in a few minutes.', 429, 'CODE_SEND_LIMIT');
+            return res.status(202).json({ ...verificationRequiredResponse(normalizedEmail), recentlySent: true });
           }
           try {
             const codeUser = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
