@@ -694,26 +694,137 @@ body.gpp-theme-active .gpp-badge.gpp-badge-community { display: inline-flex !imp
  * >= 4.5:1 (AA); --accent-hover is the lighter tint so accent-coloured text on the
  * dark backgrounds clears AA too (#FF4D5A 5.9:1, #8F7BFF 6.0:1). */
 .team1-theme {
-  --bg-main: #0f0f12;
-  --bg-card: rgba(255, 255, 255, 0.07);
-  --bg-card-hover: rgba(255, 255, 255, 0.1);
-  --bg-surface: rgba(255, 255, 255, 0.05);
-  --bg-surface-hover: rgba(255, 255, 255, 0.08);
+  --bg-main: #000000;
+  --bg-card: #1a1b1c;
+  --bg-card-hover: #222324;
+  --bg-surface: #161617;
+  --bg-surface-hover: #1f2021;
   --bg-overlay: rgba(0, 0, 0, 0.72);
-  --bg-input: rgba(255, 255, 255, 0.06);
-  --bg-input-focus: rgba(255, 255, 255, 0.09);
-  --bg-header: #17171c;
-  --text-primary: rgba(255, 255, 255, 0.94);
-  --text-secondary: rgba(255, 255, 255, 0.72);
-  --text-muted: rgba(255, 255, 255, 0.55);
+  --bg-input: #1a1b1c;
+  --bg-input-focus: #222324;
+  --bg-header: rgba(0, 0, 0, 0.9);
+  --text-primary: #ffffff;
+  --text-secondary: #e5e7eb;
+  --text-muted: #9ca3af;
   --text-faint: rgba(255, 255, 255, 0.25);
-  --stroke: rgba(255, 255, 255, 0.12);
-  --stroke-hover: rgba(255, 255, 255, 0.22);
-  --stroke-strong: rgba(255, 255, 255, 0.32);
+  --stroke: #2a2d31;
+  --stroke-hover: #3d4147;
+  --stroke-strong: #565b63;
   --accent: #E6212F;
   --accent-hover: #FF4D5A;
   --error: #FF4D5A;
   --color-scheme: dark;
+}
+
+
+/* Team1 (Avalanche team1 brand site). Restyled after team1.network: pure black page with a
+ * faint red glow, Kanit type (loaded only for this theme from App.tsx), #1a1b1c cards with
+ * #2a2d31 borders, and pill buttons in brand red #E6212F with white text (4.6:1). */
+.team1-theme {
+  --team1-red: #E6212F;
+  --team1-card: #1a1b1c;
+  --team1-line: #2a2d31;
+  --team1-font: 'Kanit', system-ui, sans-serif;
+  color-scheme: dark;
+  background: #000;
+}
+.team1-theme body {
+  font-family: var(--team1-font);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 33, 47, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 30% at 50% 0%, rgba(230, 33, 47, 0.07), transparent 70%),
+    #000;
+  background-attachment: fixed;
+}
+.team1-theme button, .team1-theme input, .team1-theme textarea, .team1-theme select { font-family: var(--team1-font); }
+.team1-theme h1, .team1-theme h2, .team1-theme h3 {
+  font-family: var(--team1-font) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em;
+}
+.team1-theme main > header > h1 { font-size: clamp(2.25rem, 6vw, 3.75rem); line-height: 1.05; text-wrap: balance; }
+/* Page wrappers carry an inline solid background; let the body glow show through. */
+.team1-theme .min-h-screen { background: transparent !important; }
+/* Landing page event tiles (SeriesLandingPage): same card treatment, red hairline on hover. */
+.team1-theme main a.block.rounded-xl {
+  background: var(--team1-card);
+  border: 1px solid var(--team1-line);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+.team1-theme main a.block.rounded-xl:hover { background: #222324; border-color: var(--team1-red); }
+.team1-theme main section > h2 { font-size: 1.75rem; margin-bottom: 1.25rem; }
+/* Header: black bar, hairline border; wordmark is the logo image (drop the duplicate text). */
+.team1-theme .site-header {
+  background: rgba(0, 0, 0, 0.9) !important;
+  border-bottom: 1px solid var(--team1-line) !important;
+  backdrop-filter: blur(12px);
+}
+.team1-theme .site-header a span { display: none; }
+/* Cards: flat #1a1b1c, hairline border, 16px radius. */
+.team1-theme .card {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 16px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.team1-theme .card:hover { border-color: #3d4147 !important; }
+/* Buttons: pills. */
+.team1-theme .btn-primary, .team1-theme .btn-secondary {
+  border-radius: 9999px;
+  font-family: var(--team1-font);
+  font-weight: 600;
+  padding: 12px 24px;
+}
+.team1-theme .btn-primary {
+  background-color: var(--team1-red);
+  border: 1px solid var(--team1-red);
+  color: #fff;
+}
+.team1-theme .btn-primary:hover:not(:disabled) { background-color: #ff3a48; border-color: #ff3a48; }
+.team1-theme .btn-secondary {
+  background: var(--team1-card);
+  border: 1px solid var(--team1-line);
+  color: #e5e7eb;
+}
+.team1-theme .btn-secondary:hover { background: #222324; border-color: #3d4147; }
+/* Inputs */
+.team1-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.team1-theme textarea, .team1-theme select {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 12px;
+  color: #fff !important;
+}
+.team1-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.team1-theme textarea:focus, .team1-theme select:focus {
+  border-color: var(--team1-red) !important;
+  box-shadow: 0 0 0 3px rgba(230, 33, 47, 0.3);
+}
+.team1-theme input::placeholder, .team1-theme textarea::placeholder { color: #9ca3af !important; }
+/* Brand-red utilities used across the app stay red (it is the brand colour here). */
+.team1-theme .text-\[\#ff393a\] { color: #fff; text-decoration: underline; text-decoration-color: #E6212F; text-underline-offset: 3px; }
+/* The header already shows the wordmark; hide the duplicate series logo in the landing hero. */
+.team1-theme main > header > img:first-child { display: none; }
+.team1-theme .bg-\[\#ff393a\] { background-color: var(--team1-red); }
+.team1-theme .from-\[\#ff393a\] { background-image: linear-gradient(135deg, #E6212F, #7a0f18); }
+/* Google Places dropdown (appended to <body>, outside the themed subtree). */
+.team1-theme .pac-container {
+  background-color: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+.team1-theme .pac-item { background-color: var(--team1-card) !important; border-color: var(--team1-line) !important; color: #e5e7eb !important; }
+.team1-theme .pac-item:hover { background-color: #222324 !important; }
+.team1-theme .pac-item-query { color: #fff !important; }
+/* Modals */
+.team1-theme .fixed.inset-0 .card, .team1-theme .fixed.inset-0 .bg-theme-header {
+  background: var(--team1-card) !important;
+  border: 1px solid var(--team1-line) !important;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7) !important;
 }
 
 /* Monad (Monad brand site). Light theme modelled on www.monad.xyz: off-white #FAFAFA page
