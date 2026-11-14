@@ -148,7 +148,7 @@ adds the Prisma fields merges. `npm --prefix backend run check:schema-drift` mus
 
 Models (column names are snake_case via `@map`, UUID PKs, `timestamptz` timestamps):
 
-- **Hackathon** (`hackathons`). One per party (`party_id UNIQUE`, FK cascade). A row existing
+- **Hackathon** (`hackathons`). One per party (`party_id UNIQUE`, FK RESTRICT, see the delete rules in section 16). A row existing
   means the app is enabled.
   - Content and schedule: `rules` (text), `submissions_open_at`, `submission_deadline`.
   - Team and track rules: `team_min_size` int default 1 CHECK >= 1, `team_max_size` int default 5
@@ -188,15 +188,18 @@ Models (column names are snake_case via `@map`, UUID PKs, `timestamptz` timestam
   - State: `status` ('draft' | 'submitted' | 'disqualified' | 'withdrawn'), `submitted_at`,
     `disqualified_reason`, `table_number` nullable, `created_at`, `updated_at`.
 - **HackathonSubmissionTrack** (`hackathon_submission_tracks`): PK `(submission_id, track_id)`.
-- **HackathonJudge** (`hackathon_judges`): `hackathon_id`, `email` (lowercased), `name`,
-  `user_id` nullable (linked on first authenticated visit), `track_ids` uuid[] (empty = all
-  tracks), `status` ('active' | 'removed'), `invited_by`, `created_at`. Unique on
-  `(hackathon_id, email)`.
-- **HackathonScore** (`hackathon_scores`): `judge_id` FK cascade, `submission_id` FK cascade,
+- **HackathonJudge** (`hackathon_judges`): `hackathon_id`, `email` (trimmed + lowercased,
+  CHECKed), `name`, `user_id` nullable (linked on first authenticated visit), `status`
+  ('active' | 'removed'), `invited_by`, `created_at`. Unique on `(hackathon_id, email)`.
+- **HackathonJudgeTrack** (`hackathon_judge_tracks`, replaces the earlier `track_ids` uuid[]):
+  PK `(judge_id, track_id)`, `hackathon_id`, composite FKs to the judge and the track of the
+  same hackathon, CASCADE on judge/track delete. No rows for a judge = all tracks, so stale
+  track ids can't exist.
+- **HackathonScore** (`hackathon_scores`): `hackathon_id`, `judge_id` and `submission_id` (composite FKs, NO ACTION),
   `criterion_scores` jsonb (`{criterionId: int}`, validated against the rubric on write),
   `total` numeric (weighted, normalized to 0-100, computed on write), `private_comment` (<=2000),
   `team_feedback` (<=2000), `updated_at`. Unique on `(judge_id, submission_id)`.
-- **HackathonAward** (`hackathon_awards`): `prize_id` FK cascade, `submission_id` FK cascade,
+- **HackathonAward** (`hackathon_awards`): `hackathon_id`, `prize_id` (composite FK, NO ACTION), `submission_id` (composite FK, RESTRICT),
   `place` int nullable, `awarded_at`, `awarded_by`. Payout tracking: `payout_status`,
   `recipient_user_id`, `recipient_wallet`, `payout_reference`, `paid_at`, `payout_notes`. Unique on
   `(prize_id, submission_id)`.
@@ -542,6 +545,37 @@ configurable (default 1-5), blind judging optional and default off.
   enum CHECKs on the text columns. `table_number` is `text` (e.g. "A12").
 - No per-judge invite code column: `/judge/:inviteCode` is read as the party's invite code, and
   judges are identified by JWT email. Revisit in PR 4 if a per-judge token is wanted.
+- **Same-hackathon integrity (schema review)**: tracks, prizes, teams, judges and submissions
+  have UNIQUE `(id, hackathon_id)`. Team members, prizes (track), submissions (team),
+  submission tracks, judge tracks, scores and awards carry `hackathon_id` and use composite FKs
+  `(ref_id, hackathon_id) -> parent(id, hackathon_id)`, so no row can point across hackathons.
+  Route code must set `hackathon_id` on scores, awards, submission tracks and judge tracks.
+- **One captain per team**: partial unique index `hackathon_team_members_one_captain_per_team`
+  on `(team_id) WHERE role = 'captain'` (raw SQL, not expressible in Prisma).
+- **Slug format**: CHECK `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`.
+- **Delete rules**: nothing silently deletes submissions, scores or awards (payout history).
+  - RESTRICT: `hackathons.party_id`, `submissions.team_id`, `awards.submission_id`.
+  - NO ACTION (blocks a direct delete like RESTRICT, but is checked at the end of the statement
+    so a hackathon-level cascade that removes both sides succeeds): `prizes.track_id`,
+    `submissions.hackathon_id`, `submission_tracks.track_id`, `scores.judge_id` /
+    `submission_id`, `awards.prize_id`.
+  - CASCADE: hackathon to its own config (tracks, prizes, criteria, teams, members, judges),
+    team to members, submission to submission tracks, judge/track to judge tracks.
+  - SET NULL: team creator, judge user, award recipient, member guest.
+  - The result: a track with prizes or entries, a team with a submission, a judge with scores,
+    and a prize or submission with awards/scores can't be deleted. A hard hackathon delete fails
+    while any submission exists. A config-only hackathon deletes cleanly.
+- **Party deletion (PR 2 must handle)**: hosts' `DELETE /api/parties/:id` is a soft cancel
+  (porchetta-81402), so it's unaffected. The only hard party delete in the backend is
+  `DELETE /api/v1/parties/:id` (API key, `backend/src/routes/v1/parties.ts`). Because
+  `hackathons.party_id` is RESTRICT, that path will raise a raw FK error (P2003, currently a
+  500) for a party with a hackathon row. PR 2 must check for a hackathon row and answer 409
+  ("disable the hackathon first"), or delete a config-only hackathon first in the same
+  transaction. "User" rows are not hard-deleted anywhere in the code.
+- **Apply transaction**: creating the FKs holds SHARE ROW EXCLUSIVE on parties / "User" /
+  guests until COMMIT. The runner uses `lock_timeout = 3s` (it fails fast behind a long writer
+  instead of queueing writers behind it), runs one aggregated check inside the transaction,
+  verifies fully after COMMIT, and prints the elapsed time.
 
 ## Sources (competitor scan)
 

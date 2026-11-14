@@ -3141,13 +3141,20 @@ model AuthRateEvent {
 // backend/scripts/apply-hackathon-schema.cjs BEFORE these models merge.
 // Backend-only tables: RLS on, no policies, no anon/authenticated grants
 // (listed in scripts/anon-no-access-tables.json). CHECK constraints (enums,
-// length caps, team size bounds) live in the SQL only.
+// length caps, team size bounds, slug format), and the one-captain-per-team
+// partial unique index, live in the SQL only.
+// Same-hackathon integrity: rows linking two hackathon-scoped rows carry
+// hackathonId and use composite relations (refId, hackathonId) -> (id, hackathonId).
+// Delete rules (see the SQL header): Restrict/NoAction wherever a delete would
+// otherwise drop submissions, scores or awards (payout history). Cascade only
+// from a hackathon to its own config.
 
 // One per party; a row means the host enabled the app (disabledAt = hidden).
+// Party delete is Restricted: hosts soft-cancel; DELETE /api/v1/parties/:id must 409 (PR 2).
 model Hackathon {
   id                     String    @id @default(uuid()) @db.Uuid
   partyId                String    @unique @map("party_id") @db.Uuid
-  party                  Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  party                  Party     @relation(fields: [partyId], references: [id], onDelete: Restrict)
   rules                  String?
   submissionsOpenAt      DateTime? @map("submissions_open_at") @db.Timestamptz
   submissionDeadline     DateTime? @map("submission_deadline") @db.Timestamptz
@@ -3188,7 +3195,9 @@ model HackathonTrack {
 
   prizes      HackathonPrize[]
   submissions HackathonSubmissionTrack[]
+  judges      HackathonJudgeTrack[]
 
+  @@unique([id, hackathonId])
   @@index([hackathonId, sortOrder])
   @@map("hackathon_tracks")
 }
@@ -3199,7 +3208,7 @@ model HackathonPrize {
   hackathonId String          @map("hackathon_id") @db.Uuid
   hackathon   Hackathon       @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   trackId     String?         @map("track_id") @db.Uuid
-  track       HackathonTrack? @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  track       HackathonTrack? @relation(fields: [trackId, hackathonId], references: [id, hackathonId], onDelete: NoAction)
   name        String
   description String?
   rank        Int?
@@ -3214,6 +3223,7 @@ model HackathonPrize {
 
   awards HackathonAward[]
 
+  @@unique([id, hackathonId])
   @@index([hackathonId, sortOrder])
   @@index([trackId])
   @@map("hackathon_prizes")
@@ -3246,18 +3256,22 @@ model HackathonTeam {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  members    HackathonTeamMember[]
-  submission HackathonSubmission?
+  members     HackathonTeamMember[]
+  // At most one (DB UNIQUE on hackathon_submissions.team_id).
+  submissions HackathonSubmission[]
 
+  @@unique([id, hackathonId])
   @@index([hackathonId])
+  @@index([createdByUserId])
   @@map("hackathon_teams")
 }
 
-// hackathonId is denormalized: @@unique([hackathonId, userId]) = one team per person per event.
+// @@unique([hackathonId, userId]) = one team per person per event. One captain per team is a
+// partial unique index in the SQL (hackathon_team_members_one_captain_per_team).
 model HackathonTeamMember {
   id            String        @id @default(uuid()) @db.Uuid
   teamId        String        @map("team_id") @db.Uuid
-  team          HackathonTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team          HackathonTeam @relation(fields: [teamId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
   hackathonId   String        @map("hackathon_id") @db.Uuid
   hackathon     Hackathon     @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   userId        String        @map("user_id")
@@ -3280,9 +3294,9 @@ model HackathonTeamMember {
 model HackathonSubmission {
   id                 String        @id @default(uuid()) @db.Uuid
   hackathonId        String        @map("hackathon_id") @db.Uuid
-  hackathon          Hackathon     @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  hackathon          Hackathon     @relation(fields: [hackathonId], references: [id], onDelete: NoAction)
   teamId             String        @unique @map("team_id") @db.Uuid
-  team               HackathonTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team               HackathonTeam @relation(fields: [teamId, hackathonId], references: [id, hackathonId], onDelete: Restrict)
   name               String
   slug               String
   tagline            String?
@@ -3304,6 +3318,7 @@ model HackathonSubmission {
   scores HackathonScore[]
   awards HackathonAward[]
 
+  @@unique([id, hackathonId])
   @@unique([hackathonId, slug])
   @@index([hackathonId, status])
   @@map("hackathon_submissions")
@@ -3311,9 +3326,10 @@ model HackathonSubmission {
 
 model HackathonSubmissionTrack {
   submissionId String              @map("submission_id") @db.Uuid
-  submission   HackathonSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission   HackathonSubmission @relation(fields: [submissionId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
   trackId      String              @map("track_id") @db.Uuid
-  track        HackathonTrack      @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  track        HackathonTrack      @relation(fields: [trackId, hackathonId], references: [id, hackathonId], onDelete: NoAction)
+  hackathonId  String              @map("hackathon_id") @db.Uuid
   createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
   @@id([submissionId, trackId])
@@ -3321,7 +3337,7 @@ model HackathonSubmissionTrack {
   @@map("hackathon_submission_tracks")
 }
 
-// Matched by JWT email (lowercased). trackIds empty = all tracks.
+// Matched by JWT email (trimmed + lowercased). No HackathonJudgeTrack rows = all tracks.
 model HackathonJudge {
   id          String    @id @default(uuid()) @db.Uuid
   hackathonId String    @map("hackathon_id") @db.Uuid
@@ -3330,28 +3346,43 @@ model HackathonJudge {
   name        String?
   userId      String?   @map("user_id")
   user        User?     @relation("HackathonJudgeUser", fields: [userId], references: [id], onDelete: SetNull)
-  trackIds    String[]  @default([]) @map("track_ids") @db.Uuid
   status      String    @default("active") // active | removed
   invitedBy   String?   @map("invited_by")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  tracks HackathonJudgeTrack[]
   scores HackathonScore[]
 
+  @@unique([id, hackathonId])
   @@unique([hackathonId, email])
   @@index([email])
   @@index([userId])
   @@map("hackathon_judges")
 }
 
+model HackathonJudgeTrack {
+  judgeId     String         @map("judge_id") @db.Uuid
+  judge       HackathonJudge @relation(fields: [judgeId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
+  trackId     String         @map("track_id") @db.Uuid
+  track       HackathonTrack @relation(fields: [trackId, hackathonId], references: [id, hackathonId], onDelete: Cascade)
+  hackathonId String         @map("hackathon_id") @db.Uuid
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@id([judgeId, trackId])
+  @@index([trackId])
+  @@map("hackathon_judge_tracks")
+}
+
 // criterionScores: {criterionId: int}. total: weighted, normalized 0-100.
 // teamFeedback is shown to the team after the reveal (later phase); privateComment is hosts-only.
 model HackathonScore {
   id              String              @id @default(uuid()) @db.Uuid
+  hackathonId     String              @map("hackathon_id") @db.Uuid
   judgeId         String              @map("judge_id") @db.Uuid
-  judge           HackathonJudge      @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  judge           HackathonJudge      @relation(fields: [judgeId, hackathonId], references: [id, hackathonId], onDelete: NoAction)
   submissionId    String              @map("submission_id") @db.Uuid
-  submission      HackathonSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission      HackathonSubmission @relation(fields: [submissionId, hackathonId], references: [id, hackathonId], onDelete: NoAction)
   criterionScores Json                @default("{}") @map("criterion_scores")
   total           Decimal             @db.Decimal(6, 2)
   privateComment  String?             @map("private_comment")
@@ -3367,10 +3398,11 @@ model HackathonScore {
 // Payout status tracking only: unpaid | pending | paid | not_applicable.
 model HackathonAward {
   id              String              @id @default(uuid()) @db.Uuid
+  hackathonId     String              @map("hackathon_id") @db.Uuid
   prizeId         String              @map("prize_id") @db.Uuid
-  prize           HackathonPrize      @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  prize           HackathonPrize      @relation(fields: [prizeId, hackathonId], references: [id, hackathonId], onDelete: NoAction)
   submissionId    String              @map("submission_id") @db.Uuid
-  submission      HackathonSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission      HackathonSubmission @relation(fields: [submissionId, hackathonId], references: [id, hackathonId], onDelete: Restrict)
   place           Int?
   awardedAt       DateTime            @default(now()) @map("awarded_at") @db.Timestamptz
   awardedBy       String?             @map("awarded_by")
