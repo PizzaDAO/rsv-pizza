@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Trophy, Loader2, Eye, EyeOff, CheckCircle2, Circle } from 'lucide-react';
+import { Trophy, Loader2, Eye, EyeOff, CheckCircle2, Circle, Lock } from 'lucide-react';
 import { hackathonHostApi, type HostHackathon, type HackathonSettingsInput } from '../../lib/hackathonApi';
 import { ErrorBanner } from './shared';
 import { SetupSection } from './SetupSection';
@@ -23,12 +23,16 @@ export function HackathonTab({ partyId }: { partyId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // false = the backend says this caller can't manage it (e.g. a co-host without the tab who
+  // reached /host/:code/hackathon directly): show a no-access state, never Enable.
+  const [canManage, setCanManage] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await hackathonHostApi.get(partyId);
-      setHackathon(res.hackathon);
+      setCanManage(res.canManage === true);
+      setHackathon(res.canManage ? res.hackathon : null);
     } catch (e: any) {
       setError(e?.message || 'Could not load the hackathon');
     } finally {
@@ -65,6 +69,16 @@ export function HackathonTab({ partyId }: { partyId: string }) {
     return (
       <div className="card p-6 flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-theme-text-muted" />
+      </div>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <div className="card p-6 sm:p-8 text-center" data-testid="hackathon-no-access">
+        <Lock className="w-10 h-10 mx-auto mb-3 text-theme-text-muted" />
+        <h2 className="text-lg font-semibold text-theme-text">You don't have access to this tab</h2>
+        <p className="text-sm text-theme-text-secondary mt-2">Ask the event host to give you access to the Hackathon tab.</p>
       </div>
     );
   }

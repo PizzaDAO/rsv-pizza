@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hackathonAutoStates } from './checklistRules.js';
 import { eventEnd, hackathonDefaults } from './defaults.js';
-import { parseJudge, parseSettings, normalizeEmail } from './validate.js';
+import { parseJudge, parseSettings, normalizeEmail, parseTrack, parsePrize, parseCriterion } from './validate.js';
 import { hostHackathon, isPubliclyVisible, publicHackathon } from './serialize.js';
 
 const base = {
@@ -76,6 +76,22 @@ describe('validation', () => {
 
   it('empty rules become null', () => {
     expect(parseSettings({ rules: '   ' }, cur)).toEqual({ rules: null });
+  });
+
+  it('NUL characters are rejected in every text input (Postgres text cannot store them)', () => {
+    expect(() => parseSettings({ rules: 'ok\u0000bad' }, cur)).toThrow(/invalid character/);
+    expect(() => parseTrack({ name: 'a\u0000' }, false)).toThrow(/invalid character/);
+    expect(() => parsePrize({ name: 'P', amountText: '\u0000' }, false)).toThrow(/invalid character/);
+    expect(() => parseCriterion({ name: 'C', description: 'x\u0000' }, false)).toThrow(/invalid character/);
+    expect(() => parseJudge({ email: 'a@b.co', name: '\u0000' }, false)).toThrow(/invalid character/);
+    expect(() => normalizeEmail('a\u0000@b.co')).toThrow();
+  });
+
+  it('dates must be within 1970-9999', () => {
+    expect(() => parseSettings({ submissionDeadline: '1969-12-31T23:59:59Z' }, cur)).toThrow(/1970 and 9999/);
+    expect(() => parseSettings({ submissionDeadline: '+010000-01-01T00:00:00Z' }, cur)).toThrow(/1970 and 9999/);
+    expect(() => parseSettings({ submissionsOpenAt: '0001-01-01T00:00:00Z' }, cur)).toThrow(/1970 and 9999/);
+    expect(parseSettings({ submissionDeadline: '2027-03-06T23:00:00Z' }, cur).submissionDeadline).toEqual(new Date('2027-03-06T23:00:00Z'));
   });
 
   it('emails are trimmed + lowercased and must look like an email', () => {

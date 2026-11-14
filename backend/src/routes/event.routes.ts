@@ -5,7 +5,7 @@ import { isAdmin } from '../middleware/auth.js';
 import { getGppGlobalEditors } from '../lib/privateConfig.js';
 import { computeEffectiveCapUsd } from '../helpers/reimbursementCap.js';
 import { resolveGppByYear, isGpp27Hidden } from '../helpers/gpp27.js';
-import { isSideHidden } from '../helpers/side.js';
+import { isEventHiddenFrom } from '../helpers/eventVisibility.js';
 import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { publicTags } from '../lib/eventTags.js';
 
@@ -239,39 +239,10 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response, next:
     // skipped (e.g. a brand-new 2027 city whose customUrl is the bare slug, with
     // no `?year=`), gate the resolved party here so a gated 2027 GPP event can
     // never leak to an out-of-scope viewer via a direct customUrl/inviteCode hit.
-    if (party.eventType === 'gpp') {
-      const partyYear = party.date ? new Date(party.date).getFullYear() : 0;
-      const hidden = await isGpp27Hidden(
-        {
-          year: partyYear,
-          eventTags: (party.eventTags as string[]) || [],
-          region: party.region ?? null,
-          city: party.city ?? null,
-        },
-        req.userEmail,
-      );
-      if (hidden) {
-        throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
-      }
-    }
-
-    // rigatoni-58919: pre-launch gate for "side" (conference side) events. Side
-    // events resolve via the normal customUrl/inviteCode lookup (no ?year=), so
-    // we only ADD the hide-gate here. A tagged-but-unpublished side event 404s
-    // for non-admin / out-of-scope viewers while SIDE_PUBLIC !== 'true'.
-    if (party.eventType === 'side' || ((party.eventTags as string[]) || []).includes('side-prelaunch')) {
-      const hidden = await isSideHidden(
-        {
-          eventType: party.eventType ?? null,
-          eventTags: (party.eventTags as string[]) || [],
-          region: party.region ?? null,
-          city: party.city ?? null,
-        },
-        req.userEmail,
-      );
-      if (hidden) {
-        throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
-      }
+    // rigatoni-58919: same gate for unpublished "side" (conference side) events. Shared helper
+    // (helpers/eventVisibility.ts) so hackathon public reads apply the identical rules.
+    if (await isEventHiddenFrom(party, req.userEmail)) {
+      throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
     }
 
     // Fetch confirmed sponsors with descriptions or logos for public display

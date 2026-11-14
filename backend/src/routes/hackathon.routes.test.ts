@@ -28,6 +28,8 @@ vi.mock('../config/database.js', () => ({ prisma: mockPrisma }));
 
 const canEdit = vi.hoisted(() => vi.fn());
 const canTab = vi.hoisted(() => vi.fn());
+const eventHidden = vi.hoisted(() => vi.fn());
+vi.mock('../helpers/eventVisibility.js', () => ({ isEventHiddenFrom: eventHidden }));
 vi.mock('../helpers/partyAccess.js', () => ({
   canUserEditParty: canEdit,
   canUserAccessTab: canTab,
@@ -92,7 +94,7 @@ function fullRow(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  for (const k of ['party', 'hackathon', 'hackathonTrack', 'hackathonPrize', 'hackathonCriterion', 'hackathonJudge', 'hackathonJudgeTrack', 'hackathonSubmission', 'hackathonSubmissionTrack', 'hackathonScore', 'hackathonAward']) {
+  for (const k of ['party', 'guest', 'hackathon', 'hackathonTrack', 'hackathonPrize', 'hackathonCriterion', 'hackathonJudge', 'hackathonJudgeTrack', 'hackathonSubmission', 'hackathonSubmissionTrack', 'hackathonScore', 'hackathonAward']) {
     mockPrisma[k] = model();
   }
   mockPrisma.$transaction = vi.fn(async (arg: any) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)));
@@ -100,6 +102,9 @@ beforeEach(() => {
   canEdit.mockImplementation(async (_p: string, _u?: string, email?: string) => email === 'host@example.com' || email === 'cohost@example.com');
   canTab.mockImplementation(async (_p: string, email?: string) => email === 'host@example.com');
   mockPrisma.hackathon.findUnique.mockImplementation(async () => fullRow());
+  eventHidden.mockResolvedValue(false);
+  mockPrisma.party.findUnique.mockResolvedValue({ eventType: null, eventTags: [], date: null, region: null, city: null, password: null });
+  mockPrisma.guest.findFirst.mockResolvedValue(null);
   mockPrisma.hackathonTrack.aggregate.mockResolvedValue({ _max: { sortOrder: 2 } });
   for (const k of ['hackathonTrack', 'hackathonPrize', 'hackathonCriterion', 'hackathonJudge', 'hackathonAward', 'hackathonScore', 'hackathonSubmission', 'hackathonSubmissionTrack']) {
     mockPrisma[k].count.mockResolvedValue(0);
@@ -170,6 +175,34 @@ describe('GET /:partyId/hackathon (public read)', () => {
       { id: JUDGE, email: 'judge@secret.example', name: 'Jude', status: 'active', trackIds: [TRACK], linked: true, createdAt: expect.any(String) },
     ]);
     expect(JSON.stringify(res.body)).not.toContain(JUDGE_USER);
+  });
+
+  it('pre-launch hidden event (GPP27 / side gate): null for non-hosts, host still gets it', async () => {
+    eventHidden.mockResolvedValue(true);
+    const anon = await request(app()).get(`/api/parties/${PARTY}/hackathon`);
+    expect(anon.body.hackathon).toBeNull();
+    expect(eventHidden.mock.calls[0][1]).toBeUndefined();
+    const user = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('ub@example.com', 'u-ub'));
+    expect(user.body.hackathon).toBeNull();
+    expect(eventHidden.mock.calls[1][1]).toBe('ub@example.com');
+    const host = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth());
+    expect(host.body.hackathon.judges).toHaveLength(1);
+  });
+
+  it('password-protected event: null unless logged in as a non-rejected guest', async () => {
+    mockPrisma.party.findUnique.mockResolvedValue({ eventType: null, eventTags: [], date: null, region: null, city: null, password: '$2a$hash' });
+    expect((await request(app()).get(`/api/parties/${PARTY}/hackathon`)).body.hackathon).toBeNull();
+
+    const stranger = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('rando@example.com', 'u-x'));
+    expect(stranger.body.hackathon).toBeNull();
+    expect(mockPrisma.guest.findFirst.mock.calls[0][0].where).toEqual({
+      partyId: PARTY, email: { equals: 'rando@example.com', mode: 'insensitive' }, NOT: { approved: false },
+    });
+
+    mockPrisma.guest.findFirst.mockResolvedValue({ id: 'g1' });
+    const guest = await request(app()).get(`/api/parties/${PARTY}/hackathon`).set('Authorization', auth('Guest@Example.com', 'u-g'));
+    expect(guest.body.hackathon.tracks).toHaveLength(1);
+    expect(JSON.stringify(guest.body)).not.toContain('judge@secret.example');
   });
 
   it('bad party id: 404', async () => {

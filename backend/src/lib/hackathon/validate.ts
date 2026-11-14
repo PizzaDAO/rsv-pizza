@@ -24,6 +24,8 @@ const has = (b: Body, k: string) => Object.prototype.hasOwnProperty.call(b, k) &
 export function optText(v: unknown, field: string, max: number): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v !== 'string') throw bad(`${field} must be text`);
+  // Postgres text can't hold NUL; reject instead of letting the write 500.
+  if (v.includes('\u0000')) throw bad(`${field} contains an invalid character`);
   const t = v.trim();
   if (!t) return null;
   if (t.length > max) throw bad(`${field} must be at most ${max} characters`);
@@ -56,6 +58,8 @@ export function optDate(v: unknown, field: string): Date | null {
   if (typeof v !== 'string') throw bad(`${field} must be a date`);
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) throw bad(`${field} must be a valid date`);
+  const y = d.getUTCFullYear();
+  if (y < 1970 || y > 9999) throw bad(`${field} must be between 1970 and 9999`);
   return d;
 }
 
@@ -160,6 +164,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeEmail(v: unknown): string {
   if (typeof v !== 'string') throw bad('Email is required');
+  if (v.includes('\u0000')) throw bad('Enter a valid email');
   const e = v.trim().toLowerCase();
   if (e.length < 3 || e.length > 320 || !EMAIL_RE.test(e)) throw bad('Enter a valid email');
   return e;

@@ -95,8 +95,10 @@ router.get('/:partyId/checklist', async (req: AuthRequest, res: Response, next: 
 
     const pizzeriasSelected = Array.isArray(party?.selectedPizzerias) && (party!.selectedPizzerias as unknown[]).length > 0;
 
-    // Hackathon platform: setup rules (published / submissions ready / judges added).
-    const hk = await prisma.hackathon.findUnique({
+    // Hackathon platform: setup rules (published / submissions ready / judges added). Only
+    // queried when the party's checklist actually uses a hackathon rule (no extra query for GPP).
+    const usesHackathonRules = items.some((i) => typeof i.autoRule === 'string' && i.autoRule.startsWith('hackathon_'));
+    const hk = !usesHackathonRules ? null : await prisma.hackathon.findUnique({
       where: { partyId },
       select: {
         publishedAt: true,

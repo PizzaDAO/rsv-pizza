@@ -16,7 +16,8 @@
  *
  * Never clobbers an admin edit: a link is only changed when it is empty or still the value the
  * brand seed set (seed-brand-checklists.cjs: 'details' / 'photos' / none); an auto rule is only
- * set when the row has no auto rule. Names and sort order are never touched. Idempotent: a
+ * set when the row has no auto rule, and never on a party item the host already completed (it
+ * keeps its manual tick; it still gets the link). Names and sort order are never touched. Idempotent: a
  * second run changes nothing.
  *
  * DRY RUN by default (read-only transaction). --apply to write. --series <slug> (default monad).
@@ -47,7 +48,9 @@ function planRow(row) {
   const [, autoRule, previousLinks] = item;
   const change = {};
   if (row.link_tab !== LINK_TAB && (!row.link_tab || previousLinks.includes(row.link_tab))) change.linkTab = LINK_TAB;
-  if (autoRule && !row.auto_rule) change.autoRule = autoRule;
+  // A party item the host already ticked keeps its manual completion: making it auto would
+  // recompute it from hackathon state and could un-tick it. (Template rows have no `completed`.)
+  if (autoRule && !row.auto_rule && row.completed !== true) change.autoRule = autoRule;
   return Object.keys(change).length ? change : null;
 }
 
@@ -94,7 +97,7 @@ async function main() {
       [seriesId, names],
     );
     const items = await client.query(
-      `SELECT ci.id, ci.name, ci.link_tab, ci.is_auto, ci.auto_rule
+      `SELECT ci.id, ci.name, ci.link_tab, ci.is_auto, ci.auto_rule, ci.completed
          FROM checklist_items ci JOIN parties p ON p.id = ci.party_id
         WHERE p.event_series_id = $1 AND ci.is_default = true AND ci.name = ANY($2::text[])`,
       [seriesId, names],

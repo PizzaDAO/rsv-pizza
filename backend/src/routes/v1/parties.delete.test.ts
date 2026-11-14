@@ -28,7 +28,7 @@ vi.mock('../../middleware/apiKey.js', () => ({
   },
 }));
 
-import v1Parties from './parties.js';
+import v1Parties, { isHackathonFkViolation } from './parties.js';
 import { errorHandler } from '../../middleware/error.js';
 
 function app() {
@@ -77,9 +77,22 @@ describe('DELETE /api/v1/parties/:id with a hackathon', () => {
     expect(tx.party.delete).not.toHaveBeenCalled();
   });
 
-  it('raw FK violation (race) maps to 409, not 500', async () => {
-    tx.party.delete.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003' }));
+  it('hackathon FK violation (race) maps to 409, not 500', async () => {
+    tx.party.delete.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003', meta: { field_name: 'hackathons_party_id_fkey (index)' } }));
     const res = await request(app()).delete(`/api/v1/parties/${ID}`);
     expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('HACKATHON_HAS_SUBMISSIONS');
+  });
+
+  it('any other FK violation keeps the previous behavior (500), not a misleading hackathon 409', async () => {
+    tx.party.delete.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003', meta: { field_name: 'payouts_party_id_fkey (index)' } }));
+    const res = await request(app()).delete(`/api/v1/parties/${ID}`);
+    expect(res.status).toBe(500);
+  });
+
+  it('isHackathonFkViolation reads meta.field_name / meta.constraint', () => {
+    expect(isHackathonFkViolation({ code: 'P2003', meta: { constraint: 'hackathons_party_id_fkey' } })).toBe(true);
+    expect(isHackathonFkViolation({ code: 'P2003', meta: {} })).toBe(false);
+    expect(isHackathonFkViolation({ code: 'P2002', meta: { field_name: 'hackathons_x' } })).toBe(false);
   });
 });

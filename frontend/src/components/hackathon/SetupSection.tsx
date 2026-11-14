@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarClock, Clock, Users, Layers, ScrollText, Loader2 } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
@@ -35,7 +35,18 @@ function formFrom(h: HostHackathon) {
 
 export function SetupSection({ hackathon, saving, onSave, onDisable }: Props) {
   const [form, setForm] = useState(() => formFrom(hackathon));
-  useEffect(() => setForm(formFrom(hackathon)), [hackathon]);
+  // Reset the form only for a different hackathon or right after THIS form saved. Other writes
+  // (Publish/Unpublish, tracks, judges) replace the hackathon object too, and must not wipe
+  // unsaved edits here.
+  const lastId = useRef(hackathon.id);
+  const resetAfterSave = useRef(false);
+  useEffect(() => {
+    if (hackathon.id !== lastId.current || resetAfterSave.current) {
+      lastId.current = hackathon.id;
+      resetAfterSave.current = false;
+      setForm(formFrom(hackathon));
+    }
+  }, [hackathon]);
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const initial = formFrom(hackathon);
@@ -47,9 +58,10 @@ export function SetupSection({ hackathon, saving, onSave, onDisable }: Props) {
   const deadline = localInputToIso(form.submissionDeadline);
   const dateError = open && deadline && deadline <= open ? 'The deadline must be after submissions open.' : null;
 
-  const save = () => {
+  const save = async () => {
     if (sizeError || dateError) return;
-    void onSave({
+    resetAfterSave.current = true;
+    const ok = await onSave({
       submissionsOpenAt: open,
       submissionDeadline: deadline,
       teamMinSize: min,
@@ -60,6 +72,7 @@ export function SetupSection({ hackathon, saving, onSave, onDisable }: Props) {
       blindJudging: form.blindJudging,
       rules: form.rules.trim() || null,
     });
+    if (!ok) resetAfterSave.current = false;
   };
 
   return (

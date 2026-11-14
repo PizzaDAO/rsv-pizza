@@ -31,4 +31,11 @@ describe('seed-hackathon-checklist', () => {
     expect(planRow({ name: 'Line up judges and mentors', link_tab: 'hackathon', auto_rule: 'hackathon_judges_added' })).toBeNull();
     expect(planRow({ name: 'Some other item', link_tab: null, auto_rule: null })).toBeNull();
   });
+
+  it('a party item the host already completed keeps its manual tick (link only, no auto rule)', () => {
+    expect(planRow({ name: 'Line up judges and mentors', link_tab: null, auto_rule: null, completed: true })).toEqual({ linkTab: 'hackathon' });
+    expect(planRow({ name: 'Publish tracks, prizes and rules', link_tab: 'hackathon', auto_rule: null, completed: true })).toBeNull();
+    expect(planRow({ name: 'Line up judges and mentors', link_tab: null, auto_rule: null, completed: false }))
+      .toEqual({ linkTab: 'hackathon', autoRule: 'hackathon_judges_added' });
+  });
 });

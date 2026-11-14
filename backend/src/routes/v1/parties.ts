@@ -352,6 +352,14 @@ router.patch('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequ
  *       404:
  *         description: Party not found
  */
+/** P2003 whose constraint is one of the hackathon_* FKs (Prisma puts it in meta.field_name / meta.constraint). */
+export function isHackathonFkViolation(e: any): boolean {
+  if (e?.code !== 'P2003') return false;
+  const meta = e.meta ?? {};
+  const where = [meta.field_name, meta.constraint, meta.modelName].filter((v) => typeof v === 'string').join(' ');
+  return /hackathon/i.test(where);
+}
+
 router.delete('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -384,8 +392,9 @@ router.delete('/:id', requireApiKey(SCOPES.PARTIES_WRITE), async (req: ApiKeyReq
       }
       await tx.party.delete({ where: { id } });
     }).catch((e: any) => {
-      // Race backstop: a project created between the count and the delete trips the FK.
-      if (e?.code === 'P2003') {
+      // Race backstop: a project created between the count and the delete trips a hackathon FK.
+      // Any other FK violation keeps the previous behavior (propagates).
+      if (isHackathonFkViolation(e)) {
         throw new AppError('This party has hackathon projects. Disable the hackathon instead of deleting the party.', 409, 'HACKATHON_HAS_SUBMISSIONS');
       }
       throw e;
