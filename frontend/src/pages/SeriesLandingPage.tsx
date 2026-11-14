@@ -5,7 +5,7 @@ import { Loader2, MapPin, CalendarDays } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { useTheme } from '../contexts/ThemeContext';
-import { brandUrl } from '../config/brand';
+import { BRAND, brandUrl } from '../config/brand';
 import { IS_SERIES_SCOPED } from '../config/brandScope';
 import { fetchPublicSeries, fetchPublicSeriesEvents, PublicSeries, type PublicSeriesEvent } from '../lib/api';
 
@@ -151,6 +151,9 @@ export function SeriesLandingPage({ slugOverride, showCreateCta }: SeriesLanding
           <h1 className="text-4xl font-bold text-theme-text mb-3">{title}</h1>
           {series.description && (
             <p className="text-theme-text-secondary whitespace-pre-line max-w-2xl mx-auto">{series.description}</p>
+          )}
+          {globalDay && BRAND.themeClass === 'doge-theme' && (
+            <img src="/brands/doge/frame.png" alt="" className="doge-hero mx-auto mt-6 w-full max-w-md" />
           )}
         </header>
 

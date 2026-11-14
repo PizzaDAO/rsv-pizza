@@ -94,7 +94,18 @@ function App() {
     const cls = BRAND.themeClass;
     if (!cls) return;
     document.documentElement.classList.add(cls);
-    return () => document.documentElement.classList.remove(cls);
+    // Doge Day's heavy rounded headline font; only fetched for that brand.
+    let fontLink: HTMLLinkElement | null = null;
+    if (cls === 'doge-theme') {
+      fontLink = document.createElement('link');
+      fontLink.rel = 'stylesheet';
+      fontLink.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap';
+      document.head.appendChild(fontLink);
+    }
+    return () => {
+      document.documentElement.classList.remove(cls);
+      fontLink?.remove();
+    };
   }, []);
 
   return (
