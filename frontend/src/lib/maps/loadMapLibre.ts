@@ -31,10 +31,13 @@ export async function loadMapLibre(): Promise<MapLibreModule> {
       // alongside the JS the first time any MapLibre map mounts.
       await import('maplibre-gl/dist/maplibre-gl.css');
       const mod = await import('maplibre-gl');
-      // maplibre-gl ships a UMD bundle: the bundler's CJS interop hands back the
-      // API on `.default`, while its .d.ts only declares named exports. Prefer
-      // `.default` when present, else the namespace itself.
-      return (mod as MapLibreModule & { default?: MapLibreModule }).default ?? mod;
+      // maplibre-gl v6 is ESM-only and, under a bundler, cannot auto-detect its
+      // worker file: point it at the Vite-emitted asset URL (same-origin, so no
+      // `worker-src blob:` CSP is needed).
+      const { default: workerUrl } = await import('maplibre-gl/dist/maplibre-gl-worker.mjs?url');
+      mod.setWorkerUrl(workerUrl);
+      // v6 is ESM-only: the namespace exposes the API directly (no `.default`).
+      return mod;
     })();
   }
   return modPromise;
