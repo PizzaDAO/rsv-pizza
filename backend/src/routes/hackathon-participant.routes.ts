@@ -56,7 +56,7 @@ import {
   validateImageRequest,
 } from '../lib/hackathon/media.js';
 import { TEAM_INCLUDE, hostTeam, myTeam, submissionImagePaths } from '../lib/hackathon/serialize.js';
-import { AWARD_INCLUDE, teamAwards, teamFeedback } from '../lib/hackathon/awards.js';
+import { AWARD_INCLUDE, assertKeepsAwardedTracks, teamAwards, teamFeedback } from '../lib/hackathon/awards.js';
 
 const router = Router();
 
@@ -520,6 +520,12 @@ router.put('/:partyId/hackathon/teams/:teamId/submission', requireAuth, teamWrit
         // Locked against leave / submit / a teammate's save: the team and project we
         // validated above must still be the ones we write.
         await prisma.$transaction(async (tx) => {
+          // PR 5: a track change takes FOR SHARE on the hackathon row first, so it serializes
+          // with award creation (FOR UPDATE on the same row, hackathon-awards.routes.ts): an
+          // award can't land on a track this save is removing, and vice versa.
+          if (trackIds !== undefined && pre) {
+            await tx.$queryRaw`SELECT id FROM hackathons WHERE id = ${tc.h.id}::uuid FOR SHARE`;
+          }
           await lockTeam(tx, tc.teamId, tc.h.id);
           const cur = await tx.hackathonSubmission.findFirst({ where: { teamId: tc.teamId, hackathonId: tc.h.id }, select: { id: true, status: true } });
           if ((cur?.id ?? null) !== (pre?.id ?? null)) {
@@ -536,6 +542,12 @@ router.put('/:partyId/hackathon/teams/:teamId/submission', requireAuth, teamWrit
           } else {
             id = cur.id;
             await tx.hackathonSubmission.update({ where: { id }, data: { ...(data as any), ...(slug ? { slug } : {}) } });
+          }
+          if (trackIds !== undefined && cur) {
+            // Same rule for participants and hosts (this route serves both): keep every track
+            // the project won a track prize in.
+            const won = await tx.hackathonAward.findMany({ where: { submissionId: id, hackathonId: tc.h.id }, select: { prize: { select: { trackId: true } } } });
+            assertKeepsAwardedTracks(won.map((a: any) => a.prize?.trackId), trackIds);
           }
           if (trackIds !== undefined) {
             await tx.hackathonSubmissionTrack.deleteMany({ where: { submissionId: id } });

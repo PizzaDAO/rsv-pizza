@@ -9,6 +9,7 @@ import {
   assertAwardable,
   assertCanReveal,
   assertCanUnreveal,
+  assertKeepsAwardedTracks,
   awardsCsvRows,
   hasRecordedPayout,
   hostAward,
@@ -70,6 +71,16 @@ describe('assertAwardable', () => {
   });
   it("People's Choice can be awarded by hand (voting comes in PR 7)", () => {
     expect(code(() => assertAwardable(prize({ kind: 'peoples_choice' }), sub(), []))).toBe('ok');
+  });
+});
+
+describe('assertKeepsAwardedTracks', () => {
+  it('every awarded track must stay; other tracks can change; overall prizes (null) pin nothing', () => {
+    expect(code(() => assertKeepsAwardedTracks(['t1'], ['t1', 't2']))).toBe('ok');
+    expect(code(() => assertKeepsAwardedTracks(['t1'], ['t2']))).toBe('409:HAS_AWARDS');
+    expect(code(() => assertKeepsAwardedTracks(['t1', 't2'], ['t1']))).toBe('409:HAS_AWARDS');
+    expect(code(() => assertKeepsAwardedTracks([null, undefined], []))).toBe('ok');
+    expect(code(() => assertKeepsAwardedTracks([], []))).toBe('ok');
   });
 });
 

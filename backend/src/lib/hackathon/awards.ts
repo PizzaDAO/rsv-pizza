@@ -154,6 +154,22 @@ export function assertAwardable(
   }
 }
 
+/**
+ * A project holding a track-scoped prize must stay in that track: a track edit may add or
+ * swap other tracks but must keep every awarded one (409 HAS_AWARDS otherwise; the host
+ * deletes the award first to move it). `awardedTrackIds` = track_id of each track prize the
+ * project holds.
+ */
+export function assertKeepsAwardedTracks(awardedTrackIds: Array<string | null | undefined>, nextTrackIds: string[]): void {
+  const missing = [...new Set(awardedTrackIds.filter((t): t is string => !!t))].filter((t) => !nextTrackIds.includes(t));
+  if (missing.length) {
+    throw conflict(
+      "This project won a prize in a track you're removing, so it has to stay in that track. Ask the host to remove the award first.",
+      'HAS_AWARDS',
+    );
+  }
+}
+
 /** Lowest free place 1..quantity (or the requested one, if free and in range). */
 export function pickPlace(prize: Pick<PrizeLike, 'quantity'>, takenPlaces: Array<number | null>, requested?: number): number {
   const taken = new Set(takenPlaces.filter((p): p is number => typeof p === 'number'));

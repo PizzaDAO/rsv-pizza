@@ -261,7 +261,7 @@ beforeEach(() => {
   mockPrisma.$transaction = vi.fn(async (arg: any) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)));
   mockPrisma.$queryRaw = vi.fn(async (strings: TemplateStringsArray, ...vals: any[]) => {
     const sql = strings.join('?');
-    if (sql.includes('FROM hackathons') && sql.includes('FOR UPDATE')) return db.hackathon.filter((h) => h.id === vals[0]).map((h) => ({ id: h.id }));
+    if (sql.includes('FROM hackathons') && (sql.includes('FOR UPDATE') || sql.includes('FOR SHARE'))) return db.hackathon.filter((h) => h.id === vals[0]).map((h) => ({ id: h.id }));
     if (sql.includes('FROM hackathon_teams') && sql.includes('FOR UPDATE')) {
       return db.hackathonTeam.filter((t) => t.id === vals[0] && t.hackathonId === vals[1]).map((t) => ({ id: t.id }));
     }
@@ -573,6 +573,71 @@ describe('team results on /me', () => {
     expect(r.status).toBe(409);
     expect(r.body.error.code).toBe('HAS_AWARDS');
     expect(db.hackathonSubmission.find((s) => s.id === S_A)!.status).toBe('submitted');
+  });
+});
+
+// ------------------------------------------------------------------ track edits on awarded projects
+
+describe('track edits on a project holding a track prize', () => {
+  const TEAM_A = '77777777-7777-4777-8777-00000000000a';
+  const save = (who: keyof typeof USERS, trackIds: string[], extra: Row = {}) =>
+    api().put(`${base}/teams/${TEAM_A}/submission`).set('Authorization', auth(who)).send({ trackIds, ...extra });
+  const tracksOf = (sid: string) => db.hackathonSubmissionTrack.filter((t) => t.submissionId === sid).map((t) => t.trackId).sort();
+
+  beforeEach(() => {
+    // createMany / deleteMany for submission tracks (not in the base fake).
+    mockPrisma.hackathonSubmissionTrack.deleteMany = vi.fn(async ({ where }: Row) => {
+      const before = db.hackathonSubmissionTrack.length;
+      db.hackathonSubmissionTrack = db.hackathonSubmissionTrack.filter((t) => t.submissionId !== where.submissionId);
+      return { count: before - db.hackathonSubmissionTrack.length };
+    });
+    mockPrisma.hackathonSubmissionTrack.createMany = vi.fn(async ({ data }: Row) => { db.hackathonSubmissionTrack.push(...data); return { count: data.length }; });
+  });
+
+  it('participant: removing the awarded track is a 409 HAS_AWARDS and nothing changes', async () => {
+    await award(P_DEFI, S_A); // DeFi track prize
+    const r = await save('alice', [T2]);
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('HAS_AWARDS');
+    expect(r.body.error.message).toMatch(/remove the award first/);
+    expect(tracksOf(S_A)).toEqual([T1]);
+    // Nor can other fields sneak through in the same rejected save.
+    expect(db.hackathonSubmission.find((s) => s.id === S_A)!.name).toBe('Slice Router');
+  });
+
+  it('participant: edits that keep every awarded track are fine (add a track, other fields)', async () => {
+    await award(P_DEFI, S_A);
+    const r = await save('alice', [T1, T2], { tagline: 'Now in two tracks' });
+    expect(r.status).toBe(200);
+    expect(tracksOf(S_A)).toEqual([T1, T2].sort());
+    expect((await api().put(`${base}/teams/${TEAM_A}/submission`).set('Authorization', auth('alice')).send({ tagline: 'No track change' })).status).toBe(200);
+  });
+
+  it('an overall prize never pins tracks', async () => {
+    await award(P_GRAND, S_A);
+    expect((await save('alice', [T2])).status).toBe(200);
+    expect(tracksOf(S_A)).toEqual([T2]);
+  });
+
+  it('host gets the same rule until the award is deleted', async () => {
+    await award(P_DEFI, S_A);
+    const r = await save('host', [T2]);
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('HAS_AWARDS');
+    expect((await api().delete(`${base}/awards/${awardIdFor(P_DEFI, S_A)}`).set('Authorization', auth('host'))).status).toBe(200);
+    expect((await save('host', [T2])).status).toBe(200);
+    expect(tracksOf(S_A)).toEqual([T2]);
+  });
+
+  it('the track write locks the hackathon row (FOR SHARE) before the team row', async () => {
+    await award(P_DEFI, S_A);
+    mockPrisma.$queryRaw.mockClear();
+    await save('alice', [T1, T2]);
+    const sqls = mockPrisma.$queryRaw.mock.calls.map((c: any[]) => c[0].join('?'));
+    const share = sqls.findIndex((s: string) => s.includes('FROM hackathons') && s.includes('FOR SHARE'));
+    const team = sqls.findIndex((s: string) => s.includes('FROM hackathon_teams') && s.includes('FOR UPDATE'));
+    expect(share).toBeGreaterThanOrEqual(0);
+    expect(team).toBeGreaterThan(share);
   });
 });
 
