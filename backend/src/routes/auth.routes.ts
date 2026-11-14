@@ -267,8 +267,10 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
     // invite-verify (security review): brute-force budget, charged to the CALLER (IP, and
     // email+IP when bound), checked before the lookup so a refused caller learns nothing.
     // Wrong guesses never lock the stored codes, so nobody can lock the owner out.
-    // See lib/loginCode.ts for the limits and the PR for the math. The attempt slot is
-    // reserved synchronously, so parallel bursts can't all slip past the budget.
+    // See lib/loginCode.ts for the limits and the PR for the math. The slot is reserved
+    // atomically in auth_rate_events (global across instances), so parallel bursts on any
+    // number of instances can't slip past the budget. If that table is unreachable this
+    // answers 503 (fail closed).
     const attempt = await reserveVerifyAttempt(req.ip, boundEmail);
     if (!attempt) {
       throw new AppError('Too many wrong codes. Try again in a few minutes.', 429, 'VERIFY_RATE_LIMITED');
@@ -278,8 +280,8 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
       throw new AppError(message, status, errCode);
     };
     /** A stale code that DID belong to the submitted email: not a guess, don't charge it. */
-    const staleOwnCode = (message: string, errCode: string): never => {
-      attempt.release();
+    const staleOwnCode = async (message: string, errCode: string): Promise<never> => {
+      await attempt.release();
       throw new AppError(message, 401, errCode);
     };
 
@@ -291,7 +293,7 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
         include: { user: true },
       });
     } catch (err) {
-      attempt.release();
+      await attempt.release();
       throw err;
     }
 
@@ -306,18 +308,18 @@ router.post('/verify-code', async (req: Request, res: Response, next: NextFuncti
 
     // Check if expired
     if (magicLink.expiresAt < new Date()) {
-      if (boundEmail) staleOwnCode('Code expired', 'CODE_EXPIRED');
+      if (boundEmail) return await staleOwnCode('Code expired', 'CODE_EXPIRED');
       return await fail('Code expired', 401, 'CODE_EXPIRED');
     }
 
     // Check if already used
     if (magicLink.used) {
-      if (boundEmail) staleOwnCode('Code already used', 'CODE_USED');
+      if (boundEmail) return await staleOwnCode('Code already used', 'CODE_USED');
       return await fail('Code already used', 401, 'CODE_USED');
     }
 
     // The code is right: give the reserved slot back.
-    attempt.release();
+    await attempt.release();
 
     // Mark as used
     await prisma.magicLink.update({

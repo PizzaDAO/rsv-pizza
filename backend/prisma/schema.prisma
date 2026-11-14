@@ -3113,3 +3113,16 @@ model Reel {
   @@index([partyId, createdAt])
   @@map("reels")
 }
+
+// durable-rate-limits: cross-instance counters for the sign-in code budgets
+// (lib/authRateLimit.ts). One row per reserved send / code check; `key` is an HMAC digest of
+// the IP or email|IP, never plaintext. Written with raw SQL (advisory-locked reserve).
+model AuthRateEvent {
+  id        BigInt   @id @default(autoincrement())
+  bucket    String
+  key       String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([bucket, key, createdAt])
+  @@map("auth_rate_events")
+}

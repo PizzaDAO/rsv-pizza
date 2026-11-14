@@ -7,7 +7,8 @@
  *     waitlisted, rejected) gets an inline sign-in code step (202 verificationRequired),
  *     identical for every kind of row. The code is the normal sign-in code email; entering
  *     it (POST /api/auth/verify-code with the email) logs them in, and the retried RSVP
- *     runs as the owner. Sends are rate-limited; wrong codes lock the email's codes.
+ *     runs as the owner. Sends and wrong codes are rate-limited per caller (global counters in
+ *     auth_rate_events, see lib/authRateLimit.test.ts for the cross-instance tests).
  *   - Brand-new emails still RSVP instantly.
  */
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
@@ -711,7 +712,7 @@ describe('POST /api/auth/verify-code bound to an email', () => {
     expect((await verify('4.4.4.7', { code, email: 'ivy@example.com' })).status).toBe(429);
   });
 
-  describe('parallel bursts cannot bypass the budget (slots are reserved before any await)', () => {
+  describe('parallel bursts cannot bypass the budget (slots are reserved atomically before the lookup)', () => {
     async function burst(n: number, body: (i: number) => Record<string, unknown>, ip: string) {
       let release!: () => void;
       const gate = new Promise<void>((r) => { release = r; });
@@ -767,6 +768,28 @@ describe('POST /api/auth/verify-code bound to an email', () => {
       expect((await verify('2.2.2.5', { code, email: 'ivy@example.com' })).body.error.code).toBe('CODE_USED');
     }
     expect(mockPrisma.magicLink.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('durable-rate-limits: if the rate-limit table is unreachable, verify fails CLOSED (503, no lookup) and sends fail open', async () => {
+    const code = await getCode();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    resetRsvpCodeLimits({
+      store: {
+        reserve: () => Promise.reject(new Error('relation "auth_rate_events" does not exist')),
+        release: () => Promise.resolve(),
+        cleanup: () => Promise.resolve(),
+      },
+    });
+    mockPrisma.magicLink.findUnique.mockClear();
+    const res = await verify('10.0.0.1', { code, email: 'ivy@example.com' });
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('RATE_LIMIT_UNAVAILABLE');
+    expect(res.body.accessToken).toBeUndefined();
+    expect(mockPrisma.magicLink.findUnique).not.toHaveBeenCalled();
+    // A sign-in email still goes out (per-instance budget only).
+    const magic = await request(app()).post('/api/auth/magic-link').set('X-Forwarded-For', '10.0.0.1').send({ email: 'ivy@example.com' });
+    expect(magic.status).toBe(200);
+    err.mockRestore();
   });
 
   it('the per-IP budget is shared across emails (one IP cannot spray many victims)', async () => {
