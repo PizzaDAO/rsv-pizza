@@ -268,8 +268,11 @@ export default async function middleware(request: Request) {
   const userAgent = request.headers.get('user-agent');
   if (!userAgent || userAgent === 'RSVPizza-OG-Rewriter' || !isCrawler(userAgent)) return next();
 
-  // Extract slug (remove leading slash and trailing slash)
-  const slug = pathname.replace(/^\//, '').replace(/\/$/, '');
+  // Extract slug (remove leading slash and trailing slash). Hackathon PR 6: /:slug/projects and
+  // /:slug/projects/:projectSlug get project OG tags; any other multi-segment path is not an event.
+  const trimmed = pathname.replace(/^\//, '').replace(/\/$/, '');
+  const projectsPath = /^([^/]+)\/projects(?:\/([a-z0-9]+(?:-[a-z0-9]+)*))?$/.exec(trimmed);
+  const slug = projectsPath ? projectsPath[1] : trimmed;
   if (!slug || slug.includes('/')) return next(); // multi-segment paths are not event slugs
 
   try {
@@ -295,7 +298,39 @@ export default async function middleware(request: Request) {
     const brandDomain = (process.env.VITE_BRAND_DOMAIN || '').trim().replace(/\/+$/, '');
     const baseUrl = brandDomain ? `https://${brandDomain}` : 'https://www.rsv.pizza'; // brand-check-ignore-line
     const brandName = (process.env.VITE_BRAND_NAME || 'RSV.Pizza').trim(); // brand-check-ignore-line
-    const pageUrl = `${baseUrl}/${slug}`;
+    const pageUrl = `${baseUrl}/${projectsPath ? trimmed : slug}`;
+
+    // Hackathon gallery / project page: the public endpoints decide visibility (a hidden gallery
+    // or project 404s / says unavailable -> normal SPA tags). Never the cover image: it's a
+    // short-lived signed URL, and crawlers cache og:image for days.
+    let projectMeta: { title: string; description: string } | null = null;
+    if (projectsPath) {
+      const projectSlug = projectsPath[2];
+      const r = await fetch(
+        projectSlug
+          ? `${apiUrl}/api/parties/${encodeURIComponent(event.id)}/hackathon/projects/${projectSlug}`
+          : `${apiUrl}/api/parties/${encodeURIComponent(event.id)}/hackathon/gallery`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!r.ok) return next();
+      const body = await r.json();
+      if (projectSlug) {
+        const proj = body?.project;
+        if (!proj?.name) return next();
+        const text = proj.tagline || (proj.description ? stripMarkdown(proj.description) : '');
+        projectMeta = {
+          title: `${proj.name} · ${event.name || 'Hackathon'}`,
+          description: (text || `A hackathon project from ${event.name || 'this event'}`).substring(0, 300),
+        };
+      } else {
+        if (!body?.available) return next();
+        const n = Array.isArray(body.projects) ? body.projects.length : 0;
+        projectMeta = {
+          title: `Projects · ${event.name || 'Hackathon'}`,
+          description: `${n} hackathon project${n === 1 ? '' : 's'} from ${event.name || 'this event'}.`,
+        };
+      }
+    }
 
     const ogImageUrl = (() => {
       if (!event.eventImageUrl) return `${baseUrl}/logo.png`;
@@ -325,7 +360,7 @@ export default async function middleware(request: Request) {
         })
       : null;
 
-    const metaTitle = event.name || 'Pizza Party';
+    const metaTitle = projectMeta?.title || event.name || 'Pizza Party';
 
     // Build description: "Hosted by X * Date @ Time * Address. description..."
     const detailsParts: string[] = [];
@@ -348,6 +383,8 @@ export default async function middleware(request: Request) {
     } else if (!metaDescription) {
       metaDescription = `Join us for ${metaTitle}! RSVP now.`;
     }
+
+    if (projectMeta) metaDescription = projectMeta.description;
 
     const twitterCard = hasCustomImage ? 'summary_large_image' : 'summary';
 

@@ -59,6 +59,8 @@ export interface PublicWinner {
   trackName: string | null;
   place: number | null;
   projectName: string;
+  /** PR 6: the project's gallery page slug (/:slug/projects/:projectSlug). */
+  projectSlug?: string | null;
   projectTagline: string | null;
   teamName: string | null;
 }
@@ -79,6 +81,8 @@ export interface PublicHackathon {
   /** PR 5: set once the host reveals results; winners is [] before that. */
   resultsRevealedAt?: string | null;
   winners?: PublicWinner[];
+  /** PR 6: the public project gallery (/:slug/projects) is open per the host's gallery setting. */
+  galleryOpen?: boolean;
 }
 
 /** Host / co-host / admin shape. */

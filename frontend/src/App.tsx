@@ -22,6 +22,8 @@ import { SideCreatePage } from './pages/SideCreatePage';
 import { CheckInPage } from './pages/CheckInPage';
 const DJPage = React.lazy(() => import('./pages/DJPage').then(m => ({ default: m.DJPage })));
 const JudgePage = React.lazy(() => import('./pages/JudgePage').then(m => ({ default: m.JudgePage })));
+const HackathonGalleryPage = React.lazy(() => import('./pages/HackathonGalleryPage').then(m => ({ default: m.HackathonGalleryPage })));
+const HackathonProjectPage = React.lazy(() => import('./pages/HackathonProjectPage').then(m => ({ default: m.HackathonProjectPage })));
 const PublicReportPage = React.lazy(() => import('./pages/PublicReportPage').then(m => ({ default: m.PublicReportPage })));
 const PublicVenueReportPage = React.lazy(() => import('./pages/PublicVenueReportPage').then(m => ({ default: m.PublicVenueReportPage })));
 const DisplayPage = React.lazy(() => import('./pages/DisplayPage').then(m => ({ default: m.DisplayPage })));
@@ -225,6 +227,11 @@ function App() {
             {/* white-label: public series landing — before /:slug catch-all */}
             <Route path="/series/:slug" element={<SeriesLandingPage />} />
             {/* Catch-all route for custom URLs - must be last */}
+            {/* Hackathon PR 6: public gallery + project pages (brand sites too; not in GPP_ONLY_PATHS).
+                Two segments, so they never shadow the /:slug catch-all; static first segments
+                (/host/:x, /map/swc, ...) still rank above them. */}
+            <Route path="/:slug/projects" element={<Suspense fallback={null}><HackathonGalleryPage /></Suspense>} />
+            <Route path="/:slug/projects/:projectSlug" element={<Suspense fallback={null}><HackathonProjectPage /></Suspense>} />
             <Route path="/:slug" element={<EventPage />} />
           </Routes>
           </Suspense>

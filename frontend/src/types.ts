@@ -992,7 +992,7 @@ export interface StaffStats {
 }
 
 // Display Widget types
-export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom';
+export type DisplayContentType = 'slideshow' | 'qr_code' | 'event_info' | 'photos' | 'upload' | 'custom' | 'hackathon';
 
 export interface SlideContent {
   type: 'image' | 'text' | 'qr';
@@ -1040,7 +1040,13 @@ export interface CustomConfig {
   refreshInterval?: number;
 }
 
-export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | UploadConfig | CustomConfig;
+// Hackathon PR 6: mode auto | countdown | gallery | winners (lib/hackathonGalleryApi.ts).
+export interface HackathonDisplayConfig {
+  mode?: 'auto' | 'countdown' | 'gallery' | 'winners';
+  showQr?: boolean;
+}
+
+export type DisplayContentConfig = SlideshowConfig | QRCodeConfig | PhotosConfig | EventInfoConfig | UploadConfig | CustomConfig | HackathonDisplayConfig;
 
 export interface Display {
   id: string;
@@ -1074,6 +1080,8 @@ export interface DisplayViewerData {
     customUrl: string | null;
   };
   photos?: Photo[];
+  /** `hackathon` displays only (public-serializer data; null when not published). */
+  hackathon?: import('./lib/hackathonGalleryApi').DisplayHackathonData | null;
 }
 
 // Budget Widget types

@@ -39,6 +39,7 @@ import checkinRoutes from './routes/checkin.routes.js';
 import displayRoutes from './routes/display.routes.js';
 import raffleRoutes from './routes/raffle.routes.js';
 import hackathonPublicRoutes from './routes/hackathon-public.routes.js';
+import hackathonGalleryRoutes from './routes/hackathon-gallery.routes.js';
 import hackathonParticipantRoutes, { hackathonCronRouter } from './routes/hackathon-participant.routes.js';
 import { hackathonPollLimiter, isHackathonPollRead } from './lib/hackathon/pollLimit.js';
 import hackathonRoutes from './routes/hackathon.routes.js';
@@ -257,6 +258,7 @@ app.use('/api/parties', donationRoutes); // Donation routes (some are public)
 app.use('/api/parties', staffRoutes); // Staff routes (host only)
 app.use('/api/parties', raffleRoutes); // Raffle routes before partyRoutes (has own auth per-route)
 app.use('/api/parties', hackathonPublicRoutes); // Hackathon public read (host gets the full setup)
+app.use('/api/parties', hackathonGalleryRoutes); // Hackathon public gallery + project pages (PR 6; host gets a preview)
 app.use('/api/parties', hackathonParticipantRoutes); // Hackathon teams + submissions (auth + eligibility / team checks per route)
 app.use('/api/parties', hackathonRoutes); // Hackathon host setup (auth + host check per route)
 app.use('/api/parties', hackathonAwardsRoutes); // Hackathon winners, reveal, payout tracking (host only, PR 5)

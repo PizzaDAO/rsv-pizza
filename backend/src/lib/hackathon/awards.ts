@@ -288,6 +288,8 @@ export function publicWinners(awards: Row[], tracks: Array<{ id: string; name: s
       trackName: a.prize?.trackId ? trackName.get(a.prize.trackId) ?? null : null,
       place: (a.place ?? null) as number | null,
       projectName: (a.submission?.name ?? '') as string,
+      /** PR 6: links the winner to its gallery page (/:slug/projects/:projectSlug). */
+      projectSlug: (a.submission?.slug ?? null) as string | null,
       projectTagline: (a.submission?.tagline ?? null) as string | null,
       teamName: (a.submission?.team?.name ?? null) as string | null,
     }));

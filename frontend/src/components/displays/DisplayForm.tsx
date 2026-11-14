@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link, Grid3X3, RefreshCw, Timer, Palette } from 'lucide-react';
+import { X, Monitor, Image, QrCode, Info, Camera, Upload, Ruler, ScreenShare, Type, Link, Grid3X3, RefreshCw, Timer, Palette, Trophy } from 'lucide-react';
 import { IconInput } from '../IconInput';
 import { Checkbox } from '../Checkbox';
 import {
@@ -11,6 +11,7 @@ import {
   PhotosConfig,
   EventInfoConfig,
   UploadConfig,
+  HackathonDisplayConfig,
 } from '../../types';
 
 interface DisplayFormProps {
@@ -37,6 +38,7 @@ const contentTypes: { value: DisplayContentType; labelKey: string; icon: React.R
   { value: 'event_info', labelKey: 'displays.eventInfo', icon: <Info size={20} />, descriptionKey: 'displays.eventInfoDesc' },
   { value: 'photos', labelKey: 'displays.photoWall', icon: <Camera size={20} />, descriptionKey: 'displays.photoWallDesc' },
   { value: 'upload', labelKey: 'displays.upload', icon: <Upload size={20} />, descriptionKey: 'displays.uploadDesc' },
+  { value: 'hackathon', labelKey: 'displays.hackathon', icon: <Trophy size={20} />, descriptionKey: 'displays.hackathonDesc' },
 ];
 
 const RESOLUTION_PRESETS = [
@@ -86,6 +88,8 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
   const [eventShowLocation, setEventShowLocation] = useState(true);
   const [uploadMediaUrl, setUploadMediaUrl] = useState('');
   const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
+  const [hackathonMode, setHackathonMode] = useState<NonNullable<HackathonDisplayConfig['mode']>>('auto');
+  const [hackathonShowQr, setHackathonShowQr] = useState(true);
 
   // Initialize from existing display config
   useEffect(() => {
@@ -114,6 +118,10 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
         case 'upload':
           setUploadMediaUrl(config.mediaUrl || '');
           setUploadMediaType(config.mediaType || 'image');
+          break;
+        case 'hackathon':
+          setHackathonMode(config.mode || 'auto');
+          setHackathonShowQr(config.showQr ?? true);
           break;
       }
     }
@@ -168,6 +176,9 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
         break;
       case 'custom':
         contentConfig = {};
+        break;
+      case 'hackathon':
+        contentConfig = { mode: hackathonMode, showQr: hackathonShowQr } as HackathonDisplayConfig;
         break;
     }
 
@@ -419,13 +430,35 @@ export function DisplayForm({ display, onSave, onClose, isLoading, error }: Disp
                 )}
               </div>
             )}
+
+            {contentType === 'hackathon' && (
+              <div className="space-y-3">
+                <select
+                  value={hackathonMode}
+                  onChange={(e) => setHackathonMode(e.target.value as NonNullable<HackathonDisplayConfig['mode']>)}
+                  aria-label={t('displays.hackathonMode')}
+                  className="w-full bg-theme-surface border border-theme-stroke rounded-lg px-3 py-2 text-theme-text"
+                >
+                  <option value="auto">{t('displays.hackathonModeAuto')}</option>
+                  <option value="countdown">{t('displays.hackathonModeCountdown')}</option>
+                  <option value="gallery">{t('displays.hackathonModeGallery')}</option>
+                  <option value="winners">{t('displays.hackathonModeWinners')}</option>
+                </select>
+                <Checkbox
+                  checked={hackathonShowQr}
+                  onChange={() => setHackathonShowQr(!hackathonShowQr)}
+                  label={t('displays.hackathonShowQr')}
+                />
+                <p className="text-xs text-theme-text-muted pl-1">{t('displays.hackathonHint')}</p>
+              </div>
+            )}
           </div>
 
           {/* Display Settings */}
           <div className="border border-theme-stroke rounded-lg p-4 space-y-4">
             <h3 className="font-medium text-theme-text">{t('displays.displaySettings')}</h3>
 
-            {(contentType === 'slideshow' || contentType === 'photos') && (
+            {(contentType === 'slideshow' || contentType === 'photos' || contentType === 'hackathon') && (
               <IconInput
                 icon={Timer}
                 type="number"

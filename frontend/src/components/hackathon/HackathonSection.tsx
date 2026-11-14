@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { Trophy, Clock, Users, Tag, ChevronDown, ChevronUp, ListChecks } from 'lucide-react';
+import { Trophy, Clock, Users, Tag, ChevronDown, ChevronUp, ListChecks, LayoutGrid } from 'lucide-react';
 import { markdownRemarkPlugins } from '../../lib/safeMarkdown';
 import { MarkdownBoundary } from '../ErrorBoundary';
 import { getHackathon, prizeAmount, type PublicHackathon, type HackathonPrize } from '../../lib/hackathonApi';
@@ -53,6 +54,8 @@ export function HackathonSection({ partyId, timezone, initial }: { partyId: stri
   const [hackathon, setHackathon] = useState<PublicHackathon | null>(initial ?? null);
   const [showRules, setShowRules] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // EventPage is mounted at /:slug, so the gallery lives at /:slug/projects.
+  const { slug } = useParams<{ slug: string }>();
 
   useEffect(() => {
     if (initial !== undefined) return;
@@ -87,7 +90,11 @@ export function HackathonSection({ partyId, timezone, initial }: { partyId: stri
       </div>
 
       {hackathon.resultsRevealedAt && hackathon.winners && hackathon.winners.length > 0 && (
-        <WinnersStrip winners={hackathon.winners} quantities={Object.fromEntries(hackathon.prizes.map((p) => [p.id, p.quantity]))} />
+        <WinnersStrip
+          winners={hackathon.winners}
+          quantities={Object.fromEntries(hackathon.prizes.map((p) => [p.id, p.quantity]))}
+          projectHref={hackathon.galleryOpen && slug ? (projectSlug) => `/${slug}/projects/${projectSlug}` : undefined}
+        />
       )}
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -110,6 +117,16 @@ export function HackathonSection({ partyId, timezone, initial }: { partyId: stri
           <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-theme-stroke bg-theme-surface text-sm text-theme-text-secondary">
             Check in at the event to submit
           </span>
+        )}
+        {/* PR 6: public gallery link, once the host's gallery setting opens it. */}
+        {hackathon.galleryOpen && slug && (
+          <Link
+            to={`/${slug}/projects`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-theme-accent bg-theme-surface text-sm text-theme-accent font-medium"
+            data-testid="hackathon-gallery-link"
+          >
+            <LayoutGrid size={14} /> View all projects
+          </Link>
         )}
       </div>
 

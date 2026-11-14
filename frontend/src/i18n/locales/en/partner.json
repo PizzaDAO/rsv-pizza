@@ -85,7 +85,11 @@
     "noSlides": "No Google Slides URL configured",
     "noPhotos": "No photos yet",
     "noMedia": "No media uploaded",
-    "displayContent": "Display content"
+    "displayContent": "Display content",
+    "passwordRequired": "This display is password protected",
+    "wrongPassword": "That password didn't work. Try again.",
+    "passwordPlaceholder": "Display password",
+    "unlock": "Show display"
   },
   "eventTable": {
     "searchPlaceholder": "Search events, hosts, venues...",

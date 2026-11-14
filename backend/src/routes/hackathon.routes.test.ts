@@ -131,7 +131,7 @@ describe('GET /:partyId/hackathon (public read)', () => {
     expect(res.body.canManage).toBe(false);
     const h = res.body.hackathon;
     expect(Object.keys(h).sort()).toEqual([
-      'criteria', 'eligibility', 'maxTracksPerSubmission', 'prizes', 'publishedAt', 'resultsRevealedAt', 'rules',
+      'criteria', 'eligibility', 'galleryOpen', 'maxTracksPerSubmission', 'prizes', 'publishedAt', 'resultsRevealedAt', 'rules',
       'submissionDeadline', 'submissionsOpenAt', 'teamMaxSize', 'teamMinSize', 'tracks', 'winners',
     ]);
     // PR 5: nothing revealed yet -> no winners, and the awards table isn't even queried.
