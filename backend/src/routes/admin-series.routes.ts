@@ -21,6 +21,7 @@ import { requireAuth, AuthRequest, isSuperAdmin } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
 import { writeStatusAudit } from '../helpers/statusAudit.js';
 import { CREATE_FLOW_KEYS, isCreateFlowKey } from '../lib/createPresets.js';
+import { isValidSeriesLinkTab } from '../lib/checklistLinkTabs.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -193,6 +194,7 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
     const b = (req.body || {}) as Record<string, unknown>;
     const name = str(b.name);
     if (!name) throw new AppError('name is required', 400, 'VALIDATION_ERROR');
+    if (!isValidSeriesLinkTab(b.linkTab)) throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
 
     const max = await prisma.checklistDefault.aggregate({
       where: { seriesId },
@@ -222,6 +224,10 @@ router.post('/:id/checklist', async (req: AuthRequest, res: Response, next: Next
 router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const b = (req.body || {}) as Record<string, unknown>;
+    // Same allow-list as the GPP defaults route (+ the checklist modal sentinels).
+    if (b.linkTab !== undefined && !isValidSeriesLinkTab(b.linkTab)) {
+      throw new AppError('Invalid linkTab value', 400, 'VALIDATION_ERROR');
+    }
     const data: Prisma.ChecklistDefaultUpdateInput = {};
     if (b.name !== undefined) data.name = str(b.name);
     if (b.dueDate !== undefined) data.dueDate = b.dueDate ? new Date(`${b.dueDate as string}T00:00:00.000Z`) : null;
@@ -230,8 +236,26 @@ router.patch('/checklist/:defaultId', async (req: AuthRequest, res: Response, ne
     if (b.linkTab !== undefined) data.linkTab = str(b.linkTab) ?? null;
     if (b.sortOrder !== undefined && typeof b.sortOrder === 'number') data.sortOrder = b.sortOrder;
 
+    const before = await prisma.checklistDefault.findUnique({
+      where: { id: req.params.defaultId },
+      select: { name: true, seriesId: true },
+    });
     const item = await prisma.checklistDefault.update({ where: { id: req.params.defaultId }, data });
-    res.json({ item });
+
+    // brand-checklists: like the GPP defaults PATCH, propagate due-date / link
+    // changes to the already-seeded default items of this series' parties.
+    let propagated = 0;
+    if (before?.seriesId && (data.dueDate !== undefined || data.linkTab !== undefined)) {
+      const itemData: Prisma.ChecklistItemUpdateManyMutationInput = {};
+      if (data.dueDate !== undefined) itemData.dueDate = data.dueDate as Date | null;
+      if (data.linkTab !== undefined) itemData.linkTab = data.linkTab as string | null;
+      const result = await prisma.checklistItem.updateMany({
+        where: { isDefault: true, name: before.name, party: { eventSeriesId: before.seriesId } },
+        data: itemData,
+      });
+      propagated = result.count;
+    }
+    res.json({ item, propagated });
   } catch (error: any) {
     if (error?.code === 'P2025') return next(new AppError('Checklist default not found', 404, 'NOT_FOUND'));
     next(error);

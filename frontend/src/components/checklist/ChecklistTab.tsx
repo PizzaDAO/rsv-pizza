@@ -11,6 +11,7 @@ import {
   toggleChecklistItem,
 } from '../../lib/api';
 import { ChecklistItemRow } from './ChecklistItemRow';
+import { hostTabPath } from './checklistActions';
 import { ChecklistItemForm } from './ChecklistItemForm';
 import { FindVenueModal } from './FindVenueModal';
 import { EstimatedAttendanceModal } from './EstimatedAttendanceModal';
@@ -111,13 +112,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ partyId }) => {
       setFindVenueOpen(true);
       return;
     }
-    if (inviteCode) {
-      if (tab === 'details') {
-        navigate(`/host/${inviteCode}`);
-      } else {
-        navigate(`/host/${inviteCode}/${tab}`);
-      }
-    }
+    if (inviteCode) navigate(hostTabPath(inviteCode, tab));
   };
 
   // Calculate progress
